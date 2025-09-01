@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { titleSchema, emailSchema } from "../../../lib/validation/schemas";
 import { ISSUE_SORT_OPTIONS } from "~/lib/types/filters";
 
 /**
@@ -6,14 +7,11 @@ import { ISSUE_SORT_OPTIONS } from "~/lib/types/filters";
  * Core schema for creating issues with additional validation
  */
 export const issueCreateSchema = z.object({
-  title: z
-    .string()
-    .min(1, "Title is required")
-    .max(200, "Title must be 200 characters or less"),
+  title: titleSchema,
   description: z.string().optional(),
   machineId: z.string().min(1, "Machine ID is required"),
   submitterName: z.string().optional(),
-  reporterEmail: z.email().optional(),
+  reporterEmail: emailSchema.optional(),
   organizationId: z.string().min(1, "Organization ID is required").optional(),
 });
 
@@ -23,11 +21,7 @@ export const issueCreateSchema = z.object({
  */
 export const issueUpdateSchema = z.object({
   id: z.string().min(1, "Issue ID is required"),
-  title: z
-    .string()
-    .min(1, "Title is required")
-    .max(200, "Title must be 200 characters or less")
-    .optional(),
+  title: titleSchema.optional(),
   description: z.string().min(1).nullable().optional(),
   statusId: z.string().optional(),
   assignedToId: z.string().optional(),
@@ -51,9 +45,7 @@ export const issueFilterSchema = z.object({
   priorityIds: z.array(z.string()).optional(),
   limit: z.number().min(1).max(1000).optional(),
   offset: z.number().min(0).optional(),
-  sortBy: z
-    .enum(ISSUE_SORT_OPTIONS)
-    .optional(),
+  sortBy: z.enum(ISSUE_SORT_OPTIONS).optional(),
   sortOrder: z.enum(["asc", "desc"]).optional(),
   statusCategory: z.string().optional(),
 });
@@ -81,14 +73,11 @@ export const issueStatusUpdateSchema = z.object({
  * For public-facing issue creation with additional validation
  */
 export const publicIssueCreateSchema = z.object({
-  title: z
-    .string()
-    .min(1, "Title is required")
-    .max(200, "Title must be 200 characters or less"),
+  title: titleSchema,
   description: z.string().optional(),
   machineId: z.string().min(1, "Machine ID is required"),
   submitterName: z.string().optional(),
-  reporterEmail: z.email(),
+  reporterEmail: emailSchema,
 });
 
 /**

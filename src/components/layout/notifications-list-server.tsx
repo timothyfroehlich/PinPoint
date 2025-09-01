@@ -14,7 +14,10 @@ import {
   MegaphoneIcon,
   ExternalLinkIcon,
 } from "lucide-react";
-import { getUserNotifications, getNotificationStats } from "~/lib/dal/notifications";
+import {
+  getUserNotifications,
+  getNotificationStats,
+} from "~/lib/dal/notifications";
 import Link from "next/link";
 
 interface NotificationListServerProps {
@@ -63,8 +66,8 @@ function getNotificationColor(type: string) {
   }
 }
 
-export async function NotificationsListServer({ 
-  limit = 10 
+export async function NotificationsListServer({
+  limit = 10,
 }: NotificationListServerProps) {
   // Parallel data fetching for optimal performance
   const [notifications, stats] = await Promise.all([
@@ -93,7 +96,7 @@ export async function NotificationsListServer({
         <div className="p-3 bg-primary-container border-b">
           <div className="flex items-center justify-between text-sm">
             <span className="text-on-primary-container font-medium">
-              {stats.unread} unread notification{stats.unread !== 1 ? 's' : ''}
+              {stats.unread} unread notification{stats.unread !== 1 ? "s" : ""}
             </span>
             <Badge variant="secondary" className="text-xs">
               {stats.today} today
@@ -138,7 +141,7 @@ export async function NotificationsListServer({
                   {/* Action Button */}
                   {notification.action_url && (
                     <Button variant="ghost" size="sm" asChild>
-                      <Link 
+                      <Link
                         href={notification.action_url}
                         className="flex items-center gap-1 text-xs"
                       >
@@ -157,9 +160,7 @@ export async function NotificationsListServer({
       {/* View All Link */}
       <div className="p-3 border-t bg-muted/20">
         <Button variant="ghost" size="sm" className="w-full" asChild>
-          <Link href="/notifications">
-            View all notifications
-          </Link>
+          <Link href="/notifications">View all notifications</Link>
         </Button>
       </div>
     </div>

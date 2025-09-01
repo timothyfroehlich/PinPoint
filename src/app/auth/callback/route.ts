@@ -11,15 +11,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    
+
     if (!error) {
       // Authentication successful - user is now organization-agnostic
       // Organization context will be determined per-request from subdomain
-      
+
       // Redirect to the appropriate subdomain URL
       const forwardedHost = request.headers.get("x-forwarded-host");
       const isLocalEnv = env.NODE_ENV === "development";
-      
+
       if (isLocalEnv) {
         return NextResponse.redirect(`http://localhost:3000${next}`);
       } else if (forwardedHost) {

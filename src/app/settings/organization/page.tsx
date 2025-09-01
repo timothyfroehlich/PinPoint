@@ -4,19 +4,28 @@
  * Phase 4B.1: Organization Settings
  */
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { Separator } from "~/components/ui/separator";
 import { Badge } from "~/components/ui/badge";
 import { CalendarIcon, GlobeIcon } from "lucide-react";
 import { requireMemberAccess } from "~/lib/organization-context";
-import { getCurrentOrganization, getOrganizationStats } from "~/lib/dal/organizations";
+import {
+  getCurrentOrganization,
+  getOrganizationStats,
+} from "~/lib/dal/organizations";
 import { OrganizationProfileForm } from "./components/OrganizationProfileForm";
 import { OrganizationLogoForm } from "./components/OrganizationLogoForm";
 import { format } from "date-fns";
 
 export default async function OrganizationSettingsPage() {
   const { organization: _organization } = await requireMemberAccess();
-  
+
   // Fetch organization details and statistics in parallel
   const [organization, stats] = await Promise.all([
     getCurrentOrganization(),
@@ -40,7 +49,8 @@ export default async function OrganizationSettingsPage() {
             <div>
               <CardTitle>{organization.name}</CardTitle>
               <CardDescription>
-                Organization ID: <code className="text-xs">{organization.id}</code>
+                Organization ID:{" "}
+                <code className="text-xs">{organization.id}</code>
               </CardDescription>
             </div>
             <div className="text-right">
@@ -82,7 +92,7 @@ export default async function OrganizationSettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <OrganizationProfileForm 
+            <OrganizationProfileForm
               organization={{
                 name: organization.name,
                 description: organization.description || "",
@@ -103,8 +113,8 @@ export default async function OrganizationSettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <OrganizationLogoForm 
-              currentLogoUrl={organization.logo_url || ""} 
+            <OrganizationLogoForm
+              currentLogoUrl={organization.logo_url || ""}
             />
           </CardContent>
         </Card>
@@ -121,13 +131,17 @@ export default async function OrganizationSettingsPage() {
         <CardContent>
           <div className="space-y-4">
             <Separator />
-            
+
             {/* Organization Statistics */}
             <div>
-              <h4 className="text-sm font-medium mb-3">Organization Statistics</h4>
+              <h4 className="text-sm font-medium mb-3">
+                Organization Statistics
+              </h4>
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
-                  <div className="text-2xl font-bold">{stats.members.total}</div>
+                  <div className="text-2xl font-bold">
+                    {stats.members.total}
+                  </div>
                   <p className="text-xs text-muted-foreground">Total Members</p>
                 </div>
                 <div className="space-y-2">
@@ -135,8 +149,12 @@ export default async function OrganizationSettingsPage() {
                   <p className="text-xs text-muted-foreground">Active Issues</p>
                 </div>
                 <div className="space-y-2">
-                  <div className="text-2xl font-bold">{stats.machines.total}</div>
-                  <p className="text-xs text-muted-foreground">Total Machines</p>
+                  <div className="text-2xl font-bold">
+                    {stats.machines.total}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Total Machines
+                  </p>
                 </div>
               </div>
             </div>
@@ -145,13 +163,17 @@ export default async function OrganizationSettingsPage() {
 
             {/* Danger Zone */}
             <div>
-              <h4 className="text-sm font-medium text-destructive mb-3">Danger Zone</h4>
+              <h4 className="text-sm font-medium text-destructive mb-3">
+                Danger Zone
+              </h4>
               <p className="text-sm text-muted-foreground mb-4">
-                These actions are permanent and cannot be undone. Proceed with caution.
+                These actions are permanent and cannot be undone. Proceed with
+                caution.
               </p>
               <div className="space-y-2">
                 <p className="text-xs text-muted-foreground">
-                  Contact support to delete your organization or transfer ownership.
+                  Contact support to delete your organization or transfer
+                  ownership.
                 </p>
               </div>
             </div>

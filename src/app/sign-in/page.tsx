@@ -4,7 +4,13 @@ import { type InferSelectModel } from "drizzle-orm";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Separator } from "~/components/ui/separator";
 import { Chrome, Loader2 } from "lucide-react";
@@ -123,7 +129,9 @@ export default function SignInPage(): React.ReactElement | null {
     }
   }
 
-  function getRoleBadgeVariant(role: Role | null): "default" | "secondary" | "destructive" | "outline" {
+  function getRoleBadgeVariant(
+    role: Role | null,
+  ): "default" | "secondary" | "destructive" | "outline" {
     if (!role) return "default";
     switch (role.name.toLowerCase()) {
       case "admin":
@@ -150,7 +158,7 @@ export default function SignInPage(): React.ReactElement | null {
             Welcome back! Please sign in to continue.
           </CardDescription>
         </CardHeader>
-        
+
         <CardContent className="space-y-6">
           <Button
             className="w-full h-12"
@@ -178,7 +186,9 @@ export default function SignInPage(): React.ReactElement | null {
 
               <div className="space-y-4">
                 <div>
-                  <h3 className="text-base font-medium">Quick Login (Dev Only)</h3>
+                  <h3 className="text-base font-medium">
+                    Quick Login (Dev Only)
+                  </h3>
                   <p className="text-sm text-muted-foreground mt-1">
                     Skip authentication and login as a test user
                   </p>
@@ -199,13 +209,15 @@ export default function SignInPage(): React.ReactElement | null {
                           variant="outline"
                           size="sm"
                           disabled={isLoading}
-                          onClick={() => void handleDevLogin(testUser.email ?? "")}
+                          onClick={() =>
+                            void handleDevLogin(testUser.email ?? "")
+                          }
                           className="flex-1 justify-start text-xs h-8"
                         >
                           {testUser.name}
                         </Button>
                         {testUser.role && (
-                          <Badge 
+                          <Badge
                             variant={getRoleBadgeVariant(testUser.role)}
                             className="text-xs h-5"
                           >

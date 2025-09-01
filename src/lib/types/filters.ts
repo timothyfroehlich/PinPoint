@@ -6,17 +6,23 @@
  */
 
 /** Canonical sort options for issues */
-export const ISSUE_SORT_OPTIONS = ["created", "updated", "status", "severity", "machine"] as const;
+export const ISSUE_SORT_OPTIONS = [
+  "created",
+  "updated",
+  "status",
+  "severity",
+  "machine",
+] as const;
 
 /** Issue sort option type derived from canonical array */
-export type IssueSortBy = typeof ISSUE_SORT_OPTIONS[number];
+export type IssueSortBy = (typeof ISSUE_SORT_OPTIONS)[number];
 
 export interface IssueFilters {
   locationId?: string;
   machineId?: string;
   statusIds?: string[];
   status?: string[]; // DAL compatibility - status names
-  priority?: string[]; // DAL compatibility - priority names  
+  priority?: string[]; // DAL compatibility - priority names
   search?: string;
   assigneeId?: string;
   reporterId?: string;
@@ -45,4 +51,3 @@ export interface MachineFilters {
   status?: string[];
   search?: string; // DAL compatibility
 }
-

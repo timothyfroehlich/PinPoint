@@ -4,7 +4,10 @@
  */
 
 import { SEED_TEST_IDS } from "../constants/seed-test-ids";
-import { SUBDOMAIN_HEADER, SUBDOMAIN_VERIFIED_HEADER } from "~/lib/subdomain-verification";
+import {
+  SUBDOMAIN_HEADER,
+  SUBDOMAIN_VERIFIED_HEADER,
+} from "~/lib/subdomain-verification";
 
 /**
  * Create mock auth context for DAL testing
@@ -49,7 +52,11 @@ export function mockSupabaseAuth(mockContext = createMockAuthContext()) {
       organization: { id: mockContext.organizationId },
       user: { id: mockContext.user.id },
       accessLevel: "member",
-      membership: { id: "membership-test", user_id: mockContext.user.id, organization_id: mockContext.organizationId },
+      membership: {
+        id: "membership-test",
+        user_id: mockContext.user.id,
+        organization_id: mockContext.organizationId,
+      },
     })),
     getOrganizationContext: vi.fn(async () => ({
       user: { id: mockContext.user.id },

@@ -37,7 +37,7 @@ interface IssueFilters {
   assigneeId?: string | undefined;
   reporterId?: string | undefined;
   ownerId?: string | undefined;
-  sortBy: typeof ISSUE_SORT_OPTIONS[number];
+  sortBy: (typeof ISSUE_SORT_OPTIONS)[number];
   sortOrder: "asc" | "desc";
 }
 
@@ -57,8 +57,8 @@ export function FilterToolbar({
 
   // Fetch locations for filter dropdown
   const { data: locations } = api.location.getAll.useQuery();
-  
-  // Get current user for "My Issues" preset  
+
+  // Get current user for "My Issues" preset
   const { data: currentUser } = api.user.getProfile.useQuery();
 
   const handleSortOrderToggle = (): void => {
@@ -88,11 +88,13 @@ export function FilterToolbar({
       <div className="mb-4">
         <FilterPresets
           currentUserId={currentUser?.id}
-          onPresetClick={(presetFilters) => { handlePresetClick(presetFilters); }}
+          onPresetClick={(presetFilters) => {
+            handlePresetClick(presetFilters);
+          }}
           activePresetId={activePresetId}
         />
       </div>
-      
+
       {/* Primary Filter Row */}
       <div className="flex items-center gap-4 flex-wrap">
         {/* Search - Most prominent */}
@@ -164,13 +166,13 @@ export function FilterToolbar({
             }
             className={cn(
               "h-8 w-8 p-0 transition-all duration-200",
-              showAdvanced && "text-primary"
+              showAdvanced && "text-primary",
             )}
           >
-            <ChevronDown 
+            <ChevronDown
               className={cn(
                 "h-4 w-4 transition-transform duration-200",
-                showAdvanced && "rotate-180"
+                showAdvanced && "rotate-180",
               )}
             />
           </Button>
@@ -222,10 +224,10 @@ export function FilterToolbar({
                   {ISSUE_SORT_OPTIONS.map((option) => {
                     const labels = {
                       created: "Created Date",
-                      updated: "Updated Date", 
+                      updated: "Updated Date",
                       status: "Status",
                       severity: "Priority",
-                      machine: "Machine"
+                      machine: "Machine",
                     } as const;
                     return (
                       <SelectItem key={option} value={option}>
@@ -246,19 +248,22 @@ export function FilterToolbar({
                     onClick={handleSortOrderToggle}
                     className={cn(
                       "h-8 w-8 p-0 transition-all duration-200",
-                      filters.sortOrder === "desc" && "text-primary"
+                      filters.sortOrder === "desc" && "text-primary",
                     )}
                   >
-                    <ArrowUpDown 
+                    <ArrowUpDown
                       className={cn(
                         "h-4 w-4 transition-transform duration-200",
-                        filters.sortOrder === "desc" && "rotate-180"
+                        filters.sortOrder === "desc" && "rotate-180",
                       )}
                     />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Sort {filters.sortOrder === "asc" ? "Ascending" : "Descending"}</p>
+                  <p>
+                    Sort{" "}
+                    {filters.sortOrder === "asc" ? "Ascending" : "Descending"}
+                  </p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>

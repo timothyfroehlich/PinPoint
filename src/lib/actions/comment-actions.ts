@@ -8,6 +8,7 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { cache } from "react"; // React 19 cache API
 import { z } from "zod";
+import { commentContentSchema } from "~/lib/validation/schemas";
 import { and, eq, isNull } from "drizzle-orm";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { comments, issues } from "~/server/db/schema";
@@ -24,46 +25,42 @@ import { requirePermission } from "./shared";
 import { PERMISSIONS } from "~/server/auth/permissions.constants";
 import { generateCommentNotifications } from "~/lib/services/notification-generator";
 
-// Enhanced validation schemas with better error messages
+// Validation using centralized schemas
 const addCommentSchema = z.object({
-  content: z
-    .string()
-    .min(1, "Comment cannot be empty")
-    .max(2000, "Comment must be less than 2000 characters")
-    .trim(),
+  content: commentContentSchema,
 });
 
 const editCommentSchema = z.object({
-  content: z
-    .string()
-    .min(1, "Comment cannot be empty")
-    .max(2000, "Comment must be less than 2000 characters")
-    .trim(),
+  content: commentContentSchema,
 });
 
 // Performance: Cached database queries for verification
-const getCommentWithAccess = cache(async (commentId: string, organizationId: string, userId: string) => {
-  const db = getGlobalDatabaseProvider().getClient();
-  return await db.query.comments.findFirst({
-    where: and(
-      eq(comments.id, commentId),
-      eq(comments.organization_id, organizationId),
-      eq(comments.author_id, userId), // User must be author to edit/delete
-      isNull(comments.deleted_at), // Not soft-deleted
-    ),
-  });
-});
+const getCommentWithAccess = cache(
+  async (commentId: string, organizationId: string, userId: string) => {
+    const db = getGlobalDatabaseProvider().getClient();
+    return await db.query.comments.findFirst({
+      where: and(
+        eq(comments.id, commentId),
+        eq(comments.organization_id, organizationId),
+        eq(comments.author_id, userId), // User must be author to edit/delete
+        isNull(comments.deleted_at), // Not soft-deleted
+      ),
+    });
+  },
+);
 
-const getIssueWithAccess = cache(async (issueId: string, organizationId: string) => {
-  const db = getGlobalDatabaseProvider().getClient();
-  return await db.query.issues.findFirst({
-    where: and(
-      eq(issues.id, issueId), 
-      eq(issues.organization_id, organizationId)
-    ),
-    columns: { id: true },
-  });
-});
+const getIssueWithAccess = cache(
+  async (issueId: string, organizationId: string) => {
+    const db = getGlobalDatabaseProvider().getClient();
+    return await db.query.issues.findFirst({
+      where: and(
+        eq(issues.id, issueId),
+        eq(issues.organization_id, organizationId),
+      ),
+      columns: { id: true },
+    });
+  },
+);
 
 /**
  * Add comment to issue via Server Action (React 19 useActionState compatible)
@@ -113,16 +110,17 @@ export async function addCommentAction(
     // Background processing (runs after response sent to user)
     runAfterResponse(async () => {
       console.log(`Comment added to issue ${issueId} by ${user.email}`);
-      
+
       // Generate notifications for issue stakeholders
       try {
         await generateCommentNotifications(issueId, commentData.id, {
           organizationId,
           actorId: user.id,
-          actorName: user.user_metadata?.['name'] as string || user.email || 'Someone',
+          actorName:
+            (user.user_metadata?.["name"] as string) || user.email || "Someone",
         });
       } catch (error) {
-        console.error('Failed to generate comment notifications:', error);
+        console.error("Failed to generate comment notifications:", error);
       }
     });
 
@@ -148,7 +146,8 @@ export async function editCommentAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId, membership } = await requireAuthContextWithRole();
+    const { user, organizationId, membership } =
+      await requireAuthContextWithRole();
     const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
 
@@ -159,15 +158,21 @@ export async function editCommentAction(
     }
 
     // Verify comment exists and user has permission to edit
-    const comment = await getCommentWithAccess(commentId, organizationId, user.id);
+    const comment = await getCommentWithAccess(
+      commentId,
+      organizationId,
+      user.id,
+    );
     if (!comment) {
-      return actionError("Comment not found or you don't have permission to edit it");
+      return actionError(
+        "Comment not found or you don't have permission to edit it",
+      );
     }
 
     // Update comment
     await db
       .update(comments)
-      .set({ 
+      .set({
         content: validation.data.content,
         updated_at: new Date(),
       })
@@ -184,10 +189,7 @@ export async function editCommentAction(
       console.log(`Comment ${commentId} edited by ${user.email}`);
     });
 
-    return actionSuccess(
-      { success: true },
-      "Comment updated successfully",
-    );
+    return actionSuccess({ success: true }, "Comment updated successfully");
   } catch (error) {
     console.error("Edit comment error:", error);
     return actionError(
@@ -206,20 +208,27 @@ export async function deleteCommentAction(
   _formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId, membership } = await requireAuthContextWithRole();
+    const { user, organizationId, membership } =
+      await requireAuthContextWithRole();
     const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
 
     // Verify comment exists and user has permission to delete
-    const comment = await getCommentWithAccess(commentId, organizationId, user.id);
+    const comment = await getCommentWithAccess(
+      commentId,
+      organizationId,
+      user.id,
+    );
     if (!comment) {
-      return actionError("Comment not found or you don't have permission to delete it");
+      return actionError(
+        "Comment not found or you don't have permission to delete it",
+      );
     }
 
     // Soft delete comment (preserve for audit trail)
     await db
       .update(comments)
-      .set({ 
+      .set({
         deleted_at: new Date(),
         deleted_by: user.id,
       })
@@ -236,10 +245,7 @@ export async function deleteCommentAction(
       console.log(`Comment ${commentId} deleted by ${user.email}`);
     });
 
-    return actionSuccess(
-      { success: true },
-      "Comment deleted successfully",
-    );
+    return actionSuccess({ success: true }, "Comment deleted successfully");
   } catch (error) {
     console.error("Delete comment error:", error);
     return actionError(
@@ -257,10 +263,11 @@ export async function restoreCommentAction(
   _formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId, membership } = await requireAuthContextWithRole();
+    const { user, organizationId, membership } =
+      await requireAuthContextWithRole();
     const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
-    
+
     // Find soft-deleted comment that user authored
     const comment = await db.query.comments.findFirst({
       where: and(
@@ -277,7 +284,7 @@ export async function restoreCommentAction(
     // Restore comment
     await db
       .update(comments)
-      .set({ 
+      .set({
         deleted_at: null,
         deleted_by: null,
       })

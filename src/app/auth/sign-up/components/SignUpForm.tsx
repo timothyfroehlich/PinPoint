@@ -37,29 +37,34 @@ import { type OrganizationOption } from "~/lib/dal/public-organizations";
 
 // API Response validation schema for security
 const organizationSelectOptionsSchema = z.object({
-  organizations: z.array(z.object({
-    id: z.string().min(1),
-    name: z.string().min(1),
-    subdomain: z.string().min(1)
-  })),
-  defaultOrganizationId: z.string().nullable()
+  organizations: z.array(
+    z.object({
+      id: z.string().min(1),
+      name: z.string().min(1),
+      subdomain: z.string().min(1),
+    }),
+  ),
+  defaultOrganizationId: z.string().nullable(),
 });
 
 // Type guard for safe organization access
 function isValidOrganizationArray(data: unknown): data is OrganizationOption[] {
-  return Array.isArray(data) && data.every((item): item is OrganizationOption => {
-    if (typeof item !== 'object' || item === null) return false;
-    
-    const obj = item as Record<string, unknown>;
-    return (
-      'id' in obj && 
-      'name' in obj && 
-      'subdomain' in obj &&
-      typeof obj.id === 'string' &&
-      typeof obj.name === 'string' &&
-      typeof obj.subdomain === 'string'
-    );
-  });
+  return (
+    Array.isArray(data) &&
+    data.every((item): item is OrganizationOption => {
+      if (typeof item !== "object" || item === null) return false;
+
+      const obj = item as Record<string, unknown>;
+      return (
+        "id" in obj &&
+        "name" in obj &&
+        "subdomain" in obj &&
+        typeof obj.id === "string" &&
+        typeof obj.name === "string" &&
+        typeof obj.subdomain === "string"
+      );
+    })
+  );
 }
 
 export function SignUpForm(): JSX.Element {
@@ -72,7 +77,8 @@ export function SignUpForm(): JSX.Element {
 
   // Organization selection state
   const [organizations, setOrganizations] = useState<OrganizationOption[]>([]);
-  const [selectedOrganizationId, setSelectedOrganizationId] = useState<string>("");
+  const [selectedOrganizationId, setSelectedOrganizationId] =
+    useState<string>("");
   const [organizationsLoading, setOrganizationsLoading] = useState(true);
 
   // Load organizations on component mount
@@ -83,18 +89,18 @@ export function SignUpForm(): JSX.Element {
         if (!response.ok) {
           throw new Error("Failed to fetch organizations");
         }
-        
+
         // Security: Validate API response to prevent injection attacks
         const rawData: unknown = await response.json();
         const validatedData = organizationSelectOptionsSchema.parse(rawData);
-        
+
         const { organizations: orgs, defaultOrganizationId } = validatedData;
-        
+
         // Additional defensive validation
         if (!isValidOrganizationArray(orgs)) {
           throw new Error("Invalid organization data structure");
         }
-        
+
         setOrganizations(orgs);
         setSelectedOrganizationId(defaultOrganizationId ?? orgs[0]?.id ?? "");
       } catch (error) {
@@ -107,7 +113,7 @@ export function SignUpForm(): JSX.Element {
         setOrganizationsLoading(false);
       }
     }
-    
+
     void loadOrganizations();
   }, []);
 
@@ -116,7 +122,7 @@ export function SignUpForm(): JSX.Element {
       alert("Please select an organization");
       return;
     }
-    
+
     setIsOAuthLoading(true);
     try {
       await signInWithOAuth(provider, selectedOrganizationId);
@@ -141,7 +147,9 @@ export function SignUpForm(): JSX.Element {
           {organizationsLoading ? (
             <div className="flex items-center space-x-2">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
-              <span className="text-sm text-muted-foreground">Loading organizations...</span>
+              <span className="text-sm text-muted-foreground">
+                Loading organizations...
+              </span>
             </div>
           ) : (
             <Select

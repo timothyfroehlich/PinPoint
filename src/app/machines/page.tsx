@@ -4,7 +4,10 @@ import { Button } from "~/components/ui/button";
 import { PlusIcon } from "lucide-react";
 import { MachineInventoryServer } from "~/components/machines/machine-inventory-server";
 import { MachineStatsServer } from "~/components/machines/machine-stats-server";
-import { AdvancedSearchForm, MACHINES_FILTER_FIELDS } from "~/components/search";
+import {
+  AdvancedSearchForm,
+  MACHINES_FILTER_FIELDS,
+} from "~/components/search";
 import { requireMemberAccess } from "~/lib/organization-context";
 import {
   getMachinesWithFilters,

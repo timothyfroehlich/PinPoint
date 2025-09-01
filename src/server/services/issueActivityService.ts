@@ -364,15 +364,17 @@ export class IssueActivityService {
         id: comment.id,
         content: comment.content,
         createdAt: comment.created_at,
-        author: comment.author ? {
-          id: comment.author.id,
-          name: comment.author.name,
-          profilePicture: comment.author.profile_picture,
-        } : {
-          id: "anonymous",
-          name: "Anonymous",
-          profilePicture: null,
-        },
+        author: comment.author
+          ? {
+              id: comment.author.id,
+              name: comment.author.name,
+              profilePicture: comment.author.profile_picture,
+            }
+          : {
+              id: "anonymous",
+              name: "Anonymous",
+              profilePicture: null,
+            },
       })),
       ...activitiesResults.map((activity) => ({
         itemType: "activity" as const,

@@ -9,23 +9,36 @@ import { getMachinesForOrg } from "~/lib/dal/machines";
 import { getAssignableUsers } from "~/lib/dal/users";
 
 // Transform DAL data for CreateIssueFormServer component
-function transformMachinesForForm(machinesResult: Awaited<ReturnType<typeof getMachinesForOrg>>) {
-  return machinesResult.items.map(machine => ({
+function transformMachinesForForm(
+  machinesResult: Awaited<ReturnType<typeof getMachinesForOrg>>,
+) {
+  return machinesResult.items.map((machine) => ({
     id: machine.id,
     name: machine.name,
-    ...(machine.model?.name && { model: machine.model.name }),
+    model: {
+      id: machine.model?.id || "",
+      name: machine.model?.name || "Unknown Model",
+      manufacturer: machine.model?.manufacturer || null,
+      year: machine.model?.year || null,
+    },
+    location: {
+      id: machine.location?.id || "",
+      name: machine.location?.name || "Unknown Location",
+    },
   }));
 }
 
 // Transform DAL data for CreateIssueFormServer component
-function transformUsersForForm(assignableUsers: Awaited<ReturnType<typeof getAssignableUsers>>) {
+function transformUsersForForm(
+  assignableUsers: Awaited<ReturnType<typeof getAssignableUsers>>,
+) {
   return assignableUsers
-    .map(user => ({
+    .map((user) => ({
       id: user.id,
-      name: user.name || 'Unknown User',
-      email: user.email || '',
+      name: user.name || "Unknown User",
+      email: user.email || "",
     }))
-    .filter(user => user.email); // Filter out users without email
+    .filter((user) => user.email); // Filter out users without email
 }
 
 // Force dynamic rendering for auth-dependent content
@@ -72,7 +85,10 @@ export default async function CreateIssuePage({
           Home
         </Link>
         <span>/</span>
-        <Link href="/issues" className="flex items-center hover:text-foreground">
+        <Link
+          href="/issues"
+          className="flex items-center hover:text-foreground"
+        >
           <Wrench className="w-4 h-4 mr-1" />
           Issues
         </Link>
@@ -84,16 +100,19 @@ export default async function CreateIssuePage({
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Create New Issue</h1>
         <p className="text-muted-foreground">
-          Report a problem with a pinball machine to help keep the games running smoothly.
+          Report a problem with a pinball machine to help keep the games running
+          smoothly.
         </p>
       </div>
 
       {/* Server Component Form with Server Actions */}
-      <CreateIssueFormServer 
+      <CreateIssueFormServer
         machines={machines}
         users={users}
         action={createIssueAction}
-        {...(resolvedSearchParams.machineId && { initialMachineId: resolvedSearchParams.machineId })}
+        {...(resolvedSearchParams.machineId && {
+          initialMachineId: resolvedSearchParams.machineId,
+        })}
       />
     </div>
   );

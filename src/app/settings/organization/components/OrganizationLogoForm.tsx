@@ -19,7 +19,9 @@ interface OrganizationLogoFormProps {
   currentLogoUrl: string;
 }
 
-export function OrganizationLogoForm({ currentLogoUrl }: OrganizationLogoFormProps) {
+export function OrganizationLogoForm({
+  currentLogoUrl,
+}: OrganizationLogoFormProps) {
   const [state, formAction, isPending] = useActionState(
     updateOrganizationLogoAction,
     null,
@@ -102,12 +104,16 @@ export function OrganizationLogoForm({ currentLogoUrl }: OrganizationLogoFormPro
             name="logoUrl"
             type="url"
             value={previewUrl}
-            onChange={(e) => { handleUrlChange(e.target.value); }}
+            onChange={(e) => {
+              handleUrlChange(e.target.value);
+            }}
             placeholder="https://example.com/logo.png"
             disabled={isPending}
           />
           {state && !state.success && state.fieldErrors?.["logoUrl"] && (
-            <p className="text-sm text-destructive">{state.fieldErrors["logoUrl"][0]}</p>
+            <p className="text-sm text-destructive">
+              {state.fieldErrors["logoUrl"][0]}
+            </p>
           )}
           <p className="text-xs text-muted-foreground">
             Enter a URL to an image file (PNG, JPG, or SVG recommended)

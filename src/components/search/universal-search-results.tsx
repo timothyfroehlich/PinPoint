@@ -7,17 +7,20 @@ import Link from "next/link";
 import { Badge } from "~/components/ui/badge";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
-import { 
-  SearchIcon, 
-  FileTextIcon, 
-  SettingsIcon, 
-  UsersIcon, 
+import {
+  SearchIcon,
+  FileTextIcon,
+  SettingsIcon,
+  UsersIcon,
   MapPinIcon,
   CalendarIcon,
   ArrowRightIcon,
-  AlertCircleIcon
+  AlertCircleIcon,
 } from "lucide-react";
-import { performUniversalSearch, type SearchEntity } from "~/lib/services/search-service";
+import {
+  performUniversalSearch,
+  type SearchEntity,
+} from "~/lib/services/search-service";
 import { requireAuthContext } from "~/lib/dal/shared";
 import { formatDistanceToNow } from "date-fns";
 
@@ -39,7 +42,7 @@ const ENTITY_ICONS = {
 
 const ENTITY_COLORS = {
   issues: "bg-primary-container text-on-primary-container",
-  machines: "bg-tertiary-container text-on-tertiary-container", 
+  machines: "bg-tertiary-container text-on-tertiary-container",
   users: "bg-primary-container text-on-primary-container",
   locations: "bg-secondary-container text-on-secondary-container",
 } as const;
@@ -67,8 +70,8 @@ export async function UniversalSearchResults({
           <SearchIcon className="h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-medium mb-2">Search PinPoint</h3>
           <p className="text-muted-foreground text-center max-w-md">
-            Search across issues, machines, locations, and team members. 
-            Enter at least 2 characters to see results.
+            Search across issues, machines, locations, and team members. Enter
+            at least 2 characters to see results.
           </p>
         </CardContent>
       </Card>
@@ -77,7 +80,7 @@ export async function UniversalSearchResults({
 
   // Get authentication context
   const { organizationId } = await requireAuthContext();
-  
+
   // Perform search
   const searchResponse = await performUniversalSearch({
     query: query.trim(),
@@ -95,7 +98,8 @@ export async function UniversalSearchResults({
           <AlertCircleIcon className="h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-medium mb-2">No results found</h3>
           <p className="text-muted-foreground text-center max-w-md">
-            We couldn't find anything matching "{query}". Try adjusting your search terms or checking your spelling.
+            We couldn't find anything matching "{query}". Try adjusting your
+            search terms or checking your spelling.
           </p>
           <div className="mt-4 text-sm text-muted-foreground">
             <p>Search tips:</p>
@@ -116,30 +120,39 @@ export async function UniversalSearchResults({
       {/* Search Results Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-semibold">
-            Search Results
-          </h2>
+          <h2 className="text-2xl font-semibold">Search Results</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            {searchResponse.totalCount} result{searchResponse.totalCount !== 1 ? 's' : ''} found for "{query}"
-            {page > 1 && ` • Page ${page} of ${Math.ceil(searchResponse.totalCount / limit)}`}
+            {searchResponse.totalCount} result
+            {searchResponse.totalCount !== 1 ? "s" : ""} found for "{query}"
+            {page > 1 &&
+              ` • Page ${page} of ${Math.ceil(searchResponse.totalCount / limit)}`}
           </p>
         </div>
-        
+
         {/* Entity count badges */}
         {showEntityCounts && (
           <div className="flex gap-2 flex-wrap">
-            {Object.entries(searchResponse.entityCounts).map(([entity, count]) => {
-              if (count === 0) return null;
-              
-              const colorClass = ENTITY_COLORS[entity as keyof typeof ENTITY_COLORS] || "bg-surface-variant text-on-surface-variant";
-              const label = ENTITY_LABELS[entity as keyof typeof ENTITY_LABELS] || entity;
-              
-              return (
-                <Badge key={entity} variant="secondary" className={colorClass}>
-                  {label}: {count}
-                </Badge>
-              );
-            })}
+            {Object.entries(searchResponse.entityCounts).map(
+              ([entity, count]) => {
+                if (count === 0) return null;
+
+                const colorClass =
+                  ENTITY_COLORS[entity as keyof typeof ENTITY_COLORS] ||
+                  "bg-surface-variant text-on-surface-variant";
+                const label =
+                  ENTITY_LABELS[entity as keyof typeof ENTITY_LABELS] || entity;
+
+                return (
+                  <Badge
+                    key={entity}
+                    variant="secondary"
+                    className={colorClass}
+                  >
+                    {label}: {count}
+                  </Badge>
+                );
+              },
+            )}
           </div>
         )}
       </div>
@@ -147,12 +160,21 @@ export async function UniversalSearchResults({
       {/* Search Results List */}
       <div className="space-y-3">
         {searchResponse.results.map((result) => {
-          const IconComponent = ENTITY_ICONS[result.entity as keyof typeof ENTITY_ICONS] || FileTextIcon;
-          const colorClass = ENTITY_COLORS[result.entity as keyof typeof ENTITY_COLORS] || "bg-surface-variant text-on-surface-variant";
-          const label = ENTITY_LABELS[result.entity as keyof typeof ENTITY_LABELS] || result.entity;
+          const IconComponent =
+            ENTITY_ICONS[result.entity as keyof typeof ENTITY_ICONS] ||
+            FileTextIcon;
+          const colorClass =
+            ENTITY_COLORS[result.entity as keyof typeof ENTITY_COLORS] ||
+            "bg-surface-variant text-on-surface-variant";
+          const label =
+            ENTITY_LABELS[result.entity as keyof typeof ENTITY_LABELS] ||
+            result.entity;
 
           return (
-            <Card key={`${result.entity}-${result.id}`} className="hover:shadow-md transition-shadow">
+            <Card
+              key={`${result.entity}-${result.id}`}
+              className="hover:shadow-md transition-shadow"
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-3 min-w-0 flex-1">
@@ -166,17 +188,20 @@ export async function UniversalSearchResults({
                           {result.title}
                           <ArrowRightIcon className="inline h-4 w-4 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </Link>
-                        <Badge variant="secondary" className={`shrink-0 ${colorClass}`}>
+                        <Badge
+                          variant="secondary"
+                          className={`shrink-0 ${colorClass}`}
+                        >
                           {label}
                         </Badge>
                       </div>
-                      
+
                       {result.subtitle && (
                         <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
                           {result.subtitle}
                         </p>
                       )}
-                      
+
                       {result.description && (
                         <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
                           {result.description}
@@ -186,7 +211,7 @@ export async function UniversalSearchResults({
                   </div>
                 </div>
               </CardHeader>
-              
+
               {/* Result metadata */}
               {showMetadata && Object.keys(result.metadata).length > 0 && (
                 <CardContent className="pt-0">
@@ -216,7 +241,7 @@ export async function UniversalSearchResults({
                         )}
                       </>
                     )}
-                    
+
                     {result.entity === "machines" && (
                       <>
                         {result.metadata["manufacturer"] && (
@@ -229,40 +254,55 @@ export async function UniversalSearchResults({
                             📍 {result.metadata["location"]}
                           </Badge>
                         )}
-                        {typeof result.metadata["issueCount"] === "number" && result.metadata["issueCount"] > 0 && (
-                          <Badge variant="outline" className="text-xs text-error">
-                            {result.metadata["issueCount"]} open issue{result.metadata["issueCount"] !== 1 ? 's' : ''}
-                          </Badge>
-                        )}
+                        {typeof result.metadata["issueCount"] === "number" &&
+                          result.metadata["issueCount"] > 0 && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs text-error"
+                            >
+                              {result.metadata["issueCount"]} open issue
+                              {result.metadata["issueCount"] !== 1 ? "s" : ""}
+                            </Badge>
+                          )}
                       </>
                     )}
-                    
+
                     {result.entity === "users" && result.metadata["email"] && (
                       <Badge variant="outline" className="text-xs">
                         {result.metadata["email"]}
                       </Badge>
                     )}
-                    
+
                     {result.entity === "locations" && (
                       <>
-                        {typeof result.metadata["machineCount"] === "number" && (
+                        {typeof result.metadata["machineCount"] ===
+                          "number" && (
                           <Badge variant="outline" className="text-xs">
-                            {result.metadata["machineCount"]} machine{result.metadata["machineCount"] !== 1 ? 's' : ''}
+                            {result.metadata["machineCount"]} machine
+                            {result.metadata["machineCount"] !== 1 ? "s" : ""}
                           </Badge>
                         )}
-                        {result.metadata["city"] && result.metadata["state"] && (
-                          <Badge variant="outline" className="text-xs">
-                            📍 {result.metadata["city"]}, {result.metadata["state"]}
-                          </Badge>
-                        )}
+                        {result.metadata["city"] &&
+                          result.metadata["state"] && (
+                            <Badge variant="outline" className="text-xs">
+                              📍 {result.metadata["city"]},{" "}
+                              {result.metadata["state"]}
+                            </Badge>
+                          )}
                       </>
                     )}
-                    
+
                     {/* Date information */}
                     {result.metadata["createdAt"] && (
-                      <Badge variant="outline" className="text-xs flex items-center gap-1">
+                      <Badge
+                        variant="outline"
+                        className="text-xs flex items-center gap-1"
+                      >
                         <CalendarIcon className="h-3 w-3" />
-                        {formatDistanceToNow(new Date(result.metadata["createdAt"]), { addSuffix: true })}
+                        {formatDistanceToNow(
+                          new Date(result.metadata["createdAt"]),
+                          { addSuffix: true },
+                        )}
                       </Badge>
                     )}
                   </div>
@@ -277,21 +317,27 @@ export async function UniversalSearchResults({
       {searchResponse.hasMore && (
         <div className="text-center py-4">
           <p className="text-sm text-muted-foreground mb-4">
-            Showing {(page - 1) * limit + 1} - {Math.min(page * limit, searchResponse.totalCount)} of {searchResponse.totalCount} results
+            Showing {(page - 1) * limit + 1} -{" "}
+            {Math.min(page * limit, searchResponse.totalCount)} of{" "}
+            {searchResponse.totalCount} results
           </p>
-          
+
           <div className="flex gap-2 justify-center">
             {page > 1 && (
               <Button variant="outline" asChild>
-                <Link href={`/search?q=${encodeURIComponent(query)}&page=${page - 1}&limit=${limit}`}>
+                <Link
+                  href={`/search?q=${encodeURIComponent(query)}&page=${page - 1}&limit=${limit}`}
+                >
                   Previous
                 </Link>
               </Button>
             )}
-            
+
             {searchResponse.hasMore && (
               <Button variant="outline" asChild>
-                <Link href={`/search?q=${encodeURIComponent(query)}&page=${page + 1}&limit=${limit}`}>
+                <Link
+                  href={`/search?q=${encodeURIComponent(query)}&page=${page + 1}&limit=${limit}`}
+                >
                   Next
                 </Link>
               </Button>
@@ -340,7 +386,10 @@ export function UniversalSearchResultsSkeleton() {
             <CardContent className="pt-0">
               <div className="flex gap-2">
                 {[1, 2, 3].map((j) => (
-                  <div key={j} className="h-5 w-16 bg-muted rounded animate-pulse" />
+                  <div
+                    key={j}
+                    className="h-5 w-16 bg-muted rounded animate-pulse"
+                  />
                 ))}
               </div>
             </CardContent>

@@ -28,13 +28,14 @@ export interface GeneratedQRCode {
  */
 export async function generateMachineQRCode(
   machineId: string,
-  options: QRCodeOptions = {}
+  options: QRCodeOptions = {},
 ): Promise<GeneratedQRCode> {
   try {
     // Build the reporting URL that the QR code will link to
-    const baseUrl = process.env["NEXT_PUBLIC_APP_URL"] || "https://pinpoint.app";
+    const baseUrl =
+      process.env["NEXT_PUBLIC_APP_URL"] || "https://pinpoint.app";
     const reportingUrl = `${baseUrl}/report?machine=${machineId}`;
-    
+
     // QR code generation options
     const qrOptions = {
       width: options.size || 256,
@@ -48,14 +49,14 @@ export async function generateMachineQRCode(
 
     // Generate QR code as base64 data URL
     const dataUrl = await QRCode.toDataURL(reportingUrl, qrOptions);
-    
+
     // Generate unique ID for this QR code
     const qrCodeId = crypto.randomUUID();
-    
+
     // For now, we'll use the data URL as both the URL and dataUrl
     // In a production app, you might want to save the image to storage
     // and return a URL to the stored image
-    
+
     return {
       id: qrCodeId,
       url: dataUrl, // In production, this might be a stored image URL
@@ -74,12 +75,13 @@ export async function generateMachineQRCode(
  */
 export async function generateMachineQRCodeBuffer(
   machineId: string,
-  options: QRCodeOptions = {}
+  options: QRCodeOptions = {},
 ): Promise<Buffer> {
   try {
-    const baseUrl = process.env["NEXT_PUBLIC_APP_URL"] || "https://pinpoint.app";
+    const baseUrl =
+      process.env["NEXT_PUBLIC_APP_URL"] || "https://pinpoint.app";
     const reportingUrl = `${baseUrl}/report?machine=${machineId}`;
-    
+
     const qrOptions = {
       width: options.size || 256,
       margin: options.margin || 2,
@@ -106,13 +108,14 @@ export function validateQRCodeParams(machineId: string): boolean {
   if (!machineId || typeof machineId !== "string") {
     return false;
   }
-  
+
   if (machineId.length < 1 || machineId.length > 100) {
     return false;
   }
-  
+
   // Basic UUID format validation
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   return uuidRegex.test(machineId);
 }
 

@@ -12,7 +12,10 @@ import { eq, and, inArray } from "drizzle-orm";
 import { requireMemberAccess } from "~/lib/organization-context";
 import { db } from "~/lib/dal/shared";
 import { machines } from "~/server/db/schema";
-import { generateMachineQRCode, validateQRCodeParams } from "~/lib/services/qr-code-service";
+import {
+  generateMachineQRCode,
+  validateQRCodeParams,
+} from "~/lib/services/qr-code-service";
 import type { ActionResult } from "~/lib/actions/shared";
 
 // ================================
@@ -270,7 +273,7 @@ export async function bulkUpdateMachinesAction(
         and(
           eq(machines.organization_id, organizationId),
           // Use inArray for proper multiple ID handling
-          inArray(machines.id, result.data.machineIds)
+          inArray(machines.id, result.data.machineIds),
         ),
       )
       .returning({ id: machines.id });
@@ -512,4 +515,3 @@ export async function bulkGenerateQRCodesAction(
 // ================================
 // HELPER FUNCTIONS
 // ================================
-

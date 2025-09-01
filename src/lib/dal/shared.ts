@@ -32,12 +32,16 @@ export const getServerAuthContext = cache(async () => {
 
   // Import here to avoid circular dependency
   const { getOrganizationContext } = await import("~/lib/organization-context");
-  
+
   try {
     // Get organization context from the new system
     const orgContext = await getOrganizationContext();
-    
-    if (orgContext?.user?.id === user.id && orgContext.accessLevel === "member" && orgContext.membership) {
+
+    if (
+      orgContext?.user?.id === user.id &&
+      orgContext.accessLevel === "member" &&
+      orgContext.membership
+    ) {
       return {
         user,
         organizationId: orgContext.organization.id,
@@ -62,7 +66,7 @@ export const getServerAuthContext = cache(async () => {
  * Require authenticated user and organization for Server Components
  * TEMPORARY: Keeping this working during architecture transition
  * Uses React 19 cache() for request-level memoization
- * 
+ *
  * @deprecated This function will be replaced with request-time organization context
  */
 export const requireAuthContext = cache(async () => {
@@ -88,31 +92,33 @@ export const requireAuthContext = cache(async () => {
  * Accepts organizationId from request-time resolution
  * Uses React 19 cache() for request-level memoization
  */
-export const requireAuthContextWithOrg = cache(async (organizationId: string) => {
-  if (!organizationId) {
-    throw new Error("Organization ID required");
-  }
+export const requireAuthContextWithOrg = cache(
+  async (organizationId: string) => {
+    if (!organizationId) {
+      throw new Error("Organization ID required");
+    }
 
-  const { user } = await getServerAuthContext();
+    const { user } = await getServerAuthContext();
 
-  if (!user) {
-    throw new Error("Authentication required");
-  }
+    if (!user) {
+      throw new Error("Authentication required");
+    }
 
-  // Validate user has membership in the requested organization
-  const membership = await db.query.memberships.findFirst({
-    where: and(
-      eq(memberships.user_id, user.id),
-      eq(memberships.organization_id, organizationId),
-    ),
-  });
+    // Validate user has membership in the requested organization
+    const membership = await db.query.memberships.findFirst({
+      where: and(
+        eq(memberships.user_id, user.id),
+        eq(memberships.organization_id, organizationId),
+      ),
+    });
 
-  if (!membership) {
-    throw new Error("User does not have access to this organization");
-  }
+    if (!membership) {
+      throw new Error("User does not have access to this organization");
+    }
 
-  return { user, organizationId };
-});
+    return { user, organizationId };
+  },
+);
 
 /**
  * Get authenticated user context with role and permissions
@@ -195,18 +201,35 @@ export const getServerAuthContextWithRole = cache(async () => {
  * Type for complete auth context with all required properties
  */
 interface CompleteAuthContext {
-  user: NonNullable<Awaited<ReturnType<typeof getServerAuthContextWithRole>>["user"]>;
-  organizationId: NonNullable<Awaited<ReturnType<typeof getServerAuthContextWithRole>>["organizationId"]>;
-  membership: NonNullable<Awaited<ReturnType<typeof getServerAuthContextWithRole>>["membership"]>;
-  role: NonNullable<Awaited<ReturnType<typeof getServerAuthContextWithRole>>["role"]>;
-  permissions: Awaited<ReturnType<typeof getServerAuthContextWithRole>>["permissions"];
+  user: NonNullable<
+    Awaited<ReturnType<typeof getServerAuthContextWithRole>>["user"]
+  >;
+  organizationId: NonNullable<
+    Awaited<ReturnType<typeof getServerAuthContextWithRole>>["organizationId"]
+  >;
+  membership: NonNullable<
+    Awaited<ReturnType<typeof getServerAuthContextWithRole>>["membership"]
+  >;
+  role: NonNullable<
+    Awaited<ReturnType<typeof getServerAuthContextWithRole>>["role"]
+  >;
+  permissions: Awaited<
+    ReturnType<typeof getServerAuthContextWithRole>
+  >["permissions"];
 }
 
 /**
  * Type guard to check if context has all required properties
  */
-function hasCompleteAuthContext(context: Awaited<ReturnType<typeof getServerAuthContextWithRole>>): context is CompleteAuthContext {
-  return !!(context.user && context.organizationId && context.membership && context.role);
+function hasCompleteAuthContext(
+  context: Awaited<ReturnType<typeof getServerAuthContextWithRole>>,
+): context is CompleteAuthContext {
+  return !!(
+    context.user &&
+    context.organizationId &&
+    context.membership &&
+    context.role
+  );
 }
 
 /**
@@ -214,27 +237,29 @@ function hasCompleteAuthContext(context: Awaited<ReturnType<typeof getServerAuth
  * Throws if not authenticated, no organization, or no role assigned
  * Uses React 19 cache() for request-level memoization
  */
-export const requireAuthContextWithRole = cache(async (): Promise<CompleteAuthContext> => {
-  const context = await getServerAuthContextWithRole();
+export const requireAuthContextWithRole = cache(
+  async (): Promise<CompleteAuthContext> => {
+    const context = await getServerAuthContextWithRole();
 
-  if (!context.user) {
-    throw new Error("Authentication required");
-  }
+    if (!context.user) {
+      throw new Error("Authentication required");
+    }
 
-  if (!context.organizationId) {
-    throw new Error("Organization selection required");
-  }
+    if (!context.organizationId) {
+      throw new Error("Organization selection required");
+    }
 
-  if (context.membership == null || context.role == null) {
-    throw new Error("Role assignment required");
-  }
+    if (context.membership == null || context.role == null) {
+      throw new Error("Role assignment required");
+    }
 
-  if (!hasCompleteAuthContext(context)) {
-    throw new Error("Incomplete authentication context");
-  }
+    if (!hasCompleteAuthContext(context)) {
+      throw new Error("Incomplete authentication context");
+    }
 
-  return context;
-});
+    return context;
+  },
+);
 
 /**
  * Pagination helpers for Server Components

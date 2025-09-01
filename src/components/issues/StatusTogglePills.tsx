@@ -15,7 +15,6 @@ interface StatusTogglePillsProps {
   parentLoading?: boolean;
 }
 
-
 interface StatusInfo {
   id: string;
   name: string;
@@ -54,10 +53,7 @@ export function StatusTogglePills({
   const statusesByCategory = useMemo(() => {
     if (!statuses) return null;
 
-    const grouped: Record<
-      "NEW" | "IN_PROGRESS" | "RESOLVED",
-      StatusInfo[]
-    > = {
+    const grouped: Record<"NEW" | "IN_PROGRESS" | "RESOLVED", StatusInfo[]> = {
       NEW: [],
       IN_PROGRESS: [],
       RESOLVED: [],
@@ -118,7 +114,13 @@ export function StatusTogglePills({
     );
   };
 
-  if (parentLoading || statusesLoading || countsLoading || !statusesByCategory || !statusCounts) {
+  if (
+    parentLoading ||
+    statusesLoading ||
+    countsLoading ||
+    !statusesByCategory ||
+    !statusCounts
+  ) {
     return (
       <div className="flex items-center gap-2">
         <Loader2 className="h-4 w-4 animate-spin" />
@@ -140,35 +142,35 @@ export function StatusTogglePills({
         // eslint-disable-next-line security/detect-object-injection -- category is type-constrained to union type
         const count = statusCounts[category];
         const label = getCategoryLabel(category);
-        
+
         // Get status color classes using Material 3 semantic colors
         const getStatusClasses = (
           category: "NEW" | "IN_PROGRESS" | "RESOLVED",
-          isActive: boolean
+          isActive: boolean,
         ) => {
           const baseClasses = "text-sm font-normal transition-all duration-200";
-          
+
           switch (category) {
             case "NEW":
               return cn(
                 baseClasses,
-                isActive 
-                  ? "bg-error text-on-error border-error hover:bg-error/90" 
-                  : "text-error border-error bg-transparent hover:bg-error/10"
+                isActive
+                  ? "bg-error text-on-error border-error hover:bg-error/90"
+                  : "text-error border-error bg-transparent hover:bg-error/10",
               );
             case "IN_PROGRESS":
               return cn(
                 baseClasses,
-                isActive 
-                  ? "bg-secondary text-on-secondary border-secondary hover:bg-secondary/90" 
-                  : "text-secondary border-secondary bg-transparent hover:bg-secondary/10"
+                isActive
+                  ? "bg-secondary text-on-secondary border-secondary hover:bg-secondary/90"
+                  : "text-secondary border-secondary bg-transparent hover:bg-secondary/10",
               );
             case "RESOLVED":
               return cn(
                 baseClasses,
-                isActive 
-                  ? "bg-tertiary text-on-tertiary border-tertiary hover:bg-tertiary/90" 
-                  : "text-tertiary border-tertiary bg-transparent hover:bg-tertiary/10"
+                isActive
+                  ? "bg-tertiary text-on-tertiary border-tertiary hover:bg-tertiary/90"
+                  : "text-tertiary border-tertiary bg-transparent hover:bg-tertiary/10",
               );
           }
         };
@@ -178,22 +180,26 @@ export function StatusTogglePills({
             key={category}
             variant="outline"
             size="sm"
-            onClick={() => { handleCategoryToggle(category); }}
+            onClick={() => {
+              handleCategoryToggle(category);
+            }}
             disabled={count === 0}
             className={cn(
               getStatusClasses(category, isActive),
               isFullySelected && "font-semibold",
               count === 0 && "opacity-50 cursor-not-allowed",
-              "h-8 px-3"
+              "h-8 px-3",
             )}
           >
             <span>{label}</span>
             {showCounts && (
-              <Badge 
-                variant="secondary" 
+              <Badge
+                variant="secondary"
                 className={cn(
                   "ml-1 h-5 px-1.5 text-xs",
-                  isActive ? "bg-surface-variant/20 text-on-surface" : "bg-current/10 text-current"
+                  isActive
+                    ? "bg-surface-variant/20 text-on-surface"
+                    : "bg-current/10 text-current",
                 )}
               >
                 {count}

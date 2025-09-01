@@ -21,11 +21,5 @@ interface MachinesErrorProps {
 export default function MachinesError({ error, reset }: MachinesErrorProps) {
   const config = errorConfigs.machines(reset);
 
-  return (
-    <ErrorBoundaryCard
-      error={error}
-      reset={reset}
-      config={config}
-    />
-  );
+  return <ErrorBoundaryCard error={error} reset={reset} config={config} />;
 }

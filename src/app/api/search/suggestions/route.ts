@@ -1,4 +1,4 @@
-import type { NextRequest} from "next/server";
+import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSearchSuggestions } from "~/lib/services/search-service";
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Extract and validate query parameters
     const { searchParams } = new URL(request.url);
     const queryParams = Object.fromEntries(searchParams.entries());
-    
+
     const { q: query, limit } = SuggestionsQuerySchema.parse(queryParams);
 
     // Require authentication and organization context
@@ -23,14 +23,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const organizationId = organization.id;
 
     // Get search suggestions
-    const suggestions = await getSearchSuggestions(query, organizationId, limit);
+    const suggestions = await getSearchSuggestions(
+      query,
+      organizationId,
+      limit,
+    );
 
     return NextResponse.json({
       suggestions,
       query,
       timestamp: new Date().toISOString(),
     });
-
   } catch (error) {
     console.error("Search suggestions error:", error);
 
@@ -42,7 +45,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           details: error.issues,
           timestamp: new Date().toISOString(),
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -54,7 +57,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           message: error.message,
           timestamp: new Date().toISOString(),
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -65,7 +68,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         message: error instanceof Error ? error.message : "Unknown error",
         timestamp: new Date().toISOString(),
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

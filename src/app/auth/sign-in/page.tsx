@@ -4,7 +4,7 @@
  */
 
 import { redirect } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, type JSX } from "react";
 
 import { SignInForm } from "./components/SignInForm";
 import { getOrganizationContext } from "~/lib/organization-context";

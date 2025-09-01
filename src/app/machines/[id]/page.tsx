@@ -47,7 +47,7 @@ export async function generateMetadata({
 export default async function MachinePage({ params }: MachinePageProps) {
   // Ensure user is authenticated and get organization context
   await requireMemberAccess();
-  
+
   try {
     const resolvedParams = await params;
     const machine = await getMachineById(resolvedParams.id);
@@ -56,11 +56,11 @@ export default async function MachinePage({ params }: MachinePageProps) {
       <div className="container mx-auto p-6 max-w-6xl space-y-6">
         {/* Server-rendered machine header */}
         <MachineHeader machine={machine} />
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             {/* Server-rendered machine details */}
-            <Suspense 
+            <Suspense
               fallback={
                 <div className="rounded-lg border p-6 space-y-4">
                   <div className="h-6 bg-muted animate-pulse rounded w-1/3" />
@@ -75,7 +75,7 @@ export default async function MachinePage({ params }: MachinePageProps) {
               <MachineDetailServer machine={machine} />
             </Suspense>
           </div>
-          
+
           <div className="space-y-4">
             {/* Client island for QR code management */}
             <MachineQRCodeClient

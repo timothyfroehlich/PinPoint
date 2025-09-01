@@ -23,7 +23,11 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireAuthContextWithRole.mockResolvedValue({
-      user: { id: "user-test", email: "user@test.com", user_metadata: { name: "Tester" } } as any,
+      user: {
+        id: "user-test",
+        email: "user@test.com",
+        user_metadata: { name: "Tester" },
+      } as any,
       organizationId: "org-test",
       membership: { roleId: "role-test" } as any,
       role: { id: "role-test", name: "Member" } as any,
@@ -98,7 +102,9 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
       // description and assigneeId omitted - should be fine
 
       // This test will fail auth, but validation should pass
-      mockRequireAuthContextWithRole.mockRejectedValue(new Error("Auth required"));
+      mockRequireAuthContextWithRole.mockRejectedValue(
+        new Error("Auth required"),
+      );
 
       const result = await createIssueAction(null, formData);
 
@@ -116,7 +122,9 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
       formData.append("description", ""); // Empty string should become undefined
       formData.append("machineId", SEED_TEST_IDS.MOCK_PATTERNS.MACHINE);
 
-      mockRequireAuthContextWithRole.mockRejectedValue(new Error("Auth required"));
+      mockRequireAuthContextWithRole.mockRejectedValue(
+        new Error("Auth required"),
+      );
 
       const result = await createIssueAction(null, formData);
 
@@ -133,7 +141,9 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
       formData.append("title", "  Test Issue  "); // Whitespace should be trimmed
       formData.append("machineId", SEED_TEST_IDS.MOCK_PATTERNS.MACHINE);
 
-      mockRequireAuthContextWithRole.mockRejectedValue(new Error("Auth required"));
+      mockRequireAuthContextWithRole.mockRejectedValue(
+        new Error("Auth required"),
+      );
 
       const result = await createIssueAction(null, formData);
 

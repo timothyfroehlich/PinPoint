@@ -1,7 +1,10 @@
-import type { NextRequest} from "next/server";
+import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { performUniversalSearch, type SearchEntity } from "~/lib/services/search-service";
+import {
+  performUniversalSearch,
+  type SearchEntity,
+} from "~/lib/services/search-service";
 import { requireMemberAccess } from "~/lib/organization-context";
 
 const UniversalSearchQuerySchema = z.object({
@@ -18,24 +21,27 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Extract and validate query parameters
     const { searchParams } = new URL(request.url);
     const queryParams = Object.fromEntries(searchParams.entries());
-    
-    const { 
-      q: query, 
-      entities: entitiesParam, 
-      page, 
-      limit, 
-      sort, 
-      order 
+
+    const {
+      q: query,
+      entities: entitiesParam,
+      page,
+      limit,
+      sort,
+      order,
     } = UniversalSearchQuerySchema.parse(queryParams);
 
     // Parse entities parameter
-    const entities: SearchEntity[] = entitiesParam === "all" 
-      ? ["all"]
-      : entitiesParam.split(",").filter(Boolean) as SearchEntity[];
+    const entities: SearchEntity[] =
+      entitiesParam === "all"
+        ? ["all"]
+        : (entitiesParam.split(",").filter(Boolean) as SearchEntity[]);
 
     // Validate entities
     const validEntities = ["issues", "machines", "users", "locations", "all"];
-    const invalidEntities = entities.filter(entity => !validEntities.includes(entity));
+    const invalidEntities = entities.filter(
+      (entity) => !validEntities.includes(entity),
+    );
     if (invalidEntities.length > 0) {
       return NextResponse.json(
         {
@@ -43,7 +49,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           details: `Invalid entities: ${invalidEntities.join(", ")}. Valid entities: ${validEntities.join(", ")}`,
           timestamp: new Date().toISOString(),
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -67,7 +73,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       sorting: { field: sort, order },
       timestamp: new Date().toISOString(),
     });
-
   } catch (error) {
     console.error("Universal search error:", error);
 
@@ -79,7 +84,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           details: error.issues,
           timestamp: new Date().toISOString(),
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -91,7 +96,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           message: error.message,
           timestamp: new Date().toISOString(),
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -102,7 +107,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         message: error instanceof Error ? error.message : "Unknown error",
         timestamp: new Date().toISOString(),
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -118,6 +123,6 @@ export function OPTIONS(): NextResponse {
         "Access-Control-Allow-Methods": "GET, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
       },
-    }
+    },
   );
 }

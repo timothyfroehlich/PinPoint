@@ -32,24 +32,29 @@ interface SystemSecuritySettingsProps {
   };
 }
 
-export function SystemSecuritySettings({ settings }: SystemSecuritySettingsProps) {
+export function SystemSecuritySettings({
+  settings,
+}: SystemSecuritySettingsProps) {
   const [formData, setFormData] = useState(settings);
-  const [state, formAction, isPending] = useActionState(updateSystemSettingsAction, null);
+  const [state, formAction, isPending] = useActionState(
+    updateSystemSettingsAction,
+    null,
+  );
 
   const handleToggle = (key: keyof typeof formData, value: boolean) => {
-    setFormData(prev => ({ ...prev, [key]: value }));
+    setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
   const handleInputChange = (key: keyof typeof formData, value: string) => {
     const numValue = parseInt(value, 10);
     if (!isNaN(numValue)) {
-      setFormData(prev => ({ ...prev, [key]: numValue }));
+      setFormData((prev) => ({ ...prev, [key]: numValue }));
     }
   };
 
   const handleSelectChange = (key: keyof typeof formData, value: string) => {
     const numValue = parseInt(value, 10);
-    setFormData(prev => ({ ...prev, [key]: numValue }));
+    setFormData((prev) => ({ ...prev, [key]: numValue }));
   };
 
   // Handle successful save
@@ -84,7 +89,9 @@ export function SystemSecuritySettings({ settings }: SystemSecuritySettingsProps
             )}
             <Switch
               checked={formData.twoFactorRequired}
-              onCheckedChange={(checked) => { handleToggle("twoFactorRequired", checked); }}
+              onCheckedChange={(checked) => {
+                handleToggle("twoFactorRequired", checked);
+              }}
               disabled={isPending}
             />
           </div>
@@ -100,7 +107,9 @@ export function SystemSecuritySettings({ settings }: SystemSecuritySettingsProps
           </p>
           <Select
             value={formData.sessionTimeout.toString()}
-            onValueChange={(value) => { handleSelectChange("sessionTimeout", value); }}
+            onValueChange={(value) => {
+              handleSelectChange("sessionTimeout", value);
+            }}
             disabled={isPending}
           >
             <SelectTrigger>
@@ -131,7 +140,9 @@ export function SystemSecuritySettings({ settings }: SystemSecuritySettingsProps
             min="6"
             max="128"
             value={formData.passwordMinLength}
-            onChange={(e) => { handleInputChange("passwordMinLength", e.target.value); }}
+            onChange={(e) => {
+              handleInputChange("passwordMinLength", e.target.value);
+            }}
             disabled={isPending}
           />
           <p className="text-xs text-muted-foreground">
@@ -149,7 +160,9 @@ export function SystemSecuritySettings({ settings }: SystemSecuritySettingsProps
           </p>
           <Select
             value={formData.loginAttempts.toString()}
-            onValueChange={(value) => { handleSelectChange("loginAttempts", value); }}
+            onValueChange={(value) => {
+              handleSelectChange("loginAttempts", value);
+            }}
             disabled={isPending}
           >
             <SelectTrigger>
@@ -170,9 +183,12 @@ export function SystemSecuritySettings({ settings }: SystemSecuritySettingsProps
         <div className="flex items-start space-x-2 p-3 bg-secondary-container rounded-md border border-secondary">
           <ShieldAlertIcon className="h-4 w-4 text-secondary mt-0.5" />
           <div className="text-sm">
-            <p className="font-medium text-on-secondary-container">Security Warning</p>
+            <p className="font-medium text-on-secondary-container">
+              Security Warning
+            </p>
             <p className="text-secondary">
-              Your current settings may reduce security. Consider enabling session timeouts and login attempt limits.
+              Your current settings may reduce security. Consider enabling
+              session timeouts and login attempt limits.
             </p>
           </div>
         </div>
@@ -180,12 +196,12 @@ export function SystemSecuritySettings({ settings }: SystemSecuritySettingsProps
 
       {/* Save Button */}
       <form action={formAction} className="pt-4">
-        <input 
-          type="hidden" 
-          name="settings" 
+        <input
+          type="hidden"
+          name="settings"
           value={JSON.stringify({ security: formData })}
         />
-        <Button 
+        <Button
           type="submit"
           disabled={isPending || !hasChanges}
           className="w-full"
