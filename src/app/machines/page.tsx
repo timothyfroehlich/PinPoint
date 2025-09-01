@@ -10,10 +10,10 @@ import {
   getMachinesWithFilters,
   getMachineStats,
   getLocationsForOrg,
-  type MachineFilters,
   type MachinePagination,
   type MachineSorting,
 } from "~/lib/dal/machines";
+import type { MachineFilters } from "~/lib/types";
 import {
   parseMachineSearchParams,
   getMachineFilterDescription,

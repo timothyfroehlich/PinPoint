@@ -3,12 +3,10 @@
  * TODO: Implement full location detail functionality
  */
 
-import type { PinPointSupabaseUser } from "~/lib/supabase/types";
+import type { PinPointSupabaseUser, LocationResponse } from "~/lib/types";
 
-interface Location {
-  id: string;
-  name: string;
-}
+// Use canonical Location type to avoid drift
+type Location = Pick<LocationResponse, "id" | "name">;
 
 interface LocationDetailViewProps {
   location: Location;

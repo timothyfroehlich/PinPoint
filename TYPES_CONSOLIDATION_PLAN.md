@@ -63,6 +63,7 @@ Notes:
 Each workstream lists scope, dependencies, deliverables, acceptance criteria, and a PR checklist. Use short-lived PRs per WS to reduce merge conflicts.
 
 WS‑01 — Types Surface Scaffolding
+- Status: Completed
 - Scope: Add missing modules: `auth.ts`, `db.ts`, `supabase.ts`, `search.ts`, `utils.ts`, `guards.ts`. Wire exports in `index.ts` using `export type { ... }` or `export type * as Db`.
 - Dependencies: None.
 - Deliverables: New files under `src/lib/types` with type-only re-exports; updated `index.ts`.
@@ -70,6 +71,7 @@ WS‑01 — Types Surface Scaffolding
 - PR checklist: Add files, update `index.ts`, run `tsc -p tsconfig.json`.
 
 WS‑02 — API Types Hygiene
+- Status: Completed
 - Scope: Restrict `src/lib/types/api.ts` to domain/API shapes only. Remove component props and duplicate filter/input DTOs. Keep/define canonical: `IssueResponse`, `IssueWithRelationsResponse`, `MachineResponse`, `LocationResponse`, `RoleResponse`, `PermissionResponse`, `ModelResponse`, `MachineForIssues`.
 - Dependencies: WS‑01 (exports exist).
 - Deliverables: Slim `api.ts` focused on API/domain; component props moved local or to a dedicated UI file if truly shared.
@@ -77,6 +79,7 @@ WS‑02 — API Types Hygiene
 - PR checklist: Move/remove types; update imports in components if needed.
 
 WS‑03 — Filters Unification
+- Status: Completed (minor follow-up fixes in pages/components)
 - Scope: Make `IssueFilters` and `MachineFilters` canonical in `src/lib/types/filters.ts`. Replace duplicates in DAL, utilities, and components.
 - Dependencies: WS‑01 (types surface stable).
 - Deliverables: All references import from `~/lib/types` (or `~/lib/types/filters`). Remove local duplicates.
@@ -87,6 +90,7 @@ WS‑03 — Filters Unification
 - PR checklist: Swap imports, delete dupes, adjust local component-only types as needed.
 
 WS‑04 — MachineForIssues Unification
+- Status: Completed
 - Scope: Use a single `MachineForIssues` under `~/lib/types/api`. Remove duplicates in `src/lib/types/gameInstance.ts` and `src/lib/utils/machine-response-transformers.ts`. Update routers/services.
 - Dependencies: WS‑02 (final canonical lives in `api.ts`).
 - Deliverables: One canonical interface; transformer utils reference canonical type.
@@ -94,6 +98,7 @@ WS‑04 — MachineForIssues Unification
 - PR checklist: Update imports, remove duplicate interfaces, ensure transformer return types align.
 
 WS‑05 — Auth & Org Context Split
+- Status: Completed
 - Scope: Add `auth.ts` to house `OrganizationContext` (app) and re-export Supabase auth/session types as type-only imports from `~/lib/supabase/types`. Provide `SupabaseOrganizationContext` alias where needed.
 - Dependencies: WS‑01.
 - Deliverables: `src/lib/types/auth.ts` with app-level shapes; `index.ts` re-exports.
@@ -101,6 +106,7 @@ WS‑05 — Auth & Org Context Split
 - PR checklist: Add file, update imports in `src/server/auth/**` and routers if applicable.
 
 WS‑06 — Zod Search Params Re‑exports
+- Status: Completed
 - Scope: Add `src/lib/types/search.ts` re-exporting `z.infer` types from existing `~/lib/search-params/*` modules.
 - Dependencies: WS‑01.
 - Deliverables: `search.ts` with type-only exports; `index.ts` re-exports.
@@ -108,6 +114,7 @@ WS‑06 — Zod Search Params Re‑exports
 - PR checklist: Add file, swap imports in pages/components/services.
 
 WS‑07 — DB Types Barrel & Boundary
+- Status: Completed
 - Scope: Add `db.ts` exporting `export type * as Db from "~/server/db/types";`. Encourage server-only usage via `import type { Db } from "~/lib/types"`.
 - Dependencies: WS‑01.
 - Deliverables: `db.ts` (or `index.ts` change) and docs notes. No app-side imports of `Db.*`.
@@ -115,24 +122,32 @@ WS‑07 — DB Types Barrel & Boundary
 - PR checklist: Add file and docs cross-links.
 
 WS‑08 — Lint/CI Enforcement
+- Status: In Progress (search-param type-only import guard added)
 - Scope: Strengthen ESLint to:
   - Disallow imports to `~/server/db/**` and block `@supabase/supabase-js` `createClient` in app code (already present).
   - Flag exported `type`/`interface` declarations for domain shapes outside `src/lib/types` (allow component props/tests/generated).
   - Prefer imports from `~/lib/types` for known names.
   - CI script to detect duplicate type names outside `src/lib/types`.
 - Dependencies: None (can start now). Coordinate with WS‑03/04 to avoid churn.
-- Deliverables: Updated `eslint.config.js` and a simple `pnpm ci:check-types-drift` script.
+- Deliverables: Updated `eslint.config.js` and a simple CI script.
 - Acceptance: Lint fails on new out-of-place domain types; CI job runs in PRs.
 - PR checklist: Add rules, update scripts, document exceptions.
 
-WS‑09 — Codemods
-- Scope: Provide jscodeshift codemods for swapping imports to `~/lib/types` and deleting duplicate declarations.
-- Dependencies: WS‑01/02/03 planned shapes finalized.
-- Deliverables: `scripts/codemods/*` with README and dry-run instructions.
-- Acceptance: Dry-run shows intended changes; run per-directory to minimize conflicts.
-- PR checklist: Add scripts, usage docs, sample commands.
+WS‑09 — Codemods (Optional/Deferred)
+- Status: Deferred (not worth complexity for TS in this repo)
+- Scope: Skip jscodeshift for TS; rely on ESLint guardrails + targeted grep-based edits.
+- Rationale: jscodeshift TS support is brittle; risk > reward given repository size and current progress.
+- Alternative workflow:
+  - Use ESLint violations as a to-do list (e.g., restricted imports/exports).
+  - Grep + mechanical replacements for imports (review diffs):
+    - `rg -n "from \"~\/lib\/search-params\/"` and replace type imports with `~/lib/types`.
+    - `rg -n "import\s+\{?\s*IssueFilters|MachineFilters\s*\}?\s+from\s+\"~\/lib\/dal\/(issues|machines)\"` and switch to `~/lib/types`.
+  - Organize imports: run editor action or `eslint --fix` where safe.
+- Acceptance: All intended paths updated; ESLint passes for import rules; no behavior change.
+- PR checklist: List commands used; before/after grep outputs.
 
 WS‑10 — Docs & Adoption
+- Status: Completed
 - Scope: Update references pointing to `~/lib/types`, add a Type Ownership matrix, and link to Non‑Negotiables.
 - Dependencies: None.
 - Deliverables: Docs updates; a small appendix in this plan for live hotspots.
@@ -209,7 +224,6 @@ Use these as targets for WS‑03/04. Allow duplicates in docs/tests.
 
 ## Definition of Done (Per WS)
 
-- Code compiles with `pnpm typecheck` and lints cleanly for the touched scope.
+- Code compiles with `npm run typecheck` and lints cleanly for the touched scope.
 - `rg` checks show only canonical definitions where expected.
 - PR includes a short “Acceptance” section mapping to criteria above.
-

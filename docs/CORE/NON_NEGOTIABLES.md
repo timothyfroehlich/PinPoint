@@ -212,6 +212,7 @@
 ## Appendices
 
 - **Examples & Snippets:** See `docs/NON_NEGOTIABLES_EXAMPLES.md`.
+- **Type System Reference:** See **[TYPE_INVENTORY.md](./TYPE_INVENTORY.md)** for comprehensive Type Ownership Matrix and import patterns.
 - **Rule IDs Glossary:**
   - CORE‑TS‑001: Declare reusable types in `src/lib/types`
   - CORE‑TS‑002: No duplicate domain types
@@ -221,10 +222,10 @@
   - CORE‑SSR‑001: Supabase SSR wrapper
   - CORE‑SSR‑002: Immediate `auth.getUser()`
   - CORE‑SSR‑003: Middleware required
-  - CORE‑SSR‑004: Don’t modify Supabase response
+  - CORE‑SSR‑004: Don't modify Supabase response
   - CORE‑SEC‑001..003: Org scoping, API protection, RLS track separation
   - CORE‑PERF‑001..002: cache(), fetch caching
   - CORE‑TEST‑001..003: Archetypes, server components, non‑manual tests
 
 - **Changelog:**
-  - 2025‑09‑01: v2 restructure adopted.
+  - 2025‑09‑01: v2 restructure adopted; added TYPE_INVENTORY.md reference.

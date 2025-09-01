@@ -318,7 +318,7 @@ export function validateMachineOrganizationBoundary(
     resourceId: machineId,
     resourceOrganizationId: machineOrganizationId,
     expectedOrganizationId,
-    resourceType: "Game instance",
+    resourceType: "Machine",
   });
 }
 
