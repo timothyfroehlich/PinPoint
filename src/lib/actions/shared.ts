@@ -161,7 +161,7 @@ export function validateFormData<T>(
   const fieldErrors = result.error.issues.reduce<Record<string, string[]>>(
     (acc: Record<string, string[]>, issue) => {
       const path = issue.path.join(".");
-      if (!acc[path]) acc[path] = [];
+      acc[path] ??= [];
       acc[path].push(issue.message);
       return acc;
     },
