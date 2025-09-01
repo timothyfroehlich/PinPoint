@@ -73,7 +73,7 @@ async function createNotificationForUser(
     entity_id: notificationData.entityId,
     message: notificationData.message,
     action_url:
-      notificationData.actionUrl ||
+      notificationData.actionUrl ??
       createNotificationActionUrl(
         notificationData.entityType,
         notificationData.entityId,
@@ -124,8 +124,8 @@ async function getIssueStakeholders(issueId: string, organizationId: string) {
   if (issue.assignedTo) {
     stakeholders.push({
       ...issue.assignedTo,
-      name: issue.assignedTo.name || issue.assignedTo.email || "Unknown User",
-      email: issue.assignedTo.email || "",
+      name: issue.assignedTo.name ?? issue.assignedTo.email ?? "Unknown User",
+      email: issue.assignedTo.email ?? "",
       role: "assignee",
     });
   }
@@ -134,8 +134,8 @@ async function getIssueStakeholders(issueId: string, organizationId: string) {
   if (issue.createdBy) {
     stakeholders.push({
       ...issue.createdBy,
-      name: issue.createdBy.name || issue.createdBy.email || "Unknown User",
-      email: issue.createdBy.email || "",
+      name: issue.createdBy.name ?? issue.createdBy.email ?? "Unknown User",
+      email: issue.createdBy.email ?? "",
       role: "creator",
     });
   }
@@ -145,8 +145,8 @@ async function getIssueStakeholders(issueId: string, organizationId: string) {
     stakeholders.push({
       ...issue.machine.owner,
       name:
-        issue.machine.owner.name || issue.machine.owner.email || "Unknown User",
-      email: issue.machine.owner.email || "",
+        issue.machine.owner.name ?? issue.machine.owner.email ?? "Unknown User",
+      email: issue.machine.owner.email ?? ""
       role: "machine_owner",
     });
   }
@@ -199,7 +199,7 @@ export async function generateCommentNotifications(
     );
     const notificationIds: string[] = [];
 
-    const message = `${context.actorName} commented on issue "${issue.title}" (${issue.machine?.name || "Unknown Machine"})`;
+    const message = `${context.actorName} commented on issue "${issue.title}" (${issue.machine?.name ?? "Unknown Machine"})`;
 
     // Create notifications for all stakeholders
     for (const stakeholder of stakeholders) {
@@ -259,7 +259,7 @@ export async function generateAssignmentNotifications(
     }
 
     const notificationIds: string[] = [];
-    const message = `${context.actorName} assigned you to issue "${issue.title}" (${issue.machine?.name || "Unknown Machine"})`;
+    const message = `${context.actorName} assigned you to issue "${issue.title}" (${issue.machine?.name ?? "Unknown Machine"})`;
 
     // Notify new assignee (if different from actor)
     if (newAssigneeId && newAssigneeId !== context.actorId) {
@@ -324,7 +324,7 @@ export async function generateStatusChangeNotifications(
     );
     const notificationIds: string[] = [];
 
-    const message = `${context.actorName} updated the status of "${issue.title}" to ${newStatusName} (${issue.machine?.name || "Unknown Machine"})`;
+    const message = `${context.actorName} updated the status of "${issue.title}" to ${newStatusName} (${issue.machine?.name ?? "Unknown Machine"})`;
 
     // Create notifications for all stakeholders
     for (const stakeholder of stakeholders) {
@@ -386,7 +386,7 @@ export async function generateIssueCreationNotifications(
     }
 
     const notificationIds: string[] = [];
-    const message = `New issue "${issue.title}" reported for ${issue.machine?.name || "Unknown Machine"}`;
+    const message = `New issue "${issue.title}" reported for ${issue.machine?.name ?? "Unknown Machine"}`;
 
     // Notify machine owner (if different from creator)
     if (issue.machine?.owner && issue.machine.owner.id !== context.actorId) {

@@ -6,7 +6,6 @@ import {
   useEffect,
   useState,
   type ReactNode,
-  type JSX,
 } from "react";
 
 import type { PinPointSupabaseUser } from "~/lib/types";
@@ -25,7 +24,7 @@ export function AuthProvider({
   children,
 }: {
   children: ReactNode;
-}): JSX.Element {
+}): React.JSX.Element {
   const [user, setUser] = useState<PinPointSupabaseUser | null>(null);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();

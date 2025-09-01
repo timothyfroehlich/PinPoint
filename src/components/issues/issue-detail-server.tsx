@@ -45,7 +45,7 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
               Created {formatDistanceToNow(new Date(issue.created_at))} ago
             </span>
             <span>•</span>
-            <span>by {issue.createdBy?.name || "Unknown"}</span>
+            <span>by {issue.createdBy?.name ?? "Unknown"}</span>
           </div>
         </div>
 
@@ -96,13 +96,13 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
                           {comment.author?.name
                             ?.split(" ")
                             .map((n) => n[0])
-                            .join("") || "U"}
+                            .join("") ?? "U"}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 space-y-1">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm">
-                            {comment.author?.name || "Unknown User"}
+                            {comment.author?.name ?? "Unknown User"}
                           </span>
                           <span className="text-muted-foreground text-xs">
                             {formatDistanceToNow(new Date(comment.created_at))}{" "}
@@ -158,10 +158,10 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
               <div className="space-y-2">
                 <div>
                   <p className="font-medium">
-                    {issue.machine?.name || "Unknown Machine"}
+                    {issue.machine?.name ?? "Unknown Machine"}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {issue.machine?.model?.name || "Unknown Model"}
+                    {issue.machine?.model?.name ?? "Unknown Model"}
                   </p>
                 </div>
                 {/* Location info would need to be added to DAL query */}
@@ -186,7 +186,7 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
                 <div className="flex items-center gap-3">
                   <Avatar className="h-8 w-8">
                     <AvatarFallback>
-                      {(issue.assignedTo.name || issue.assignedTo.email || "U")
+                      {(issue.assignedTo.name ?? issue.assignedTo.email ?? "U")
                         .split(" ")
                         .map((n: string) => n[0])
                         .join("")}
@@ -194,7 +194,7 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
                   </Avatar>
                   <div>
                     <p className="font-medium">
-                      {issue.assignedTo.name || issue.assignedTo.email}
+                      {issue.assignedTo.name ?? issue.assignedTo.email}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {issue.assignedTo.email}
@@ -209,11 +209,11 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
               <div className="mt-4">
                 <IssueAssignmentClient
                   issueId={issue.id}
-                  {...(issue.assignedTo?.id && {
+                  {...(issue.assignedTo && {
                     currentAssigneeId: issue.assignedTo.id,
-                  })}
-                  {...(issue.assignedTo?.name && {
-                    currentAssigneeName: issue.assignedTo.name,
+                    ...(issue.assignedTo.name && {
+                      currentAssigneeName: issue.assignedTo.name,
+                    })
                   })}
                 />
               </div>
@@ -239,8 +239,8 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
                 {/* Status Update - Client Island */}
                 <IssueStatusUpdateClient
                   issueId={issue.id}
-                  currentStatusId={issue.status?.id || ""}
-                  currentStatusName={issue.status?.name || "Unknown"}
+                  currentStatusId={issue.status?.id ?? ""}
+                  currentStatusName={issue.status?.name ?? "Unknown"}
                 />
               </div>
             </CardContent>

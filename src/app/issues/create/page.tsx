@@ -16,14 +16,14 @@ function transformMachinesForForm(
     id: machine.id,
     name: machine.name,
     model: {
-      id: machine.model?.id || "",
-      name: machine.model?.name || "Unknown Model",
-      manufacturer: machine.model?.manufacturer || null,
-      year: machine.model?.year || null,
+      id: machine.model.id ?? "",
+      name: machine.model.name ?? "Unknown Model",
+      manufacturer: machine.model.manufacturer ?? null,
+      year: machine.model.year ?? null,
     },
     location: {
-      id: machine.location?.id || "",
-      name: machine.location?.name || "Unknown Location",
+      id: machine.location.id ?? "",
+      name: machine.location.name ?? "Unknown Location",
     },
   }));
 }

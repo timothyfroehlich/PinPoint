@@ -129,7 +129,7 @@ function IssueCard({ issue }: { issue: Issue }) {
             <div className="flex items-center gap-1">
               <WrenchIcon className="h-4 w-4" />
               <span>
-                {issue.machine?.name || "Unknown Machine"}
+                {issue.machine?.name ?? "Unknown Machine"}
                 {issue.machine?.model?.name && ` (${issue.machine.model.name})`}
               </span>
             </div>
@@ -271,7 +271,7 @@ export function IssuesListServer({
   if (!issues) {
     return (
       <Suspense fallback={<IssuesListSkeleton />}>
-        <IssuesListWithData limit={limit || 20} />
+        <IssuesListWithData limit={limit ?? 20} />
       </Suspense>
     );
   }

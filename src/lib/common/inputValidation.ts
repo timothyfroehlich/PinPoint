@@ -13,7 +13,16 @@
  */
 
 import { z } from "zod";
-import { nameSchema, optionalNameSchema, issueTitleSchema, optionalIssueTitleSchema, descriptionSchema, searchQuerySchema, submitterNameSchema } from "../validation/schemas";
+import {
+  idSchema,
+  nameSchema,
+  optionalNameSchema,
+  descriptionSchema,
+  searchQuerySchema,
+  titleSchema as issueTitleSchema,
+  optionalTitleSchema as optionalIssueTitleSchema,
+  nameSchema as submitterNameSchema,
+} from "~/lib/validation/schemas";
 
 // ============================================================================
 // BASIC ID VALIDATION SCHEMAS
@@ -25,7 +34,7 @@ import { nameSchema, optionalNameSchema, issueTitleSchema, optionalIssueTitleSch
  * Examples: getById, update, delete operations
  */
 export const entityIdSchema = z.object({
-  id: z.string().min(1, "ID is required"),
+  id: idSchema,
 });
 
 /**
@@ -33,7 +42,7 @@ export const entityIdSchema = z.object({
  * Pattern: Used in machine.core.ts, machine.owner.ts, machine.location.ts, qrCode.ts
  */
 export const machineIdSchema = z.object({
-  machineId: z.string().min(1, "Machine ID is required"),
+  machineId: idSchema,
 });
 
 /**
@@ -41,7 +50,7 @@ export const machineIdSchema = z.object({
  * Pattern: Used in location.ts, machine.core.ts, pinballMap.ts
  */
 export const locationIdSchema = z.object({
-  locationId: z.string().min(1, "Location ID is required"),
+  locationId: idSchema,
 });
 
 /**
@@ -49,7 +58,7 @@ export const locationIdSchema = z.object({
  * Pattern: Used in admin.ts, role.ts, user.ts, issue assignment
  */
 export const userIdSchema = z.object({
-  userId: z.string().min(1, "User ID is required"),
+  userId: idSchema,
 });
 
 /**
@@ -57,7 +66,7 @@ export const userIdSchema = z.object({
  * Pattern: Used in issue.core.ts, issue.comment.ts, issue.attachment.ts
  */
 export const issueIdSchema = z.object({
-  issueId: z.string().min(1, "Issue ID is required"),
+  issueId: idSchema,
 });
 
 // ============================================================================
@@ -128,7 +137,7 @@ export const pinballMapIdSchema = z.object({
  * Array of string IDs validation
  * Pattern: Used in filtering operations (status IDs, role IDs, etc.)
  */
-export const stringIdArraySchema = z.array(z.string().min(1)).optional();
+export const stringIdArraySchema = z.array(idSchema).optional();
 
 /**
  * Status IDs filter validation
@@ -155,7 +164,7 @@ export const createEntityWithNameSchema = z.object({
  * Pattern: Used in location.ts, machine.core.ts updates
  */
 export const updateEntityWithNameSchema = z.object({
-  id: z.string().min(1, "ID is required"),
+  id: idSchema,
   name: optionalNameSchema,
 });
 
@@ -166,7 +175,7 @@ export const updateEntityWithNameSchema = z.object({
 export const issueCreationCoreSchema = z.object({
   title: issueTitleSchema,
   description: descriptionSchema,
-  machineId: z.string().min(1, "Machine ID is required"),
+  machineId: idSchema,
   submitterName: submitterNameSchema,
 });
 
@@ -175,7 +184,7 @@ export const issueCreationCoreSchema = z.object({
  * Pattern: Used in issue.core.ts update operations
  */
 export const issueUpdateCoreSchema = z.object({
-  id: z.string().min(1, "Issue ID is required"),
+  id: idSchema,
   title: optionalIssueTitleSchema,
   description: descriptionSchema,
   statusId: z.string().optional(),
@@ -188,8 +197,8 @@ export const issueUpdateCoreSchema = z.object({
  */
 export const machineCreationSchema = z.object({
   name: z.string().optional(),
-  modelId: z.string().min(1, "Model ID is required"),
-  locationId: z.string().min(1, "Location ID is required"),
+  modelId: idSchema,
+  locationId: idSchema,
 });
 
 /**
@@ -197,10 +206,10 @@ export const machineCreationSchema = z.object({
  * Pattern: Used in machine.core.ts update operations
  */
 export const machineUpdateSchema = z.object({
-  id: z.string().min(1, "Machine ID is required"),
+  id: idSchema,
   name: z.string().optional(),
-  modelId: z.string().optional(),
-  locationId: z.string().optional(),
+  modelId: idSchema.optional(),
+  locationId: idSchema.optional(),
 });
 
 // ============================================================================
@@ -212,16 +221,16 @@ export const machineUpdateSchema = z.object({
  * Pattern: Used in issue.core.ts getAll with complex filtering
  */
 export const issueFilteringSchema = z.object({
-  locationId: z.string().optional(),
-  machineId: z.string().optional(),
+  locationId: idSchema.optional(),
+  machineId: idSchema.optional(),
   statusIds: stringIdArraySchema,
   search: searchQuerySchema,
-  assigneeId: z.string().optional(),
-  reporterId: z.string().optional(),
-  ownerId: z.string().optional(),
-  modelId: z.string().optional(),
+  assigneeId: idSchema.optional(),
+  reporterId: idSchema.optional(),
+  ownerId: idSchema.optional(),
+  modelId: idSchema.optional(),
   // Additional filter for single status
-  statusId: z.string().optional(),
+  statusId: idSchema.optional(),
 });
 
 /**
@@ -229,7 +238,7 @@ export const issueFilteringSchema = z.object({
  * Pattern: Used in model router for game search
  */
 export const opdbSearchSchema = z.object({
-  query: z.string().min(1, "Search query is required"),
+  query: searchQuerySchema,
 });
 
 /**
@@ -237,7 +246,7 @@ export const opdbSearchSchema = z.object({
  * Pattern: Used in model router for specific model lookup
  */
 export const opdbModelSchema = z.object({
-  opdbId: z.string().min(1, "OPDB ID is required"),
+  opdbId: idSchema,
 });
 
 // ============================================================================
@@ -249,7 +258,7 @@ export const opdbModelSchema = z.object({
  * Pattern: Used in issue assignment, role assignment operations
  */
 export const userAssignmentSchema = z.object({
-  userId: z.string().min(1, "User ID is required"),
+  userId: idSchema,
 });
 
 /**
@@ -265,8 +274,8 @@ export const optionalUserAssignmentSchema = z.object({
  * Pattern: Used in machine.owner.ts for owner assignment/removal
  */
 export const machineOwnerAssignmentSchema = z.object({
-  machineId: z.string().min(1, "Machine ID is required"),
-  ownerId: z.string().optional(), // undefined/null removes owner
+  machineId: idSchema,
+  ownerId: idSchema.optional(), // undefined/null removes owner
 });
 
 /**
@@ -274,8 +283,8 @@ export const machineOwnerAssignmentSchema = z.object({
  * Pattern: Used in issue.core.ts for assigning users to issues
  */
 export const issueAssignmentSchema = z.object({
-  issueId: z.string().min(1, "Issue ID is required"),
-  userId: z.string().min(1, "User ID is required"),
+  issueId: idSchema,
+  userId: idSchema,
 });
 
 // ============================================================================
@@ -287,7 +296,7 @@ export const issueAssignmentSchema = z.object({
  * Pattern: Used in notification.ts operations
  */
 export const notificationIdSchema = z.object({
-  notificationId: z.string().min(1, "Notification ID is required"),
+  notificationId: idSchema,
 });
 
 // ============================================================================
@@ -299,7 +308,7 @@ export const notificationIdSchema = z.object({
  * Pattern: Used in comment.ts operations
  */
 export const commentIdSchema = z.object({
-  commentId: z.string().min(1, "Comment ID is required"),
+  commentId: idSchema,
 });
 
 /**
@@ -342,7 +351,7 @@ export function createEntityIdSchema(
 ): z.ZodObject<Record<string, z.ZodString>> {
   const fieldName = `${entityName}Id`;
   return z.object({
-    [fieldName]: z.string().min(1, `${entityName} ID is required`),
+    [fieldName]: idSchema,
   });
 }
 
@@ -369,7 +378,7 @@ export function createNamedEntityUpdateSchema(): z.ZodObject<{
   name: z.ZodOptional<z.ZodString>;
 }> {
   return z.object({
-    id: z.string().min(1, "ID is required"),
+    id: idSchema,
     name: optionalNameSchema,
   });
 }
@@ -385,20 +394,24 @@ export function validateNonEmptyStringArray(
   if (!Array.isArray(array)) {
     throw new Error(`${fieldName} must be an array`);
   }
-
   if (array.length === 0) {
     throw new Error(`${fieldName} cannot be empty`);
   }
-
-  for (const [index, item] of array.entries()) {
-    if (typeof item !== "string" || item.trim().length === 0) {
-      throw new Error(
-        `${fieldName}[${String(index)}] must be a non-empty string`,
-      );
+  // Narrow the type iteratively to avoid any usage
+  const arr: unknown[] = array as unknown[];
+  const result: string[] = [];
+  for (let index = 0; index < arr.length; index++) {
+    const raw: unknown = arr[index];
+    if (typeof raw !== "string") {
+      throw new Error(`${fieldName}[${String(index)}] must be a string`);
     }
+    const trimmed = raw.trim();
+    if (trimmed.length === 0) {
+      throw new Error(`${fieldName}[${String(index)}] must be a non-empty string`);
+    }
+    result.push(trimmed);
   }
-
-  return array as string[];
+  return result;
 }
 
 /**

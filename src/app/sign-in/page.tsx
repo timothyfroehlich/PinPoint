@@ -1,6 +1,5 @@
 "use client";
 
-import { type InferSelectModel } from "drizzle-orm";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
@@ -19,10 +18,10 @@ import { useAuth } from "~/app/auth-provider";
 import { authenticateDevUser, getAuthResultMessage } from "~/lib/auth/dev-auth";
 import { isDevAuthAvailable } from "~/lib/environment-client";
 import { createClient } from "~/utils/supabase/client";
-import type { users, roles } from "~/server/db/schema";
+import type { Db } from "~/lib/types";
 
-type User = InferSelectModel<typeof users>;
-type Role = InferSelectModel<typeof roles>;
+type User = Db.User;
+type Role = Db.Role;
 type UserWithRole = User & { role: Role | null };
 
 // Check if dev features are available
