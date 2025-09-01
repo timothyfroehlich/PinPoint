@@ -150,7 +150,7 @@ export function SearchButtonTrigger({
 
   // Get the appropriate shortcut key based on platform
   const shortcutKey = mounted
-    ? navigator.platform.includes("Mac")
+    ? navigator.userAgent.includes("Mac")
       ? "⌘"
       : "Ctrl"
     : "Ctrl";
