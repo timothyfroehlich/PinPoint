@@ -41,6 +41,26 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { {{IMPORTED_ACTIONS}} } from "{{MODULE_PATH}}";
+import {
+  SUBDOMAIN_HEADER,
+  SUBDOMAIN_VERIFIED_HEADER,
+} from "~/lib/subdomain-verification";
+
+/**
+ * Subdomain verification helpers for tests
+ * Use trusted headers to simulate middleware-verified subdomain context.
+ */
+export function createTrustedSubdomainHeaders(subdomain: string): Headers {
+  return new Headers({
+    [SUBDOMAIN_HEADER]: subdomain,
+    [SUBDOMAIN_VERIFIED_HEADER]: "1",
+  });
+}
+export function createUntrustedSubdomainHeaders(subdomain: string): Headers {
+  return new Headers({
+    [SUBDOMAIN_HEADER]: subdomain,
+  });
+}
 
 // Mock authentication for boundary testing
 vi.mock("~/lib/actions/shared", async () => {
@@ -51,8 +71,8 @@ vi.mock("~/lib/actions/shared", async () => {
   };
 });
 
-const { getActionAuthContext } = await import("~/lib/actions/shared");
-const mockGetActionAuthContext = vi.mocked(getActionAuthContext);
+const { requireAuthContextWithRole } = await import("~/lib/actions/shared");
+const mockGetActionAuthContext = vi.mocked(requireAuthContextWithRole);
 
 describe("{{MODULE_NAME}} Server Actions (Server Action Tests - Archetype 4)", () => {
   beforeEach(() => {
@@ -263,7 +283,7 @@ describe("{{MODULE_NAME}} Server Actions (Server Action Tests - Archetype 4)", (
       // Test that actions respect organization boundaries
       const validAuthContext = {
         user: { id: SEED_TEST_IDS.USERS.ADMIN },
-        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
       };
       mockGetActionAuthContext.mockResolvedValue(validAuthContext);
 
@@ -292,7 +312,7 @@ describe("{{MODULE_NAME}} Server Actions (Server Action Tests - Archetype 4)", (
       // Mock successful auth to test the full flow
       const validAuthContext = {
         user: { id: SEED_TEST_IDS.USERS.ADMIN },
-        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
       };
       mockGetActionAuthContext.mockResolvedValue(validAuthContext);
 

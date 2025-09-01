@@ -8,50 +8,18 @@ BEGIN;
 
 SELECT plan(15);
 
--- Setup: Ensure test organizations exist using hardcoded IDs (organizations already exist from seeding)
-INSERT INTO organizations (id, name, subdomain) VALUES 
-  (test_org_primary(), 'Test Organization Primary', 'test-primary'),
-  (test_org_competitor(), 'Test Organization Competitor', 'test-competitor')
-ON CONFLICT (id) DO NOTHING;
-
--- Create test data for primary organization with proper context
+-- Use seeded data; insert only minimal issues against seeded machines
 SET LOCAL role = 'authenticated';
 SELECT set_primary_org_context();
-
--- Create test models for primary organization  
-INSERT INTO models (id, name, manufacturer, organization_id, year) VALUES
-  ('test-model-multi-primary', 'Primary Org Model', 'Test Manufacturer', test_org_primary(), 2020);
-
--- Create test locations in primary organization
-INSERT INTO locations (id, name, organization_id) VALUES
-  ('test-location-primary', 'Primary Org Location', test_org_primary());
-
--- Create test machines in primary organization
-INSERT INTO machines (id, name, organization_id, location_id, model_id) VALUES
-  ('test-machine-primary', 'Primary Org Machine', test_org_primary(), 'test-location-primary', 'test-model-multi-primary');
-
--- Create test issues in primary organization
 INSERT INTO issues (id, title, description, organization_id, created_by_id, machine_id, status_id, priority_id) VALUES
-  ('test-issue-primary', 'Primary Org Issue', 'Confidential primary data', test_org_primary(), test_user_admin(), 'test-machine-primary', 'status-new-primary-001', 'priority-high-primary-001');
+  ('test-issue-primary', 'Primary Org Issue', 'Confidential primary data', test_org_primary(), test_user_admin(), 'machine-mm-001', 'status-new-primary-001', 'priority-high-primary-001')
+ON CONFLICT (id) DO NOTHING;
 
 -- Switch to competitor organization context
 SELECT set_competitor_org_context();
-
--- Create test models for competitor organization
-INSERT INTO models (id, name, manufacturer, organization_id, year) VALUES
-  ('test-model-multi-competitor', 'Competitor Org Model', 'Test Manufacturer', test_org_competitor(), 2020);
-
--- Create test locations in competitor organization
-INSERT INTO locations (id, name, organization_id) VALUES
-  ('test-location-competitor', 'Competitor Org Location', test_org_competitor());
-
--- Create test machines in competitor organization
-INSERT INTO machines (id, name, organization_id, location_id, model_id) VALUES
-  ('test-machine-competitor', 'Competitor Org Machine', test_org_competitor(), 'test-location-competitor', 'test-model-multi-competitor');
-
--- Create test issues in competitor organization
 INSERT INTO issues (id, title, description, organization_id, created_by_id, machine_id, status_id, priority_id) VALUES
-  ('test-issue-competitor', 'Competitor Org Issue', 'Confidential competitor data', test_org_competitor(), test_user_member2(), 'test-machine-competitor', 'status-new-competitor-001', 'priority-high-competitor-001');
+  ('test-issue-competitor', 'Competitor Org Issue', 'Confidential competitor data', test_org_competitor(), test_user_member2(), 'machine-test-org-competitor-001', 'status-new-competitor-001', 'priority-high-competitor-001')
+ON CONFLICT (id) DO NOTHING;
 
 -- Test 1: RLS is enabled on key tables
 SELECT results_eq(

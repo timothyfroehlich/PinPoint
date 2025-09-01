@@ -66,26 +66,21 @@ export const getServerAuthContext = cache(async () => {
  * @deprecated This function will be replaced with request-time organization context
  */
 export const requireAuthContext = cache(async () => {
-  const { user } = await getServerAuthContext();
+  // Fetch full Supabase AuthUser first for compatibility
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
     throw new Error("Authentication required");
   }
 
-  // TEMPORARY FIX: Get organization from user's first membership
-  // This allows dev login to work while proper request-time organization context is being implemented
-  const membership = await db.query.memberships.findFirst({
-    where: eq(memberships.user_id, user.id),
-    columns: {
-      organization_id: true,
-    },
-  });
+  // Use secure organization resolution and membership validation
+  const { requireMemberAccess } = await import("~/lib/organization-context");
+  const { organization } = await requireMemberAccess();
 
-  if (!membership) {
-    throw new Error("User has no organization membership");
-  }
-
-  return { user, organizationId: membership.organization_id };
+  return { user, organizationId: organization.id };
 });
 
 /**

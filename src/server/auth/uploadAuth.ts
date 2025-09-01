@@ -9,8 +9,8 @@ import { transformKeysToCamelCase } from "~/lib/utils/case-transformers";
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 import type { DrizzleClient } from "~/server/db/drizzle";
 
-import { env } from "~/env";
 import { organizations, memberships } from "~/server/db/schema";
+import { extractTrustedSubdomain, parseSubdomainFromHost } from "~/lib/subdomain-verification";
 
 export interface UploadAuthContext {
   user: PinPointSupabaseUser;
@@ -60,9 +60,17 @@ export async function getUploadAuthContext(
     });
   }
 
-  // 2. Resolve organization from subdomain
-  let subdomain = req.headers.get("x-subdomain");
-  subdomain ??= env.DEFAULT_ORG_SUBDOMAIN;
+  // 2. Resolve organization from subdomain: verified header, else fallback to Host parsing
+  const host = req.headers.get("host") ?? "";
+  const subdomain =
+    extractTrustedSubdomain(req.headers as unknown as Headers) ??
+    parseSubdomainFromHost(host);
+  if (!subdomain) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Invalid subdomain - organization context required",
+    });
+  }
 
   const organizationResult = await drizzle.query.organizations.findFirst({
     where: eq(organizations.subdomain, subdomain),

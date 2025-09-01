@@ -76,13 +76,13 @@ The multi-tenancy system architecture is implemented with the following componen
 | **Organization** | Top-level tenant                 | No           |
 | **Membership**   | User-Organization link with role | Yes          |
 | **Location**     | Physical venue                   | Yes          |
-| **Model**        | Machine type (from OPDB)         | No\*         |
+| **Model**        | Machine type (commercial/custom) | No\*         |
 | **Machine**      | Physical machine instance        | Yes          |
 | **Issue**        | Problem report                   | Yes          |
 | **Comment**      | Issue discussion                 | Yes          |
 | **Attachment**   | Issue images                     | Yes          |
 
-\*OPDB models are global, custom models are organization-scoped
+\*Commercial models are global, custom models are organization-scoped
 
 ### RBAC Implementation
 
@@ -339,7 +339,7 @@ See `CLAUDE.md` for complete quality standards and development guidelines.
 1. **ESM Modules**: Project uses `"type": "module"` for modern JavaScript
 2. **No Migrations**: Pre-production uses `db:reset` for schema changes
 3. **Minimal Testing**: Simplified test system focused on pure functions and critical security policies
-4. **Global Models**: OPDB data shared across organizations
+4. **Global Models**: Commercial game data shared across organizations
 5. **Soft Deletes**: Comments use soft delete with audit trail
 
 ## References

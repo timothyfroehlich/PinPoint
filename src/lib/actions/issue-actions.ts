@@ -15,13 +15,15 @@ import { issues, issueStatuses, priorities, comments } from "~/server/db/schema"
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { transformKeysToSnakeCase } from "~/lib/utils/case-transformers";
 import {
-  getActionAuthContext,
+  requireAuthContextWithRole,
   validateFormData,
   actionSuccess,
   actionError,
   runAfterResponse,
   type ActionResult,
 } from "./shared";
+import { requirePermission } from "./shared";
+import { PERMISSIONS } from "~/server/auth/permissions.constants";
 import { 
   generateIssueCreationNotifications,
   generateStatusChangeNotifications,
@@ -96,7 +98,7 @@ export async function createIssueAction(
   formData: FormData,
 ): Promise<ActionResult<{ id: string }>> {
   try {
-    const { user, organizationId } = await getActionAuthContext();
+    const { user, organizationId, membership } = await requireAuthContextWithRole();
 
     // Enhanced validation with Zod
     const validation = validateFormData(formData, createIssueSchema);
@@ -105,6 +107,7 @@ export async function createIssueAction(
     }
 
     const db = getGlobalDatabaseProvider().getClient();
+    await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
 
     // Parallel queries for better performance
     const [defaultStatus, defaultPriority] = await Promise.all([
@@ -180,7 +183,7 @@ export async function updateIssueStatusAction(
   formData: FormData,
 ): Promise<ActionResult<{ statusId: string }>> {
   try {
-    const { user, organizationId } = await getActionAuthContext();
+    const { user, organizationId, membership } = await requireAuthContextWithRole();
 
     // Enhanced validation
     const validation = validateFormData(formData, updateIssueStatusSchema);
@@ -189,6 +192,7 @@ export async function updateIssueStatusAction(
     }
 
     const db = getGlobalDatabaseProvider().getClient();
+    await requirePermission(membership, PERMISSIONS.ISSUE_EDIT, db);
 
     // Update with organization scoping for security
     const [updatedIssue] = await db
@@ -254,7 +258,7 @@ export async function addCommentAction(
   formData: FormData,
 ): Promise<ActionResult<{ commentId: string }>> {
   try {
-    const { user, organizationId } = await getActionAuthContext();
+    const { user, organizationId, membership } = await requireAuthContextWithRole();
 
     // Enhanced validation
     const validation = validateFormData(formData, addCommentSchema);
@@ -263,6 +267,7 @@ export async function addCommentAction(
     }
 
     const db = getGlobalDatabaseProvider().getClient();
+    await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
 
     // Verify issue exists and user has access
     const issue = await db.query.issues.findFirst({
@@ -316,7 +321,7 @@ export async function updateIssueAssignmentAction(
   formData: FormData,
 ): Promise<ActionResult<{ assigneeId: string | null }>> {
   try {
-    const { user, organizationId } = await getActionAuthContext();
+    const { user, organizationId, membership } = await requireAuthContextWithRole();
 
     // Enhanced validation
     const validation = validateFormData(formData, updateIssueAssignmentSchema);
@@ -325,6 +330,7 @@ export async function updateIssueAssignmentAction(
     }
 
     const db = getGlobalDatabaseProvider().getClient();
+    await requirePermission(membership, PERMISSIONS.ISSUE_ASSIGN, db);
 
     // Get current assignee for notification comparison
     const currentIssue = await db.query.issues.findFirst({
@@ -394,7 +400,7 @@ export async function bulkUpdateIssuesAction(
   formData: FormData,
 ): Promise<ActionResult<{ updatedCount: number }>> {
   try {
-    const { user, organizationId } = await getActionAuthContext();
+    const { user, organizationId, membership } = await requireAuthContextWithRole();
 
     // Parse JSON data from form
     const jsonData = formData.get("data") as string;
@@ -409,6 +415,7 @@ export async function bulkUpdateIssuesAction(
     }
 
     const db = getGlobalDatabaseProvider().getClient();
+    await requirePermission(membership, PERMISSIONS.ISSUE_BULK_MANAGE, db);
     const { issueIds, statusId, assigneeId } = validation.data;
 
     // Build update object

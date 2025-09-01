@@ -10,6 +10,11 @@ import { cache } from "react"; // React 19 cache API
 // import { unstable_after } from "next/server"; // Background tasks
 import type { z } from "zod";
 import { createClient } from "~/lib/supabase/server";
+import { requireMemberAccess } from "~/lib/organization-context";
+import { requirePermission as baseRequirePermission } from "~/server/auth/permissions";
+import { getGlobalDatabaseProvider } from "~/server/db/provider";
+import { requireAuthContextWithRole } from "~/lib/dal/shared";
+export { requireAuthContextWithRole };
 
 /**
  * Server Action result types (React 19 useActionState compatible)
@@ -23,6 +28,7 @@ export type ActionResult<T = any> =
  * Uses cache() to prevent duplicate auth checks within same request
  */
 export const getActionAuthContext = cache(async () => {
+  // Fetch full AuthUser first to preserve redirect behavior for unauthenticated users
   const supabase = await createClient();
   const {
     data: { user },
@@ -33,20 +39,29 @@ export const getActionAuthContext = cache(async () => {
     redirect("/sign-in");
   }
 
-  const organizationId = user.user_metadata?.["organizationId"] as
-    | string
-    | undefined;
-  if (!organizationId) {
-    throw new Error("Organization selection required");
-  }
+  // Validate org access using secure subdomain + membership check
+  const { organization } = await requireMemberAccess();
 
-  return { user, organizationId };
+  return { user, organizationId: organization.id };
 });
 
 /**
  * Alias for DAL compatibility (same as getServerAuthContext)
  */
 export const getServerAuthContext = getActionAuthContext;
+
+/**
+ * Combined auth + permission helper for Server Actions.
+ * Ensures user is authenticated, has org context and required permission.
+ */
+export async function requireActionAuthContextWithPermission(permission: string) {
+  const { user, organizationId, membership } = await requireAuthContextWithRole();
+  const db = getGlobalDatabaseProvider().getClient();
+  await baseRequirePermission({ roleId: membership?.role_id ?? null }, permission, db);
+  return { user, organizationId, membership };
+}
+
+export type ActionAuthContextWithRole = Awaited<ReturnType<typeof requireAuthContextWithRole>>;
 
 /**
  * Safe FormData extraction with validation
@@ -174,6 +189,18 @@ export function revalidateMachines(): void {
 export function revalidateDashboard(): void {
   revalidatePath("/dashboard");
   revalidateTag("dashboard");
+}
+
+/**
+ * Wrapper exporting a membership-aware permission check for Actions code.
+ * Accepts DAL membership (snake_case), adapts to permissions API shape.
+ */
+export async function requirePermission(
+  membership: { role_id?: string | null } | null,
+  permission: string,
+  db: Parameters<typeof baseRequirePermission>[2],
+): Promise<void> {
+  await baseRequirePermission({ roleId: membership?.role_id ?? null }, permission, db);
 }
 
 /**
