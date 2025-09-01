@@ -12,17 +12,20 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   console.log(`[MIDDLEWARE] Request to: ${host}${url.pathname}`);
 
+  // Track auth error state to forward to the app
+  let hasAuthError: boolean | undefined = undefined;
+
   // Buffer cookies set by Supabase so we can attach them to the final response
-  const bufferedCookies: Array<{
+  const bufferedCookies: {
     name: string;
     value: string;
     options?: Parameters<typeof NextResponse.prototype.cookies.set>[2];
-  }> = [];
+  }[] = [];
 
   // Handle Supabase session refresh (Updated 2025 patterns)
   try {
     const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
     if (supabaseUrl && supabaseAnonKey) {
       const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
@@ -62,18 +65,9 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
         cookies: request.cookies.getAll().map(c => ({ name: c.name, hasValue: !!c.value })),
       });
 
-      // Optional: Redirect unauthenticated users (can be customized per app needs)
-      if (
-        !user &&
-        !request.nextUrl.pathname.startsWith("/login") &&
-        !request.nextUrl.pathname.startsWith("/auth") &&
-        !request.nextUrl.pathname.startsWith("/demo-server-actions") // Allow demo access
-      ) {
-        // Preserve subdomain in redirect for multi-tenant setup
-        const loginUrl = url.clone();
-        loginUrl.pathname = "/auth/sign-in";
-        return NextResponse.redirect(loginUrl);
-      }
+      // Instead of redirecting unauthenticated users, forward an error signal
+      // The app can surface a toast/modal upon seeing this header/cookie.
+      hasAuthError = !user;
     }
   } catch (error) {
     console.warn("[MIDDLEWARE] Supabase session refresh failed:", error);
@@ -86,6 +80,9 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   // Forward verified subdomain headers to the request seen by the app/router
   const requestHeaders = new Headers(request.headers);
+  if (typeof hasAuthError !== "undefined" && hasAuthError) {
+    requestHeaders.set("x-auth-error", "unauthenticated");
+  }
   if (subdomain) {
     requestHeaders.set("x-subdomain", subdomain);
     requestHeaders.set(SUBDOMAIN_VERIFIED_HEADER, "1");
@@ -96,6 +93,12 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   // Create the final response with forwarded headers
   const supabaseResponse = NextResponse.next({ request: { headers: requestHeaders } });
+
+  // Mirror auth error to response header for client-side handling if present
+  const authError = requestHeaders.get("x-auth-error");
+  if (authError) {
+    supabaseResponse.headers.set("x-auth-error", authError);
+  }
 
   // Ensure any Supabase SSR cookies are applied to this final response
   bufferedCookies.forEach(({ name, value, options }) => {
@@ -116,7 +119,7 @@ function getSubdomain(host: string): string | null {
 
   if (!hostWithoutPort) return null;
 
-  if (isDevelopment()) {
+  if (env.NODE_ENV === "development") {
     // In development, expect format: subdomain.localhost
     if (hostWithoutPort === "localhost") return null;
     const parts = hostWithoutPort.split(".");

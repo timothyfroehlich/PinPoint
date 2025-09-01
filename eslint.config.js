@@ -177,6 +177,59 @@ export default tseslint.config(
     },
   },
   {
+    // Guardrails for app code (exclude server code)
+    files: ["src/**/*.{ts,tsx}"],
+    excludedFiles: [
+      "src/server/**",
+      "supabase/**",
+      "RSC_MIGRATION/**",
+      "docs/**",
+    ],
+    rules: {
+      // App code must not depend directly on DB schema/types or low-level server modules
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "~/server/db/schema",
+              message:
+                "Import DB model types via '~/lib/types' (Db.*) per CORE-TS-003. Do not import schema directly in app code.",
+            },
+            {
+              name: "~/server/db/types",
+              message:
+                "Import DB model types via '~/lib/types' (Db.*) per CORE-TS-003. Do not import server DB types directly in app code.",
+            },
+            {
+              name: "@supabase/supabase-js",
+              importNames: ["createClient"],
+              message:
+                "Use '~/lib/supabase/server' createClient() wrapper for SSR per CORE-SSR-001.",
+            },
+          ],
+          patterns: [
+            {
+              group: [
+                "~/server/db/**",
+                "../server/db/**",
+                "../../server/db/**",
+                "../../../server/db/**",
+              ],
+              message:
+                "Do not import server DB modules in app code. Use '~/lib/types' for types and service boundaries per CORE-TS-003.",
+            },
+            {
+              group: ["../../*", "../../../*", "../../../../*"],
+              message:
+                "Use the '~/' path alias instead of deep relative imports (../../).",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // Strategic exemptions: API layer files - allow necessary tRPC patterns (limited scope)
     files: ["src/server/api/routers/**/*.ts"],
     rules: {
@@ -380,6 +433,7 @@ export default tseslint.config(
       "playwright.config.ts",
       "tooling.config.js",
       "tooling.config.ts",
+      "supabase/migrations/**/*", // Generated migration files
     ],
   },
 );

@@ -28,10 +28,12 @@ export interface OrganizationOption {
 /**
  * Get all organizations for login dropdown
  * No authentication required - public endpoint for organization selection
+ * Per §9.1: Only returns organizations with is_public = true
  * Uses React 19 cache() for request-level memoization
  */
 export const getAllOrganizationsForLogin = cache(async (): Promise<OrganizationOption[]> => {
   const orgs = await db.query.organizations.findMany({
+    where: eq(organizations.is_public, true),
     columns: {
       id: true,
       name: true,
@@ -63,7 +65,7 @@ export const getOrganizationBySubdomain = cache(async (subdomain: string) => {
     },
   });
 
-  return organization || null;
+  return organization ?? null;
 });
 
 /**
@@ -111,7 +113,7 @@ export const getOrganizationSelectOptions = cache(async () => {
 
   return {
     organizations: sortedOrgs,
-    defaultOrganizationId: apcOrganization?.id || sortedOrgs[0]?.id || null,
+    defaultOrganizationId: apcOrganization?.id ?? sortedOrgs[0]?.id ?? null,
   };
 });
 
@@ -149,5 +151,5 @@ export const getOrganizationSubdomainById = cache(async (organizationId: string)
     },
   });
 
-  return organization?.subdomain || null;
+  return organization?.subdomain ?? null;
 });

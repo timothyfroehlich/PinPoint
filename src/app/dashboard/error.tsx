@@ -18,7 +18,7 @@ interface DashboardErrorProps {
  * Error boundary for dashboard page - main application entry point
  * Provides context-specific error handling for the primary user interface
  */
-export default function DashboardError({ error, reset }: DashboardErrorProps) {
+export default function DashboardError({ error, reset }: DashboardErrorProps): JSX.Element {
   const config = errorConfigs.dashboard(reset);
 
   return (

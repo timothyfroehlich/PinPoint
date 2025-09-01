@@ -7,7 +7,7 @@
  */
 
 import { initTRPC, TRPCError } from "@trpc/server";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
@@ -16,7 +16,6 @@ import type { SupabaseServerClient } from "~/lib/supabase/server";
 import type { PinPointSupabaseUser } from "~/lib/supabase/types";
 import type { DrizzleClient } from "~/server/db/drizzle";
 
-import { env } from "~/env";
 import { logger } from "~/lib/logger";
 import {
   ERROR_MESSAGE_TRUNCATE_LENGTH,
@@ -29,6 +28,7 @@ import { getUserPermissionsForSupabaseUser } from "~/server/auth/permissions";
 import { getSupabaseUser } from "~/server/auth/supabase";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { organizations, memberships } from "~/server/db/schema";
+import { withOrgRLS } from "~/server/db/utils/rls";
 import { ServiceFactory } from "~/server/services/factory";
 
 /**
@@ -151,35 +151,27 @@ export const createTRPCContext = async (
 
   // Fallback: derive organization from subdomain for users without app_metadata organizationId
   if (!organization) {
-    const subdomain =
-      opts.headers.get("x-subdomain") ?? env.DEFAULT_ORG_SUBDOMAIN;
+    const subdomain = opts.headers.get("x-subdomain");
+    
+    if (!subdomain) {
+      // No subdomain = public PinPoint site, no organization context needed
+      organization = null;
+    } else {
+      const org = await db.query.organizations.findFirst({
+        where: eq(organizations.subdomain, subdomain),
+      });
 
-    const org = await db.query.organizations.findFirst({
-      where: eq(organizations.subdomain, subdomain),
-    });
+      if (org) {
+        organization = {
+          id: org.id,
+          subdomain: org.subdomain,
+          name: org.name,
+        } satisfies Organization;
 
-    if (org) {
-      organization = {
-        id: org.id,
-        subdomain: org.subdomain,
-        name: org.name,
-      } satisfies Organization;
+        // Set organizationId for downstream procedures if not already set
+        organizationId ??= org.id;
 
-      // Set organizationId for downstream procedures if not already set
-      organizationId ??= org.id;
-
-      // Set session variable for RLS policies (simple, no verification)
-      try {
-        await db.execute(
-          sql`SET LOCAL app.current_organization_id = ${org.id}`,
-        );
-      } catch {
-        // Log but continue - application-layer filtering will work as fallback
-        logger.warn({
-          msg: "Could not set RLS session variable, using application-layer filtering",
-          component: "createTRPCContext",
-          context: { organizationId: org.id, subdomain },
-        });
+        // RLS session variable is now bound in procedure-level transactions.
       }
     }
   }
@@ -368,7 +360,7 @@ export const organizationProcedure = protectedProcedure.use(
           with: {
             organization: true,
           },
-          orderBy: [sql`updated_at DESC`], // Get most recent membership
+          // Note: memberships table doesn't have updated_at, using id for deterministic ordering
         });
 
         if (userMembership?.organization) {
@@ -420,58 +412,64 @@ export const organizationProcedure = protectedProcedure.use(
       });
     }
 
-    // RLS automatically scopes this query to user's organization
-    const membership = await ctx.db.query.memberships.findFirst({
-      where: and(
-        eq(memberships.organization_id, organizationId),
-        eq(memberships.user_id, ctx.user.id),
-      ),
-      with: {
-        role: {
-          with: {
-            rolePermissions: {
-              with: {
-                permission: true,
+    // Execute the remainder within an RLS-bound transaction
+    const result = await withOrgRLS(ctx.db, organizationId, async (tx) => {
+      // Membership query under RLS + explicit where
+      const membership = await tx.query.memberships.findFirst({
+        where: and(
+          eq(memberships.organization_id, organizationId),
+          eq(memberships.user_id, ctx.user.id),
+        ),
+        with: {
+          role: {
+            with: {
+              rolePermissions: {
+                with: {
+                  permission: true,
+                },
               },
             },
           },
         },
-      },
-    });
-
-    if (!membership) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "You don't have permission to access this organization",
       });
-    }
 
-    // Get user permissions (handles admin role automatically)
-    const userPermissions = await getUserPermissionsForSupabaseUser(
-      ctx.user,
-      ctx.db,
-    );
+      if (!membership) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You don't have permission to access this organization",
+        });
+      }
 
-    return next({
-      ctx: {
-        ...ctx,
-        organizationId, // Guaranteed non-null (original or repaired)
-        organization, // Guaranteed non-null (original or repaired)
-        membership: {
-          id: membership.id,
-          organizationId: membership.organization_id,
-          userId: membership.user_id,
-          role: {
-            id: membership.role.id,
-            name: membership.role.name,
-            permissions: membership.role.rolePermissions.map(
-              (rp) => rp.permission,
-            ),
-          },
-        } satisfies Membership,
-        userPermissions,
-      } satisfies RLSOrganizationTRPCContext,
+      // Get user permissions (handles admin role automatically)
+      const userPermissions = await getUserPermissionsForSupabaseUser(
+        ctx.user,
+        tx,
+      );
+
+      return next({
+        ctx: {
+          ...ctx,
+          db: tx,
+          organizationId, // Guaranteed non-null (original or repaired)
+          organization, // Guaranteed non-null (original or repaired)
+          membership: {
+            id: membership.id,
+            organizationId: membership.organization_id,
+            userId: membership.user_id,
+            role: {
+              id: membership.role.id,
+              name: membership.role.name,
+              permissions: membership.role.rolePermissions.map(
+                (rp) => rp.permission,
+              ),
+            },
+          } satisfies Membership,
+          userPermissions,
+        } satisfies RLSOrganizationTRPCContext,
+      });
     });
+
+    return result;
   },
 );
 
@@ -483,7 +481,7 @@ export const organizationProcedure = protectedProcedure.use(
  *
  * Use this for new routers that don't need complex permission checking.
  */
-export const orgScopedProcedure = protectedProcedure.use(({ ctx, next }) => {
+export const orgScopedProcedure = protectedProcedure.use(async ({ ctx, next }) => {
   if (!ctx.organizationId) {
     throw new TRPCError({
       code: "FORBIDDEN",
@@ -491,12 +489,17 @@ export const orgScopedProcedure = protectedProcedure.use(({ ctx, next }) => {
     });
   }
 
-  return next({
-    ctx: {
-      ...ctx,
-      organizationId: ctx.organizationId, // Guaranteed non-null for RLS
-    },
+  const result = await withOrgRLS(ctx.db, ctx.organizationId, async (tx) => {
+    return next({
+      ctx: {
+        ...ctx,
+        db: tx,
+        organizationId: ctx.organizationId!, // Guaranteed non-null for RLS
+      } satisfies TRPCContext & { organizationId: string },
+    });
   });
+
+  return result;
 });
 
 /**
@@ -512,7 +515,7 @@ export const orgScopedProcedure = protectedProcedure.use(({ ctx, next }) => {
  * - Standardizes error handling for missing organization context
  * - Compatible with application-layer organization filtering patterns
  */
-export const anonOrgScopedProcedure = publicProcedure.use(({ ctx, next }) => {
+export const anonOrgScopedProcedure = publicProcedure.use(async ({ ctx, next }) => {
   if (!ctx.organization) {
     throw new TRPCError({
       code: "NOT_FOUND",
@@ -520,11 +523,21 @@ export const anonOrgScopedProcedure = publicProcedure.use(({ ctx, next }) => {
     });
   }
 
-  return next({
-    ctx: {
-      ...ctx,
-      organizationId: ctx.organization.id, // Guaranteed non-null for consistency
-      organization: ctx.organization, // Guaranteed non-null
-    },
+  const org = ctx.organization; // Non-null assertion: checked above
+  const orgId = org.id;
+  const result = await withOrgRLS(ctx.db, orgId, async (tx) => {
+    return next({
+      ctx: {
+        ...ctx,
+        db: tx,
+        organizationId: orgId, // Guaranteed non-null for consistency
+        organization: org, // Guaranteed non-null
+      } satisfies TRPCContext & {
+        organizationId: string;
+        organization: NonNullable<TRPCContext["organization"]>;
+      },
+    });
   });
+
+  return result;
 });
