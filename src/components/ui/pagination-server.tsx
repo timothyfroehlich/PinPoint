@@ -269,7 +269,7 @@ export function PaginationUniversal({
   totalCount,
   baseUrl,
   searchParams = {},
-  itemName = "items",
+  itemName = "items", // eslint-disable-line @typescript-eslint/no-unused-vars
 }: PaginationUniversalProps) {
   // Calculate items per page (estimate from totalCount and totalPages)
   const itemsPerPage =

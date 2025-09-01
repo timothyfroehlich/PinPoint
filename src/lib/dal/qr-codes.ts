@@ -10,8 +10,6 @@ import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { ServiceFactory } from "~/server/services/factory";
 import { constructReportUrl } from "~/server/utils/qrCodeUtils";
 import type { 
-  QRCodeResolution,
-  QRCodeResolutionError, 
   QRCodeResolutionResult 
 } from "~/lib/types";
 
