@@ -4,11 +4,17 @@
  * Phase 4B.4: Activity Log
  */
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import { 
-  ActivityIcon, 
+import {
+  ActivityIcon,
   ClockIcon,
   UserIcon,
   FileTextIcon,
@@ -16,7 +22,7 @@ import {
   AlertTriangleIcon,
   SettingsIcon,
   DownloadIcon,
-  FilterIcon
+  FilterIcon,
 } from "lucide-react";
 import { requireMemberAccess } from "~/lib/organization-context";
 import { getActivityLog, getActivityStats } from "~/lib/dal/activity-log";
@@ -30,7 +36,7 @@ export default async function ActivityLogPage({
 }) {
   const { organization } = await requireMemberAccess();
   const organizationId = organization.id;
-  
+
   // Await searchParams as required by Next.js 15
   const resolvedSearchParams = await searchParams;
 
@@ -55,7 +61,11 @@ export default async function ActivityLogPage({
     getActivityStats(organizationId),
   ]);
 
-  const { entries: mockActivityLog, totalCount: totalEntries, totalPages } = activityResult;
+  const {
+    entries: mockActivityLog,
+    totalCount: totalEntries,
+    totalPages,
+  } = activityResult;
 
   const getActionIcon = (action: string) => {
     switch (action) {
@@ -130,7 +140,9 @@ export default async function ActivityLogPage({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Security Events</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Security Events
+            </CardTitle>
             <ShieldIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -144,7 +156,9 @@ export default async function ActivityLogPage({
             <AlertTriangleIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-error">{stats.errorEvents}</div>
+            <div className="text-2xl font-bold text-error">
+              {stats.errorEvents}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -177,14 +191,16 @@ export default async function ActivityLogPage({
           <div className="space-y-4">
             {mockActivityLog.map((entry) => {
               const ActionIcon = getActionIcon(entry.action);
-              
+
               return (
                 <div
                   key={entry.id}
                   className="flex items-start space-x-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                 >
                   {/* Icon and Severity */}
-                  <div className={`p-2 rounded-lg ${getSeverityColor(entry.severity)}`}>
+                  <div
+                    className={`p-2 rounded-lg ${getSeverityColor(entry.severity)}`}
+                  >
                     <ActionIcon className="h-4 w-4" />
                   </div>
 
@@ -223,14 +239,11 @@ export default async function ActivityLogPage({
           {/* Pagination */}
           <div className="flex items-center justify-between mt-6">
             <div className="text-sm text-muted-foreground">
-              Showing {((page - 1) * limit) + 1} to {Math.min(page * limit, totalEntries)} of {totalEntries} entries
+              Showing {(page - 1) * limit + 1} to{" "}
+              {Math.min(page * limit, totalEntries)} of {totalEntries} entries
             </div>
             <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-              >
+              <Button variant="outline" size="sm" disabled={page <= 1}>
                 Previous
               </Button>
               <div className="flex items-center space-x-1">
@@ -248,11 +261,7 @@ export default async function ActivityLogPage({
                   );
                 })}
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= totalPages}
-              >
+              <Button variant="outline" size="sm" disabled={page >= totalPages}>
                 Next
               </Button>
             </div>

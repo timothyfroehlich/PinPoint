@@ -7,6 +7,7 @@
  */
 
 import { z } from "zod";
+import { uuidSchema } from "~/lib/validation/schemas";
 
 // Comprehensive schema for issue filtering
 const IssueSearchParamsSchema = z.object({
@@ -32,12 +33,12 @@ const IssueSearchParamsSchema = z.object({
     }),
 
   // User filtering
-  assignee: z.string().uuid().optional(),
-  reporter: z.string().uuid().optional(),
+  assignee: uuidSchema.optional(),
+  reporter: uuidSchema.optional(),
 
   // Machine/location filtering
-  machine: z.string().uuid().optional(),
-  location: z.string().uuid().optional(),
+  machine: uuidSchema.optional(),
+  location: uuidSchema.optional(),
 
   // Date range filtering
   created_after: z.string().datetime().optional(),

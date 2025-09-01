@@ -216,8 +216,6 @@ export interface ModelResponse
   };
 }
 
-
-
 /** Attachment response */
 export type AttachmentResponse = DrizzleToCamelCase<
   InferSelectModel<typeof attachments>
@@ -342,7 +340,6 @@ export type MachineModel = NonNullable<MachineResponse>["model"];
 /** Owner from machine response */
 export type MachineOwner = NonNullable<MachineResponse>["owner"];
 
-
 // ============================================================================
 // Utility Types - Common Patterns
 // ============================================================================
@@ -364,7 +361,6 @@ export type IssueSortBy = "created" | "updated" | "priority" | "status";
 
 /** Sort order options */
 export type SortOrder = "asc" | "desc";
-
 
 // ============================================================================
 // Re-exports for Convenience

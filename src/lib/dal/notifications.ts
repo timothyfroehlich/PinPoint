@@ -116,7 +116,13 @@ export const getRecentUnreadNotifications = cache(async (limit = 5) => {
  */
 export const getNotificationsByType = cache(
   async (
-    notificationType: "ISSUE_CREATED" | "ISSUE_UPDATED" | "ISSUE_ASSIGNED" | "ISSUE_COMMENTED" | "MACHINE_ASSIGNED" | "SYSTEM_ANNOUNCEMENT",
+    notificationType:
+      | "ISSUE_CREATED"
+      | "ISSUE_UPDATED"
+      | "ISSUE_ASSIGNED"
+      | "ISSUE_COMMENTED"
+      | "MACHINE_ASSIGNED"
+      | "SYSTEM_ANNOUNCEMENT",
     limit = 10,
   ) => {
     return ensureOrgContextAndBindRLS(async (tx, context) => {
@@ -274,7 +280,9 @@ export type UserNotification = Awaited<
   ReturnType<typeof getUserNotifications>
 >[0];
 
-export type NotificationStats = Awaited<ReturnType<typeof getNotificationStats>>;
+export type NotificationStats = Awaited<
+  ReturnType<typeof getNotificationStats>
+>;
 
 export type RecentNotification = Awaited<
   ReturnType<typeof getRecentUnreadNotifications>

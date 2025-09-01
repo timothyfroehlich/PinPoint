@@ -15,7 +15,13 @@ import { AlertTriangle, RefreshCw, Home, HelpCircle } from "lucide-react";
 export interface ErrorAction {
   label: string;
   action: () => void;
-  variant?: "default" | "outline" | "destructive" | "secondary" | "ghost" | "link";
+  variant?:
+    | "default"
+    | "outline"
+    | "destructive"
+    | "secondary"
+    | "ghost"
+    | "link";
   icon?: React.ComponentType<{ className?: string }>;
 }
 
@@ -38,7 +44,11 @@ interface ErrorBoundaryCardProps {
  * Reusable error boundary card that follows PinPoint's design patterns
  * Integrates with existing shadcn/ui components for consistency
  */
-export function ErrorBoundaryCard({ error, reset: _reset, config }: ErrorBoundaryCardProps) {
+export function ErrorBoundaryCard({
+  error,
+  reset: _reset,
+  config,
+}: ErrorBoundaryCardProps) {
   const {
     title,
     description,
@@ -71,7 +81,7 @@ export function ErrorBoundaryCard({ error, reset: _reset, config }: ErrorBoundar
       case "info":
         return {
           iconBg: "bg-primary-container",
-          iconColor: "text-on-primary-container", 
+          iconColor: "text-on-primary-container",
           titleColor: "text-on-primary-container",
         };
       default:
@@ -89,7 +99,9 @@ export function ErrorBoundaryCard({ error, reset: _reset, config }: ErrorBoundar
     <div className="container mx-auto px-4 py-8">
       <Card className="max-w-2xl mx-auto">
         <CardHeader className="text-center">
-          <div className={`mx-auto w-12 h-12 ${colors.iconBg} rounded-full flex items-center justify-center mb-4`}>
+          <div
+            className={`mx-auto w-12 h-12 ${colors.iconBg} rounded-full flex items-center justify-center mb-4`}
+          >
             <Icon className={`w-6 h-6 ${colors.iconColor}`} />
           </div>
           <CardTitle className={`text-xl font-semibold ${colors.titleColor}`}>
@@ -97,9 +109,7 @@ export function ErrorBoundaryCard({ error, reset: _reset, config }: ErrorBoundar
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-muted-foreground text-center">
-            {description}
-          </p>
+          <p className="text-muted-foreground text-center">{description}</p>
 
           {/* Error digest for support */}
           {error.digest && (
@@ -109,7 +119,7 @@ export function ErrorBoundaryCard({ error, reset: _reset, config }: ErrorBoundar
               </Badge>
             </div>
           )}
-          
+
           {/* Development error details */}
           {showErrorDetails && (
             <div className="bg-muted p-4 rounded text-sm">
@@ -117,7 +127,7 @@ export function ErrorBoundaryCard({ error, reset: _reset, config }: ErrorBoundar
               <pre className="mt-2 whitespace-pre-wrap">{error.message}</pre>
             </div>
           )}
-          
+
           {/* Action buttons */}
           <div className="flex flex-wrap justify-center gap-3">
             {actions.map((actionItem, index) => {
@@ -154,29 +164,33 @@ export const createCommonActions = {
   }),
 
   dashboard: (): ErrorAction => ({
-    label: "Return to Dashboard", 
-    action: () => window.location.href = "/dashboard",
+    label: "Return to Dashboard",
+    action: () => (window.location.href = "/dashboard"),
     variant: "outline",
     icon: Home,
   }),
 
   support: (): ErrorAction => ({
     label: "Contact Support",
-    action: () => window.location.href = "mailto:support@pinpoint.com?subject=Application Error",
-    variant: "outline", 
+    action: () =>
+      (window.location.href =
+        "mailto:support@pinpoint.com?subject=Application Error"),
+    variant: "outline",
     icon: HelpCircle,
   }),
 
   refresh: (): ErrorAction => ({
     label: "Refresh Page",
-    action: () => { window.location.reload(); },
+    action: () => {
+      window.location.reload();
+    },
     variant: "secondary",
     icon: RefreshCw,
   }),
 
   signIn: (): ErrorAction => ({
     label: "Sign In",
-    action: () => window.location.href = "/auth/sign-in",
+    action: () => (window.location.href = "/auth/sign-in"),
     variant: "default",
   }),
 };

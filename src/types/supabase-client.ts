@@ -1,6 +1,6 @@
 /**
  * Custom Supabase Client Type Definitions
- * 
+ *
  * Extends auto-generated types with custom definitions for PinPoint
  * Note: supabase.ts is auto-generated - do not edit
  */
@@ -12,12 +12,18 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export type { Database };
 
 // Custom typed Supabase client
-export type TypedSupabaseClient = SupabaseClient<Database, "public" | "graphql_public">;
+export type TypedSupabaseClient = SupabaseClient<
+  Database,
+  "public" | "graphql_public"
+>;
 
 // Convenience type aliases for commonly used types
-export type Tables<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];
-export type Inserts<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Insert"];
-export type Updates<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Update"];
+export type Tables<T extends keyof Database["public"]["Tables"]> =
+  Database["public"]["Tables"][T]["Row"];
+export type Inserts<T extends keyof Database["public"]["Tables"]> =
+  Database["public"]["Tables"][T]["Insert"];
+export type Updates<T extends keyof Database["public"]["Tables"]> =
+  Database["public"]["Tables"][T]["Update"];
 
 // Common entity types
 export type Organization = Tables<"organizations">;
@@ -34,7 +40,7 @@ export type Model = Tables<"models">;
 
 // Insert types for forms
 export type InsertOrganization = Inserts<"organizations">;
-export type InsertUser = Inserts<"users">;  
+export type InsertUser = Inserts<"users">;
 export type InsertMachine = Inserts<"machines">;
 export type InsertIssue = Inserts<"issues">;
 

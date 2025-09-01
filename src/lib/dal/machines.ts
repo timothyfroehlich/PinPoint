@@ -26,7 +26,6 @@ import type { MachineFilters } from "~/lib/types";
 // TYPE DEFINITIONS
 // ================================
 
-
 export interface MachinePagination {
   page: number;
   limit: number;
@@ -77,33 +76,35 @@ export const getMachinesWithFilters = cache(
         isNull(machines.deleted_at), // Exclude soft-deleted machines per §9.3
       ];
 
-    // Location filtering
-    if (filters.locationIds?.length) {
-      whereConditions.push(inArray(machines.location_id, filters.locationIds));
-    }
+      // Location filtering
+      if (filters.locationIds?.length) {
+        whereConditions.push(
+          inArray(machines.location_id, filters.locationIds),
+        );
+      }
 
-    // Model filtering
-    if (filters.modelIds?.length) {
-      whereConditions.push(inArray(machines.model_id, filters.modelIds));
-    }
+      // Model filtering
+      if (filters.modelIds?.length) {
+        whereConditions.push(inArray(machines.model_id, filters.modelIds));
+      }
 
-    // Owner filtering
-    if (filters.ownerIds?.length) {
-      whereConditions.push(inArray(machines.owner_id, filters.ownerIds));
-    }
+      // Owner filtering
+      if (filters.ownerIds?.length) {
+        whereConditions.push(inArray(machines.owner_id, filters.ownerIds));
+      }
 
-    // QR code filtering
-    if (filters.hasQR === true) {
-      whereConditions.push(sql`${machines.qr_code_url} IS NOT NULL`);
-    } else if (filters.hasQR === false) {
-      whereConditions.push(sql`${machines.qr_code_url} IS NULL`);
-    }
+      // QR code filtering
+      if (filters.hasQR === true) {
+        whereConditions.push(sql`${machines.qr_code_url} IS NOT NULL`);
+      } else if (filters.hasQR === false) {
+        whereConditions.push(sql`${machines.qr_code_url} IS NULL`);
+      }
 
-    // Search across machine name, location name, and model name
-    if (filters.search) {
-      const searchTerm = `%${filters.search}%`;
-      whereConditions.push(
-        sql`(
+      // Search across machine name, location name, and model name
+      if (filters.search) {
+        const searchTerm = `%${filters.search}%`;
+        whereConditions.push(
+          sql`(
           ${machines.name} ILIKE ${searchTerm}
           OR EXISTS (
             SELECT 1 FROM ${locations} 
@@ -115,43 +116,43 @@ export const getMachinesWithFilters = cache(
             WHERE ${models.id} = ${machines.model_id} 
             AND ${models.name} ILIKE ${searchTerm}
           )
-        )`
-      );
-    }
+        )`,
+        );
+      }
 
-    // Build order by
-    let orderBy;
-    switch (sorting.field) {
-      case "name":
-        orderBy =
-          sorting.order === "desc" ? desc(machines.name) : asc(machines.name);
-        break;
-      case "updated_at":
-        orderBy =
-          sorting.order === "desc"
-            ? desc(machines.updated_at)
-            : asc(machines.updated_at);
-        break;
-      case "location":
-        // Complex sorting by location name - we'll use a subquery
-        orderBy =
-          sorting.order === "desc"
-            ? sql`(SELECT ${locations.name} FROM ${locations} WHERE ${locations.id} = ${machines.location_id}) DESC`
-            : sql`(SELECT ${locations.name} FROM ${locations} WHERE ${locations.id} = ${machines.location_id}) ASC`;
-        break;
-      case "model":
-        // Complex sorting by model name - we'll use a subquery
-        orderBy =
-          sorting.order === "desc"
-            ? sql`(SELECT ${models.name} FROM ${models} WHERE ${models.id} = ${machines.model_id}) DESC`
-            : sql`(SELECT ${models.name} FROM ${models} WHERE ${models.id} = ${machines.model_id}) ASC`;
-        break;
-      default:
-        orderBy =
-          sorting.order === "desc"
-            ? desc(machines.created_at)
-            : asc(machines.created_at);
-    }
+      // Build order by
+      let orderBy;
+      switch (sorting.field) {
+        case "name":
+          orderBy =
+            sorting.order === "desc" ? desc(machines.name) : asc(machines.name);
+          break;
+        case "updated_at":
+          orderBy =
+            sorting.order === "desc"
+              ? desc(machines.updated_at)
+              : asc(machines.updated_at);
+          break;
+        case "location":
+          // Complex sorting by location name - we'll use a subquery
+          orderBy =
+            sorting.order === "desc"
+              ? sql`(SELECT ${locations.name} FROM ${locations} WHERE ${locations.id} = ${machines.location_id}) DESC`
+              : sql`(SELECT ${locations.name} FROM ${locations} WHERE ${locations.id} = ${machines.location_id}) ASC`;
+          break;
+        case "model":
+          // Complex sorting by model name - we'll use a subquery
+          orderBy =
+            sorting.order === "desc"
+              ? sql`(SELECT ${models.name} FROM ${models} WHERE ${models.id} = ${machines.model_id}) DESC`
+              : sql`(SELECT ${models.name} FROM ${models} WHERE ${models.id} = ${machines.model_id}) ASC`;
+          break;
+        default:
+          orderBy =
+            sorting.order === "desc"
+              ? desc(machines.created_at)
+              : asc(machines.created_at);
+      }
 
       // Execute queries in parallel
       const [machineResults, totalCountResult] = await Promise.all([
@@ -179,8 +180,8 @@ export const getMachinesWithFilters = cache(
           .then((result) => result[0]?.count ?? 0),
       ]);
 
-    const hasNextPage = machineResults.length > pagination.limit;
-    const items = hasNextPage ? machineResults.slice(0, -1) : machineResults;
+      const hasNextPage = machineResults.length > pagination.limit;
+      const items = hasNextPage ? machineResults.slice(0, -1) : machineResults;
 
       return {
         items,

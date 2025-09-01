@@ -21,11 +21,5 @@ interface IssuesErrorProps {
 export default function IssuesError({ error, reset }: IssuesErrorProps) {
   const config = errorConfigs.issues(reset);
 
-  return (
-    <ErrorBoundaryCard
-      error={error}
-      reset={reset}
-      config={config}
-    />
-  );
+  return <ErrorBoundaryCard error={error} reset={reset} config={config} />;
 }

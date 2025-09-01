@@ -16,7 +16,10 @@ import type { DrizzleClient } from "~/server/db/drizzle";
 import type { SupabaseServerClient } from "~/lib/supabase/server";
 import { SEED_TEST_IDS } from "../constants/seed-test-ids";
 import { createMockDatabase } from "./service-test-helpers";
-import { SUBDOMAIN_VERIFIED_HEADER, SUBDOMAIN_HEADER } from "~/lib/subdomain-verification";
+import {
+  SUBDOMAIN_VERIFIED_HEADER,
+  SUBDOMAIN_HEADER,
+} from "~/lib/subdomain-verification";
 
 /**
  * Anonymous user test context with organization scoping

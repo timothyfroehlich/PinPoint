@@ -20,10 +20,12 @@ interface SettingsLayoutProps {
   children: React.ReactNode;
 }
 
-export default async function SettingsLayout({ children }: SettingsLayoutProps) {
+export default async function SettingsLayout({
+  children,
+}: SettingsLayoutProps) {
   // Ensure user is authenticated and has organization access
   await requireMemberAccess();
-  
+
   // requireMemberAccess already ensures user is authenticated and has membership
   // No additional checks needed
 
@@ -36,14 +38,14 @@ export default async function SettingsLayout({ children }: SettingsLayoutProps) 
     },
     {
       title: "Users",
-      href: "/settings/users", 
+      href: "/settings/users",
       icon: UsersIcon,
       description: "Manage team members and permissions",
     },
     {
       title: "Roles",
       href: "/settings/roles",
-      icon: ShieldIcon, 
+      icon: ShieldIcon,
       description: "Configure roles and permissions",
     },
     {
@@ -72,9 +74,9 @@ export default async function SettingsLayout({ children }: SettingsLayoutProps) 
                 Manage your organization and application settings
               </p>
             </div>
-            
+
             <Separator />
-            
+
             <nav className="space-y-2">
               {navigationItems.map((item) => {
                 const Icon = item.icon;
@@ -96,12 +98,10 @@ export default async function SettingsLayout({ children }: SettingsLayoutProps) 
             </nav>
           </div>
         </aside>
-        
+
         {/* Settings Content */}
         <div className="flex-1 lg:max-w-4xl">
-          <div className="space-y-6">
-            {children}
-          </div>
+          <div className="space-y-6">{children}</div>
         </div>
       </div>
     </div>

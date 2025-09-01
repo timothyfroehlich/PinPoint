@@ -49,7 +49,12 @@ export function mockServerActionAuth(mockContext = createMockAuthContext()) {
       organization: { id: mockContext.organizationId },
       user: { id: mockContext.user.id },
       accessLevel: "member",
-      membership: { id: "membership-test", user_id: mockContext.user.id, organization_id: mockContext.organizationId, role_id: mockContext.membership?.role_id || "role-test" },
+      membership: {
+        id: "membership-test",
+        user_id: mockContext.user.id,
+        organization_id: mockContext.organizationId,
+        role_id: mockContext.membership?.role_id || "role-test",
+      },
     })),
   }));
 
@@ -58,8 +63,21 @@ export function mockServerActionAuth(mockContext = createMockAuthContext()) {
     requireAuthContextWithRole: vi.fn(async () => ({
       user: mockContext.user,
       organizationId: mockContext.organizationId,
-      membership: { id: "membership-test", user_id: mockContext.user.id, organization_id: mockContext.organizationId, role: { id: mockContext.membership?.role_id || "role-test", name: "Member" }, role_id: mockContext.membership?.role_id || "role-test", rolePermissions: [] },
-      role: { id: mockContext.membership?.role_id || "role-test", name: "Member" },
+      membership: {
+        id: "membership-test",
+        user_id: mockContext.user.id,
+        organization_id: mockContext.organizationId,
+        role: {
+          id: mockContext.membership?.role_id || "role-test",
+          name: "Member",
+        },
+        role_id: mockContext.membership?.role_id || "role-test",
+        rolePermissions: [],
+      },
+      role: {
+        id: mockContext.membership?.role_id || "role-test",
+        name: "Member",
+      },
       permissions: mockContext.permissions || [],
     })),
   }));
@@ -68,7 +86,9 @@ export function mockServerActionAuth(mockContext = createMockAuthContext()) {
   vi.mock("~/server/auth/permissions", async (orig) => {
     return {
       ...(await orig()),
-      requirePermission: vi.fn(async (_membership, _permission, _db) => Promise.resolve()),
+      requirePermission: vi.fn(async (_membership, _permission, _db) =>
+        Promise.resolve(),
+      ),
     };
   });
 

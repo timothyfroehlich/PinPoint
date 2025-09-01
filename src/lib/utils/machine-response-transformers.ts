@@ -29,7 +29,11 @@ import {
   transformKeysToCamelCase,
   transformKeysToSnakeCase,
 } from "./case-transformers";
-import type { MachineResponse, LocationResponse, MachineForIssues } from "~/lib/types/api";
+import type {
+  MachineResponse,
+  LocationResponse,
+  MachineForIssues,
+} from "~/lib/types/api";
 
 /**
  * NOTE: MachineResponse, LocationResponse, MachineForIssues types are now defined in ~/lib/types/api.ts

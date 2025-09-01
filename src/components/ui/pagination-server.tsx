@@ -272,8 +272,9 @@ export function PaginationUniversal({
   itemName = "items",
 }: PaginationUniversalProps) {
   // Calculate items per page (estimate from totalCount and totalPages)
-  const itemsPerPage = totalPages > 1 ? Math.ceil(totalCount / totalPages) : totalCount;
-  
+  const itemsPerPage =
+    totalPages > 1 ? Math.ceil(totalCount / totalPages) : totalCount;
+
   return (
     <PaginationServer
       currentPage={currentPage}

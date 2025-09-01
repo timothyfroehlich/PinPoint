@@ -165,12 +165,10 @@ export function sanitizeUrlParams(params: URLSearchParams): URLSearchParams {
 /**
  * Type guards for URL parameter validation
  */
-function isValidSortBy(
-  value: string | null,
-): value is IssueSortBy {
+function isValidSortBy(value: string | null): value is IssueSortBy {
   return (
     typeof value === "string" &&
-    ISSUE_SORT_OPTIONS.includes(value as typeof ISSUE_SORT_OPTIONS[number])
+    ISSUE_SORT_OPTIONS.includes(value as (typeof ISSUE_SORT_OPTIONS)[number])
   );
 }
 

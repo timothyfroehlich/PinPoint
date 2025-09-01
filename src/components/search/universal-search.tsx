@@ -1,7 +1,7 @@
 /**
  * Universal Search Component
  * Enhanced search for navigation bar with cross-entity results, suggestions, and recent searches
- * 
+ *
  * Features:
  * - Cross-entity search with suggestions
  * - Recent searches stored in localStorage
@@ -18,16 +18,20 @@ import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
-import { 
-  SearchIcon, 
-  XIcon, 
-  Loader2, 
-  ClockIcon, 
-  ArrowRightIcon
+import {
+  SearchIcon,
+  XIcon,
+  Loader2,
+  ClockIcon,
+  ArrowRightIcon,
 } from "lucide-react";
 import { useDebounce } from "~/lib/hooks/use-debounce";
 import { type SearchResult } from "~/lib/services/search-service";
-import { ENTITY_ICONS, ENTITY_COLORS, type EntityType } from "~/lib/constants/entity-ui";
+import {
+  ENTITY_ICONS,
+  ENTITY_COLORS,
+  type EntityType,
+} from "~/lib/constants/entity-ui";
 
 interface UniversalSearchProps {
   placeholder?: string;
@@ -56,18 +60,18 @@ export function UniversalSearch({
 }: UniversalSearchProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  
+
   // Search state
   const [searchValue, setSearchValue] = useState("");
   const [suggestions, setSuggestions] = useState<SearchResult[]>([]);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
-  
+
   // Refs
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  
+
   // Debounce search input for API calls
   const debouncedSearchValue = useDebounce(searchValue, 300);
 
@@ -87,7 +91,11 @@ export function UniversalSearch({
 
   // Fetch search suggestions when debounced value changes
   useEffect(() => {
-    if (!showSuggestions || !debouncedSearchValue || debouncedSearchValue.length < 2) {
+    if (
+      !showSuggestions ||
+      !debouncedSearchValue ||
+      debouncedSearchValue.length < 2
+    ) {
       setSuggestions([]);
       return;
     }
@@ -133,7 +141,9 @@ export function UniversalSearch({
     };
 
     document.addEventListener("mousedown", handleClickOutside);
-    return () => { document.removeEventListener("mousedown", handleClickOutside); };
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, []);
 
   // Handle keyboard navigation
@@ -147,9 +157,11 @@ export function UniversalSearch({
 
     if (showDropdown) {
       document.addEventListener("keydown", handleKeyDown);
-      return () => { document.removeEventListener("keydown", handleKeyDown); };
+      return () => {
+        document.removeEventListener("keydown", handleKeyDown);
+      };
     }
-    
+
     return undefined;
   }, [showDropdown]);
 
@@ -158,16 +170,19 @@ export function UniversalSearch({
 
     const newRecentSearches = [
       query.trim(),
-      ...recentSearches.filter(s => s !== query.trim()).slice(0, 4),
+      ...recentSearches.filter((s) => s !== query.trim()).slice(0, 4),
     ];
-    
+
     setRecentSearches(newRecentSearches);
-    localStorage.setItem("pinpoint-recent-searches", JSON.stringify(newRecentSearches));
+    localStorage.setItem(
+      "pinpoint-recent-searches",
+      JSON.stringify(newRecentSearches),
+    );
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (searchValue.trim()) {
       saveRecentSearch(searchValue);
       startTransition(() => {
@@ -184,7 +199,7 @@ export function UniversalSearch({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchValue(value);
-    
+
     if (value.length >= 2) {
       setShowDropdown(true);
     }
@@ -217,11 +232,11 @@ export function UniversalSearch({
     setShowDropdown(false);
   };
 
-  const shouldShowDropdown = showDropdown && (
-    (suggestions.length > 0) ||
-    (recentSearches.length > 0 && searchValue.length === 0) ||
-    isLoadingSuggestions
-  );
+  const shouldShowDropdown =
+    showDropdown &&
+    (suggestions.length > 0 ||
+      (recentSearches.length > 0 && searchValue.length === 0) ||
+      isLoadingSuggestions);
 
   return (
     <div className={`relative ${className}`}>
@@ -265,7 +280,7 @@ export function UniversalSearch({
 
       {/* Search suggestions dropdown */}
       {shouldShowDropdown && (
-        <Card 
+        <Card
           ref={dropdownRef}
           className="absolute top-full left-0 right-0 mt-1 z-50 max-h-96 overflow-y-auto shadow-lg"
         >
@@ -280,7 +295,9 @@ export function UniversalSearch({
                 {recentSearches.map((recentSearch, index) => (
                   <button
                     key={index}
-                    onClick={() => { selectRecentSearch(recentSearch); }}
+                    onClick={() => {
+                      selectRecentSearch(recentSearch);
+                    }}
                     className="w-full text-left px-3 py-2 hover:bg-muted rounded-md flex items-center gap-2 transition-colors"
                   >
                     <SearchIcon className="h-3 w-3 text-muted-foreground" />
@@ -310,13 +327,18 @@ export function UniversalSearch({
                   </div>
                 )}
                 {suggestions.map((suggestion) => {
-                  const IconComponent = ENTITY_ICONS[suggestion.entity as EntityType] || SearchIcon;
-                  const colorClass = ENTITY_COLORS[suggestion.entity as EntityType] || "bg-surface-variant text-on-surface-variant";
+                  const IconComponent =
+                    ENTITY_ICONS[suggestion.entity as EntityType] || SearchIcon;
+                  const colorClass =
+                    ENTITY_COLORS[suggestion.entity as EntityType] ||
+                    "bg-surface-variant text-on-surface-variant";
 
                   return (
                     <button
                       key={`${suggestion.entity}-${suggestion.id}`}
-                      onClick={() => { selectSuggestion(suggestion); }}
+                      onClick={() => {
+                        selectSuggestion(suggestion);
+                      }}
                       className="w-full text-left px-3 py-3 hover:bg-muted rounded-md transition-colors"
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -339,8 +361,8 @@ export function UniversalSearch({
                           </div>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
-                          <Badge 
-                            variant="secondary" 
+                          <Badge
+                            variant="secondary"
                             className={`text-xs ${colorClass}`}
                           >
                             {suggestion.entity}

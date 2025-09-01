@@ -77,14 +77,14 @@ export function RealtimeCommentsClient({
             (payload) => {
               // Only show comments from other users and not already loaded
               if (
-                payload.new['author_id'] !== currentUserId &&
-                !existingCommentIds.includes(payload.new['id'])
+                payload.new["author_id"] !== currentUserId &&
+                !existingCommentIds.includes(payload.new["id"])
               ) {
                 const newComment = payload.new as Comment;
-                
+
                 setNewComments((prev) => {
                   // Avoid duplicates
-                  if (prev.some(c => c.id === newComment.id)) {
+                  if (prev.some((c) => c.id === newComment.id)) {
                     return prev;
                   }
                   return [...prev, newComment];
@@ -92,10 +92,12 @@ export function RealtimeCommentsClient({
 
                 // Auto-remove notification after 45 seconds
                 setTimeout(() => {
-                  setNewComments(prev => prev.filter(c => c.id !== newComment.id));
+                  setNewComments((prev) =>
+                    prev.filter((c) => c.id !== newComment.id),
+                  );
                 }, 45000);
               }
-            }
+            },
           )
           // Listen for comment updates (edits)
           .on(
@@ -108,11 +110,13 @@ export function RealtimeCommentsClient({
             },
             (payload) => {
               // Update existing comment in real-time
-              if (payload.new['author_id'] !== currentUserId) {
+              if (payload.new["author_id"] !== currentUserId) {
                 const updatedComment = payload.new as Comment;
-                
+
                 setNewComments((prev) => {
-                  const existingIndex = prev.findIndex(c => c.id === updatedComment.id);
+                  const existingIndex = prev.findIndex(
+                    (c) => c.id === updatedComment.id,
+                  );
                   if (existingIndex !== -1) {
                     const updated = [...prev];
                     updated[existingIndex] = updatedComment;
@@ -121,7 +125,7 @@ export function RealtimeCommentsClient({
                   return prev;
                 });
               }
-            }
+            },
           )
           // Listen for issue status changes
           .on(
@@ -134,7 +138,7 @@ export function RealtimeCommentsClient({
             },
             (payload) => {
               // Show status update notification
-              if (payload.new['updated_at'] !== payload.old['updated_at']) {
+              if (payload.new["updated_at"] !== payload.old["updated_at"]) {
                 setStatusUpdate({
                   status: "Status updated",
                   user: "Someone",
@@ -146,12 +150,12 @@ export function RealtimeCommentsClient({
                   setStatusUpdate(null);
                 }, 10000);
               }
-            }
+            },
           )
           .subscribe((status) => {
-            if (status === 'SUBSCRIBED') {
+            if (status === "SUBSCRIBED") {
               setIsConnected(true);
-            } else if (status === 'CHANNEL_ERROR') {
+            } else if (status === "CHANNEL_ERROR") {
               setIsConnected(false);
             }
           });
@@ -169,7 +173,9 @@ export function RealtimeCommentsClient({
 
     const cleanup = initializeRealtimeConnection();
     return () => {
-      cleanup.then(fn => { fn?.(); });
+      cleanup.then((fn) => {
+        fn?.();
+      });
     };
   }, [issueId, currentUserId, existingCommentIds]);
 
@@ -185,14 +191,16 @@ export function RealtimeCommentsClient({
         <div className="flex items-center justify-between">
           <div className="text-sm text-muted-foreground flex items-center gap-2">
             <MessageSquareIcon className="h-4 w-4" />
-            {newComments.length > 0 && statusUpdate 
-              ? "Live updates:" 
-              : newComments.length > 0 
+            {newComments.length > 0 && statusUpdate
+              ? "Live updates:"
+              : newComments.length > 0
                 ? "New comments from other users:"
-                : "Issue updated:"
-            }
+                : "Issue updated:"}
           </div>
-          <Badge variant={isConnected ? "secondary" : "outline"} className="text-xs">
+          <Badge
+            variant={isConnected ? "secondary" : "outline"}
+            className="text-xs"
+          >
             {isConnected ? "Live" : "Disconnected"}
           </Badge>
         </div>
@@ -206,11 +214,11 @@ export function RealtimeCommentsClient({
               <Badge variant="secondary" className="text-xs">
                 Issue Updated
               </Badge>
-              <span className="text-sm font-medium">
-                {statusUpdate.status}
-              </span>
+              <span className="text-sm font-medium">{statusUpdate.status}</span>
               <span className="text-xs text-muted-foreground">
-                {formatDistanceToNow(new Date(statusUpdate.timestamp), { addSuffix: true })}
+                {formatDistanceToNow(new Date(statusUpdate.timestamp), {
+                  addSuffix: true,
+                })}
               </span>
             </div>
           </AlertDescription>
@@ -219,7 +227,10 @@ export function RealtimeCommentsClient({
 
       {/* Real-time comment notifications */}
       {newComments.map((comment) => (
-        <Alert key={comment.id} className="border-tertiary bg-tertiary-container">
+        <Alert
+          key={comment.id}
+          className="border-tertiary bg-tertiary-container"
+        >
           <AlertDescription>
             <div className="flex items-start gap-3">
               <Avatar className="h-8 w-8">
@@ -230,20 +241,22 @@ export function RealtimeCommentsClient({
                     .join("") || "U"}
                 </AvatarFallback>
               </Avatar>
-              
+
               <div className="flex-1 space-y-1">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-sm">
                     {comment.author?.name || "Someone"}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                    {formatDistanceToNow(new Date(comment.created_at), {
+                      addSuffix: true,
+                    })}
                   </span>
                   <Badge variant="secondary" className="text-xs">
                     New Comment
                   </Badge>
                 </div>
-                
+
                 <div className="text-sm text-on-surface whitespace-pre-wrap leading-relaxed">
                   {comment.content}
                 </div>

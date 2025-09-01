@@ -105,7 +105,8 @@ export const modelCoreRouter = createTRPCRouter({
       if (model.is_custom) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Cannot delete custom models. Remove machine instances instead.",
+          message:
+            "Cannot delete custom models. Remove machine instances instead.",
         });
       }
 

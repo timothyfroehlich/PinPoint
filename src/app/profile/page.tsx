@@ -10,11 +10,7 @@ import {
   List,
   LogOut,
 } from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-} from "~/components/ui/card";
+import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Alert, AlertDescription } from "~/components/ui/alert";
 import { Button } from "~/components/ui/button";
@@ -93,9 +89,7 @@ export default function ProfilePage(): JSX.Element {
     return (
       <div className="container mx-auto max-w-6xl py-8 text-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
-        <h2 className="text-lg font-semibold mt-4">
-          Loading profile...
-        </h2>
+        <h2 className="text-lg font-semibold mt-4">Loading profile...</h2>
       </div>
     );
   }
@@ -149,20 +143,14 @@ export default function ProfilePage(): JSX.Element {
       <Card className="shadow-md">
         <CardContent className="p-6">
           <div className="flex flex-col sm:flex-row items-center gap-6">
-            <UserAvatar
-              user={userProfile}
-              size="large"
-              showTooltip={false}
-            />
+            <UserAvatar user={userProfile} size="large" showTooltip={false} />
             <div className="flex-1 text-center sm:text-left">
               <h1 className="text-3xl font-bold mb-2">
                 {userProfile.name ?? "Unnamed User"}
               </h1>
               {/* Note: Email is handled by Supabase Auth, not stored in user profile */}
               {userProfile.bio && (
-                <p className="text-muted-foreground mb-4">
-                  {userProfile.bio}
-                </p>
+                <p className="text-muted-foreground mb-4">{userProfile.bio}</p>
               )}
               <div className="flex items-center justify-center sm:justify-start gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -237,10 +225,7 @@ export default function ProfilePage(): JSX.Element {
             ) : (
               <div className="flex flex-wrap gap-2">
                 {memberships.map((membership: unknown) => {
-                  const membershipData = membership as Record<
-                    string,
-                    unknown
-                  >;
+                  const membershipData = membership as Record<string, unknown>;
                   const organization = membershipData["organization"] as
                     | { name?: string }
                     | undefined;
@@ -252,10 +237,12 @@ export default function ProfilePage(): JSX.Element {
                       key={membershipData["id"] as string}
                       variant={role?.name === "admin" ? "default" : "outline"}
                       className={cn(
-                        role?.name === "admin" && "bg-primary text-primary-foreground"
+                        role?.name === "admin" &&
+                          "bg-primary text-primary-foreground",
                       )}
                     >
-                      {organization?.name ?? "Unknown"} ({role?.name ?? "Unknown"})
+                      {organization?.name ?? "Unknown"} (
+                      {role?.name ?? "Unknown"})
                     </Badge>
                   );
                 })}
@@ -309,9 +296,7 @@ export default function ProfilePage(): JSX.Element {
         </CardHeader>
         <CardContent>
           {ownedMachines.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No games owned yet
-            </p>
+            <p className="text-sm text-muted-foreground">No games owned yet</p>
           ) : gamesViewMode === "grid" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {ownedMachines.map((machine) => (
@@ -344,7 +329,7 @@ export default function ProfilePage(): JSX.Element {
                   key={machine.id}
                   className={cn(
                     "py-4 px-0",
-                    index < ownedMachines.length - 1 && "border-b"
+                    index < ownedMachines.length - 1 && "border-b",
                   )}
                 >
                   <div>
@@ -358,9 +343,7 @@ export default function ProfilePage(): JSX.Element {
                         <> • {String(machine.model.year)}</>
                       )}
                       <br />
-                      <span className="text-xs">
-                        @ {machine.location.name}
-                      </span>
+                      <span className="text-xs">@ {machine.location.name}</span>
                     </div>
                   </div>
                 </div>

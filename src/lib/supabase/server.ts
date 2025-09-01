@@ -29,7 +29,8 @@ export async function createClient() {
   if (!supabaseUrl || !supabaseAnonKey) {
     const missingVars = [];
     if (!supabaseUrl) missingVars.push("NEXT_PUBLIC_SUPABASE_URL");
-    if (!supabaseAnonKey) missingVars.push("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
+    if (!supabaseAnonKey)
+      missingVars.push("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
     throw new Error(
       `Missing required Supabase environment variables: ${missingVars.join(", ")}`,
     );

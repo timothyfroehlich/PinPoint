@@ -72,4 +72,3 @@ describe("addCommentAction permissions", () => {
     expect(mockRequirePermission).not.toHaveBeenCalled();
   });
 });
-
