@@ -88,7 +88,7 @@ export async function MachineInventoryServer({
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1">
             <GenericSearch
-              initialSearch={filters.search}
+              {...(filters.search && { initialSearch: filters.search })}
               basePath="/machines"
               placeholder="Search machines, locations, or models..."
             />
@@ -134,7 +134,7 @@ export async function MachineInventoryServer({
       <div className="flex flex-col md:flex-row gap-4">
         <div className="flex-1">
           <GenericSearch
-            initialSearch={filters.search}
+            {...(filters.search && { initialSearch: filters.search })}
             basePath="/machines"
             placeholder="Search machines, locations, or models..."
             size="sm"

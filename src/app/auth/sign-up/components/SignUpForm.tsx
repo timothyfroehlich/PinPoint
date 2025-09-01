@@ -59,9 +59,9 @@ function isValidOrganizationArray(data: unknown): data is OrganizationOption[] {
         "id" in obj &&
         "name" in obj &&
         "subdomain" in obj &&
-        typeof obj.id === "string" &&
-        typeof obj.name === "string" &&
-        typeof obj.subdomain === "string"
+        typeof obj["id"] === "string" &&
+        typeof obj["name"] === "string" &&
+        typeof obj["subdomain"] === "string"
       );
     })
   );
