@@ -1,57 +1,19 @@
 /**
- * OPDB API Types
+ * @fileoverview DEPRECATED: OPDB API Types
  *
- * TypeScript interfaces for Open Pinball Database API responses
+ * **THIS FILE IS DEPRECATED**
+ * OPDB types have been moved to `~/lib/types/external.ts` for centralization.
+ * All OPDB types are now available via `~/lib/types`.
+ *
+ * Migration:
+ * ```typescript
+ * // OLD: import type { OPDBMachine } from "~/lib/opdb/types";
+ * // NEW: import type { OPDBMachine } from "~/lib/types";
+ * ```
+ *
+ * @deprecated Use `~/lib/types` instead
+ * @see ~/lib/types/external.ts - New location for external API types
  */
 
-export interface OPDBSearchResult {
-  id: string;
-  text: string;
-  // Additional fields from OPDB search response
-}
-
-export interface OPDBMachine {
-  id: string;
-  name: string;
-  manufacturer?: string;
-  year?: number;
-  type?: string;
-  description?: string;
-  images?: string[];
-  // Additional OPDB fields
-}
-
-export interface OPDBParsedId {
-  groupId: string;
-  machineId?: string | undefined;
-  aliasId?: string | undefined;
-}
-
-export interface OPDBAPIResponse<T> {
-  data: T | null;
-  success: boolean;
-  error?: string;
-}
-
-export interface OPDBSearchResponse {
-  results: OPDBSearchResult[];
-  total: number;
-}
-
-export interface OPDBMachineDetails extends OPDBMachine {
-  // Extended machine details from individual machine endpoint
-  aliases?: string[];
-  features?: string[];
-  playfield_image?: string;
-  backglass_image?: string;
-  cabinet_image?: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface OPDBExportResponse {
-  machines: OPDBMachine[];
-  total: number;
-  page: number;
-  per_page: number;
-}
+// This file no longer exports types to avoid ESLint violations.
+// All OPDB types are available from ~/lib/types

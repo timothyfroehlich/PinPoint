@@ -8,7 +8,7 @@ import { eq, count } from "drizzle-orm";
 import type {
   PinballMapMachine,
   PinballMapMachineDetailsResponse,
-} from "~/lib/pinballmap/types";
+} from "~/lib/types";
 import type { DrizzleClient } from "~/server/db/drizzle";
 
 import { transformPinballMapMachineToModel } from "~/lib/external/pinballmapTransformer";

@@ -5,7 +5,7 @@ import { z } from "zod";
 
 // Internal types (alphabetical)
 import type { ModelResponse } from "~/lib/types/api";
-import type { OPDBSearchResult } from "~/lib/opdb/types";
+import type { OPDBSearchResult } from "~/lib/types";
 
 // Internal utilities (alphabetical)
 import { env } from "~/env";

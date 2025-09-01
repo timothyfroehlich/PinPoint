@@ -35,15 +35,8 @@ export type * from "./guards";
 // Validation types and constants
 export type * from "./validation";
 
-// External service types (OPDB) - re-export for centralized access
-export type {
-  OPDBSearchResult,
-  OPDBMachine,
-  OPDBMachineDetails,
-  OPDBParsedId,
-  OPDBAPIResponse,
-  OPDBExportResponse,
-} from "~/lib/opdb/types";
+// External service types - re-export for centralized access
+export type * from "./external";
 
 // Common DAL utility types
 export type { PaginationOptions } from "~/lib/dal/shared";
