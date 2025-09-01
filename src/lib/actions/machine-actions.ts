@@ -68,7 +68,7 @@ export async function createMachineAction(
     name: formData.get("name"),
     locationId: formData.get("locationId"),
     modelId: formData.get("modelId"),
-    ownerId: formData.get("ownerId") || undefined,
+    ownerId: formData.get("ownerId") ?? undefined,
   });
 
   if (!result.success) {
@@ -89,7 +89,7 @@ export async function createMachineAction(
         organization_id: organizationId,
         location_id: result.data.locationId,
         model_id: result.data.modelId,
-        owner_id: result.data.ownerId || null,
+        owner_id: result.data.ownerId ?? null,
         created_at: new Date(),
         updated_at: new Date(),
       })
@@ -121,7 +121,7 @@ export async function updateMachineAction(
     name: formData.get("name"),
     locationId: formData.get("locationId"),
     modelId: formData.get("modelId"),
-    ownerId: formData.get("ownerId") || undefined,
+    ownerId: formData.get("ownerId") ?? undefined,
   });
 
   if (!result.success) {
@@ -142,7 +142,7 @@ export async function updateMachineAction(
     if (result.data.locationId) updateData.location_id = result.data.locationId;
     if (result.data.modelId) updateData.model_id = result.data.modelId;
     if (result.data.ownerId !== undefined)
-      updateData.owner_id = result.data.ownerId || null;
+      updateData.owner_id = result.data.ownerId ?? null;
 
     // Update with organization scoping
     const [updatedMachine] = await db
@@ -241,8 +241,8 @@ export async function bulkUpdateMachinesAction(
 
   const result = BulkUpdateMachineSchema.safeParse({
     machineIds,
-    locationId: formData.get("locationId") || undefined,
-    ownerId: formData.get("ownerId") || undefined,
+    locationId: formData.get("locationId") ?? undefined,
+    ownerId: formData.get("ownerId") ?? undefined,
   });
 
   if (!result.success) {
@@ -261,7 +261,7 @@ export async function bulkUpdateMachinesAction(
 
     if (result.data.locationId) updateData.location_id = result.data.locationId;
     if (result.data.ownerId !== undefined)
-      updateData.owner_id = result.data.ownerId || null;
+      updateData.owner_id = result.data.ownerId ?? null;
 
     // Update machines with organization scoping using inArray for multiple IDs
     const updatedMachines = await db

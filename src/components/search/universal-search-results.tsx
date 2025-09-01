@@ -137,10 +137,10 @@ export async function UniversalSearchResults({
                 if (count === 0) return null;
 
                 const colorClass =
-                  ENTITY_COLORS[entity as keyof typeof ENTITY_COLORS] ??
+                  (entity in ENTITY_COLORS ? ENTITY_COLORS[entity as keyof typeof ENTITY_COLORS] : null) ??
                   "bg-surface-variant text-on-surface-variant";
                 const label =
-                  ENTITY_LABELS[entity as keyof typeof ENTITY_LABELS] ?? entity;
+                  (entity in ENTITY_LABELS ? ENTITY_LABELS[entity as keyof typeof ENTITY_LABELS] : null) ?? entity;
 
                 return (
                   <Badge
@@ -161,13 +161,13 @@ export async function UniversalSearchResults({
       <div className="space-y-3">
         {searchResponse.results.map((result) => {
           const IconComponent =
-            ENTITY_ICONS[result.entity as keyof typeof ENTITY_ICONS] ??
+            (result.entity in ENTITY_ICONS ? ENTITY_ICONS[result.entity as keyof typeof ENTITY_ICONS] : null) ??
             FileTextIcon;
           const colorClass =
-            ENTITY_COLORS[result.entity as keyof typeof ENTITY_COLORS] ??
+            (result.entity in ENTITY_COLORS ? ENTITY_COLORS[result.entity as keyof typeof ENTITY_COLORS] : null) ??
             "bg-surface-variant text-on-surface-variant";
           const label =
-            ENTITY_LABELS[result.entity as keyof typeof ENTITY_LABELS] ??
+            (result.entity in ENTITY_LABELS ? ENTITY_LABELS[result.entity as keyof typeof ENTITY_LABELS] : null) ??
             result.entity;
 
           return (

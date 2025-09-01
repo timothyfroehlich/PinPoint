@@ -108,8 +108,7 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
                             {formatDistanceToNow(new Date(comment.created_at))}{" "}
                             ago
                           </span>
-                          {comment.updated_at &&
-                            new Date(comment.updated_at).getTime() !==
+                          {new Date(comment.updated_at).getTime() !==
                               new Date(comment.created_at).getTime() && (
                               <Badge variant="outline" className="text-xs">
                                 edited
@@ -158,10 +157,10 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
               <div className="space-y-2">
                 <div>
                   <p className="font-medium">
-                    {issue.machine?.name ?? "Unknown Machine"}
+                    {issue.machine.name ?? "Unknown Machine"}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {issue.machine?.model?.name ?? "Unknown Model"}
+                    {issue.machine.model.name ?? "Unknown Model"}
                   </p>
                 </div>
                 {/* Location info would need to be added to DAL query */}
@@ -229,18 +228,16 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm">Current Status:</span>
-                  {issue.status && (
-                    <Badge variant="outline" className={statusColor}>
-                      {issue.status.name}
-                    </Badge>
-                  )}
+                  <Badge variant="outline" className={statusColor}>
+                    {issue.status.name}
+                  </Badge>
                 </div>
 
                 {/* Status Update - Client Island */}
                 <IssueStatusUpdateClient
                   issueId={issue.id}
-                  currentStatusId={issue.status?.id ?? ""}
-                  currentStatusName={issue.status?.name ?? "Unknown"}
+                  currentStatusId={issue.status.id ?? ""}
+                  currentStatusName={issue.status.name ?? "Unknown"}
                 />
               </div>
             </CardContent>
@@ -264,8 +261,7 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
                   )}
                 </span>
               </div>
-              {issue.updated_at &&
-                new Date(issue.updated_at).getTime() !==
+              {new Date(issue.updated_at).getTime() !==
                   new Date(issue.created_at).getTime() && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Updated:</span>
