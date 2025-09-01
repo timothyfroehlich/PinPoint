@@ -2,11 +2,6 @@
 -- PinPoint Row Level Security Policies (Single Source of Truth)
 -- =================================================================
 
--- =================================================================
--- 0. TESTING INFRASTRUCTURE SETUP
--- =================================================================
--- Install pgTAP extension for RLS testing
-CREATE EXTENSION IF NOT EXISTS pgtap;
 
 -- =================================================================
 -- ROW LEVEL SECURITY POLICIES
