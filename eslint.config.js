@@ -36,14 +36,7 @@ export default tseslint.config(
       },
     },
   },
-  {
-    // Allow server-only imports and type exports in organization context module
-    files: ["src/lib/organization-context.ts"],
-    rules: {
-      "no-restricted-imports": "off",
-      "no-restricted-syntax": "off",
-    },
-  },
+
   {
     // Main configuration for all TS/TSX files
     files: convertPatterns.forESLint(INCLUDE_PATTERNS.production),
@@ -301,6 +294,57 @@ export default tseslint.config(
   {
     // Allow server imports in DAL layer for data access abstraction
     files: ["src/lib/dal/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "off",
+      "no-restricted-syntax": "off",
+    },
+  },
+  {
+    // Allow server imports in server-side API routers
+    files: ["src/server/api/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "off",
+    },
+  },
+  {
+    // Allow server imports in server-side services
+    files: ["src/server/services/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "off",
+    },
+  },
+  {
+    // Allow server imports in server-side auth modules
+    files: ["src/server/auth/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "off",
+    },
+  },
+  {
+    // Allow server imports in test helpers
+    files: ["src/test/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "off",
+      "no-restricted-syntax": "off",
+    },
+  },
+  {
+    // Allow server imports in server DB layer (already excluded by main rule but explicitly adding)
+    files: ["src/server/db/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "off",
+    },
+  },
+  {
+    // Allow server imports in lib services layer
+    files: ["src/lib/services/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "off",
+    },
+  },
+  {
+    // Allow server-only imports and type exports in organization context module (moved to end)
+    files: ["src/lib/organization-context.ts"],
     rules: {
       "no-restricted-imports": "off",
       "no-restricted-syntax": "off",
