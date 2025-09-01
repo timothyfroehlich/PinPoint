@@ -351,6 +351,13 @@ export default tseslint.config(
     },
   },
   {
+    // Allow server imports in Server Actions (server-side execution)
+    files: ["src/lib/actions/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "off",
+    },
+  },
+  {
     // Strategic exemptions: API layer files - allow necessary tRPC patterns (limited scope)
     files: ["src/server/api/routers/**/*.ts"],
     rules: {
