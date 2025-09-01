@@ -63,8 +63,8 @@ export function IssueAssignmentClient({
         </SelectTrigger>
         <SelectContent>
           {userOptions.map((user) => (
-            <SelectItem 
-              key={user.id} 
+            <SelectItem
+              key={user.id}
               value={user.id === "unassigned" ? "" : user.id}
             >
               {user.name}
@@ -85,7 +85,9 @@ export function IssueAssignmentClient({
       )}
 
       {state && state.success && (
-        <p className="text-tertiary text-sm">✅ Assignment updated successfully</p>
+        <p className="text-tertiary text-sm">
+          ✅ Assignment updated successfully
+        </p>
       )}
 
       <Button type="submit" disabled={isPending} size="sm" className="w-full">

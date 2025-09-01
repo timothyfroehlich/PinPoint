@@ -41,7 +41,9 @@ export function CommentFormClient({ issueId }: CommentFormClientProps) {
           )}
 
           {state && state.success && (
-            <p className="text-tertiary text-sm">✅ Comment added successfully</p>
+            <p className="text-tertiary text-sm">
+              ✅ Comment added successfully
+            </p>
           )}
 
           <div className="flex justify-end">

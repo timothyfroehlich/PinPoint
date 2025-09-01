@@ -31,19 +31,21 @@ export interface OrganizationOption {
  * Per §9.1: Only returns organizations with is_public = true
  * Uses React 19 cache() for request-level memoization
  */
-export const getAllOrganizationsForLogin = cache(async (): Promise<OrganizationOption[]> => {
-  const orgs = await db.query.organizations.findMany({
-    where: eq(organizations.is_public, true),
-    columns: {
-      id: true,
-      name: true,
-      subdomain: true,
-    },
-    orderBy: (organizations, { asc }) => [asc(organizations.name)],
-  });
+export const getAllOrganizationsForLogin = cache(
+  async (): Promise<OrganizationOption[]> => {
+    const orgs = await db.query.organizations.findMany({
+      where: eq(organizations.is_public, true),
+      columns: {
+        id: true,
+        name: true,
+        subdomain: true,
+      },
+      orderBy: (organizations, { asc }) => [asc(organizations.name)],
+    });
 
-  return orgs;
-});
+    return orgs;
+  },
+);
 
 /**
  * Map subdomain to organization ID
@@ -73,23 +75,25 @@ export const getOrganizationBySubdomain = cache(async (subdomain: string) => {
  * Public function that doesn't require auth context
  * Uses React 19 cache() for request-level memoization
  */
-export const getPublicOrganizationById = cache(async (organizationId: string) => {
-  const organization = await db.query.organizations.findFirst({
-    where: eq(organizations.id, organizationId),
-    columns: {
-      id: true,
-      name: true,
-      subdomain: true,
-      logo_url: true,
-    },
-  });
+export const getPublicOrganizationById = cache(
+  async (organizationId: string) => {
+    const organization = await db.query.organizations.findFirst({
+      where: eq(organizations.id, organizationId),
+      columns: {
+        id: true,
+        name: true,
+        subdomain: true,
+        logo_url: true,
+      },
+    });
 
-  if (!organization) {
-    throw new Error("Organization not found");
-  }
+    if (!organization) {
+      throw new Error("Organization not found");
+    }
 
-  return organization;
-});
+    return organization;
+  },
+);
 
 /**
  * Get formatted organization options for login dropdown
@@ -100,8 +104,8 @@ export const getOrganizationSelectOptions = cache(async () => {
   const organizations = await getAllOrganizationsForLogin();
 
   // Find APC (default organization) by looking for the seed data organization
-  const apcOrganization = organizations.find(org => 
-    org.subdomain === 'apc' || org.id === 'test-org-pinpoint'
+  const apcOrganization = organizations.find(
+    (org) => org.subdomain === "apc" || org.id === "test-org-pinpoint",
   );
 
   // Sort with APC first if found, then alphabetical
@@ -122,34 +126,38 @@ export const getOrganizationSelectOptions = cache(async () => {
  * Used for form validation and security checks
  * Uses React 19 cache() for request-level memoization
  */
-export const validateOrganizationExists = cache(async (organizationId: string): Promise<boolean> => {
-  try {
-    const organization = await db.query.organizations.findFirst({
-      where: eq(organizations.id, organizationId),
-      columns: {
-        id: true,
-      },
-    });
-    
-    return !!organization;
-  } catch (error) {
-    console.error('Error validating organization:', error);
-    return false;
-  }
-});
+export const validateOrganizationExists = cache(
+  async (organizationId: string): Promise<boolean> => {
+    try {
+      const organization = await db.query.organizations.findFirst({
+        where: eq(organizations.id, organizationId),
+        columns: {
+          id: true,
+        },
+      });
+
+      return !!organization;
+    } catch (error) {
+      console.error("Error validating organization:", error);
+      return false;
+    }
+  },
+);
 
 /**
  * Get organization subdomain by ID
  * Used for post-auth redirect URL construction
  * Uses React 19 cache() for request-level memoization
  */
-export const getOrganizationSubdomainById = cache(async (organizationId: string): Promise<string | null> => {
-  const organization = await db.query.organizations.findFirst({
-    where: eq(organizations.id, organizationId),
-    columns: {
-      subdomain: true,
-    },
-  });
+export const getOrganizationSubdomainById = cache(
+  async (organizationId: string): Promise<string | null> => {
+    const organization = await db.query.organizations.findFirst({
+      where: eq(organizations.id, organizationId),
+      columns: {
+        subdomain: true,
+      },
+    });
 
-  return organization?.subdomain ?? null;
-});
+    return organization?.subdomain ?? null;
+  },
+);

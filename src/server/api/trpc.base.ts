@@ -152,7 +152,7 @@ export const createTRPCContext = async (
   // Fallback: derive organization from subdomain for users without app_metadata organizationId
   if (!organization) {
     const subdomain = opts.headers.get("x-subdomain");
-    
+
     if (!subdomain) {
       // No subdomain = public PinPoint site, no organization context needed
       organization = null;
@@ -481,26 +481,28 @@ export const organizationProcedure = protectedProcedure.use(
  *
  * Use this for new routers that don't need complex permission checking.
  */
-export const orgScopedProcedure = protectedProcedure.use(async ({ ctx, next }) => {
-  if (!ctx.organizationId) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "User does not have organization context",
-    });
-  }
+export const orgScopedProcedure = protectedProcedure.use(
+  async ({ ctx, next }) => {
+    if (!ctx.organizationId) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "User does not have organization context",
+      });
+    }
 
-  const result = await withOrgRLS(ctx.db, ctx.organizationId, async (tx) => {
-    return next({
-      ctx: {
-        ...ctx,
-        db: tx,
-        organizationId: ctx.organizationId!, // Guaranteed non-null for RLS
-      } satisfies TRPCContext & { organizationId: string },
+    const result = await withOrgRLS(ctx.db, ctx.organizationId, async (tx) => {
+      return next({
+        ctx: {
+          ...ctx,
+          db: tx,
+          organizationId: ctx.organizationId!, // Guaranteed non-null for RLS
+        } satisfies TRPCContext & { organizationId: string },
+      });
     });
-  });
 
-  return result;
-});
+    return result;
+  },
+);
 
 /**
  * Anonymous organization-scoped procedure
@@ -515,29 +517,31 @@ export const orgScopedProcedure = protectedProcedure.use(async ({ ctx, next }) =
  * - Standardizes error handling for missing organization context
  * - Compatible with application-layer organization filtering patterns
  */
-export const anonOrgScopedProcedure = publicProcedure.use(async ({ ctx, next }) => {
-  if (!ctx.organization) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Organization not found. Please check the URL or subdomain.",
-    });
-  }
+export const anonOrgScopedProcedure = publicProcedure.use(
+  async ({ ctx, next }) => {
+    if (!ctx.organization) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Organization not found. Please check the URL or subdomain.",
+      });
+    }
 
-  const org = ctx.organization; // Non-null assertion: checked above
-  const orgId = org.id;
-  const result = await withOrgRLS(ctx.db, orgId, async (tx) => {
-    return next({
-      ctx: {
-        ...ctx,
-        db: tx,
-        organizationId: orgId, // Guaranteed non-null for consistency
-        organization: org, // Guaranteed non-null
-      } satisfies TRPCContext & {
-        organizationId: string;
-        organization: NonNullable<TRPCContext["organization"]>;
-      },
+    const org = ctx.organization; // Non-null assertion: checked above
+    const orgId = org.id;
+    const result = await withOrgRLS(ctx.db, orgId, async (tx) => {
+      return next({
+        ctx: {
+          ...ctx,
+          db: tx,
+          organizationId: orgId, // Guaranteed non-null for consistency
+          organization: org, // Guaranteed non-null
+        } satisfies TRPCContext & {
+          organizationId: string;
+          organization: NonNullable<TRPCContext["organization"]>;
+        },
+      });
     });
-  });
 
-  return result;
-});
+    return result;
+  },
+);

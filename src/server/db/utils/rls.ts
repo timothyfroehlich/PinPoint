@@ -10,7 +10,9 @@ export async function bindRLSContext(
   tx: DrizzleClient,
   organizationId: string,
 ): Promise<void> {
-  await tx.execute(sql`SET LOCAL app.current_organization_id = ${organizationId}`);
+  await tx.execute(
+    sql`SET LOCAL app.current_organization_id = ${organizationId}`,
+  );
 }
 
 /**
@@ -27,4 +29,3 @@ export async function withOrgRLS<T>(
     return await fn(tx as unknown as DrizzleClient);
   });
 }
-

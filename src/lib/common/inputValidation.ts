@@ -13,6 +13,7 @@
  */
 
 import { z } from "zod";
+import { nameSchema, optionalNameSchema, issueTitleSchema, optionalIssueTitleSchema, descriptionSchema, searchQuerySchema, submitterNameSchema } from "../validation/schemas";
 
 // ============================================================================
 // BASIC ID VALIDATION SCHEMAS
@@ -67,57 +68,31 @@ export const issueIdSchema = z.object({
  * Standard name validation for entities
  * Pattern: Used in location.ts, machine.core.ts, role creation
  */
-export const nameSchema = z
-  .string()
-  .min(1, "Name is required")
-  .max(255, "Name must be 255 characters or less");
-
-/**
- * Optional name validation for updates
- * Pattern: Used in update operations across multiple routers
- */
-export const optionalNameSchema = nameSchema.optional();
+// nameSchema re-exported from centralized validation
 
 /**
  * Issue title validation
  * Pattern: Specific to issue.core.ts create/update operations
  */
-export const issueTitleSchema = z
-  .string()
-  .min(1, "Title is required")
-  .max(255, "Title must be 255 characters or less");
-
-/**
- * Optional issue title for updates
- */
-export const optionalIssueTitleSchema = issueTitleSchema.optional();
+// issueTitleSchema re-exported from centralized validation
 
 /**
  * Description validation (longer text fields)
  * Pattern: Used in issue.core.ts, comment creation
  */
-export const descriptionSchema = z
-  .string()
-  .max(10000, "Description must be 10,000 characters or less")
-  .optional();
+// descriptionSchema re-exported from centralized validation
 
 /**
  * Search query validation
  * Pattern: Used in filtering operations across multiple routers
  */
-export const searchQuerySchema = z
-  .string()
-  .min(1, "Search query cannot be empty")
-  .optional();
+// searchQuerySchema re-exported from centralized validation
 
 /**
  * Submitter name validation for anonymous issue reporting
  * Pattern: Used in public issue creation endpoints
  */
-export const submitterNameSchema = z
-  .string()
-  .max(100, "Submitter name must be 100 characters or less")
-  .optional();
+// submitterNameSchema re-exported from centralized validation
 
 // ============================================================================
 // NUMERIC VALIDATION SCHEMAS
@@ -331,13 +306,7 @@ export const commentIdSchema = z.object({
  * Comment creation schema
  * Pattern: Used in comment.ts create operations
  */
-export const commentCreationSchema = z.object({
-  issueId: z.string().min(1, "Issue ID is required"),
-  content: z
-    .string()
-    .min(1, "Comment content is required")
-    .max(10000, "Comment must be 10,000 characters or less"),
-});
+// commentCreationSchema re-exported from centralized validation
 
 // ============================================================================
 // VALIDATION HELPERS
@@ -347,12 +316,7 @@ export const commentCreationSchema = z.object({
  * Email validation schema
  * Pattern: Used in user management operations
  */
-export const emailSchema = z.string().pipe(z.email());
-
-/**
- * Optional email validation
- */
-export const optionalEmailSchema = emailSchema.optional();
+// emailSchema and optionalEmailSchema re-exported from centralized validation
 
 /**
  * Boolean flag validation

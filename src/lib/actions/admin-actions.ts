@@ -7,12 +7,18 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
+import { emailSchema, uuidSchema } from "~/lib/validation/schemas";
 import { eq, and } from "drizzle-orm";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { users, memberships, roles } from "~/server/db/schema";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { updateSystemSettings } from "~/lib/dal/system-settings";
-import { logActivity, ACTIVITY_ACTIONS, ACTIVITY_ENTITIES, exportActivityLog } from "~/lib/dal/activity-log";
+import {
+  logActivity,
+  ACTIVITY_ACTIONS,
+  ACTIVITY_ENTITIES,
+  exportActivityLog,
+} from "~/lib/dal/activity-log";
 import {
   requireAuthContextWithRole,
   validateFormData,
@@ -27,33 +33,20 @@ import { PERMISSIONS } from "~/server/auth/permissions.constants";
 
 // Enhanced validation schemas with better error messages
 const inviteUserSchema = z.object({
-  email: z
-    .string()
-    .email("Please enter a valid email address")
-    .trim()
-    .toLowerCase(),
-  name: z
-    .string()
-    .max(100, "Name must be less than 100 characters")
-    .optional(),
-  roleId: z
-    .string()
-    .uuid("Invalid role selected")
-    .optional(),
-  message: z
-    .string()
-    .max(500, "Message must be less than 500 characters")
-    .optional(),
+  email: emailSchema.transform((s) => s.toLowerCase()),
+  name: z.string().max(100, "Name must be less than 100 characters").optional(),
+  roleId: uuidSchema.optional(),
+  message: z.string().max(500, "Message must be less than 500 characters").optional(),
 });
 
 const updateUserRoleSchema = z.object({
-  userId: z.string().uuid("Invalid user ID"),
-  roleId: z.string().uuid("Invalid role selected"),
+  userId: uuidSchema,
+  roleId: uuidSchema,
 });
 
 const removeUserSchema = z.object({
-  userId: z.string().uuid("Invalid user ID"),
-  confirmEmail: z.string().email("Please enter the user's email to confirm"),
+  userId: uuidSchema,
+  confirmEmail: emailSchema,
 });
 
 const updateSystemSettingsSchema = z.object({
@@ -84,7 +77,8 @@ export async function inviteUserAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId, membership } = await requireAuthContextWithRole();
+    const { user, organizationId, membership } =
+      await requireAuthContextWithRole();
 
     // Enhanced validation with Zod
     const validation = validateFormData(formData, inviteUserSchema);
@@ -123,11 +117,13 @@ export async function inviteUserAction(
           eq(roles.is_default, true),
         ),
       });
-      
+
       if (!defaultRole) {
-        return actionError("No default role configured. Please contact support.");
+        return actionError(
+          "No default role configured. Please contact support.",
+        );
       }
-      
+
       roleId = defaultRole.id;
     }
 
@@ -135,13 +131,16 @@ export async function inviteUserAction(
     let userId = existingUser?.id;
     if (!existingUser) {
       // Create a new user record with unverified email
-      const newUser = await db.insert(users).values({
-        id: generatePrefixedId("user"),
-        email: validation.data.email,
-        name: validation.data.name || null,
-        email_verified: null, // Email not verified until they complete signup
-      }).returning({ id: users.id });
-      
+      const newUser = await db
+        .insert(users)
+        .values({
+          id: generatePrefixedId("user"),
+          email: validation.data.email,
+          name: validation.data.name || null,
+          email_verified: null, // Email not verified until they complete signup
+        })
+        .returning({ id: users.id });
+
       userId = newUser[0]?.id;
       if (!userId) {
         return actionError("Failed to create user record");
@@ -154,12 +153,15 @@ export async function inviteUserAction(
     }
 
     // Create membership for the user
-    const [newMembership] = await db.insert(memberships).values({
-      id: generatePrefixedId("membership"),
-      user_id: userId,
-      organization_id: organizationId,
-      role_id: roleId,
-    }).returning({ id: memberships.id });
+    const [newMembership] = await db
+      .insert(memberships)
+      .values({
+        id: generatePrefixedId("membership"),
+        user_id: userId,
+        organization_id: organizationId,
+        role_id: roleId,
+      })
+      .returning({ id: memberships.id });
 
     if (!newMembership) {
       return actionError("Failed to create user membership");
@@ -181,12 +183,15 @@ export async function inviteUserAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`User invitation processed for ${validation.data.email} by ${user.email}`, {
-        userId,
-        membershipId: newMembership?.id,
-        organizationId,
-        roleId,
-      });
+      console.log(
+        `User invitation processed for ${validation.data.email} by ${user.email}`,
+        {
+          userId,
+          membershipId: newMembership?.id,
+          organizationId,
+          roleId,
+        },
+      );
 
       // Log the activity
       await logActivity({
@@ -198,7 +203,7 @@ export async function inviteUserAction(
         details: `Invited ${validation.data.email} to join the organization`,
         severity: "info",
       });
-      
+
       // TODO: Send actual invitation email with signup/login link
       // The email should include:
       // - Welcome message with personal note if provided
@@ -215,7 +220,7 @@ export async function inviteUserAction(
       //   inviterName: user.name || user.email,
       //   roleName: role.name,
       //   personalMessage: validation.data.message,
-      //   signupUrl: existingUser 
+      //   signupUrl: existingUser
       //     ? `${baseUrl}/auth/sign-in?invitation=${invitationToken}`
       //     : `${baseUrl}/auth/sign-up?invitation=${invitationToken}`,
       // });
@@ -243,7 +248,8 @@ export async function updateUserRoleAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId, membership } = await requireAuthContextWithRole();
+    const { user, organizationId, membership } =
+      await requireAuthContextWithRole();
 
     // Enhanced validation
     const validation = validateFormData(formData, updateUserRoleSchema);
@@ -290,8 +296,10 @@ export async function updateUserRoleAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`User role updated by ${user.email}: ${validation.data.userId} -> ${role.name}`);
-      
+      console.log(
+        `User role updated by ${user.email}: ${validation.data.userId} -> ${role.name}`,
+      );
+
       // Log the activity
       await logActivity({
         organizationId,
@@ -324,7 +332,8 @@ export async function removeUserAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId, membership } = await requireAuthContextWithRole();
+    const { user, organizationId, membership } =
+      await requireAuthContextWithRole();
 
     // Enhanced validation
     const validation = validateFormData(formData, removeUserSchema);
@@ -367,8 +376,10 @@ export async function removeUserAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`User removed from organization by ${user.email}: ${validation.data.confirmEmail}`);
-      
+      console.log(
+        `User removed from organization by ${user.email}: ${validation.data.confirmEmail}`,
+      );
+
       // Log the activity
       await logActivity({
         organizationId,
@@ -401,7 +412,8 @@ export async function updateSystemSettingsAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId, membership } = await requireAuthContextWithRole();
+    const { user, organizationId, membership } =
+      await requireAuthContextWithRole();
 
     // Parse JSON data from form
     const settingsData = formData.get("settings") as string;
@@ -411,7 +423,7 @@ export async function updateSystemSettingsAction(
 
     const data = JSON.parse(settingsData);
     const validation = updateSystemSettingsSchema.safeParse({ settings: data });
-    
+
     if (!validation.success) {
       return actionError("Invalid settings data");
     }
@@ -433,7 +445,7 @@ export async function updateSystemSettingsAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(`System settings updated by ${user.email}`);
-      
+
       // Log the activity
       await logActivity({
         organizationId,
@@ -453,7 +465,9 @@ export async function updateSystemSettingsAction(
   } catch (error) {
     console.error("Update system settings error:", error);
     return actionError(
-      error instanceof Error ? error.message : "Failed to update system settings",
+      error instanceof Error
+        ? error.message
+        : "Failed to update system settings",
     );
   }
 }
@@ -463,7 +477,8 @@ export async function updateSystemSettingsAction(
  */
 export async function exportActivityLogAction(): Promise<Response> {
   try {
-    const { user, organizationId, membership } = await requireAuthContextWithRole();
+    const { user, organizationId, membership } =
+      await requireAuthContextWithRole();
 
     const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ADMIN_VIEW_ANALYTICS, db);
@@ -486,25 +501,25 @@ export async function exportActivityLogAction(): Promise<Response> {
     });
 
     // Generate filename with timestamp
-    const timestamp = new Date().toISOString().split('T')[0];
+    const timestamp = new Date().toISOString().split("T")[0];
     const filename = `activity-log-${timestamp}.csv`;
 
     // Return CSV file response
     return new Response(csvData, {
       status: 200,
       headers: {
-        'Content-Type': 'text/csv',
-        'Content-Disposition': `attachment; filename="${filename}"`,
+        "Content-Type": "text/csv",
+        "Content-Disposition": `attachment; filename="${filename}"`,
       },
     });
   } catch (error) {
     console.error("Export activity log error:", error);
-    
+
     // Return error response
     return new Response("Failed to export activity log", {
       status: 500,
       headers: {
-        'Content-Type': 'text/plain',
+        "Content-Type": "text/plain",
       },
     });
   }

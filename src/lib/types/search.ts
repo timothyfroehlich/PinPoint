@@ -6,4 +6,3 @@
 
 export type { IssueSearchParams } from "~/lib/search-params/issue-search-params";
 export type { MachineSearchParams } from "~/lib/search-params/machine-search-params";
-

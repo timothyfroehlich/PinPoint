@@ -2,7 +2,13 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
-import { AlertTriangleIcon, PlusIcon, ArrowRightIcon, WrenchIcon, BarChart3Icon } from "lucide-react";
+import {
+  AlertTriangleIcon,
+  PlusIcon,
+  ArrowRightIcon,
+  WrenchIcon,
+  BarChart3Icon,
+} from "lucide-react";
 import { requireMemberAccess } from "~/lib/organization-context";
 import { getIssuesForOrg } from "~/lib/dal/issues";
 import {
@@ -33,8 +39,7 @@ export default async function DashboardPage() {
       <div>
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground mt-1">
-          Welcome back,{" "}
-          {user.name ?? user.email?.split("@")[0] ?? "User"}
+          Welcome back, {user.name ?? user.email.split("@")[0] ?? "User"}
         </p>
       </div>
 

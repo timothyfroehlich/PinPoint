@@ -1,7 +1,7 @@
 /**
  * Generic Search Component
  * Optimized for simple list searches with URL state management
- * 
+ *
  * Features:
  * - URL parameter management with configurable base paths
  * - React 19 useDeferredValue for performance optimization
@@ -142,9 +142,11 @@ export function GenericSearch({
   return (
     <form onSubmit={handleSubmit} className={className}>
       <div className="relative">
-        <SearchIcon className={`absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground ${
-          size === "sm" ? "h-3 w-3" : "h-4 w-4"
-        }`} />
+        <SearchIcon
+          className={`absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground ${
+            size === "sm" ? "h-3 w-3" : "h-4 w-4"
+          }`}
+        />
         <Input
           type="search"
           placeholder={placeholder}
@@ -152,19 +154,23 @@ export function GenericSearch({
           onChange={(e) => {
             setSearchValue(e.target.value);
           }}
-          className={`${size === "sm" ? "pl-8 pr-8 h-8" : "pl-10 pr-10"}`}
+          className={size === "sm" ? "pl-8 pr-8 h-8" : "pl-10 pr-10"}
           autoFocus={autoFocus}
           disabled={disabled || isPending}
         />
 
         {/* Loading indicator */}
         {isPending && (
-          <div className={`absolute top-1/2 transform -translate-y-1/2 ${
-            size === "sm" ? "right-7" : "right-8"
-          }`}>
-            <Loader2 className={`animate-spin text-muted-foreground ${
-              size === "sm" ? "h-3 w-3" : "h-4 w-4"
-            }`} />
+          <div
+            className={`absolute top-1/2 transform -translate-y-1/2 ${
+              size === "sm" ? "right-7" : "right-8"
+            }`}
+          >
+            <Loader2
+              className={`animate-spin text-muted-foreground ${
+                size === "sm" ? "h-3 w-3" : "h-4 w-4"
+              }`}
+            />
           </div>
         )}
 
@@ -180,7 +186,7 @@ export function GenericSearch({
             }`}
             disabled={isPending}
           >
-            <XIcon className={`${size === "sm" ? "h-3 w-3" : "h-4 w-4"}`} />
+            <XIcon className={size === "sm" ? "h-3 w-3" : "h-4 w-4"} />
           </Button>
         )}
       </div>
