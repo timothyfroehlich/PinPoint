@@ -335,7 +335,7 @@ async function searchMachines(
     entity: "machines" as const,
     id: machine.id,
     title: machine.name,
-    subtitle: `${machine.manufacturer || "Unknown"} ${machine.modelName || "Model"}${machine.year ? ` (${machine.year})` : ""}`,
+    subtitle: `${machine.manufacturer ?? "Unknown"} ${machine.modelName ?? "Model"}${machine.year ? ` (${machine.year})` : ""}`,
     description: machine.locationName
       ? `Located at ${machine.locationName}`
       : "Location not specified",
@@ -347,10 +347,10 @@ async function searchMachines(
       location: machine.locationName,
       locationId: machine.locationId,
       qrCodeId: machine.qrCodeId,
-      issueCount: machine.issueCount || 0,
+      issueCount: machine.issueCount ?? 0,
       createdAt: machine.createdAt,
     },
-    relevance: Number(machine.relevance || 0) * 100,
+    relevance: Number(machine.relevance ?? 0) * 100,
   }));
 }
 
@@ -397,7 +397,7 @@ async function searchUsers(
   return results.map((user) => ({
     entity: "users" as const,
     id: user.id,
-    title: user.name || user.email || "Unknown User",
+    title: user.name ?? user.email ?? "Unknown User",
     subtitle: user.email ?? "",
     description:
       user.bio?.slice(0, 150) +
@@ -409,7 +409,7 @@ async function searchUsers(
       profilePicture: user.profilePicture,
       createdAt: user.createdAt,
     },
-    relevance: Number(user.relevance || 0) * 100,
+    relevance: Number(user.relevance ?? 0) * 100,
   }));
 }
 
@@ -463,7 +463,7 @@ async function searchLocations(
     entity: "locations" as const,
     id: location.id,
     title: location.name,
-    subtitle: `${location.city || ""}${location.city && location.state ? ", " : ""}${location.state || ""}`,
+    subtitle: `${location.city ?? ""}${location.city && location.state ? ", " : ""}${location.state ?? ""}`,
     description:
       location.description?.slice(0, 150) +
       (location.description && location.description.length > 150 ? "..." : ""),
@@ -472,10 +472,10 @@ async function searchLocations(
       city: location.city,
       state: location.state,
       street: location.street,
-      machineCount: location.machineCount || 0,
+      machineCount: location.machineCount ?? 0,
       createdAt: location.createdAt,
     },
-    relevance: Number(location.relevance || 0) * 100,
+    relevance: Number(location.relevance ?? 0) * 100,
   }));
 }
 
@@ -502,7 +502,7 @@ async function countIssues(
       ),
     );
 
-  return result[0]?.count || 0;
+  return result[0]?.count ?? 0;
 }
 
 async function countMachines(
@@ -526,7 +526,7 @@ async function countMachines(
       ),
     );
 
-  return result[0]?.count || 0;
+  return result[0]?.count ?? 0;
 }
 
 async function countUsers(
@@ -550,7 +550,7 @@ async function countUsers(
       ),
     );
 
-  return result[0]?.count || 0;
+  return result[0]?.count ?? 0;
 }
 
 async function countLocations(
@@ -573,7 +573,7 @@ async function countLocations(
       ),
     );
 
-  return result[0]?.count || 0;
+  return result[0]?.count ?? 0;
 }
 
 /**

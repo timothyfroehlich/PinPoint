@@ -8,6 +8,7 @@
 
 import { revalidateTag, revalidatePath } from "next/cache";
 import { z } from "zod";
+import { nameSchema, idSchema } from "~/lib/validation/schemas";
 import { eq, and, inArray } from "drizzle-orm";
 import { requireMemberAccess } from "~/lib/organization-context";
 import { db } from "~/lib/dal/shared";
@@ -23,35 +24,32 @@ import type { ActionResult } from "~/lib/actions/shared";
 // ================================
 
 const CreateMachineSchema = z.object({
-  name: z
-    .string()
-    .min(1, "Machine name is required")
-    .max(100, "Machine name too long"),
-  locationId: z.string().min(1, "Location is required"),
-  modelId: z.string().min(1, "Model is required"),
-  ownerId: z.string().optional(),
+  name: nameSchema,
+  locationId: idSchema,
+  modelId: idSchema,
+  ownerId: idSchema.optional(),
 });
 
 const UpdateMachineSchema = CreateMachineSchema.partial().extend({
-  id: z.string().min(1, "Machine ID is required"),
+  id: idSchema,
 });
 
 const BulkUpdateMachineSchema = z.object({
   machineIds: z
-    .array(z.string())
+    .array(idSchema)
     .min(1, "At least one machine must be selected")
     .max(50, "Cannot process more than 50 machines at once"),
-  locationId: z.string().optional(),
-  ownerId: z.string().optional(),
+  locationId: idSchema.optional(),
+  ownerId: idSchema.optional(),
 });
 
 const GenerateQRCodeSchema = z.object({
-  machineId: z.string().min(1, "Machine ID is required"),
+  machineId: idSchema,
 });
 
 const BulkQRGenerateSchema = z.object({
   machineIds: z
-    .array(z.string())
+    .array(idSchema)
     .min(1, "At least one machine must be selected")
     .max(50, "Cannot process more than 50 machines at once"),
 });

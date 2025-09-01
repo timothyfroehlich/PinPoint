@@ -343,7 +343,7 @@ export const getIssueDashboardStats = cache(async () => {
     // Process status breakdown
     const statusCounts = statusBreakdown.reduce<Record<string, number>>(
       (acc, issue) => {
-        const statusName = issue.status?.name ?? "unknown";
+        const statusName = issue.status.name ?? "unknown";
         acc[statusName] = (acc[statusName] ?? 0) + 1;
         return acc;
       },
@@ -353,7 +353,7 @@ export const getIssueDashboardStats = cache(async () => {
     // Process priority breakdown
     const priorityCounts = priorityBreakdown.reduce<Record<string, number>>(
       (acc, issue) => {
-        const priorityName = issue.priority?.name ?? "unknown";
+        const priorityName = issue.priority.name ?? "unknown";
         acc[priorityName] = (acc[priorityName] ?? 0) + 1;
         return acc;
       },
@@ -503,12 +503,10 @@ export const getIssueTrendData = cache(async (days = 30) => {
       Record<string, { created: number; resolved: number }>
     >((acc, issue) => {
       const [dateKey] = issue.created_at.toISOString().split("T");
-      if (!acc[dateKey]) {
-        acc[dateKey] = { created: 0, resolved: 0 };
-      }
+      acc[dateKey] ??= { created: 0, resolved: 0 };
       acc[dateKey].created += 1;
 
-      const statusName = (issue.status?.name ?? "").toLowerCase();
+      const statusName = (issue.status.name ?? "").toLowerCase();
       if (statusName.includes("resolved") || statusName.includes("closed")) {
         acc[dateKey].resolved += 1;
       }

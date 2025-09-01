@@ -3,7 +3,7 @@
  * Server Component for handling authentication failures
  */
 
-import { Suspense, type JSX } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 
 import { Button } from "~/components/ui/button";
@@ -30,7 +30,7 @@ export const metadata = {
 
 export default async function AuthCodeErrorPage({
   searchParams,
-}: AuthCodeErrorPageProps): Promise<JSX.Element> {
+}: AuthCodeErrorPageProps): Promise<React.JSX.Element> {
   const resolvedSearchParams = await searchParams;
   return (
     <div className="min-h-screen flex items-center justify-center bg-surface-container-lowest py-12 px-4 sm:px-6 lg:px-8">
@@ -93,7 +93,7 @@ function ErrorDetails({
 }: {
   error?: string | undefined;
   description?: string | undefined;
-}): JSX.Element {
+}): React.JSX.Element {
   const getErrorMessage = (
     errorCode?: string,
   ): { title: string; message: string; suggestions: string[] } => {
@@ -193,7 +193,7 @@ function ErrorDetails({
   );
 }
 
-function ErrorDetailsSkeleton(): JSX.Element {
+function ErrorDetailsSkeleton(): React.JSX.Element {
   return (
     <div className="space-y-4">
       <div className="h-20 bg-error-container border border-error rounded-md animate-pulse" />

@@ -67,7 +67,7 @@ function isValidOrganizationArray(data: unknown): data is OrganizationOption[] {
   );
 }
 
-export function SignUpForm(): JSX.Element {
+export function SignUpForm(): React.JSX.Element {
   const [magicLinkState, magicLinkAction, magicLinkPending] = useActionState<
     ActionResult<{ message: string }> | null,
     FormData

@@ -1,5 +1,5 @@
 import { createBrowserClient } from "@supabase/ssr";
-import type { TypedSupabaseClient } from "~/types/supabase-client";
+import type { TypedSupabaseClient } from "~/lib/types";
 import { env } from "~/env";
 
 /**
@@ -39,5 +39,6 @@ export function getClient(): TypedSupabaseClient {
   return clientInstance;
 }
 
-// Export types for TypeScript IntelliSense
-export type SupabaseBrowserClient = TypedSupabaseClient;
+// Types are now centralized in ~/lib/types/auth.ts
+// Re-export for backwards compatibility
+export type { SupabaseBrowserClient } from "~/lib/types";

@@ -133,7 +133,7 @@ export const getOrganizationContext = cache(
       if (authUser) {
         const email = authUser.email ?? "";
         const name =
-          (authUser.user_metadata?.["name"] as string | undefined) ?? email;
+          (authUser.user_metadata["name"] as string | undefined) ?? email;
         user = {
           id: authUser.id,
           email,

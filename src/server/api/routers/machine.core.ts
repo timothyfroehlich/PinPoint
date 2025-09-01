@@ -17,7 +17,7 @@ import {
 import {
   machineCreateSchema,
   machineFilterSchema,
-  machineIdSchema,
+  machineIdParamSchema,
   machineUpdateSchema,
 } from "~/server/api/schemas/machine.schema";
 import {
@@ -246,7 +246,7 @@ export const machineCoreRouter = createTRPCRouter({
   ),
 
   getById: orgScopedProcedure
-    .input(machineIdSchema)
+    .input(machineIdParamSchema)
     .query(async ({ ctx, input }): Promise<MachineResponse> => {
       const [machineWithRelations] = await ctx.db
         .select({
@@ -454,7 +454,7 @@ export const machineCoreRouter = createTRPCRouter({
     }),
 
   delete: machineDeleteProcedure
-    .input(machineIdSchema)
+    .input(machineIdParamSchema)
     .mutation(async ({ ctx, input }): Promise<MachineResponse> => {
       // Verify the machine exists (RLS handles org scoping)
       const [existingMachine] = await ctx.db

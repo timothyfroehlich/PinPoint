@@ -50,7 +50,7 @@ export function MachineFiltersClient({
   const [isPending, startTransition] = useTransition();
 
   const [selectedLocations, setSelectedLocations] = useState<string[]>(
-    initialFilters.locationIds || [],
+    initialFilters.locationIds ?? [],
   );
 
   const updateFilters = (
@@ -119,9 +119,9 @@ export function MachineFiltersClient({
   };
 
   const activeFilterCount =
-    (initialFilters.locationIds?.length || 0) +
-    (initialFilters.modelIds?.length || 0) +
-    (initialFilters.ownerIds?.length || 0) +
+    (initialFilters.locationIds?.length ?? 0) +
+    (initialFilters.modelIds?.length ?? 0) +
+    (initialFilters.ownerIds?.length ?? 0) +
     (initialFilters.hasQR !== undefined ? 1 : 0);
 
   return (
