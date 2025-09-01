@@ -13,7 +13,7 @@ import { ZodError } from "zod";
 
 import type { LoggerInterface } from "~/lib/logger";
 import type { SupabaseServerClient } from "~/lib/supabase/server";
-import type { PinPointSupabaseUser } from "~/lib/supabase/types";
+import type { PinPointSupabaseUser } from "~/lib/types";
 import type { DrizzleClient } from "~/server/db/drizzle";
 
 import { logger } from "~/lib/logger";

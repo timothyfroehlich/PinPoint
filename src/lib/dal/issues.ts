@@ -7,6 +7,7 @@ import { cache } from "react";
 import { and, desc, eq, sql, isNull, inArray, type SQL } from "drizzle-orm";
 import { issues, issueStatuses, priorities } from "~/server/db/schema";
 import { ensureOrgContextAndBindRLS } from "~/lib/organization-context";
+import type { IssueFilters } from "~/lib/types";
 
 /**
  * Get issues for the current organization with machine and assignee details
@@ -42,16 +43,6 @@ export const getIssuesForOrg = cache(async () => {
   });
 });
 
-/**
- * Advanced issue filtering interface for URL-based state management
- * Updated for exactOptionalPropertyTypes compliance
- */
-export interface IssueFilters {
-  status?: string[] | undefined;
-  priority?: string[] | undefined;
-  assigneeId?: string | undefined;
-  search?: string | undefined;
-}
 
 export interface IssuePagination {
   page: number;

@@ -17,6 +17,7 @@
 ### For Current Development
 
 - **Patterns**: [`developer-guides/`](./developer-guides/) - Current implementation guides
+- **Types**: [`CORE/TYPE_INVENTORY.md`](./CORE/TYPE_INVENTORY.md) - Type system reference and import patterns
 - **Security**: [`quick-reference/api-security-patterns.md`](./quick-reference/api-security-patterns.md) - Essential patterns
 - **Testing**: [`testing/TEST_SYSTEM_REBOOT_PLAN.md`](./testing/TEST_SYSTEM_REBOOT_PLAN.md) - Archetype system
 

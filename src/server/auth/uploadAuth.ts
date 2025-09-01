@@ -6,7 +6,7 @@ import { getSupabaseUser } from "./supabase";
 import { isValidOrganization, isValidMembership } from "./types";
 import { transformKeysToCamelCase } from "~/lib/utils/case-transformers";
 
-import type { PinPointSupabaseUser } from "~/lib/supabase/types";
+import type { PinPointSupabaseUser } from "~/lib/types";
 import type { DrizzleClient } from "~/server/db/drizzle";
 
 import { organizations, memberships } from "~/server/db/schema";
