@@ -1,7 +1,7 @@
 /**
  * Visibility Inheritance Utilities
  * Implementation of §6 visibility inheritance rules per RLS assertions
- * 
+ *
  * Hierarchy: Organization (required) → Location → Machine → Issue
  */
 
@@ -14,7 +14,7 @@ export interface VisibilityChain {
 
 /**
  * Calculate effective visibility per §6 RLS assertions
- * 
+ *
  * Algorithm:
  * 1. If org private ⇒ private
  * 2. Walk Location → Machine → Issue: first explicit FALSE ⇒ private; first explicit TRUE remembered
@@ -29,12 +29,18 @@ export function calculateEffectiveVisibility(chain: VisibilityChain): boolean {
 
   // 2. Walk the chain looking for explicit values
   const explicitValues: boolean[] = [];
-  
+
   // Collect explicit (non-null) values from the chain
-  if (chain.location?.is_public !== null && chain.location?.is_public !== undefined) {
+  if (
+    chain.location?.is_public !== null &&
+    chain.location?.is_public !== undefined
+  ) {
     explicitValues.push(chain.location.is_public);
   }
-  if (chain.machine?.is_public !== null && chain.machine?.is_public !== undefined) {
+  if (
+    chain.machine?.is_public !== null &&
+    chain.machine?.is_public !== undefined
+  ) {
     explicitValues.push(chain.machine.is_public);
   }
   if (chain.issue?.is_public !== null && chain.issue?.is_public !== undefined) {
@@ -52,7 +58,7 @@ export function calculateEffectiveVisibility(chain: VisibilityChain): boolean {
   }
 
   // No explicit values found - use organization's default for issues
-  return chain.organization.public_issue_default === 'public';
+  return chain.organization.public_issue_default === "public";
 }
 
 /**
@@ -61,7 +67,7 @@ export function calculateEffectiveVisibility(chain: VisibilityChain): boolean {
 export function calculateEffectiveMachineVisibility(
   organization: { is_public: boolean },
   location: { is_public: boolean | null } | null,
-  machine: { is_public: boolean | null }
+  machine: { is_public: boolean | null },
 ): boolean {
   // If organization is private, machine is private
   if (!organization.is_public) {
@@ -87,7 +93,7 @@ export function calculateEffectiveMachineVisibility(
  */
 export function calculateEffectiveLocationVisibility(
   organization: { is_public: boolean },
-  location: { is_public: boolean | null }
+  location: { is_public: boolean | null },
 ): boolean {
   // If organization is private, location is private
   if (!organization.is_public) {
@@ -127,7 +133,7 @@ export function buildVisibilityChain(
   organization: { is_public: boolean; public_issue_default: string },
   location?: { is_public: boolean | null } | null,
   machine?: { is_public: boolean | null } | null,
-  issue?: { is_public: boolean | null } | null
+  issue?: { is_public: boolean | null } | null,
 ): VisibilityChain {
   return {
     organization,

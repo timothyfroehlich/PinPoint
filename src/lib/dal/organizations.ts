@@ -236,13 +236,15 @@ export const getOrganizationDashboardData = cache(async () => {
     const organizationId = context.organization.id;
 
     const [organization, stats] = await Promise.all([
-      tx.query.organizations.findFirst({
-        where: eq(organizations.id, organizationId),
-        columns: { id: true, name: true, subdomain: true, logo_url: true },
-      }).then((o) => {
-        if (!o) throw new Error("Organization not found");
-        return o;
-      }),
+      tx.query.organizations
+        .findFirst({
+          where: eq(organizations.id, organizationId),
+          columns: { id: true, name: true, subdomain: true, logo_url: true },
+        })
+        .then((o) => {
+          if (!o) throw new Error("Organization not found");
+          return o;
+        }),
       getOrganizationStats(),
     ]);
 

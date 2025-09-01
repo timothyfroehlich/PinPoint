@@ -5,7 +5,13 @@
  */
 
 import Link from "next/link";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import {
   BuildingIcon,
@@ -31,7 +37,7 @@ export default async function SettingsPage() {
       stats: orgDetails.name,
     },
     {
-      title: "Users & Roles", 
+      title: "Users & Roles",
       description: "Manage team members, roles, and permissions",
       href: "/settings/users",
       icon: UsersIcon,
@@ -40,7 +46,7 @@ export default async function SettingsPage() {
     {
       title: "Role Management",
       description: "Configure roles and permission templates",
-      href: "/settings/roles", 
+      href: "/settings/roles",
       icon: ShieldIcon,
       stats: "Manage roles",
     },

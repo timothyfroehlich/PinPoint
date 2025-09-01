@@ -112,7 +112,7 @@ export function clearAllFilters(): IssueFilters {
 function isValidSortField(value: unknown): value is IssueFilters["sortBy"] {
   return (
     typeof value === "string" &&
-    ISSUE_SORT_OPTIONS.includes(value as typeof ISSUE_SORT_OPTIONS[number])
+    ISSUE_SORT_OPTIONS.includes(value as (typeof ISSUE_SORT_OPTIONS)[number])
   );
 }
 

@@ -1,4 +1,12 @@
-import { pgTable, text, timestamp, boolean, index, jsonb, inet } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  timestamp,
+  boolean,
+  index,
+  jsonb,
+  inet,
+} from "drizzle-orm/pg-core";
 
 // =================================
 // ORGANIZATION & TENANCY TABLES
@@ -11,13 +19,13 @@ export const organizations = pgTable(
     name: text().notNull(),
     subdomain: text().unique().notNull(), // For V1.0 subdomain feature
     logo_url: text(),
-    
+
     // Organization profile information (Phase 4B.1)
     description: text(),
     website: text(),
     phone: text(),
     address: text(),
-    
+
     // Anonymous access settings
     allow_anonymous_issues: boolean().default(true).notNull(),
     allow_anonymous_comments: boolean().default(true).notNull(),
@@ -29,7 +37,7 @@ export const organizations = pgTable(
     is_public: boolean().default(false).notNull(),
     // Default applied to issues when chain has no explicit TRUE/FALSE and org is public
     public_issue_default: text().default("private").notNull(),
-    
+
     created_at: timestamp().defaultNow().notNull(),
     updated_at: timestamp().defaultNow().notNull(),
   },
@@ -115,7 +123,10 @@ export const systemSettings = pgTable(
   },
   (table) => [
     // System settings lookup by organization and key
-    index("system_settings_org_key_idx").on(table.organization_id, table.setting_key),
+    index("system_settings_org_key_idx").on(
+      table.organization_id,
+      table.setting_key,
+    ),
     index("system_settings_organization_id_idx").on(table.organization_id),
   ],
 );
@@ -140,7 +151,10 @@ export const activityLog = pgTable(
   },
   (table) => [
     // Activity log queries by organization and time
-    index("activity_log_org_time_idx").on(table.organization_id, table.created_at),
+    index("activity_log_org_time_idx").on(
+      table.organization_id,
+      table.created_at,
+    ),
     index("activity_log_user_id_idx").on(table.user_id),
     index("activity_log_action_idx").on(table.action),
     index("activity_log_entity_idx").on(table.entity_type, table.entity_id),

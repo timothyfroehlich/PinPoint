@@ -6,4 +6,3 @@
  */
 
 export type * as Db from "~/server/db/types";
-

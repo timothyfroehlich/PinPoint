@@ -74,17 +74,17 @@ export const issues = pgTable(
     created_at: timestamp().defaultNow().notNull(),
     updated_at: timestamp().defaultNow().notNull(),
     resolved_at: timestamp(),
-    
+
     // Public access control (nullable = inherit)
     is_public: boolean(),
-    
+
     // Anonymous reporting support
     reporter_type: reporterTypeEnum().default("authenticated").notNull(),
     reporter_email: text(), // For anonymous issue reporting
     submitter_name: text(), // Optional name for anonymous issue reporting
     anonymous_session_id: varchar({ length: 255 }), // Session tracking for anonymous reporters
     anonymous_contact_method: varchar({ length: 255 }), // Optional email/phone for anonymous reporters
-    
+
     // Moderation support
     moderation_status: moderationStatusEnum().default("approved").notNull(),
 
@@ -109,10 +109,16 @@ export const issues = pgTable(
     index("issues_created_by_id_idx").on(table.created_by_id),
     // Public access and anonymous reporting indexes
     index("issues_public_org_idx").on(table.organization_id, table.is_public),
-    index("issues_reporter_type_idx").on(table.reporter_type, table.organization_id),
+    index("issues_reporter_type_idx").on(
+      table.reporter_type,
+      table.organization_id,
+    ),
     index("issues_anon_session_idx").on(table.anonymous_session_id),
     // Moderation queue indexes
-    index("issues_moderation_pending_idx").on(table.organization_id, table.moderation_status),
+    index("issues_moderation_pending_idx").on(
+      table.organization_id,
+      table.moderation_status,
+    ),
   ],
 );
 
@@ -155,12 +161,12 @@ export const comments = pgTable(
     // Soft delete fields
     deleted_at: timestamp(), // Null = not deleted, Date = soft deleted
     deleted_by: text(), // Who deleted the comment (for audit trail)
-    
+
     // Anonymous commenting support
     commenter_type: commenterTypeEnum().default("authenticated").notNull(),
     anonymous_session_id: varchar({ length: 255 }), // Session tracking for anonymous commenters
     anonymous_display_name: varchar({ length: 100 }), // Optional display name for anonymous commenters
-    
+
     // Moderation support
     moderation_status: moderationStatusEnum().default("approved").notNull(),
 
@@ -175,10 +181,16 @@ export const comments = pgTable(
     index("comments_issue_id_idx").on(table.issue_id),
     index("comments_author_id_idx").on(table.author_id),
     // Anonymous commenting indexes
-    index("comments_commenter_type_idx").on(table.commenter_type, table.issue_id),
+    index("comments_commenter_type_idx").on(
+      table.commenter_type,
+      table.issue_id,
+    ),
     index("comments_anon_session_idx").on(table.anonymous_session_id),
     // Comment moderation queue indexes
-    index("comments_moderation_pending_idx").on(table.issue_id, table.moderation_status),
+    index("comments_moderation_pending_idx").on(
+      table.issue_id,
+      table.moderation_status,
+    ),
   ],
 );
 
@@ -233,7 +245,7 @@ export const upvotes = pgTable(
     id: text().primaryKey(),
     created_at: timestamp().defaultNow().notNull(),
     issue_id: text().notNull(),
-    
+
     // Anonymous voting support
     voter_type: voterTypeEnum().default("authenticated").notNull(),
     user_id: text(), // Nullable for anonymous votes
@@ -243,7 +255,10 @@ export const upvotes = pgTable(
     index("upvotes_issue_id_idx").on(table.issue_id),
     index("upvotes_user_id_issue_id_idx").on(table.user_id, table.issue_id),
     // Anonymous voting constraints and indexes
-    index("upvotes_anon_session_issue_idx").on(table.issue_id, table.anonymous_session_id),
+    index("upvotes_anon_session_issue_idx").on(
+      table.issue_id,
+      table.anonymous_session_id,
+    ),
   ],
 );
 
@@ -263,7 +278,11 @@ export const anonymousRateLimits = pgTable(
   },
   (table) => [
     // Unique constraint for rate limiting (one action per session per org per type)
-    index("rate_limits_session_org_action_idx").on(table.session_id, table.organization_id, table.action_type),
+    index("rate_limits_session_org_action_idx").on(
+      table.session_id,
+      table.organization_id,
+      table.action_type,
+    ),
     // Cleanup index for old entries
     index("rate_limits_cleanup_idx").on(table.created_at),
   ],

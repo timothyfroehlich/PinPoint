@@ -51,12 +51,12 @@ export function NotificationBellClient({
               // New notification received
               setUnreadCount((prev) => prev + 1);
               setHasNewNotifications(true);
-              
+
               // Clear new notification indicator after 3 seconds
               setTimeout(() => {
                 setHasNewNotifications(false);
               }, 3000);
-            }
+            },
           )
           .on(
             "postgres_changes",
@@ -68,19 +68,25 @@ export function NotificationBellClient({
             },
             (payload) => {
               // Notification was marked as read
-              if (payload.old['read'] === false && payload.new['read'] === true) {
+              if (
+                payload.old["read"] === false &&
+                payload.new["read"] === true
+              ) {
                 setUnreadCount((prev) => Math.max(0, prev - 1));
               }
               // Notification was marked as unread
-              else if (payload.old['read'] === true && payload.new['read'] === false) {
+              else if (
+                payload.old["read"] === true &&
+                payload.new["read"] === false
+              ) {
                 setUnreadCount((prev) => prev + 1);
               }
-            }
+            },
           )
           .subscribe((status) => {
-            if (status === 'SUBSCRIBED') {
+            if (status === "SUBSCRIBED") {
               setIsConnected(true);
-            } else if (status === 'CHANNEL_ERROR') {
+            } else if (status === "CHANNEL_ERROR") {
               setIsConnected(false);
             }
           });
@@ -90,7 +96,10 @@ export function NotificationBellClient({
           setIsConnected(false);
         };
       } catch (error) {
-        console.error("Failed to initialize notification realtime connection:", error);
+        console.error(
+          "Failed to initialize notification realtime connection:",
+          error,
+        );
         setIsConnected(false);
         return () => {}; // Return empty cleanup function on error
       }
@@ -98,13 +107,15 @@ export function NotificationBellClient({
 
     const cleanup = initializeRealtimeConnection();
     return () => {
-      cleanup.then(fn => { fn?.(); });
+      cleanup.then((fn) => {
+        fn?.();
+      });
     };
   }, [userId]);
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
-    
+
     // Clear new notifications indicator when opened
     if (open) {
       setHasNewNotifications(false);
@@ -118,25 +129,25 @@ export function NotificationBellClient({
           variant="ghost"
           size="icon"
           className="relative hover:bg-muted"
-          aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+          aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
         >
           {hasNewNotifications || unreadCount > 0 ? (
-            <BellRingIcon 
-              className={`h-5 w-5 ${hasNewNotifications ? 'animate-pulse text-primary' : ''}`} 
+            <BellRingIcon
+              className={`h-5 w-5 ${hasNewNotifications ? "animate-pulse text-primary" : ""}`}
             />
           ) : (
             <BellIcon className="h-5 w-5" />
           )}
-          
+
           {/* Unread Count Badge */}
           {unreadCount > 0 && (
             <Badge
               variant={hasNewNotifications ? "destructive" : "secondary"}
               className={`absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center text-xs p-0 min-w-0 ${
-                hasNewNotifications ? 'animate-pulse' : ''
+                hasNewNotifications ? "animate-pulse" : ""
               }`}
             >
-              {unreadCount > 99 ? '99+' : unreadCount}
+              {unreadCount > 99 ? "99+" : unreadCount}
             </Badge>
           )}
 
@@ -147,11 +158,7 @@ export function NotificationBellClient({
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent 
-        className="w-80 p-0" 
-        align="end" 
-        sideOffset={8}
-      >
+      <PopoverContent className="w-80 p-0" align="end" sideOffset={8}>
         <div className="border-b px-4 py-3">
           <div className="flex items-center justify-between">
             <h4 className="text-sm font-medium">Notifications</h4>
@@ -171,10 +178,9 @@ export function NotificationBellClient({
 
         {/* Simplified notification display */}
         <div className="p-4 text-center text-sm text-muted-foreground">
-          {unreadCount > 0 
-            ? `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}`
-            : "No new notifications"
-          }
+          {unreadCount > 0
+            ? `${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}`
+            : "No new notifications"}
         </div>
       </PopoverContent>
     </Popover>

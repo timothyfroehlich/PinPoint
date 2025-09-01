@@ -18,7 +18,7 @@ export const metadata = {
 
 export default async function NewMachinePage() {
   await requireMemberAccess();
-  
+
   // Fetch required data for form
   const [locations, models] = await Promise.all([
     getLocationsForOrg(),

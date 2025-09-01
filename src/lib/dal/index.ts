@@ -133,9 +133,11 @@ export async function getDashboardData(): Promise<{
  * Gets authentication context with role and organization info
  * Optimized for layout components needing user state
  */
-export async function getUserContextData(): Promise<AuthContextWithRole & {
-  profile: UserProfileResponse | null;
-}> {
+export async function getUserContextData(): Promise<
+  AuthContextWithRole & {
+    profile: UserProfileResponse | null;
+  }
+> {
   const { getServerAuthContextWithRole } = await import("./shared");
   const { getCurrentUserProfile } = await import("./users");
 

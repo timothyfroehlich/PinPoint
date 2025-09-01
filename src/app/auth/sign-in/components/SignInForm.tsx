@@ -44,7 +44,7 @@ import { getCurrentDomain } from "~/lib/utils/domain";
 
 export function SignInForm() {
   const router = useRouter();
-  
+
   const [magicLinkState, magicLinkAction, magicLinkPending] = useActionState<
     ActionResult<{ message: string }> | null,
     FormData
@@ -56,7 +56,8 @@ export function SignInForm() {
 
   // Organization selection state
   const [organizations, setOrganizations] = useState<OrganizationOption[]>([]);
-  const [selectedOrganizationId, setSelectedOrganizationId] = useState<string>("");
+  const [selectedOrganizationId, setSelectedOrganizationId] =
+    useState<string>("");
   const [organizationsLoading, setOrganizationsLoading] = useState(true);
 
   // tRPC: fetch public organizations (anon-safe)
@@ -92,7 +93,7 @@ export function SignInForm() {
       alert("Please select an organization");
       return;
     }
-    
+
     setIsOAuthLoading(true);
     try {
       await signInWithOAuth(provider, selectedOrganizationId);
@@ -107,7 +108,7 @@ export function SignInForm() {
       alert("Please select an organization");
       return;
     }
-    
+
     setDevAuthLoading(true);
     try {
       const supabase = createClient();
@@ -121,14 +122,18 @@ export function SignInForm() {
 
       if (result.success) {
         console.log("Dev login successful:", result.method);
-        
+
         // CRITICAL: Wait for session to sync between client and server
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
         // Use the selected organization from the dropdown to redirect to proper subdomain
-        const selectedOrg = organizations.find(org => org.id === selectedOrganizationId);
+        const selectedOrg = organizations.find(
+          (org) => org.id === selectedOrganizationId,
+        );
         if (selectedOrg?.subdomain) {
-          const isDev = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+          const isDev =
+            typeof window !== "undefined" &&
+            window.location.hostname === "localhost";
           if (isDev) {
             window.location.href = `https://${selectedOrg.subdomain}.localhost:3000/dashboard`;
             return;
@@ -138,11 +143,11 @@ export function SignInForm() {
           window.location.href = `https://${selectedOrg.subdomain}.${currentDomain}/dashboard`;
           return;
         }
-        
+
         // Fallback: regular navigation if no organization selected
         router.refresh();
-        await new Promise(resolve => setTimeout(resolve, 200));
-        router.push('/dashboard');
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        router.push("/dashboard");
       } else {
         console.error("Login failed:", result.error);
         setDevAuthError(getAuthResultMessage(result));
@@ -168,7 +173,9 @@ export function SignInForm() {
           {organizationsLoading ? (
             <div className="flex items-center space-x-2">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
-              <span className="text-sm text-muted-foreground">Loading organizations...</span>
+              <span className="text-sm text-muted-foreground">
+                Loading organizations...
+              </span>
             </div>
           ) : (
             <Select

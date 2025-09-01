@@ -3,7 +3,12 @@ import { sql } from "drizzle-orm";
 
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 
-interface PublicOrgRow { id: string; name: string; subdomain: string; logo_url: string | null }
+interface PublicOrgRow {
+  id: string;
+  name: string;
+  subdomain: string;
+  logo_url: string | null;
+}
 
 export async function GET(_request: NextRequest): Promise<NextResponse> {
   try {
@@ -13,7 +18,11 @@ export async function GET(_request: NextRequest): Promise<NextResponse> {
     );
 
     const rows = (result as unknown as { rows: PublicOrgRow[] }).rows;
-    const organizations = rows.map((r) => ({ id: r.id, name: r.name, subdomain: r.subdomain }));
+    const organizations = rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      subdomain: r.subdomain,
+    }));
 
     // Prefer APC/test org as default if present, else first
     const apc = organizations.find(
@@ -30,4 +39,3 @@ export async function GET(_request: NextRequest): Promise<NextResponse> {
     );
   }
 }
-

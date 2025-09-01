@@ -43,7 +43,6 @@ export const getIssuesForOrg = cache(async () => {
   });
 });
 
-
 export interface IssuePagination {
   page: number;
   limit: number;
@@ -69,7 +68,9 @@ export const getIssuesWithFilters = cache(
       const organizationId = context.organization.id;
 
       // Build where conditions
-      const whereConditions: SQL[] = [eq(issues.organization_id, organizationId)];
+      const whereConditions: SQL[] = [
+        eq(issues.organization_id, organizationId),
+      ];
 
       // Status filtering by status names
       if (filters.status?.length) {
@@ -115,36 +116,42 @@ export const getIssuesWithFilters = cache(
         }
       }
 
-    // Assignee filtering
-    if (filters.assigneeId) {
-      whereConditions.push(eq(issues.assigned_to_id, filters.assigneeId));
-    }
+      // Assignee filtering
+      if (filters.assigneeId) {
+        whereConditions.push(eq(issues.assigned_to_id, filters.assigneeId));
+      }
 
-    // Search filtering (title and description)
-    if (filters.search) {
-      whereConditions.push(
-        sql`(${issues.title} ILIKE ${"%" + filters.search + "%"} OR ${issues.description} ILIKE ${"%" + filters.search + "%"})`,
-      );
-    }
+      // Search filtering (title and description)
+      if (filters.search) {
+        whereConditions.push(
+          sql`(${issues.title} ILIKE ${"%" + filters.search + "%"} OR ${issues.description} ILIKE ${"%" + filters.search + "%"})`,
+        );
+      }
 
-    // Calculate offset for pagination
-    const offset = (pagination.page - 1) * pagination.limit;
+      // Calculate offset for pagination
+      const offset = (pagination.page - 1) * pagination.limit;
 
-    // Build order by clause - handle different field types
-    let orderBy;
-    if (sorting.field === "created_at") {
-      orderBy =
-        sorting.order === "desc" ? desc(issues.created_at) : issues.created_at;
-    } else if (sorting.field === "title") {
-      orderBy = sorting.order === "desc" ? desc(issues.title) : issues.title;
-    } else if (sorting.field === "updated_at") {
-      orderBy =
-        sorting.order === "desc" ? desc(issues.updated_at) : issues.updated_at;
-    } else {
-      // Default to created_at
-      orderBy =
-        sorting.order === "desc" ? desc(issues.created_at) : issues.created_at;
-    }
+      // Build order by clause - handle different field types
+      let orderBy;
+      if (sorting.field === "created_at") {
+        orderBy =
+          sorting.order === "desc"
+            ? desc(issues.created_at)
+            : issues.created_at;
+      } else if (sorting.field === "title") {
+        orderBy = sorting.order === "desc" ? desc(issues.title) : issues.title;
+      } else if (sorting.field === "updated_at") {
+        orderBy =
+          sorting.order === "desc"
+            ? desc(issues.updated_at)
+            : issues.updated_at;
+      } else {
+        // Default to created_at
+        orderBy =
+          sorting.order === "desc"
+            ? desc(issues.created_at)
+            : issues.created_at;
+      }
 
       // Get total count for pagination info
       const totalCount = await tx
@@ -158,7 +165,12 @@ export const getIssuesWithFilters = cache(
         where: and(...whereConditions),
         with: {
           machine: {
-            columns: { id: true, name: true, model_id: true, location_id: true },
+            columns: {
+              id: true,
+              name: true,
+              model_id: true,
+              location_id: true,
+            },
             with: {
               model: {
                 columns: { id: true, name: true },
@@ -180,9 +192,9 @@ export const getIssuesWithFilters = cache(
         offset,
       });
 
-    // Check if there's a next page
-    const hasNextPage: boolean = issuesResult.length > pagination.limit;
-    const issuesData = hasNextPage ? issuesResult.slice(0, -1) : issuesResult;
+      // Check if there's a next page
+      const hasNextPage: boolean = issuesResult.length > pagination.limit;
+      const issuesData = hasNextPage ? issuesResult.slice(0, -1) : issuesResult;
 
       return {
         issues: issuesData,
@@ -328,32 +340,32 @@ export const getIssueDashboardStats = cache(async () => {
         }),
       ]);
 
-  // Process status breakdown
-  const statusCounts = statusBreakdown.reduce<Record<string, number>>(
-    (acc, issue) => {
-      const statusName = issue.status?.name ?? "unknown";
-      acc[statusName] = (acc[statusName] ?? 0) + 1;
-      return acc;
-    },
-    {},
-  );
+    // Process status breakdown
+    const statusCounts = statusBreakdown.reduce<Record<string, number>>(
+      (acc, issue) => {
+        const statusName = issue.status?.name ?? "unknown";
+        acc[statusName] = (acc[statusName] ?? 0) + 1;
+        return acc;
+      },
+      {},
+    );
 
-  // Process priority breakdown
-  const priorityCounts = priorityBreakdown.reduce<Record<string, number>>(
-    (acc, issue) => {
-      const priorityName = issue.priority?.name ?? "unknown";
-      acc[priorityName] = (acc[priorityName] ?? 0) + 1;
-      return acc;
-    },
-    {},
-  );
+    // Process priority breakdown
+    const priorityCounts = priorityBreakdown.reduce<Record<string, number>>(
+      (acc, issue) => {
+        const priorityName = issue.priority?.name ?? "unknown";
+        acc[priorityName] = (acc[priorityName] ?? 0) + 1;
+        return acc;
+      },
+      {},
+    );
 
-  // Process assignment statistics
-  const totalIssues = assignmentStats.length;
-  const assignedIssues = assignmentStats.filter(
-    (issue) => issue.assigned_to_id,
-  ).length;
-  const unassignedIssues = totalIssues - assignedIssues;
+    // Process assignment statistics
+    const totalIssues = assignmentStats.length;
+    const assignedIssues = assignmentStats.filter(
+      (issue) => issue.assigned_to_id,
+    ).length;
+    const unassignedIssues = totalIssues - assignedIssues;
 
     return {
       total: totalIssues,

@@ -7,6 +7,7 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
+import { nameSchema, LIMITS } from "../validation/schemas";
 import { eq } from "drizzle-orm";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { organizations } from "~/server/db/schema";
@@ -25,11 +26,7 @@ import { PERMISSIONS } from "~/server/auth/permissions.constants";
 
 // Enhanced validation schemas with better error messages
 const updateOrganizationProfileSchema = z.object({
-  name: z
-    .string()
-    .min(1, "Organization name is required")
-    .max(100, "Organization name must be less than 100 characters")
-    .trim(),
+  name: nameSchema,
   description: z
     .string()
     .max(500, "Description must be less than 500 characters")
@@ -43,10 +40,7 @@ const updateOrganizationProfileSchema = z.object({
     .string()
     .max(20, "Phone number must be less than 20 characters")
     .optional(),
-  address: z
-    .string()
-    .max(200, "Address must be less than 200 characters")
-    .optional(),
+  address: z.string().max(LIMITS.TITLE_MAX, "Address must be less than 200 characters").optional(),
 });
 
 const updateOrganizationLogoSchema = z.object({
@@ -66,12 +60,16 @@ export async function updateOrganizationProfileAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId, membership } = await requireAuthContextWithRole();
+    const { user, organizationId, membership } =
+      await requireAuthContextWithRole();
     const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ORGANIZATION_MANAGE, db);
 
     // Enhanced validation with Zod
-    const validation = validateFormData(formData, updateOrganizationProfileSchema);
+    const validation = validateFormData(
+      formData,
+      updateOrganizationProfileSchema,
+    );
     if (!validation.success) {
       return validation;
     }
@@ -88,7 +86,11 @@ export async function updateOrganizationProfileAction(
 
     const [updatedOrg] = await db
       .update(organizations)
-      .set(transformKeysToSnakeCase(updateData) as typeof organizations.$inferInsert)
+      .set(
+        transformKeysToSnakeCase(
+          updateData,
+        ) as typeof organizations.$inferInsert,
+      )
       .where(eq(organizations.id, organizationId))
       .returning({ id: organizations.id, name: organizations.name });
 
@@ -105,7 +107,9 @@ export async function updateOrganizationProfileAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`Organization ${organizationId} profile updated by ${user.email}`);
+      console.log(
+        `Organization ${organizationId} profile updated by ${user.email}`,
+      );
     });
 
     return actionSuccess(
@@ -130,7 +134,8 @@ export async function updateOrganizationLogoAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId, membership } = await requireAuthContextWithRole();
+    const { user, organizationId, membership } =
+      await requireAuthContextWithRole();
     const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ORGANIZATION_MANAGE, db);
 
@@ -162,7 +167,9 @@ export async function updateOrganizationLogoAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`Organization ${organizationId} logo updated by ${user.email}`);
+      console.log(
+        `Organization ${organizationId} logo updated by ${user.email}`,
+      );
     });
 
     return actionSuccess(

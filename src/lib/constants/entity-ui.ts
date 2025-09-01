@@ -27,7 +27,7 @@ export const ENTITY_ICONS = {
  */
 export const ENTITY_COLORS = {
   issues: "bg-primary-container text-on-primary-container",
-  machines: "bg-tertiary-container text-on-tertiary-container", 
+  machines: "bg-tertiary-container text-on-tertiary-container",
   users: "bg-primary-container text-on-primary-container",
   locations: "bg-secondary-container text-on-secondary-container",
 } as const;
@@ -38,7 +38,7 @@ export const ENTITY_COLORS = {
  */
 export const ENTITY_NAMES = {
   issues: "Issues",
-  machines: "Machines", 
+  machines: "Machines",
   users: "Users",
   locations: "Locations",
 } as const;
@@ -50,7 +50,7 @@ export const ENTITY_NAMES = {
 export const ENTITY_SINGULAR = {
   issues: "Issue",
   machines: "Machine",
-  users: "User", 
+  users: "User",
   locations: "Location",
 } as const;
 

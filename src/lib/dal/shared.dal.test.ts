@@ -1,31 +1,31 @@
 /**
  * DAL Auth Context Tests - Archetype 6 (Enhanced)
  * Service business logic testing with mocked auth context and database
- * 
+ *
  * ARCHETYPE BOUNDARIES:
  * - Test business logic functions that coordinate data access and processing
  * - Mock authentication context and external dependencies
  * - Focus on organization scoping and permission enforcement
  * - NO direct database operations (those belong in Repository archetype)
- * 
+ *
  * WHAT BELONGS HERE:
  * - Service layer functions that call multiple data sources
  * - Business rules and validation logic with external dependencies
  * - Functions requiring authentication context or organization scoping
  * - Cache behavior testing and invalidation patterns
- * 
+ *
  * WHAT DOESN'T BELONG:
  * - Pure functions without dependencies (use Unit archetype)
  * - Direct database queries (use Repository archetype for integration testing)
  * - React components (use Client Island or Server Component archetypes)
  * - Full API request/response cycles (use API Integration archetype)
- * 
+ *
  * MOCKING STRATEGY:
  * - Mock external API calls, database connections, and file system access
  * - Use consistent SEED_TEST_IDS for predictable test data
  * - Mock authentication context with realistic user and organization data
  * - Verify that mocked dependencies are called with correct parameters
- * 
+ *
  * ORGANIZATION SCOPING:
  * - Every test should verify proper organization boundary enforcement
  * - Mock different organization contexts to test isolation
@@ -38,10 +38,10 @@ import type { User } from "@supabase/supabase-js";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 // Import functions to test
-import { 
-  requireAuthContext, 
+import {
+  requireAuthContext,
   getServerAuthContext,
-  getServerAuthContextWithRole 
+  getServerAuthContextWithRole,
 } from "~/lib/dal/shared";
 
 // Mock secure organization context
@@ -51,17 +51,17 @@ vi.mock("~/lib/organization-context", () => ({
     user: { id: SEED_TEST_IDS.USERS.ADMIN },
     organization: { id: SEED_TEST_IDS.ORGANIZATIONS.primary },
     accessLevel: "member",
-    membership: { role: { name: "Admin" } }
-  }))
+    membership: { role: { name: "Admin" } },
+  })),
 }));
 
 // Mock the Supabase client
 vi.mock("~/lib/supabase/server", () => ({
   createClient: vi.fn(() => ({
     auth: {
-      getUser: vi.fn()
-    }
-  }))
+      getUser: vi.fn(),
+    },
+  })),
 }));
 
 // Mock the database provider
@@ -70,25 +70,25 @@ vi.mock("~/server/db/provider", () => ({
     getClient: vi.fn(() => ({
       query: {
         memberships: {
-          findFirst: vi.fn()
-        }
-      }
-    }))
-  }))
+          findFirst: vi.fn(),
+        },
+      },
+    })),
+  })),
 }));
 
 const mockUser: User = {
   id: SEED_TEST_IDS.USERS.ADMIN,
-  email: 'tim.froehlich@example.com',
+  email: "tim.froehlich@example.com",
   app_metadata: {
     organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
-    role: 'Admin'
+    role: "Admin",
   },
   user_metadata: {
-    name: 'Tim Froehlich'
+    name: "Tim Froehlich",
   },
-  aud: 'authenticated',
-  created_at: '2025-08-28T04:25:59.758927Z'
+  aud: "authenticated",
+  created_at: "2025-08-28T04:25:59.758927Z",
 };
 
 describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
@@ -108,9 +108,9 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
         auth: {
           getUser: vi.fn().mockResolvedValue({
             data: { user: mockUser },
-            error: null
-          })
-        }
+            error: null,
+          }),
+        },
       } as any);
 
       const context = await getServerAuthContext();
@@ -118,9 +118,9 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
       expect(context).toMatchObject({
         user: expect.objectContaining({
           id: SEED_TEST_IDS.USERS.ADMIN,
-          email: 'tim.froehlich@example.com'
+          email: "tim.froehlich@example.com",
         }),
-        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
       });
     });
 
@@ -130,9 +130,9 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
         auth: {
           getUser: vi.fn().mockResolvedValue({
             data: { user: null },
-            error: { message: 'No user' }
-          })
-        }
+            error: { message: "No user" },
+          }),
+        },
       } as any);
 
       const context = await getServerAuthContext();
@@ -141,7 +141,7 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
         user: null,
         organizationId: null,
         membership: null,
-        role: null
+        role: null,
       });
     });
 
@@ -151,13 +151,17 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
         auth: {
           getUser: vi.fn().mockResolvedValue({
             data: { user: mockUser },
-            error: null
-          })
-        }
+            error: null,
+          }),
+        },
       } as any);
 
-      const { getOrganizationContext } = await import("~/lib/organization-context");
-      vi.mocked(getOrganizationContext).mockRejectedValueOnce(new Error("no ctx"));
+      const { getOrganizationContext } = await import(
+        "~/lib/organization-context"
+      );
+      vi.mocked(getOrganizationContext).mockRejectedValueOnce(
+        new Error("no ctx"),
+      );
 
       const context = await getServerAuthContext();
       expect(context.organizationId).toBeNull();
@@ -171,17 +175,19 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
         auth: {
           getUser: vi.fn().mockResolvedValue({
             data: { user: mockUser },
-            error: null
-          })
-        }
+            error: null,
+          }),
+        },
       } as any);
 
-      const { requireMemberAccess } = await import("~/lib/organization-context");
+      const { requireMemberAccess } = await import(
+        "~/lib/organization-context"
+      );
       vi.mocked(requireMemberAccess).mockResolvedValue({
         user: { id: mockUser.id },
         organization: { id: SEED_TEST_IDS.ORGANIZATIONS.primary },
         membership: {},
-        accessLevel: "member"
+        accessLevel: "member",
       } as any);
 
       const context = await requireAuthContext();
@@ -189,9 +195,9 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
       expect(context).toMatchObject({
         user: expect.objectContaining({
           id: SEED_TEST_IDS.USERS.ADMIN,
-          email: 'tim.froehlich@example.com'
+          email: "tim.froehlich@example.com",
         }),
-        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
       });
     });
 
@@ -201,12 +207,14 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
         auth: {
           getUser: vi.fn().mockResolvedValue({
             data: { user: null },
-            error: { message: 'No user' }
-          })
-        }
+            error: { message: "No user" },
+          }),
+        },
       } as any);
 
-      await expect(requireAuthContext()).rejects.toThrow('Authentication required');
+      await expect(requireAuthContext()).rejects.toThrow(
+        "Authentication required",
+      );
     });
 
     it("throws when membership validation fails", async () => {
@@ -215,15 +223,19 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
         auth: {
           getUser: vi.fn().mockResolvedValue({
             data: { user: mockUser },
-            error: null
-          })
-        }
+            error: null,
+          }),
+        },
       } as any);
 
-      const { requireMemberAccess } = await import("~/lib/organization-context");
-      vi.mocked(requireMemberAccess).mockRejectedValue(new Error('Access denied'));
+      const { requireMemberAccess } = await import(
+        "~/lib/organization-context"
+      );
+      vi.mocked(requireMemberAccess).mockRejectedValue(
+        new Error("Access denied"),
+      );
 
-      await expect(requireAuthContext()).rejects.toThrow('Access denied');
+      await expect(requireAuthContext()).rejects.toThrow("Access denied");
     });
   });
 
@@ -235,13 +247,15 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
         auth: {
           getUser: vi.fn().mockResolvedValue({
             data: { user: mockUser },
-            error: null
-          })
-        }
+            error: null,
+          }),
+        },
       } as any);
 
       // Mock database query - return null since this is complex integration
-      const { getGlobalDatabaseProvider } = await import("~/server/db/provider");
+      const { getGlobalDatabaseProvider } = await import(
+        "~/server/db/provider"
+      );
       const mockDb = getGlobalDatabaseProvider().getClient();
       vi.mocked(mockDb.query.memberships.findFirst).mockResolvedValue(null);
 
@@ -250,12 +264,12 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
       // This test validates the structure when no membership is found
       expect(context).toMatchObject({
         user: expect.objectContaining({
-          id: SEED_TEST_IDS.USERS.ADMIN
+          id: SEED_TEST_IDS.USERS.ADMIN,
         }),
         organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
         membership: null,
         role: null,
-        permissions: []
+        permissions: [],
       });
     });
 
@@ -266,13 +280,15 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
         auth: {
           getUser: vi.fn().mockResolvedValue({
             data: { user: mockUser },
-            error: null
-          })
-        }
+            error: null,
+          }),
+        },
       } as any);
 
       // Mock database query returning null
-      const { getGlobalDatabaseProvider } = await import("~/server/db/provider");
+      const { getGlobalDatabaseProvider } = await import(
+        "~/server/db/provider"
+      );
       const mockDb = getGlobalDatabaseProvider().getClient();
       vi.mocked(mockDb.query.memberships.findFirst).mockResolvedValue(null);
 
@@ -283,7 +299,7 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
         organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
         membership: null,
         role: null,
-        permissions: []
+        permissions: [],
       });
     });
 
@@ -293,9 +309,9 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
         auth: {
           getUser: vi.fn().mockResolvedValue({
             data: { user: null },
-            error: { message: 'No user' }
-          })
-        }
+            error: { message: "No user" },
+          }),
+        },
       } as any);
 
       const context = await getServerAuthContextWithRole();
@@ -305,7 +321,7 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
         organizationId: null,
         membership: null,
         role: null,
-        permissions: []
+        permissions: [],
       });
     });
   });
@@ -316,7 +332,7 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
       expect(typeof getServerAuthContext).toBe("function");
       expect(typeof requireAuthContext).toBe("function");
       expect(typeof getServerAuthContextWithRole).toBe("function");
-      
+
       // In real implementation, could test memoization by calling
       // functions multiple times and verifying auth calls are cached
       // but that requires more complex mocking of React's cache()
@@ -325,11 +341,15 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
 
   describe("Security patterns verification", () => {
     it("properly validates organizationId format", async () => {
-      const { requireMemberAccess } = await import("~/lib/organization-context");
-      vi.mocked(requireMemberAccess).mockRejectedValueOnce(
-        new Error("Organization selection required")
+      const { requireMemberAccess } = await import(
+        "~/lib/organization-context"
       );
-      await expect(requireAuthContext()).rejects.toThrow("Organization selection required");
+      vi.mocked(requireMemberAccess).mockRejectedValueOnce(
+        new Error("Organization selection required"),
+      );
+      await expect(requireAuthContext()).rejects.toThrow(
+        "Organization selection required",
+      );
     });
 
     it("handles different organization contexts correctly", async () => {
@@ -337,21 +357,27 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
       vi.mocked(createClient).mockReturnValue({
         auth: {
           getUser: vi.fn().mockResolvedValue({
-            data: { user: { ...mockUser, id: SEED_TEST_IDS.USERS.MEMBER2 } as any },
-            error: null
-          })
-        }
+            data: {
+              user: { ...mockUser, id: SEED_TEST_IDS.USERS.MEMBER2 } as any,
+            },
+            error: null,
+          }),
+        },
       } as any);
-      const { requireMemberAccess } = await import("~/lib/organization-context");
+      const { requireMemberAccess } = await import(
+        "~/lib/organization-context"
+      );
       vi.mocked(requireMemberAccess).mockResolvedValue({
         user: { id: SEED_TEST_IDS.USERS.MEMBER2 },
         organization: { id: SEED_TEST_IDS.ORGANIZATIONS.competitor },
         membership: {},
-        accessLevel: "member"
+        accessLevel: "member",
       } as any);
 
       const context = await requireAuthContext();
-      expect(context.organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.competitor);
+      expect(context.organizationId).toBe(
+        SEED_TEST_IDS.ORGANIZATIONS.competitor,
+      );
     });
   });
 
@@ -362,12 +388,12 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
         auth: {
           getUser: vi.fn().mockResolvedValue({
             data: { user: null },
-            error: { 
-              message: 'JWT expired',
-              status: 401 
-            }
-          })
-        }
+            error: {
+              message: "JWT expired",
+              status: 401,
+            },
+          }),
+        },
       } as any);
 
       const context = await getServerAuthContext();
@@ -376,7 +402,7 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
         user: null,
         organizationId: null,
         membership: null,
-        role: null
+        role: null,
       });
     });
 
@@ -384,26 +410,26 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
       // This test verifies the function's behavior when database queries fail
       // Based on the implementation, it should handle database errors gracefully
       // and return user context with null role info rather than throwing
-      
+
       // Mock successful auth
       const { createClient } = await import("~/lib/supabase/server");
       vi.mocked(createClient).mockReturnValue({
         auth: {
           getUser: vi.fn().mockResolvedValue({
             data: { user: mockUser },
-            error: null
-          })
-        }
+            error: null,
+          }),
+        },
       } as any);
 
       // For now, just test that the function exists and is callable
       // Complex database error scenarios would be better tested in integration tests
       const context = await getServerAuthContextWithRole();
-      
+
       // Should return user context even if role lookup fails
-      expect(context).toHaveProperty('user');
-      expect(context).toHaveProperty('organizationId');
-      expect(context).toHaveProperty('permissions');
+      expect(context).toHaveProperty("user");
+      expect(context).toHaveProperty("organizationId");
+      expect(context).toHaveProperty("permissions");
     });
   });
 });

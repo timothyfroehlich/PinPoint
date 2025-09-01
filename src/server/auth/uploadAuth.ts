@@ -10,7 +10,10 @@ import type { PinPointSupabaseUser } from "~/lib/types";
 import type { DrizzleClient } from "~/server/db/drizzle";
 
 import { organizations, memberships } from "~/server/db/schema";
-import { extractTrustedSubdomain, parseSubdomainFromHost } from "~/lib/subdomain-verification";
+import {
+  extractTrustedSubdomain,
+  parseSubdomainFromHost,
+} from "~/lib/subdomain-verification";
 
 export interface UploadAuthContext {
   user: PinPointSupabaseUser;

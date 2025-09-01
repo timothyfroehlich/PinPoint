@@ -82,6 +82,8 @@ export function validateMachineOwnership(
   return { valid: true };
 }
 
+import { titleSchema, emailSchema, LIMITS } from "../validation/schemas";
+
 /**
  * Validate issue creation input parameters
  * Pure function that validates basic input constraints
@@ -89,42 +91,31 @@ export function validateMachineOwnership(
 export function validateIssueCreationInput(
   input: PublicIssueCreationInput | AuthenticatedIssueCreationInput,
 ): ValidationResult {
-  if (!input.title || input.title.trim().length === 0) {
-    return {
-      valid: false,
-      error: "Title is required",
-    };
+  // Validate title via centralized schema
+  const titleStr = input.title;
+  const titleResult = titleSchema.safeParse(titleStr);
+  if (!titleResult.success) {
+  return { valid: false, error: titleResult.error.issues[0].message };
   }
 
-  if (input.title.length > 255) {
-    return {
-      valid: false,
-      error: "Title must be 255 characters or less",
-    };
+  // Validate optional description (use commentContentSchema for length constraints but allow empty)
+  if ("description" in input && input.description) {
+    const descTrimmed = (input.description || "").trim();
+    if (descTrimmed.length > LIMITS.DESCRIPTION_MAX) {
+      return { valid: false, error: `Description must be ${String(LIMITS.DESCRIPTION_MAX)} characters or less` };
+    }
   }
 
-  if (input.description && input.description.length > 2000) {
-    return {
-      valid: false,
-      error: "Description must be 2000 characters or less",
-    };
-  }
-
+  // Machine ID presence
   if (!input.machineId || input.machineId.trim().length === 0) {
-    return {
-      valid: false,
-      error: "Machine ID is required",
-    };
+    return { valid: false, error: "Machine ID is required" };
   }
 
-  // Validate email format for public issues
+  // Validate email format for public issues using centralized emailSchema
   if ("reporterEmail" in input && input.reporterEmail) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(input.reporterEmail)) {
-      return {
-        valid: false,
-        error: "Invalid email format",
-      };
+    const emailResult = emailSchema.safeParse(input.reporterEmail);
+    if (!emailResult.success) {
+  return { valid: false, error: emailResult.error.issues[0].message };
     }
   }
 

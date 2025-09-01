@@ -53,7 +53,12 @@ export function Navigation({ organizationContext }: NavigationProps) {
 
           {/* Center Section - Quick Links */}
           <div className="hidden md:flex items-center gap-1">
-            <Button variant="ghost" size="sm" asChild className="text-on-primary-container hover:bg-surface-variant">
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              className="text-on-primary-container hover:bg-surface-variant"
+            >
               <Link href="/issues" className="flex items-center gap-2">
                 <AlertTriangleIcon className="h-4 w-4" />
                 Issues
@@ -67,21 +72,36 @@ export function Navigation({ organizationContext }: NavigationProps) {
               </Link>
             </Button>
 
-            <Button variant="ghost" size="sm" asChild className="text-on-primary-container hover:bg-surface-variant">
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              className="text-on-primary-container hover:bg-surface-variant"
+            >
               <Link href="/machines" className="flex items-center gap-2">
                 <WrenchIcon className="h-4 w-4" />
                 Machines
               </Link>
             </Button>
 
-            <Button variant="ghost" size="sm" asChild className="text-on-primary-container hover:bg-surface-variant">
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              className="text-on-primary-container hover:bg-surface-variant"
+            >
               <Link href="/locations" className="flex items-center gap-2">
                 <MapPinIcon className="h-4 w-4" />
                 Locations
               </Link>
             </Button>
 
-            <Button variant="ghost" size="sm" asChild className="text-on-primary-container hover:bg-surface-variant">
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              className="text-on-primary-container hover:bg-surface-variant"
+            >
               <Link href="/settings" className="flex items-center gap-2">
                 <ShieldIcon className="h-4 w-4" />
                 Admin
@@ -103,14 +123,21 @@ export function Navigation({ organizationContext }: NavigationProps) {
           {/* Right Section - User Context */}
           <div className="flex items-center gap-3">
             <NotificationBellWrapper userId={organizationContext.user.id} />
-            
-            <UserContextDisplay user={organizationContext.user} organization={organizationContext.organization} />
 
-  <UserMenuClient user={{
-      id: organizationContext.user.id,
-      name: organizationContext.user.name ?? organizationContext.user.email,
-      email: organizationContext.user.email,
-    }} />
+            <UserContextDisplay
+              user={organizationContext.user}
+              organization={organizationContext.organization}
+            />
+
+            <UserMenuClient
+              user={{
+                id: organizationContext.user.id,
+                name:
+                  organizationContext.user.name ??
+                  organizationContext.user.email,
+                email: organizationContext.user.email,
+              }}
+            />
           </div>
         </div>
       </div>
@@ -119,7 +146,11 @@ export function Navigation({ organizationContext }: NavigationProps) {
 }
 
 // Organization Logo Component (now receives data as props)
-function OrganizationLogo({ organization }: { organization: { id: string; name: string; subdomain: string } }) {
+function OrganizationLogo({
+  organization,
+}: {
+  organization: { id: string; name: string; subdomain: string };
+}) {
   return (
     <Link href="/dashboard" className="flex items-center gap-3">
       <span className="text-xl font-bold text-on-primary-container">
@@ -130,19 +161,19 @@ function OrganizationLogo({ organization }: { organization: { id: string; name: 
 }
 
 // User Context Display Component (now receives data as props)
-function UserContextDisplay({ 
-  user, 
-  organization 
-}: { 
+function UserContextDisplay({
+  user,
+  organization,
+}: {
   user: { id: string; name?: string; email: string };
   organization: { id: string; name: string; subdomain: string };
 }) {
   return (
     <div className="text-right hidden lg:block">
-      <p className="text-sm font-medium text-on-primary-container">{user.name ?? user.email}</p>
-      <p className="text-xs text-on-surface-variant">
-        {organization.name}
+      <p className="text-sm font-medium text-on-primary-container">
+        {user.name ?? user.email}
       </p>
+      <p className="text-xs text-on-surface-variant">{organization.name}</p>
     </div>
   );
 }
