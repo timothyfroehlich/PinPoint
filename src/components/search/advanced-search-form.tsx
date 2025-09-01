@@ -51,8 +51,8 @@ export interface AdvancedSearchFormProps {
   // Current search state from URL
   currentParams: Record<string, string | string[] | undefined>;
 
-  // URL building functions
-  buildUrl: (params: Record<string, any>) => string;
+  // URL building functions - using unknown for type safety
+  buildUrl: (params: Record<string, unknown>) => string;
 
   // Optional customization
   title?: string;
@@ -61,11 +61,12 @@ export interface AdvancedSearchFormProps {
   defaultExpanded?: boolean;
   showActiveFilters?: boolean;
 
-  // Event handlers
-  onFormSubmit?: (params: Record<string, any>) => void;
+  // Event handlers - using unknown for type safety
+  onFormSubmit?: (params: Record<string, unknown>) => void;
 }
 
-type FormState = Record<string, any>;
+// Form state type - using unknown for type safety
+type FormState = Record<string, unknown>;
 
 export function AdvancedSearchForm({
   entityType,
@@ -118,7 +119,7 @@ export function AdvancedSearchForm({
   });
 
   // Handle form field updates
-  const updateFormField = (fieldId: string, value: any) => {
+  const updateFormField = (fieldId: string, value: unknown) => {
     setFormState((prev) => ({
       ...prev,
       [fieldId]: value,
@@ -130,31 +131,38 @@ export function AdvancedSearchForm({
     event.preventDefault();
 
     // Build clean parameters object
-    const params: Record<string, any> = {};
+    const params: Record<string, unknown> = {};
 
     fields.forEach((field) => {
       if (field.type === "multi-select") {
         const values = formState[field.id] as string[];
-        if (values.length > 0) {
+        if (Array.isArray(values) && values.length > 0) {
           params[field.id] = values;
         }
       } else if (field.type === "date-range") {
         const start = formState[`${field.id}_start`];
         const end = formState[`${field.id}_end`];
-        if (start) params[`${field.id}_start`] = start;
-        if (end) params[`${field.id}_end`] = end;
+        if (start && typeof start === "string")
+          params[`${field.id}_start`] = start;
+        if (end && typeof end === "string") params[`${field.id}_end`] = end;
       } else if (field.type === "number-range") {
         const min = formState[`${field.id}_min`];
         const max = formState[`${field.id}_max`];
-        if (min) params[`${field.id}_min`] = min;
-        if (max) params[`${field.id}_max`] = max;
+        if (min && (typeof min === "string" || typeof min === "number"))
+          params[`${field.id}_min`] = min;
+        if (max && (typeof max === "string" || typeof max === "number"))
+          params[`${field.id}_max`] = max;
       } else if (field.type === "boolean") {
         if (formState[field.id] === true) {
           params[field.id] = "true";
         }
       } else {
         const value = formState[field.id];
-        if (value && value !== "") {
+        if (
+          value &&
+          value !== "" &&
+          (typeof value === "string" || typeof value === "number")
+        ) {
           params[field.id] = value;
         }
       }
