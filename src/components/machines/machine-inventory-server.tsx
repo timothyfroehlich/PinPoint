@@ -177,7 +177,7 @@ export async function MachineInventoryServer({
                   </Link>
                   <p className="text-sm text-muted-foreground">
                     {machine.model?.manufacturer} {machine.model?.name}
-                    {machine.model?.year && ` (${machine.model.year})`}
+                    {machine.model?.year && ` (${String(machine.model.year)})`}
                   </p>
                 </div>
 
@@ -259,7 +259,8 @@ export async function MachineInventoryServer({
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {machine.model?.manufacturer}
-                        {machine.model?.year && ` (${machine.model.year})`}
+                        {machine.model?.year &&
+                          ` (${String(machine.model.year)})`}
                       </div>
                     </div>
                   </TableCell>
