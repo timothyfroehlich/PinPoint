@@ -26,14 +26,14 @@ import { type Model } from "~/server/db/types";
 
 export const modelRouter = createTRPCRouter({
   // Get all models accessible to this organization
-  // Includes: OPDB models (global) + org's custom models (future v1.x feature)
+  // Includes: commercial models (global) + org's custom models (future v1.x feature)
   getAll: orgScopedProcedure.query(
     async ({ ctx }): Promise<ModelResponse[]> => {
       const allModels = await ctx.db.query.models.findMany({
         where:
-          // Global OPDB models (organizationId = NULL) OR org's custom models
+          // Global commercial models (organizationId = NULL) OR org's custom models
           or(
-            isNull(models.organization_id), // OPDB models
+            isNull(models.organization_id), // Commercial models
             eq(models.organization_id, ctx.organizationId), // Custom models
           ),
         with: {
@@ -67,9 +67,9 @@ export const modelRouter = createTRPCRouter({
       const model = await ctx.db.query.models.findFirst({
         where: and(
           eq(models.id, input.id),
-          // Must be OPDB model OR org's custom model
+          // Must be commercial model OR org's custom model
           or(
-            isNull(models.organization_id), // OPDB models
+            isNull(models.organization_id), // Commercial models
             eq(models.organization_id, ctx.organizationId), // Custom models
           ),
         ),
@@ -99,7 +99,7 @@ export const modelRouter = createTRPCRouter({
       return transformed as ModelResponse;
     }),
 
-  // Search OPDB games for typeahead
+  // Search commercial games for typeahead
   searchOPDB: orgScopedProcedure
     .input(z.object({ query: z.string().min(1) }))
     .query(async ({ input }): Promise<OPDBSearchResult[]> => {
@@ -111,11 +111,11 @@ export const modelRouter = createTRPCRouter({
   createFromOPDB: organizationManageProcedure
     .input(z.object({ opdbId: z.string() }))
     .mutation(async ({ ctx, input }): Promise<Model> => {
-      // Check if this OPDB game already exists globally
+      // Check if this commercial game already exists globally
       const existingGame = await ctx.db.query.models.findFirst({
         where: and(
           eq(models.opdb_id, input.opdbId),
-          isNull(models.organization_id), // OPDB models have NULL organizationId
+          isNull(models.organization_id), // Commercial models have NULL organizationId
         ),
       });
 
@@ -137,15 +137,15 @@ export const modelRouter = createTRPCRouter({
         });
       }
 
-      // Create global OPDB Model record
-      // OPDB games are shared across all organizations
+      // Create global commercial Model record
+      // Commercial games are shared across all organizations
       const [newModel] = await ctx.db
         .insert(models)
         .values({
           id: generateId(),
           name: machineData.name,
-          organization_id: null, // NULL for OPDB models (global access)
-          is_custom: false, // OPDB models are not custom
+          organization_id: null, // NULL for commercial models (global access)
+          is_custom: false, // Commercial models are not custom
           opdb_id: input.opdbId,
           manufacturer: machineData.manufacturer ?? null,
           year: machineData.year ?? null,
@@ -164,12 +164,12 @@ export const modelRouter = createTRPCRouter({
       return newModel;
     }),
 
-  // Sync existing OPDB models with latest OPDB data
+  // Sync existing commercial models with latest OPDB data
   syncWithOPDB: organizationManageProcedure.mutation(
     async ({
       ctx,
     }): Promise<{ synced: number; total?: number; message: string }> => {
-      // Find all OPDB models that have machines in this organization
+      // Find all commercial models that have machines in this organization
       const machinesInOrg = await ctx.db.query.machines.findMany({
         where: eq(machines.organization_id, ctx.organizationId),
         with: {
@@ -177,13 +177,13 @@ export const modelRouter = createTRPCRouter({
         },
       });
 
-      // Extract and filter OPDB models from machines
-      const opdbModelsToSync = machinesInOrg
+      // Extract and filter commercial models from machines
+      const commercialModelsToSync = machinesInOrg
         .map((machine) => machine.model)
         .filter(
           (model) =>
             model.opdb_id != null &&
-            model.organization_id === null && // Only OPDB models
+            model.organization_id === null && // Only commercial models
             !model.is_custom,
         )
         // Remove duplicates by creating a Map
@@ -192,10 +192,10 @@ export const modelRouter = createTRPCRouter({
           return uniqueModels;
         }, new Map<string, NonNullable<(typeof machinesInOrg)[0]["model"]>>());
 
-      const uniqueModels = Array.from(opdbModelsToSync.values());
+      const uniqueModels = Array.from(commercialModelsToSync.values());
 
       if (uniqueModels.length === 0) {
-        return { synced: 0, message: "No OPDB-linked games found to sync" };
+        return { synced: 0, message: "No commercial games found to sync" };
       }
 
       const opdbClient = new OPDBClient(env.OPDB_API_KEY, env.OPDB_API_URL);
@@ -223,8 +223,8 @@ export const modelRouter = createTRPCRouter({
           }
         } catch (error) {
           ctx.logger.error({
-            msg: "Failed to sync OPDB game",
-            component: "modelRouter.syncOPDBGames",
+            msg: "Failed to sync commercial game",
+            component: "modelRouter.syncCommercialGames",
             context: {
               gameTitle: title.name,
               gameId: title.id,
@@ -247,5 +247,5 @@ export const modelRouter = createTRPCRouter({
   ),
 
   // Note: Custom model CRUD operations will be added in v1.x
-  // For now, OPDB models are read-only after creation and cannot be deleted
+  // For now, commercial models are read-only after creation and cannot be deleted
 });

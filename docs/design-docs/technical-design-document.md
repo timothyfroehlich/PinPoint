@@ -15,7 +15,7 @@ The system will be architected as a multi-tenant web application utilizing a sha
 
 PinPoint integrates with the Open Pinball Database (OPDB) and [PinballMap.com](http://pinballmap.com/) to provide authoritative game data and streamline game management:
 
-- **Hybrid Data Model:** Models are sourced from OPDB but cached locally for performance and offline capability
+- **Hybrid Data Model:** Commercial models are sourced from OPDB but cached locally for performance and offline capability
 - **API Integration:** Server-side integration with OPDB's REST API for searching, fetching, and syncing game data
 - **Data Synchronization:** Periodic sync processes to keep local game data up-to-date with OPDB
 - **Fallback Strategy:** Support for custom game titles when OPDB data is unavailable or incomplete

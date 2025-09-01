@@ -4,6 +4,11 @@
  */
 
 import { createMockAuthContext } from "./dal-test-helpers";
+import { PERMISSIONS } from "~/server/auth/permissions.constants";
+import {
+  SUBDOMAIN_HEADER,
+  SUBDOMAIN_VERIFIED_HEADER,
+} from "~/lib/subdomain-verification";
 
 /**
  * Create test FormData for Server Action testing
@@ -38,6 +43,35 @@ export function mockServerActionAuth(mockContext = createMockAuthContext()) {
     })),
   }));
 
+  // Mock secure organization context to align with new implementation
+  vi.mock("~/lib/organization-context", () => ({
+    requireMemberAccess: vi.fn(async () => ({
+      organization: { id: mockContext.organizationId },
+      user: { id: mockContext.user.id },
+      accessLevel: "member",
+      membership: { id: "membership-test", user_id: mockContext.user.id, organization_id: mockContext.organizationId, role_id: mockContext.membership?.role_id || "role-test" },
+    })),
+  }));
+
+  // Mock DAL requireAuthContextWithRole pathway used by actions helper
+  vi.mock("~/lib/dal/shared", () => ({
+    requireAuthContextWithRole: vi.fn(async () => ({
+      user: mockContext.user,
+      organizationId: mockContext.organizationId,
+      membership: { id: "membership-test", user_id: mockContext.user.id, organization_id: mockContext.organizationId, role: { id: mockContext.membership?.role_id || "role-test", name: "Member" }, role_id: mockContext.membership?.role_id || "role-test", rolePermissions: [] },
+      role: { id: mockContext.membership?.role_id || "role-test", name: "Member" },
+      permissions: mockContext.permissions || [],
+    })),
+  }));
+
+  // Default permission checks to pass; tests can override
+  vi.mock("~/server/auth/permissions", async (orig) => {
+    return {
+      ...(await orig()),
+      requirePermission: vi.fn(async (_membership, _permission, _db) => Promise.resolve()),
+    };
+  });
+
   // Mock Next.js cache and navigation functions
   vi.mock("next/cache", () => ({
     revalidatePath: vi.fn(),
@@ -48,6 +82,43 @@ export function mockServerActionAuth(mockContext = createMockAuthContext()) {
   }));
 
   return mockContext;
+}
+
+export function mockAdminAuth() {
+  return mockServerActionAuth({
+    ...createMockAuthContext(),
+    permissions: Object.values(PERMISSIONS),
+  } as any);
+}
+
+export function mockMemberAuth() {
+  return mockServerActionAuth(createMockAuthContext());
+}
+
+export function mockAuthWithPermissions(permissions: string[]) {
+  return mockServerActionAuth({
+    ...createMockAuthContext(),
+    permissions,
+  } as any);
+}
+
+/**
+ * Create headers representing a middleware-verified subdomain.
+ */
+export function createTrustedSubdomainHeaders(subdomain: string): Headers {
+  return new Headers({
+    [SUBDOMAIN_HEADER]: subdomain,
+    [SUBDOMAIN_VERIFIED_HEADER]: "1",
+  });
+}
+
+/**
+ * Create headers with an untrusted subdomain (no verification header).
+ */
+export function createUntrustedSubdomainHeaders(subdomain: string): Headers {
+  return new Headers({
+    [SUBDOMAIN_HEADER]: subdomain,
+  });
 }
 
 /**

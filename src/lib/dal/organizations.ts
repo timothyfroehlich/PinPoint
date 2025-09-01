@@ -5,7 +5,7 @@
  */
 
 import { cache } from "react";
-import { eq, sql, count } from "drizzle-orm";
+import { eq, sql, count, and } from "drizzle-orm";
 import {
   organizations,
   issues,
@@ -188,9 +188,10 @@ export const validateUserMembership = cache(async (userId: string) => {
   const { organizationId } = await requireAuthContext();
 
   const membership = await db.query.memberships.findFirst({
-    where:
-      eq(memberships.user_id, userId) &&
+    where: and(
+      eq(memberships.user_id, userId),
       eq(memberships.organization_id, organizationId),
+    ),
     with: {
       role: {
         columns: {

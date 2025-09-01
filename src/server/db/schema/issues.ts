@@ -75,8 +75,8 @@ export const issues = pgTable(
     updated_at: timestamp().defaultNow().notNull(),
     resolved_at: timestamp(),
     
-    // Public access control
-    is_public: boolean().default(true).notNull(),
+    // Public access control (nullable = inherit)
+    is_public: boolean(),
     
     // Anonymous reporting support
     reporter_type: reporterTypeEnum().default("authenticated").notNull(),

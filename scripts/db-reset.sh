@@ -10,7 +10,7 @@
 #   ./scripts/db-reset.sh preview  # Reset preview environment database
 #
 # Features:
-# - Automatically pulls correct environment variables from Vercel
+# - Uses your existing .env.local; does not auto-pull from Vercel
 # - Uses modular SQL seed files for maintainability  
 # - Supports both Supabase (local/preview) and PostgreSQL-only (CI) workflows
 # - Auto-generates TypeScript types after schema changes
@@ -74,7 +74,6 @@ validate_dependencies() {
     local missing_deps=()
     
     # Check for required commands
-    command -v vercel >/dev/null || missing_deps+=("vercel")
     command -v supabase >/dev/null || missing_deps+=("supabase")
     command -v npm >/dev/null || missing_deps+=("npm")
     command -v psql >/dev/null || missing_deps+=("psql")
@@ -89,23 +88,37 @@ validate_dependencies() {
 }
 
 # =============================================================================
-# Environment Setup
+# Environment Safety Checks
 # =============================================================================
 
-pull_environment_config() {
+validate_local_env_safety() {
     local env="$1"
-    
-    log_step "Pulling environment configuration from Vercel"
-    
-    if [[ "$env" == "local" ]]; then
-        log_info "Pulling development environment variables..."
-        vercel env pull .env.local --environment=development
-    else
-        log_info "Pulling preview environment variables..."
-        vercel env pull .env.local --environment=preview --yes
+    local allow_non_local="$2" # "true" to allow running with non-local env
+
+    log_step "Validating .env.local safety for $env"
+
+    if [[ ! -f ".env.local" ]]; then
+        if [[ "$allow_non_local" != "true" ]]; then
+            log_error ".env.local not found. Create it (copy from .env.example) or pass --allow-non-local to proceed."
+            exit 1
+        else
+            log_warning ".env.local not found; proceeding due to --allow-non-local"
+            return 0
+        fi
     fi
-    
-    log_success "Environment variables loaded for $env"
+
+    # Detect obvious cloud DB/URL patterns (supabase.co) to prevent accidental prod/preview targeting
+    if grep -E "SUPABASE_URL|NEXT_PUBLIC_SUPABASE_URL|POSTGRES_URL|POSTGRES_URL_NON_POOLING|DATABASE_URL|SUPABASE_DB_URL" .env.local | grep -E "supabase\\.co|aws-" >/dev/null 2>&1; then
+        if [[ "$allow_non_local" != "true" ]]; then
+            log_error "Detected non-local Supabase/DB settings in .env.local (contains supabase.co/aws)."
+            log_error "Run with --allow-non-local to proceed anyway."
+            exit 1
+        else
+            log_warning "Proceeding with non-local settings due to --allow-non-local"
+        fi
+    else
+        log_success ".env.local appears local-safe (no supabase.co/aws endpoints detected)"
+    fi
 }
 
 # =============================================================================
@@ -117,18 +130,29 @@ execute_sql_seeds() {
     
     log_step "Executing modular SQL seed files"
     
-    # Define seed files in execution order
-    local seed_files=(
-        "01-infrastructure.sql"
-        "02-metadata.sql" 
-        "03-users.sql"
-        "04-machines.sql"
-        "05-issues.sql"
+    # Define seed files in execution order based on environment
+    local seed_files=()
+    
+    # Base infrastructure (all environments)
+    seed_files=(
+        "base/01-rls-policies.sql"
+        "base/02-permissions.sql"
     )
+    
+    if [[ "$env" == "local" || "$env" == "preview" ]]; then
+        # Add development/test data for local and preview
+        seed_files+=(
+            "dev/01-infrastructure.sql"
+            "dev/02-metadata.sql" 
+            "dev/03-users.sql"
+            "dev/04-machines.sql"
+            "dev/05-issues.sql"
+        )
+    fi
     
     # Add Supabase-specific seeds for local and preview
     if [[ "$env" != "ci" ]]; then
-        seed_files+=("99-supabase-auth.sql")
+        seed_files+=("dev/99-supabase-auth.sql")
     fi
     
     log_info "Executing ${#seed_files[@]} seed files..."
@@ -164,12 +188,8 @@ reset_supabase_database() {
         npm run db:push:local
     fi
     
-    # Execute our modular seed files
+    # Execute our modular seed files (includes RLS policies)
     execute_sql_seeds "$env"
-    
-    # Set up Row Level Security policies
-    log_info "Setting up RLS policies..."
-    npm run db:setup-rls
     
     # Sync schema definitions back to Drizzle
     log_info "Syncing schema definitions..."
@@ -187,7 +207,7 @@ generate_typescript_types() {
     
     log_step "Generating TypeScript types from database schema"
     
-    if [[ "$env" == "local" ]]; then
+    if [[ "$env" == "local" || "$env" == "preview" ]]; then
         log_info "Generating types from local database..."
         supabase gen types typescript --local > src/types/supabase.ts
     else
@@ -215,14 +235,19 @@ main() {
     echo -e "${NC}"
     
     # Validate arguments
-    if [[ $# -ne 1 ]]; then
-        log_error "Usage: $0 <local|preview>"
+    if [[ $# -lt 1 || $# -gt 2 ]]; then
+        log_error "Usage: $0 <local|preview> [--allow-non-local]"
         log_error "  local   - Reset local Supabase database"
-        log_error "  preview - Reset preview environment database"
+        log_error "  preview - Reset preview environment database (uses dev seeds)"
+        log_error "  --allow-non-local  Proceed even if .env.local looks non-local (DANGEROUS)"
         exit 1
     fi
     
     local environment="$1"
+    local allow_non_local="false"
+    if [[ "${2:-}" == "--allow-non-local" ]]; then
+        allow_non_local="true"
+    fi
     
     # Change to project root
     cd "$PROJECT_ROOT"
@@ -230,9 +255,9 @@ main() {
     # Validation
     validate_environment "$environment"
     validate_dependencies
+    validate_local_env_safety "$environment" "$allow_non_local"
     
     # Execution steps
-    pull_environment_config "$environment"
     reset_supabase_database "$environment"
     generate_typescript_types "$environment"
     

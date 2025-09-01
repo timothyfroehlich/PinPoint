@@ -196,6 +196,14 @@ export type OrganizationResponse = DrizzleToCamelCase<
   InferSelectModel<typeof organizations>
 >;
 
+/** Minimal public organization listing (for sign-in/landing) */
+export interface PublicOrganizationMinimal {
+  id: string;
+  name: string;
+  subdomain: string;
+  logoUrl: string | null;
+}
+
 /** Role response */
 export type RoleResponse = DrizzleToCamelCase<InferSelectModel<typeof roles>>;
 

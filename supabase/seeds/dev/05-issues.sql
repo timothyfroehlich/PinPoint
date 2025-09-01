@@ -1,6 +1,5 @@
--- PinPoint Issues Seeding
--- Sample issues for testing and development
--- Universal PostgreSQL - works in any PostgreSQL environment
+-- DEVELOPMENT SEED (Local Dev Only) — DO NOT USE IN PROD
+-- Contains sample issues used by dev/test. Not for production.
 
 -- =============================================================================
 -- ISSUES: Create issues using SEED_TEST_IDS from minimal-issues.ts
@@ -26,3 +25,10 @@ ON CONFLICT (id) DO UPDATE SET
   status_id = EXCLUDED.status_id,
   created_by_id = EXCLUDED.created_by_id,
   updated_at = EXCLUDED.updated_at;
+
+
+-- Add one competitor issue to exercise org default public behavior
+INSERT INTO issues (id, title, description, organization_id, machine_id, priority_id, status_id, created_by_id)
+VALUES
+  ('issue-competitor-sample-001', 'Competitor Sample Issue', 'Sample issue for visibility tests', 'test-org-competitor', 'machine-test-org-competitor-001', 'priority-low-competitor-001', 'status-new-competitor-001', '10000000-0000-4000-8000-000000000002')
+ON CONFLICT (id) DO NOTHING;

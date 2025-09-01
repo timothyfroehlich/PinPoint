@@ -4,6 +4,7 @@
  */
 
 import { SEED_TEST_IDS } from "../constants/seed-test-ids";
+import { SUBDOMAIN_HEADER, SUBDOMAIN_VERIFIED_HEADER } from "~/lib/subdomain-verification";
 
 /**
  * Create mock auth context for DAL testing
@@ -18,7 +19,6 @@ export function createMockAuthContext(userId?: string, orgId?: string) {
       id: testUserId,
       email: "tim.froehlich@example.com",
       user_metadata: {
-        organizationId: testOrgId,
         name: "Tim Froehlich",
       },
     },
@@ -43,7 +43,42 @@ export function mockSupabaseAuth(mockContext = createMockAuthContext()) {
     })),
   }));
 
+  // Also mock secure org validation for any code paths that use it
+  vi.mock("~/lib/organization-context", () => ({
+    requireMemberAccess: vi.fn(async () => ({
+      organization: { id: mockContext.organizationId },
+      user: { id: mockContext.user.id },
+      accessLevel: "member",
+      membership: { id: "membership-test", user_id: mockContext.user.id, organization_id: mockContext.organizationId },
+    })),
+    getOrganizationContext: vi.fn(async () => ({
+      user: { id: mockContext.user.id },
+      organization: { id: mockContext.organizationId },
+      accessLevel: "member",
+      membership: { role: { name: "Admin" } },
+    })),
+  }));
+
   return mockContext;
+}
+
+/**
+ * Create headers representing a middleware-verified subdomain for DAL tests.
+ */
+export function createTrustedSubdomainHeaders(subdomain: string): Headers {
+  return new Headers({
+    [SUBDOMAIN_HEADER]: subdomain,
+    [SUBDOMAIN_VERIFIED_HEADER]: "1",
+  });
+}
+
+/**
+ * Create headers with an untrusted subdomain (no verification header) for DAL tests.
+ */
+export function createUntrustedSubdomainHeaders(subdomain: string): Headers {
+  return new Headers({
+    [SUBDOMAIN_HEADER]: subdomain,
+  });
 }
 
 /**
