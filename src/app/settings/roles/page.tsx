@@ -31,7 +31,7 @@ export default async function RolesSettingsPage() {
   // Fetch roles using the existing role router
   const roles = await api.role.getAll();
   // TODO: Implement role statistics API
-  const roleStats: any[] = [];
+  const roleStats: unknown[] = [];
 
   return (
     <div className="space-y-6">
