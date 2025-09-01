@@ -24,7 +24,7 @@ The system is architected as a multi-tenant SaaS platform, allowing multiple org
 **For Operators & Technicians:**
 
 - **Secure, Role-Based Access:** Manage your organization with distinct permissions for `Admins` and `Members`. [1]
-- **Fleet Management:** Define game titles and manage every physical `Game Instance` across one or more `Locations`. [1]
+- **Fleet Management:** Define models and manage every physical `Machine` across one or more `Locations`. [1]
 - **Internal Management Dashboard:** A private dashboard to view, filter, and manage all issues. Update status, severity, and assignees, and hold internal discussions with comments. [1]
 - **Complete Audit Trail:** Every issue features a time-stamped, immutable log of every action taken, providing full accountability. [1]
 - **Advanced Tools:** Merge duplicate issues into a single canonical report and allow registered users to "upvote" issues to help with prioritization. [1]

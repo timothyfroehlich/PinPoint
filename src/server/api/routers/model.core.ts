@@ -9,7 +9,7 @@ import { models, machines } from "~/server/db/schema";
 export const modelCoreRouter = createTRPCRouter({
   // Enhanced getAll with OPDB metadata
   getAll: orgScopedProcedure.query(async ({ ctx }) => {
-    // Get all game titles that have instances in this organization
+    // Get all models that have machine instances in this organization
     const modelsWithMachines = await ctx.db.query.models.findMany({
       with: {
         machines: {
@@ -37,7 +37,7 @@ export const modelCoreRouter = createTRPCRouter({
       .sort((a, b) => a.name.localeCompare(b.name));
   }),
 
-  // Get single game title by ID
+  // Get single model by ID
   getById: orgScopedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
@@ -54,7 +54,7 @@ export const modelCoreRouter = createTRPCRouter({
       if (!model || model.machines.length === 0) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Game title not found or access denied",
+          message: "Model not found or access denied",
         });
       }
 
@@ -69,7 +69,7 @@ export const modelCoreRouter = createTRPCRouter({
       };
     }),
 
-  // Delete game title (only if no game instances exist)
+  // Delete model (only if no machine instances exist)
   delete: organizationManageProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
@@ -86,7 +86,7 @@ export const modelCoreRouter = createTRPCRouter({
       if (!model) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Game title not found or access denied",
+          message: "Model not found or access denied",
         });
       }
 
@@ -98,21 +98,21 @@ export const modelCoreRouter = createTRPCRouter({
       if (orgMachines.length === 0) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Game title not found or access denied",
+          message: "Model not found or access denied",
         });
       }
 
       if (model.is_custom) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Cannot delete custom games. Remove game instances instead.",
+          message: "Cannot delete custom models. Remove machine instances instead.",
         });
       }
 
       if (orgMachines.length > 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Cannot delete game title that has game instances",
+          message: "Cannot delete model that has machine instances",
         });
       }
 

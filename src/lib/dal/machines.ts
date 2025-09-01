@@ -20,18 +20,12 @@ import {
 import { machines, locations, models } from "~/server/db/schema";
 // No direct db access; use ensureOrgContextAndBindRLS to run under RLS-bound tx
 import { ensureOrgContextAndBindRLS } from "~/lib/organization-context";
+import type { MachineFilters } from "~/lib/types";
 
 // ================================
 // TYPE DEFINITIONS
 // ================================
 
-export interface MachineFilters {
-  locationIds?: string[] | undefined;
-  modelIds?: string[] | undefined;
-  ownerIds?: string[] | undefined;
-  search?: string | undefined;
-  hasQR?: boolean | undefined;
-}
 
 export interface MachinePagination {
   page: number;

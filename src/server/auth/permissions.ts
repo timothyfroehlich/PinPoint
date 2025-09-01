@@ -5,7 +5,7 @@ import { PermissionService } from "../services/permissionService";
 
 import { SYSTEM_ROLES } from "./permissions.constants";
 
-import type { PinPointSupabaseUser } from "~/lib/supabase/types";
+import type { PinPointSupabaseUser } from "~/lib/types";
 
 import { type DrizzleClient } from "~/server/db/drizzle";
 import { roles } from "~/server/db/schema";

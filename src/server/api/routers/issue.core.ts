@@ -760,7 +760,7 @@ export const issueCoreRouter = createTRPCRouter({
             aValue = a.priority.order;
             bValue = b.priority.order;
             break;
-          case "game":
+          case "machine":
             aValue = a.machine.model.name;
             bValue = b.machine.model.name;
             break;
@@ -1365,7 +1365,7 @@ export const issueCoreRouter = createTRPCRouter({
             aValue = a.priority.order;
             bValue = b.priority.order;
             break;
-          case "game":
+          case "machine":
             aValue = a.machine.model.name;
             bValue = b.machine.model.name;
             break;

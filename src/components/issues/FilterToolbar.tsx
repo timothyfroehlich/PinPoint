@@ -19,10 +19,11 @@ import {
   TooltipTrigger,
 } from "~/components/ui/tooltip";
 import { cn } from "~/lib/utils";
+import { ISSUE_SORT_OPTIONS } from "~/lib/types/filters";
 
 import { AdvancedFiltersDropdown } from "./AdvancedFiltersDropdown";
-import { GameFilterDropdown } from "./GameFilterDropdown";
-import { SearchTextField } from "./SearchTextField";
+import { MachineFilterDropdown } from "./MachineFilterDropdown";
+import { FilteredSearch } from "~/components/ui/filtered-search";
 import { StatusTogglePills } from "./StatusTogglePills";
 import { FilterPresets } from "./FilterPresets";
 
@@ -36,7 +37,7 @@ interface IssueFilters {
   assigneeId?: string | undefined;
   reporterId?: string | undefined;
   ownerId?: string | undefined;
-  sortBy: "created" | "updated" | "status" | "severity" | "game";
+  sortBy: typeof ISSUE_SORT_OPTIONS[number];
   sortOrder: "asc" | "desc";
 }
 
@@ -96,11 +97,12 @@ export function FilterToolbar({
       <div className="flex items-center gap-4 flex-wrap">
         {/* Search - Most prominent */}
         <div className="flex-grow min-w-[250px]">
-          <SearchTextField
+          <FilteredSearch
             value={filters.search ?? ""}
             onChange={(search) => {
               onFiltersChange({ search: search === "" ? undefined : search });
             }}
+            placeholder="Search issues..."
           />
         </div>
 
@@ -119,7 +121,7 @@ export function FilterToolbar({
         </div>
 
         {/* Machine Filter - Primary */}
-        <GameFilterDropdown
+        <MachineFilterDropdown
           value={filters.machineId ?? ""}
           onChange={(machineId) => {
             onFiltersChange({
@@ -217,11 +219,20 @@ export function FilterToolbar({
                   <SelectValue placeholder="Sort By" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="created">Created Date</SelectItem>
-                  <SelectItem value="updated">Updated Date</SelectItem>
-                  <SelectItem value="status">Status</SelectItem>
-                  <SelectItem value="severity">Priority</SelectItem>
-                  <SelectItem value="game">Game</SelectItem>
+                  {ISSUE_SORT_OPTIONS.map((option) => {
+                    const labels = {
+                      created: "Created Date",
+                      updated: "Updated Date", 
+                      status: "Status",
+                      severity: "Priority",
+                      machine: "Machine"
+                    } as const;
+                    return (
+                      <SelectItem key={option} value={option}>
+                        {labels[option]}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
