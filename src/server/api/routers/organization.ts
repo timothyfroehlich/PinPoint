@@ -66,7 +66,7 @@ export const organizationRouter = createTRPCRouter({
     );
 
     // Drizzle returns a driver-specific result; normalize rows
-    const rows = (result as unknown as { rows: Array<{ id: string; name: string; subdomain: string; logo_url: string | null }> }).rows ?? [];
+    const rows = (result as unknown as { rows: { id: string; name: string; subdomain: string; logo_url: string | null }[] }).rows ?? [];
     return rows.map((r) => ({ id: r.id, name: r.name, subdomain: r.subdomain, logoUrl: r.logo_url }));
   }),
 });

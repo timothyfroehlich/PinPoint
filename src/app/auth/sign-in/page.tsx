@@ -14,10 +14,10 @@ export const metadata = {
   description: "Sign in to your PinPoint account",
 };
 
-export default async function SignInPage() {
+export default async function SignInPage(): Promise<JSX.Element> {
   // Check if user is already authenticated
   const orgContext = await getOrganizationContext();
-  if (orgContext?.user && orgContext?.accessLevel === "member") {
+  if (orgContext?.user && orgContext.accessLevel === "member") {
     redirect("/dashboard");
   }
 
@@ -39,7 +39,7 @@ export default async function SignInPage() {
   );
 }
 
-function SignInFormSkeleton() {
+function SignInFormSkeleton(): JSX.Element {
   return (
     <div className="space-y-6">
       <div className="space-y-4">

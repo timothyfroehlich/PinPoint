@@ -194,7 +194,7 @@ export async function inviteUserAction(
         userId: user.id,
         action: ACTIVITY_ACTIONS.INVITATION_SENT,
         entity: ACTIVITY_ENTITIES.USER,
-        entityId: userId!,
+        entityId: userId,
         details: `Invited ${validation.data.email} to join the organization`,
         severity: "info",
       });

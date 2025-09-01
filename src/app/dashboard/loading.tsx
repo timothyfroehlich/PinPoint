@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 
-export default function DashboardLoading() {
+export default function DashboardLoading(): JSX.Element {
   return (
     <div className="space-y-8">
       {/* Welcome Section Skeleton */}

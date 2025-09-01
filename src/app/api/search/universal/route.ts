@@ -108,7 +108,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 }
 
 // Add OPTIONS handler for CORS support
-export async function OPTIONS(): Promise<NextResponse> {
+export function OPTIONS(): NextResponse {
   return NextResponse.json(
     {},
     {
