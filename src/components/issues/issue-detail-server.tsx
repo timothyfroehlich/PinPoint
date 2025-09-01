@@ -109,11 +109,11 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
                             ago
                           </span>
                           {new Date(comment.updated_at).getTime() !==
-                              new Date(comment.created_at).getTime() && (
-                              <Badge variant="outline" className="text-xs">
-                                edited
-                              </Badge>
-                            )}
+                            new Date(comment.created_at).getTime() && (
+                            <Badge variant="outline" className="text-xs">
+                              edited
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-sm whitespace-pre-wrap leading-relaxed">
                           {comment.content}
@@ -156,11 +156,9 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
             <CardContent>
               <div className="space-y-2">
                 <div>
-                  <p className="font-medium">
-                    {issue.machine.name ?? "Unknown Machine"}
-                  </p>
+                  <p className="font-medium">{issue.machine.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    {issue.machine.model.name ?? "Unknown Model"}
+                    {issue.machine.model.name}
                   </p>
                 </div>
                 {/* Location info would need to be added to DAL query */}
@@ -212,7 +210,7 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
                     currentAssigneeId: issue.assignedTo.id,
                     ...(issue.assignedTo.name && {
                       currentAssigneeName: issue.assignedTo.name,
-                    })
+                    }),
                   })}
                 />
               </div>
@@ -236,8 +234,8 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
                 {/* Status Update - Client Island */}
                 <IssueStatusUpdateClient
                   issueId={issue.id}
-                  currentStatusId={issue.status.id ?? ""}
-                  currentStatusName={issue.status.name ?? "Unknown"}
+                  currentStatusId={issue.status.id}
+                  currentStatusName={issue.status.name}
                 />
               </div>
             </CardContent>
@@ -262,17 +260,17 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
                 </span>
               </div>
               {new Date(issue.updated_at).getTime() !==
-                  new Date(issue.created_at).getTime() && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Updated:</span>
-                    <span>
-                      {format(
-                        new Date(issue.updated_at),
-                        "MMM d, yyyy 'at' h:mm a",
-                      )}
-                    </span>
-                  </div>
-                )}
+                new Date(issue.created_at).getTime() && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Updated:</span>
+                  <span>
+                    {format(
+                      new Date(issue.updated_at),
+                      "MMM d, yyyy 'at' h:mm a",
+                    )}
+                  </span>
+                </div>
+              )}
               {issue.resolved_at && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Resolved:</span>
