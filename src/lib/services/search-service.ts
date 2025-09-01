@@ -257,9 +257,9 @@ async function searchIssues(
     title: issue.title,
     subtitle: issue.machineName
       ? `${issue.machineName} • ${issue.statusName}`
-      : issue.statusName || "No status",
+      : issue.statusName ?? "No status",
     description:
-      issue.description?.slice(0, 150) +
+      (issue.description?.slice(0, 150) ?? "") +
       (issue.description && issue.description.length > 150 ? "..." : ""),
     url: `/issues/${issue.id}`,
     metadata: {
@@ -273,7 +273,7 @@ async function searchIssues(
       createdAt: issue.createdAt,
       consistency: issue.consistency,
     },
-    relevance: Number(issue.relevance || 0) * 100, // Scale relevance for sorting
+    relevance: issue.relevance * 100, // Scale relevance for sorting
   }));
 }
 
@@ -335,7 +335,7 @@ async function searchMachines(
     entity: "machines" as const,
     id: machine.id,
     title: machine.name,
-    subtitle: `${machine.manufacturer ?? "Unknown"} ${machine.modelName ?? "Model"}${machine.year ? ` (${machine.year})` : ""}`,
+    subtitle: `${machine.manufacturer ?? "Unknown"} ${machine.modelName ?? "Model"}${machine.year ? ` (${String(machine.year)})` : ""}`,
     description: machine.locationName
       ? `Located at ${machine.locationName}`
       : "Location not specified",
@@ -347,10 +347,10 @@ async function searchMachines(
       location: machine.locationName,
       locationId: machine.locationId,
       qrCodeId: machine.qrCodeId,
-      issueCount: machine.issueCount ?? 0,
+      issueCount: machine.issueCount,
       createdAt: machine.createdAt,
     },
-    relevance: Number(machine.relevance ?? 0) * 100,
+    relevance: machine.relevance * 100,
   }));
 }
 
@@ -400,7 +400,7 @@ async function searchUsers(
     title: user.name ?? user.email ?? "Unknown User",
     subtitle: user.email ?? "",
     description:
-      user.bio?.slice(0, 150) +
+      (user.bio?.slice(0, 150) ?? "") +
       (user.bio && user.bio.length > 150 ? "..." : ""),
     url: `/users/${user.id}`,
     metadata: {
@@ -409,7 +409,7 @@ async function searchUsers(
       profilePicture: user.profilePicture,
       createdAt: user.createdAt,
     },
-    relevance: Number(user.relevance ?? 0) * 100,
+    relevance: user.relevance * 100,
   }));
 }
 
@@ -465,17 +465,17 @@ async function searchLocations(
     title: location.name,
     subtitle: `${location.city ?? ""}${location.city && location.state ? ", " : ""}${location.state ?? ""}`,
     description:
-      location.description?.slice(0, 150) +
+      (location.description?.slice(0, 150) ?? "") +
       (location.description && location.description.length > 150 ? "..." : ""),
     url: `/locations/${location.id}`,
     metadata: {
       city: location.city,
       state: location.state,
       street: location.street,
-      machineCount: location.machineCount ?? 0,
+      machineCount: location.machineCount,
       createdAt: location.createdAt,
     },
-    relevance: Number(location.relevance ?? 0) * 100,
+    relevance: location.relevance * 100,
   }));
 }
 
