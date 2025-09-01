@@ -1,6 +1,5 @@
--- PinPoint Supabase-Specific Infrastructure
--- Features that require Supabase platform: auth triggers, storage, functions
--- Only executed in local development and preview environments
+-- DEVELOPMENT SEED (Local Dev Only) — DO NOT USE IN PROD
+-- Supabase-specific storage bucket and test auth users for local development.
 
 -- =============================================================================
 -- STORAGE: Create file upload bucket
@@ -44,7 +43,8 @@ BEGIN
     NEW.email_confirmed_at,
     NOW(),
     NOW()
-  );
+  )
+  ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
 $$;

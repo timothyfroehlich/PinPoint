@@ -23,6 +23,12 @@ export const organizations = pgTable(
     allow_anonymous_comments: boolean().default(true).notNull(),
     allow_anonymous_upvotes: boolean().default(true).notNull(),
     require_moderation_anonymous: boolean().default(false).notNull(),
+
+    // Public visibility controls
+    // Organization is_public is authoritative root for inheritance chain
+    is_public: boolean().default(false).notNull(),
+    // Default applied to issues when chain has no explicit TRUE/FALSE and org is public
+    public_issue_default: text().default("private").notNull(),
     
     created_at: timestamp().defaultNow().notNull(),
     updated_at: timestamp().defaultNow().notNull(),

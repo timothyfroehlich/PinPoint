@@ -8,7 +8,7 @@
 import { useActionState } from "react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { z } from "zod";
+import { api } from "~/trpc/react";
 
 import { Button } from "~/components/ui/button";
 import {
@@ -40,30 +40,7 @@ import { type OrganizationOption } from "~/lib/dal/public-organizations";
 import { authenticateDevUser, getAuthResultMessage } from "~/lib/auth/dev-auth";
 import { isDevAuthAvailable } from "~/lib/environment-client";
 import { createClient } from "~/utils/supabase/client";
-
-// API Response validation schema for security
-const organizationSelectOptionsSchema = z.object({
-  organizations: z.array(z.object({
-    id: z.string().min(1),
-    name: z.string().min(1),
-    subdomain: z.string().min(1)
-  })),
-  defaultOrganizationId: z.string().nullable()
-});
-
-// Type guard for safe organization access
-function isValidOrganizationArray(data: unknown): data is OrganizationOption[] {
-  return Array.isArray(data) && data.every(item => 
-    typeof item === 'object' && 
-    item !== null && 
-    'id' in item && 
-    'name' in item && 
-    'subdomain' in item &&
-    typeof item.id === 'string' &&
-    typeof item.name === 'string' &&
-    typeof item.subdomain === 'string'
-  );
-}
+import { getCurrentDomain } from "~/lib/utils/domain";
 
 export function SignInForm() {
   const router = useRouter();
@@ -82,44 +59,33 @@ export function SignInForm() {
   const [selectedOrganizationId, setSelectedOrganizationId] = useState<string>("");
   const [organizationsLoading, setOrganizationsLoading] = useState(true);
 
+  // tRPC: fetch public organizations (anon-safe)
+  const { data: publicOrganizations, isLoading: orgsLoading } =
+    api.organization.listPublic.useQuery();
+
   // Development auth integration (preserving existing dev auth system)
   const shouldShowDevLogin = isDevAuthAvailable();
 
-  // Load organizations on component mount
+  // Load organizations from tRPC when ready
   useEffect(() => {
-    async function loadOrganizations() {
-      try {
-        const response = await fetch("/api/organizations/public");
-        if (!response.ok) {
-          throw new Error("Failed to fetch organizations");
-        }
-        
-        // Security: Validate API response to prevent injection attacks
-        const rawData = await response.json();
-        const validatedData = organizationSelectOptionsSchema.parse(rawData);
-        
-        const { organizations: orgs, defaultOrganizationId } = validatedData;
-        
-        // Additional defensive validation
-        if (!isValidOrganizationArray(orgs)) {
-          throw new Error("Invalid organization data structure");
-        }
-        
-        setOrganizations(orgs);
-        setSelectedOrganizationId(defaultOrganizationId ?? orgs[0]?.id ?? "");
-      } catch (error) {
-        console.error("Failed to load organizations:", error);
-        // Handle validation errors gracefully
-        if (error instanceof z.ZodError) {
-          console.error("API response validation failed:", error.issues);
-        }
-      } finally {
-        setOrganizationsLoading(false);
-      }
-    }
-    
-    loadOrganizations();
-  }, []);
+    setOrganizationsLoading(orgsLoading);
+    if (orgsLoading) return;
+
+    const orgs: OrganizationOption[] = (publicOrganizations ?? []).map((o) => ({
+      id: o.id,
+      name: o.name,
+      subdomain: o.subdomain,
+    }));
+
+    // Prefer APC/test org as default if present, else first
+    const apc = orgs.find(
+      (o) => o.subdomain === "apc" || o.id === "test-org-pinpoint",
+    );
+    const defaultId = apc?.id ?? orgs[0]?.id ?? "";
+
+    setOrganizations(orgs);
+    setSelectedOrganizationId(defaultId);
+  }, [publicOrganizations, orgsLoading]);
 
   const handleOAuthSignIn = async (provider: "google") => {
     if (!selectedOrganizationId) {
@@ -167,8 +133,9 @@ export function SignInForm() {
             window.location.href = `http://${selectedOrg.subdomain}.localhost:3000/dashboard`;
             return;
           }
-          // In production, use proper domain
-          window.location.href = `https://${selectedOrg.subdomain}.yourdomain.com/dashboard`;
+          // In production, use dynamic domain
+          const currentDomain = getCurrentDomain();
+          window.location.href = `https://${selectedOrg.subdomain}.${currentDomain}/dashboard`;
           return;
         }
         

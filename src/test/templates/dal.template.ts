@@ -38,6 +38,26 @@ import { eq, and } from "drizzle-orm";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import * as dalShared from "~/lib/dal/shared";
 import { {{IMPORTED_FUNCTIONS}} } from "{{MODULE_PATH}}";
+import {
+  SUBDOMAIN_HEADER,
+  SUBDOMAIN_VERIFIED_HEADER,
+} from "~/lib/subdomain-verification";
+
+/**
+ * Subdomain verification helpers for DAL tests
+ * Use trusted headers to simulate middleware-verified subdomain context.
+ */
+export function createTrustedSubdomainHeaders(subdomain: string): Headers {
+  return new Headers({
+    [SUBDOMAIN_HEADER]: subdomain,
+    [SUBDOMAIN_VERIFIED_HEADER]: "1",
+  });
+}
+export function createUntrustedSubdomainHeaders(subdomain: string): Headers {
+  return new Headers({
+    [SUBDOMAIN_HEADER]: subdomain,
+  });
+}
 
 // Mock the database and auth context
 vi.mock("~/lib/dal/shared", async () => {

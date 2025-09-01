@@ -75,7 +75,7 @@ export default tseslint.config(
       "vitest/no-disabled-tests": "off", // Enable only in test files
       "vitest/no-focused-tests": "off", // Enable only in test files
 
-      // Custom Drizzle safety (replaces abandoned plugin)
+      // Custom Drizzle safety (replaces problematic plugin)
       "no-restricted-syntax": [
         "error",
         {
@@ -364,6 +364,7 @@ export default tseslint.config(
       ".claude/**/*",
       ".archived-tests-2025-08-23/**/*", // Archived test files
       "src/test/templates/**/*.ts", // Template files excluded from linting
+      "src/test/templates/**/*.tsx", // Template files excluded from linting
       "src/test/archived-templates/**/*.ts", // Archived template files excluded from linting
       "add-location-seed.ts", // Temporary script file
       "next-env.d.ts", // Next.js generated file

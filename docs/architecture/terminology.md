@@ -37,7 +37,7 @@ During the backend refactor, several core models were renamed for clarity and co
 ### Physical Assets
 
 - **Location**: Physical venue belonging to an Organization (e.g., "Main Arcade", "Workshop")
-- **Model**: Generic pinball machine type from OPDB (e.g., "Medieval Madness", "Godzilla Premium")
+- **Model**: Generic pinball machine type from commercial sources (e.g., "Medieval Madness", "Godzilla Premium")
 - **Machine**: Specific physical instance of a Model at a Location
 - **Owner**: User who owns a specific Machine (for notification purposes)
 
@@ -55,7 +55,7 @@ During the backend refactor, several core models were renamed for clarity and co
 
 - **OPDB**: Open Pinball Database - external API providing authoritative pinball machine data
 - **PinballMap**: External service for public pinball location data
-- **Custom Model**: Machine type created within PinPoint when not available in OPDB
+- **Custom Model**: Machine type created within PinPoint when not available from commercial sources
 
 ### Technical Terms
 

@@ -250,16 +250,16 @@ export const issueFilteringSchema = z.object({
 });
 
 /**
- * OPDB search schema
- * Pattern: Used in model.opdb.ts for game search
+ * Commercial game search schema
+ * Pattern: Used in model router for game search
  */
 export const opdbSearchSchema = z.object({
   query: z.string().min(1, "Search query is required"),
 });
 
 /**
- * OPDB model lookup schema
- * Pattern: Used in model.opdb.ts for specific model lookup
+ * Commercial model lookup schema
+ * Pattern: Used in model router for specific model lookup
  */
 export const opdbModelSchema = z.object({
   opdbId: z.string().min(1, "OPDB ID is required"),

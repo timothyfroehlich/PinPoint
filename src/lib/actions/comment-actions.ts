@@ -13,13 +13,15 @@ import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { comments, issues } from "~/server/db/schema";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import {
-  getActionAuthContext,
+  requireAuthContextWithRole,
   validateFormData,
   actionSuccess,
   actionError,
   runAfterResponse,
   type ActionResult,
 } from "./shared";
+import { requirePermission } from "./shared";
+import { PERMISSIONS } from "~/server/auth/permissions.constants";
 import { generateCommentNotifications } from "~/lib/services/notification-generator";
 
 // Enhanced validation schemas with better error messages
@@ -73,13 +75,17 @@ export async function addCommentAction(
   formData: FormData,
 ): Promise<ActionResult<{ commentId: string }>> {
   try {
-    const { user, organizationId } = await getActionAuthContext();
+    const { user, organizationId } = await requireAuthContextWithRole();
 
     // Enhanced validation
     const validation = validateFormData(formData, addCommentSchema);
     if (!validation.success) {
       return validation;
     }
+
+    // Note: Commenting is allowed for any authenticated member who can view the issue.
+    // Do NOT require ISSUE_CREATE here; visibility of the issue implies comment permission.
+    const db = getGlobalDatabaseProvider().getClient();
 
     // Verify issue exists and user has access
     const issue = await getIssueWithAccess(issueId, organizationId);
@@ -96,7 +102,6 @@ export async function addCommentAction(
       organization_id: organizationId,
     };
 
-    const db = getGlobalDatabaseProvider().getClient();
     await db.insert(comments).values(commentData);
 
     // Granular cache invalidation
@@ -143,7 +148,9 @@ export async function editCommentAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId } = await getActionAuthContext();
+    const { user, organizationId, membership } = await requireAuthContextWithRole();
+    const db = getGlobalDatabaseProvider().getClient();
+    await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
 
     // Enhanced validation
     const validation = validateFormData(formData, editCommentSchema);
@@ -158,7 +165,6 @@ export async function editCommentAction(
     }
 
     // Update comment
-    const db = getGlobalDatabaseProvider().getClient();
     await db
       .update(comments)
       .set({ 
@@ -200,7 +206,9 @@ export async function deleteCommentAction(
   _formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId } = await getActionAuthContext();
+    const { user, organizationId, membership } = await requireAuthContextWithRole();
+    const db = getGlobalDatabaseProvider().getClient();
+    await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
 
     // Verify comment exists and user has permission to delete
     const comment = await getCommentWithAccess(commentId, organizationId, user.id);
@@ -209,7 +217,6 @@ export async function deleteCommentAction(
     }
 
     // Soft delete comment (preserve for audit trail)
-    const db = getGlobalDatabaseProvider().getClient();
     await db
       .update(comments)
       .set({ 
@@ -250,9 +257,9 @@ export async function restoreCommentAction(
   _formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId } = await getActionAuthContext();
-
+    const { user, organizationId, membership } = await requireAuthContextWithRole();
     const db = getGlobalDatabaseProvider().getClient();
+    await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
     
     // Find soft-deleted comment that user authored
     const comment = await db.query.comments.findFirst({
@@ -287,10 +294,7 @@ export async function restoreCommentAction(
       console.log(`Comment ${commentId} restored by ${user.email}`);
     });
 
-    return actionSuccess(
-      { success: true },
-      "Comment restored successfully",
-    );
+    return actionSuccess({ success: true }, "Comment restored successfully");
   } catch (error) {
     console.error("Restore comment error:", error);
     return actionError(

@@ -1,4 +1,6 @@
--- PinPoint Metadata Seeding  
+-- DEVELOPMENT SEED (Local Dev Only) — DO NOT USE IN PROD
+-- Contains org-scoped metadata (priorities, issue_statuses, collection_types) for dev/test.
+-- Production/Preview should run base seeds in supabase/seeds/base/*.sql only.
 -- Organization-specific configuration: priorities, statuses, collection types
 -- Universal PostgreSQL - works in any PostgreSQL environment
 

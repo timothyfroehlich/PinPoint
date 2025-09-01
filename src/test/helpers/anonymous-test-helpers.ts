@@ -16,6 +16,7 @@ import type { DrizzleClient } from "~/server/db/drizzle";
 import type { SupabaseServerClient } from "~/lib/supabase/server";
 import { SEED_TEST_IDS } from "../constants/seed-test-ids";
 import { createMockDatabase } from "./service-test-helpers";
+import { SUBDOMAIN_VERIFIED_HEADER, SUBDOMAIN_HEADER } from "~/lib/subdomain-verification";
 
 /**
  * Anonymous user test context with organization scoping
@@ -67,8 +68,10 @@ export function createAnonymousTestContext(
   };
 
   // Create request headers with subdomain
+  // Include both headers to simulate middleware-verified subdomain
   const headers = new Headers({
-    "x-subdomain": subdomain,
+    [SUBDOMAIN_HEADER]: subdomain,
+    [SUBDOMAIN_VERIFIED_HEADER]: "1",
     ...options.additionalHeaders,
   });
 

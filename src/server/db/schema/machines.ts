@@ -40,8 +40,8 @@ export const locations = pgTable(
     last_sync_at: timestamp(), // When was last sync performed
     sync_enabled: boolean().default(false).notNull(), // Enable/disable sync for this location
     
-    // Public access control
-    is_public: boolean().default(true).notNull(),
+    // Public access control (nullable = inherit)
+    is_public: boolean(),
   },
   (table) => [
     // Multi-tenancy: organization_id filtering
@@ -51,18 +51,18 @@ export const locations = pgTable(
   ],
 );
 
-// Models Table (OPDB + Future Custom Models)
-// organizationId = NULL for OPDB models (global access)
+// Models Table (Commercial Models + Future Custom Models)
+// organizationId = NULL for commercial models (global access)
 // organizationId != NULL for custom models (org-scoped, v1.x feature)
 export const models = pgTable("models", {
   id: text().primaryKey(),
   name: text().notNull(),
-  organization_id: text(), // NULL for OPDB (global), set for custom (org-scoped)
+  organization_id: text(), // NULL for commercial models (global), set for custom models (org-scoped)
   manufacturer: text(),
   year: integer(),
 
   // Model Type Classification
-  is_custom: boolean().default(false).notNull(), // false = OPDB, true = custom
+  is_custom: boolean().default(false).notNull(), // false = commercial model, true = custom
 
   // Cross-Database References (IPDB and OPDB from PinballMap)
   ipdb_id: text().unique(), // Internet Pinball Database ID
@@ -106,8 +106,11 @@ export const machines = pgTable(
     qr_code_url: text(),
     qr_code_generated_at: timestamp(),
     
-    // Public access control
-    is_public: boolean().default(true).notNull(),
+    // Public access control (nullable = inherit)
+    is_public: boolean(),
+
+    // Soft delete
+    deleted_at: timestamp(),
 
     // Timestamps
     created_at: timestamp().defaultNow().notNull(),
