@@ -44,13 +44,13 @@ export function ActivityLogFilter() {
       : undefined,
   );
   const [selectedUser, setSelectedUser] = useState(
-    searchParams.get("userId") || "",
+    searchParams.get("userId") ?? "",
   );
   const [selectedAction, setSelectedAction] = useState(
-    searchParams.get("action") || "",
+    searchParams.get("action") ?? "",
   );
   const [searchTerm, setSearchTerm] = useState(
-    searchParams.get("search") || "",
+    searchParams.get("search") ?? "",
   );
 
   // Create query string from current filters
@@ -101,7 +101,11 @@ export function ActivityLogFilter() {
   };
 
   const hasActiveFilters =
-    dateFrom || dateTo || selectedUser || selectedAction || searchTerm;
+    Boolean(dateFrom) ||
+    Boolean(dateTo) ||
+    Boolean(selectedUser) ||
+    Boolean(selectedAction) ||
+    Boolean(searchTerm);
 
   return (
     <div className="space-y-4">

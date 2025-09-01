@@ -117,7 +117,7 @@ export async function addCommentAction(
           organizationId,
           actorId: user.id,
           actorName:
-            (user.user_metadata?.["name"] as string) || user.email || "Someone",
+            (user.user_metadata?.["name"] as string) ?? user.email ?? "Someone",
         });
       } catch (error) {
         console.error("Failed to generate comment notifications:", error);

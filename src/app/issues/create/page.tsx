@@ -35,8 +35,8 @@ function transformUsersForForm(
   return assignableUsers
     .map((user) => ({
       id: user.id,
-      name: user.name || "Unknown User",
-      email: user.email || "",
+      name: user.name ?? "Unknown User",
+      email: user.email ?? "",
     }))
     .filter((user) => user.email); // Filter out users without email
 }

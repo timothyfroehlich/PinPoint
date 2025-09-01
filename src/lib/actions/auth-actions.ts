@@ -41,12 +41,12 @@ const oauthProviderSchema = z.object({
  */
 async function getBaseDomain(): Promise<string> {
   const headersList = await headers();
-  const host = headersList.get("host") || "localhost:3000";
-  
+  const host = headersList.get("host") ?? "localhost:3000";
+
   if (isDevelopment()) {
     return "localhost:3000";
   }
-  
+
   // Use getCookieDomain to extract base domain, then remove leading dot
   // e.g., "org1.mysite.com" -> ".mysite.com" -> "mysite.com"
   return getCookieDomain(host).replace(/^\./, "");
