@@ -56,10 +56,10 @@ export const booleanParamTransformer = z
  * Date range schema for filtering
  */
 export const DateRangeSchema = z.object({
-  created_after: z.string().datetime().optional(),
-  created_before: z.string().datetime().optional(),
-  updated_after: z.string().datetime().optional(),
-  updated_before: z.string().datetime().optional(),
+  created_after: z.string().iso().datetime().optional(),
+  created_before: z.string().iso().datetime().optional(),
+  updated_after: z.string().iso().datetime().optional(),
+  updated_before: z.string().iso().datetime().optional(),
 });
 
 /**

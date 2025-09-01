@@ -41,10 +41,10 @@ const IssueSearchParamsSchema = z.object({
   location: uuidSchema.optional(),
 
   // Date range filtering
-  created_after: z.string().datetime().optional(),
-  created_before: z.string().datetime().optional(),
-  updated_after: z.string().datetime().optional(),
-  updated_before: z.string().datetime().optional(),
+  created_after: z.string().iso().datetime().optional(),
+  created_before: z.string().iso().datetime().optional(),
+  updated_after: z.string().iso().datetime().optional(),
+  updated_before: z.string().iso().datetime().optional(),
 
   // Sorting
   sort: z
