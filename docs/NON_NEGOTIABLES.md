@@ -6,7 +6,7 @@ _Critical file content patterns that MUST be enforced during static analysis_
 
 **Memory Safety Violations**: Per-test PGlite instances cause system lockups. Use worker-scoped pattern.
 
-**Migration Files**: Any files in `supabase/migrations/` directory. Pre-beta has zero users.
+**Migration Files**: Any NEW files in `supabase/migrations/` directory. Pre-beta uses initial migration (`0000_fuzzy_talisman.sql`) for Supabase seeding only.
 
 **Schema Modifications**: Schema is locked. Code adapts to schema, not vice versa.
 
