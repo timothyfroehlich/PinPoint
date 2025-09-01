@@ -330,7 +330,7 @@ export const getLocationsForOrg = cache(async () => {
 
 /**
  * Get models available for the current organization (for filters)
- * Includes both global OPDB models and org-specific custom models
+ * Includes both global commercial models and org-specific custom models
  * Uses React 19 cache() for request-level memoization
  */
 export const getModelsForOrg = cache(async () => {
@@ -338,7 +338,7 @@ export const getModelsForOrg = cache(async () => {
 
   return await db.query.models.findMany({
     where: or(
-      sql`${models.organization_id} IS NULL`, // Global OPDB models
+      sql`${models.organization_id} IS NULL`, // Global commercial models
       eq(models.organization_id, organizationId), // Org-specific custom models
     ),
     columns: {

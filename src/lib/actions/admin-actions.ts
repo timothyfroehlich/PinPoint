@@ -14,13 +14,16 @@ import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { updateSystemSettings } from "~/lib/dal/system-settings";
 import { logActivity, ACTIVITY_ACTIONS, ACTIVITY_ENTITIES, exportActivityLog } from "~/lib/dal/activity-log";
 import {
-  getActionAuthContext,
+  requireAuthContextWithRole,
   validateFormData,
   actionSuccess,
   actionError,
   runAfterResponse,
   type ActionResult,
 } from "./shared";
+import { requirePermission } from "./shared";
+import { PERMISSIONS } from "~/server/auth/permissions.constants";
+// Removed unused getDB alias import
 
 // Enhanced validation schemas with better error messages
 const inviteUserSchema = z.object({
@@ -81,7 +84,7 @@ export async function inviteUserAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId } = await getActionAuthContext();
+    const { user, organizationId, membership } = await requireAuthContextWithRole();
 
     // Enhanced validation with Zod
     const validation = validateFormData(formData, inviteUserSchema);
@@ -90,6 +93,7 @@ export async function inviteUserAction(
     }
 
     const db = getGlobalDatabaseProvider().getClient();
+    await requirePermission(membership, PERMISSIONS.USER_MANAGE, db);
 
     // Check if user already exists in the system
     const existingUser = await db.query.users.findFirst({
@@ -150,14 +154,14 @@ export async function inviteUserAction(
     }
 
     // Create membership for the user
-    const membership = await db.insert(memberships).values({
+    const [newMembership] = await db.insert(memberships).values({
       id: generatePrefixedId("membership"),
       user_id: userId,
       organization_id: organizationId,
       role_id: roleId,
     }).returning({ id: memberships.id });
 
-    if (!membership[0]) {
+    if (!newMembership) {
       return actionError("Failed to create user membership");
     }
 
@@ -166,7 +170,7 @@ export async function inviteUserAction(
       userId,
       organizationId,
       roleId,
-      membershipId: membership[0].id,
+      membershipId: newMembership.id,
     });
 
     // Cache invalidation
@@ -179,7 +183,7 @@ export async function inviteUserAction(
     runAfterResponse(async () => {
       console.log(`User invitation processed for ${validation.data.email} by ${user.email}`, {
         userId,
-        membershipId: membership[0]?.id,
+        membershipId: newMembership?.id,
         organizationId,
         roleId,
       });
@@ -239,7 +243,7 @@ export async function updateUserRoleAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId } = await getActionAuthContext();
+    const { user, organizationId, membership } = await requireAuthContextWithRole();
 
     // Enhanced validation
     const validation = validateFormData(formData, updateUserRoleSchema);
@@ -248,6 +252,7 @@ export async function updateUserRoleAction(
     }
 
     const db = getGlobalDatabaseProvider().getClient();
+    await requirePermission(membership, PERMISSIONS.USER_MANAGE, db);
 
     // Verify role exists in this organization
     const role = await db.query.roles.findFirst({
@@ -319,7 +324,7 @@ export async function removeUserAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId } = await getActionAuthContext();
+    const { user, organizationId, membership } = await requireAuthContextWithRole();
 
     // Enhanced validation
     const validation = validateFormData(formData, removeUserSchema);
@@ -328,6 +333,7 @@ export async function removeUserAction(
     }
 
     const db = getGlobalDatabaseProvider().getClient();
+    await requirePermission(membership, PERMISSIONS.USER_MANAGE, db);
 
     // Verify user exists and email matches (safety check)
     const targetUser = await db.query.users.findFirst({
@@ -395,7 +401,7 @@ export async function updateSystemSettingsAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId } = await getActionAuthContext();
+    const { user, organizationId, membership } = await requireAuthContextWithRole();
 
     // Parse JSON data from form
     const settingsData = formData.get("settings") as string;
@@ -409,6 +415,10 @@ export async function updateSystemSettingsAction(
     if (!validation.success) {
       return actionError("Invalid settings data");
     }
+
+    // Permission check for settings update
+    const db = getGlobalDatabaseProvider().getClient();
+    await requirePermission(membership, PERMISSIONS.ORGANIZATION_MANAGE, db);
 
     // Update system settings in database
     // TODO: Fix type mismatch between flat form schema and nested SystemSettingsData interface
@@ -453,7 +463,10 @@ export async function updateSystemSettingsAction(
  */
 export async function exportActivityLogAction(): Promise<Response> {
   try {
-    const { user, organizationId } = await getActionAuthContext();
+    const { user, organizationId, membership } = await requireAuthContextWithRole();
+
+    const db = getGlobalDatabaseProvider().getClient();
+    await requirePermission(membership, PERMISSIONS.ADMIN_VIEW_ANALYTICS, db);
 
     // Export activity log to CSV
     const csvData = await exportActivityLog(organizationId, {

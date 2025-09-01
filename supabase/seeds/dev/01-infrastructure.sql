@@ -1,6 +1,6 @@
--- PinPoint Infrastructure Seeding
--- Core permissions, organizations, roles, and relationships
--- Universal PostgreSQL - works in any PostgreSQL environment
+-- DEVELOPMENT SEED (Local Dev Only) — DO NOT USE IN PROD
+-- Contains sample organizations, roles, role-permissions, and root locations for dev/test.
+-- Production/Preview should run base seeds in supabase/seeds/base/*.sql only.
 
 -- =============================================================================
 -- GLOBAL PERMISSIONS: Create all permissions
@@ -26,26 +26,31 @@ INSERT INTO permissions (id, name, description) VALUES
   ('perm-org-manage-018', 'organization:manage', 'Manage organization settings'),
   ('perm-role-manage-019', 'role:manage', 'Manage roles and permissions'),
   ('perm-user-manage-020', 'user:manage', 'Manage users and memberships'),
-  ('perm-admin-view-analytics-021', 'admin:view_analytics', 'View analytics and reports')
+  ('perm-admin-view-analytics-021', 'admin:view_analytics', 'View analytics and reports'),
+  ('perm-comment-moderate-022', 'comment:moderate', 'Moderate comments')
 ON CONFLICT (id) DO NOTHING;
 
 -- =============================================================================
 -- ORGANIZATIONS: Create two test organizations for RLS testing
 -- =============================================================================
-INSERT INTO organizations (id, name, subdomain, created_at, updated_at) VALUES
-  ('test-org-pinpoint', 'Austin Pinball Collective', 'apc', now(), now()),
-  ('test-org-competitor', 'Competitor Arcade', 'arcade-masters', now(), now())
+-- Minimal org seed with visibility defaults
+INSERT INTO organizations (id, name, subdomain, is_public, public_issue_default, created_at, updated_at) VALUES
+  ('test-org-pinpoint', 'Austin Pinball Collective', 'apc', true, 'private', now(), now()),
+  ('test-org-competitor', 'Competitor Arcade', 'arcade-masters', true, 'public', now(), now())
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
   subdomain = EXCLUDED.subdomain,
+  is_public = EXCLUDED.is_public,
+  public_issue_default = EXCLUDED.public_issue_default,
   updated_at = now();
 
 -- =============================================================================
 -- LOCATIONS: Create default locations for both organizations
 -- =============================================================================
+-- Keep descendant visibility inherited (NULL) by default
 INSERT INTO locations (id, name, organization_id, is_public, created_at, updated_at) VALUES
-  ('location-default-primary-001', 'Main Floor', 'test-org-pinpoint', true, now(), now()),
-  ('location-default-competitor-001', 'Main Floor', 'test-org-competitor', true, now(), now())
+  ('location-default-primary-001', 'Main Floor', 'test-org-pinpoint', NULL, now(), now()),
+  ('location-default-competitor-001', 'Main Floor', 'test-org-competitor', NULL, now(), now())
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
   organization_id = EXCLUDED.organization_id,
@@ -74,7 +79,10 @@ ON CONFLICT (id) DO UPDATE SET
 -- ROLE PERMISSIONS: Assign permissions to roles
 -- =============================================================================
 -- Admin roles get all permissions
-INSERT INTO role_permissions (role_id, permission_id) VALUES
+-- Insert role permissions if not already present (no unique constraint on table)
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT v.role_id, v.permission_id
+FROM (VALUES
   -- Primary organization admin permissions
   ('role-admin-primary-001', 'perm-issue-view-001'),
   ('role-admin-primary-001', 'perm-issue-create-002'),
@@ -97,6 +105,7 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
   ('role-admin-primary-001', 'perm-role-manage-019'),
   ('role-admin-primary-001', 'perm-user-manage-020'),
   ('role-admin-primary-001', 'perm-admin-view-analytics-021'),
+  ('role-admin-primary-001', 'perm-comment-moderate-022'),
   -- Competitor organization admin permissions
   ('role-admin-competitor-001', 'perm-issue-view-001'),
   ('role-admin-competitor-001', 'perm-issue-create-002'),
@@ -119,6 +128,7 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
   ('role-admin-competitor-001', 'perm-role-manage-019'),
   ('role-admin-competitor-001', 'perm-user-manage-020'),
   ('role-admin-competitor-001', 'perm-admin-view-analytics-021'),
+  ('role-admin-competitor-001', 'perm-comment-moderate-022'),
   -- Member roles get standard permissions
   ('role-member-primary-001', 'perm-issue-view-001'),
   ('role-member-primary-001', 'perm-issue-create-002'),
@@ -141,4 +151,8 @@ INSERT INTO role_permissions (role_id, permission_id) VALUES
   ('role-unauth-competitor-001', 'perm-issue-view-001'),
   ('role-unauth-competitor-001', 'perm-machine-view-007'),
   ('role-unauth-competitor-001', 'perm-location-view-011')
-ON CONFLICT (role_id, permission_id) DO NOTHING;
+) AS v(role_id, permission_id)
+WHERE NOT EXISTS (
+  SELECT 1 FROM role_permissions rp
+  WHERE rp.role_id = v.role_id AND rp.permission_id = v.permission_id
+);

@@ -81,7 +81,7 @@ SEED_TEST_IDS.MOCK_PATTERNS.MACHINE; // "mock-machine-1"
 
 - **Predictable debugging**: "test-org-pinpoint is failing" vs random UUIDs
 - **Cross-org boundary testing**: Two organizations for RLS isolation validation
-- **Global OPDB catalog**: Shared machine models visible to all organizations
+- **Global commercial catalog**: Shared machine models visible to all organizations
 - **Consistent test data**: Same IDs across unit, integration, and security tests
 
 **Architecture**: [📖 seed-data-architecture.md](./seed-data-architecture.md)

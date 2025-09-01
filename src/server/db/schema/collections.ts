@@ -161,7 +161,7 @@ export const pinballMapConfigs = pgTable(
     last_global_sync: timestamp(),
 
     // Data Preferences
-    create_missing_models: boolean().default(true).notNull(), // Create Model records for unknown OPDB games
+    create_missing_models: boolean().default(true).notNull(), // Create Model records for unknown commercial games
     update_existing_data: boolean().default(false).notNull(), // Whether to update existing machine data
   },
   (table) => [

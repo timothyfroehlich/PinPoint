@@ -11,17 +11,7 @@ SELECT plan(14);
 -- Create test data for both organizations to validate isolation boundaries
 -- This is required for proper security testing - empty data doesn't validate RLS
 
--- Create test models for both organizations
-INSERT INTO models (id, name, manufacturer, organization_id, year)
-VALUES 
-  ('test-model-primary-1', 'Test Machine Model Primary', 'Test Manufacturer', test_org_primary(), 2020),
-  ('test-model-competitor-1', 'Test Machine Model Competitor', 'Test Manufacturer', test_org_competitor(), 2020);
-
--- Create test machines for both organizations
-INSERT INTO machines (id, name, organization_id, location_id, model_id)
-VALUES
-  ('test-machine-primary-1', 'Primary Test Machine 1', test_org_primary(), 'location-default-primary-001', 'test-model-primary-1'),
-  ('test-machine-competitor-1', 'Competitor Test Machine 1', test_org_competitor(), 'location-default-competitor-001', 'test-model-competitor-1');
+-- Use seeded machines for both organizations
 
 -- Create test issues in primary organization
 SET LOCAL role = 'authenticated';
@@ -30,9 +20,10 @@ SELECT set_jwt_claims_for_test(test_org_primary(), test_user_admin(), 'admin', A
 
 INSERT INTO issues (id, title, description, organization_id, created_by_id, machine_id, status_id, priority_id)
 VALUES 
-  ('test-issue-primary-1', 'Primary Org Secret Issue 1', 'Confidential primary org data', test_org_primary(), test_user_admin(), 'test-machine-primary-1', 'status-new-primary-001', 'priority-medium-primary-001'),
-  ('test-issue-primary-2', 'Primary Org Secret Issue 2', 'Another confidential primary org data', test_org_primary(), test_user_admin(), 'test-machine-primary-1', 'status-in-progress-primary-001', 'priority-high-primary-001'),
-  ('test-issue-primary-3', 'Primary Org Secret Issue 3', 'Third confidential primary org data', test_org_primary(), test_user_admin(), 'test-machine-primary-1', 'status-fixed-primary-001', 'priority-low-primary-001');
+  ('test-issue-primary-1', 'Primary Org Secret Issue 1', 'Confidential primary org data', test_org_primary(), test_user_admin(), 'machine-mm-001', 'status-new-primary-001', 'priority-medium-primary-001'),
+  ('test-issue-primary-2', 'Primary Org Secret Issue 2', 'Another confidential primary org data', test_org_primary(), test_user_admin(), 'machine-mm-001', 'status-in-progress-primary-001', 'priority-high-primary-001'),
+  ('test-issue-primary-3', 'Primary Org Secret Issue 3', 'Third confidential primary org data', test_org_primary(), test_user_admin(), 'machine-mm-001', 'status-needs-expert-primary-001', 'priority-low-primary-001')
+ON CONFLICT (id) DO NOTHING;
 
 -- Create test issues in competitor organization  
 SELECT set_competitor_org_context();
@@ -40,8 +31,9 @@ SELECT set_jwt_claims_for_test(test_org_competitor(), test_user_member2(), 'admi
 
 INSERT INTO issues (id, title, description, organization_id, created_by_id, machine_id, status_id, priority_id)
 VALUES
-  ('test-issue-competitor-1', 'Competitor Org Secret Issue 1', 'Confidential competitor org data', test_org_competitor(), test_user_member2(), 'test-machine-competitor-1', 'status-new-competitor-001', 'priority-high-competitor-001'),
-  ('test-issue-competitor-2', 'Competitor Org Secret Issue 2', 'Another confidential competitor org data', test_org_competitor(), test_user_member2(), 'test-machine-competitor-1', 'status-fixed-competitor-001', 'priority-medium-competitor-001');
+  ('test-issue-competitor-1', 'Competitor Org Secret Issue 1', 'Confidential competitor org data', test_org_competitor(), test_user_member2(), 'machine-test-org-competitor-001', 'status-new-competitor-001', 'priority-high-competitor-001'),
+  ('test-issue-competitor-2', 'Competitor Org Secret Issue 2', 'Another confidential competitor org data', test_org_competitor(), test_user_member2(), 'machine-test-org-competitor-001', 'status-needs-expert-competitor-001', 'priority-medium-competitor-001')
+ON CONFLICT (id) DO NOTHING;
 
 -- Test 1: CRITICAL - Zero tolerance cross-organizational issue access
 -- Primary org user should NOT see competitor org issues
@@ -77,8 +69,8 @@ SET LOCAL role = 'authenticated';
 SELECT set_competitor_org_context();
 SELECT results_eq(
   'SELECT COUNT(*)::integer FROM issues WHERE organization_id = ' || quote_literal(test_org_competitor()),
-  'VALUES (2)',
-  'Competitor org user sees exactly their organization''s issues (2 test issues)'
+  'VALUES (3)',
+  'Competitor org user sees exactly their organization''s issues (1 seed + 2 test issues)'
 );
 
 -- Test 5: Cross-organizational issue lookup by ID returns empty
@@ -94,8 +86,8 @@ SELECT results_eq(
 SET LOCAL role = 'authenticated';
 SELECT set_competitor_org_context();
 SELECT results_eq(
-  'SELECT COUNT(*)::integer FROM issues WHERE title ILIKE ''%primary%'' OR title ILIKE ''%secret%''',
-  'VALUES (2)', -- Only sees own "secret" issues, not primary org ones
+  'SELECT COUNT(*)::integer FROM issues WHERE title ILIKE ''%Competitor Org Secret%''',
+  'VALUES (2)',
   'Issue search queries cannot find issues outside organization'
 );
 

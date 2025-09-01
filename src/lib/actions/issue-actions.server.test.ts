@@ -12,16 +12,23 @@ vi.mock("./shared", async () => {
   const actual = await vi.importActual("./shared");
   return {
     ...actual,
-    getActionAuthContext: vi.fn(),
+    requireAuthContextWithRole: vi.fn(),
   };
 });
 
-const { getActionAuthContext } = await import("./shared");
-const mockGetActionAuthContext = vi.mocked(getActionAuthContext);
+const { requireAuthContextWithRole } = await import("./shared");
+const mockRequireAuthContextWithRole = vi.mocked(requireAuthContextWithRole);
 
 describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRequireAuthContextWithRole.mockResolvedValue({
+      user: { id: "user-test", email: "user@test.com", user_metadata: { name: "Tester" } } as any,
+      organizationId: "org-test",
+      membership: { roleId: "role-test" } as any,
+      role: { id: "role-test", name: "Member" } as any,
+      permissions: [],
+    } as any);
   });
 
   describe("FormData validation patterns", () => {
@@ -91,7 +98,7 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
       // description and assigneeId omitted - should be fine
 
       // This test will fail auth, but validation should pass
-      mockGetActionAuthContext.mockRejectedValue(new Error("Auth required"));
+      mockRequireAuthContextWithRole.mockRejectedValue(new Error("Auth required"));
 
       const result = await createIssueAction(null, formData);
 
@@ -109,7 +116,7 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
       formData.append("description", ""); // Empty string should become undefined
       formData.append("machineId", SEED_TEST_IDS.MOCK_PATTERNS.MACHINE);
 
-      mockGetActionAuthContext.mockRejectedValue(new Error("Auth required"));
+      mockRequireAuthContextWithRole.mockRejectedValue(new Error("Auth required"));
 
       const result = await createIssueAction(null, formData);
 
@@ -126,7 +133,7 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
       formData.append("title", "  Test Issue  "); // Whitespace should be trimmed
       formData.append("machineId", SEED_TEST_IDS.MOCK_PATTERNS.MACHINE);
 
-      mockGetActionAuthContext.mockRejectedValue(new Error("Auth required"));
+      mockRequireAuthContextWithRole.mockRejectedValue(new Error("Auth required"));
 
       const result = await createIssueAction(null, formData);
 
@@ -189,7 +196,7 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
 
   describe("Authentication boundary testing", () => {
     it("requires authentication for createIssueAction", async () => {
-      mockGetActionAuthContext.mockRejectedValue(
+      mockRequireAuthContextWithRole.mockRejectedValue(
         new Error("Authentication required"),
       );
 
@@ -203,11 +210,11 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
       if (!result.success) {
         expect(result.error).toBe("Authentication required");
       }
-      expect(mockGetActionAuthContext).toHaveBeenCalledOnce();
+      expect(mockRequireAuthContextWithRole).toHaveBeenCalledOnce();
     });
 
     it("requires authentication for updateIssueStatusAction", async () => {
-      mockGetActionAuthContext.mockRejectedValue(new Error("No session"));
+      mockRequireAuthContextWithRole.mockRejectedValue(new Error("No session"));
 
       const formData = new FormData();
       formData.append("statusId", "550e8400-e29b-41d4-a716-446655440000");
@@ -222,7 +229,7 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
       if (!result.success) {
         expect(result.error).toBe("No session");
       }
-      expect(mockGetActionAuthContext).toHaveBeenCalledOnce();
+      expect(mockRequireAuthContextWithRole).toHaveBeenCalledOnce();
     });
   });
 
