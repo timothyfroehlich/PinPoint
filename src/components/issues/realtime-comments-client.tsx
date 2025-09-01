@@ -238,14 +238,14 @@ export function RealtimeCommentsClient({
                   {comment.author?.name
                     ?.split(" ")
                     .map((n) => n[0])
-                    .join("") || "U"}
+                    .join("") ?? "U"}
                 </AvatarFallback>
               </Avatar>
 
               <div className="flex-1 space-y-1">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-sm">
-                    {comment.author?.name || "Someone"}
+                    {comment.author?.name ?? "Someone"}
                   </span>
                   <span className="text-xs text-muted-foreground">
                     {formatDistanceToNow(new Date(comment.created_at), {

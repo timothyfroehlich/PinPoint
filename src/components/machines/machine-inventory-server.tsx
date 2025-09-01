@@ -184,7 +184,7 @@ export async function MachineInventoryServer({
                 <div className="flex items-center gap-1 text-sm text-muted-foreground">
                   <MapPinIcon className="h-3 w-3" />
                   <span className="truncate">
-                    {machine.location?.name || "Unknown Location"}
+                    {machine.location?.name ?? "Unknown Location"}
                     {machine.location?.city && `, ${machine.location.city}`}
                   </span>
                 </div>
@@ -240,7 +240,7 @@ export async function MachineInventoryServer({
                     <div className="flex items-center gap-1">
                       <MapPinIcon className="h-3 w-3 text-muted-foreground" />
                       <span className="truncate">
-                        {machine.location?.name || "Unknown"}
+                        {machine.location?.name ?? "Unknown"}
                       </span>
                     </div>
                     {machine.location?.city && (
@@ -255,7 +255,7 @@ export async function MachineInventoryServer({
                   <TableCell>
                     <div className="space-y-1">
                       <div className="font-medium">
-                        {machine.model?.name || "Unknown Model"}
+                        {machine.model?.name ?? "Unknown Model"}
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {machine.model?.manufacturer}

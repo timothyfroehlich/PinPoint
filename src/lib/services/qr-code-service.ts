@@ -33,16 +33,16 @@ export async function generateMachineQRCode(
   try {
     // Build the reporting URL that the QR code will link to
     const baseUrl =
-      process.env["NEXT_PUBLIC_APP_URL"] || "https://pinpoint.app";
+      process.env["NEXT_PUBLIC_APP_URL"] ?? "https://pinpoint.app";
     const reportingUrl = `${baseUrl}/report?machine=${machineId}`;
 
     // QR code generation options
     const qrOptions = {
-      width: options.size || 256,
-      margin: options.margin || 2,
+      width: options.size ?? 256,
+      margin: options.margin ?? 2,
       color: {
-        dark: options.color?.dark || "#000000",
-        light: options.color?.light || "#FFFFFF",
+        dark: options.color?.dark ?? "#000000",
+        light: options.color?.light ?? "#FFFFFF",
       },
       errorCorrectionLevel: "M" as const,
     };
@@ -79,15 +79,15 @@ export async function generateMachineQRCodeBuffer(
 ): Promise<Buffer> {
   try {
     const baseUrl =
-      process.env["NEXT_PUBLIC_APP_URL"] || "https://pinpoint.app";
+      process.env["NEXT_PUBLIC_APP_URL"] ?? "https://pinpoint.app";
     const reportingUrl = `${baseUrl}/report?machine=${machineId}`;
 
     const qrOptions = {
-      width: options.size || 256,
-      margin: options.margin || 2,
+      width: options.size ?? 256,
+      margin: options.margin ?? 2,
       color: {
-        dark: options.color?.dark || "#000000",
-        light: options.color?.light || "#FFFFFF",
+        dark: options.color?.dark ?? "#000000",
+        light: options.color?.light ?? "#FFFFFF",
       },
       errorCorrectionLevel: "M" as const,
     };

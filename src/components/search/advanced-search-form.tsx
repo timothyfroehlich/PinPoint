@@ -99,18 +99,18 @@ export function AdvancedSearchForm({
             : [];
       } else if (field.type === "date-range") {
         initialState[`${field.id}_start`] =
-          currentParams[`${field.id}_start`] || "";
+          currentParams[`${field.id}_start`] ?? "";
         initialState[`${field.id}_end`] =
-          currentParams[`${field.id}_end`] || "";
+          currentParams[`${field.id}_end`] ?? "";
       } else if (field.type === "number-range") {
         initialState[`${field.id}_min`] =
-          currentParams[`${field.id}_min`] || "";
+          currentParams[`${field.id}_min`] ?? "";
         initialState[`${field.id}_max`] =
-          currentParams[`${field.id}_max`] || "";
+          currentParams[`${field.id}_max`] ?? "";
       } else if (field.type === "boolean") {
         initialState[field.id] = currentValue === "true";
       } else {
-        initialState[field.id] = currentValue || "";
+        initialState[field.id] = currentValue ?? "";
       }
     });
 
@@ -135,7 +135,7 @@ export function AdvancedSearchForm({
     fields.forEach((field) => {
       if (field.type === "multi-select") {
         const values = formState[field.id] as string[];
-        if (values && values.length > 0) {
+        if (values.length > 0) {
           params[field.id] = values;
         }
       } else if (field.type === "date-range") {
@@ -208,7 +208,7 @@ export function AdvancedSearchForm({
   const activeFilterCount = fields.reduce((count, field) => {
     if (field.type === "multi-select") {
       const values = formState[field.id] as string[];
-      return count + (values?.length || 0);
+      return count + values.length;
     } else if (field.type === "date-range") {
       const hasStart = formState[`${field.id}_start`];
       const hasEnd = formState[`${field.id}_end`];
@@ -235,7 +235,7 @@ export function AdvancedSearchForm({
               id={field.id}
               type="text"
               placeholder={field.placeholder}
-              value={formState[field.id] || ""}
+              value={formState[field.id] ?? ""}
               onChange={(e) => {
                 updateFormField(field.id, e.target.value);
               }}
@@ -248,7 +248,7 @@ export function AdvancedSearchForm({
           <div key={field.id} className="space-y-2">
             <Label htmlFor={field.id}>{field.label}</Label>
             <Select
-              value={formState[field.id] || ""}
+              value={formState[field.id] ?? ""}
               onValueChange={(value) => {
                 updateFormField(field.id, value);
               }}
@@ -256,7 +256,7 @@ export function AdvancedSearchForm({
               <SelectTrigger>
                 <SelectValue
                   placeholder={
-                    field.placeholder || `Select ${field.label.toLowerCase()}`
+                    field.placeholder ?? `Select ${field.label.toLowerCase()}`
                   }
                 />
               </SelectTrigger>
@@ -279,7 +279,7 @@ export function AdvancedSearchForm({
         );
 
       case "multi-select":
-        const selectedValues = (formState[field.id] as string[]) || [];
+        const selectedValues = formState[field.id] as string[];
         return (
           <div key={field.id} className="space-y-2">
             <Label>{field.label}</Label>
@@ -322,7 +322,7 @@ export function AdvancedSearchForm({
                 <Input
                   type="date"
                   placeholder="Start date"
-                  value={formState[`${field.id}_start`] || ""}
+                  value={formState[`${field.id}_start`] ?? ""}
                   onChange={(e) => {
                     updateFormField(`${field.id}_start`, e.target.value);
                   }}
@@ -332,7 +332,7 @@ export function AdvancedSearchForm({
                 <Input
                   type="date"
                   placeholder="End date"
-                  value={formState[`${field.id}_end`] || ""}
+                  value={formState[`${field.id}_end`] ?? ""}
                   onChange={(e) => {
                     updateFormField(`${field.id}_end`, e.target.value);
                   }}
@@ -353,7 +353,7 @@ export function AdvancedSearchForm({
                   placeholder={`Min ${field.label.toLowerCase()}`}
                   min={field.min}
                   max={field.max}
-                  value={formState[`${field.id}_min`] || ""}
+                  value={formState[`${field.id}_min`] ?? ""}
                   onChange={(e) => {
                     updateFormField(`${field.id}_min`, e.target.value);
                   }}
@@ -365,7 +365,7 @@ export function AdvancedSearchForm({
                   placeholder={`Max ${field.label.toLowerCase()}`}
                   min={field.min}
                   max={field.max}
-                  value={formState[`${field.id}_max`] || ""}
+                  value={formState[`${field.id}_max`] ?? ""}
                   onChange={(e) => {
                     updateFormField(`${field.id}_max`, e.target.value);
                   }}
@@ -403,7 +403,7 @@ export function AdvancedSearchForm({
               <Filter className="h-5 w-5 text-muted-foreground" />
               <div>
                 <CardTitle className="text-lg">
-                  {title || `Advanced ${entityType} Search`}
+                  {title ?? `Advanced ${entityType} Search`}
                 </CardTitle>
                 {description && (
                   <p className="text-sm text-muted-foreground mt-1">
@@ -445,7 +445,7 @@ export function AdvancedSearchForm({
             <Filter className="h-5 w-5 text-muted-foreground" />
             <div>
               <CardTitle className="text-lg">
-                {title || `Advanced ${entityType} Search`}
+                {title ?? `Advanced ${entityType} Search`}
               </CardTitle>
               {description && (
                 <p className="text-sm text-muted-foreground mt-1">

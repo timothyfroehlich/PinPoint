@@ -33,10 +33,10 @@ interface MachineHeaderProps {
 }
 
 export function MachineHeader({ machine }: MachineHeaderProps) {
-  const displayName = machine.name || machine.model?.name || "Unknown Machine";
-  const locationName = machine.location?.name || "No Location";
+  const displayName = machine.name ?? machine.model?.name ?? "Unknown Machine";
+  const locationName = machine.location?.name ?? "No Location";
   const modelInfo = machine.model
-    ? `${machine.model.manufacturer || ""} ${machine.model.name}`.trim()
+    ? `${machine.model.manufacturer ?? ""} ${machine.model.name}`.trim()
     : "Unknown Model";
 
   return (

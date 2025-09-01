@@ -44,7 +44,7 @@ export function IssueAssignmentClient({
   currentAssigneeName,
   availableUsers,
 }: IssueAssignmentClientProps) {
-  const userOptions = availableUsers || DEFAULT_USER_OPTIONS;
+  const userOptions = availableUsers ?? DEFAULT_USER_OPTIONS;
 
   const [state, formAction, isPending] = useActionState(
     updateIssueAssignmentAction.bind(null, issueId),
@@ -55,11 +55,11 @@ export function IssueAssignmentClient({
     <form action={formAction} className="space-y-3">
       <Select
         name="assigneeId"
-        defaultValue={currentAssigneeId || "unassigned"}
+        defaultValue={currentAssigneeId ?? "unassigned"}
         disabled={isPending}
       >
         <SelectTrigger>
-          <SelectValue placeholder={currentAssigneeName || "Unassigned"} />
+          <SelectValue placeholder={currentAssigneeName ?? "Unassigned"} />
         </SelectTrigger>
         <SelectContent>
           {userOptions.map((user) => (
@@ -80,7 +80,7 @@ export function IssueAssignmentClient({
 
       {state && !state.success && (
         <p className="text-error text-sm">
-          {state.error || "Failed to update assignment"}
+          {state.error ?? "Failed to update assignment"}
         </p>
       )}
 

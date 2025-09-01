@@ -9,7 +9,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { cache } from "react"; // React 19 cache API
 import { z } from "zod";
-import { titleSchema, commentContentSchema, uuidSchema } from "~/lib/validation/schemas";
+import { titleSchema, commentContentSchema, uuidSchema, idSchema } from "~/lib/validation/schemas";
 import { and, eq, inArray } from "drizzle-orm";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import {
@@ -40,28 +40,28 @@ import {
 const createIssueSchema = z.object({
   title: titleSchema,
   description: z.string().optional(),
-  machineId: uuidSchema.or(z.string().min(1, "Please select a machine")),
+  machineId: uuidSchema.or(idSchema.refine(() => false, "Please select a machine")),
   priority: z.enum(["low", "medium", "high"]).optional().default("medium"),
   assigneeId: uuidSchema.optional(),
 });
 
 const updateIssueStatusSchema = z.object({
-  statusId: z.string().uuid("Invalid status selected"),
+  statusId: uuidSchema, // uses centralized uuid validator (provides proper message)
 });
 
 const addCommentSchema = z.object({ content: commentContentSchema });
 
 const updateIssueAssignmentSchema = z.object({
-  assigneeId: z.string().uuid("Invalid assignee selected").optional(),
+  assigneeId: uuidSchema.optional(),
 });
 
 const bulkUpdateIssuesSchema = z.object({
   issueIds: z
-    .array(z.string().uuid())
+    .array(uuidSchema)
     .min(1, "No issues selected")
     .max(50, "Cannot update more than 50 issues at once"),
-  statusId: z.string().uuid().optional(),
-  assigneeId: z.string().uuid().optional(),
+  statusId: uuidSchema.optional(),
+  assigneeId: uuidSchema.optional(),
 });
 
 // Performance: Cached database queries for default values
@@ -120,7 +120,7 @@ export async function createIssueAction(
     const issueData = {
       id: generatePrefixedId("issue"),
       title: validation.data.title,
-      description: validation.data.description || "",
+      description: validation.data.description ?? "",
       machineId: validation.data.machineId,
       organizationId,
       statusId: defaultStatus.id,
@@ -152,7 +152,7 @@ export async function createIssueAction(
           organizationId,
           actorId: user.id,
           actorName:
-            (user.user_metadata?.["name"] as string) || user.email || "Someone",
+            (user.user_metadata?.["name"] as string) ?? user.email ?? "Someone",
         });
       } catch (error) {
         console.error(
@@ -232,8 +232,8 @@ export async function updateIssueStatusAction(
             organizationId,
             actorId: user.id,
             actorName:
-              (user.user_metadata?.["name"] as string) ||
-              user.email ||
+              (user.user_metadata?.["name"] as string) ??
+              user.email ??
               "Someone",
           });
         }
@@ -351,12 +351,12 @@ export async function updateIssueAssignmentAction(
       columns: { assigned_to_id: true },
     });
 
-    const previousAssigneeId = currentIssue?.assigned_to_id || null;
+    const previousAssigneeId = currentIssue?.assigned_to_id ?? null;
 
     // Update assignment with organization scoping
     const [updatedIssue] = await db
       .update(issues)
-      .set({ assigned_to_id: validation.data.assigneeId || null })
+      .set({ assigned_to_id: validation.data.assigneeId ?? null })
       .where(
         and(eq(issues.id, issueId), eq(issues.organization_id, organizationId)),
       )
@@ -380,14 +380,14 @@ export async function updateIssueAssignmentAction(
       try {
         await generateAssignmentNotifications(
           issueId,
-          validation.data.assigneeId || null,
+          validation.data.assigneeId ?? null,
           previousAssigneeId,
           {
             organizationId,
             actorId: user.id,
             actorName:
-              (user.user_metadata?.["name"] as string) ||
-              user.email ||
+              (user.user_metadata?.["name"] as string) ??
+              user.email ??
               "Someone",
           },
         );
@@ -441,7 +441,7 @@ export async function bulkUpdateIssuesAction(
     // Build update object
     const updateData: any = {};
     if (statusId) updateData.status_id = statusId;
-    if (assigneeId !== undefined) updateData.assigned_to_id = assigneeId;
+    if (assigneeId !== undefined) updateData.assigned_to_id = assigneeId ?? null;
 
     if (Object.keys(updateData).length === 0) {
       return actionError("No updates specified");

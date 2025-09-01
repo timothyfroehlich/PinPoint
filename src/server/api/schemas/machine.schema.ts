@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { idSchema, machineIdSchema } from "~/lib/validation/schemas";
 
 /**
  * Machine Creation Schema
@@ -6,8 +7,8 @@ import { z } from "zod";
  */
 export const machineCreateSchema = z.object({
   name: z.string().optional(),
-  modelId: z.string().min(1, "Model ID is required"),
-  locationId: z.string().min(1, "Location ID is required"),
+  modelId: idSchema,
+  locationId: idSchema,
 });
 
 /**
@@ -15,10 +16,10 @@ export const machineCreateSchema = z.object({
  * Schema for updating existing machines
  */
 export const machineUpdateSchema = z.object({
-  id: z.string().min(1, "Machine ID is required"),
+  id: machineIdSchema,
   name: z.string().optional(),
-  modelId: z.string().optional(),
-  locationId: z.string().optional(),
+  modelId: idSchema.optional(),
+  locationId: idSchema.optional(),
 });
 
 /**
@@ -26,16 +27,16 @@ export const machineUpdateSchema = z.object({
  * For assigning or removing machine owners
  */
 export const machineOwnerAssignmentSchema = z.object({
-  machineId: z.string().min(1, "Machine ID is required"),
-  ownerId: z.string().optional(), // undefined/null removes owner
+  machineId: machineIdSchema,
+  ownerId: idSchema.optional(), // undefined/null removes owner
 });
 
 /**
  * Machine ID Validation Schema
  * For operations requiring just a machine ID
  */
-export const machineIdSchema = z.object({
-  id: z.string().min(1, "Machine ID is required"),
+export const machineIdParamSchema = z.object({
+  id: machineIdSchema,
 });
 
 /**
@@ -55,13 +56,13 @@ export const machineFilterSchema = z.object({
  * Output validation schemas corresponding to machine response transformers
  */
 export const machineResponseSchema = z.object({
-  id: z.string(),
+  id: machineIdSchema,
   name: z.string(),
-  modelId: z.string().optional(),
-  locationId: z.string().optional(),
-  organizationId: z.string(),
-  ownerId: z.string().nullable().optional(),
-  qrCodeId: z.string().optional(),
+  modelId: idSchema.optional(),
+  locationId: idSchema.optional(),
+  organizationId: idSchema,
+  ownerId: idSchema.nullable().optional(),
+  qrCodeId: idSchema.optional(),
   qrCodeUrl: z.string().optional(),
   qrCodeGeneratedAt: z.date().optional(),
   ownerNotificationsEnabled: z.boolean().optional(),
@@ -72,9 +73,9 @@ export const machineResponseSchema = z.object({
   updatedAt: z.date().optional(),
   model: z
     .object({
-      id: z.string(),
-      name: z.string(),
-      manufacturer: z.string(),
+  id: idSchema,
+  name: z.string(),
+  manufacturer: z.string(),
       year: z.number().nullable(),
       machineType: z.string(),
       ipdbUrl: z.string().nullable(),
@@ -83,7 +84,7 @@ export const machineResponseSchema = z.object({
     .optional(),
   location: z
     .object({
-      id: z.string(),
+  id: idSchema,
       name: z.string(),
       address: z.string().nullable(),
       city: z.string().nullable(),
@@ -94,9 +95,9 @@ export const machineResponseSchema = z.object({
     .optional(),
   owner: z
     .object({
-      id: z.string(),
-      name: z.string(),
-      email: z.string(),
+  id: idSchema,
+  name: z.string(),
+  email: z.string(),
       profilePicture: z.string().nullable(),
     })
     .nullable()
@@ -104,16 +105,16 @@ export const machineResponseSchema = z.object({
 });
 
 export const machineForIssuesSchema = z.object({
-  id: z.string(),
+  id: idSchema,
   name: z.string(),
   model: z.object({
-    id: z.string(),
+    id: idSchema,
     name: z.string(),
     manufacturer: z.string(),
     year: z.number().nullable(),
   }),
   location: z.object({
-    id: z.string(),
+    id: idSchema,
     name: z.string(),
     address: z.string().nullable(),
   }),
