@@ -94,6 +94,9 @@ betterer-output.log
 agent_workspace/
 cleanup_analysis/
 
+# Project index files (auto-generated)
+PROJECT_INDEX.json
+
 # Claude hooks cache files
 .claude/hooks/.quality-check.js.swp
 .claude/hooks/.quality-check.json.swp
