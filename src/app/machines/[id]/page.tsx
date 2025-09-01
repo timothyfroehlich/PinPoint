@@ -29,10 +29,10 @@ export async function generateMetadata({
 
     return {
       title: `${machineName} - Machine Inventory - PinPoint`,
-      description: `${machine.model.name ?? "Machine"} at ${machine.location.name ?? "Unknown Location"}`,
+      description: `${machine.model.name} at ${machine.location.name}`,
       openGraph: {
         title: machineName,
-        description: `${machine.model.name ?? "Machine"} at ${machine.location.name ?? "Unknown Location"}`,
+        description: `${machine.model.name} at ${machine.location.name}`,
         type: "article",
       },
     };
