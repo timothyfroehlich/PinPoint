@@ -44,6 +44,17 @@ import {
   getServerAuthContextWithRole 
 } from "~/lib/dal/shared";
 
+// Mock secure organization context
+vi.mock("~/lib/organization-context", () => ({
+  requireMemberAccess: vi.fn(),
+  getOrganizationContext: vi.fn(async () => ({
+    user: { id: SEED_TEST_IDS.USERS.ADMIN },
+    organization: { id: SEED_TEST_IDS.ORGANIZATIONS.primary },
+    accessLevel: "member",
+    membership: { role: { name: "Admin" } }
+  }))
+}));
+
 // Mock the Supabase client
 vi.mock("~/lib/supabase/server", () => ({
   createClient: vi.fn(() => ({
@@ -90,7 +101,7 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
   });
 
   describe("getServerAuthContext", () => {
-    it("successfully extracts organizationId from app_metadata", async () => {
+    it("successfully extracts organizationId from organization context", async () => {
       // Mock successful auth
       const { createClient } = await import("~/lib/supabase/server");
       vi.mocked(createClient).mockReturnValue({
@@ -134,37 +145,7 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
       });
     });
 
-    it("handles missing organizationId in app_metadata", async () => {
-      const userWithoutOrg: User = {
-        ...mockUser,
-        app_metadata: {}
-      };
-
-      const { createClient } = await import("~/lib/supabase/server");
-      vi.mocked(createClient).mockReturnValue({
-        auth: {
-          getUser: vi.fn().mockResolvedValue({
-            data: { user: userWithoutOrg },
-            error: null
-          })
-        }
-      } as any);
-
-      const context = await getServerAuthContext();
-
-      expect(context).toMatchObject({
-        user: expect.objectContaining({
-          id: SEED_TEST_IDS.USERS.ADMIN
-        }),
-        organizationId: null,
-        membership: null,
-        role: null
-      });
-    });
-  });
-
-  describe("requireAuthContext", () => {
-    it("returns auth context when user is authenticated with organizationId", async () => {
+    it("returns null organization when org context unavailable", async () => {
       const { createClient } = await import("~/lib/supabase/server");
       vi.mocked(createClient).mockReturnValue({
         auth: {
@@ -173,6 +154,34 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
             error: null
           })
         }
+      } as any);
+
+      const { getOrganizationContext } = await import("~/lib/organization-context");
+      vi.mocked(getOrganizationContext).mockRejectedValueOnce(new Error("no ctx"));
+
+      const context = await getServerAuthContext();
+      expect(context.organizationId).toBeNull();
+    });
+  });
+
+  describe("requireAuthContext", () => {
+    it("returns auth context when user is authenticated and member", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      vi.mocked(createClient).mockReturnValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: mockUser },
+            error: null
+          })
+        }
+      } as any);
+
+      const { requireMemberAccess } = await import("~/lib/organization-context");
+      vi.mocked(requireMemberAccess).mockResolvedValue({
+        user: { id: mockUser.id },
+        organization: { id: SEED_TEST_IDS.ORGANIZATIONS.primary },
+        membership: {},
+        accessLevel: "member"
       } as any);
 
       const context = await requireAuthContext();
@@ -200,23 +209,21 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
       await expect(requireAuthContext()).rejects.toThrow('Authentication required');
     });
 
-    it("throws when organizationId is missing from app_metadata", async () => {
-      const userWithoutOrg: User = {
-        ...mockUser,
-        app_metadata: {}
-      };
-
+    it("throws when membership validation fails", async () => {
       const { createClient } = await import("~/lib/supabase/server");
       vi.mocked(createClient).mockReturnValue({
         auth: {
           getUser: vi.fn().mockResolvedValue({
-            data: { user: userWithoutOrg },
+            data: { user: mockUser },
             error: null
           })
         }
       } as any);
 
-      await expect(requireAuthContext()).rejects.toThrow('Organization selection required');
+      const { requireMemberAccess } = await import("~/lib/organization-context");
+      vi.mocked(requireMemberAccess).mockRejectedValue(new Error('Access denied'));
+
+      await expect(requireAuthContext()).rejects.toThrow('Access denied');
     });
   });
 
@@ -318,57 +325,33 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
 
   describe("Security patterns verification", () => {
     it("properly validates organizationId format", async () => {
-      // Test with invalid organizationId in app_metadata
-      const userWithInvalidOrg: User = {
-        ...mockUser,
-        app_metadata: {
-          organizationId: '', // Empty string should be treated as missing
-          role: 'Admin'
-        }
-      };
-
-      const { createClient } = await import("~/lib/supabase/server");
-      vi.mocked(createClient).mockReturnValue({
-        auth: {
-          getUser: vi.fn().mockResolvedValue({
-            data: { user: userWithInvalidOrg },
-            error: null
-          })
-        }
-      } as any);
-
-      await expect(requireAuthContext()).rejects.toThrow('Organization selection required');
+      const { requireMemberAccess } = await import("~/lib/organization-context");
+      vi.mocked(requireMemberAccess).mockRejectedValueOnce(
+        new Error("Organization selection required")
+      );
+      await expect(requireAuthContext()).rejects.toThrow("Organization selection required");
     });
 
     it("handles different organization contexts correctly", async () => {
-      const competitorUser: User = {
-        ...mockUser,
-        id: SEED_TEST_IDS.USERS.MEMBER2,
-        email: 'escher.lefkoff@example.com',
-        app_metadata: {
-          organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
-          role: 'Member'
-        }
-      };
-
       const { createClient } = await import("~/lib/supabase/server");
       vi.mocked(createClient).mockReturnValue({
         auth: {
           getUser: vi.fn().mockResolvedValue({
-            data: { user: competitorUser },
+            data: { user: { ...mockUser, id: SEED_TEST_IDS.USERS.MEMBER2 } as any },
             error: null
           })
         }
       } as any);
+      const { requireMemberAccess } = await import("~/lib/organization-context");
+      vi.mocked(requireMemberAccess).mockResolvedValue({
+        user: { id: SEED_TEST_IDS.USERS.MEMBER2 },
+        organization: { id: SEED_TEST_IDS.ORGANIZATIONS.competitor },
+        membership: {},
+        accessLevel: "member"
+      } as any);
 
       const context = await requireAuthContext();
-
-      expect(context).toMatchObject({
-        user: expect.objectContaining({
-          id: SEED_TEST_IDS.USERS.MEMBER2
-        }),
-        organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor
-      });
+      expect(context.organizationId).toBe(SEED_TEST_IDS.ORGANIZATIONS.competitor);
     });
   });
 

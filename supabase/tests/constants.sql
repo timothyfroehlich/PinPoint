@@ -59,13 +59,15 @@ CREATE OR REPLACE FUNCTION set_jwt_claims_for_test(
 BEGIN
   -- Set JWT claims for RLS policy testing
   PERFORM set_config('request.jwt.claims', json_build_object(
-    'sub', COALESCE(user_id, 'test-user'),
+    'sub', COALESCE(user_id, '00000000-0000-4000-8000-000000000000'),
     'app_metadata', json_build_object(
       'organizationId', org_id,
       'role', role_name,
       'permissions', permissions
     )
   )::text, true);
+  -- Also set session organization context used by RLS policies
+  PERFORM set_config('app.current_organization_id', org_id, true);
 END;
 $$ LANGUAGE plpgsql;
 
@@ -93,6 +95,7 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION clear_jwt_context() RETURNS VOID AS $$
 BEGIN
   PERFORM set_config('request.jwt.claims', NULL, true);
+  PERFORM set_config('app.current_organization_id', NULL, true);
 END;
 $$ LANGUAGE plpgsql;
 

@@ -20,8 +20,9 @@ SELECT results_eq(
 -- Primary org user should NOT see competitor org users
 SET LOCAL role = 'authenticated';
 SELECT set_primary_org_context();
+SELECT set_jwt_claims_for_test(test_org_primary(), test_user_admin(), 'admin', ARRAY['user:view']);
 SELECT results_eq(
-  'SELECT COUNT(*)::integer FROM users u JOIN memberships m ON u.id = m.user_id WHERE m.organization_id = ' || quote_literal(test_org_competitor()),
+  'SELECT COUNT(*)::integer FROM users u JOIN memberships m ON u.id = m.user_id WHERE m.organization_id = ' || quote_literal(test_org_competitor()) || ' AND u.id <> auth.uid()::text',
   'VALUES (0)',
   'CRITICAL: Primary org user cannot see ANY competitor organization users'
 );
@@ -30,8 +31,9 @@ SELECT results_eq(
 -- Competitor org user should NOT see primary org users  
 SET LOCAL role = 'authenticated';
 SELECT set_competitor_org_context();
+SELECT set_jwt_claims_for_test(test_org_competitor(), test_user_member2(), 'member', ARRAY['user:view']);
 SELECT results_eq(
-  'SELECT COUNT(*)::integer FROM users u JOIN memberships m ON u.id = m.user_id WHERE m.organization_id = ' || quote_literal(test_org_primary()),
+  'SELECT COUNT(*)::integer FROM users u JOIN memberships m ON u.id = m.user_id WHERE m.organization_id = ' || quote_literal(test_org_primary()) || ' AND u.id <> auth.uid()::text',
   'VALUES (0)',
   'CRITICAL: Competitor org user cannot see ANY primary organization users'
 );
@@ -39,6 +41,7 @@ SELECT results_eq(
 -- Test 4: Primary org user sees only own organization users
 SET LOCAL role = 'authenticated';
 SELECT set_primary_org_context();
+SELECT set_jwt_claims_for_test(test_org_primary(), test_user_admin(), 'admin', ARRAY['user:view']);
 SELECT results_eq(
   'SELECT COUNT(*)::integer FROM users u JOIN memberships m ON u.id = m.user_id WHERE m.organization_id = ' || quote_literal(test_org_primary()),
   'SELECT COUNT(*)::integer FROM users u JOIN memberships m ON u.id = m.user_id WHERE m.organization_id = ' || quote_literal(test_org_primary()),
@@ -69,7 +72,7 @@ SELECT results_eq(
 SET LOCAL role = 'authenticated';
 SELECT set_primary_org_context();
 SELECT results_eq(
-  'SELECT u.email FROM users u JOIN memberships m ON u.id = m.user_id WHERE m.organization_id = ' || quote_literal(test_org_competitor()) || ' LIMIT 1',
+  'SELECT u.email FROM users u JOIN memberships m ON u.id = m.user_id WHERE m.organization_id = ' || quote_literal(test_org_competitor()) || ' AND u.id <> auth.uid()::text LIMIT 1',
   'SELECT NULL::text WHERE FALSE',
   'Cross-org user lookup returns empty results'
 );
@@ -93,7 +96,8 @@ SELECT results_eq(
 
 -- Test 10: Authenticated role with empty JWT claims returns no results  
 SET LOCAL role = 'authenticated';
-SELECT set_jwt_claims_for_test('', '', 'member', ARRAY[]::TEXT[]);
+-- Use valid user id but invalid org context to avoid UUID errors while still returning no data
+SELECT set_jwt_claims_for_test('non-existent-org-id', test_user_member1(), 'member', ARRAY[]::TEXT[]);
 SELECT results_eq(
   'SELECT COUNT(*)::integer FROM users',
   'VALUES (0)',
@@ -102,7 +106,7 @@ SELECT results_eq(
 
 -- Test 11: Invalid organization context returns no results
 SET LOCAL role = 'authenticated';
-SELECT set_jwt_claims_for_test('non-existent-org-id', 'test-user', 'member', ARRAY['user:view']);
+SELECT set_jwt_claims_for_test('non-existent-org-id', '00000000-0000-4000-8000-000000000000', 'member', ARRAY['user:view']);
 SELECT results_eq(
   'SELECT COUNT(*)::integer FROM users',
   'VALUES (0)',

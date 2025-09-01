@@ -152,10 +152,10 @@ export const getCurrentUserPermissions = cache(async () => {
  * Uses React 19 cache() for request-level memoization per userId
  */
 export const getUserActivityStats = cache(async (userId?: string) => {
-  const { organizationId } = await requireAuthContext();
+  const { organizationId, user } = await requireAuthContext();
 
   // Use current user if no userId provided
-  const targetUserId = userId || (await requireAuthContext()).user.id;
+  const targetUserId = userId ?? user.id;
 
   // Verify user access through membership
   const membership = await db.query.memberships.findFirst({
@@ -234,10 +234,10 @@ export const getAssignableUsers = cache(async () => {
  */
 export const getUserRecentActivity = cache(
   async (limit = 10, userId?: string) => {
-    const { organizationId } = await requireAuthContext();
+    const { organizationId, user } = await requireAuthContext();
 
     // Use current user if no userId provided
-    const targetUserId = userId || (await requireAuthContext()).user.id;
+    const targetUserId = userId ?? user.id;
 
     // Verify user access through membership
     const membership = await db.query.memberships.findFirst({

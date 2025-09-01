@@ -57,7 +57,10 @@ export const env = createEnv({
         ? z.string()
         : z.string().optional(),
     OPDB_API_URL: z.string().url().default("https://opdb.org/api"),
-    DEFAULT_ORG_SUBDOMAIN: z.string().default("apc"),
+    // DEFAULT_ORG_SUBDOMAIN has been removed for security: organization context
+    // must be derived from the request subdomain (middleware-verified) rather
+    // than a silent global fallback. Handle any marketing or default routes at
+    // the application level explicitly.
     // Additional environment variables that were accessed directly via process.env
     VERCEL_URL: z.string().optional(),
     PORT: z.string().optional(),
@@ -137,7 +140,6 @@ export const env = createEnv({
     GOOGLE_CLIENT_ID: process.env["GOOGLE_CLIENT_ID"],
     GOOGLE_CLIENT_SECRET: process.env["GOOGLE_CLIENT_SECRET"],
     OPDB_API_URL: process.env["OPDB_API_URL"],
-    DEFAULT_ORG_SUBDOMAIN: process.env["DEFAULT_ORG_SUBDOMAIN"],
     VERCEL_URL: process.env["VERCEL_URL"],
     PORT: process.env["PORT"],
     PINBALL_MAP_API_KEY: process.env["PINBALL_MAP_API_KEY"],

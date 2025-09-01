@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 import { env } from "~/env";
-import { isDevelopment } from "~/lib/environment";
+import { SUBDOMAIN_VERIFIED_HEADER } from "~/lib/subdomain-verification";
+import { getCookieDomain } from "~/lib/utils/domain";
 
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const url = request.nextUrl.clone();
@@ -11,10 +12,12 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   console.log(`[MIDDLEWARE] Request to: ${host}${url.pathname}`);
 
-  // Create Supabase response for session management (2025 SSR pattern)
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
+  // Buffer cookies set by Supabase so we can attach them to the final response
+  const bufferedCookies: Array<{
+    name: string;
+    value: string;
+    options?: Parameters<typeof NextResponse.prototype.cookies.set>[2];
+  }> = [];
 
   // Handle Supabase session refresh (Updated 2025 patterns)
   try {
@@ -28,21 +31,17 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
             return request.cookies.getAll();
           },
           setAll(cookiesToSet) {
-            // Standard Supabase SSR pattern - let Supabase handle cookies naturally
-            cookiesToSet.forEach(({ name, value }) =>
-              request.cookies.set(name, value),
-            );
-            supabaseResponse = NextResponse.next({ request });
+            // Buffer cookies; we'll attach them to the final response later
+            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
             cookiesToSet.forEach(({ name, value, options }) => {
-              // Set cookie domain for subdomain sharing
               const cookieOptions = {
                 ...options,
-                domain: isDevelopment() ? ".localhost" : ".yourdomain.com",
+                domain: getCookieDomain(host),
                 path: "/",
                 sameSite: "lax" as const,
                 maxAge: 100000000,
-              };
-              supabaseResponse.cookies.set(name, value, cookieOptions);
+              } as const;
+              bufferedCookies.push({ name, value, options: cookieOptions });
             });
           },
         },
@@ -85,13 +84,27 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   const subdomain = getSubdomain(host);
   console.log(`[MIDDLEWARE] Detected subdomain: ${subdomain ?? "none"}`);
 
-  // Add subdomain to headers for organization resolution (only if subdomain exists)
+  // Forward verified subdomain headers to the request seen by the app/router
+  const requestHeaders = new Headers(request.headers);
   if (subdomain) {
-    supabaseResponse.headers.set("x-subdomain", subdomain);
-    console.log(`[MIDDLEWARE] Setting x-subdomain header: ${subdomain}`);
+    requestHeaders.set("x-subdomain", subdomain);
+    requestHeaders.set(SUBDOMAIN_VERIFIED_HEADER, "1");
+    console.log(`[MIDDLEWARE] Forwarding verified subdomain headers: ${subdomain}`);
   } else {
     console.log(`[MIDDLEWARE] No subdomain detected, allowing root domain access`);
   }
+
+  // Create the final response with forwarded headers
+  const supabaseResponse = NextResponse.next({ request: { headers: requestHeaders } });
+
+  // Ensure any Supabase SSR cookies are applied to this final response
+  bufferedCookies.forEach(({ name, value, options }) => {
+    if (options) {
+      supabaseResponse.cookies.set(name, value, options);
+    } else {
+      supabaseResponse.cookies.set(name, value);
+    }
+  });
 
   return supabaseResponse;
 }

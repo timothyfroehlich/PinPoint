@@ -467,7 +467,7 @@ export type Database = {
           created_by_id: string | null
           description: string | null
           id: string
-          is_public: boolean
+          is_public: boolean | null
           machine_id: string
           moderation_status: Database["public"]["Enums"]["moderation_status"]
           organization_id: string
@@ -490,7 +490,7 @@ export type Database = {
           created_by_id?: string | null
           description?: string | null
           id: string
-          is_public?: boolean
+          is_public?: boolean | null
           machine_id: string
           moderation_status?: Database["public"]["Enums"]["moderation_status"]
           organization_id: string
@@ -513,7 +513,7 @@ export type Database = {
           created_by_id?: string | null
           description?: string | null
           id?: string
-          is_public?: boolean
+          is_public?: boolean | null
           machine_id?: string
           moderation_status?: Database["public"]["Enums"]["moderation_status"]
           organization_id?: string
@@ -534,7 +534,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
-          is_public: boolean
+          is_public: boolean | null
           last_sync_at: string | null
           latitude: number | null
           longitude: number | null
@@ -555,7 +555,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id: string
-          is_public?: boolean
+          is_public?: boolean | null
           last_sync_at?: string | null
           latitude?: number | null
           longitude?: number | null
@@ -576,7 +576,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
-          is_public?: boolean
+          is_public?: boolean | null
           last_sync_at?: string | null
           latitude?: number | null
           longitude?: number | null
@@ -597,8 +597,9 @@ export type Database = {
       machines: {
         Row: {
           created_at: string
+          deleted_at: string | null
           id: string
-          is_public: boolean
+          is_public: boolean | null
           location_id: string
           model_id: string
           name: string
@@ -615,8 +616,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          deleted_at?: string | null
           id: string
-          is_public?: boolean
+          is_public?: boolean | null
           location_id: string
           model_id: string
           name: string
@@ -633,8 +635,9 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          deleted_at?: string | null
           id?: string
-          is_public?: boolean
+          is_public?: boolean | null
           location_id?: string
           model_id?: string
           name?: string
@@ -781,9 +784,11 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          is_public: boolean
           logo_url: string | null
           name: string
           phone: string | null
+          public_issue_default: string
           require_moderation_anonymous: boolean
           subdomain: string
           updated_at: string
@@ -797,9 +802,11 @@ export type Database = {
           created_at?: string
           description?: string | null
           id: string
+          is_public?: boolean
           logo_url?: string | null
           name: string
           phone?: string | null
+          public_issue_default?: string
           require_moderation_anonymous?: boolean
           subdomain: string
           updated_at?: string
@@ -813,9 +820,11 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_public?: boolean
           logo_url?: string | null
           name?: string
           phone?: string | null
+          public_issue_default?: string
           require_moderation_anonymous?: boolean
           subdomain?: string
           updated_at?: string
@@ -1109,12 +1118,45 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      public_organizations_minimal: {
+        Row: {
+          id: string | null
+          logo_url: string | null
+          name: string | null
+          subdomain: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       cleanup_anonymous_rate_limits: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      fn_effective_issue_public: {
+        Args: { issue_id: string }
+        Returns: boolean
+      }
+      fn_effective_location_public: {
+        Args: { loc_id: string }
+        Returns: boolean
+      }
+      fn_effective_machine_public: {
+        Args: { machine_id: string }
+        Returns: boolean
+      }
+      fn_is_org_member: {
+        Args: { org_id: string; uid: string }
+        Returns: boolean
+      }
+      fn_public_organizations_minimal: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          logo_url: string
+          name: string
+          subdomain: string
+        }[]
       }
     }
     Enums: {

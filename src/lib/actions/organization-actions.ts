@@ -12,13 +12,16 @@ import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { organizations } from "~/server/db/schema";
 import { transformKeysToSnakeCase } from "~/lib/utils/case-transformers";
 import {
-  getActionAuthContext,
+  requireAuthContextWithRole,
   validateFormData,
   actionSuccess,
   actionError,
   runAfterResponse,
   type ActionResult,
 } from "./shared";
+import { requirePermission } from "./shared";
+import { PERMISSIONS } from "~/server/auth/permissions.constants";
+// Duplicate import removed
 
 // Enhanced validation schemas with better error messages
 const updateOrganizationProfileSchema = z.object({
@@ -63,15 +66,15 @@ export async function updateOrganizationProfileAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId } = await getActionAuthContext();
+    const { user, organizationId, membership } = await requireAuthContextWithRole();
+    const db = getGlobalDatabaseProvider().getClient();
+    await requirePermission(membership, PERMISSIONS.ORGANIZATION_MANAGE, db);
 
     // Enhanced validation with Zod
     const validation = validateFormData(formData, updateOrganizationProfileSchema);
     if (!validation.success) {
       return validation;
     }
-
-    const db = getGlobalDatabaseProvider().getClient();
 
     // Update organization with validated data
     const updateData = {
@@ -127,15 +130,15 @@ export async function updateOrganizationLogoAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId } = await getActionAuthContext();
+    const { user, organizationId, membership } = await requireAuthContextWithRole();
+    const db = getGlobalDatabaseProvider().getClient();
+    await requirePermission(membership, PERMISSIONS.ORGANIZATION_MANAGE, db);
 
     // Enhanced validation
     const validation = validateFormData(formData, updateOrganizationLogoSchema);
     if (!validation.success) {
       return validation;
     }
-
-    const db = getGlobalDatabaseProvider().getClient();
 
     // Update logo URL
     const [updatedOrg] = await db

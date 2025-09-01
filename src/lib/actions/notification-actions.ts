@@ -11,7 +11,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { notifications } from "~/server/db/schema";
 import {
-  getActionAuthContext,
+  requireAuthContextWithRole,
   validateFormData,
   actionSuccess,
   actionError,
@@ -40,7 +40,7 @@ export async function markNotificationAsReadAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId } = await getActionAuthContext();
+    const { user, organizationId } = await requireAuthContextWithRole();
 
     // Enhanced validation
     const validation = validateFormData(formData, markAsReadSchema);
@@ -97,7 +97,7 @@ export async function bulkMarkNotificationsAsReadAction(
   formData: FormData,
 ): Promise<ActionResult<{ updatedCount: number }>> {
   try {
-    const { user, organizationId } = await getActionAuthContext();
+    const { user, organizationId } = await requireAuthContextWithRole();
 
     // Parse JSON data from form
     const jsonData = formData.get("data") as string;
@@ -158,7 +158,7 @@ export async function markAllNotificationsAsReadAction(
   formData: FormData,
 ): Promise<ActionResult<{ updatedCount: number }>> {
   try {
-    const { user, organizationId } = await getActionAuthContext();
+    const { user, organizationId } = await requireAuthContextWithRole();
 
     // Enhanced validation
     const validation = validateFormData(formData, markAllAsReadSchema);
@@ -211,7 +211,7 @@ export async function markNotificationAsUnreadAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId } = await getActionAuthContext();
+    const { user, organizationId } = await requireAuthContextWithRole();
 
     const validation = validateFormData(formData, markAsReadSchema);
     if (!validation.success) {

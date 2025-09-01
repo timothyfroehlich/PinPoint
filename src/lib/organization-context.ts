@@ -13,6 +13,7 @@ import { db } from "~/lib/dal/shared";
 import { organizations, memberships } from "~/server/db/schema";
 import { createClient } from "~/utils/supabase/server";
 import { isDevelopment } from "~/lib/environment";
+import { extractTrustedSubdomain } from "~/lib/subdomain-verification";
 
 export type AccessLevel = "anonymous" | "authenticated" | "member";
 
@@ -44,11 +45,9 @@ export interface OrganizationContext {
 async function extractSubdomain(): Promise<string | null> {
   const headersList = await headers();
   
-  // Try x-subdomain header first (set by middleware)
-  const subdomainHeader = headersList.get("x-subdomain");
-  if (subdomainHeader) {
-    return subdomainHeader;
-  }
+  // Prefer trusted subdomain header values (set by middleware)
+  const trusted = extractTrustedSubdomain(headersList as unknown as Headers);
+  if (trusted) return trusted;
   
   // Fall back to Host header parsing
   const host = headersList.get("host");

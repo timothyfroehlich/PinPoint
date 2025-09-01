@@ -1,6 +1,5 @@
--- PinPoint Machines & Models Seeding
--- Game models and machine instances
--- Universal PostgreSQL - works in any PostgreSQL environment
+-- DEVELOPMENT SEED (Local Dev Only) — DO NOT USE IN PROD
+-- Contains sample models and machines for dev/test. Not for production.
 
 -- =============================================================================
 -- MODELS: Create exact 7 models from TypeScript extractUniqueGames()
@@ -24,16 +23,17 @@ ON CONFLICT (id) DO UPDATE SET
 -- =============================================================================
 -- MACHINES: Create machines using exact SEED_TEST_IDS with correct schema
 -- =============================================================================
+-- Keep machine visibility inherited (NULL). Owner retained for now.
 INSERT INTO machines (id, name, model_id, organization_id, location_id, owner_id, is_public, created_at, updated_at) VALUES
   -- Primary organization machines (using default primary location and admin user as owner)
-  ('machine-mm-001', 'Ultraman: Kaiju Rumble (Blood Sucker Edition) #1', 'model_GBLLd-MdEON-A94po', 'test-org-pinpoint', 'location-default-primary-001', '10000000-0000-4000-8000-000000000001', true, now(), now()),
-  ('machine-cc-001', 'Xenon #1', 'model_G42Pk-MZe2e', 'test-org-pinpoint', 'location-default-primary-001', '10000000-0000-4000-8000-000000000001', true, now(), now()),
-  ('machine-rfm-001', 'Cleopatra #1', 'model_GrknN-MQrdv', 'test-org-pinpoint', 'location-default-primary-001', '10000000-0000-4000-8000-000000000001', true, now(), now()),
-  ('machine-cleopatra-001', 'Revenge from Mars #1', 'model_G50Wr-MLeZP', 'test-org-pinpoint', 'location-default-primary-001', '10000000-0000-4000-8000-000000000001', true, now(), now()),
-  ('machine-xenon-001', 'Star Trek: The Next Generation #1', 'model_GR6d8-M1rZd', 'test-org-pinpoint', 'location-default-primary-001', '10000000-0000-4000-8000-000000000001', true, now(), now()),
-  ('machine-ultraman-001', 'Lord of the Rings #1', 'model_GrqZX-MD15w', 'test-org-pinpoint', 'location-default-primary-001', '10000000-0000-4000-8000-000000000001', true, now(), now()),
+  ('machine-mm-001', 'Ultraman: Kaiju Rumble (Blood Sucker Edition) #1', 'model_GBLLd-MdEON-A94po', 'test-org-pinpoint', 'location-default-primary-001', '10000000-0000-4000-8000-000000000001', NULL, now(), now()),
+  ('machine-cc-001', 'Xenon #1', 'model_G42Pk-MZe2e', 'test-org-pinpoint', 'location-default-primary-001', '10000000-0000-4000-8000-000000000001', NULL, now(), now()),
+  ('machine-rfm-001', 'Cleopatra #1', 'model_GrknN-MQrdv', 'test-org-pinpoint', 'location-default-primary-001', '10000000-0000-4000-8000-000000000001', NULL, now(), now()),
+  ('machine-cleopatra-001', 'Revenge from Mars #1', 'model_G50Wr-MLeZP', 'test-org-pinpoint', 'location-default-primary-001', '10000000-0000-4000-8000-000000000001', NULL, now(), now()),
+  ('machine-xenon-001', 'Star Trek: The Next Generation #1', 'model_GR6d8-M1rZd', 'test-org-pinpoint', 'location-default-primary-001', '10000000-0000-4000-8000-000000000001', NULL, now(), now()),
+  ('machine-ultraman-001', 'Lord of the Rings #1', 'model_GrqZX-MD15w', 'test-org-pinpoint', 'location-default-primary-001', '10000000-0000-4000-8000-000000000001', NULL, now(), now()),
   -- Competitor organization machine
-  ('machine-test-org-competitor-001', 'Transporter the Rescue #1', 'model_G5n2D-MLn85', 'test-org-competitor', 'location-default-competitor-001', '10000000-0000-4000-8000-000000000001', true, now(), now())
+  ('machine-test-org-competitor-001', 'Transporter the Rescue #1', 'model_G5n2D-MLn85', 'test-org-competitor', 'location-default-competitor-001', '10000000-0000-4000-8000-000000000001', NULL, now(), now())
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
   model_id = EXCLUDED.model_id,
