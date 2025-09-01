@@ -291,6 +291,22 @@ export default tseslint.config(
     },
   },
   {
+    // Allow server imports in lib/types for type definitions
+    files: ["src/lib/types/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "off",
+      "no-restricted-syntax": "off",
+    },
+  },
+  {
+    // Allow server imports in DAL layer for data access abstraction
+    files: ["src/lib/dal/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "off",
+      "no-restricted-syntax": "off",
+    },
+  },
+  {
     // Strategic exemptions: API layer files - allow necessary tRPC patterns (limited scope)
     files: ["src/server/api/routers/**/*.ts"],
     rules: {
