@@ -33,16 +33,14 @@ export function ActivityLogFilter() {
   const searchParams = useSearchParams();
 
   // Get current filter values from URL
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(
-    searchParams.get("dateFrom")
-      ? new Date(searchParams.get("dateFrom")!)
-      : undefined,
-  );
-  const [dateTo, setDateeTo] = useState<Date | undefined>(
-    searchParams.get("dateTo")
-      ? new Date(searchParams.get("dateTo")!)
-      : undefined,
-  );
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(() => {
+    const dateFromParam = searchParams.get("dateFrom");
+    return dateFromParam ? new Date(dateFromParam) : undefined;
+  });
+  const [dateTo, setDateeTo] = useState<Date | undefined>(() => {
+    const dateToParam = searchParams.get("dateTo");
+    return dateToParam ? new Date(dateToParam) : undefined;
+  });
   const [selectedUser, setSelectedUser] = useState(
     searchParams.get("userId") || "",
   );

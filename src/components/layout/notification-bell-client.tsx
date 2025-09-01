@@ -92,7 +92,7 @@ export function NotificationBellClient({
           });
 
         return () => {
-          supabase.removeChannel(channel);
+          void supabase.removeChannel(channel);
           setIsConnected(false);
         };
       } catch (error) {
@@ -105,11 +105,19 @@ export function NotificationBellClient({
       }
     };
 
-    const cleanup = initializeRealtimeConnection();
+    let cleanupFunction: (() => void) | null = null;
+
+    // Initialize async connection and store cleanup function
+    void initializeRealtimeConnection()
+      .then((cleanup) => {
+        cleanupFunction = cleanup;
+      })
+      .catch(console.error);
+
     return () => {
-      cleanup.then((fn) => {
-        fn?.();
-      });
+      if (cleanupFunction) {
+        cleanupFunction();
+      }
     };
   }, [userId]);
 
