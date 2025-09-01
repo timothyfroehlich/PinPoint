@@ -2,6 +2,9 @@
 -- Part of dual-track testing strategy: pgTAP + PGlite with integration_tester
 -- See: docs/testing/dual-track-testing-strategy.md
 
+-- Install pgTAP extension for RLS testing (development/testing only)
+CREATE EXTENSION IF NOT EXISTS pgtap;
+
 DO $$
 BEGIN
   -- Ensure test roles exist with correct permissions
