@@ -25,10 +25,10 @@ import type {
   machineUpdateSchema,
 } from "~/server/api/schemas/machine.schema";
 import type {
-  issueSearchParamsSchema,
+  IssueSearchParams,
 } from "~/lib/search-params/issue-search-params";
 import type {
-  machineSearchParamsSchema,
+  MachineSearchParams,
 } from "~/lib/search-params/machine-search-params";
 
 // Issue validation types
@@ -40,5 +40,12 @@ export type MachineCreateInput = z.infer<typeof machineCreateSchema>;
 export type MachineUpdateInput = z.infer<typeof machineUpdateSchema>;
 
 // Search param validation types
-export type IssueSearchParamsInput = z.infer<typeof issueSearchParamsSchema>;
-export type MachineSearchParamsInput = z.infer<typeof machineSearchParamsSchema>;
+export type IssueSearchParamsInput = IssueSearchParams;
+export type MachineSearchParamsInput = MachineSearchParams;
+
+// User validation types
+export interface ValidationUser {
+  readonly id: string;
+  readonly name: string | null;
+  readonly email: string;
+}
