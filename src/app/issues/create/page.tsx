@@ -16,14 +16,14 @@ function transformMachinesForForm(
     id: machine.id,
     name: machine.name,
     model: {
-      id: machine.model.id ?? "",
-      name: machine.model.name ?? "Unknown Model",
+      id: machine.model.id,
+      name: machine.model.name,
       manufacturer: machine.model.manufacturer ?? null,
       year: machine.model.year ?? null,
     },
     location: {
-      id: machine.location.id ?? "",
-      name: machine.location.name ?? "Unknown Location",
+      id: machine.location.id,
+      name: machine.location.name,
     },
   }));
 }
@@ -35,8 +35,8 @@ function transformUsersForForm(
   return assignableUsers
     .map((user) => ({
       id: user.id,
-      name: user.name || "Unknown User",
-      email: user.email || "",
+      name: user.name ?? "Unknown User",
+      email: user.email ?? "",
     }))
     .filter((user) => user.email); // Filter out users without email
 }
