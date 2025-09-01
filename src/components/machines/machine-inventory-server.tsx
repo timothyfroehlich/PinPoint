@@ -185,7 +185,7 @@ export async function MachineInventoryServer({
                   <MapPinIcon className="h-3 w-3" />
                   <span className="truncate">
                     {machine.location?.name ?? "Unknown Location"}
-                    {machine.location?.city && `, ${machine.location.city}`}
+                    {machine.location?.city && `, ${String(machine.location.city)}`}
                   </span>
                 </div>
 
