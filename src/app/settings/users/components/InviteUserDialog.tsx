@@ -44,7 +44,7 @@ export function InviteUserDialog({
   // Handle successful invitation
   useEffect(() => {
     if (state?.success) {
-      toast.success(state.message || "User invitation sent successfully!");
+      toast.success(state.message ?? "User invitation sent successfully!");
       setIsOpen(false);
     } else if (state && !state.success) {
       // Handle field errors or general error
@@ -64,7 +64,7 @@ export function InviteUserDialog({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        {children || (
+        {children ?? (
           <Button>
             <UserPlusIcon className="mr-2 h-4 w-4" />
             Invite User
