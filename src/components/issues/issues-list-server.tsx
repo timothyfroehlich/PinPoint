@@ -130,7 +130,7 @@ function IssueCard({ issue }: { issue: Issue }) {
               <WrenchIcon className="h-4 w-4" />
               <span>
                 {issue.machine?.name ?? "Unknown Machine"}
-                {issue.machine?.model?.name && ` (${issue.machine.model.name})`}
+                {issue.machine?.model?.name && ` (${String(issue.machine.model.name)})`}
               </span>
             </div>
 

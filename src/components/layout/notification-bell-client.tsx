@@ -129,7 +129,7 @@ export function NotificationBellClient({
           variant="ghost"
           size="icon"
           className="relative hover:bg-muted"
-          aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
+          aria-label={`Notifications${unreadCount > 0 ? ` (${String(unreadCount)} unread)` : ""}`}
         >
           {hasNewNotifications || unreadCount > 0 ? (
             <BellRingIcon
@@ -179,7 +179,7 @@ export function NotificationBellClient({
         {/* Simplified notification display */}
         <div className="p-4 text-center text-sm text-muted-foreground">
           {unreadCount > 0
-            ? `${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}`
+            ? `${String(unreadCount)} unread notification${unreadCount === 1 ? "" : "s"}`
             : "No new notifications"}
         </div>
       </PopoverContent>
