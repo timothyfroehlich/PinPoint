@@ -146,7 +146,7 @@ async function getIssueStakeholders(issueId: string, organizationId: string) {
       ...issue.machine.owner,
       name:
         issue.machine.owner.name ?? issue.machine.owner.email ?? "Unknown User",
-      email: issue.machine.owner.email ?? ""
+      email: issue.machine.owner.email ?? "",
       role: "machine_owner",
     });
   }
