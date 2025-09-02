@@ -16,13 +16,13 @@ import {
   idSchema,
 } from "~/lib/validation/schemas";
 import { and, eq, inArray } from "drizzle-orm";
-import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import {
   issues,
   issueStatuses,
   priorities,
   comments,
 } from "~/server/db/schema";
+import { db } from "~/lib/dal/shared";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { transformKeysToSnakeCase } from "~/lib/utils/case-transformers";
 import {
@@ -73,7 +73,6 @@ const bulkUpdateIssuesSchema = z.object({
 
 // Performance: Cached database queries for default values
 const getDefaultStatus = cache(async (organizationId: string) => {
-  const db = getGlobalDatabaseProvider().getClient();
   return await db.query.issueStatuses.findFirst({
     where: and(
       eq(issueStatuses.is_default, true),
@@ -83,7 +82,6 @@ const getDefaultStatus = cache(async (organizationId: string) => {
 });
 
 const getDefaultPriority = cache(async (organizationId: string) => {
-  const db = getGlobalDatabaseProvider().getClient();
   return await db.query.priorities.findFirst({
     where: and(
       eq(priorities.is_default, true),
@@ -110,7 +108,6 @@ export async function createIssueAction(
       return validation;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
 
     // Parallel queries for better performance
@@ -151,7 +148,9 @@ export async function createIssueAction(
 
     // Background processing (runs after response sent to user)
     runAfterResponse(async () => {
-      console.log(`Issue ${issueData.id} created by ${user.email}`);
+      console.log(
+        `Issue ${issueData.id} created by ${user.email ?? "unknown"}`,
+      );
 
       // Generate notifications for issue creation
       try {
@@ -199,7 +198,6 @@ export async function updateIssueStatusAction(
       return validation;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ISSUE_EDIT, db);
 
     // Update with organization scoping for security
@@ -223,7 +221,9 @@ export async function updateIssueStatusAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`Issue ${issueId} status updated by ${user.email}`);
+      console.log(
+        `Issue ${issueId} status updated by ${user.email ?? "unknown"}`,
+      );
 
       // Generate notifications for status change
       try {
@@ -275,7 +275,6 @@ export async function addCommentAction(
       return validation;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
 
     // Verify issue exists and user has access
@@ -308,8 +307,11 @@ export async function addCommentAction(
     revalidateTag(`comments-${issueId}`);
 
     // Background processing
-    runAfterResponse(async () => {
-      console.log(`Comment added to issue ${issueId} by ${user.email}`);
+    runAfterResponse(() => {
+      console.log(
+        `Comment added to issue ${issueId} by ${user.email ?? "unknown"}`,
+      );
+      return Promise.resolve();
     });
 
     return actionSuccess(
@@ -342,7 +344,6 @@ export async function updateIssueAssignmentAction(
       return validation;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ISSUE_ASSIGN, db);
 
     // Get current assignee for notification comparison
@@ -377,7 +378,9 @@ export async function updateIssueAssignmentAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`Issue ${issueId} assignment updated by ${user.email}`);
+      console.log(
+        `Issue ${issueId} assignment updated by ${user.email ?? "unknown"}`,
+      );
 
       // Generate notifications for assignment change
       try {
@@ -434,7 +437,6 @@ export async function bulkUpdateIssuesAction(
       return actionError("Invalid bulk update data");
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ISSUE_BULK_MANAGE, db);
     const { issueIds, statusId, assigneeId } = validation.data;
 
@@ -465,15 +467,16 @@ export async function bulkUpdateIssuesAction(
     revalidateTag("issues");
 
     // Background processing
-    runAfterResponse(async () => {
+    runAfterResponse(() => {
       console.log(
-        `Bulk updated ${updatedIssues.length} issues by ${user.email}`,
+        `Bulk updated ${String(updatedIssues.length)} issues by ${user.email ?? "unknown"}`,
       );
+      return Promise.resolve();
     });
 
     return actionSuccess(
       { updatedCount: updatedIssues.length },
-      `Successfully updated ${updatedIssues.length} issue${updatedIssues.length !== 1 ? "s" : ""}`,
+      `Successfully updated ${String(updatedIssues.length)} issue${updatedIssues.length !== 1 ? "s" : ""}`,
     );
   } catch (error) {
     console.error("Bulk update issues error:", error);

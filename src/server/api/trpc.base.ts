@@ -495,7 +495,7 @@ export const orgScopedProcedure = protectedProcedure.use(
         ctx: {
           ...ctx,
           db: tx,
-          organizationId: ctx.organizationId!, // Guaranteed non-null for RLS
+          organizationId: ctx.organizationId, // Already checked for null above
         } satisfies TRPCContext & { organizationId: string },
       });
     });

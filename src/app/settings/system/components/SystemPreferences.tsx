@@ -54,7 +54,7 @@ export function SystemPreferences({ settings }: SystemPreferencesProps) {
   // Handle successful save
   useEffect(() => {
     if (state?.success) {
-      toast.success(state.message || "System preferences saved successfully!");
+      toast.success(state.message ?? "System preferences saved successfully!");
     } else if (state) {
       if (state.error) {
         toast.error(state.error);
