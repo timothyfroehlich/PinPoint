@@ -169,7 +169,7 @@ async function IssuesWithData({
           collapsible={true}
           defaultExpanded={false}
           showActiveFilters={true}
-          buildUrl={buildIssueUrl}
+          buildUrl={(params) => buildIssueUrl("/issues", params, rawParams)}
         />
       </Suspense>
 
