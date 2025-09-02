@@ -23,11 +23,11 @@ import type { ActionResult } from "~/lib/actions/shared";
 import type { MachineForIssues } from "~/lib/types";
 
 type Machine = MachineForIssues;
-type User = {
+interface User {
   id: string;
   name: string | null;
   email: string;
-};
+}
 
 interface CreateIssueFormServerProps {
   machines: Machine[];

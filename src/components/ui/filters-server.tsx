@@ -35,7 +35,7 @@ interface ActiveFilter {
 }
 
 interface FiltersServerProps {
-  currentFilters: Record<string, any>;
+  currentFilters: Record<string, unknown>;
   searchPlaceholder?: string;
   filterOptions: Record<string, FilterOption[]>;
   activeFilters: ActiveFilter[];
@@ -176,7 +176,7 @@ function ActiveFilterBadge({ filter }: { filter: ActiveFilter }) {
  * Compact filter bar for inline filtering
  */
 interface FilterBarServerProps {
-  currentFilters: Record<string, any>;
+  currentFilters: Record<string, unknown>;
   quickFilters: {
     key: string;
     label: string;
