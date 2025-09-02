@@ -128,7 +128,7 @@ export function SignInForm() {
           (org) => org.id === selectedOrganizationId,
         );
         if (selectedOrg?.subdomain) {
-          const currentSubdomain = window.location.hostname.split('.')[0];
+          const currentSubdomain = window.location.hostname.split(".")[0];
 
           if (currentSubdomain === selectedOrg.subdomain) {
             // Already on correct subdomain, just navigate to dashboard
@@ -136,8 +136,10 @@ export function SignInForm() {
             return;
           } else {
             // Need to redirect to correct subdomain
-            const isLocalhost = window.location.hostname.includes('localhost');
-            const rootDomain = isLocalhost ? 'localhost:3000' : getCurrentDomain();
+            const isLocalhost = window.location.hostname.includes("localhost");
+            const rootDomain = isLocalhost
+              ? "localhost:3000"
+              : getCurrentDomain();
             window.location.href = `${window.location.protocol}//${selectedOrg.subdomain}.${rootDomain}/dashboard`;
             return;
           }
@@ -183,7 +185,10 @@ export function SignInForm() {
               disabled={isOAuthLoading || magicLinkPending || devAuthLoading}
             >
               <SelectTrigger data-testid="org-select-trigger">
-                <SelectValue placeholder="Select your organization" data-testid="org-select-value" />
+                <SelectValue
+                  placeholder="Select your organization"
+                  data-testid="org-select-value"
+                />
               </SelectTrigger>
               <SelectContent>
                 {organizations.map((org) => (

@@ -35,7 +35,7 @@ interface ActiveFilter {
 }
 
 interface FiltersServerProps {
-  currentFilters: Record<string, any>;
+  currentFilters: Record<string, unknown>;
   searchPlaceholder?: string;
   filterOptions: Record<string, FilterOption[]>;
   activeFilters: ActiveFilter[];
@@ -176,7 +176,7 @@ function ActiveFilterBadge({ filter }: { filter: ActiveFilter }) {
  * Compact filter bar for inline filtering
  */
 interface FilterBarServerProps {
-  currentFilters: Record<string, any>;
+  currentFilters: Record<string, unknown>;
   quickFilters: {
     key: string;
     label: string;
@@ -254,13 +254,17 @@ export function FilterBarServer({
  */
 export function createFilterAction(
   basePath: string,
-  urlBuilder: (basePath: string, params: any, currentParams?: any) => string,
+  urlBuilder: (
+    basePath: string,
+    params: Record<string, unknown>,
+    currentParams?: Record<string, unknown>,
+  ) => string,
 ) {
   return function handleFilterSubmit(formData: FormData) {
     "use server";
 
     // Extract form data
-    const params: Record<string, any> = {};
+    const params: Record<string, unknown> = {};
 
     for (const [key, value] of formData.entries()) {
       if (value && value !== "all") {

@@ -8,7 +8,11 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { cache } from "react"; // React 19 cache API
 import { z } from "zod";
-import { titleSchema, commentContentSchema, uuidSchema } from "~/lib/validation/schemas";
+import {
+  titleSchema,
+  commentContentSchema,
+  uuidSchema,
+} from "~/lib/validation/schemas";
 import { and, eq, inArray } from "drizzle-orm";
 import {
   issues,
@@ -147,19 +151,20 @@ export async function createIssueAction(
     }
 
     // Handle special "unassigned" case
-    const assigneeId = validated.assigneeId === "unassigned" 
-      ? null 
-      : validated.assigneeId ?? null;
+    const assigneeId =
+      validated.assigneeId === "unassigned"
+        ? null
+        : (validated.assigneeId ?? null);
 
     // Create issue with validated data
-  const issueData = {
+    const issueData = {
       id: generatePrefixedId("issue"),
-  title: validated.title,
-  description: validated.description ?? "",
-  machineId: validated.machineId,
+      title: validated.title,
+      description: validated.description ?? "",
+      machineId: validated.machineId,
       organizationId,
-  statusId: resolvedStatus.id,
-  priorityId: resolvedPriority.id,
+      statusId: resolvedStatus.id,
+      priorityId: resolvedPriority.id,
       assigneeId,
       createdById: user.id,
     };
@@ -200,10 +205,7 @@ export async function createIssueAction(
     });
 
     // Return success (client enhancement layer will handle navigation)
-    return actionSuccess(
-      { id: issueData.id },
-      "Issue created successfully",
-    );
+    return actionSuccess({ id: issueData.id }, "Issue created successfully");
   } catch (error) {
     // (Legacy redirect handling removed – action now returns success and client redirects)
     console.error("Create issue error:", error);
@@ -397,10 +399,11 @@ export async function updateIssueAssignmentAction(
     const previousAssigneeId = currentIssue?.assigned_to_id ?? null;
 
     // Handle special "unassigned" case
-    const assigneeId = validation.data.assigneeId === "unassigned" 
-      ? null 
-      : validation.data.assigneeId ?? null;
-    
+    const assigneeId =
+      validation.data.assigneeId === "unassigned"
+        ? null
+        : (validation.data.assigneeId ?? null);
+
     // Update assignment with organization scoping
     const [updatedIssue] = await db
       .update(issues)
@@ -488,7 +491,7 @@ export async function bulkUpdateIssuesAction(
     const { issueIds, statusId, assigneeId } = validation.data;
 
     // Build update object
-    const updateData: any = {};
+    const updateData: Partial<typeof issues.$inferInsert> = {};
     if (statusId) updateData.status_id = statusId;
     if (assigneeId !== undefined)
       updateData.assigned_to_id = assigneeId ?? null;

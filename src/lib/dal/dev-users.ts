@@ -14,7 +14,7 @@ import { transformKeysToCamelCase } from "~/lib/utils/case-transformers";
 import type { DevUserResponse } from "~/lib/types";
 
 // Internal type for query result transformation
-type DevUserRaw = {
+interface DevUserRaw {
   id: string;
   name: string | null;
   email: string | null; // email can be null in database
@@ -27,7 +27,7 @@ type DevUserRaw = {
   created_at: Date;
   updated_at: Date;
   roles: string[];
-};
+}
 
 /**
  * Get development users for testing login

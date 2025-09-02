@@ -102,7 +102,7 @@ export default function SignInPage(): React.ReactElement | null {
       if (testUser?.name) userData.name = testUser.name;
       if (testUser?.role?.name) userData.role = testUser.role.name;
 
-      const result = await authenticateDevUser(supabase as any, userData);
+      const result = await authenticateDevUser(supabase, userData);
 
       const message = getAuthResultMessage(result);
 
