@@ -197,7 +197,7 @@ export function hexToHslString(hex: string): string {
   const hslS = Math.round(s * 100);
   const hslL = Math.round(l * 100);
 
-  return `${hslH} ${hslS}% ${hslL}%`;
+  return `${String(hslH)} ${String(hslS)}% ${String(hslL)}%`;
 }
 
 /**

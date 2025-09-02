@@ -41,7 +41,7 @@ export function SystemNotificationSettings({
   useEffect(() => {
     if (state?.success) {
       toast.success(
-        state.message || "Notification settings saved successfully!",
+        state.message ?? "Notification settings saved successfully!",
       );
     } else if (state) {
       if (state.error) {
