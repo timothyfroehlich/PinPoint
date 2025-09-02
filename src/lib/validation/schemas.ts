@@ -441,7 +441,7 @@ export function makeUpdateSchema<T extends z.ZodRawShape>(shape: T) {
  */
 export function withId<IdKey extends string>(
   idKey: IdKey,
-  idSchema: z.ZodTypeAny,
+  idSchema: z.ZodType,
   payload: z.ZodObject<any>,
 ): z.ZodObject<any> {
   return z.object({ [idKey]: idSchema }).extend(payload.shape);
