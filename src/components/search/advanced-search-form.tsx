@@ -25,6 +25,8 @@ import {
 } from "~/components/ui/select";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Separator } from "~/components/ui/separator";
+import { buildIssueUrl } from "~/lib/search-params/issue-search-params";
+import { buildMachineUrl } from "~/lib/search-params/machine-search-params";
 
 // Generic filter configuration interface
 export interface FilterField {
@@ -51,8 +53,8 @@ export interface AdvancedSearchFormProps {
   // Current search state from URL
   currentParams: Record<string, string | string[] | undefined>;
 
-  // URL building functions
-  buildUrl: (params: Record<string, any>) => string;
+  // URL configuration
+  basePath: string;
 
   // Optional customization
   title?: string;
@@ -71,7 +73,7 @@ export function AdvancedSearchForm({
   entityType,
   fields,
   currentParams,
-  buildUrl,
+  basePath,
   title,
   description,
   collapsible = true,
@@ -81,6 +83,18 @@ export function AdvancedSearchForm({
 }: AdvancedSearchFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+
+  // Helper function to build URLs based on entity type
+  const buildUrl = (params: Record<string, any>) => {
+    if (entityType === "issues") {
+      return buildIssueUrl(basePath, params, currentParams);
+    } else if (entityType === "machines") {
+      return buildMachineUrl(basePath, params, currentParams);
+    } else {
+      // fallback for universal or other types - you could extend this
+      throw new Error(`URL building not implemented for entityType: ${entityType}`);
+    }
+  };
 
   // Form state management
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);

@@ -65,7 +65,7 @@ export function IssueAssignmentClient({
           {userOptions.map((user) => (
             <SelectItem
               key={user.id}
-              value={user.id === "unassigned" ? "" : user.id}
+              value={user.id}
             >
               {user.name}
               {user.email && (
