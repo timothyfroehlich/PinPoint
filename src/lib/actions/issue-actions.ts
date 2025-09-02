@@ -9,7 +9,12 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { cache } from "react"; // React 19 cache API
 import { z } from "zod";
-import { titleSchema, commentContentSchema, uuidSchema, idSchema } from "~/lib/validation/schemas";
+import {
+  titleSchema,
+  commentContentSchema,
+  uuidSchema,
+  idSchema,
+} from "~/lib/validation/schemas";
 import { and, eq, inArray } from "drizzle-orm";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import {
@@ -40,7 +45,9 @@ import {
 const createIssueSchema = z.object({
   title: titleSchema,
   description: z.string().optional(),
-  machineId: uuidSchema.or(idSchema.refine(() => false, "Please select a machine")),
+  machineId: uuidSchema.or(
+    idSchema.refine(() => false, "Please select a machine"),
+  ),
   priority: z.enum(["low", "medium", "high"]).optional().default("medium"),
   assigneeId: uuidSchema.optional(),
 });
@@ -151,8 +158,7 @@ export async function createIssueAction(
         await generateIssueCreationNotifications(issueData.id, {
           organizationId,
           actorId: user.id,
-          actorName:
-            (user.user_metadata?.["name"] as string) ?? user.email ?? "Someone",
+          actorName: (user.user_metadata?.["name"] as string) ?? user.email,
         });
       } catch (error) {
         console.error(
@@ -231,10 +237,7 @@ export async function updateIssueStatusAction(
           await generateStatusChangeNotifications(issueId, statusResult.name, {
             organizationId,
             actorId: user.id,
-            actorName:
-              (user.user_metadata?.["name"] as string) ??
-              user.email ??
-              "Someone",
+            actorName: (user.user_metadata?.["name"] as string) ?? user.email,
           });
         }
       } catch (error) {
@@ -385,10 +388,7 @@ export async function updateIssueAssignmentAction(
           {
             organizationId,
             actorId: user.id,
-            actorName:
-              (user.user_metadata?.["name"] as string) ??
-              user.email ??
-              "Someone",
+            actorName: (user.user_metadata?.["name"] as string) ?? user.email,
           },
         );
       } catch (error) {
@@ -441,7 +441,7 @@ export async function bulkUpdateIssuesAction(
     // Build update object
     const updateData: any = {};
     if (statusId) updateData.status_id = statusId;
-    if (assigneeId !== undefined) updateData.assigned_to_id = assigneeId ?? null;
+    if (assigneeId !== undefined) updateData.assigned_to_id = assigneeId;
 
     if (Object.keys(updateData).length === 0) {
       return actionError("No updates specified");
