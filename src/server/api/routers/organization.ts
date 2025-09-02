@@ -69,18 +69,14 @@ export const organizationRouter = createTRPCRouter({
         sql`SELECT id, name, subdomain, logo_url FROM public_organizations_minimal ORDER BY name`,
       );
 
-      // Drizzle returns a driver-specific result; normalize rows
-      const rows =
-        (
-          result as unknown as {
-            rows: {
-              id: string;
-              name: string;
-              subdomain: string;
-              logo_url: string | null;
-            }[];
-          }
-        ).rows ?? [];
+      // With postgres-js driver, execute() returns rows directly as an array
+      const rows = result as {
+        id: string;
+        name: string;
+        subdomain: string;
+        logo_url: string | null;
+      }[];
+
       return rows.map((r) => ({
         id: r.id,
         name: r.name,

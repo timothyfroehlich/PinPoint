@@ -95,10 +95,10 @@ export default async function OrganizationSettingsPage() {
             <OrganizationProfileForm
               organization={{
                 name: organization.name,
-                description: organization.description || "",
-                website: organization.website || "",
-                phone: organization.phone || "",
-                address: organization.address || "",
+                description: organization.description ?? "",
+                website: organization.website ?? "",
+                phone: organization.phone ?? "",
+                address: organization.address ?? "",
               }}
             />
           </CardContent>
@@ -114,7 +114,7 @@ export default async function OrganizationSettingsPage() {
           </CardHeader>
           <CardContent>
             <OrganizationLogoForm
-              currentLogoUrl={organization.logo_url || ""}
+              currentLogoUrl={organization.logo_url ?? ""}
             />
           </CardContent>
         </Card>
