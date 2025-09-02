@@ -188,7 +188,7 @@ export async function editCommentAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`Comment ${commentId} edited by ${user.email}`);
+      console.log(`Comment ${commentId} edited by ${user.email ?? "unknown"}`);
     });
 
     return actionSuccess({ success: true }, "Comment updated successfully");
@@ -244,7 +244,7 @@ export async function deleteCommentAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`Comment ${commentId} deleted by ${user.email}`);
+      console.log(`Comment ${commentId} deleted by ${user.email ?? "unknown"}`);
     });
 
     return actionSuccess({ success: true }, "Comment deleted successfully");
@@ -300,7 +300,9 @@ export async function restoreCommentAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`Comment ${commentId} restored by ${user.email}`);
+      console.log(
+        `Comment ${commentId} restored by ${user.email ?? "unknown"}`,
+      );
     });
 
     return actionSuccess({ success: true }, "Comment restored successfully");

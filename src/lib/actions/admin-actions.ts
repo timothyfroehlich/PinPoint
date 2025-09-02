@@ -447,7 +447,7 @@ export async function updateSystemSettingsAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`System settings updated by ${user.email}`);
+      console.log(`System settings updated by ${user.email ?? "unknown"}`);
 
       // Log the activity
       await logActivity({
@@ -456,7 +456,7 @@ export async function updateSystemSettingsAction(
         action: ACTIVITY_ACTIONS.SETTINGS_UPDATED,
         entity: ACTIVITY_ENTITIES.SETTINGS,
         entityId: "system-settings",
-        details: `Updated system settings: ${Object.keys(validation.data.settings).join(", ")}`,
+        details: `Updated system settings: ${Object.keys(validation.data.settings).join(", ") ?? "none"}`,
         severity: "info",
       });
     });
@@ -505,14 +505,14 @@ export async function exportActivityLogAction(): Promise<Response> {
 
     // Generate filename with timestamp
     const timestamp = new Date().toISOString().split("T")[0];
-    const filename = `activity-log-${timestamp}.csv`;
+    const filename = `activity-log-${timestamp ?? "unknown"}.csv`;
 
     // Return CSV file response
     return new Response(csvData, {
       status: 200,
       headers: {
         "Content-Type": "text/csv",
-        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Disposition": `attachment; filename="${String(filename)}"`,
       },
     });
   } catch (error) {

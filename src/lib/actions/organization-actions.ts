@@ -40,7 +40,10 @@ const updateOrganizationProfileSchema = z.object({
     .string()
     .max(20, "Phone number must be less than 20 characters")
     .optional(),
-  address: z.string().max(LIMITS.TITLE_MAX, "Address must be less than 200 characters").optional(),
+  address: z
+    .string()
+    .max(LIMITS.TITLE_MAX, "Address must be less than 200 characters")
+    .optional(),
 });
 
 const updateOrganizationLogoSchema = z.object({
@@ -108,7 +111,7 @@ export async function updateOrganizationProfileAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(
-        `Organization ${organizationId} profile updated by ${user.email}`,
+        `Organization ${organizationId} profile updated by ${user.email ?? "unknown"}`,
       );
     });
 
@@ -168,7 +171,7 @@ export async function updateOrganizationLogoAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(
-        `Organization ${organizationId} logo updated by ${user.email}`,
+        `Organization ${organizationId} logo updated by ${user.email ?? "unknown"}`,
       );
     });
 
