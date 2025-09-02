@@ -448,7 +448,7 @@ export async function bulkUpdateIssuesAction(
     const { issueIds, statusId, assigneeId } = validation.data;
 
     // Build update object
-    const updateData: any = {};
+    const updateData: Partial<typeof issues.$inferInsert> = {};
     if (statusId) updateData.status_id = statusId;
     if (assigneeId !== undefined)
       updateData.assigned_to_id = assigneeId ?? null;
