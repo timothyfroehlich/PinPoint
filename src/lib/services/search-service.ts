@@ -256,8 +256,8 @@ async function searchIssues(
     id: issue.id,
     title: issue.title,
     subtitle: issue.machineName
-      ? `${issue.machineName} • ${issue.statusName}`
-      : issue.statusName ?? "No status",
+      ? `${issue.machineName} • ${issue.statusName ?? "No status"}`
+      : (issue.statusName ?? "No status"),
     description:
       (issue.description?.slice(0, 150) ?? "") +
       (issue.description && issue.description.length > 150 ? "..." : ""),

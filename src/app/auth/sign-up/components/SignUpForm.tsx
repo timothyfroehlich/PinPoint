@@ -28,11 +28,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import {
-  signInWithOAuth,
-  sendMagicLink,
-  type ActionResult,
-} from "~/lib/actions/auth-actions";
+import { signInWithOAuth, sendMagicLink } from "~/lib/actions/auth-actions";
+import { type ActionResult } from "~/lib/actions/auth-actions";
 import { type OrganizationOption } from "~/lib/dal/public-organizations";
 
 // API Response validation schema for security
@@ -59,9 +56,9 @@ function isValidOrganizationArray(data: unknown): data is OrganizationOption[] {
         "id" in obj &&
         "name" in obj &&
         "subdomain" in obj &&
-        typeof obj.id === "string" &&
-        typeof obj.name === "string" &&
-        typeof obj.subdomain === "string"
+        typeof obj["id"] === "string" &&
+        typeof obj["name"] === "string" &&
+        typeof obj["subdomain"] === "string"
       );
     })
   );

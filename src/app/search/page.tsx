@@ -133,7 +133,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 }
 
 // Server Component for search results with data
-async function SearchResultsWithData({
+function SearchResultsWithData({
   query,
   entities,
   page,
