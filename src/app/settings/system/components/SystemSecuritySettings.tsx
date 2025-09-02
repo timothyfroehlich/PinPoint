@@ -61,7 +61,7 @@ export function SystemSecuritySettings({
   useEffect(() => {
     if (state?.success) {
       toast.success(state.message ?? "Security settings saved successfully!");
-    } else if (state && !state.success) {
+    } else if (state) {
       if (state.error) {
         toast.error(state.error);
       }

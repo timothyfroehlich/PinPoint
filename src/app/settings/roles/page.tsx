@@ -141,7 +141,7 @@ export default async function RolesSettingsPage() {
                           users
                         </span>
                         <span>•</span>
-                        <span>{role.permissions?.length ?? 0} permissions</span>
+                        <span>{role.permissions.length} permissions</span>
                       </div>
                     </div>
                   </div>
@@ -159,7 +159,7 @@ export default async function RolesSettingsPage() {
                 </div>
 
                 {/* Role Permissions Preview */}
-                {role.permissions && role.permissions.length > 0 && (
+                {role.permissions.length > 0 && (
                   <div className="mt-4 ml-14">
                     <h4 className="text-sm font-medium mb-2">Permissions</h4>
                     <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">

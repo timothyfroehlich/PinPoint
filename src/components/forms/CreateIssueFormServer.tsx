@@ -167,10 +167,7 @@ export function CreateIssueFormServer({
                 <SelectItem value="low" data-testid="priority-option-low">
                   Low
                 </SelectItem>
-                <SelectItem
-                  value="medium"
-                  data-testid="priority-option-medium"
-                >
+                <SelectItem value="medium" data-testid="priority-option-medium">
                   Medium
                 </SelectItem>
                 <SelectItem value="high" data-testid="priority-option-high">

@@ -92,7 +92,9 @@ export function AdvancedSearchForm({
       return buildMachineUrl(basePath, params, currentParams);
     } else {
       // fallback for universal or other types - you could extend this
-      throw new Error(`URL building not implemented for entityType: ${entityType}`);
+      throw new Error(
+        `URL building not implemented for entityType: ${entityType}`,
+      );
     }
   };
 

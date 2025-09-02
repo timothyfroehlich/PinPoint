@@ -57,7 +57,7 @@ export function CreateMachineFormClient({
   const [state, formAction, isPending] = useActionState(actionWrapper, null);
 
   // Redirect on success
-  if (state?.success && state.data?.machineId) {
+  if (state?.success && state.data.machineId) {
     router.push(`/machines/${state.data.machineId}`);
   }
 

@@ -24,13 +24,14 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
   // Parallel data fetching for optimal performance
   const { user } = await requireMemberAccess();
   const userId = user.id;
-  const [issue, comments, commentCount, assignableUsers, availableStatuses] = await Promise.all([
-    getIssueById(issueId),
-    getCommentsForIssue(issueId),
-    getCommentCountForIssue(issueId),
-    getAssignableUsers(),
-    getAvailableStatuses(),
-  ]);
+  const [issue, comments, commentCount, assignableUsers, availableStatuses] =
+    await Promise.all([
+      getIssueById(issueId),
+      getCommentsForIssue(issueId),
+      getCommentCountForIssue(issueId),
+      getAssignableUsers(),
+      getAvailableStatuses(),
+    ]);
 
   // Dynamic status colors based on status category
   const getStatusColorClass = (category?: string) => {
@@ -130,11 +131,11 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
                             ago
                           </span>
                           {new Date(comment.updated_at).getTime() !==
-                              new Date(comment.created_at).getTime() && (
-                              <Badge variant="outline" className="text-xs">
-                                edited
-                              </Badge>
-                            )}
+                            new Date(comment.created_at).getTime() && (
+                            <Badge variant="outline" className="text-xs">
+                              edited
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-sm whitespace-pre-wrap leading-relaxed">
                           {comment.content}
@@ -232,17 +233,17 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
                   issueId={issue.id}
                   availableUsers={[
                     { id: "unassigned", name: "Unassigned", email: "" },
-                    ...assignableUsers.map(user => ({
+                    ...assignableUsers.map((user) => ({
                       id: user.id,
-                      name: user.name ?? user.email,
-                      email: user.email,
-                    }))
+                      name: user.name ?? user.email ?? "Unknown",
+                      email: user.email ?? "",
+                    })),
                   ]}
                   {...(issue.assignedTo && {
                     currentAssigneeId: issue.assignedTo.id,
                     ...(issue.assignedTo.name && {
                       currentAssigneeName: issue.assignedTo.name,
-                    })
+                    }),
                   })}
                 />
               </div>
@@ -293,17 +294,17 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
                 </span>
               </div>
               {new Date(issue.updated_at).getTime() !==
-                  new Date(issue.created_at).getTime() && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Updated:</span>
-                    <span>
-                      {format(
-                        new Date(issue.updated_at),
-                        "MMM d, yyyy 'at' h:mm a",
-                      )}
-                    </span>
-                  </div>
-                )}
+                new Date(issue.created_at).getTime() && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Updated:</span>
+                  <span>
+                    {format(
+                      new Date(issue.updated_at),
+                      "MMM d, yyyy 'at' h:mm a",
+                    )}
+                  </span>
+                </div>
+              )}
               {issue.resolved_at && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Resolved:</span>
