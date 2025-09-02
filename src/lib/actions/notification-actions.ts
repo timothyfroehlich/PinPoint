@@ -8,8 +8,8 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { and, eq, inArray } from "drizzle-orm";
-import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { notifications } from "~/server/db/schema";
+import { db } from "~/lib/dal/shared";
 import {
   requireAuthContextWithRole,
   validateFormData,
@@ -50,8 +50,6 @@ export async function markNotificationAsReadAction(
     if (!validation.success) {
       return validation;
     }
-
-    const db = getGlobalDatabaseProvider().getClient();
 
     // Update notification with proper access control
     const [updatedNotification] = await db
@@ -115,7 +113,6 @@ export async function bulkMarkNotificationsAsReadAction(
       return actionError("Invalid bulk update data");
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
     const { notificationIds } = validation.data;
 
     // Bulk update with proper access control
@@ -174,8 +171,6 @@ export async function markAllNotificationsAsReadAction(
       return validation;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
-
     // Mark all unread notifications as read
     const updatedNotifications = await db
       .update(notifications)
@@ -229,8 +224,6 @@ export async function markNotificationAsUnreadAction(
     if (!validation.success) {
       return validation;
     }
-
-    const db = getGlobalDatabaseProvider().getClient();
 
     // Update notification with proper access control
     const [updatedNotification] = await db

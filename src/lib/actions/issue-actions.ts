@@ -16,13 +16,13 @@ import {
   idSchema,
 } from "~/lib/validation/schemas";
 import { and, eq, inArray } from "drizzle-orm";
-import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import {
   issues,
   issueStatuses,
   priorities,
   comments,
 } from "~/server/db/schema";
+import { db } from "~/lib/dal/shared";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { transformKeysToSnakeCase } from "~/lib/utils/case-transformers";
 import {
@@ -73,7 +73,6 @@ const bulkUpdateIssuesSchema = z.object({
 
 // Performance: Cached database queries for default values
 const getDefaultStatus = cache(async (organizationId: string) => {
-  const db = getGlobalDatabaseProvider().getClient();
   return await db.query.issueStatuses.findFirst({
     where: and(
       eq(issueStatuses.is_default, true),
@@ -83,7 +82,6 @@ const getDefaultStatus = cache(async (organizationId: string) => {
 });
 
 const getDefaultPriority = cache(async (organizationId: string) => {
-  const db = getGlobalDatabaseProvider().getClient();
   return await db.query.priorities.findFirst({
     where: and(
       eq(priorities.is_default, true),
@@ -110,7 +108,6 @@ export async function createIssueAction(
       return validation;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
 
     // Parallel queries for better performance
@@ -202,7 +199,6 @@ export async function updateIssueStatusAction(
       return validation;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ISSUE_EDIT, db);
 
     // Update with organization scoping for security
@@ -283,7 +279,6 @@ export async function addCommentAction(
       return validation;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
 
     // Verify issue exists and user has access
@@ -352,7 +347,6 @@ export async function updateIssueAssignmentAction(
       return validation;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ISSUE_ASSIGN, db);
 
     // Get current assignee for notification comparison
@@ -449,7 +443,6 @@ export async function bulkUpdateIssuesAction(
       return actionError("Invalid bulk update data");
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ISSUE_BULK_MANAGE, db);
     const { issueIds, statusId, assigneeId } = validation.data;
 
