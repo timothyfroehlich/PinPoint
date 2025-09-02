@@ -306,7 +306,7 @@ export async function UniversalSearchResults({
                       >
                         <CalendarIcon className="h-3 w-3" />
                         {formatDistanceToNow(
-                          new Date(result.metadata["createdAt"]),
+                          new Date(String(result.metadata["createdAt"])),
                           { addSuffix: true },
                         )}
                       </Badge>

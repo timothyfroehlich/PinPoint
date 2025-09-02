@@ -81,7 +81,13 @@ export function UniversalSearch({
       const saved = localStorage.getItem("pinpoint-recent-searches");
       if (saved) {
         try {
-          setRecentSearches(JSON.parse(saved));
+          const parsed = JSON.parse(saved);
+          if (
+            Array.isArray(parsed) &&
+            parsed.every((item) => typeof item === "string")
+          ) {
+            setRecentSearches(parsed);
+          }
         } catch (error) {
           console.error("Failed to parse recent searches:", error);
         }

@@ -1,9 +1,9 @@
 /**
  * Supabase Database Schema Types (Generated)
- * 
+ *
  * Auto-generated from Supabase schema.
  * Contains all table, insert, update, and relationship type definitions.
- * 
+ *
  * Note: This file contains generated types from `supabase gen types`
  * Do not modify manually - regenerate using database schema commands.
  */
@@ -1220,12 +1220,8 @@ export interface Database {
         Relationships: [];
       };
     };
-    Views: {
-      [_ in never]: never;
-    };
-    Functions: {
-      [_ in never]: never;
-    };
+    Views: Record<never, never>;
+    Functions: Record<never, never>;
     Enums: {
       moderation_status: "pending" | "approved" | "rejected";
       notification_entity:
@@ -1249,9 +1245,7 @@ export interface Database {
         | "organization_update";
       visibility: "public" | "organization" | "private";
     };
-    CompositeTypes: {
-      [_ in never]: never;
-    };
+    CompositeTypes: Record<never, never>;
   };
 }
 
