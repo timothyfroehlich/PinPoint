@@ -15,6 +15,7 @@ import {
 } from "~/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { api } from "~/trpc/react";
+import type { IssueWithRelationsResponse } from "~/lib/types/api";
 
 interface MachineFilterDropdownProps {
   onChange: (machineId: string) => void;
@@ -43,7 +44,7 @@ export function MachineFilterDropdown({
     if (!issues || !showCounts) return {};
 
     const counts: Record<string, number> = {};
-    issues.forEach((issue: any) => {
+    issues.forEach((issue: IssueWithRelationsResponse) => {
       if (issue.machine?.id) {
         counts[issue.machine.id] = (counts[issue.machine.id] ?? 0) + 1;
       }

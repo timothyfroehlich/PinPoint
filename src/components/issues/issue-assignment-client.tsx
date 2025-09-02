@@ -63,10 +63,7 @@ export function IssueAssignmentClient({
         </SelectTrigger>
         <SelectContent>
           {userOptions.map((user) => (
-            <SelectItem
-              key={user.id}
-              value={user.id}
-            >
+            <SelectItem key={user.id} value={user.id}>
               {user.name}
               {user.email && (
                 <span className="text-xs text-muted-foreground ml-1">
@@ -79,9 +76,7 @@ export function IssueAssignmentClient({
       </Select>
 
       {state && !state.success && (
-        <p className="text-error text-sm">
-          {state.error}
-        </p>
+        <p className="text-error text-sm">{state.error}</p>
       )}
 
       {state && state.success && (

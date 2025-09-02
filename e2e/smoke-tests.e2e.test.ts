@@ -48,32 +48,37 @@ test.describe("Smoke Tests", () => {
   test("open first issue from list", async ({ page }) => {
     await devLoginAsTim(page);
     await page.goto("/issues");
-  const issuesList = page.locator("[data-testid='issues-list']").first();
-  await expect(issuesList).toBeVisible({ timeout: 10000 });
+    const issuesList = page.locator("[data-testid='issues-list']").first();
+    await expect(issuesList).toBeVisible({ timeout: 10000 });
     const firstIssueLink = page
       .locator("[data-testid='issue-card'] [data-testid='issue-link']")
       .first();
     await expect(firstIssueLink).toBeVisible();
     const firstIssueTitle = await firstIssueLink.textContent();
     await firstIssueLink.click();
-    await expect(page.locator("[data-testid='issue-title']"))
-      .toHaveText(firstIssueTitle ?? /.+/, { timeout: 10000 });
-    await expect(page.locator("[data-testid='issue-status-badge']"))
-      .toBeVisible();
+    await expect(page.locator("[data-testid='issue-title']")).toHaveText(
+      firstIssueTitle ?? /.+/,
+      { timeout: 10000 },
+    );
+    await expect(
+      page.locator("[data-testid='issue-status-badge']"),
+    ).toBeVisible();
   });
 
   test("issue creation (authenticated)", async ({ page }) => {
-  const consoleMessages: string[] = [];
-  page.on("console", (msg) => consoleMessages.push(`[${msg.type()}] ${msg.text()}`));
+    const consoleMessages: string[] = [];
+    page.on("console", (msg) =>
+      consoleMessages.push(`[${msg.type()}] ${msg.text()}`),
+    );
     await devLoginAsTim(page);
     // Navigate via issues page link to ensure link works
     await page.goto("/issues");
     const createLink = page.locator("a[href='/issues/create']").first();
     await expect(createLink).toBeVisible();
     await createLink.click();
-    await expect(
-      page.locator("[data-testid='create-issue-form']"),
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.locator("[data-testid='create-issue-form']")).toBeVisible(
+      { timeout: 10000 },
+    );
 
     const uniqueTitle = `Smoke Issue ${Date.now()}`;
     await page.locator("[data-testid='issue-title-input']").fill(uniqueTitle);
@@ -91,7 +96,9 @@ test.describe("Smoke Tests", () => {
     await firstMachine.click();
 
     // Wait for React state flush + hidden input population with a UUID
-    const hiddenMachineId = page.locator("[data-testid='machineId-hidden']").first();
+    const hiddenMachineId = page
+      .locator("[data-testid='machineId-hidden']")
+      .first();
     await expect(hiddenMachineId).toHaveAttribute("value", /.+/, {
       timeout: 5000,
     });
@@ -110,7 +117,7 @@ test.describe("Smoke Tests", () => {
     }
 
     // Ensure machineId hidden input populated before submit
-  // (Already validated above - keep placeholder for readability)
+    // (Already validated above - keep placeholder for readability)
 
     await page.locator("[data-testid='create-issue-submit']").click();
 
@@ -147,7 +154,9 @@ test.describe("Smoke Tests", () => {
       console.log("Form HTML snippet:", formHtml.slice(0, 1000));
     }
     expect(redirected).toBeTruthy();
-    await expect(page.locator("[data-testid='issue-title']"))
-      .toContainText(uniqueTitle, { timeout: 10000 });
+    await expect(page.locator("[data-testid='issue-title']")).toContainText(
+      uniqueTitle,
+      { timeout: 10000 },
+    );
   });
 });

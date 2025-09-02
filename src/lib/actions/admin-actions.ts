@@ -9,8 +9,12 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { emailSchema, uuidSchema } from "~/lib/validation/schemas";
 import { eq, and } from "drizzle-orm";
+import { users, memberships, roles } from "~/server/db/schema";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
-import { updateSystemSettings } from "~/lib/dal/system-settings";
+import {
+  updateSystemSettings,
+  type SystemSettingsData,
+} from "~/lib/dal/system-settings";
 import {
   logActivity,
   ACTIVITY_ACTIONS,
@@ -431,9 +435,38 @@ export async function updateSystemSettingsAction(
     // Permission check for settings update
     await requirePermission(membership, PERMISSIONS.ORGANIZATION_MANAGE, db);
 
-    // Update system settings in database
-    // TODO: Fix type mismatch between flat form schema and nested SystemSettingsData interface
-    await updateSystemSettings(organizationId, validation.data.settings as any);
+    // Convert flat form data to nested SystemSettingsData structure
+    const flatSettings = validation.data.settings;
+    const systemSettingsData: SystemSettingsData = {
+      notifications: {
+        emailNotifications: flatSettings.emailNotifications ?? true,
+        pushNotifications: flatSettings.pushNotifications ?? false,
+        issueUpdates: flatSettings.issueUpdates ?? true,
+        weeklyDigest: flatSettings.weeklyDigest ?? true,
+        maintenanceAlerts: flatSettings.maintenanceAlerts ?? true,
+      },
+      security: {
+        twoFactorRequired: flatSettings.twoFactorRequired ?? false,
+        sessionTimeout: flatSettings.sessionTimeout ?? 30,
+        passwordMinLength: flatSettings.passwordMinLength ?? 8,
+        loginAttempts: flatSettings.loginAttempts ?? 5,
+      },
+      preferences: {
+        timezone: flatSettings.timezone ?? "UTC",
+        dateFormat: flatSettings.dateFormat ?? "YYYY-MM-DD",
+        theme: flatSettings.theme ?? "system",
+        language: flatSettings.language ?? "en",
+        itemsPerPage: flatSettings.itemsPerPage ?? 25,
+      },
+      features: {
+        realTimeUpdates: true, // Default values for features not in form
+        analyticsTracking: true,
+        betaFeatures: false,
+        maintenanceMode: false,
+      },
+    };
+
+    await updateSystemSettings(organizationId, systemSettingsData);
 
     // Cache invalidation
     revalidatePath("/settings/system");

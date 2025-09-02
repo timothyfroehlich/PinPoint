@@ -12,6 +12,7 @@ import { Badge } from "~/components/ui/badge";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
 import { MessageSquareIcon } from "lucide-react";
+import { REALTIME_SUBSCRIBE_STATES } from "@supabase/realtime-js";
 
 interface Comment {
   id: string;
@@ -78,7 +79,7 @@ export function RealtimeCommentsClient({
               // Only show comments from other users and not already loaded
               if (
                 payload.new["author_id"] !== currentUserId &&
-                !existingCommentIds.includes(payload.new["id"])
+                !existingCommentIds.includes(String(payload.new["id"]))
               ) {
                 const newComment = payload.new as Comment;
 
@@ -153,9 +154,9 @@ export function RealtimeCommentsClient({
             },
           )
           .subscribe((status) => {
-            if (status === "SUBSCRIBED") {
+            if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
               setIsConnected(true);
-            } else if (status === "CHANNEL_ERROR") {
+            } else if (status === REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR) {
               setIsConnected(false);
             }
           });
