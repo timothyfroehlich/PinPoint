@@ -69,52 +69,8 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- =============================================================================
--- AUTH USERS: Create auth.users entries for test users
+-- AUTH USERS: Dev users now created via Supabase Admin API
 -- =============================================================================
--- Insert corresponding auth.users for the test users (Supabase-specific)
--- These must match the user IDs in 03-users.sql
-
-INSERT INTO auth.users (id, instance_id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_user_meta_data, is_super_admin, role)
-VALUES 
-  (
-    '10000000-0000-4000-8000-000000000001', 
-    '00000000-0000-0000-0000-000000000000',
-    'tim.froehlich@example.com', 
-    crypt('dev-login-123', gen_salt('bf')), 
-    now(), 
-    now(), 
-    now(),
-    '{"name": "Tim Froehlich", "organizationId": "test-org-pinpoint"}'::jsonb,
-    false,
-    'authenticated'
-  ),
-  (
-    '10000000-0000-4000-8000-000000000002', 
-    '00000000-0000-0000-0000-000000000000',
-    'harry.williams@example.com', 
-    crypt('dev-login-123', gen_salt('bf')), 
-    now(), 
-    now(), 
-    now(),
-    '{"name": "Harry Williams", "organizationId": "test-org-pinpoint"}'::jsonb,
-    false,
-    'authenticated'
-  ),
-  (
-    '10000000-0000-4000-8000-000000000003', 
-    '00000000-0000-0000-0000-000000000000',
-    'escher.lefkoff@example.com', 
-    crypt('dev-login-123', gen_salt('bf')), 
-    now(), 
-    now(), 
-    now(),
-    '{"name": "Escher Lefkoff", "organizationId": "test-org-pinpoint"}'::jsonb,
-    false,
-    'authenticated'
-  )
-ON CONFLICT (id) DO UPDATE SET
-  email = EXCLUDED.email,
-  encrypted_password = EXCLUDED.encrypted_password,
-  email_confirmed_at = EXCLUDED.email_confirmed_at,
-  updated_at = now(),
-  raw_user_meta_data = EXCLUDED.raw_user_meta_data;
+-- Dev auth users are now created via scripts/create-dev-users.ts using the
+-- Supabase Admin API, which properly handles password hashing and auth integration.
+-- This approach is compatible with Supabase's authentication system.
