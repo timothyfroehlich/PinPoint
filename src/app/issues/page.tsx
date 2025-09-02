@@ -76,7 +76,7 @@ export async function generateMetadata({ searchParams }: IssuesPageProps) {
       canonical: canonicalUrl,
     },
     openGraph: {
-      title: `Issues (${totalCount} found) - PinPoint`,
+      title: `Issues (${String(totalCount)} found) - PinPoint`,
       description,
       type: "website",
     },
@@ -123,7 +123,7 @@ async function IssuesWithData({
               {result.totalCount} issue{result.totalCount !== 1 ? "s" : ""}{" "}
               found
               {pagination.page > 1 &&
-                ` • Page ${pagination.page} of ${result.totalPages}`}
+                ` • Page ${String(pagination.page)} of ${String(result.totalPages)}`}
             </p>
 
             {/* Active Filter Badges */}
