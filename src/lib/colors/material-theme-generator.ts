@@ -12,6 +12,16 @@ import {
   hexFromArgb,
 } from "@material/material-color-utilities";
 
+// Extended Scheme interface for additional surface container properties
+// that may be available in newer versions of Material Color Utilities
+interface ExtendedScheme extends Scheme {
+  surfaceContainer?: number;
+  surfaceContainerHigh?: number;
+  surfaceContainerHighest?: number;
+  surfaceContainerLow?: number;
+  surfaceContainerLowest?: number;
+}
+
 export interface MaterialColors {
   // Primary color family
   primary: string;
@@ -70,6 +80,9 @@ export interface MaterialTheme {
  * Handles potential undefined properties gracefully
  */
 function schemeToColors(scheme: Scheme): MaterialColors {
+  // Type guard to check if scheme has extended surface container properties
+  const extendedScheme = scheme as ExtendedScheme;
+
   return {
     primary: hexFromArgb(scheme.primary),
     onPrimary: hexFromArgb(scheme.onPrimary),
@@ -98,20 +111,20 @@ function schemeToColors(scheme: Scheme): MaterialColors {
 
     // Handle potentially undefined surface container properties
     // Fall back to computed alternatives if not available
-    surfaceContainer: (scheme as any).surfaceContainer
-      ? hexFromArgb((scheme as any).surfaceContainer)
+    surfaceContainer: extendedScheme.surfaceContainer
+      ? hexFromArgb(extendedScheme.surfaceContainer)
       : hexFromArgb(scheme.surface), // fallback
-    surfaceContainerHigh: (scheme as any).surfaceContainerHigh
-      ? hexFromArgb((scheme as any).surfaceContainerHigh)
+    surfaceContainerHigh: extendedScheme.surfaceContainerHigh
+      ? hexFromArgb(extendedScheme.surfaceContainerHigh)
       : hexFromArgb(scheme.surfaceVariant), // fallback
-    surfaceContainerHighest: (scheme as any).surfaceContainerHighest
-      ? hexFromArgb((scheme as any).surfaceContainerHighest)
+    surfaceContainerHighest: extendedScheme.surfaceContainerHighest
+      ? hexFromArgb(extendedScheme.surfaceContainerHighest)
       : hexFromArgb(scheme.surfaceVariant), // fallback
-    surfaceContainerLow: (scheme as any).surfaceContainerLow
-      ? hexFromArgb((scheme as any).surfaceContainerLow)
+    surfaceContainerLow: extendedScheme.surfaceContainerLow
+      ? hexFromArgb(extendedScheme.surfaceContainerLow)
       : hexFromArgb(scheme.surface), // fallback
-    surfaceContainerLowest: (scheme as any).surfaceContainerLowest
-      ? hexFromArgb((scheme as any).surfaceContainerLowest)
+    surfaceContainerLowest: extendedScheme.surfaceContainerLowest
+      ? hexFromArgb(extendedScheme.surfaceContainerLowest)
       : hexFromArgb(scheme.surface), // fallback
 
     outline: hexFromArgb(scheme.outline),
@@ -210,14 +223,14 @@ export function generateCssCustomProperties(theme: MaterialTheme) {
   const lightTheme = Object.entries(theme.light)
     .map(
       ([key, value]) =>
-        `  --${key.replace(/([A-Z])/g, "-$1").toLowerCase()}: ${hexToHslString(value)};`,
+        `  --${key.replace(/([A-Z])/g, "-$1").toLowerCase()}: ${hexToHslString(value as string)};`,
     )
     .join("\n");
 
   const darkTheme = Object.entries(theme.dark)
     .map(
       ([key, value]) =>
-        `  --${key.replace(/([A-Z])/g, "-$1").toLowerCase()}: ${hexToHslString(value)};`,
+        `  --${key.replace(/([A-Z])/g, "-$1").toLowerCase()}: ${hexToHslString(value as string)};`,
     )
     .join("\n");
 

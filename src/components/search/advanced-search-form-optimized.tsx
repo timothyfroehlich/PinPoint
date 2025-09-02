@@ -38,7 +38,7 @@ const Checkbox = dynamic(
   },
 );
 
-type FormState = Record<string, any>;
+type FormState = Record<string, unknown>;
 
 // Memoized field renderer for performance
 const MemoizedFieldRenderer = memo(function FieldRenderer({
@@ -48,7 +48,7 @@ const MemoizedFieldRenderer = memo(function FieldRenderer({
 }: {
   field: FilterField;
   formState: FormState;
-  updateFormField: (fieldId: string, value: any) => void;
+  updateFormField: (fieldId: string, value: unknown) => void;
 }) {
   // Memoize callbacks to prevent unnecessary re-renders
   const handleTextChange = useCallback(
@@ -92,7 +92,7 @@ const MemoizedFieldRenderer = memo(function FieldRenderer({
             id={field.id}
             type="text"
             placeholder={field.placeholder}
-            value={formState[field.id] ?? ""}
+            value={(formState[field.id] as string) ?? ""}
             onChange={handleTextChange}
           />
         </div>
@@ -103,7 +103,7 @@ const MemoizedFieldRenderer = memo(function FieldRenderer({
         <div className="space-y-2">
           <Label htmlFor={field.id}>{field.label}</Label>
           <Select
-            value={formState[field.id] ?? ""}
+            value={(formState[field.id] as string) ?? ""}
             onValueChange={handleSelectChange}
           >
             <SelectTrigger>
@@ -172,7 +172,7 @@ const MemoizedFieldRenderer = memo(function FieldRenderer({
               <Input
                 type="date"
                 placeholder="Start date"
-                value={formState[`${field.id}_start`] ?? ""}
+                value={(formState[`${field.id}_start`] as string) ?? ""}
                 onChange={(e) => {
                   updateFormField(`${field.id}_start`, e.target.value);
                 }}
@@ -182,7 +182,7 @@ const MemoizedFieldRenderer = memo(function FieldRenderer({
               <Input
                 type="date"
                 placeholder="End date"
-                value={formState[`${field.id}_end`] ?? ""}
+                value={(formState[`${field.id}_end`] as string) ?? ""}
                 onChange={(e) => {
                   updateFormField(`${field.id}_end`, e.target.value);
                 }}
@@ -203,7 +203,7 @@ const MemoizedFieldRenderer = memo(function FieldRenderer({
                 placeholder={`Min ${field.label.toLowerCase()}`}
                 min={field.min}
                 max={field.max}
-                value={formState[`${field.id}_min`] ?? ""}
+                value={(formState[`${field.id}_min`] as string) ?? ""}
                 onChange={(e) => {
                   updateFormField(`${field.id}_min`, e.target.value);
                 }}
@@ -215,7 +215,7 @@ const MemoizedFieldRenderer = memo(function FieldRenderer({
                 placeholder={`Max ${field.label.toLowerCase()}`}
                 min={field.min}
                 max={field.max}
-                value={formState[`${field.id}_max`] ?? ""}
+                value={(formState[`${field.id}_max`] as string) ?? ""}
                 onChange={(e) => {
                   updateFormField(`${field.id}_max`, e.target.value);
                 }}
@@ -298,7 +298,7 @@ export const AdvancedSearchFormOptimized = memo(
     const [formState, setFormState] = useState<FormState>(initialFormState);
 
     // Memoized callbacks to prevent re-renders
-    const updateFormField = useCallback((fieldId: string, value: any) => {
+    const updateFormField = useCallback((fieldId: string, value: unknown) => {
       setFormState((prev) => ({
         ...prev,
         [fieldId]: value,
@@ -333,7 +333,7 @@ export const AdvancedSearchFormOptimized = memo(
         event.preventDefault();
 
         // Build clean parameters object
-        const params: Record<string, any> = {};
+        const params: Record<string, unknown> = {};
 
         fields.forEach((field) => {
           if (field.type === "multi-select") {

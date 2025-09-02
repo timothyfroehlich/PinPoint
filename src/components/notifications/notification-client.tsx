@@ -32,6 +32,37 @@ interface Notification {
   }[];
 }
 
+// Custom event type definitions for type safety
+interface MachineUpdateEventDetail {
+  machineName: string;
+}
+
+interface FormSubmissionEventDetail {
+  success: boolean;
+  title?: string;
+  message?: string;
+}
+
+// Supabase notification payload type
+interface NotificationPayload {
+  id: string;
+  type: "success" | "error" | "info" | "warning";
+  title: string;
+  message: string;
+  auto_hide: boolean;
+  organization_id: string;
+  created_at: string;
+}
+
+// Type-safe custom event interfaces
+interface MachineUpdateEvent extends CustomEvent {
+  detail: MachineUpdateEventDetail;
+}
+
+interface FormSubmissionEvent extends CustomEvent {
+  detail: FormSubmissionEventDetail;
+}
+
 interface NotificationClientProps {
   userId?: string;
   organizationId?: string;
@@ -78,8 +109,8 @@ export function NotificationClient({
       });
     };
 
-    const handleMachineUpdate: EventListener = (event) => {
-      const customEvent = event as CustomEvent;
+    const handleMachineUpdate = (event: Event) => {
+      const customEvent = event as MachineUpdateEvent;
       addNotification({
         type: "info",
         title: "Machine Updated",
@@ -88,8 +119,8 @@ export function NotificationClient({
       });
     };
 
-    const handleFormSubmission: EventListener = (event) => {
-      const customEvent = event as CustomEvent;
+    const handleFormSubmission = (event: Event) => {
+      const customEvent = event as FormSubmissionEvent;
       if (customEvent.detail.success) {
         addNotification({
           type: "success",
@@ -143,12 +174,12 @@ export function NotificationClient({
             },
             (payload) => {
               if (payload.new) {
-                const notification = payload.new as any;
+                const notification = payload.new as NotificationPayload;
                 addNotification({
                   type: notification.type ?? "info",
                   title: notification.title ?? "Notification",
                   message: notification.message ?? "",
-                  autoHide: notification.auto_hide !== false,
+                  autoHide: notification.auto_hide,
                 });
               }
             },

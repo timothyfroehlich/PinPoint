@@ -272,7 +272,10 @@ export function getFilterField(
 /**
  * Validate filter values against field configuration
  */
-export function validateFilterValue(field: FilterField, value: any): boolean {
+export function validateFilterValue(
+  field: FilterField,
+  value: unknown,
+): boolean {
   switch (field.type) {
     case "text":
       return typeof value === "string" && value.length <= 100;

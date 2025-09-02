@@ -23,7 +23,6 @@ import { buildMetadataDescription } from "~/lib/search-params/shared";
 // Force dynamic rendering for auth-dependent content
 export const dynamic = "force-dynamic";
 
-
 interface IssuesPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }

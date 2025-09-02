@@ -63,12 +63,13 @@ export interface AdvancedSearchFormProps {
   defaultExpanded?: boolean;
   showActiveFilters?: boolean;
 
-  // Event handlers
-  onFormSubmit?: (params: Record<string, any>) => void;
-  buildUrl: (params: Record<string, any>) => string;
+  // Event handlers - using unknown for type safety
+  onFormSubmit?: (params: Record<string, unknown>) => void;
+  buildUrl: (params: Record<string, unknown>) => string;
 }
 
-type FormState = Record<string, any>;
+// Form state type - using unknown for type safety
+type FormState = Record<string, unknown>;
 
 export function AdvancedSearchForm({
   entityType,
@@ -86,14 +87,16 @@ export function AdvancedSearchForm({
   const [isPending, startTransition] = useTransition();
 
   // Helper function to build URLs based on entity type
-  const buildUrl = (params: Record<string, any>) => {
+  const buildUrl = (params: Record<string, unknown>) => {
     if (entityType === "issues") {
       return buildIssueUrl(basePath, params, currentParams);
     } else if (entityType === "machines") {
       return buildMachineUrl(basePath, params, currentParams);
     } else {
       // fallback for universal or other types - you could extend this
-      throw new Error(`URL building not implemented for entityType: ${entityType}`);
+      throw new Error(
+        `URL building not implemented for entityType: ${entityType}`,
+      );
     }
   };
 
@@ -133,7 +136,7 @@ export function AdvancedSearchForm({
   });
 
   // Handle form field updates
-  const updateFormField = (fieldId: string, value: any) => {
+  const updateFormField = (fieldId: string, value: unknown) => {
     setFormState((prev) => ({
       ...prev,
       [fieldId]: value,
@@ -145,31 +148,38 @@ export function AdvancedSearchForm({
     event.preventDefault();
 
     // Build clean parameters object
-    const params: Record<string, any> = {};
+    const params: Record<string, unknown> = {};
 
     fields.forEach((field) => {
       if (field.type === "multi-select") {
         const values = formState[field.id] as string[];
-        if (values.length > 0) {
+        if (Array.isArray(values) && values.length > 0) {
           params[field.id] = values;
         }
       } else if (field.type === "date-range") {
         const start = formState[`${field.id}_start`];
         const end = formState[`${field.id}_end`];
-        if (start) params[`${field.id}_start`] = start;
-        if (end) params[`${field.id}_end`] = end;
+        if (start && typeof start === "string")
+          params[`${field.id}_start`] = start;
+        if (end && typeof end === "string") params[`${field.id}_end`] = end;
       } else if (field.type === "number-range") {
         const min = formState[`${field.id}_min`];
         const max = formState[`${field.id}_max`];
-        if (min) params[`${field.id}_min`] = min;
-        if (max) params[`${field.id}_max`] = max;
+        if (min && (typeof min === "string" || typeof min === "number"))
+          params[`${field.id}_min`] = min;
+        if (max && (typeof max === "string" || typeof max === "number"))
+          params[`${field.id}_max`] = max;
       } else if (field.type === "boolean") {
         if (formState[field.id] === true) {
           params[field.id] = "true";
         }
       } else {
         const value = formState[field.id];
-        if (value && value !== "") {
+        if (
+          value &&
+          value !== "" &&
+          (typeof value === "string" || typeof value === "number")
+        ) {
           params[field.id] = value;
         }
       }
@@ -250,7 +260,7 @@ export function AdvancedSearchForm({
               id={field.id}
               type="text"
               placeholder={field.placeholder}
-              value={formState[field.id] ?? ""}
+              value={(formState[field.id] as string) ?? ""}
               onChange={(e) => {
                 updateFormField(field.id, e.target.value);
               }}
@@ -263,7 +273,7 @@ export function AdvancedSearchForm({
           <div key={field.id} className="space-y-2">
             <Label htmlFor={field.id}>{field.label}</Label>
             <Select
-              value={formState[field.id] ?? ""}
+              value={(formState[field.id] as string) ?? ""}
               onValueChange={(value) => {
                 updateFormField(field.id, value);
               }}
@@ -337,7 +347,7 @@ export function AdvancedSearchForm({
                 <Input
                   type="date"
                   placeholder="Start date"
-                  value={formState[`${field.id}_start`] ?? ""}
+                  value={(formState[`${field.id}_start`] as string) ?? ""}
                   onChange={(e) => {
                     updateFormField(`${field.id}_start`, e.target.value);
                   }}
@@ -347,7 +357,7 @@ export function AdvancedSearchForm({
                 <Input
                   type="date"
                   placeholder="End date"
-                  value={formState[`${field.id}_end`] ?? ""}
+                  value={(formState[`${field.id}_end`] as string) ?? ""}
                   onChange={(e) => {
                     updateFormField(`${field.id}_end`, e.target.value);
                   }}
@@ -368,7 +378,7 @@ export function AdvancedSearchForm({
                   placeholder={`Min ${field.label.toLowerCase()}`}
                   min={field.min}
                   max={field.max}
-                  value={formState[`${field.id}_min`] ?? ""}
+                  value={(formState[`${field.id}_min`] as string) ?? ""}
                   onChange={(e) => {
                     updateFormField(`${field.id}_min`, e.target.value);
                   }}
@@ -380,7 +390,7 @@ export function AdvancedSearchForm({
                   placeholder={`Max ${field.label.toLowerCase()}`}
                   min={field.min}
                   max={field.max}
-                  value={formState[`${field.id}_max`] ?? ""}
+                  value={(formState[`${field.id}_max`] as string) ?? ""}
                   onChange={(e) => {
                     updateFormField(`${field.id}_max`, e.target.value);
                   }}

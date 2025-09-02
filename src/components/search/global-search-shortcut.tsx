@@ -52,7 +52,7 @@ export function GlobalSearchShortcut({ children }: GlobalSearchShortcutProps) {
       const timer = setTimeout(() => {
         const input = document.querySelector(
           "[data-search-input]",
-        ) as HTMLElement | null;
+        ) as HTMLInputElement;
         if (input) {
           input.focus();
         }

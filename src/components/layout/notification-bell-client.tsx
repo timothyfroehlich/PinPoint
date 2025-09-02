@@ -14,6 +14,7 @@ import {
 } from "~/components/ui/popover";
 import { Badge } from "~/components/ui/badge";
 import { BellIcon, BellRingIcon } from "lucide-react";
+import { REALTIME_SUBSCRIBE_STATES } from "@supabase/realtime-js";
 interface NotificationBellClientProps {
   initialUnreadCount: number;
   userId: string;
@@ -84,9 +85,9 @@ export function NotificationBellClient({
             },
           )
           .subscribe((status) => {
-            if (status === "SUBSCRIBED") {
+            if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
               setIsConnected(true);
-            } else if (status === "CHANNEL_ERROR") {
+            } else if (status === REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR) {
               setIsConnected(false);
             }
           });

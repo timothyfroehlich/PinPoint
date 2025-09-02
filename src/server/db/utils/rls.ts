@@ -13,7 +13,9 @@ export async function bindRLSContext(
   // PostgreSQL doesn't allow parameters in DDL commands like SET LOCAL
   // We need to use sql.raw() with proper escaping for security
   await tx.execute(
-    sql.raw(`SET LOCAL app.current_organization_id = '${organizationId.replace(/'/g, "''")}'`),
+    sql.raw(
+      `SET LOCAL app.current_organization_id = '${organizationId.replace(/'/g, "''")}'`,
+    ),
   );
 }
 
