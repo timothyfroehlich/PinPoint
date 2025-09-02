@@ -47,7 +47,7 @@ export default async function UsersSettingsPage() {
   const availableRoles = roles.map((role) => ({
     id: role.id,
     name: role.name,
-    description: undefined, // Roles don't have descriptions in schema
+    // description omitted since roles don't have descriptions in schema
     isSystem: role.isSystem,
   }));
 
