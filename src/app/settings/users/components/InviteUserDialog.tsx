@@ -46,7 +46,7 @@ export function InviteUserDialog({
     if (state?.success) {
       toast.success(state.message || "User invitation sent successfully!");
       setIsOpen(false);
-    } else if (!state.success) {
+    } else if (state) {
       // Handle field errors or general error
       if (state.fieldErrors) {
         // Display field-specific errors

@@ -64,7 +64,7 @@ export function RoleChangeDialog({
     if (state?.success) {
       toast.success(state.message || "User role updated successfully!");
       setIsOpen(false);
-    } else if (!state.success) {
+    } else if (state) {
       // Handle field errors or general error
       if (state.fieldErrors) {
         Object.entries(state.fieldErrors).forEach(([field, errors]) => {
