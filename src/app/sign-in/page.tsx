@@ -18,10 +18,8 @@ import { useAuth } from "~/app/auth-provider";
 import { authenticateDevUser, getAuthResultMessage } from "~/lib/auth/dev-auth";
 import { isDevAuthAvailable } from "~/lib/environment-client";
 import { createClient } from "~/utils/supabase/client";
-import type { Db } from "~/lib/types";
+import type { User, Role } from "~/lib/types";
 
-type User = Db.User;
-type Role = Db.Role;
 type UserWithRole = User & { role: Role | null };
 
 // Check if dev features are available
@@ -105,7 +103,7 @@ export default function SignInPage(): React.ReactElement | null {
       if (testUser?.name) userData.name = testUser.name;
       if (testUser?.role?.name) userData.role = testUser.role.name;
 
-      const result = await authenticateDevUser(supabase as any, userData);
+      const result = await authenticateDevUser(supabase, userData);
 
       const message = getAuthResultMessage(result);
 
