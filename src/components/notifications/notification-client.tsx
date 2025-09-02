@@ -156,19 +156,21 @@ export function NotificationClient({
           .subscribe();
 
         return () => {
-          supabase.removeChannel(orgChannel);
+          void supabase.removeChannel(orgChannel);
           setIsConnected(false);
         };
       } catch (error) {
         console.error("Failed to initialize notification stream:", error);
         setIsConnected(false);
-        return () => {}; // No-op cleanup function
+        return () => {
+          // No-op cleanup function on error
+        };
       }
     };
 
     const cleanup = initializeNotificationStream();
     return () => {
-      cleanup.then((fn) => {
+      void cleanup.then((fn) => {
         fn?.();
       });
     };

@@ -100,7 +100,14 @@ export async function createMachineAction(
     revalidateTag(`dashboard-${organizationId}`);
     revalidatePath("/machines");
 
-    return { success: true, data: { machineId: machine!.id } };
+    if (!machine) {
+      return {
+        success: false,
+        error: "Failed to create machine. No data returned.",
+      };
+    }
+
+    return { success: true, data: { machineId: machine.id } };
   } catch (error) {
     console.error("Create machine error:", error);
     return {

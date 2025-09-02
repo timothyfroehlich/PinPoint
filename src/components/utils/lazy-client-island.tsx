@@ -47,7 +47,7 @@ export function LazyClientIsland<T = any>({
   // Load component immediately if requested
   useEffect(() => {
     if (loadImmediately || strategy === "immediate") {
-      loadComponent();
+      void loadComponent();
     }
   }, [loadImmediately, strategy]);
 
@@ -58,7 +58,7 @@ export function LazyClientIsland<T = any>({
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry?.isIntersecting) {
-          loadComponent();
+          void loadComponent();
           observer.disconnect();
         }
       },
@@ -80,10 +80,10 @@ export function LazyClientIsland<T = any>({
 
     const loadOnIdle = () => {
       if ("requestIdleCallback" in window) {
-        requestIdleCallback(() => loadComponent(), { timeout: 2000 });
+        requestIdleCallback(() => void loadComponent(), { timeout: 2000 });
       } else {
         // Fallback for browsers without requestIdleCallback
-        setTimeout(() => loadComponent(), 1000);
+        setTimeout(() => void loadComponent(), 1000);
       }
     };
 
@@ -124,7 +124,7 @@ export function LazyClientIsland<T = any>({
         <button
           onClick={() => {
             setError(null);
-            loadComponent();
+            void loadComponent();
           }}
           className="mt-2 text-xs text-error hover:text-error underline"
         >
