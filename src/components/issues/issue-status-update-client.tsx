@@ -46,7 +46,7 @@ const DEFAULT_STATUS_OPTIONS = [
 // Placeholder action - will be replaced with actual Server Action
 async function updateIssueStatusAction(
   issueId: string,
-  _prevState: any,
+  _prevState: unknown,
   formData: FormData,
 ) {
   // Simulate API delay
