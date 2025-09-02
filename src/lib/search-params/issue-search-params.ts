@@ -79,7 +79,10 @@ export function parseIssueSearchParams(
   const parsed = IssueSearchParamsSchema.safeParse(searchParams);
 
   if (!parsed.success) {
-    console.warn("Invalid issue search parameters:", parsed.error.flatten());
+    console.warn(
+      "Invalid issue search parameters:",
+      z.treeifyError(parsed.error),
+    );
     // Return default values on parsing error
     return IssueSearchParamsSchema.parse({});
   }
