@@ -115,8 +115,7 @@ export async function addCommentAction(
         await generateCommentNotifications(issueId, commentData.id, {
           organizationId,
           actorId: user.id,
-          actorName:
-            (user.user_metadata?.["name"] as string) ?? user.email ?? "Someone",
+          actorName: user.user_metadata["name"] || user.email,
         });
       } catch (error) {
         console.error("Failed to generate comment notifications:", error);

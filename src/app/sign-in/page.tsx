@@ -18,10 +18,7 @@ import { useAuth } from "~/app/auth-provider";
 import { authenticateDevUser, getAuthResultMessage } from "~/lib/auth/dev-auth";
 import { isDevAuthAvailable } from "~/lib/environment-client";
 import { createClient } from "~/utils/supabase/client";
-import type { Db } from "~/lib/types";
-
-type User = Db.User;
-type Role = Db.Role;
+import type { User, Role } from "~/lib/types/db";
 type UserWithRole = User & { role: Role | null };
 
 // Check if dev features are available

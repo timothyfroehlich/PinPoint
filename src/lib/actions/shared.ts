@@ -58,11 +58,7 @@ export async function requireActionAuthContextWithPermission(
 ) {
   const { user, organizationId, membership } =
     await requireAuthContextWithRole();
-  await baseRequirePermission(
-    { roleId: membership?.role_id ?? null },
-    permission,
-    db,
-  );
+  await baseRequirePermission({ roleId: membership.role_id }, permission, db);
   return { user, organizationId, membership };
 }
 
