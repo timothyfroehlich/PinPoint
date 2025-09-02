@@ -15,7 +15,7 @@
 export function getCookieDomain(host: string): string {
   // Remove port if present
   const hostParts = host.split(":");
-  const hostname = hostParts.length > 0 ? hostParts[0] : host;
+  const hostname = hostParts[0] ?? host;
 
   // Handle localhost (development)
   if (hostname === "localhost") {

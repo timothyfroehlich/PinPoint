@@ -16,6 +16,7 @@ import {
   parseIssueSearchParams,
   getIssueFilterDescription,
   getIssueCanonicalUrl,
+  buildIssueUrl,
 } from "~/lib/search-params/issue-search-params";
 import { buildMetadataDescription } from "~/lib/search-params/shared";
 
@@ -169,6 +170,7 @@ async function IssuesWithData({
           collapsible={true}
           defaultExpanded={false}
           showActiveFilters={true}
+          buildUrl={buildIssueUrl}
         />
       </Suspense>
 
