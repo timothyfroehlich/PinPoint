@@ -72,11 +72,7 @@ export function MachineFiltersClient({
     }
 
     if (updates.hasQR !== undefined) {
-      if (updates.hasQR !== null) {
-        params.set("hasQR", String(updates.hasQR));
-      } else {
-        params.delete("hasQR");
-      }
+      params.set("hasQR", String(updates.hasQR));
     }
 
     if (updates.view) {

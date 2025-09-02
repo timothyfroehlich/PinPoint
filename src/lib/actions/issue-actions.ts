@@ -8,7 +8,11 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { cache } from "react"; // React 19 cache API
 import { z } from "zod";
-import { titleSchema, commentContentSchema, uuidSchema } from "~/lib/validation/schemas";
+import {
+  titleSchema,
+  commentContentSchema,
+  uuidSchema,
+} from "~/lib/validation/schemas";
 import { and, eq, inArray } from "drizzle-orm";
 import {
   issues,
@@ -147,19 +151,20 @@ export async function createIssueAction(
     }
 
     // Handle special "unassigned" case
-    const assigneeId = validated.assigneeId === "unassigned" 
-      ? null 
-      : validated.assigneeId ?? null;
+    const assigneeId =
+      validated.assigneeId === "unassigned"
+        ? null
+        : (validated.assigneeId ?? null);
 
     // Create issue with validated data
-  const issueData = {
+    const issueData = {
       id: generatePrefixedId("issue"),
-  title: validated.title,
-  description: validated.description ?? "",
-  machineId: validated.machineId,
+      title: validated.title,
+      description: validated.description ?? "",
+      machineId: validated.machineId,
       organizationId,
-  statusId: resolvedStatus.id,
-  priorityId: resolvedPriority.id,
+      statusId: resolvedStatus.id,
+      priorityId: resolvedPriority.id,
       assigneeId,
       createdById: user.id,
     };
@@ -188,8 +193,7 @@ export async function createIssueAction(
         await generateIssueCreationNotifications(issueData.id, {
           organizationId,
           actorId: user.id,
-          actorName:
-            (user.user_metadata?.["name"] as string) ?? user.email ?? "Someone",
+          actorName: user.user_metadata["name"] || user.email,
         });
       } catch (error) {
         console.error(
@@ -200,10 +204,7 @@ export async function createIssueAction(
     });
 
     // Return success (client enhancement layer will handle navigation)
-    return actionSuccess(
-      { id: issueData.id },
-      "Issue created successfully",
-    );
+    return actionSuccess({ id: issueData.id }, "Issue created successfully");
   } catch (error) {
     // (Legacy redirect handling removed – action now returns success and client redirects)
     console.error("Create issue error:", error);
@@ -273,10 +274,7 @@ export async function updateIssueStatusAction(
           await generateStatusChangeNotifications(issueId, statusResult.name, {
             organizationId,
             actorId: user.id,
-            actorName:
-              (user.user_metadata?.["name"] as string) ??
-              user.email ??
-              "Someone",
+            actorName: user.user_metadata["name"] || user.email,
           });
         }
       } catch (error) {
@@ -397,10 +395,11 @@ export async function updateIssueAssignmentAction(
     const previousAssigneeId = currentIssue?.assigned_to_id ?? null;
 
     // Handle special "unassigned" case
-    const assigneeId = validation.data.assigneeId === "unassigned" 
-      ? null 
-      : validation.data.assigneeId ?? null;
-    
+    const assigneeId =
+      validation.data.assigneeId === "unassigned"
+        ? null
+        : (validation.data.assigneeId ?? null);
+
     // Update assignment with organization scoping
     const [updatedIssue] = await db
       .update(issues)
@@ -435,10 +434,7 @@ export async function updateIssueAssignmentAction(
           {
             organizationId,
             actorId: user.id,
-            actorName:
-              (user.user_metadata?.["name"] as string) ??
-              user.email ??
-              "Someone",
+            actorName: user.user_metadata["name"] || user.email,
           },
         );
       } catch (error) {
@@ -490,8 +486,7 @@ export async function bulkUpdateIssuesAction(
     // Build update object
     const updateData: any = {};
     if (statusId) updateData.status_id = statusId;
-    if (assigneeId !== undefined)
-      updateData.assigned_to_id = assigneeId ?? null;
+    if (assigneeId !== undefined) updateData.assigned_to_id = assigneeId;
 
     if (Object.keys(updateData).length === 0) {
       return actionError("No updates specified");
