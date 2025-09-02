@@ -18,11 +18,8 @@ import { useAuth } from "~/app/auth-provider";
 import { authenticateDevUser, getAuthResultMessage } from "~/lib/auth/dev-auth";
 import { isDevAuthAvailable } from "~/lib/environment-client";
 import { createClient } from "~/utils/supabase/client";
-import type { Db } from "~/lib/types";
-
-type User = Db.User;
-type Role = Db.Role;
-type UserWithRole = User & { role: Role | null };
+import type { AuthUser, AuthRole } from "~/lib/types";
+type UserWithRole = AuthUser & { role: AuthRole | null };
 
 // Check if dev features are available
 const shouldShowDevLogin = isDevAuthAvailable();
@@ -129,7 +126,7 @@ export default function SignInPage(): React.ReactElement | null {
   }
 
   function getRoleBadgeVariant(
-    role: Role | null,
+    role: AuthRole | null,
   ): "default" | "secondary" | "destructive" | "outline" {
     if (!role) return "default";
     switch (role.name.toLowerCase()) {
