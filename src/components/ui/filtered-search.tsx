@@ -74,7 +74,7 @@ export function FilteredSearch({
     onChange("");
   }, [onChange]);
 
-  const inputId = `filtered-search-${Math.random().toString(36).substr(2, 9)}`;
+  const inputId = `filtered-search-${Math.random().toString(36).substring(2, 9)}`;
 
   return (
     <div
