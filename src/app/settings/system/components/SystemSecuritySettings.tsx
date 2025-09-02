@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useActionState, useEffect } from "react";
+import React, { useState, useActionState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { Input } from "~/components/ui/input";
@@ -34,25 +34,25 @@ interface SystemSecuritySettingsProps {
 
 export function SystemSecuritySettings({
   settings,
-}: SystemSecuritySettingsProps) {
+}: SystemSecuritySettingsProps): JSX.Element {
   const [formData, setFormData] = useState(settings);
   const [state, formAction, isPending] = useActionState(
     updateSystemSettingsAction,
     null,
   );
 
-  const handleToggle = (key: keyof typeof formData, value: boolean) => {
+  const handleToggle = (key: keyof typeof formData, value: boolean): void => {
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleInputChange = (key: keyof typeof formData, value: string) => {
+  const handleInputChange = (key: keyof typeof formData, value: string): void => {
     const numValue = parseInt(value, 10);
     if (!isNaN(numValue)) {
       setFormData((prev) => ({ ...prev, [key]: numValue }));
     }
   };
 
-  const handleSelectChange = (key: keyof typeof formData, value: string) => {
+  const handleSelectChange = (key: keyof typeof formData, value: string): void => {
     const numValue = parseInt(value, 10);
     setFormData((prev) => ({ ...prev, [key]: numValue }));
   };

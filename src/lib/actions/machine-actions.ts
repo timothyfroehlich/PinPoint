@@ -18,6 +18,7 @@ import {
   validateQRCodeParams,
 } from "~/lib/services/qr-code-service";
 import type { ActionResult } from "~/lib/actions/shared";
+import { validateFormData } from "~/lib/actions/shared";
 
 // ================================
 // VALIDATION SCHEMAS
@@ -30,9 +31,15 @@ const CreateMachineSchema = z.object({
   ownerId: idSchema.optional(),
 });
 
+// Explicit type for better TypeScript inference
+type CreateMachineData = z.infer<typeof CreateMachineSchema>;
+
 const UpdateMachineSchema = CreateMachineSchema.partial().extend({
   id: idSchema,
 });
+
+// Explicit type for better TypeScript inference
+type UpdateMachineData = z.infer<typeof UpdateMachineSchema>;
 
 const BulkUpdateMachineSchema = z.object({
   machineIds: z
@@ -64,20 +71,10 @@ export async function createMachineAction(
   const { organization } = await requireMemberAccess();
   const organizationId = organization.id;
 
-  const result = CreateMachineSchema.safeParse({
-    name: formData.get("name"),
-    locationId: formData.get("locationId"),
-    modelId: formData.get("modelId"),
-    ownerId: formData.get("ownerId") ?? undefined,
-  });
-
-  if (!result.success) {
-    const treeifiedError = z.treeifyError(result.error);
-    return {
-      success: false,
-      error: "Validation failed",
-      fieldErrors: treeifiedError.fieldErrors,
-    };
+  // Enhanced validation with validateFormData
+  const validation: ActionResult<CreateMachineData> = validateFormData(formData, CreateMachineSchema);
+  if (!validation.success) {
+    return validation;
   }
 
   try {
@@ -86,11 +83,11 @@ export async function createMachineAction(
       .insert(machines)
       .values({
         id: crypto.randomUUID(),
-        name: result.data.name,
+        name: validation.data.name,
         organization_id: organizationId,
-        location_id: result.data.locationId,
-        model_id: result.data.modelId,
-        owner_id: result.data.ownerId ?? null,
+        location_id: validation.data.locationId,
+        model_id: validation.data.modelId,
+        owner_id: validation.data.ownerId ?? null,
         created_at: new Date(),
         updated_at: new Date(),
       })
@@ -124,21 +121,10 @@ export async function updateMachineAction(
   const { organization } = await requireMemberAccess();
   const organizationId = organization.id;
 
-  const result = UpdateMachineSchema.safeParse({
-    id: formData.get("id"),
-    name: formData.get("name"),
-    locationId: formData.get("locationId"),
-    modelId: formData.get("modelId"),
-    ownerId: formData.get("ownerId") ?? undefined,
-  });
-
-  if (!result.success) {
-    const treeifiedError = z.treeifyError(result.error);
-    return {
-      success: false,
-      error: "Validation failed",
-      fieldErrors: treeifiedError.fieldErrors,
-    };
+  // Enhanced validation with validateFormData
+  const validation: ActionResult<UpdateMachineData> = validateFormData(formData, UpdateMachineSchema);
+  if (!validation.success) {
+    return validation;
   }
 
   try {
@@ -147,11 +133,11 @@ export async function updateMachineAction(
       updated_at: new Date(),
     };
 
-    if (result.data.name) updateData.name = result.data.name;
-    if (result.data.locationId) updateData.location_id = result.data.locationId;
-    if (result.data.modelId) updateData.model_id = result.data.modelId;
-    if (result.data.ownerId !== undefined)
-      updateData.owner_id = result.data.ownerId ?? null;
+    if (validation.data.name) updateData.name = validation.data.name;
+    if (validation.data.locationId) updateData.location_id = validation.data.locationId;
+    if (validation.data.modelId) updateData.model_id = validation.data.modelId;
+    if (validation.data.ownerId !== undefined)
+      updateData.owner_id = validation.data.ownerId ?? null;
 
     // Update with organization scoping
     const [updatedMachine] = await db
@@ -159,7 +145,7 @@ export async function updateMachineAction(
       .set(updateData)
       .where(
         and(
-          eq(machines.id, result.data.id),
+          eq(machines.id, validation.data.id),
           eq(machines.organization_id, organizationId),
         ),
       )
@@ -173,12 +159,12 @@ export async function updateMachineAction(
     }
 
     // Cache invalidation
-    revalidateTag(`machine-${result.data.id}`);
+    revalidateTag(`machine-${updatedMachine.id}`);
     revalidateTag(`machines-${organizationId}`);
-    revalidatePath(`/machines/${result.data.id}`);
+    revalidatePath(`/machines/${updatedMachine.id}`);
     revalidatePath("/machines");
 
-    return { success: true, data: { machineId: result.data.id } };
+    return { success: true, data: { machineId: updatedMachine.id } };
   } catch (error) {
     console.error("Update machine error:", error);
     return {
@@ -248,18 +234,13 @@ export async function bulkUpdateMachinesAction(
   const machineIdsString = formData.get("machineIds") as string;
   const machineIds = machineIdsString ? machineIdsString.split(",") : [];
 
-  const result = BulkUpdateMachineSchema.safeParse({
-    machineIds,
-    locationId: formData.get("locationId") ?? undefined,
-    ownerId: formData.get("ownerId") ?? undefined,
-  });
-
-  if (!result.success) {
-    const treeifiedError = z.treeifyError(result.error);
+  // Enhanced validation with validateFormData (using parsed machineIds)
+  const bulkData = { machineIds, locationId: formData.get("locationId") ?? undefined, ownerId: formData.get("ownerId") ?? undefined };
+  const validation = BulkUpdateMachineSchema.safeParse(bulkData);
+  if (!validation.success) {
     return {
       success: false,
       error: "Validation failed",
-      fieldErrors: treeifiedError.fieldErrors,
     };
   }
 
@@ -269,9 +250,9 @@ export async function bulkUpdateMachinesAction(
       updated_at: new Date(),
     };
 
-    if (result.data.locationId) updateData.location_id = result.data.locationId;
-    if (result.data.ownerId !== undefined)
-      updateData.owner_id = result.data.ownerId ?? null;
+    if (validation.data.locationId) updateData.location_id = validation.data.locationId;
+    if (validation.data.ownerId !== undefined)
+      updateData.owner_id = validation.data.ownerId ?? null;
 
     // Update machines with organization scoping using inArray for multiple IDs
     const updatedMachines = await db
@@ -281,7 +262,7 @@ export async function bulkUpdateMachinesAction(
         and(
           eq(machines.organization_id, organizationId),
           // Use inArray for proper multiple ID handling
-          inArray(machines.id, result.data.machineIds),
+          inArray(machines.id, validation.data.machineIds),
         ),
       )
       .returning({ id: machines.id });
@@ -315,11 +296,9 @@ export async function generateQRCodeAction(
   });
 
   if (!result.success) {
-    const treeifiedError = z.treeifyError(result.error);
     return {
       success: false,
       error: "Validation failed",
-      fieldErrors: treeifiedError.fieldErrors,
     };
   }
 
@@ -452,11 +431,9 @@ export async function bulkGenerateQRCodesAction(
   const result = BulkQRGenerateSchema.safeParse({ machineIds });
 
   if (!result.success) {
-    const treeifiedError = z.treeifyError(result.error);
     return {
       success: false,
       error: "Validation failed",
-      fieldErrors: treeifiedError.fieldErrors,
     };
   }
 

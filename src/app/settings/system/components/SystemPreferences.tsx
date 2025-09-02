@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useActionState, useEffect } from "react";
+import React, { useState, useActionState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import {
@@ -36,14 +36,14 @@ interface SystemPreferencesProps {
   };
 }
 
-export function SystemPreferences({ settings }: SystemPreferencesProps) {
+export function SystemPreferences({ settings }: SystemPreferencesProps): JSX.Element {
   const [formData, setFormData] = useState(settings);
   const [state, formAction, isPending] = useActionState(
     updateSystemSettingsAction,
     null,
   );
 
-  const handleSelectChange = (key: keyof typeof formData, value: string) => {
+  const handleSelectChange = (key: keyof typeof formData, value: string): void => {
     if (key === "itemsPerPage") {
       setFormData((prev) => ({ ...prev, [key]: parseInt(value, 10) }));
     } else {

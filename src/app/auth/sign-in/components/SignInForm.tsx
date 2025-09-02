@@ -5,6 +5,7 @@
 
 "use client";
 
+import React from "react";
 import { useActionState } from "react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -39,7 +40,7 @@ import { isDevAuthAvailable } from "~/lib/environment-client";
 import { createClient } from "~/utils/supabase/client";
 import { getCurrentDomain } from "~/lib/utils/domain";
 
-export function SignInForm() {
+export function SignInForm(): React.JSX.Element {
   const router = useRouter();
 
   const [magicLinkState, magicLinkAction, magicLinkPending] = useActionState<
@@ -85,7 +86,7 @@ export function SignInForm() {
     setSelectedOrganizationId(defaultId);
   }, [publicOrganizations, orgsLoading]);
 
-  const handleOAuthSignIn = async (provider: "google") => {
+  const handleOAuthSignIn = async (provider: "google"): Promise<void> => {
     if (!selectedOrganizationId) {
       alert("Please select an organization");
       return;
@@ -100,7 +101,7 @@ export function SignInForm() {
     }
   };
 
-  const handleDevAuth = async (email: string, role: string) => {
+  const handleDevAuth = async (email: string, role: string): Promise<void> => {
     if (!selectedOrganizationId) {
       alert("Please select an organization");
       return;
@@ -195,7 +196,7 @@ export function SignInForm() {
                   <SelectItem
                     key={org.id}
                     value={org.id}
-                    data-testid={`org-option-${org.subdomain ?? org.id}`}
+                    data-testid={`org-option-${org.subdomain}`}
                   >
                     {org.name}
                   </SelectItem>

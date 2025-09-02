@@ -69,8 +69,8 @@ export const organizationRouter = createTRPCRouter({
         sql`SELECT id, name, subdomain, logo_url FROM public_organizations_minimal ORDER BY name`,
       );
 
-      // With postgres-js driver, execute() returns rows directly as an array
-      const rows = result as {
+      // Convert RowList to typed array (TypeScript requires 'unknown' intermediate step)
+      const rows = result as unknown as {
         id: string;
         name: string;
         subdomain: string;

@@ -47,3 +47,9 @@ export type {
 
 // Common DAL utility types
 export type { PaginationOptions } from "~/lib/dal/shared";
+
+// Test types and interfaces (shared across test files)
+export type * from "./test";
+
+// tRPC type utilities and inference helpers
+export type * from "./trpc";

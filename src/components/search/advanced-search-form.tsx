@@ -82,12 +82,12 @@ export function AdvancedSearchForm({
   defaultExpanded = false,
   showActiveFilters = true,
   onFormSubmit,
-}: AdvancedSearchFormProps) {
+}: AdvancedSearchFormProps): JSX.Element {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   // Helper function to build URLs based on entity type
-  const buildUrl = (params: Record<string, unknown>) => {
+  const buildUrl = (params: Record<string, unknown>): string => {
     if (entityType === "issues") {
       return buildIssueUrl(basePath, params, currentParams);
     } else if (entityType === "machines") {
@@ -136,7 +136,7 @@ export function AdvancedSearchForm({
   });
 
   // Handle form field updates
-  const updateFormField = (fieldId: string, value: unknown) => {
+  const updateFormField = (fieldId: string, value: unknown): void => {
     setFormState((prev) => ({
       ...prev,
       [fieldId]: value,
@@ -144,7 +144,7 @@ export function AdvancedSearchForm({
   };
 
   // Handle form submission with URL update
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = (event: React.FormEvent): void => {
     event.preventDefault();
 
     // Build clean parameters object
@@ -202,7 +202,7 @@ export function AdvancedSearchForm({
   };
 
   // Clear all filters
-  const handleClearFilters = () => {
+  const handleClearFilters = (): void => {
     const clearedState: FormState = {};
 
     fields.forEach((field) => {
@@ -250,7 +250,7 @@ export function AdvancedSearchForm({
   }, 0);
 
   // Render individual form field
-  const renderField = (field: FilterField) => {
+  const renderField = (field: FilterField): JSX.Element | null => {
     switch (field.type) {
       case "text":
         return (
@@ -260,7 +260,7 @@ export function AdvancedSearchForm({
               id={field.id}
               type="text"
               placeholder={field.placeholder}
-              value={(formState[field.id] as string) ?? ""}
+              value={(formState[field.id] as string) || ""}
               onChange={(e) => {
                 updateFormField(field.id, e.target.value);
               }}
@@ -273,7 +273,7 @@ export function AdvancedSearchForm({
           <div key={field.id} className="space-y-2">
             <Label htmlFor={field.id}>{field.label}</Label>
             <Select
-              value={(formState[field.id] as string) ?? ""}
+              value={(formState[field.id] as string) || ""}
               onValueChange={(value) => {
                 updateFormField(field.id, value);
               }}
@@ -347,7 +347,7 @@ export function AdvancedSearchForm({
                 <Input
                   type="date"
                   placeholder="Start date"
-                  value={(formState[`${field.id}_start`] as string) ?? ""}
+                  value={(formState[`${field.id}_start`] as string) || ""}
                   onChange={(e) => {
                     updateFormField(`${field.id}_start`, e.target.value);
                   }}
@@ -357,7 +357,7 @@ export function AdvancedSearchForm({
                 <Input
                   type="date"
                   placeholder="End date"
-                  value={(formState[`${field.id}_end`] as string) ?? ""}
+                  value={(formState[`${field.id}_end`] as string) || ""}
                   onChange={(e) => {
                     updateFormField(`${field.id}_end`, e.target.value);
                   }}
@@ -378,7 +378,7 @@ export function AdvancedSearchForm({
                   placeholder={`Min ${field.label.toLowerCase()}`}
                   min={field.min}
                   max={field.max}
-                  value={(formState[`${field.id}_min`] as string) ?? ""}
+                  value={(formState[`${field.id}_min`] as string) || ""}
                   onChange={(e) => {
                     updateFormField(`${field.id}_min`, e.target.value);
                   }}
@@ -390,7 +390,7 @@ export function AdvancedSearchForm({
                   placeholder={`Max ${field.label.toLowerCase()}`}
                   min={field.min}
                   max={field.max}
-                  value={(formState[`${field.id}_max`] as string) ?? ""}
+                  value={(formState[`${field.id}_max`] as string) || ""}
                   onChange={(e) => {
                     updateFormField(`${field.id}_max`, e.target.value);
                   }}

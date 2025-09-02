@@ -83,7 +83,7 @@ export function GenericSearch({
   autoFocus = false,
   disabled = false,
   size = "default",
-}: GenericSearchProps) {
+}: GenericSearchProps): JSX.Element {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
@@ -120,11 +120,11 @@ export function GenericSearch({
     initialSearch,
   ]);
 
-  const clearSearch = () => {
+  const clearSearch = (): void => {
     setSearchValue("");
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
     // Force immediate navigation on form submit
     const currentParams = Object.fromEntries(searchParams.entries());
@@ -151,7 +151,7 @@ export function GenericSearch({
           type="search"
           placeholder={placeholder}
           value={searchValue}
-          onChange={(e) => {
+          onChange={(e): void => {
             setSearchValue(e.target.value);
           }}
           className={size === "sm" ? "pl-8 pr-8 h-8" : "pl-10 pr-10"}
@@ -197,7 +197,7 @@ export function GenericSearch({
 /**
  * Compact variant for dense layouts or sidebars
  */
-export function GenericSearchCompact(props: Omit<GenericSearchProps, "size">) {
+export function GenericSearchCompact(props: Omit<GenericSearchProps, "size">): JSX.Element {
   return <GenericSearch {...props} size="sm" />;
 }
 
@@ -209,22 +209,22 @@ export function useGenericSearch(
   initialSearch = "",
   basePath: string,
   urlBuilder: GenericSearchProps["urlBuilder"] = defaultUrlBuilder,
-) {
+): { searchValue: string; deferredSearchValue: string; isPending: boolean; updateSearch: (newValue: string) => void; clearSearch: () => void; commitSearch: (value?: string) => void; } {
   const [searchValue, setSearchValue] = useState(initialSearch);
   const deferredSearchValue = useDeferredValue(searchValue);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const updateSearch = (newValue: string) => {
+  const updateSearch = (newValue: string): void => {
     setSearchValue(newValue);
   };
 
-  const clearSearch = () => {
+  const clearSearch = (): void => {
     setSearchValue("");
   };
 
-  const commitSearch = (value?: string) => {
+  const commitSearch = (value?: string): void => {
     const searchTerm = value ?? searchValue;
     const currentParams = Object.fromEntries(searchParams.entries());
 

@@ -1,3 +1,4 @@
+import React from "react";
 import Link from "next/link";
 import { Button } from "~/components/ui/button";
 import {
@@ -16,7 +17,7 @@ interface NavigationProps {
   organizationContext: OrganizationContext | null;
 }
 
-export function Navigation({ organizationContext }: NavigationProps) {
+export function Navigation({ organizationContext }: NavigationProps): JSX.Element {
   if (!organizationContext?.user) {
     // Unauthenticated navigation - using Material 3 surface colors
     return (
@@ -150,7 +151,7 @@ function OrganizationLogo({
   organization,
 }: {
   organization: { id: string; name: string; subdomain: string };
-}) {
+}): JSX.Element {
   return (
     <Link href="/dashboard" className="flex items-center gap-3">
       <span className="text-xl font-bold text-on-primary-container">
@@ -167,7 +168,7 @@ function UserContextDisplay({
 }: {
   user: { id: string; name?: string; email: string };
   organization: { id: string; name: string; subdomain: string };
-}) {
+}): JSX.Element {
   return (
     <div className="text-right hidden lg:block">
       <p className="text-sm font-medium text-on-primary-container">

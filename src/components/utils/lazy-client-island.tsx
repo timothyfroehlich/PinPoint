@@ -38,7 +38,7 @@ export function LazyClientIsland<T = Record<string, unknown>>({
   threshold = 0.1,
   strategy = "intersection",
   name = "LazyComponent",
-}: LazyClientIslandProps<T>) {
+}: LazyClientIslandProps<T>): JSX.Element | null {
   const [Component, setComponent] = useState<ComponentType<T> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -78,7 +78,7 @@ export function LazyClientIsland<T = Record<string, unknown>>({
   useEffect(() => {
     if (Component || isLoading || strategy !== "idle") return;
 
-    const loadOnIdle = () => {
+    const loadOnIdle = (): void => {
       if ("requestIdleCallback" in window) {
         requestIdleCallback(() => void loadComponent(), { timeout: 2000 });
       } else {
@@ -90,7 +90,7 @@ export function LazyClientIsland<T = Record<string, unknown>>({
     loadOnIdle();
   }, [Component, isLoading, strategy]);
 
-  const loadComponent = async () => {
+  const loadComponent = async (): Promise<void> => {
     if (Component || isLoading) return;
 
     setIsLoading(true);
@@ -159,10 +159,10 @@ export function LazyClientIsland<T = Record<string, unknown>>({
  */
 export function usePreloadComponent<T = Record<string, unknown>>(
   importComponent: () => Promise<{ default: ComponentType<T> }>,
-) {
+): { preload: () => Promise<void>; isPreloaded: boolean } {
   const [isPreloaded, setIsPreloaded] = useState(false);
 
-  const preload = async () => {
+  const preload = async (): Promise<void> => {
     if (isPreloaded) return;
 
     try {
@@ -182,8 +182,8 @@ export function usePreloadComponent<T = Record<string, unknown>>(
 export function createLazyClientIsland<T = Record<string, unknown>>(
   importComponent: () => Promise<{ default: ComponentType<T> }>,
   defaultProps?: Partial<LazyClientIslandProps<T>>,
-) {
-  return function LazyWrapper(props: T & Partial<LazyClientIslandProps<T>>) {
+): (props: T & Partial<LazyClientIslandProps<T>>) => JSX.Element {
+  return function LazyWrapper(props: T & Partial<LazyClientIslandProps<T>>): JSX.Element {
     const {
       fallback,
       loadImmediately,
@@ -198,10 +198,10 @@ export function createLazyClientIsland<T = Record<string, unknown>>(
         importComponent={importComponent}
         componentProps={componentProps as T}
         fallback={fallback ?? defaultProps?.fallback}
-        loadImmediately={loadImmediately ?? defaultProps?.loadImmediately}
-        threshold={threshold ?? defaultProps?.threshold}
-        strategy={strategy ?? defaultProps?.strategy}
-        name={name ?? defaultProps?.name}
+        loadImmediately={loadImmediately ?? defaultProps?.loadImmediately ?? false}
+        threshold={threshold ?? defaultProps?.threshold ?? 0.1}
+        strategy={strategy ?? defaultProps?.strategy ?? "intersection"}
+        name={name ?? defaultProps?.name ?? "LazyComponent"}
       />
     );
   };

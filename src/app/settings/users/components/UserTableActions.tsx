@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
@@ -51,10 +51,10 @@ export function UserTableActions({
   user,
   currentUserCanManage,
   availableRoles = [],
-}: UserTableActionsProps) {
+}: UserTableActionsProps): JSX.Element | null {
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleResendInvitation = () => {
+  const handleResendInvitation = (): void => {
     setIsLoading(true);
     try {
       // TODO: Implement resend invitation
@@ -66,7 +66,7 @@ export function UserTableActions({
     }
   };
 
-  const handleRemoveUser = () => {
+  const handleRemoveUser = (): void => {
     setIsLoading(true);
     try {
       // TODO: Implement user removal with confirmation dialog

@@ -29,7 +29,7 @@ import { SystemNotificationSettings } from "./components/SystemNotificationSetti
 import { SystemSecuritySettings } from "./components/SystemSecuritySettings";
 import { SystemPreferences } from "./components/SystemPreferences";
 
-export default async function SystemSettingsPage() {
+export default async function SystemSettingsPage(): Promise<React.JSX.Element> {
   const { organization } = await requireMemberAccess();
   const organizationId = organization.id;
 

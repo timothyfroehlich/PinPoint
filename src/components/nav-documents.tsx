@@ -33,7 +33,7 @@ export function NavDocuments({
     url: string;
     icon: Icon;
   }[];
-}) {
+}): JSX.Element {
   const { isMobile } = useSidebar();
 
   return (

@@ -219,7 +219,10 @@ export function hexToHslString(hex: string): string {
  * @param theme - Material theme generated from generateMaterialTheme
  * @returns CSS custom properties as strings
  */
-export function generateCssCustomProperties(theme: MaterialTheme) {
+export function generateCssCustomProperties(theme: MaterialTheme): {
+  light: string;
+  dark: string;
+} {
   const lightTheme = Object.entries(theme.light)
     .map(
       ([key, value]) =>

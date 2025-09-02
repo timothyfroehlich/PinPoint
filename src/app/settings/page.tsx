@@ -4,6 +4,7 @@
  * Phase 4B: Essential Administrative Interfaces
  */
 
+import React from "react";
 import Link from "next/link";
 import {
   Card,
@@ -24,7 +25,7 @@ import {
 import { requireMemberAccess } from "~/lib/organization-context";
 import { getCurrentOrganization } from "~/lib/dal/organizations";
 
-export default async function SettingsPage() {
+export default async function SettingsPage(): Promise<React.JSX.Element> {
   const { user } = await requireMemberAccess();
   const orgDetails = await getCurrentOrganization();
 

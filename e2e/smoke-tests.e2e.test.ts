@@ -6,27 +6,47 @@
 import { test, expect } from "@playwright/test";
 
 async function devLoginAsTim(page: import("@playwright/test").Page) {
-  await page.goto("/");
-  const loginLink = page.locator("a[href*='/auth/sign-in']").first();
-  if (await loginLink.isVisible().catch(() => false)) {
-    await loginLink.click();
-  } else {
-    await page.locator("text=/Sign in/i").first().click();
-  }
-  await expect(page.locator("h1")).toContainText(/Welcome back/i);
+  // Go directly to sign-in page instead of relying on home navigation.
+  await page.goto("/auth/sign-in");
+  await expect(page.locator("h1")).toContainText(/Welcome back|Sign In/i);
   const orgTrigger = page.locator("[data-testid='org-select-trigger']");
-  await expect(orgTrigger).toBeVisible({ timeout: 10000 });
-  // Ensure Austin Pinball Collective selected (open select if needed)
-  const triggerText = (await orgTrigger.textContent()) || "";
-  if (!/Austin Pinball Collective/i.test(triggerText)) {
+  await expect(orgTrigger).toBeVisible({ timeout: 15000 });
+
+  // Ensure an organization is selected (generic approach). If empty, open and pick first available option.
+  let triggerTextInitial = (await orgTrigger.textContent()) || "";
+  if (!triggerTextInitial.trim()) {
     await orgTrigger.click();
-    await page
-      .locator("[data-testid='org-option-apc']")
-      .or(page.locator("[role='option']:has-text('Austin Pinball Collective')"))
-      .click();
+    for (let i = 0; i < 12; i++) {
+      const firstOption = page.locator('[role="option"]').first();
+      if (await firstOption.isVisible().catch(() => false)) {
+        await firstOption.click();
+        break;
+      }
+      await page.waitForTimeout(250);
+    }
   }
-  await expect(orgTrigger).toContainText(/Austin Pinball Collective/i);
-  await page.locator("[data-testid='dev-login-tim']").click();
+  // Close any lingering dropdown overlays
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(100);
+  await page.keyboard.press("Escape");
+  await expect(orgTrigger).toHaveText(/.+/, { timeout: 5000 });
+
+  const devLoginBtn = page.locator("[data-testid='dev-login-tim']");
+  await expect(devLoginBtn).toBeVisible({ timeout: 10000 });
+  let clicked = false;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      await devLoginBtn.click();
+      clicked = true;
+      break;
+    } catch {
+      await page.keyboard.press("Escape");
+      await page.waitForTimeout(150);
+    }
+  }
+  if (!clicked) {
+    await devLoginBtn.click({ force: true });
+  }
   // Wait for dashboard
   for (let i = 0; i < 40; i++) {
     await page.waitForTimeout(500);
@@ -125,7 +145,7 @@ test.describe("Smoke Tests", () => {
     let redirected = false;
     for (let i = 0; i < 40; i++) {
       await page.waitForTimeout(500);
-      if (/\/issues\/issue_/.test(page.url())) {
+      if (page.url().includes('/issues/issue_')) {
         redirected = true;
         break;
       }

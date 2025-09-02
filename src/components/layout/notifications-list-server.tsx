@@ -3,6 +3,7 @@
  * Server-rendered notification dropdown content
  */
 
+import React from "react";
 import { formatDistanceToNow } from "date-fns";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -27,7 +28,7 @@ interface NotificationListServerProps {
 /**
  * Get appropriate icon based on notification type
  */
-function getNotificationIcon(type: string) {
+function getNotificationIcon(type: string): JSX.Element {
   switch (type) {
     case "ISSUE_CREATED":
     case "ISSUE_UPDATED":
@@ -47,7 +48,7 @@ function getNotificationIcon(type: string) {
 /**
  * Get appropriate color scheme based on notification type using Material 3 colors
  */
-function getNotificationColor(type: string) {
+function getNotificationColor(type: string): string {
   switch (type) {
     case "ISSUE_CREATED":
       return "bg-error-container border-outline-variant text-on-error-container";
@@ -68,7 +69,7 @@ function getNotificationColor(type: string) {
 
 export async function NotificationsListServer({
   limit = 10,
-}: NotificationListServerProps) {
+}: NotificationListServerProps): Promise<JSX.Element> {
   // Parallel data fetching for optimal performance
   const [notifications, stats] = await Promise.all([
     getUserNotifications(limit),

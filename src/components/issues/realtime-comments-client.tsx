@@ -44,7 +44,7 @@ export function RealtimeCommentsClient({
   issueId,
   currentUserId,
   existingCommentIds = [],
-}: RealtimeCommentsClientProps) {
+}: RealtimeCommentsClientProps): JSX.Element | null {
   const [newComments, setNewComments] = useState<Comment[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [statusUpdate, setStatusUpdate] = useState<{

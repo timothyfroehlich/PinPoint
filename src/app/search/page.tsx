@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { type Metadata } from "next";
 import { type SearchEntity } from "~/lib/services/search-service";
 import {
   UniversalSearchResults,
@@ -14,7 +15,7 @@ interface SearchPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export async function generateMetadata({ searchParams }: SearchPageProps) {
+export async function generateMetadata({ searchParams }: SearchPageProps): Promise<Metadata> {
   const params = await searchParams;
   const query = typeof params["q"] === "string" ? params["q"] : "";
 
@@ -37,7 +38,7 @@ export async function generateMetadata({ searchParams }: SearchPageProps) {
   };
 }
 
-export default async function SearchPage({ searchParams }: SearchPageProps) {
+export default async function SearchPage({ searchParams }: SearchPageProps): Promise<React.JSX.Element> {
   // Authentication validation with automatic redirect
   await requireMemberAccess();
 
@@ -143,7 +144,7 @@ function SearchResultsWithData({
   entities: SearchEntity[];
   page: number;
   limit: number;
-}) {
+}): React.JSX.Element {
   return (
     <UniversalSearchResults
       query={query}

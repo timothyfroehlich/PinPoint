@@ -265,7 +265,11 @@ export interface PaginationOptions {
   limit?: number;
 }
 
-export function getPaginationParams(options: PaginationOptions = {}) {
+export function getPaginationParams(options: PaginationOptions = {}): {
+  limit: number;
+  offset: number;
+  page: number;
+} {
   const page = Math.max(1, options.page ?? 1);
   const limit = Math.min(100, Math.max(1, options.limit ?? 20));
   const offset = (page - 1) * limit;

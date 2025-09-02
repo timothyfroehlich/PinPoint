@@ -35,7 +35,7 @@ export function FilterPresets({
   onPresetClick,
   activePresetId,
   className,
-}: FilterPresetsProps) {
+}: FilterPresetsProps): JSX.Element {
   // Define preset filter combinations
   const presets: FilterPreset[] = [
     {
@@ -83,7 +83,7 @@ export function FilterPresets({
       <span className="text-sm font-medium text-muted-foreground">
         Quick Filters:
       </span>
-      {presets.map((preset) => {
+      {presets.map((preset): JSX.Element => {
         const isActive = activePresetId === preset.id;
 
         return (
@@ -91,7 +91,7 @@ export function FilterPresets({
             key={preset.id}
             variant={isActive ? "default" : "outline"}
             size="sm"
-            onClick={() => {
+            onClick={(): void => {
               onPresetClick(preset.filters);
             }}
             className={cn(
@@ -112,7 +112,7 @@ export function FilterPresets({
       <Button
         variant="ghost"
         size="sm"
-        onClick={() => {
+        onClick={(): void => {
           onPresetClick({});
         }}
         className="h-8 px-3 text-muted-foreground"

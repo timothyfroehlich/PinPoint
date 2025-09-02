@@ -43,7 +43,7 @@ export function IssueAssignmentClient({
   currentAssigneeId,
   currentAssigneeName,
   availableUsers,
-}: IssueAssignmentClientProps) {
+}: IssueAssignmentClientProps): JSX.Element {
   const userOptions = availableUsers ?? DEFAULT_USER_OPTIONS;
 
   const [state, formAction, isPending] = useActionState(

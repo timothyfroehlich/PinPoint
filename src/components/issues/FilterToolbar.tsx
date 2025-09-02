@@ -51,7 +51,7 @@ export function FilterToolbar({
   filters,
   onFiltersChange,
   isLoading = false,
-}: FilterToolbarProps) {
+}: FilterToolbarProps): JSX.Element {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [activePresetId, setActivePresetId] = useState<string>();
 
@@ -70,7 +70,7 @@ export function FilterToolbar({
   const handlePresetClick = (
     presetFilters: Partial<IssueFilters>,
     presetId?: string,
-  ) => {
+  ): void => {
     // Apply preset filters and mark which preset is active
     onFiltersChange({
       ...filters,

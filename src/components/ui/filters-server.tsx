@@ -56,7 +56,7 @@ export function FiltersServer({
   actionUrl,
   clearAllUrl,
   children,
-}: FiltersServerProps) {
+}: FiltersServerProps): JSX.Element {
   return (
     <Card>
       <CardHeader className="pb-4">
@@ -157,7 +157,7 @@ export function FiltersServer({
 /**
  * Active filter badge with remove functionality
  */
-function ActiveFilterBadge({ filter }: { filter: ActiveFilter }) {
+function ActiveFilterBadge({ filter }: { filter: ActiveFilter }): JSX.Element {
   return (
     <Badge variant="secondary" className="flex items-center gap-1 pr-1">
       <span className="text-xs">
@@ -191,7 +191,7 @@ export function FilterBarServer({
   quickFilters,
   searchUrl,
   clearUrl,
-}: FilterBarServerProps) {
+}: FilterBarServerProps): JSX.Element {
   const hasActiveFilters = Object.values(currentFilters).some(
     (value) =>
       value !== undefined &&
@@ -259,7 +259,7 @@ export function createFilterAction(
     params: Record<string, unknown>,
     currentParams?: Record<string, unknown>,
   ) => string,
-) {
+): (formData: FormData) => void {
   return function handleFilterSubmit(formData: FormData) {
     "use server";
 
@@ -296,7 +296,7 @@ export function CheckboxFilter({
   label,
   options,
   selectedValues,
-}: CheckboxFilterProps) {
+}: CheckboxFilterProps): JSX.Element {
   return (
     <div className="space-y-2">
       <Label className="text-sm font-medium">{label}</Label>

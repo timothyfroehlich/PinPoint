@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { type Metadata } from "next";
 import Link from "next/link";
 import { Button } from "~/components/ui/button";
 import { PlusIcon } from "lucide-react";
@@ -32,7 +33,7 @@ interface MachinesPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export async function generateMetadata({ searchParams }: MachinesPageProps) {
+export async function generateMetadata({ searchParams }: MachinesPageProps): Promise<Metadata> {
   await requireMemberAccess();
 
   // Parse search params using centralized utility
@@ -93,7 +94,7 @@ export async function generateMetadata({ searchParams }: MachinesPageProps) {
 
 export default async function MachinesPage({
   searchParams,
-}: MachinesPageProps) {
+}: MachinesPageProps): Promise<React.JSX.Element> {
   await requireMemberAccess();
 
   // Parse URL parameters using centralized utility
