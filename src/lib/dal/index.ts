@@ -149,7 +149,7 @@ export async function getUserContextData(): Promise<
 
   return {
     ...authContext,
-    profile: userProfile,
+    profile: userProfile ? transformKeysToCamelCase(userProfile) as UserProfileResponse : null,
   };
 }
 

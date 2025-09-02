@@ -67,8 +67,8 @@ export function validateFilters(filters: Partial<IssueFilters>): IssueFilters {
 
   const trimmedSearch = typeof filters.search === "string" ? filters.search.trim() : undefined;
 
-  const validatedSortBy = isValidSortField(filters.sortBy) ? filters.sortBy : defaults.sortBy;
-  const validatedSortOrder = isValidSortOrder(filters.sortOrder) ? filters.sortOrder : defaults.sortOrder;
+  const validatedSortBy: IssueFilters["sortBy"] = isValidSortField(filters.sortBy) ? filters.sortBy : defaults.sortBy;
+  const validatedSortOrder: IssueFilters["sortOrder"] = isValidSortOrder(filters.sortOrder) ? filters.sortOrder : defaults.sortOrder;
 
   return {
     ...(filters.locationId && { locationId: filters.locationId }),
@@ -78,8 +78,8 @@ export function validateFilters(filters: Partial<IssueFilters>): IssueFilters {
     ...(filters.assigneeId && { assigneeId: filters.assigneeId }),
     ...(filters.reporterId && { reporterId: filters.reporterId }),
     ...(filters.ownerId && { ownerId: filters.ownerId }),
-    sortBy: validatedSortBy,
-    sortOrder: validatedSortOrder,
+    ...(validatedSortBy && { sortBy: validatedSortBy }),
+    ...(validatedSortOrder && { sortOrder: validatedSortOrder }),
   };
 }
 

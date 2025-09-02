@@ -31,8 +31,8 @@ import {
 import {
   signInWithOAuth,
   sendMagicLink,
-  type ActionResult,
 } from "~/lib/actions/auth-actions";
+import { type ActionResult } from "~/lib/actions/auth-actions";
 import { type OrganizationOption } from "~/lib/dal/public-organizations";
 
 // API Response validation schema for security
