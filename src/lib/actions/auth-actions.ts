@@ -18,10 +18,11 @@ import {
 import { isDevelopment } from "~/lib/environment";
 import { extractFormFields } from "~/lib/utils/form-data";
 import { getCookieDomain } from "~/lib/utils/domain";
-import { actionError, type ActionResult } from "./shared";
+import { actionError } from "./shared";
 
-// Re-export ActionResult for compatibility with existing components
-export type { ActionResult };
+// Workaround for Turbopack bug PACK-5180: re-export types using import/export pattern  
+import type { ActionResult as _ActionResult } from "./shared";
+export type ActionResult<T = any> = _ActionResult<T>;
 
 // Validation schemas
 const magicLinkSchema = z.object({
