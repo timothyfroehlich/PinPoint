@@ -77,7 +77,7 @@ export function IssueStatusUpdateClient({
   currentStatusName,
   availableStatuses,
 }: IssueStatusUpdateClientProps) {
-  const statusOptions = availableStatuses || DEFAULT_STATUS_OPTIONS;
+  const statusOptions = availableStatuses ?? DEFAULT_STATUS_OPTIONS;
 
   const [state, formAction, isPending] = useActionState(
     updateIssueStatusAction.bind(null, issueId),

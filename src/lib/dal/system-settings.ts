@@ -114,14 +114,12 @@ export const getSystemSettings = cache(
           }
           case "security": {
             const k = key as keyof SystemSettingsData["security"];
-            securityPartial[k] =
-              value as SystemSettingsData["security"][typeof k];
+            (securityPartial as any)[k] = value;
             break;
           }
           case "preferences": {
             const k = key as keyof SystemSettingsData["preferences"];
-            preferencesPartial[k] =
-              value as SystemSettingsData["preferences"][typeof k];
+            (preferencesPartial as any)[k] = value;
             break;
           }
           case "features": {

@@ -123,7 +123,7 @@ export function NotificationClient({
       addNotification({
         type: "info",
         title: "Machine Updated",
-        message: `Machine "${customEvent.detail.machineName}" has been updated`,
+        message: `Machine "${String(customEvent.detail?.machineName ?? "Unknown")}" has been updated`,
         autoHide: true,
       });
     };
@@ -196,19 +196,21 @@ export function NotificationClient({
           .subscribe();
 
         return () => {
-          supabase.removeChannel(orgChannel);
+          void supabase.removeChannel(orgChannel);
           setIsConnected(false);
         };
       } catch (error) {
         console.error("Failed to initialize notification stream:", error);
         setIsConnected(false);
-        return () => {}; // No-op cleanup function
+        return () => {
+          // No-op cleanup function on error
+        };
       }
     };
 
     const cleanup = initializeNotificationStream();
     return () => {
-      cleanup.then((fn) => {
+      void cleanup.then((fn) => {
         fn?.();
       });
     };

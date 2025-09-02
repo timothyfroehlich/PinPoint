@@ -351,7 +351,7 @@ export function createEntityIdSchema(
 ): z.ZodObject<Record<string, z.ZodString>> {
   const fieldName = `${entityName}Id`;
   return z.object({
-    [fieldName]: idSchema,
+    [fieldName]: z.string().min(1, "ID is required"),
   });
 }
 
@@ -364,8 +364,9 @@ export function createNamedEntityCreationSchema(
 ): z.ZodObject<{
   name: z.ZodOptional<z.ZodString> | z.ZodString;
 }> {
+  const baseNameSchema = z.string().min(1, "Name is required");
   return z.object({
-    name: requireName ? nameSchema : optionalNameSchema,
+    name: requireName ? baseNameSchema : baseNameSchema.optional(),
   });
 }
 
@@ -378,8 +379,8 @@ export function createNamedEntityUpdateSchema(): z.ZodObject<{
   name: z.ZodOptional<z.ZodString>;
 }> {
   return z.object({
-    id: idSchema,
-    name: optionalNameSchema,
+    id: z.string().min(1, "ID is required"),
+    name: z.string().min(1, "Name is required").optional(),
   });
 }
 
@@ -407,7 +408,9 @@ export function validateNonEmptyStringArray(
     }
     const trimmed = raw.trim();
     if (trimmed.length === 0) {
-      throw new Error(`${fieldName}[${String(index)}] must be a non-empty string`);
+      throw new Error(
+        `${fieldName}[${String(index)}] must be a non-empty string`,
+      );
     }
     result.push(trimmed);
   }
