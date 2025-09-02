@@ -21,7 +21,7 @@ import {
   performUniversalSearch,
   type SearchEntity,
 } from "~/lib/services/search-service";
-import { requireAuthContextWithRole } from "~/lib/organization-context";
+import { requireAuthContextWithRole } from "~/lib/dal/shared";
 import { formatDistanceToNow } from "date-fns";
 
 interface UniversalSearchResultsProps {
