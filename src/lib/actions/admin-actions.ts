@@ -34,10 +34,7 @@ import { PERMISSIONS } from "~/server/auth/permissions.constants";
 // Enhanced validation schemas with better error messages
 const inviteUserSchema = z.object({
   email: emailSchema.transform((s) => s.toLowerCase()),
-  name: z
-    .string()
-    .max(100, "Name must be less than 100 characters")
-    .optional(),
+  name: z.string().max(100, "Name must be less than 100 characters").optional(),
   roleId: uuidSchema.optional(),
   message: z
     .string()
@@ -193,7 +190,7 @@ export async function inviteUserAction(
         `User invitation processed for ${validation.data.email} by ${user.email}`,
         {
           userId,
-          membershipId: newMembership?.id,
+          membershipId: newMembership.id,
           organizationId,
           roleId,
         },
