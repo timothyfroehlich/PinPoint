@@ -98,7 +98,10 @@ export function parseMachineSearchParams(
   const parsed = MachineSearchParamsSchema.safeParse(searchParams);
 
   if (!parsed.success) {
-    console.warn("Invalid machine search parameters:", parsed.error.flatten());
+    console.warn(
+      "Invalid machine search parameters:",
+      z.treeifyError(parsed.error),
+    );
     // Return default values on parsing error
     return MachineSearchParamsSchema.parse({});
   }
