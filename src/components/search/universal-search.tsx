@@ -67,6 +67,7 @@ export function UniversalSearch({
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   // Refs
   const inputRef = useRef<HTMLInputElement>(null);
@@ -75,9 +76,14 @@ export function UniversalSearch({
   // Debounce search input for API calls
   const debouncedSearchValue = useDebounce(searchValue, 300);
 
+  // Set mounted state to prevent hydration mismatches
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Load recent searches from localStorage on mount
   useEffect(() => {
-    if (showRecentSearches) {
+    if (mounted && showRecentSearches) {
       const saved = localStorage.getItem("pinpoint-recent-searches");
       if (saved) {
         try {
@@ -87,7 +93,7 @@ export function UniversalSearch({
         }
       }
     }
-  }, [showRecentSearches]);
+  }, [mounted, showRecentSearches]);
 
   // Fetch search suggestions when debounced value changes
   useEffect(() => {
@@ -129,6 +135,8 @@ export function UniversalSearch({
 
   // Close dropdown when clicking outside
   useEffect(() => {
+    if (!mounted) return;
+
     const handleClickOutside = (event: MouseEvent) => {
       if (
         dropdownRef.current &&
@@ -144,10 +152,12 @@ export function UniversalSearch({
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, []);
+  }, [mounted]);
 
   // Handle keyboard navigation
   useEffect(() => {
+    if (!mounted) return;
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setShowDropdown(false);
@@ -161,12 +171,10 @@ export function UniversalSearch({
         document.removeEventListener("keydown", handleKeyDown);
       };
     }
-
-    return undefined;
-  }, [showDropdown]);
+  }, [mounted, showDropdown]);
 
   const saveRecentSearch = (query: string) => {
-    if (!showRecentSearches || !query.trim()) return;
+    if (!mounted || !showRecentSearches || !query.trim()) return;
 
     const newRecentSearches = [
       query.trim(),

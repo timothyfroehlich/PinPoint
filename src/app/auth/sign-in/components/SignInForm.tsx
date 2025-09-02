@@ -128,17 +128,19 @@ export function SignInForm() {
           (org) => org.id === selectedOrganizationId,
         );
         if (selectedOrg?.subdomain) {
-          const isDev =
-            typeof window !== "undefined" &&
-            window.location.hostname === "localhost";
-          if (isDev) {
-            window.location.href = `https://${selectedOrg.subdomain}.localhost:3000/dashboard`;
+          const currentSubdomain = window.location.hostname.split('.')[0];
+
+          if (currentSubdomain === selectedOrg.subdomain) {
+            // Already on correct subdomain, just navigate to dashboard
+            router.push("/dashboard");
+            return;
+          } else {
+            // Need to redirect to correct subdomain
+            const isLocalhost = window.location.hostname.includes('localhost');
+            const rootDomain = isLocalhost ? 'localhost:3000' : getCurrentDomain();
+            window.location.href = `${window.location.protocol}//${selectedOrg.subdomain}.${rootDomain}/dashboard`;
             return;
           }
-          // In production, use dynamic domain
-          const currentDomain = getCurrentDomain();
-          window.location.href = `https://${selectedOrg.subdomain}.${currentDomain}/dashboard`;
-          return;
         }
 
         // Fallback: regular navigation if no organization selected
@@ -180,12 +182,16 @@ export function SignInForm() {
               onValueChange={setSelectedOrganizationId}
               disabled={isOAuthLoading || magicLinkPending || devAuthLoading}
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Select your organization" />
+              <SelectTrigger data-testid="org-select-trigger">
+                <SelectValue placeholder="Select your organization" data-testid="org-select-value" />
               </SelectTrigger>
               <SelectContent>
                 {organizations.map((org) => (
-                  <SelectItem key={org.id} value={org.id}>
+                  <SelectItem
+                    key={org.id}
+                    value={org.id}
+                    data-testid={`org-option-${org.subdomain ?? org.id}`}
+                  >
                     {org.name}
                   </SelectItem>
                 ))}
@@ -340,6 +346,7 @@ export function SignInForm() {
                   variant="outline"
                   size="sm"
                   className="w-full text-xs"
+                  data-testid="dev-login-tim"
                 >
                   {devAuthLoading ? "Logging in..." : "Dev Login: Tim (Admin)"}
                 </Button>
@@ -354,6 +361,7 @@ export function SignInForm() {
                   variant="outline"
                   size="sm"
                   className="w-full text-xs"
+                  data-testid="dev-login-harry"
                 >
                   {devAuthLoading
                     ? "Logging in..."
