@@ -65,22 +65,31 @@ export function mergeFilters(
 export function validateFilters(filters: Partial<IssueFilters>): IssueFilters {
   const defaults = getDefaultFilters();
 
+  const trimmedSearch =
+    typeof filters.search === "string" ? filters.search.trim() : undefined;
+
+  const validatedSortBy: IssueFilters["sortBy"] = isValidSortField(
+    filters.sortBy,
+  )
+    ? filters.sortBy
+    : defaults.sortBy;
+  const validatedSortOrder: IssueFilters["sortOrder"] = isValidSortOrder(
+    filters.sortOrder,
+  )
+    ? filters.sortOrder
+    : defaults.sortOrder;
+
   return {
-    locationId: filters.locationId ?? undefined,
-    machineId: filters.machineId ?? undefined,
-    statusIds: Array.isArray(filters.statusIds) ? filters.statusIds : undefined,
-    search:
-      typeof filters.search === "string"
-        ? // Convert empty strings to undefined for API consistency
-          filters.search.trim() || undefined
-        : undefined,
-    assigneeId: filters.assigneeId ?? undefined,
-    reporterId: filters.reporterId ?? undefined,
-    ownerId: filters.ownerId ?? undefined,
-    sortBy: isValidSortField(filters.sortBy) ? filters.sortBy : defaults.sortBy,
-    sortOrder: isValidSortOrder(filters.sortOrder)
-      ? filters.sortOrder
-      : defaults.sortOrder,
+    ...(filters.locationId && { locationId: filters.locationId }),
+    ...(filters.machineId && { machineId: filters.machineId }),
+    ...(Array.isArray(filters.statusIds) &&
+      filters.statusIds.length > 0 && { statusIds: filters.statusIds }),
+    ...(trimmedSearch && { search: trimmedSearch }),
+    ...(filters.assigneeId && { assigneeId: filters.assigneeId }),
+    ...(filters.reporterId && { reporterId: filters.reporterId }),
+    ...(filters.ownerId && { ownerId: filters.ownerId }),
+    ...(validatedSortBy && { sortBy: validatedSortBy }),
+    ...(validatedSortOrder && { sortOrder: validatedSortOrder }),
   };
 }
 

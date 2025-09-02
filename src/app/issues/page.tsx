@@ -70,7 +70,7 @@ export async function generateMetadata({ searchParams }: IssuesPageProps) {
   const canonicalUrl = getIssueCanonicalUrl("/issues", parsedParams);
 
   return {
-    title: `Issues (${totalCount} found) - PinPoint`,
+    title: `Issues (${String(totalCount)} found) - PinPoint`,
     description,
     alternates: {
       canonical: canonicalUrl,

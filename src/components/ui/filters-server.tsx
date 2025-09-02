@@ -256,7 +256,7 @@ export function createFilterAction(
   basePath: string,
   urlBuilder: (basePath: string, params: any, currentParams?: any) => string,
 ) {
-  return async function handleFilterSubmit(formData: FormData) {
+  return function handleFilterSubmit(formData: FormData) {
     "use server";
 
     // Extract form data

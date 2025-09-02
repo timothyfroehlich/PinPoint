@@ -20,10 +20,14 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import type { ActionResult } from "~/lib/actions/shared";
-import type { MachineForIssues, UserResponse } from "~/lib/types";
+import type { MachineForIssues } from "~/lib/types";
 
 type Machine = MachineForIssues;
-type User = Pick<UserResponse, "id" | "name" | "email">;
+type User = {
+  id: string;
+  name: string | null;
+  email: string;
+};
 
 interface CreateIssueFormServerProps {
   machines: Machine[];
@@ -91,7 +95,7 @@ export function CreateIssueFormServer({
             <Select
               name="machineId"
               required
-              defaultValue={initialMachineId || ""}
+              defaultValue={initialMachineId ?? ""}
               disabled={isPending}
             >
               <SelectTrigger>

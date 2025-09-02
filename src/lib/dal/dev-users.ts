@@ -13,6 +13,22 @@ import { users, memberships, roles, organizations } from "~/server/db/schema";
 import { transformKeysToCamelCase } from "~/lib/utils/case-transformers";
 import type { DevUserResponse } from "~/lib/types";
 
+// Internal type for query result transformation
+type DevUserRaw = {
+  id: string;
+  name: string | null;
+  email: string | null; // email can be null in database
+  email_verified: Date | null; // Fixed: email_verified is timestamp in database
+  image: string | null;
+  bio: string | null;
+  notification_frequency: "IMMEDIATE" | "DAILY" | "WEEKLY" | "NEVER";
+  email_notifications_enabled: boolean;
+  push_notifications_enabled: boolean;
+  created_at: Date;
+  updated_at: Date;
+  roles: string[];
+};
+
 /**
  * Get development users for testing login
  * Only returns users with @example.com emails
@@ -60,8 +76,14 @@ export const getDevUsers = cache(async (): Promise<DevUserResponse[]> => {
         push_notifications_enabled: row.push_notifications_enabled,
         created_at: row.created_at,
         updated_at: row.updated_at,
-        role_name: row.role_name,
+        roles: [],
       });
+    }
+
+    // Add role if it exists
+    if (row.role_name) {
+      const user = userMap.get(userId)!;
+      user.roles.push(row.role_name);
     }
   }
 

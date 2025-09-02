@@ -125,7 +125,7 @@ export async function UniversalSearchResults({
             {searchResponse.totalCount} result
             {searchResponse.totalCount !== 1 ? "s" : ""} found for "{query}"
             {page > 1 &&
-              ` • Page ${page} of ${Math.ceil(searchResponse.totalCount / limit)}`}
+              ` • Page ${String(page)} of ${String(Math.ceil(searchResponse.totalCount / limit))}`}
           </p>
         </div>
 
@@ -137,10 +137,13 @@ export async function UniversalSearchResults({
                 if (count === 0) return null;
 
                 const colorClass =
-                  (entity in ENTITY_COLORS ? ENTITY_COLORS[entity as keyof typeof ENTITY_COLORS] : null) ??
-                  "bg-surface-variant text-on-surface-variant";
+                  (entity in ENTITY_COLORS
+                    ? ENTITY_COLORS[entity as keyof typeof ENTITY_COLORS]
+                    : null) ?? "bg-surface-variant text-on-surface-variant";
                 const label =
-                  (entity in ENTITY_LABELS ? ENTITY_LABELS[entity as keyof typeof ENTITY_LABELS] : null) ?? entity;
+                  (entity in ENTITY_LABELS
+                    ? ENTITY_LABELS[entity as keyof typeof ENTITY_LABELS]
+                    : null) ?? entity;
 
                 return (
                   <Badge
@@ -161,14 +164,17 @@ export async function UniversalSearchResults({
       <div className="space-y-3">
         {searchResponse.results.map((result) => {
           const IconComponent =
-            (result.entity in ENTITY_ICONS ? ENTITY_ICONS[result.entity as keyof typeof ENTITY_ICONS] : null) ??
-            FileTextIcon;
+            (result.entity in ENTITY_ICONS
+              ? ENTITY_ICONS[result.entity as keyof typeof ENTITY_ICONS]
+              : null) ?? FileTextIcon;
           const colorClass =
-            (result.entity in ENTITY_COLORS ? ENTITY_COLORS[result.entity as keyof typeof ENTITY_COLORS] : null) ??
-            "bg-surface-variant text-on-surface-variant";
+            (result.entity in ENTITY_COLORS
+              ? ENTITY_COLORS[result.entity as keyof typeof ENTITY_COLORS]
+              : null) ?? "bg-surface-variant text-on-surface-variant";
           const label =
-            (result.entity in ENTITY_LABELS ? ENTITY_LABELS[result.entity as keyof typeof ENTITY_LABELS] : null) ??
-            result.entity;
+            (result.entity in ENTITY_LABELS
+              ? ENTITY_LABELS[result.entity as keyof typeof ENTITY_LABELS]
+              : null) ?? result.entity;
 
           return (
             <Card
@@ -326,7 +332,7 @@ export async function UniversalSearchResults({
             {page > 1 && (
               <Button variant="outline" asChild>
                 <Link
-                  href={`/search?q=${encodeURIComponent(query)}&page=${page - 1}&limit=${limit}`}
+                  href={`/search?q=${encodeURIComponent(query)}&page=${String(page - 1)}&limit=${String(limit)}`}
                 >
                   Previous
                 </Link>
@@ -336,7 +342,7 @@ export async function UniversalSearchResults({
             {searchResponse.hasMore && (
               <Button variant="outline" asChild>
                 <Link
-                  href={`/search?q=${encodeURIComponent(query)}&page=${page + 1}&limit=${limit}`}
+                  href={`/search?q=${encodeURIComponent(query)}&page=${String(page + 1)}&limit=${String(limit)}`}
                 >
                   Next
                 </Link>
