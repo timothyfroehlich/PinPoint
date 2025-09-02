@@ -33,7 +33,9 @@ const updateOrganizationProfileSchema = z.object({
     .optional(),
   website: z
     .string()
-    .url("Please enter a valid website URL")
+    .refine((val) => !val || /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(val), {
+      message: "Please enter a valid website URL",
+    })
     .optional()
     .or(z.literal("")),
   phone: z
@@ -49,7 +51,9 @@ const updateOrganizationProfileSchema = z.object({
 const updateOrganizationLogoSchema = z.object({
   logoUrl: z
     .string()
-    .url("Please enter a valid logo URL")
+    .refine((val) => !val || /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(val), {
+      message: "Please enter a valid logo URL",
+    })
     .optional()
     .or(z.literal("")),
 });

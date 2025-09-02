@@ -107,7 +107,8 @@ export function MachineQRCodeClient({
       // Create a new window for printing
       const printWindow = window.open("", "_blank");
       if (printWindow) {
-        printWindow.document.write(`
+        // Use modern DOM manipulation instead of document.write
+        printWindow.document.documentElement.innerHTML = `
           <html>
             <head>
               <title>QR Code - ${machineName}</title>
@@ -151,8 +152,8 @@ export function MachineQRCodeClient({
               </div>
             </body>
           </html>
-        `);
-        printWindow.document.close();
+        `;
+        // Remove document.close() as it's not needed with innerHTML
         printWindow.print();
         printWindow.close();
 
