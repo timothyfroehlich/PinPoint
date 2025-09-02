@@ -34,8 +34,6 @@ import { activityTypeEnum } from "~/server/db/schema/issues";
 // Types moved to ~/lib/types - keeping for internal compatibility only
 // DO NOT add new exports to this file
 
-import type { DrizzleClient } from "~/server/db/drizzle";
-
 /**
  * Represents a raw, untransformed result from a database query.
  * Fields in this type are expected to be in snake_case, matching the database schema.

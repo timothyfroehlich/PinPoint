@@ -167,7 +167,9 @@ export function RealtimeCommentsClient({
       } catch (error) {
         console.error("Failed to initialize realtime connection:", error);
         setIsConnected(false);
-        return () => {}; // Return empty cleanup function on error
+        return () => {
+          // No-op cleanup function on error
+        };
       }
     };
 

@@ -101,7 +101,9 @@ export function NotificationBellClient({
           error,
         );
         setIsConnected(false);
-        return () => {}; // Return empty cleanup function on error
+        return () => {
+          // No-op cleanup function on error
+        };
       }
     };
 
