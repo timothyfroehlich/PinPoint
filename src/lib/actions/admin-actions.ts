@@ -32,7 +32,6 @@ import {
 import { db } from "~/lib/dal/shared";
 import { requirePermission } from "./shared";
 import { PERMISSIONS } from "~/server/auth/permissions.constants";
-import { users, memberships, roles } from "~/server/db/schema";
 // Removed unused getDB alias import
 
 // Enhanced validation schemas with better error messages
