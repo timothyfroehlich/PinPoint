@@ -106,7 +106,9 @@ export async function addCommentAction(
 
     // Background processing (runs after response sent to user)
     runAfterResponse(async () => {
-      console.log(`Comment added to issue ${issueId} by ${user.email}`);
+      console.log(
+        `Comment added to issue ${issueId} by ${user.email ?? "unknown"}`,
+      );
 
       // Generate notifications for issue stakeholders
       try {
@@ -182,7 +184,7 @@ export async function editCommentAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`Comment ${commentId} edited by ${user.email}`);
+      console.log(`Comment ${commentId} edited by ${user.email ?? "unknown"}`);
     });
 
     return actionSuccess({ success: true }, "Comment updated successfully");
@@ -237,7 +239,7 @@ export async function deleteCommentAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`Comment ${commentId} deleted by ${user.email}`);
+      console.log(`Comment ${commentId} deleted by ${user.email ?? "unknown"}`);
     });
 
     return actionSuccess({ success: true }, "Comment deleted successfully");
@@ -292,7 +294,9 @@ export async function restoreCommentAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`Comment ${commentId} restored by ${user.email}`);
+      console.log(
+        `Comment ${commentId} restored by ${user.email ?? "unknown"}`,
+      );
     });
 
     return actionSuccess({ success: true }, "Comment restored successfully");
