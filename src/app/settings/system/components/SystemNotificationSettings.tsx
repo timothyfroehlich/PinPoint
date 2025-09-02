@@ -43,7 +43,7 @@ export function SystemNotificationSettings({
       toast.success(
         state.message || "Notification settings saved successfully!",
       );
-    } else if (!state.success) {
+    } else if (state) {
       if (state.error) {
         toast.error(state.error);
       }
