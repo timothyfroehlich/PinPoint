@@ -72,7 +72,7 @@ export function MachineHeader({ machine }: MachineHeaderProps) {
                 <div className="flex items-center gap-1">
                   <MapPin className="h-4 w-4" />
                   {locationName}
-                  {machine.location?.city && machine.location?.state && (
+                  {machine.location?.city && machine.location.state && (
                     <span className="text-muted-foreground">
                       - {machine.location.city}, {machine.location.state}
                     </span>
