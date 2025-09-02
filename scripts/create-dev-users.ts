@@ -9,6 +9,7 @@
 import { config } from "dotenv";
 config({ path: ".env.local" });
 
+// eslint-disable-next-line no-restricted-imports -- Admin script needs direct Supabase client
 import { createClient } from "@supabase/supabase-js";
 
 interface DevUser {
@@ -42,10 +43,21 @@ const DEV_USERS: DevUser[] = [
 const DEV_PASSWORD = "dev-login-123";
 
 async function createDevUsers() {
+  // Check required environment variables
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
+
+  if (!supabaseUrl || !supabaseSecretKey) {
+    console.error("❌ Missing required environment variables:");
+    if (!supabaseUrl) console.error("  - NEXT_PUBLIC_SUPABASE_URL");
+    if (!supabaseSecretKey) console.error("  - SUPABASE_SECRET_KEY");
+    process.exit(1);
+  }
+
   // Create Supabase admin client
   const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SECRET_KEY!, // Service role key for admin operations
+    supabaseUrl,
+    supabaseSecretKey, // Service role key for admin operations
     {
       auth: {
         autoRefreshToken: false,

@@ -33,7 +33,7 @@ export function NavUser({
     email: string;
     avatar: string;
   };
-}) {
+}): JSX.Element {
   const { isMobile } = useSidebar();
 
   return (

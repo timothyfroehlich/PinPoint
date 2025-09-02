@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useActionState } from "react";
+import React, { useActionState } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -27,7 +27,7 @@ interface OrganizationProfileFormProps {
 
 export function OrganizationProfileForm({
   organization,
-}: OrganizationProfileFormProps) {
+}: OrganizationProfileFormProps): JSX.Element {
   const [state, formAction, isPending] = useActionState(
     updateOrganizationProfileAction,
     null,

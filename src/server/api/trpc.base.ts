@@ -495,7 +495,7 @@ export const orgScopedProcedure = protectedProcedure.use(
         ctx: {
           ...ctx,
           db: tx,
-          organizationId: ctx.organizationId, // Already checked for null above
+          organizationId: ctx.organizationId as string, // Type assertion: already checked for null above
         } satisfies TRPCContext & { organizationId: string },
       });
     });

@@ -38,14 +38,14 @@ export function PaginationServer({
   searchParams,
   itemsPerPage = 20,
   showSummary = true,
-}: PaginationServerProps) {
+}: PaginationServerProps): JSX.Element | null {
   // Don't render pagination for single page or no results
   if (totalPages <= 1) return null;
 
   /**
    * Build page URL preserving all current search parameters
    */
-  const buildPageUrl = (page: number) => {
+  const buildPageUrl = (page: number): string => {
     const params = new URLSearchParams();
 
     // Preserve all current search parameters
@@ -71,7 +71,7 @@ export function PaginationServer({
   /**
    * Generate page numbers to display with ellipsis handling
    */
-  const generatePageNumbers = () => {
+  const generatePageNumbers = (): (number | "ellipsis")[] => {
     const pages: (number | "ellipsis")[] = [];
     const maxPagesToShow = 7;
 
@@ -200,10 +200,10 @@ export function PaginationServerCompact({
   totalPages,
   basePath,
   searchParams,
-}: Omit<PaginationServerProps, "totalItems" | "itemsPerPage" | "showSummary">) {
+}: Omit<PaginationServerProps, "totalItems" | "itemsPerPage" | "showSummary">): JSX.Element | null {
   if (totalPages <= 1) return null;
 
-  const buildPageUrl = (page: number) => {
+  const buildPageUrl = (page: number): string => {
     const params = new URLSearchParams();
 
     Object.entries(searchParams).forEach(([key, value]) => {
@@ -270,7 +270,7 @@ export function PaginationUniversal({
   baseUrl,
   searchParams = {},
   itemName: _itemName = "items",
-}: PaginationUniversalProps) {
+}: PaginationUniversalProps): JSX.Element | null {
   // Calculate items per page (estimate from totalCount and totalPages)
   const itemsPerPage =
     totalPages > 1 ? Math.ceil(totalCount / totalPages) : totalCount;

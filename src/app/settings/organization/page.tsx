@@ -23,7 +23,7 @@ import { OrganizationProfileForm } from "./components/OrganizationProfileForm";
 import { OrganizationLogoForm } from "./components/OrganizationLogoForm";
 import { format } from "date-fns";
 
-export default async function OrganizationSettingsPage() {
+export default async function OrganizationSettingsPage(): Promise<React.JSX.Element> {
   const { organization: _organization } = await requireMemberAccess();
 
   // Fetch organization details and statistics in parallel

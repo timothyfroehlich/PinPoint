@@ -16,7 +16,7 @@ interface DashboardStatsProps {
   };
 }
 
-export function DashboardStats({ stats }: DashboardStatsProps) {
+export function DashboardStats({ stats }: DashboardStatsProps): JSX.Element {
   const resolutionRate =
     stats.totalIssues > 0
       ? Math.round((stats.closedIssues / stats.totalIssues) * 100)
@@ -77,7 +77,7 @@ interface StatCardProps {
   trend: "good" | "neutral" | "needs-attention";
 }
 
-function StatCard({ title, value, icon, description, trend }: StatCardProps) {
+function StatCard({ title, value, icon, description, trend }: StatCardProps): JSX.Element {
   const trendColors = {
     good: "text-tertiary",
     neutral: "text-secondary",

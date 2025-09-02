@@ -44,7 +44,7 @@ export async function generateMetadata({
   }
 }
 
-export default async function MachinePage({ params }: MachinePageProps) {
+export default async function MachinePage({ params }: MachinePageProps): Promise<React.JSX.Element> {
   // Ensure user is authenticated and get organization context
   await requireMemberAccess();
 

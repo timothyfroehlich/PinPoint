@@ -23,7 +23,7 @@ interface NotificationBellClientProps {
 export function NotificationBellClient({
   initialUnreadCount,
   userId,
-}: NotificationBellClientProps) {
+}: NotificationBellClientProps): JSX.Element {
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
   const [isOpen, setIsOpen] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -124,7 +124,7 @@ export function NotificationBellClient({
     };
   }, [userId]);
 
-  const handleOpenChange = (open: boolean) => {
+  const handleOpenChange = (open: boolean): void => {
     setIsOpen(open);
 
     // Clear new notifications indicator when opened

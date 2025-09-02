@@ -25,7 +25,7 @@ export function ProfilePictureUpload({
   size: _size,
   currentImage,
   onImageChange: _onImageChange,
-}: ProfilePictureUploadProps) {
+}: ProfilePictureUploadProps): JSX.Element {
   return (
     <div className="space-y-4">
       <div className="flex items-center space-x-4">

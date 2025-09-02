@@ -41,7 +41,7 @@ export function FilteredSearch({
   className = "",
   showLabel = false,
   size = "default",
-}: FilteredSearchProps) {
+}: FilteredSearchProps): JSX.Element {
   const [localValue, setLocalValue] = useState(value);
 
   // Sync with external value changes
@@ -139,7 +139,7 @@ export function FilteredSearch({
  */
 export function FilteredSearchCompact(
   props: Omit<FilteredSearchProps, "size" | "showLabel">,
-) {
+): JSX.Element {
   return <FilteredSearch {...props} size="sm" showLabel={false} />;
 }
 
@@ -148,6 +148,6 @@ export function FilteredSearchCompact(
  */
 export function FilteredSearchWithLabel(
   props: Omit<FilteredSearchProps, "showLabel">,
-) {
+): JSX.Element {
   return <FilteredSearch {...props} showLabel={true} />;
 }

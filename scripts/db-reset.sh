@@ -223,7 +223,7 @@ generate_typescript_types() {
     
     if [[ "$env" == "local" || "$env" == "preview" ]]; then
         log_info "Generating types from local database..."
-        supabase gen types typescript --local > src/types/supabase.ts
+        supabase gen types typescript --local > src/lib/types/database.ts
     else
         log_info "Generating types from preview database..."
         # For preview, we need the DATABASE_URL from environment
@@ -231,7 +231,7 @@ generate_typescript_types() {
             log_warning "DATABASE_URL not set, skipping type generation"
             return
         fi
-        supabase gen types typescript --db-url "$DATABASE_URL" > src/types/supabase.ts
+        supabase gen types typescript --db-url "$DATABASE_URL" > src/lib/types/database.ts
     fi
     
     log_success "TypeScript types generated successfully"

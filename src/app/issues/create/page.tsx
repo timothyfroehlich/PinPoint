@@ -11,19 +11,32 @@ import { getAssignableUsers } from "~/lib/dal/users";
 // Transform DAL data for CreateIssueFormServer component
 function transformMachinesForForm(
   machinesResult: Awaited<ReturnType<typeof getMachinesForOrg>>,
-) {
+): {
+  id: string;
+  name: string;
+  model: {
+    id: string;
+    name: string;
+    manufacturer: string | null;
+    year: number | null;
+  };
+  location: {
+    id: string;
+    name: string;
+  };
+}[] {
   return machinesResult.items.map((machine) => ({
     id: machine.id,
     name: machine.name,
     model: {
-      id: machine.model?.id ?? "",
-      name: machine.model?.name ?? "Unknown Model",
-      manufacturer: machine.model?.manufacturer ?? null,
-      year: machine.model?.year ?? null,
+      id: machine.model.id,
+      name: machine.model.name,
+      manufacturer: machine.model.manufacturer,
+      year: machine.model.year,
     },
     location: {
-      id: machine.location?.id ?? "",
-      name: machine.location?.name ?? "Unknown Location",
+      id: machine.location.id,
+      name: machine.location.name,
     },
   }));
 }
@@ -31,7 +44,11 @@ function transformMachinesForForm(
 // Transform DAL data for CreateIssueFormServer component
 function transformUsersForForm(
   assignableUsers: Awaited<ReturnType<typeof getAssignableUsers>>,
-) {
+): {
+  id: string;
+  name: string;
+  email: string;
+}[] {
   return assignableUsers
     .map((user) => ({
       id: user.id,

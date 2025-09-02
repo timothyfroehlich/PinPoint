@@ -18,7 +18,7 @@ export function LocationDetailView({
   location,
   user: _user,
   locationId: _locationId,
-}: LocationDetailViewProps) {
+}: LocationDetailViewProps): JSX.Element {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="space-y-6">

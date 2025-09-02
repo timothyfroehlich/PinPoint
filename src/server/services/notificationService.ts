@@ -30,7 +30,7 @@ export const NotificationEntity = {
   ORGANIZATION: "ORGANIZATION" as const,
 } as const;
 
-export interface NotificationData {
+interface NotificationData {
   userId: string;
   organizationId: string;
   type: NotificationType;

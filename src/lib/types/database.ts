@@ -1,1330 +1,1354 @@
-/**
- * Supabase Database Schema Types (Generated)
- *
- * Auto-generated from Supabase schema.
- * Contains all table, insert, update, and relationship type definitions.
- *
- * Note: This file contains generated types from `supabase gen types`
- * Do not modify manually - regenerate using database schema commands.
- */
-
 export type Json =
   | string
   | number
   | boolean
   | null
   | { [key: string]: Json | undefined }
-  | Json[];
+  | Json[]
 
-export interface Database {
+export type Database = {
   graphql_public: {
-    Tables: Record<never, never>;
-    Views: Record<never, never>;
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
     Functions: {
       graphql: {
         Args: {
-          extensions?: Json;
-          operationName?: string;
-          query?: string;
-          variables?: Json;
-        };
-        Returns: Json;
-      };
-    };
-    Enums: Record<never, never>;
-    CompositeTypes: Record<never, never>;
-  };
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       accounts: {
         Row: {
-          access_token: string | null;
-          expires_at: string | null;
-          id: string;
-          id_token: string | null;
-          provider: string;
-          provider_account_id: string;
-          refresh_token: string | null;
-          scope: string | null;
-          session_state: string | null;
-          token_type: string | null;
-          type: string;
-          user_id: string;
-        };
+          access_token: string | null
+          expires_at: string | null
+          id: string
+          id_token: string | null
+          provider: string
+          provider_account_id: string
+          refresh_token: string | null
+          scope: string | null
+          session_state: string | null
+          token_type: string | null
+          type: string
+          user_id: string
+        }
         Insert: {
-          access_token?: string | null;
-          expires_at?: string | null;
-          id: string;
-          id_token?: string | null;
-          provider: string;
-          provider_account_id: string;
-          refresh_token?: string | null;
-          scope?: string | null;
-          session_state?: string | null;
-          token_type?: string | null;
-          type: string;
-          user_id: string;
-        };
+          access_token?: string | null
+          expires_at?: string | null
+          id: string
+          id_token?: string | null
+          provider: string
+          provider_account_id: string
+          refresh_token?: string | null
+          scope?: string | null
+          session_state?: string | null
+          token_type?: string | null
+          type: string
+          user_id: string
+        }
         Update: {
-          access_token?: string | null;
-          expires_at?: string | null;
-          id?: string;
-          id_token?: string | null;
-          provider?: string;
-          provider_account_id?: string;
-          refresh_token?: string | null;
-          scope?: string | null;
-          session_state?: string | null;
-          token_type?: string | null;
-          type?: string;
-          user_id?: string;
-        };
-        Relationships: [];
-      };
+          access_token?: string | null
+          expires_at?: string | null
+          id?: string
+          id_token?: string | null
+          provider?: string
+          provider_account_id?: string
+          refresh_token?: string | null
+          scope?: string | null
+          session_state?: string | null
+          token_type?: string | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       activity_log: {
         Row: {
-          action: string;
-          created_at: string;
-          details: Json | null;
-          entity_id: string | null;
-          entity_type: string;
-          id: string;
-          ip_address: unknown | null;
-          organization_id: string;
-          severity: string;
-          user_agent: string | null;
-          user_id: string | null;
-        };
+          action: string
+          created_at: string
+          details: Json | null
+          entity_id: string | null
+          entity_type: string
+          id: string
+          ip_address: unknown | null
+          organization_id: string
+          severity: string
+          user_agent: string | null
+          user_id: string | null
+        }
         Insert: {
-          action: string;
-          created_at?: string;
-          details?: Json | null;
-          entity_id?: string | null;
-          entity_type: string;
-          id: string;
-          ip_address?: unknown | null;
-          organization_id: string;
-          severity?: string;
-          user_agent?: string | null;
-          user_id?: string | null;
-        };
+          action: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type: string
+          id: string
+          ip_address?: unknown | null
+          organization_id: string
+          severity?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
         Update: {
-          action?: string;
-          created_at?: string;
-          details?: Json | null;
-          entity_id?: string | null;
-          entity_type?: string;
-          id?: string;
-          ip_address?: unknown | null;
-          organization_id?: string;
-          severity?: string;
-          user_agent?: string | null;
-          user_id?: string | null;
-        };
+          action?: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          ip_address?: unknown | null
+          organization_id?: string
+          severity?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
         Relationships: [
           {
-            foreignKeyName: "fk_activity_log_organization";
-            columns: ["organization_id"];
-            isOneToOne: false;
-            referencedRelation: "organizations";
-            referencedColumns: ["id"];
+            foreignKeyName: "activity_log_organization_id_organizations_id_fk"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "fk_activity_log_user";
-            columns: ["user_id"];
-            isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
+        ]
+      }
+      anonymous_rate_limits: {
+        Row: {
+          action_type: string
+          created_at: string
+          id: string
+          ip_address: string | null
+          organization_id: string
+          session_id: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          organization_id: string
+          session_id: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          organization_id?: string
+          session_id?: string
+        }
+        Relationships: []
+      }
       attachments: {
         Row: {
-          created_at: string;
-          file_name: string;
-          file_path: string;
-          file_size: number;
-          file_type: string;
-          id: string;
-          issue_id: string;
-          organization_id: string;
-          updated_at: string;
-          uploaded_by: string;
-        };
+          created_at: string
+          file_name: string
+          file_type: string
+          id: string
+          issue_id: string
+          organization_id: string
+          url: string
+        }
         Insert: {
-          created_at?: string;
-          file_name: string;
-          file_path: string;
-          file_size: number;
-          file_type: string;
-          id: string;
-          issue_id: string;
-          organization_id: string;
-          updated_at?: string;
-          uploaded_by: string;
-        };
+          created_at?: string
+          file_name: string
+          file_type: string
+          id: string
+          issue_id: string
+          organization_id: string
+          url: string
+        }
         Update: {
-          created_at?: string;
-          file_name?: string;
-          file_path?: string;
-          file_size?: number;
-          file_type?: string;
-          id?: string;
-          issue_id?: string;
-          organization_id?: string;
-          updated_at?: string;
-          uploaded_by?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "fk_attachments_issue";
-            columns: ["issue_id"];
-            isOneToOne: false;
-            referencedRelation: "issues";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "fk_attachments_organization";
-            columns: ["organization_id"];
-            isOneToOne: false;
-            referencedRelation: "organizations";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "fk_attachments_user";
-            columns: ["uploaded_by"];
-            isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
+          created_at?: string
+          file_name?: string
+          file_type?: string
+          id?: string
+          issue_id?: string
+          organization_id?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      collection_machines: {
+        Row: {
+          collection_id: string
+          created_at: string
+          machine_id: string
+        }
+        Insert: {
+          collection_id: string
+          created_at?: string
+          machine_id: string
+        }
+        Update: {
+          collection_id?: string
+          created_at?: string
+          machine_id?: string
+        }
+        Relationships: []
+      }
       collection_types: {
         Row: {
-          created_at: string;
-          description: string | null;
-          id: string;
-          name: string;
-          organization_id: string;
-          updated_at: string;
-        };
+          created_at: string
+          description: string | null
+          display_name: string | null
+          generation_rules: Json | null
+          id: string
+          is_auto_generated: boolean
+          is_enabled: boolean
+          name: string
+          organization_id: string
+          sort_order: number
+          source_field: string | null
+          updated_at: string
+        }
         Insert: {
-          created_at?: string;
-          description?: string | null;
-          id: string;
-          name: string;
-          organization_id: string;
-          updated_at?: string;
-        };
+          created_at?: string
+          description?: string | null
+          display_name?: string | null
+          generation_rules?: Json | null
+          id: string
+          is_auto_generated?: boolean
+          is_enabled?: boolean
+          name: string
+          organization_id: string
+          sort_order?: number
+          source_field?: string | null
+          updated_at?: string
+        }
         Update: {
-          created_at?: string;
-          description?: string | null;
-          id?: string;
-          name?: string;
-          organization_id?: string;
-          updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "fk_collection_types_organization";
-            columns: ["organization_id"];
-            isOneToOne: false;
-            referencedRelation: "organizations";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
+          created_at?: string
+          description?: string | null
+          display_name?: string | null
+          generation_rules?: Json | null
+          id?: string
+          is_auto_generated?: boolean
+          is_enabled?: boolean
+          name?: string
+          organization_id?: string
+          sort_order?: number
+          source_field?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       collections: {
         Row: {
-          collection_type_id: string;
-          created_at: string;
-          description: string | null;
-          id: string;
-          name: string;
-          organization_id: string;
-          updated_at: string;
-        };
+          created_at: string
+          description: string | null
+          filter_criteria: Json | null
+          id: string
+          is_manual: boolean
+          is_smart: boolean
+          location_id: string | null
+          name: string
+          organization_id: string
+          sort_order: number
+          type_id: string
+          updated_at: string
+        }
         Insert: {
-          collection_type_id: string;
-          created_at?: string;
-          description?: string | null;
-          id: string;
-          name: string;
-          organization_id: string;
-          updated_at?: string;
-        };
+          created_at?: string
+          description?: string | null
+          filter_criteria?: Json | null
+          id: string
+          is_manual?: boolean
+          is_smart?: boolean
+          location_id?: string | null
+          name: string
+          organization_id: string
+          sort_order?: number
+          type_id: string
+          updated_at?: string
+        }
         Update: {
-          collection_type_id?: string;
-          created_at?: string;
-          description?: string | null;
-          id?: string;
-          name?: string;
-          organization_id?: string;
-          updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "fk_collections_collection_type";
-            columns: ["collection_type_id"];
-            isOneToOne: false;
-            referencedRelation: "collection_types";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "fk_collections_organization";
-            columns: ["organization_id"];
-            isOneToOne: false;
-            referencedRelation: "organizations";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
+          created_at?: string
+          description?: string | null
+          filter_criteria?: Json | null
+          id?: string
+          is_manual?: boolean
+          is_smart?: boolean
+          location_id?: string | null
+          name?: string
+          organization_id?: string
+          sort_order?: number
+          type_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       comments: {
         Row: {
-          anonymous_session_id: string | null;
-          content: string;
-          created_at: string;
-          id: string;
-          is_internal: boolean;
-          issue_id: string;
-          organization_id: string;
-          updated_at: string;
-          user_id: string | null;
-        };
+          anonymous_display_name: string | null
+          anonymous_session_id: string | null
+          author_id: string | null
+          commenter_type: Database["public"]["Enums"]["commenter_type"]
+          content: string
+          created_at: string
+          deleted_at: string | null
+          deleted_by: string | null
+          id: string
+          issue_id: string
+          moderation_status: Database["public"]["Enums"]["moderation_status"]
+          organization_id: string
+          updated_at: string
+        }
         Insert: {
-          anonymous_session_id?: string | null;
-          content: string;
-          created_at?: string;
-          id: string;
-          is_internal?: boolean;
-          issue_id: string;
-          organization_id: string;
-          updated_at?: string;
-          user_id?: string | null;
-        };
+          anonymous_display_name?: string | null
+          anonymous_session_id?: string | null
+          author_id?: string | null
+          commenter_type?: Database["public"]["Enums"]["commenter_type"]
+          content: string
+          created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+          id: string
+          issue_id: string
+          moderation_status?: Database["public"]["Enums"]["moderation_status"]
+          organization_id: string
+          updated_at?: string
+        }
         Update: {
-          anonymous_session_id?: string | null;
-          content?: string;
-          created_at?: string;
-          id?: string;
-          is_internal?: boolean;
-          issue_id?: string;
-          organization_id?: string;
-          updated_at?: string;
-          user_id?: string | null;
-        };
+          anonymous_display_name?: string | null
+          anonymous_session_id?: string | null
+          author_id?: string | null
+          commenter_type?: Database["public"]["Enums"]["commenter_type"]
+          content?: string
+          created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+          id?: string
+          issue_id?: string
+          moderation_status?: Database["public"]["Enums"]["moderation_status"]
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      invitations: {
+        Row: {
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string
+          organization_id: string
+          role_id: string
+          status: string
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string
+          organization_id: string
+          role_id: string
+          status?: string
+          token: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          organization_id?: string
+          role_id?: string
+          status?: string
+          token?: string
+          updated_at?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "fk_comments_issue";
-            columns: ["issue_id"];
-            isOneToOne: false;
-            referencedRelation: "issues";
-            referencedColumns: ["id"];
+            foreignKeyName: "invitations_organization_id_organizations_id_fk"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "fk_comments_organization";
-            columns: ["organization_id"];
-            isOneToOne: false;
-            referencedRelation: "organizations";
-            referencedColumns: ["id"];
+            foreignKeyName: "invitations_role_id_roles_id_fk"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "fk_comments_user";
-            columns: ["user_id"];
-            isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
+        ]
+      }
       issue_history: {
         Row: {
-          changed_by: string | null;
-          changed_from: Json | null;
-          changed_to: Json | null;
-          created_at: string;
-          field_name: string;
-          id: string;
-          issue_id: string;
-          organization_id: string;
-        };
+          actor_id: string | null
+          changed_at: string
+          field: string
+          id: string
+          issue_id: string
+          new_value: string | null
+          old_value: string | null
+          organization_id: string
+          type: Database["public"]["Enums"]["activity_type"]
+        }
         Insert: {
-          changed_by?: string | null;
-          changed_from?: Json | null;
-          changed_to?: Json | null;
-          created_at?: string;
-          field_name: string;
-          id: string;
-          issue_id: string;
-          organization_id: string;
-        };
+          actor_id?: string | null
+          changed_at?: string
+          field: string
+          id: string
+          issue_id: string
+          new_value?: string | null
+          old_value?: string | null
+          organization_id: string
+          type: Database["public"]["Enums"]["activity_type"]
+        }
         Update: {
-          changed_by?: string | null;
-          changed_from?: Json | null;
-          changed_to?: Json | null;
-          created_at?: string;
-          field_name?: string;
-          id?: string;
-          issue_id?: string;
-          organization_id?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "fk_issue_history_changed_by";
-            columns: ["changed_by"];
-            isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "fk_issue_history_issue";
-            columns: ["issue_id"];
-            isOneToOne: false;
-            referencedRelation: "issues";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "fk_issue_history_organization";
-            columns: ["organization_id"];
-            isOneToOne: false;
-            referencedRelation: "organizations";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
+          actor_id?: string | null
+          changed_at?: string
+          field?: string
+          id?: string
+          issue_id?: string
+          new_value?: string | null
+          old_value?: string | null
+          organization_id?: string
+          type?: Database["public"]["Enums"]["activity_type"]
+        }
+        Relationships: []
+      }
       issue_statuses: {
         Row: {
-          created_at: string;
-          description: string | null;
-          id: string;
-          is_closed: boolean;
-          is_default: boolean;
-          name: string;
-          order_index: number;
-          organization_id: string;
-          updated_at: string;
-        };
+          category: Database["public"]["Enums"]["status_category"]
+          id: string
+          is_default: boolean
+          name: string
+          organization_id: string
+        }
         Insert: {
-          created_at?: string;
-          description?: string | null;
-          id: string;
-          is_closed?: boolean;
-          is_default?: boolean;
-          name: string;
-          order_index?: number;
-          organization_id: string;
-          updated_at?: string;
-        };
+          category: Database["public"]["Enums"]["status_category"]
+          id: string
+          is_default?: boolean
+          name: string
+          organization_id: string
+        }
         Update: {
-          created_at?: string;
-          description?: string | null;
-          id?: string;
-          is_closed?: boolean;
-          is_default?: boolean;
-          name?: string;
-          order_index?: number;
-          organization_id?: string;
-          updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "fk_issue_statuses_organization";
-            columns: ["organization_id"];
-            isOneToOne: false;
-            referencedRelation: "organizations";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
+          category?: Database["public"]["Enums"]["status_category"]
+          id?: string
+          is_default?: boolean
+          name?: string
+          organization_id?: string
+        }
+        Relationships: []
+      }
       issues: {
         Row: {
-          anonymous_session_id: string | null;
-          assigned_to: string | null;
-          created_at: string;
-          description: string | null;
-          id: string;
-          machine_id: string;
-          moderation_status: Database["public"]["Enums"]["moderation_status"];
-          organization_id: string;
-          priority_id: string | null;
-          reported_by: string | null;
-          resolved_at: string | null;
-          status_id: string;
-          title: string;
-          updated_at: string;
-          visibility: Database["public"]["Enums"]["visibility"];
-        };
+          anonymous_contact_method: string | null
+          anonymous_session_id: string | null
+          assigned_to_id: string | null
+          checklist: Json | null
+          consistency: string | null
+          created_at: string
+          created_by_id: string | null
+          description: string | null
+          id: string
+          is_public: boolean | null
+          machine_id: string
+          moderation_status: Database["public"]["Enums"]["moderation_status"]
+          organization_id: string
+          priority_id: string
+          reporter_email: string | null
+          reporter_type: Database["public"]["Enums"]["reporter_type"]
+          resolved_at: string | null
+          status_id: string
+          submitter_name: string | null
+          title: string
+          updated_at: string
+        }
         Insert: {
-          anonymous_session_id?: string | null;
-          assigned_to?: string | null;
-          created_at?: string;
-          description?: string | null;
-          id: string;
-          machine_id: string;
-          moderation_status?: Database["public"]["Enums"]["moderation_status"];
-          organization_id: string;
-          priority_id?: string | null;
-          reported_by?: string | null;
-          resolved_at?: string | null;
-          status_id: string;
-          title: string;
-          updated_at?: string;
-          visibility?: Database["public"]["Enums"]["visibility"];
-        };
+          anonymous_contact_method?: string | null
+          anonymous_session_id?: string | null
+          assigned_to_id?: string | null
+          checklist?: Json | null
+          consistency?: string | null
+          created_at?: string
+          created_by_id?: string | null
+          description?: string | null
+          id: string
+          is_public?: boolean | null
+          machine_id: string
+          moderation_status?: Database["public"]["Enums"]["moderation_status"]
+          organization_id: string
+          priority_id: string
+          reporter_email?: string | null
+          reporter_type?: Database["public"]["Enums"]["reporter_type"]
+          resolved_at?: string | null
+          status_id: string
+          submitter_name?: string | null
+          title: string
+          updated_at?: string
+        }
         Update: {
-          anonymous_session_id?: string | null;
-          assigned_to?: string | null;
-          created_at?: string;
-          description?: string | null;
-          id?: string;
-          machine_id?: string;
-          moderation_status?: Database["public"]["Enums"]["moderation_status"];
-          organization_id?: string;
-          priority_id?: string | null;
-          reported_by?: string | null;
-          resolved_at?: string | null;
-          status_id?: string;
-          title?: string;
-          updated_at?: string;
-          visibility?: Database["public"]["Enums"]["visibility"];
-        };
-        Relationships: [
-          {
-            foreignKeyName: "fk_issues_assigned_to";
-            columns: ["assigned_to"];
-            isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "fk_issues_machine";
-            columns: ["machine_id"];
-            isOneToOne: false;
-            referencedRelation: "machines";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "fk_issues_organization";
-            columns: ["organization_id"];
-            isOneToOne: false;
-            referencedRelation: "organizations";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "fk_issues_priority";
-            columns: ["priority_id"];
-            isOneToOne: false;
-            referencedRelation: "priorities";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "fk_issues_reported_by";
-            columns: ["reported_by"];
-            isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "fk_issues_status";
-            columns: ["status_id"];
-            isOneToOne: false;
-            referencedRelation: "issue_statuses";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
+          anonymous_contact_method?: string | null
+          anonymous_session_id?: string | null
+          assigned_to_id?: string | null
+          checklist?: Json | null
+          consistency?: string | null
+          created_at?: string
+          created_by_id?: string | null
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          machine_id?: string
+          moderation_status?: Database["public"]["Enums"]["moderation_status"]
+          organization_id?: string
+          priority_id?: string
+          reporter_email?: string | null
+          reporter_type?: Database["public"]["Enums"]["reporter_type"]
+          resolved_at?: string | null
+          status_id?: string
+          submitter_name?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       locations: {
         Row: {
-          address: string | null;
-          city: string | null;
-          country: string | null;
-          created_at: string;
-          description: string | null;
-          id: string;
-          is_public: boolean | null;
-          name: string;
-          organization_id: string;
-          phone: string | null;
-          postal_code: string | null;
-          state: string | null;
-          street: string | null;
-          sync_enabled: boolean;
-          updated_at: string;
-          website: string | null;
-        };
+          city: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_public: boolean | null
+          last_sync_at: string | null
+          latitude: number | null
+          longitude: number | null
+          name: string
+          organization_id: string
+          phone: string | null
+          pinball_map_id: number | null
+          region_id: string | null
+          state: string | null
+          street: string | null
+          sync_enabled: boolean
+          updated_at: string
+          website: string | null
+          zip: string | null
+        }
         Insert: {
-          address?: string | null;
-          city?: string | null;
-          country?: string | null;
-          created_at?: string;
-          description?: string | null;
-          id: string;
-          is_public?: boolean | null;
-          name: string;
-          organization_id: string;
-          phone?: string | null;
-          postal_code?: string | null;
-          state?: string | null;
-          street?: string | null;
-          sync_enabled?: boolean;
-          updated_at?: string;
-          website?: string | null;
-        };
+          city?: string | null
+          created_at?: string
+          description?: string | null
+          id: string
+          is_public?: boolean | null
+          last_sync_at?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          name: string
+          organization_id: string
+          phone?: string | null
+          pinball_map_id?: number | null
+          region_id?: string | null
+          state?: string | null
+          street?: string | null
+          sync_enabled?: boolean
+          updated_at?: string
+          website?: string | null
+          zip?: string | null
+        }
         Update: {
-          address?: string | null;
-          city?: string | null;
-          country?: string | null;
-          created_at?: string;
-          description?: string | null;
-          id?: string;
-          is_public?: boolean | null;
-          name?: string;
-          organization_id?: string;
-          phone?: string | null;
-          postal_code?: string | null;
-          state?: string | null;
-          street?: string | null;
-          sync_enabled?: boolean;
-          updated_at?: string;
-          website?: string | null;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "fk_locations_organization";
-            columns: ["organization_id"];
-            isOneToOne: false;
-            referencedRelation: "organizations";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
-      machine_collections: {
-        Row: {
-          collection_id: string;
-          created_at: string;
-          id: string;
-          machine_id: string;
-          organization_id: string;
-          updated_at: string;
-        };
-        Insert: {
-          collection_id: string;
-          created_at?: string;
-          id: string;
-          machine_id: string;
-          organization_id: string;
-          updated_at?: string;
-        };
-        Update: {
-          collection_id?: string;
-          created_at?: string;
-          id?: string;
-          machine_id?: string;
-          organization_id?: string;
-          updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "fk_machine_collections_collection";
-            columns: ["collection_id"];
-            isOneToOne: false;
-            referencedRelation: "collections";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "fk_machine_collections_machine";
-            columns: ["machine_id"];
-            isOneToOne: false;
-            referencedRelation: "machines";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "fk_machine_collections_organization";
-            columns: ["organization_id"];
-            isOneToOne: false;
-            referencedRelation: "organizations";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
+          city?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_public?: boolean | null
+          last_sync_at?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          name?: string
+          organization_id?: string
+          phone?: string | null
+          pinball_map_id?: number | null
+          region_id?: string | null
+          state?: string | null
+          street?: string | null
+          sync_enabled?: boolean
+          updated_at?: string
+          website?: string | null
+          zip?: string | null
+        }
+        Relationships: []
+      }
       machines: {
         Row: {
-          created_at: string;
-          description: string | null;
-          id: string;
-          location_id: string;
-          model_id: string;
-          name: string;
-          organization_id: string;
-          owner_id: string | null;
-          qr_code_generated_at: string | null;
-          qr_code_id: string | null;
-          qr_code_url: string | null;
-          serial_number: string | null;
-          updated_at: string;
-        };
+          created_at: string
+          deleted_at: string | null
+          id: string
+          is_public: boolean | null
+          location_id: string
+          model_id: string
+          name: string
+          notify_on_comments: boolean
+          notify_on_new_issues: boolean
+          notify_on_status_changes: boolean
+          organization_id: string
+          owner_id: string | null
+          owner_notifications_enabled: boolean
+          qr_code_generated_at: string | null
+          qr_code_id: string | null
+          qr_code_url: string | null
+          updated_at: string
+        }
         Insert: {
-          created_at?: string;
-          description?: string | null;
-          id: string;
-          location_id: string;
-          model_id: string;
-          name: string;
-          organization_id: string;
-          owner_id?: string | null;
-          qr_code_generated_at?: string | null;
-          qr_code_id?: string | null;
-          qr_code_url?: string | null;
-          serial_number?: string | null;
-          updated_at?: string;
-        };
+          created_at?: string
+          deleted_at?: string | null
+          id: string
+          is_public?: boolean | null
+          location_id: string
+          model_id: string
+          name: string
+          notify_on_comments?: boolean
+          notify_on_new_issues?: boolean
+          notify_on_status_changes?: boolean
+          organization_id: string
+          owner_id?: string | null
+          owner_notifications_enabled?: boolean
+          qr_code_generated_at?: string | null
+          qr_code_id?: string | null
+          qr_code_url?: string | null
+          updated_at?: string
+        }
         Update: {
-          created_at?: string;
-          description?: string | null;
-          id?: string;
-          location_id?: string;
-          model_id?: string;
-          name?: string;
-          organization_id?: string;
-          owner_id?: string | null;
-          qr_code_generated_at?: string | null;
-          qr_code_id?: string | null;
-          qr_code_url?: string | null;
-          serial_number?: string | null;
-          updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "fk_machines_location";
-            columns: ["location_id"];
-            isOneToOne: false;
-            referencedRelation: "locations";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "fk_machines_model";
-            columns: ["model_id"];
-            isOneToOne: false;
-            referencedRelation: "models";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "fk_machines_organization";
-            columns: ["organization_id"];
-            isOneToOne: false;
-            referencedRelation: "organizations";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "fk_machines_owner";
-            columns: ["owner_id"];
-            isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_public?: boolean | null
+          location_id?: string
+          model_id?: string
+          name?: string
+          notify_on_comments?: boolean
+          notify_on_new_issues?: boolean
+          notify_on_status_changes?: boolean
+          organization_id?: string
+          owner_id?: string | null
+          owner_notifications_enabled?: boolean
+          qr_code_generated_at?: string | null
+          qr_code_id?: string | null
+          qr_code_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       memberships: {
         Row: {
-          created_at: string;
-          id: string;
-          organization_id: string;
-          role_id: string;
-          updated_at: string;
-          user_id: string;
-        };
+          id: string
+          organization_id: string
+          role_id: string
+          user_id: string
+        }
         Insert: {
-          created_at?: string;
-          id: string;
-          organization_id: string;
-          role_id: string;
-          updated_at?: string;
-          user_id: string;
-        };
+          id: string
+          organization_id: string
+          role_id: string
+          user_id: string
+        }
         Update: {
-          created_at?: string;
-          id?: string;
-          organization_id?: string;
-          role_id?: string;
-          updated_at?: string;
-          user_id?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "fk_memberships_organization";
-            columns: ["organization_id"];
-            isOneToOne: false;
-            referencedRelation: "organizations";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "fk_memberships_role";
-            columns: ["role_id"];
-            isOneToOne: false;
-            referencedRelation: "roles";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "fk_memberships_user";
-            columns: ["user_id"];
-            isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
+          id?: string
+          organization_id?: string
+          role_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       models: {
         Row: {
-          created_at: string;
-          description: string | null;
-          id: string;
-          manufacturer: string | null;
-          name: string;
-          organization_id: string;
-          updated_at: string;
-          year_manufactured: number | null;
-        };
+          created_at: string
+          id: string
+          ipdb_id: string | null
+          ipdb_link: string | null
+          is_active: boolean
+          is_custom: boolean
+          kineticist_url: string | null
+          machine_display: string | null
+          machine_type: string | null
+          manufacturer: string | null
+          name: string
+          opdb_id: string | null
+          opdb_img_url: string | null
+          organization_id: string | null
+          updated_at: string
+          year: number | null
+        }
         Insert: {
-          created_at?: string;
-          description?: string | null;
-          id: string;
-          manufacturer?: string | null;
-          name: string;
-          organization_id: string;
-          updated_at?: string;
-          year_manufactured?: number | null;
-        };
+          created_at?: string
+          id: string
+          ipdb_id?: string | null
+          ipdb_link?: string | null
+          is_active?: boolean
+          is_custom?: boolean
+          kineticist_url?: string | null
+          machine_display?: string | null
+          machine_type?: string | null
+          manufacturer?: string | null
+          name: string
+          opdb_id?: string | null
+          opdb_img_url?: string | null
+          organization_id?: string | null
+          updated_at?: string
+          year?: number | null
+        }
         Update: {
-          created_at?: string;
-          description?: string | null;
-          id?: string;
-          manufacturer?: string | null;
-          name?: string;
-          organization_id?: string;
-          updated_at?: string;
-          year_manufactured?: number | null;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "fk_models_organization";
-            columns: ["organization_id"];
-            isOneToOne: false;
-            referencedRelation: "organizations";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
+          created_at?: string
+          id?: string
+          ipdb_id?: string | null
+          ipdb_link?: string | null
+          is_active?: boolean
+          is_custom?: boolean
+          kineticist_url?: string | null
+          machine_display?: string | null
+          machine_type?: string | null
+          manufacturer?: string | null
+          name?: string
+          opdb_id?: string | null
+          opdb_img_url?: string | null
+          organization_id?: string | null
+          updated_at?: string
+          year?: number | null
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
-          content: Json;
-          created_at: string;
-          entity_id: string | null;
-          entity_type: Database["public"]["Enums"]["notification_entity"];
-          expires_at: string | null;
-          id: string;
-          is_read: boolean;
-          organization_id: string;
-          priority: Database["public"]["Enums"]["notification_priority"];
-          title: string;
-          type: Database["public"]["Enums"]["notification_type"];
-          updated_at: string;
-          user_id: string;
-        };
+          action_url: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: Database["public"]["Enums"]["notification_entity"] | null
+          id: string
+          message: string
+          organization_id: string
+          read: boolean
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id: string
+        }
         Insert: {
-          content: Json;
-          created_at?: string;
-          entity_id?: string | null;
-          entity_type: Database["public"]["Enums"]["notification_entity"];
-          expires_at?: string | null;
-          id: string;
-          is_read?: boolean;
-          organization_id: string;
-          priority?: Database["public"]["Enums"]["notification_priority"];
-          title: string;
-          type: Database["public"]["Enums"]["notification_type"];
-          updated_at?: string;
-          user_id: string;
-        };
+          action_url?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?:
+            | Database["public"]["Enums"]["notification_entity"]
+            | null
+          id: string
+          message: string
+          organization_id: string
+          read?: boolean
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id: string
+        }
         Update: {
-          content?: Json;
-          created_at?: string;
-          entity_id?: string | null;
-          entity_type?: Database["public"]["Enums"]["notification_entity"];
-          expires_at?: string | null;
-          id?: string;
-          is_read?: boolean;
-          organization_id?: string;
-          priority?: Database["public"]["Enums"]["notification_priority"];
-          title?: string;
-          type?: Database["public"]["Enums"]["notification_type"];
-          updated_at?: string;
-          user_id?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "fk_notifications_organization";
-            columns: ["organization_id"];
-            isOneToOne: false;
-            referencedRelation: "organizations";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "fk_notifications_user";
-            columns: ["user_id"];
-            isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
+          action_url?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?:
+            | Database["public"]["Enums"]["notification_entity"]
+            | null
+          id?: string
+          message?: string
+          organization_id?: string
+          read?: boolean
+          type?: Database["public"]["Enums"]["notification_type"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       organizations: {
         Row: {
-          address: string | null;
-          created_at: string;
-          description: string | null;
-          id: string;
-          is_public: boolean;
-          logo_url: string | null;
-          name: string;
-          phone: string | null;
-          public_issue_creation_enabled: boolean;
-          public_issue_default: string;
-          subdomain: string;
-          updated_at: string;
-          website: string | null;
-        };
+          address: string | null
+          allow_anonymous_comments: boolean
+          allow_anonymous_issues: boolean
+          allow_anonymous_upvotes: boolean
+          created_at: string
+          description: string | null
+          id: string
+          is_public: boolean
+          logo_url: string | null
+          name: string
+          phone: string | null
+          public_issue_default: string
+          require_moderation_anonymous: boolean
+          subdomain: string
+          updated_at: string
+          website: string | null
+        }
         Insert: {
-          address?: string | null;
-          created_at?: string;
-          description?: string | null;
-          id: string;
-          is_public?: boolean;
-          logo_url?: string | null;
-          name: string;
-          phone?: string | null;
-          public_issue_creation_enabled?: boolean;
-          public_issue_default: string;
-          subdomain: string;
-          updated_at?: string;
-          website?: string | null;
-        };
+          address?: string | null
+          allow_anonymous_comments?: boolean
+          allow_anonymous_issues?: boolean
+          allow_anonymous_upvotes?: boolean
+          created_at?: string
+          description?: string | null
+          id: string
+          is_public?: boolean
+          logo_url?: string | null
+          name: string
+          phone?: string | null
+          public_issue_default?: string
+          require_moderation_anonymous?: boolean
+          subdomain: string
+          updated_at?: string
+          website?: string | null
+        }
         Update: {
-          address?: string | null;
-          created_at?: string;
-          description?: string | null;
-          id?: string;
-          is_public?: boolean;
-          logo_url?: string | null;
-          name?: string;
-          phone?: string | null;
-          public_issue_creation_enabled?: boolean;
-          public_issue_default?: string;
-          subdomain?: string;
-          updated_at?: string;
-          website?: string | null;
-        };
-        Relationships: [];
-      };
+          address?: string | null
+          allow_anonymous_comments?: boolean
+          allow_anonymous_issues?: boolean
+          allow_anonymous_upvotes?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_public?: boolean
+          logo_url?: string | null
+          name?: string
+          phone?: string | null
+          public_issue_default?: string
+          require_moderation_anonymous?: boolean
+          subdomain?: string
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
       permissions: {
         Row: {
-          created_at: string;
-          description: string | null;
-          id: string;
-          name: string;
-          updated_at: string;
-        };
+          description: string | null
+          id: string
+          name: string
+        }
         Insert: {
-          created_at?: string;
-          description?: string | null;
-          id: string;
-          name: string;
-          updated_at?: string;
-        };
+          description?: string | null
+          id: string
+          name: string
+        }
         Update: {
-          created_at?: string;
-          description?: string | null;
-          id?: string;
-          name?: string;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      pinball_map_configs: {
+        Row: {
+          api_enabled: boolean
+          api_key: string | null
+          auto_sync_enabled: boolean
+          create_missing_models: boolean
+          id: string
+          last_global_sync: string | null
+          organization_id: string
+          sync_interval_hours: number
+          update_existing_data: boolean
+        }
+        Insert: {
+          api_enabled?: boolean
+          api_key?: string | null
+          auto_sync_enabled?: boolean
+          create_missing_models?: boolean
+          id: string
+          last_global_sync?: string | null
+          organization_id: string
+          sync_interval_hours?: number
+          update_existing_data?: boolean
+        }
+        Update: {
+          api_enabled?: boolean
+          api_key?: string | null
+          auto_sync_enabled?: boolean
+          create_missing_models?: boolean
+          id?: string
+          last_global_sync?: string | null
+          organization_id?: string
+          sync_interval_hours?: number
+          update_existing_data?: boolean
+        }
+        Relationships: []
+      }
       priorities: {
         Row: {
-          color: string | null;
-          created_at: string;
-          description: string | null;
-          id: string;
-          is_default: boolean;
-          name: string;
-          order_index: number;
-          organization_id: string;
-          updated_at: string;
-        };
+          id: string
+          is_default: boolean
+          name: string
+          order: number
+          organization_id: string
+        }
         Insert: {
-          color?: string | null;
-          created_at?: string;
-          description?: string | null;
-          id: string;
-          is_default?: boolean;
-          name: string;
-          order_index?: number;
-          organization_id: string;
-          updated_at?: string;
-        };
+          id: string
+          is_default?: boolean
+          name: string
+          order: number
+          organization_id: string
+        }
         Update: {
-          color?: string | null;
-          created_at?: string;
-          description?: string | null;
-          id?: string;
-          is_default?: boolean;
-          name?: string;
-          order_index?: number;
-          organization_id?: string;
-          updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "fk_priorities_organization";
-            columns: ["organization_id"];
-            isOneToOne: false;
-            referencedRelation: "organizations";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
+          id?: string
+          is_default?: boolean
+          name?: string
+          order?: number
+          organization_id?: string
+        }
+        Relationships: []
+      }
       role_permissions: {
         Row: {
-          created_at: string;
-          id: string;
-          organization_id: string;
-          permission_id: string;
-          role_id: string;
-          updated_at: string;
-        };
+          permission_id: string
+          role_id: string
+        }
         Insert: {
-          created_at?: string;
-          id: string;
-          organization_id: string;
-          permission_id: string;
-          role_id: string;
-          updated_at?: string;
-        };
+          permission_id: string
+          role_id: string
+        }
         Update: {
-          created_at?: string;
-          id?: string;
-          organization_id?: string;
-          permission_id?: string;
-          role_id?: string;
-          updated_at?: string;
-        };
+          permission_id?: string
+          role_id?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "fk_role_permissions_organization";
-            columns: ["organization_id"];
-            isOneToOne: false;
-            referencedRelation: "organizations";
-            referencedColumns: ["id"];
+            foreignKeyName: "role_permissions_permission_id_permissions_id_fk"
+            columns: ["permission_id"]
+            isOneToOne: false
+            referencedRelation: "permissions"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "fk_role_permissions_permission";
-            columns: ["permission_id"];
-            isOneToOne: false;
-            referencedRelation: "permissions";
-            referencedColumns: ["id"];
+            foreignKeyName: "role_permissions_role_id_roles_id_fk"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "fk_role_permissions_role";
-            columns: ["role_id"];
-            isOneToOne: false;
-            referencedRelation: "roles";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
+        ]
+      }
       roles: {
         Row: {
-          created_at: string;
-          id: string;
-          is_default: boolean;
-          is_system: boolean;
-          name: string;
-          organization_id: string;
-          updated_at: string;
-        };
+          created_at: string
+          id: string
+          is_default: boolean
+          is_system: boolean
+          name: string
+          organization_id: string
+          updated_at: string
+        }
         Insert: {
-          created_at?: string;
-          id: string;
-          is_default?: boolean;
-          is_system?: boolean;
-          name: string;
-          organization_id: string;
-          updated_at?: string;
-        };
+          created_at?: string
+          id: string
+          is_default?: boolean
+          is_system?: boolean
+          name: string
+          organization_id: string
+          updated_at?: string
+        }
         Update: {
-          created_at?: string;
-          id?: string;
-          is_default?: boolean;
-          is_system?: boolean;
-          name?: string;
-          organization_id?: string;
-          updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "fk_roles_organization";
-            columns: ["organization_id"];
-            isOneToOne: false;
-            referencedRelation: "organizations";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          is_system?: boolean
+          name?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sessions: {
+        Row: {
+          expires: string
+          id: string
+          session_token: string
+          user_id: string
+        }
+        Insert: {
+          expires: string
+          id: string
+          session_token: string
+          user_id: string
+        }
+        Update: {
+          expires?: string
+          id?: string
+          session_token?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       system_settings: {
         Row: {
-          created_at: string;
-          description: string | null;
-          id: string;
-          key: string;
-          updated_at: string;
-          value: Json;
-        };
+          created_at: string
+          id: string
+          organization_id: string
+          setting_key: string
+          setting_value: Json
+          updated_at: string
+        }
         Insert: {
-          created_at?: string;
-          description?: string | null;
-          id: string;
-          key: string;
-          updated_at?: string;
-          value: Json;
-        };
+          created_at?: string
+          id: string
+          organization_id: string
+          setting_key: string
+          setting_value: Json
+          updated_at?: string
+        }
         Update: {
-          created_at?: string;
-          description?: string | null;
-          id?: string;
-          key?: string;
-          updated_at?: string;
-          value?: Json;
-        };
-        Relationships: [];
-      };
-      upvotes: {
-        Row: {
-          anonymous_session_id: string | null;
-          created_at: string;
-          id: string;
-          issue_id: string;
-          organization_id: string;
-          updated_at: string;
-          user_id: string | null;
-        };
-        Insert: {
-          anonymous_session_id?: string | null;
-          created_at?: string;
-          id: string;
-          issue_id: string;
-          organization_id: string;
-          updated_at?: string;
-          user_id?: string | null;
-        };
-        Update: {
-          anonymous_session_id?: string | null;
-          created_at?: string;
-          id?: string;
-          issue_id?: string;
-          organization_id?: string;
-          updated_at?: string;
-          user_id?: string | null;
-        };
+          created_at?: string
+          id?: string
+          organization_id?: string
+          setting_key?: string
+          setting_value?: Json
+          updated_at?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "fk_upvotes_issue";
-            columns: ["issue_id"];
-            isOneToOne: false;
-            referencedRelation: "issues";
-            referencedColumns: ["id"];
+            foreignKeyName: "system_settings_organization_id_organizations_id_fk"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "fk_upvotes_organization";
-            columns: ["organization_id"];
-            isOneToOne: false;
-            referencedRelation: "organizations";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "fk_upvotes_user";
-            columns: ["user_id"];
-            isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
+        ]
+      }
+      upvotes: {
+        Row: {
+          anonymous_session_id: string | null
+          created_at: string
+          id: string
+          issue_id: string
+          user_id: string | null
+          voter_type: Database["public"]["Enums"]["voter_type"]
+        }
+        Insert: {
+          anonymous_session_id?: string | null
+          created_at?: string
+          id: string
+          issue_id: string
+          user_id?: string | null
+          voter_type?: Database["public"]["Enums"]["voter_type"]
+        }
+        Update: {
+          anonymous_session_id?: string | null
+          created_at?: string
+          id?: string
+          issue_id?: string
+          user_id?: string | null
+          voter_type?: Database["public"]["Enums"]["voter_type"]
+        }
+        Relationships: []
+      }
       users: {
         Row: {
-          bio: string | null;
-          created_at: string;
-          email: string;
-          email_notifications_enabled: boolean;
-          email_verified: string | null;
-          id: string;
-          image: string | null;
-          name: string | null;
-          notification_frequency: string | null;
-          push_notifications_enabled: boolean;
-          updated_at: string;
-        };
+          bio: string | null
+          created_at: string
+          email: string | null
+          email_notifications_enabled: boolean
+          email_verified: string | null
+          id: string
+          image: string | null
+          name: string | null
+          notification_frequency: Database["public"]["Enums"]["notification_frequency"]
+          profile_picture: string | null
+          push_notifications_enabled: boolean
+          updated_at: string
+        }
         Insert: {
-          bio?: string | null;
-          created_at?: string;
-          email: string;
-          email_notifications_enabled?: boolean;
-          email_verified?: string | null;
-          id: string;
-          image?: string | null;
-          name?: string | null;
-          notification_frequency?: string | null;
-          push_notifications_enabled?: boolean;
-          updated_at?: string;
-        };
+          bio?: string | null
+          created_at?: string
+          email?: string | null
+          email_notifications_enabled?: boolean
+          email_verified?: string | null
+          id: string
+          image?: string | null
+          name?: string | null
+          notification_frequency?: Database["public"]["Enums"]["notification_frequency"]
+          profile_picture?: string | null
+          push_notifications_enabled?: boolean
+          updated_at?: string
+        }
         Update: {
-          bio?: string | null;
-          created_at?: string;
-          email?: string;
-          email_notifications_enabled?: boolean;
-          email_verified?: string | null;
-          id?: string;
-          image?: string | null;
-          name?: string | null;
-          notification_frequency?: string | null;
-          push_notifications_enabled?: boolean;
-          updated_at?: string;
-        };
-        Relationships: [];
-      };
+          bio?: string | null
+          created_at?: string
+          email?: string | null
+          email_notifications_enabled?: boolean
+          email_verified?: string | null
+          id?: string
+          image?: string | null
+          name?: string | null
+          notification_frequency?: Database["public"]["Enums"]["notification_frequency"]
+          profile_picture?: string | null
+          push_notifications_enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       verification_tokens: {
         Row: {
-          expires: string;
-          identifier: string;
-          token: string;
-        };
+          expires: string
+          identifier: string
+          token: string
+        }
         Insert: {
-          expires: string;
-          identifier: string;
-          token: string;
-        };
+          expires: string
+          identifier: string
+          token: string
+        }
         Update: {
-          expires?: string;
-          identifier?: string;
-          token?: string;
-        };
-        Relationships: [];
-      };
-    };
-    Views: Record<never, never>;
-    Functions: Record<never, never>;
+          expires?: string
+          identifier?: string
+          token?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      public_organizations_minimal: {
+        Row: {
+          id: string | null
+          logo_url: string | null
+          name: string | null
+          subdomain: string | null
+        }
+        Relationships: []
+      }
+    }
+    Functions: {
+      cleanup_anonymous_rate_limits: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      fn_effective_issue_public: {
+        Args: { issue_id: string }
+        Returns: boolean
+      }
+      fn_effective_location_public: {
+        Args: { loc_id: string }
+        Returns: boolean
+      }
+      fn_effective_machine_public: {
+        Args: { machine_id: string }
+        Returns: boolean
+      }
+      fn_has_permission: {
+        Args: { org_id: string; perm_name: string; uid: string }
+        Returns: boolean
+      }
+      fn_is_org_member: {
+        Args: { org_id: string; uid: string }
+        Returns: boolean
+      }
+      fn_public_organizations_minimal: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          logo_url: string
+          name: string
+          subdomain: string
+        }[]
+      }
+    }
     Enums: {
-      moderation_status: "pending" | "approved" | "rejected";
-      notification_entity:
-        | "issue"
-        | "comment"
-        | "machine"
-        | "location"
-        | "user"
-        | "organization";
-      notification_priority: "low" | "medium" | "high" | "urgent";
+      activity_type:
+        | "CREATED"
+        | "STATUS_CHANGED"
+        | "ASSIGNED"
+        | "PRIORITY_CHANGED"
+        | "COMMENTED"
+        | "COMMENT_DELETED"
+        | "ATTACHMENT_ADDED"
+        | "MERGED"
+        | "RESOLVED"
+        | "REOPENED"
+        | "SYSTEM"
+      commenter_type: "authenticated" | "anonymous"
+      moderation_status: "pending" | "approved" | "rejected"
+      notification_entity: "ISSUE" | "MACHINE" | "COMMENT" | "ORGANIZATION"
+      notification_frequency: "IMMEDIATE" | "DAILY" | "WEEKLY" | "NEVER"
       notification_type:
-        | "issue_created"
-        | "issue_updated"
-        | "issue_assigned"
-        | "issue_resolved"
-        | "comment_added"
-        | "machine_added"
-        | "machine_updated"
-        | "system_alert"
-        | "user_invitation"
-        | "organization_update";
-      visibility: "public" | "organization" | "private";
-    };
-    CompositeTypes: Record<never, never>;
-  };
+        | "ISSUE_CREATED"
+        | "ISSUE_UPDATED"
+        | "ISSUE_ASSIGNED"
+        | "ISSUE_COMMENTED"
+        | "MACHINE_ASSIGNED"
+        | "SYSTEM_ANNOUNCEMENT"
+      reporter_type: "authenticated" | "anonymous"
+      status_category: "NEW" | "IN_PROGRESS" | "RESOLVED"
+      voter_type: "authenticated" | "anonymous"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
 }
 
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
 export type Tables<
-  PublicTableNameOrOptions extends
-    | keyof (Database["public"]["Tables"] & Database["public"]["Views"])
-    | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-        Database[PublicTableNameOrOptions["schema"]]["Views"])
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-      Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R;
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
     }
     ? R
     : never
-  : PublicTableNameOrOptions extends keyof (Database["public"]["Tables"] &
-        Database["public"]["Views"])
-    ? (Database["public"]["Tables"] &
-        Database["public"]["Views"])[PublicTableNameOrOptions] extends {
-        Row: infer R;
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
       }
       ? R
       : never
-    : never;
+    : never
 
 export type TablesInsert<
-  PublicTableNameOrOptions extends
-    | keyof Database["public"]["Tables"]
-    | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I;
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
     }
     ? I
     : never
-  : PublicTableNameOrOptions extends keyof Database["public"]["Tables"]
-    ? Database["public"]["Tables"][PublicTableNameOrOptions] extends {
-        Insert: infer I;
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
       }
       ? I
       : never
-    : never;
+    : never
 
 export type TablesUpdate<
-  PublicTableNameOrOptions extends
-    | keyof Database["public"]["Tables"]
-    | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U;
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
     }
     ? U
     : never
-  : PublicTableNameOrOptions extends keyof Database["public"]["Tables"]
-    ? Database["public"]["Tables"][PublicTableNameOrOptions] extends {
-        Update: infer U;
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
       }
       ? U
       : never
-    : never;
+    : never
 
 export type Enums<
-  PublicEnumNameOrOptions extends
-    | keyof Database["public"]["Enums"]
-    | { schema: keyof Database },
-  EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = PublicEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : PublicEnumNameOrOptions extends keyof Database["public"]["Enums"]
-    ? Database["public"]["Enums"][PublicEnumNameOrOptions]
-    : never;
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
+  public: {
+    Enums: {
+      activity_type: [
+        "CREATED",
+        "STATUS_CHANGED",
+        "ASSIGNED",
+        "PRIORITY_CHANGED",
+        "COMMENTED",
+        "COMMENT_DELETED",
+        "ATTACHMENT_ADDED",
+        "MERGED",
+        "RESOLVED",
+        "REOPENED",
+        "SYSTEM",
+      ],
+      commenter_type: ["authenticated", "anonymous"],
+      moderation_status: ["pending", "approved", "rejected"],
+      notification_entity: ["ISSUE", "MACHINE", "COMMENT", "ORGANIZATION"],
+      notification_frequency: ["IMMEDIATE", "DAILY", "WEEKLY", "NEVER"],
+      notification_type: [
+        "ISSUE_CREATED",
+        "ISSUE_UPDATED",
+        "ISSUE_ASSIGNED",
+        "ISSUE_COMMENTED",
+        "MACHINE_ASSIGNED",
+        "SYSTEM_ANNOUNCEMENT",
+      ],
+      reporter_type: ["authenticated", "anonymous"],
+      status_category: ["NEW", "IN_PROGRESS", "RESOLVED"],
+      voter_type: ["authenticated", "anonymous"],
+    },
+  },
+} as const
+

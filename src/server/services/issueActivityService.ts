@@ -24,7 +24,7 @@ const ActivityType = {
   SYSTEM: "SYSTEM" as const,
 } as const;
 
-export interface ActivityData {
+interface ActivityData {
   type: ActivityType;
   actorId?: string;
   fieldName?: string;
@@ -34,7 +34,7 @@ export interface ActivityData {
 }
 
 // IssueStatus interface for backward compatibility
-export interface IssueStatus {
+interface IssueStatus {
   name: string;
 }
 
