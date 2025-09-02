@@ -62,7 +62,7 @@ export function RoleChangeDialog({
   // Handle successful role change
   useEffect(() => {
     if (state?.success) {
-      toast.success(state.message || "User role updated successfully!");
+      toast.success(state.message ?? "User role updated successfully!");
       setIsOpen(false);
     } else if (state) {
       // Handle field errors or general error
@@ -89,7 +89,7 @@ export function RoleChangeDialog({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        {children || (
+        {children ?? (
           <Button variant="outline" size="sm">
             <ShieldIcon className="mr-2 h-4 w-4" />
             Change Role

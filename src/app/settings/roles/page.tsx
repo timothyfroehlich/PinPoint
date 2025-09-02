@@ -132,12 +132,12 @@ export default async function RolesSettingsPage() {
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {(role as any).description || "No description provided"}
+                        {(role as any).description ?? "No description provided"}
                       </p>
                       <div className="flex items-center space-x-4 mt-2 text-xs text-muted-foreground">
                         <span>
                           {roleStats.find((stat) => stat.id === role.id)?._count
-                            .members || 0}{" "}
+                            .members ?? 0}{" "}
                           users
                         </span>
                         <span>•</span>
