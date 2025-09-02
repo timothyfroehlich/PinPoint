@@ -46,8 +46,7 @@ export function isPinPointSupabaseUser(
   if (!isSupabaseUser(value)) return false;
 
   const user = value;
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  return user.app_metadata !== null && typeof user.app_metadata === "object";
+  return typeof user.app_metadata === "object";
 }
 
 /**
@@ -68,12 +67,7 @@ export function isSupabaseAuthError(value: unknown): value is AuthError {
 export function isSuccessfulUserResponse(
   response: UserResponse,
 ): response is { data: { user: User }; error: null } {
-  return (
-    response.error === null &&
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    response.data.user !== null &&
-    isSupabaseUser(response.data.user)
-  );
+  return response.error === null && isSupabaseUser(response.data.user);
 }
 
 /**

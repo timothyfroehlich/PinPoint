@@ -193,8 +193,7 @@ export async function createIssueAction(
         await generateIssueCreationNotifications(issueData.id, {
           organizationId,
           actorId: user.id,
-          actorName:
-            (user.user_metadata?.["name"] as string) ?? user.email ?? "Someone",
+          actorName: user.user_metadata["name"] || user.email,
         });
       } catch (error) {
         console.error(
@@ -275,10 +274,7 @@ export async function updateIssueStatusAction(
           await generateStatusChangeNotifications(issueId, statusResult.name, {
             organizationId,
             actorId: user.id,
-            actorName:
-              (user.user_metadata?.["name"] as string) ??
-              user.email ??
-              "Someone",
+            actorName: user.user_metadata["name"] || user.email,
           });
         }
       } catch (error) {
@@ -438,10 +434,7 @@ export async function updateIssueAssignmentAction(
           {
             organizationId,
             actorId: user.id,
-            actorName:
-              (user.user_metadata?.["name"] as string) ??
-              user.email ??
-              "Someone",
+            actorName: user.user_metadata["name"] || user.email,
           },
         );
       } catch (error) {
@@ -493,8 +486,7 @@ export async function bulkUpdateIssuesAction(
     // Build update object
     const updateData: Partial<typeof issues.$inferInsert> = {};
     if (statusId) updateData.status_id = statusId;
-    if (assigneeId !== undefined)
-      updateData.assigned_to_id = assigneeId ?? null;
+    if (assigneeId !== undefined) updateData.assigned_to_id = assigneeId;
 
     if (Object.keys(updateData).length === 0) {
       return actionError("No updates specified");
