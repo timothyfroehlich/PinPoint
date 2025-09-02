@@ -50,9 +50,7 @@ export function GlobalSearchShortcut({ children }: GlobalSearchShortcutProps) {
     if (isOpen) {
       // Small delay to ensure dialog is fully rendered
       const timer = setTimeout(() => {
-        const input = document.querySelector(
-          "[data-search-input]",
-        ) as HTMLElement | null;
+        const input = document.querySelector("[data-search-input]");
         if (input) {
           input.focus();
         }

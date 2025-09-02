@@ -188,7 +188,7 @@ export function NotificationClient({
                   type: notification.type ?? "info",
                   title: notification.title ?? "Notification",
                   message: notification.message ?? "",
-                  autoHide: notification.auto_hide !== false,
+                  autoHide: notification.auto_hide,
                 });
               }
             },
