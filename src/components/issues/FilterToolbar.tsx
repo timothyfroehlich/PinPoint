@@ -67,7 +67,10 @@ export function FilterToolbar({
     });
   };
 
-  const handlePresetClick = (presetFilters: any, presetId?: string) => {
+  const handlePresetClick = (
+    presetFilters: Partial<IssueFilters>,
+    presetId?: string,
+  ) => {
     // Apply preset filters and mark which preset is active
     onFiltersChange({
       ...filters,
