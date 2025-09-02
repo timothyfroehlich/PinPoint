@@ -11,7 +11,7 @@ import { z } from "zod";
 export function extractFormField<T>(
   formData: FormData,
   fieldName: string,
-  schema: z.ZodSchema<T>,
+  schema: z.ZodType<T>,
 ): T {
   const value = formData.get(fieldName);
 
@@ -34,7 +34,7 @@ export function extractFormField<T>(
 export function extractOptionalFormField<T>(
   formData: FormData,
   fieldName: string,
-  schema: z.ZodSchema<T>,
+  schema: z.ZodType<T>,
 ): T | null {
   const value = formData.get(fieldName);
 
@@ -56,7 +56,7 @@ export function extractOptionalFormField<T>(
  */
 export function extractFormFields<T extends Record<string, unknown>>(
   formData: FormData,
-  schema: z.ZodSchema<T>,
+  schema: z.ZodType<T>,
 ): T {
   // Convert FormData to plain object
   const data: Record<string, FormDataEntryValue | FormDataEntryValue[]> = {};
@@ -95,8 +95,22 @@ export function extractFormFields<T extends Record<string, unknown>>(
 export const formFieldTypes = {
   string: z.string().trim(),
   nonEmptyString: z.string().trim().min(1, "Field cannot be empty"),
-  email: z.string().email("Invalid email address").trim().toLowerCase(),
-  uuid: z.string().uuid("Invalid ID format"),
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .refine((val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), {
+      message: "Invalid email address",
+    }),
+  uuid: z
+    .string()
+    .refine(
+      (val) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          val,
+        ),
+      { message: "Invalid ID format" },
+    ),
   boolean: z
     .union([z.literal("true"), z.literal("false"), z.boolean()])
     .transform((val) => val === true || val === "true"),
