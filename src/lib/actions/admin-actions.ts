@@ -36,7 +36,7 @@ import { PERMISSIONS } from "~/server/auth/permissions.constants";
 
 // Enhanced validation schemas with better error messages
 const inviteUserSchema = z.object({
-  email: emailSchema.transform((s) => s.toLowerCase()),
+  email: z.string().email().transform((s: string) => s.trim().toLowerCase()),
   name: z.string().max(100, "Name must be less than 100 characters").optional(),
   roleId: uuidSchema.optional(),
   message: z
@@ -45,15 +45,24 @@ const inviteUserSchema = z.object({
     .optional(),
 });
 
+// Explicit type for better TypeScript inference
+type InviteUserData = z.infer<typeof inviteUserSchema>;
+
 const updateUserRoleSchema = z.object({
   userId: uuidSchema,
   roleId: uuidSchema,
 });
 
+// Explicit type for better TypeScript inference
+type UpdateUserRoleData = z.infer<typeof updateUserRoleSchema>;
+
 const removeUserSchema = z.object({
   userId: uuidSchema,
-  confirmEmail: emailSchema,
+  confirmEmail: z.string().email().transform((s: string) => s.trim().toLowerCase()),
 });
+
+// Explicit type for better TypeScript inference
+type RemoveUserData = z.infer<typeof removeUserSchema>;
 
 const updateSystemSettingsSchema = z.object({
   settings: z.object({
@@ -87,7 +96,7 @@ export async function inviteUserAction(
       await requireAuthContextWithRole();
 
     // Enhanced validation with Zod
-    const validation = validateFormData(formData, inviteUserSchema);
+    const validation: ActionResult<InviteUserData> = validateFormData(formData, inviteUserSchema);
     if (!validation.success) {
       return validation;
     }
@@ -257,7 +266,7 @@ export async function updateUserRoleAction(
       await requireAuthContextWithRole();
 
     // Enhanced validation
-    const validation = validateFormData(formData, updateUserRoleSchema);
+    const validation: ActionResult<UpdateUserRoleData> = validateFormData(formData, updateUserRoleSchema);
     if (!validation.success) {
       return validation;
     }
@@ -340,7 +349,7 @@ export async function removeUserAction(
       await requireAuthContextWithRole();
 
     // Enhanced validation
-    const validation = validateFormData(formData, removeUserSchema);
+    const validation: ActionResult<RemoveUserData> = validateFormData(formData, removeUserSchema);
     if (!validation.success) {
       return validation;
     }
