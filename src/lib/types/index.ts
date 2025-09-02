@@ -8,7 +8,7 @@
  * import { IssueFilters, MachineResponse, PinPointSupabaseUser } from "~/lib/types";
  */
 
-// API response types and related aliases
+// API response types and related aliases (preferred versions)
 export type * from "./api";
 
 // Shared filter types (avoid IssueSortBy conflict)

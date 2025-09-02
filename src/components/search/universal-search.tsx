@@ -123,7 +123,7 @@ export function UniversalSearch({
         const response = await fetch(`/api/search/suggestions?${params}`);
         if (response.ok) {
           const data: SearchSuggestionsResponse = await response.json();
-          setSuggestions(data.suggestions ?? []);
+          setSuggestions(data.suggestions);
         } else {
           console.error("Failed to fetch suggestions:", response.statusText);
           setSuggestions([]);
@@ -345,10 +345,9 @@ export function UniversalSearch({
                 )}
                 {suggestions.map((suggestion) => {
                   const IconComponent =
-                    ENTITY_ICONS[suggestion.entity as EntityType] || SearchIcon;
+                    ENTITY_ICONS[suggestion.entity as EntityType];
                   const colorClass =
-                    ENTITY_COLORS[suggestion.entity as EntityType] ||
-                    "bg-surface-variant text-on-surface-variant";
+                    ENTITY_COLORS[suggestion.entity as EntityType];
 
                   return (
                     <button

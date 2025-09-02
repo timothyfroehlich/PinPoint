@@ -201,7 +201,7 @@ export async function inviteUserAction(
         `User invitation processed for ${validation.data.email} by ${user.email ?? "unknown"}`,
         {
           userId,
-          membershipId: newMembership?.id,
+          membershipId: newMembership.id,
           organizationId,
           roleId,
         },
@@ -493,7 +493,7 @@ export async function updateSystemSettingsAction(
         action: ACTIVITY_ACTIONS.SETTINGS_UPDATED,
         entity: ACTIVITY_ENTITIES.SETTINGS,
         entityId: "system-settings",
-        details: `Updated system settings: ${Object.keys(validation.data.settings).join(", ") ?? "none"}`,
+        details: `Updated system settings: ${Object.keys(validation.data.settings).join(", ")}`,
         severity: "info",
       });
     });

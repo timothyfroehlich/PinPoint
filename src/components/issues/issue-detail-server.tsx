@@ -235,8 +235,8 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
                     { id: "unassigned", name: "Unassigned", email: "" },
                     ...assignableUsers.map((user) => ({
                       id: user.id,
-                      name: user.name ?? user.email,
-                      email: user.email,
+                      name: user.name ?? user.email ?? "Unknown",
+                      email: user.email ?? "",
                     })),
                   ]}
                   {...(issue.assignedTo && {
