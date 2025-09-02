@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useActionState, useEffect } from "react";
+import React, { useState, useActionState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -37,7 +37,7 @@ interface InviteUserDialogProps {
 export function InviteUserDialog({
   children,
   availableRoles = [],
-}: InviteUserDialogProps) {
+}: InviteUserDialogProps): JSX.Element {
   const [isOpen, setIsOpen] = useState(false);
   const [state, formAction, isPending] = useActionState(inviteUserAction, null);
 

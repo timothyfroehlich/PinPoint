@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useActionState, useEffect } from "react";
+import React, { useState, useActionState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { Switch } from "~/components/ui/switch";
@@ -26,14 +26,14 @@ interface SystemNotificationSettingsProps {
 
 export function SystemNotificationSettings({
   settings,
-}: SystemNotificationSettingsProps) {
+}: SystemNotificationSettingsProps): JSX.Element {
   const [formData, setFormData] = useState(settings);
   const [state, formAction, isPending] = useActionState(
     updateSystemSettingsAction,
     null,
   );
 
-  const handleToggle = (key: keyof typeof formData, value: boolean) => {
+  const handleToggle = (key: keyof typeof formData, value: boolean): void => {
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 

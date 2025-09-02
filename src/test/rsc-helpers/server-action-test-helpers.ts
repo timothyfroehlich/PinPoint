@@ -160,7 +160,7 @@ export async function testServerAction<T>(
  * Assert database changes after Server Action
  * Verifies mutations actually occurred
  */
-export async function expectDatabaseChange<T>(options: {
+export async function expectDatabaseChange(options: {
   table: string;
   where: Record<string, any>;
   toExist: boolean;

@@ -1,24 +1,28 @@
 # PinPoint Target Architecture
 
-**Last Updated**: Unknown  
-**Last Reviewed**: Unknown  
+**Last Updated**: September 2, 2025  
+**Last Reviewed**: September 2, 2025  
 
 _The definitive architectural blueprint for PinPoint's server-first, multi-tenant issue tracking platform_
 
 ## Table of Contents
 
 1. [Technology Foundation](#1-technology-foundation)
-2. [Authentication & Session Management](#2-authentication--session-management)
-3. [Database Architecture & RLS Policies](#3-database-architecture--rls-policies)
-4. [Application Architecture](#4-application-architecture)
-5. [Directory Structure Map](#5-directory-structure-map)
-6. [Security Model](#6-security-model)
-7. [Data Flow Architecture](#7-data-flow-architecture)
-8. [UI Component Strategy](#8-ui-component-strategy)
-9. [File Storage & Media Handling](#9-file-storage--media-handling)
-10. [User Journey Support Architecture](#10-user-journey-support-architecture)
-11. [RSC Testing & Quality Architecture](#11-rsc-testing--quality-architecture)
-12. [Areas Requiring Refinement](#12-areas-requiring-refinement)
+2. [React Compiler Architecture](#2-react-compiler-architecture)
+3. [Authentication & Session Management](#3-authentication--session-management)
+4. [Organization Context Resolution](#4-organization-context-resolution)
+5. [Database Architecture & RLS Policies](#5-database-architecture--rls-policies)
+6. [Advanced Error Handling](#6-advanced-error-handling)
+7. [Application Architecture](#7-application-architecture)
+8. [Directory Structure Map](#8-directory-structure-map)
+9. [Security Model](#9-security-model)
+10. [Data Flow Architecture](#10-data-flow-architecture)
+11. [UI Component Strategy](#11-ui-component-strategy)
+12. [Progressive Enhancement Architecture](#12-progressive-enhancement-architecture)
+13. [File Storage & Media Handling](#13-file-storage--media-handling)
+14. [User Journey Support Architecture](#14-user-journey-support-architecture)
+15. [RSC Testing & Quality Architecture](#15-rsc-testing--quality-architecture)
+16. [Areas Requiring Refinement](#16-areas-requiring-refinement)
 
 ## 1. Technology Foundation
 
@@ -122,7 +126,219 @@ _The definitive architectural blueprint for PinPoint's server-first, multi-tenan
 - CSS layer strategy enabling smooth style system transition
 - Feature-complete functionality maintained throughout migration process
 
-## 2. Authentication & Session Management
+## 2. React Compiler Architecture
+
+### Core React Compiler Integration
+
+**Build-Time Optimization Foundation**
+- React Compiler provides automatic memoization without manual intervention through build-time code transformation
+- Eliminates need for manual `useMemo`, `useCallback`, and `React.memo` patterns while maintaining optimal performance
+- Analyzes component dependencies at build time and generates optimized code with runtime checks using `react/compiler-runtime`
+- Only optimizes code that follows React's rules, safely skipping problematic components rather than failing builds
+
+**Server Components Optimization Strategy**
+- Perfect compatibility with Next.js 15 Server Components enabling automatic memoization of server-side data fetching
+- Optimized component rendering on both server and client with intelligent caching strategies
+- Compatible with async Server Components patterns and request-level memoization using React 19 cache() API
+- Hybrid architecture support optimizing both server data fetching and client interactivity boundaries
+
+### Automatic Performance Optimization Patterns
+
+**Request-Level Memoization Integration**
+- Seamless integration with React 19 cache() API for request-scoped caching in Server Components
+- Eliminates duplicate database queries within single request lifecycle through compiler-generated cache wrappers
+- Memory-efficient query patterns with automatic cleanup after request completion perfect for SSR environments
+- Performance benefits include re-render prevention, computation memoization, and optimized memory management
+
+**Intelligent Code Generation**
+```typescript
+// Compiler automatically transforms this:
+function ExpensiveComponent({ organizationId }) {
+  const processedData = heavyComputation(organizationId);
+  return <div>{processedData}</div>;
+}
+
+// Into optimized version with runtime memoization:
+function ExpensiveComponent({ organizationId }) {
+  const $ = _c(2);
+  let processedData;
+  if ($[0] !== organizationId) {
+    processedData = heavyComputation(organizationId);
+    $[0] = organizationId;
+    $[1] = processedData;
+  } else {
+    processedData = $[1];
+  }
+  return <div>{processedData}</div>;
+}
+```
+
+### Build Integration and Configuration
+
+**Next.js 15 Configuration Architecture**
+```javascript
+// next.config.js - React Compiler integration
+const nextConfig = {
+  experimental: {
+    reactCompiler: true, // Enable automatic optimization
+  },
+};
+```
+
+**Production-Safe Compilation Strategy**
+- `panicThreshold: 'none'` configuration skips problematic components instead of failing builds
+- Selective compilation using `compilationMode: 'annotation'` for controlled rollout and gradual adoption
+- Directory-based compilation control enabling phased deployment and feature flag integration
+- Comprehensive error logging and monitoring integration for production deployment validation
+
+### Development Experience and Debugging
+
+**Three-Tiered Debugging Architecture**
+- Build-time errors indicate severe Rules of React violations requiring immediate attention
+- Runtime behavioral changes often reveal subtle Rules of React violations requiring investigation
+- Performance monitoring tracks over-memoization cases and bundle size impact for optimization decisions
+
+**Debugging Tools and Escape Hatches**
+```javascript
+// Temporary debugging escape hatch
+function ProblematicComponent() {
+  "use no memo"; // Disable compilation for debugging
+  // Component implementation
+}
+
+// Detailed logging configuration
+module.exports = {
+  plugins: [
+    ['babel-plugin-react-compiler', {
+      logger: {
+        logEvent(filename, event) {
+          if (event.kind === 'CompileError') {
+            console.error(`Compilation failed: ${filename}`);
+            console.error(`Reason: ${event.detail.reason}`);
+          }
+        }
+      }
+    }]
+  ]
+};
+```
+
+### TypeScript Integration and Compatibility
+
+**Full TypeScript Support Architecture**
+- Seamless integration with TypeScript strictest configuration without requiring code changes
+- Automatic type inference preservation while adding memoization optimizations
+- Compatible with complex generic types and discriminated unions used throughout the codebase
+- Type-safe optimization ensuring no runtime type errors introduced through compilation
+
+**Component Type Preservation**
+```typescript
+interface ComplexProps {
+  organizationId: string;
+  onUpdate: (data: ComplexData) => Promise<void>;
+  filters: IssueFilters;
+}
+
+// Compiler preserves all type information while optimizing
+function TypedComponent({ organizationId, onUpdate, filters }: ComplexProps) {
+  // Automatic optimization without losing type safety
+  const processedData = processComplexData(organizationId, filters);
+  return <ComplexUI data={processedData} onUpdate={onUpdate} />;
+}
+```
+
+### Performance Monitoring and Bundle Impact
+
+**Bundle Size Analysis and Management**
+- Compiler runtime adds approximately 1.11kB to bundle size for memoization infrastructure
+- Potential bundle reduction through elimination of manual memoization patterns
+- Net bundle impact depends on existing memoization patterns and can be monitored through build analytics
+- Selective compilation strategies available for bundle size optimization when needed
+
+**Performance Metrics Integration**
+```typescript
+// Track compiler impact on performance
+function trackCompilerMetrics() {
+  performance.mark('component-render-start');
+  // Component rendering with compiler optimizations
+  performance.mark('component-render-end');
+  
+  const measure = performance.measure(
+    'component-render', 
+    'component-render-start', 
+    'component-render-end'
+  );
+  
+  // Monitor compiler performance impact
+  reportMetrics('react-compiler', measure.duration);
+}
+```
+
+### Error Handling and Production Resilience
+
+**Comprehensive Error Architecture**
+- Build-time error handling with graceful fallback to unoptimized code when compilation fails
+- Runtime error boundaries specifically designed to handle compiler-related issues
+- Production error monitoring with correlation IDs for tracking compiler-related runtime issues
+- Automatic rollback mechanisms for problematic component optimizations in production
+
+**Error Monitoring Integration**
+```typescript
+// Production error boundary for compiler issues
+function CompilerErrorBoundary({ children }) {
+  return (
+    <ErrorBoundary
+      FallbackComponent={ErrorFallback}
+      onError={(error, errorInfo) => {
+        if (error.message.includes('compiler-runtime')) {
+          reportCompilerIssue(error, errorInfo, {
+            context: 'compiler-optimization',
+            severity: 'medium'
+          });
+        }
+      }}
+    >
+      {children}
+    </ErrorBoundary>
+  );
+}
+```
+
+### Production Deployment Strategy
+
+**Incremental Adoption Architecture**
+- Phase 1: Annotation mode with feature flags for controlled component-level rollout
+- Phase 2: Directory-based compilation enabling module-level optimization deployment
+- Phase 3: Full inference mode with comprehensive monitoring and automatic fallback capabilities
+- Rollback readiness with immediate compilation disable capability for emergency situations
+
+**Feature Flag Integration**
+```typescript
+// Production-ready feature flag implementation
+export function shouldUseReactCompiler(): boolean {
+  return (
+    process.env.REACT_COMPILER_ENABLED === 'true' &&
+    !isBot(navigator.userAgent) && // Skip optimization for bots
+    Math.random() < parseFloat(process.env.COMPILER_ROLLOUT_PERCENTAGE || '0.5')
+  );
+}
+```
+
+### Integration with PinPoint Architecture
+
+**Server Component Optimization Alignment**
+- Perfect integration with PinPoint's server-first architecture optimizing data access layer performance
+- Automatic memoization of organization-scoped queries preventing duplicate database operations
+- Request-level cache() API enhancement through compiler optimizations reducing server response times
+- Multi-tenant data access optimization ensuring consistent performance across organizational boundaries
+
+**Security and Multi-Tenant Considerations**
+- Compiler optimizations maintain organization scoping boundaries without compromising security
+- Authentication context memoization optimization while preserving security validation requirements
+- RLS policy enforcement compatibility with compiler optimizations ensuring data isolation integrity
+- Performance improvements that enhance rather than compromise multi-tenant security architecture
+
+## 3. Authentication & Session Management
 
 ### Core Authentication Architecture
 
@@ -214,7 +430,347 @@ _The definitive architectural blueprint for PinPoint's server-first, multi-tenan
 - Integration with data mutation workflows requiring authentication context
 - Type-safe authentication context propagation through Server Action parameters
 
-## 3. Database Architecture & RLS Policies
+## 4. Organization Context Resolution
+
+### Multi-Tenant Organization Context Architecture
+
+**Request-Time Organization Resolution Strategy**
+- Subdomain-based tenant identification with automatic organization mapping for pre-authentication context establishment
+- DNS-based tenant isolation providing inherent security boundaries and simplified routing without manual tenant filtering
+- Wildcard subdomain architecture enabling scalable multi-tenant deployment with automatic certificate management
+- Request-level organization context binding through Next.js middleware with header-based context propagation
+
+**Advanced Subdomain-Based Resolution Patterns**
+```typescript
+// middleware.ts - Extract organization from subdomain
+export async function middleware(request: NextRequest) {
+  const host = request.headers.get('host')
+  const subdomain = host?.split('.')[0]
+  
+  // Set organization context in request headers
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-organization-context', subdomain || 'default')
+  
+  return NextResponse.next({
+    request: { headers: requestHeaders }
+  })
+}
+```
+
+### React 19 Cache Integration for Context Resolution
+
+**Request-Scoped Organization Context Caching**
+```typescript
+import { cache } from 'react'
+
+// Request-scoped organization resolution with React 19 cache API
+export const getOrganizationContext = cache(async () => {
+  const headers = await import('next/headers')
+  const orgContext = (await headers.headers()).get('x-organization-context')
+  
+  if (!orgContext) {
+    throw new OrganizationContextError('No organization context found')
+  }
+  
+  return await validateAndResolveOrganization(orgContext)
+})
+
+// Cached organization-aware data fetching
+export const getOrganizationData = cache(async (orgId: string) => {
+  return await db.query.issues.findMany({
+    where: eq(issues.organizationId, orgId)
+  })
+})
+```
+
+**Performance Benefits of Request-Level Memoization**
+- Eliminates duplicate authentication queries within single request lifecycle
+- Organization context resolved once per request with automatic cache invalidation between requests
+- Database query deduplication preventing N+1 organization validation patterns
+- Memory-efficient context management with automatic cleanup after request completion
+
+### Supabase SSR Integration with Organization Context
+
+**Enhanced Authentication with Organization Binding**
+```typescript
+import { createServerClient } from '@supabase/ssr'
+
+export async function createOrganizationAwareClient() {
+  const cookies = await import('next/headers').then(m => m.cookies())
+  
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() { return cookies.getAll() },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookies.set(name, value, options)
+          })
+        },
+      },
+    }
+  )
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  const organizationId = user?.app_metadata?.organizationId
+  
+  if (!organizationId) {
+    throw new OrganizationContextError('User lacks organization context')
+  }
+  
+  return { supabase, organizationId, user }
+}
+```
+
+**JWT-Based Organization Context Security**
+- Organization assignment stored in app_metadata field controlled exclusively by service role preventing user tampering
+- RLS policies automatically read organization context from JWT tokens for database-level enforcement
+- Multi-organization user membership support with role-specific permissions per organizational context
+- Automatic context validation and repair mechanisms for users with broken organization associations
+
+### Server Components Organization Scoping
+
+**Next.js 15 Server Components with Organization Context**
+```typescript
+// Server Component with organization scoping
+export default async function IssuesPage() {
+  const { organizationId } = await getOrganizationContext()
+  const issues = await getOrganizationData(organizationId)
+  
+  return <IssuesList issues={issues} />
+}
+
+// Context propagation through component hierarchy
+export default async function OrganizationLayout({
+  children
+}: {
+  children: React.ReactNode
+}) {
+  const { organization, user } = await getOrganizationContext()
+  
+  return (
+    <div>
+      <OrganizationHeader organization={organization} />
+      <OrganizationProvider organizationId={organization.id}>
+        {children}
+      </OrganizationProvider>
+    </div>
+  )
+}
+```
+
+**Client Island Integration for Organization-Aware Interactions**
+```typescript
+'use client'
+export function OrganizationProvider({ 
+  children, 
+  organizationId 
+}: {
+  children: React.ReactNode
+  organizationId: string
+}) {
+  const [orgContext] = useState(organizationId)
+  
+  return (
+    <OrganizationContext.Provider value={orgContext}>
+      {children}
+    </OrganizationContext.Provider>
+  )
+}
+```
+
+### Database Query Scoping and RLS Integration
+
+**Hybrid RLS Approach for Multi-Tenant Security**
+```sql
+-- Organization-scoped RLS policy
+CREATE POLICY tenant_isolation ON issues
+  FOR ALL
+  TO authenticated
+  USING (organization_id = current_setting('app.current_organization_id'));
+
+ALTER TABLE issues ENABLE ROW LEVEL SECURITY;
+```
+
+**Application-Layer Enhancement with Drizzle Integration**
+```typescript
+// Drizzle with organization context binding
+export async function withOrgRLS<T>(
+  db: DrizzleClient,
+  organizationId: string,
+  fn: (tx: DrizzleClient) => Promise<T>
+): Promise<T> {
+  return await db.transaction(async (tx) => {
+    // Bind organization context for RLS
+    await tx.execute(
+      sql.raw(`SET LOCAL app.current_organization_id = '${organizationId.replace(/'/g, "''")}'`)
+    )
+    return await fn(tx)
+  })
+}
+```
+
+### Security Boundaries and Multi-Organization Management
+
+**Defense-in-Depth Organization Validation**
+```typescript
+export async function validateOrganizationAccess(
+  userId: string,
+  requestedOrgId: string
+): Promise<OrganizationContext> {
+  // Multi-layer validation pipeline
+  const membership = await db.query.memberships.findFirst({
+    where: and(
+      eq(memberships.user_id, userId),
+      eq(memberships.organization_id, requestedOrgId)
+    )
+  })
+  
+  if (!membership) {
+    throw new UnauthorizedError('No membership found')
+  }
+  
+  const organization = await db.query.organizations.findFirst({
+    where: eq(organizations.id, requestedOrgId)
+  })
+  
+  if (!organization?.is_active) {
+    throw new OrganizationSuspendedError('Organization inactive')
+  }
+  
+  return { organization, membership }
+}
+```
+
+**Multi-Organization User Membership Handling**
+```typescript
+// Organization switching with subdomain-based routing
+export async function switchOrganization(
+  userId: string,
+  targetOrgId: string
+): Promise<{ redirectUrl: string }> {
+  await validateOrganizationAccess(userId, targetOrgId)
+  await updateUserOrganization(userId, targetOrgId)
+  
+  const org = await getOrganization(targetOrgId)
+  const redirectUrl = `https://${org.subdomain}.${process.env.BASE_DOMAIN}`
+  
+  return { redirectUrl }
+}
+```
+
+### Context Repair and Error Recovery Architecture
+
+**Graceful Context Recovery Mechanisms**
+```typescript
+export async function repairOrganizationContext(
+  user: User
+): Promise<OrganizationContext | null> {
+  try {
+    // Try current app_metadata first
+    const orgId = user.app_metadata?.organizationId
+    if (orgId) {
+      const context = await validateOrganizationAccess(user.id, orgId)
+      return context
+    }
+    
+    // Find user's default organization
+    const defaultMembership = await db.query.memberships.findFirst({
+      where: and(
+        eq(memberships.user_id, user.id),
+        eq(memberships.is_active, true)
+      ),
+      orderBy: desc(memberships.created_at)
+    })
+    
+    if (defaultMembership) {
+      await updateUserOrganization(user.id, defaultMembership.organization_id)
+      return await validateOrganizationAccess(user.id, defaultMembership.organization_id)
+    }
+    
+    return null
+  } catch (error) {
+    console.warn('Context repair failed:', error)
+    return null
+  }
+}
+```
+
+**Progressive Degradation for Context Failures**
+```typescript
+export async function getOrganizationContextWithFallback(): Promise<OrganizationContext | null> {
+  try {
+    return await getOrganizationContext()
+  } catch (error) {
+    if (error instanceof OrganizationContextError) {
+      const user = await getCurrentUser()
+      if (user) {
+        return await repairOrganizationContext(user)
+      }
+    }
+    
+    console.error('Organization context resolution failed:', error)
+    return null
+  }
+}
+```
+
+### Performance Optimization and Monitoring
+
+**Request-Level Performance Patterns**
+- React 19 cache() API eliminates duplicate organization resolution queries within single request
+- Connection pool optimization with organization context persistence across connection reuse
+- Strategic organization context propagation minimizing validation overhead while maintaining security
+- Database query optimization with organization-first filtering and proper indexing strategies
+
+**Organization Context Monitoring Integration**
+```typescript
+// Track organization context resolution performance
+export async function monitoredOrganizationResolution(
+  requestId: string
+): Promise<OrganizationContext> {
+  const startTime = performance.now()
+  
+  try {
+    const context = await getOrganizationContext()
+    
+    const duration = performance.now() - startTime
+    trackMetric('organization_context_resolution', duration, {
+      requestId,
+      organizationId: context.organization.id,
+      success: true
+    })
+    
+    return context
+  } catch (error) {
+    const duration = performance.now() - startTime
+    trackMetric('organization_context_resolution', duration, {
+      requestId,
+      success: false,
+      error: error.message
+    })
+    throw error
+  }
+}
+```
+
+### Integration with PinPoint Multi-Tenant Architecture
+
+**Seamless Security Layer Integration**
+- Organization context resolution integrates seamlessly with existing RLS policies providing defense-in-depth security
+- Authentication layer enhancement without compromising existing security boundaries or validation requirements
+- Multi-tenant data access patterns enhanced with automatic organization context injection and validation
+- Performance optimization through request-level caching while maintaining strict organizational isolation requirements
+
+**Scalability and Operational Excellence**
+- Subdomain-based routing enables horizontal scaling with organization-specific deployment strategies when needed
+- Monitoring and observability integration providing insights into organization context resolution performance and failure patterns
+- Automated error recovery mechanisms ensuring system resilience during organizational membership changes
+- Integration points for external systems while preserving organizational boundaries and security requirements
+
+## 5. Database Architecture & RLS Policies
 
 ### Core Database Architecture
 
@@ -657,7 +1213,591 @@ _The definitive architectural blueprint for PinPoint's server-first, multi-tenan
 - Build optimization with proper code splitting aligned with architectural boundaries
 - Bundle analysis and performance monitoring integrated with directory structure organization
 
-## 6. Security Model
+## 6. Advanced Error Handling
+
+### Multi-Layer Error Classification and Propagation
+
+**Type-Safe Error Classification Architecture**
+```typescript
+// ~/lib/types/errors.ts - Comprehensive error classification system
+export const ErrorSeverity = {
+  LOW: 'low',
+  MEDIUM: 'medium', 
+  HIGH: 'high',
+  CRITICAL: 'critical'
+} as const
+
+export type ErrorSeverity = typeof ErrorSeverity[keyof typeof ErrorSeverity]
+
+export interface ClassifiedError {
+  type: 'validation' | 'authorization' | 'database' | 'external' | 'system'
+  severity: ErrorSeverity
+  userMessage: string
+  internalMessage: string
+  context?: Record<string, unknown>
+  organizationId?: string
+}
+
+// Security-conscious error classes
+export class ValidationError extends Error implements ClassifiedError {
+  readonly type = 'validation'
+  readonly severity = ErrorSeverity.LOW
+  
+  constructor(
+    public readonly userMessage: string,
+    public readonly internalMessage: string = userMessage,
+    public readonly context?: Record<string, unknown>
+  ) {
+    super(internalMessage)
+    this.name = 'ValidationError'
+  }
+}
+
+export class AuthorizationError extends Error implements ClassifiedError {
+  readonly type = 'authorization'
+  readonly severity = ErrorSeverity.HIGH
+  readonly userMessage = 'Access denied'
+  
+  constructor(
+    public readonly internalMessage: string,
+    public readonly organizationId?: string,
+    public readonly context?: Record<string, unknown>
+  ) {
+    super(internalMessage)
+    this.name = 'AuthorizationError'
+  }
+}
+```
+
+**Multi-Layer Error Propagation Strategy**
+- Layer 1: Input validation with field-level error reporting and structured validation feedback
+- Layer 2: Business logic validation with context-aware error classification and organizational scoping
+- Layer 3: Database constraint enforcement with transaction rollback and retry mechanisms
+- Layer 4: External service integration with circuit breaker patterns and graceful degradation
+- Layer 5: System-level error boundaries with monitoring integration and automatic recovery attempts
+
+### Server Components Error Boundary Architecture
+
+**Hybrid Server/Client Error Handling Pattern**
+```typescript
+// Global error boundary for unhandled server errors
+export default function GlobalError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string }
+  reset: () => void
+}) {
+  return (
+    <html>
+      <body>
+        <div className="error-fallback">
+          <h2>Something went wrong!</h2>
+          {process.env.NODE_ENV === 'development' && (
+            <pre className="error-details">{error.message}</pre>
+          )}
+          <button onClick={() => reset()}>Try again</button>
+        </div>
+      </body>
+    </html>
+  )
+}
+
+// Progressive error boundaries at multiple levels
+async function ServerDataComponent({ orgId }: { orgId: string }) {
+  try {
+    const data = await getOrganizationData(orgId)
+    return <ClientErrorBoundary data={data} />
+  } catch (error) {
+    return <ErrorFallback message="Unable to load data" />
+  }
+}
+```
+
+**Client Island Error Integration**
+```typescript
+'use client'
+function ClientErrorBoundary({ data }: { data: any }) {
+  const [error, setError] = useState<Error | null>(null)
+  
+  if (error) {
+    return (
+      <div className="error-boundary">
+        <h3>Something went wrong</h3>
+        <button onClick={() => setError(null)}>Retry</button>
+        <button onClick={() => window.location.reload()}>Refresh Page</button>
+      </div>
+    )
+  }
+  
+  return <DataDisplay data={data} onError={setError} />
+}
+```
+
+### Server Actions Error Handling and User Feedback
+
+**React 19 useActionState Integration Pattern**
+```typescript
+'use server'
+export async function createIssue(
+  prevState: any,
+  formData: FormData
+): Promise<{ message?: string; errors?: Record<string, string[]> }> {
+  // Security-conscious input validation
+  const validatedFields = createIssueSchema.safeParse({
+    title: formData.get('title'),
+    organizationId: formData.get('organizationId'),
+  })
+
+  if (!validatedFields.success) {
+    return {
+      errors: validatedFields.error.flatten().fieldErrors,
+      message: 'Invalid input provided',
+    }
+  }
+
+  try {
+    // Organization-scoped operation with error handling
+    await createIssueForOrganization(validatedFields.data)
+    redirect('/issues')
+  } catch (error) {
+    if (error instanceof DatabaseError) {
+      console.error('Database error:', error) // Server-side logging only
+      return { message: 'Unable to create issue. Please try again.' }
+    }
+    
+    if (error instanceof AuthorizationError) {
+      return { message: 'You do not have permission to perform this action.' }
+    }
+    
+    // Generic fallback prevents information disclosure
+    return { message: 'An unexpected error occurred.' }
+  }
+}
+```
+
+**Enhanced Form Error Handling with Progressive Enhancement**
+```typescript
+'use client'
+export function CreateIssueForm() {
+  const [state, formAction, pending] = useActionState(createIssue, { message: '' })
+
+  return (
+    <form action={formAction}>
+      <input name="title" required />
+      {state?.errors?.title && (
+        <div className="field-error" role="alert" aria-live="polite">
+          {state.errors.title.join(', ')}
+        </div>
+      )}
+      
+      {state?.message && (
+        <div className="form-error" role="alert" aria-live="polite">
+          {state.message}
+        </div>
+      )}
+      
+      <button disabled={pending} type="submit">
+        {pending ? 'Creating...' : 'Create Issue'}
+      </button>
+    </form>
+  )
+}
+```
+
+### Security-Conscious Error Messaging
+
+**Production Error Sanitization Architecture**
+```typescript
+// ~/lib/errors/error-sanitizer.ts
+export function sanitizeErrorForClient(error: unknown): {
+  message: string
+  code?: string
+  digest?: string
+} {
+  if (process.env.NODE_ENV === 'development') {
+    // Full error details in development
+    return {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      code: error instanceof ClassifiedError ? error.type : undefined,
+    }
+  }
+
+  // Production: only safe, generic messages
+  if (error instanceof ValidationError) {
+    return { message: error.userMessage }
+  }
+  
+  if (error instanceof AuthorizationError) {
+    return { 
+      message: error.userMessage,
+      code: 'authorization_error'
+    }
+  }
+  
+  if (error instanceof DatabaseError) {
+    return { 
+      message: 'A system error occurred. Please try again later.',
+      digest: generateErrorDigest(error) // For log correlation
+    }
+  }
+  
+  // Generic fallback prevents information leakage
+  return { 
+    message: 'An unexpected error occurred.',
+    digest: generateErrorDigest(error)
+  }
+}
+
+function generateErrorDigest(error: unknown): string {
+  const errorString = error instanceof Error ? error.stack : String(error)
+  return crypto.createHash('sha256').update(errorString).digest('hex').slice(0, 8)
+}
+```
+
+**Multi-Tenant Error Context Isolation**
+- Organization-scoped error logging preventing cross-tenant information leakage
+- Error context sanitization removing sensitive organizational data from client responses  
+- Audit trail generation for security events while protecting organizational boundaries
+- Error correlation across organizational boundaries for system-wide issue detection while maintaining data isolation
+
+### Database Error Handling and Transaction Safety
+
+**Transaction Wrapper with Retry Logic**
+```typescript
+// ~/lib/dal/transaction-wrapper.ts
+export async function safeTransaction<T>(
+  operation: (tx: typeof db) => Promise<T>,
+  options: { 
+    organizationId: string
+    maxRetries?: number
+    backoffMs?: number
+  }
+): Promise<{ data?: T; error?: ClassifiedError }> {
+  const { organizationId, maxRetries = 3, backoffMs = 1000 } = options
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const data = await db.transaction(async (tx) => {
+        // Verify organization context within transaction
+        await verifyOrganizationAccess(tx, organizationId)
+        return await operation(tx)
+      })
+      
+      return { data }
+    } catch (error) {
+      console.error(`Transaction attempt ${attempt} failed:`, {
+        error: error instanceof Error ? error.message : String(error),
+        organizationId,
+        attempt
+      })
+      
+      if (isDatabaseConstraintError(error)) {
+        if (attempt === maxRetries) {
+          return {
+            error: new DatabaseError(
+              'Database operation failed after retries',
+              error instanceof Error ? error.message : String(error),
+              { organizationId, attempts: maxRetries }
+            )
+          }
+        }
+        
+        // Exponential backoff before retry
+        await new Promise(resolve => 
+          setTimeout(resolve, backoffMs * Math.pow(2, attempt - 1))
+        )
+        continue
+      }
+      
+      // Non-retryable error
+      return {
+        error: error instanceof ClassifiedError 
+          ? error 
+          : new DatabaseError('Unexpected database error', String(error), { organizationId })
+      }
+    }
+  }
+}
+```
+
+### TypeScript Strictest Error Handling Patterns
+
+**Type-Safe Error Guards and Validation**
+```typescript
+// ~/lib/types/guards.ts - Strict type validation for error handling
+export function isValidOrganizationContext(
+  context: unknown
+): context is { organizationId: string; userId: string } {
+  return (
+    typeof context === 'object' &&
+    context !== null &&
+    'organizationId' in context &&
+    'userId' in context &&
+    typeof (context as any).organizationId === 'string' &&
+    typeof (context as any).userId === 'string' &&
+    (context as any).organizationId.length > 0 &&
+    (context as any).userId.length > 0
+  )
+}
+
+// Safe operation wrapper with comprehensive error handling
+export async function safeOrganizationOperation<T>(
+  context: unknown,
+  operation: (ctx: { organizationId: string; userId: string }) => Promise<T>
+): Promise<{ data?: T; error?: ClassifiedError }> {
+  if (!isValidOrganizationContext(context)) {
+    return {
+      error: new AuthorizationError(
+        'Invalid organization context',
+        undefined,
+        { providedContext: context }
+      )
+    }
+  }
+
+  try {
+    const data = await operation(context)
+    return { data }
+  } catch (error) {
+    if (error instanceof ClassifiedError) {
+      return { error }
+    }
+    
+    return {
+      error: new DatabaseError(
+        'Database operation failed',
+        error instanceof Error ? error.message : String(error),
+        { organizationId: context.organizationId }
+      )
+    }
+  }
+}
+```
+
+### Real-Time Error Monitoring and Recovery
+
+**Structured Error Logging Architecture**
+```typescript
+// ~/lib/monitoring/error-logger.ts
+interface ErrorLogEntry {
+  timestamp: string
+  level: 'error' | 'warn' | 'info'
+  message: string
+  error?: {
+    name: string
+    message: string
+    stack?: string
+    digest?: string
+  }
+  context: {
+    organizationId?: string
+    userId?: string
+    requestId?: string
+    userAgent?: string
+    url?: string
+  }
+  metadata?: Record<string, unknown>
+}
+
+export class StructuredLogger {
+  async logError(
+    error: unknown,
+    context: Partial<ErrorLogEntry['context']> = {},
+    metadata?: Record<string, unknown>
+  ): Promise<void> {
+    const entry: ErrorLogEntry = {
+      timestamp: new Date().toISOString(),
+      level: 'error',
+      message: error instanceof Error ? error.message : String(error),
+      error: error instanceof Error ? {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+        digest: error instanceof ClassifiedError 
+          ? generateErrorDigest(error) 
+          : undefined
+      } : undefined,
+      context: {
+        requestId: generateRequestId(),
+        ...context
+      },
+      metadata
+    }
+    
+    // Send to monitoring service with organizational context isolation
+    await this.sendToMonitoring(entry)
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Structured Error Log:', JSON.stringify(entry, null, 2))
+    }
+  }
+}
+```
+
+### Progressive Enhancement Error Fallbacks
+
+**Graceful Degradation Error Boundaries**
+```typescript
+// ~/components/error-boundaries/progressive-error-boundary.tsx
+'use client'
+interface ProgressiveErrorBoundaryProps {
+  children: React.ReactNode
+  fallback?: React.ComponentType<{ error: Error; retry: () => void }>
+  level: 'page' | 'section' | 'component'
+}
+
+export function ProgressiveErrorBoundary({
+  children,
+  fallback: Fallback,
+  level
+}: ProgressiveErrorBoundaryProps) {
+  const [error, setError] = useState<Error | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
+  
+  const retry = useCallback(() => {
+    setError(null)
+    setRetryCount(count => count + 1)
+  }, [])
+  
+  if (error) {
+    if (Fallback) {
+      return <Fallback error={error} retry={retry} />
+    }
+    
+    // Progressive fallback based on error boundary level
+    switch (level) {
+      case 'page':
+        return (
+          <div className="page-error">
+            <h1>Page Unavailable</h1>
+            <p>This page is temporarily unavailable.</p>
+            <button onClick={retry}>Retry</button>
+            <a href="/">Return Home</a>
+          </div>
+        )
+      
+      case 'section':
+        return (
+          <div className="section-error">
+            <p>This section couldn't load.</p>
+            <button onClick={retry}>Try Again</button>
+          </div>
+        )
+      
+      case 'component':
+        return (
+          <div className="component-error">
+            <span>Unable to load</span>
+          </div>
+        )
+    }
+  }
+  
+  return (
+    <ErrorBoundary onError={(error) => {
+      const logger = new StructuredLogger()
+      logger.logError(error, { 
+        errorBoundaryLevel: level,
+        retryCount 
+      })
+    }}>
+      {children}
+    </ErrorBoundary>
+  )
+}
+```
+
+### Accessible Error User Experience Patterns
+
+**Screen Reader Optimized Error Display**
+```typescript
+// ~/components/ui/error-display.tsx
+interface ErrorDisplayProps {
+  error: ClassifiedError
+  onRetry?: () => void
+  onDismiss?: () => void
+  showDetails?: boolean
+}
+
+export function ErrorDisplay({ 
+  error, 
+  onRetry, 
+  onDismiss, 
+  showDetails = false 
+}: ErrorDisplayProps) {
+  const getErrorIcon = (severity: ErrorSeverity) => {
+    switch (severity) {
+      case ErrorSeverity.CRITICAL: return '🚨'
+      case ErrorSeverity.HIGH: return '⚠️'
+      case ErrorSeverity.MEDIUM: return '⚠️'
+      case ErrorSeverity.LOW: return 'ℹ️'
+    }
+  }
+  
+  return (
+    <div 
+      className={`error-display error-display--${error.severity}`}
+      role="alert"
+      aria-live="polite"
+    >
+      <div className="error-display__header">
+        <span className="error-display__icon" aria-hidden="true">
+          {getErrorIcon(error.severity)}
+        </span>
+        <h3 className="error-display__title">
+          {error.userMessage}
+        </h3>
+      </div>
+      
+      {showDetails && process.env.NODE_ENV === 'development' && (
+        <details className="error-display__details">
+          <summary>Technical Details</summary>
+          <pre>{error.internalMessage}</pre>
+          {error.context && (
+            <pre>{JSON.stringify(error.context, null, 2)}</pre>
+          )}
+        </details>
+      )}
+      
+      <div className="error-display__actions">
+        {onRetry && (
+          <button 
+            className="error-display__retry-button"
+            onClick={onRetry}
+          >
+            Try Again
+          </button>
+        )}
+        {onDismiss && (
+          <button 
+            className="error-display__dismiss-button"
+            onClick={onDismiss}
+          >
+            Dismiss
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+```
+
+### Integration with PinPoint Multi-Tenant Architecture
+
+**Organization-Scoped Error Handling**
+- Error classification and handling respects organizational boundaries preventing cross-tenant information leakage
+- Multi-tenant error monitoring with organization-specific dashboards and alerting capabilities
+- Performance impact minimization through request-level error handling optimization and cache integration
+- Security-first error design ensuring no sensitive organizational data exposed through error messages or logging
+
+**Scalability and Reliability Integration**
+- Error handling patterns designed for high-availability multi-tenant environments with automatic recovery mechanisms
+- Integration with existing authentication and authorization layers maintaining security boundaries during error scenarios
+- Performance monitoring integration tracking error rates and resolution patterns across organizational boundaries
+- Comprehensive audit trail generation supporting compliance requirements while maintaining organizational data isolation
+
+## 7. Security Model
 
 ### Multi-Layered Defense Architecture
 
@@ -1233,7 +2373,595 @@ _The definitive architectural blueprint for PinPoint's server-first, multi-tenan
 - Visual design consistency monitoring with automated screenshot comparison detecting unintended changes
 - Accessibility compliance automation with continuous integration blocking releases for accessibility violations
 
-## 9. File Storage & Media Handling
+## 9. Progressive Enhancement Architecture
+
+### Server-First Progressive Enhancement Foundation
+
+**Core Progressive Enhancement Philosophy**
+- Server-first architecture where baseline functionality works without JavaScript ensuring accessibility and performance by default
+- Progressive layer of enhancements providing improved user experience for users with modern browsers and fast connections
+- Default to Server Components with selective client-side hydration minimizing JavaScript execution overhead and bundle size
+- Content-first rendering ensuring users see meaningful content immediately with enhancement layers loading progressively
+
+**React 19 Server Components Integration**
+```typescript
+// Server Component - Works without JavaScript
+export default async function IssuesPage() {
+  const issues = await getIssues(); // Server-side data fetching
+  
+  return (
+    <div>
+      {/* Static content renders first */}
+      <IssuesList issues={issues} />
+      
+      {/* Progressive enhancement with Client Components */}
+      <Suspense fallback={<FilterSkeleton />}>
+        <IssueFilters /> {/* Client Component for interactivity */}
+      </Suspense>
+    </div>
+  );
+}
+
+// Client Component - Hydrates selectively
+'use client'
+function InteractiveNote({ note }) {
+  const [expanded, setExpanded] = useState(false);
+  
+  return (
+    <article>
+      {/* Static content always visible */}
+      <h3>{note.title}</h3>
+      <p>{note.preview}</p>
+      
+      {/* Enhanced functionality */}
+      <button onClick={() => setExpanded(!expanded)}>
+        {expanded ? 'Collapse' : 'Expand'}
+      </button>
+      {expanded && <div>{note.fullContent}</div>}
+    </article>
+  );
+}
+```
+
+### Form Functionality Without JavaScript
+
+**Server Actions Progressive Enhancement**
+```typescript
+// Server Action - works without JavaScript
+'use server'
+async function createIssue(formData: FormData) {
+  const title = formData.get('title') as string;
+  const description = formData.get('description') as string;
+  
+  // Validate and save with organization scoping
+  const issue = await db.issues.create({
+    title,
+    description,
+    organizationId: getOrgId()
+  });
+  
+  // Progressive enhancement: redirect vs. return data
+  redirect(`/issues/${issue.id}`);
+}
+
+// Form Component - Progressive enhancement ready
+export default function CreateIssueForm() {
+  return (
+    <form action={createIssue}>
+      <div>
+        <label htmlFor="title">Issue Title</label>
+        <input 
+          id="title" 
+          name="title" 
+          required 
+          type="text"
+        />
+      </div>
+      
+      <div>
+        <label htmlFor="description">Description</label>
+        <textarea 
+          id="description" 
+          name="description" 
+          required
+        />
+      </div>
+      
+      {/* Works without JavaScript */}
+      <button type="submit">Create Issue</button>
+    </form>
+  );
+}
+```
+
+**Enhanced Form with Client-Side Features**
+```typescript
+'use client'
+import { useActionState } from 'react';
+
+export default function EnhancedCreateIssueForm() {
+  const [state, formAction, pending] = useActionState(createIssue, null);
+  
+  return (
+    <form action={formAction}>
+      {/* Same form fields with progressive enhancement */}
+      
+      {/* Progressive enhancement features */}
+      {state?.errors?.title && (
+        <p role="alert" className="error">{state.errors.title}</p>
+      )}
+      
+      <button 
+        type="submit" 
+        disabled={pending}
+        aria-busy={pending}
+      >
+        {pending ? 'Creating...' : 'Create Issue'}
+      </button>
+      
+      {/* Optimistic UI */}
+      {pending && <div>Your issue is being created...</div>}
+    </form>
+  );
+}
+```
+
+### Client Island Architecture and Hydration Boundaries
+
+**Strategic Hydration Boundary Implementation**
+```typescript
+// Server Component shell
+export default async function DashboardPage() {
+  const [stats, recentIssues] = await Promise.all([
+    getStats(),
+    getRecentIssues()
+  ]);
+  
+  return (
+    <main>
+      {/* Static content - no hydration needed */}
+      <StatsDisplay stats={stats} />
+      
+      {/* Hydration boundary #1: Search functionality */}
+      <Suspense fallback={<SearchSkeleton />}>
+        <SearchIsland />
+      </Suspense>
+      
+      {/* Static list with progressive enhancement */}
+      <IssuesList issues={recentIssues} />
+      
+      {/* Hydration boundary #2: Interactive filters */}
+      <Suspense fallback={<FiltersSkeleton />}>
+        <FiltersIsland />
+      </Suspense>
+    </main>
+  );
+}
+
+// Selective hydration with Activity boundaries
+function TabContainer() {
+  const [activeTab, setActiveTab] = useState('issues');
+  
+  return (
+    <>
+      <TabButtons activeTab={activeTab} onChange={setActiveTab} />
+      
+      {/* Each tab is an independent hydration island */}
+      <Activity mode={activeTab === "issues" ? "visible" : "hidden"}>
+        <IssuesTab />
+      </Activity>
+      
+      <Activity mode={activeTab === "reports" ? "visible" : "hidden"}>
+        <ReportsTab />
+      </Activity>
+    </>
+  );
+}
+```
+
+### Accessibility-First Progressive Enhancement
+
+**WCAG 2025 Compliance Architecture**
+```typescript
+// Accessible progressive enhancement following WCAG 2.2+ standards
+export default function AccessibleDataTable({ data }) {
+  return (
+    <div>
+      {/* Always accessible table structure */}
+      <table role="table" aria-label="Issues list">
+        <thead>
+          <tr>
+            <th scope="col">Title</th>
+            <th scope="col">Status</th>
+            <th scope="col">Priority</th>
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map(issue => (
+            <tr key={issue.id}>
+              <td>
+                <a href={`/issues/${issue.id}`}>{issue.title}</a>
+              </td>
+              <td>
+                <span 
+                  className={`status status-${issue.status}`}
+                  aria-label={`Status: ${issue.status}`}
+                >
+                  {issue.status}
+                </span>
+              </td>
+              <td>{issue.priority}</td>
+              <td>
+                {/* Progressive enhancement: works without JS */}
+                <form action={updateIssueStatus} method="post">
+                  <input type="hidden" name="id" value={issue.id} />
+                  <select 
+                    name="status" 
+                    defaultValue={issue.status}
+                    aria-label={`Update status for ${issue.title}`}
+                  >
+                    <option value="open">Open</option>
+                    <option value="in-progress">In Progress</option>
+                    <option value="closed">Closed</option>
+                  </select>
+                  <button type="submit">Update</button>
+                </form>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      
+      {/* Enhanced features with proper ARIA */}
+      <Suspense fallback={null}>
+        <EnhancedTableFeatures />
+      </Suspense>
+    </div>
+  );
+}
+```
+
+**Screen Reader Optimization with Live Regions**
+```typescript
+'use client'
+export default function LiveUpdates() {
+  const [status, setStatus] = useState('');
+  
+  return (
+    <div>
+      {/* Screen readers announce changes */}
+      <div 
+        role="status" 
+        aria-live="polite" 
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {status}
+      </div>
+      
+      {/* Visual updates */}
+      <div aria-hidden="true">
+        {status && <div className="notification">{status}</div>}
+      </div>
+    </div>
+  );
+}
+```
+
+### Performance Optimization Through Progressive Loading
+
+**Core Web Vitals 2025 Optimization Strategy**
+```typescript
+// Request-level caching for performance
+import { cache } from 'react';
+
+const getCachedIssues = cache(async (orgId: string) => {
+  return await db.query.issues.findMany({
+    where: eq(issues.organizationId, orgId)
+  });
+});
+
+// Progressive loading with proper metrics optimization
+export default async function OptimizedIssuePage({ orgId }) {
+  return (
+    <div>
+      {/* Immediate LCP content */}
+      <h1>Issues Dashboard</h1>
+      
+      {/* Critical above-the-fold content */}
+      <Suspense fallback={<IssuesListSkeleton />}>
+        <IssuesList orgId={orgId} />
+      </Suspense>
+      
+      {/* Below-the-fold: lazy load */}
+      <Suspense fallback={<ChartsSkeleton />}>
+        <IssueCharts orgId={orgId} />
+      </Suspense>
+    </div>
+  );
+}
+```
+
+**Progressive Image Enhancement**
+```typescript
+// Progressive image enhancement with Next.js optimization
+import Image from 'next/image';
+
+export function ProgressiveImage({ src, alt, priority = false }) {
+  return (
+    <div className="image-container">
+      {/* Base64 placeholder loads immediately */}
+      <Image
+        src={src}
+        alt={alt}
+        priority={priority}
+        sizes="(max-width: 768px) 100vw, 50vw"
+        placeholder="blur"
+        blurDataURL="data:image/jpeg;base64,..."
+        style={{
+          width: '100%',
+          height: 'auto',
+        }}
+      />
+    </div>
+  );
+}
+```
+
+### Network Resilience and Offline Capability Patterns
+
+**Service Worker Integration for Progressive Enhancement**
+```javascript
+// public/sw.js - Progressive web app enhancement
+self.addEventListener('fetch', (event) => {
+  // Cache-first strategy for static assets
+  if (event.request.destination === 'script' || 
+      event.request.destination === 'style') {
+    event.respondWith(
+      caches.match(event.request)
+        .then(response => response || fetch(event.request))
+    );
+  }
+  
+  // Network-first for API calls with fallback
+  if (event.request.url.includes('/api/')) {
+    event.respondWith(
+      fetch(event.request)
+        .catch(() => caches.match(event.request))
+    );
+  }
+});
+```
+
+**Offline-First Form Handling with Progressive Enhancement**
+```typescript
+'use client'
+export function OfflineCapableForm() {
+  const [isOnline, setIsOnline] = useState(true);
+  
+  useEffect(() => {
+    setIsOnline(navigator.onLine);
+    
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+  
+  return (
+    <form action={createIssue}>
+      {/* Form fields */}
+      
+      {!isOnline && (
+        <div role="alert" className="offline-notice">
+          You're offline. Your form will be submitted when connection resumes.
+        </div>
+      )}
+      
+      <button type="submit">
+        {isOnline ? 'Submit' : 'Save for Later'}
+      </button>
+    </form>
+  );
+}
+```
+
+### Mobile-First Responsive Progressive Enhancement
+
+**Container Query Responsive Architecture**
+```typescript
+// Modern responsive design with container queries
+export function ResponsiveIssueCard({ issue }) {
+  return (
+    <article className="issue-card" data-container="issue-card">
+      <h3>{issue.title}</h3>
+      
+      {/* Content adapts based on container size */}
+      <div className="issue-meta">
+        <span className="status">{issue.status}</span>
+        <span className="priority">{issue.priority}</span>
+      </div>
+      
+      {/* Progressive disclosure on mobile */}
+      <Suspense fallback={null}>
+        <IssueActions issue={issue} />
+      </Suspense>
+    </article>
+  );
+}
+```
+
+```css
+/* Container query responsive design */
+.issue-card {
+  container-type: inline-size;
+  container-name: issue-card;
+}
+
+/* Mobile-first base styles */
+.issue-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Enhanced layout for larger containers */
+@container issue-card (min-width: 300px) {
+  .issue-meta {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+}
+
+@container issue-card (min-width: 500px) {
+  .issue-card {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+  }
+}
+```
+
+### SEO and Core Web Vitals Optimization
+
+**2025 Core Web Vitals Implementation Strategy**
+```typescript
+// Optimized for new 2025 metrics including Engagement Reliability (ER)
+export default function OptimizedPage() {
+  return (
+    <div>
+      {/* LCP optimization: hero content loads first */}
+      <section className="hero">
+        <h1>Issues Dashboard</h1>
+        <p>Manage your team's workflow efficiently</p>
+      </section>
+      
+      {/* CLS prevention: reserved space */}
+      <div style={{ minHeight: '400px' }}>
+        <Suspense fallback={<div style={{ height: '400px' }}>Loading...</div>}>
+          <IssuesList />
+        </Suspense>
+      </div>
+      
+      {/* INP optimization: immediate feedback */}
+      <Suspense fallback={null}>
+        <InteractiveElements />
+      </Suspense>
+    </div>
+  );
+}
+```
+
+**Performance Budget Implementation with Progressive Enhancement**
+```typescript
+// next.config.js - Performance budgets
+const nextConfig = {
+  experimental: {
+    bundlePagesRouterDependencies: true,
+  },
+  
+  // Performance budgets for progressive enhancement
+  webpack(config, { isServer }) {
+    if (!isServer) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        // Reduce bundle size while maintaining functionality
+        'date-fns': 'date-fns/esm',
+      };
+    }
+    
+    return config;
+  },
+};
+```
+
+### Testing Strategies for Progressive Enhancement
+
+**Playwright Testing for Progressive Enhancement**
+```typescript
+// tests/progressive-enhancement.spec.ts
+import { test, expect } from '@playwright/test';
+
+test.describe('Progressive Enhancement', () => {
+  test('form works without JavaScript', async ({ page }) => {
+    // Disable JavaScript
+    await page.context().addInitScript(() => {
+      delete window.fetch;
+      delete window.XMLHttpRequest;
+    });
+    
+    await page.goto('/issues/new');
+    
+    // Fill form
+    await page.fill('[name="title"]', 'Test Issue');
+    await page.fill('[name="description"]', 'Test Description');
+    
+    // Submit form (should work without JS)
+    await page.click('[type="submit"]');
+    
+    // Should navigate to success page
+    await expect(page).toHaveURL(/\/issues\/\d+/);
+  });
+  
+  test('accessibility with screen reader simulation', async ({ page }) => {
+    await page.goto('/issues');
+    
+    // Check ARIA labels and semantic structure
+    await expect(page.locator('[role="main"]')).toBeVisible();
+    await expect(page.locator('[aria-label*="Issues list"]')).toBeVisible();
+    
+    // Test keyboard navigation
+    await page.keyboard.press('Tab');
+    await expect(page.locator(':focus')).toHaveAttribute('aria-label');
+  });
+  
+  test('Core Web Vitals compliance', async ({ page }) => {
+    await page.goto('/issues');
+    
+    // Measure LCP
+    const lcp = await page.evaluate(() => {
+      return new Promise((resolve) => {
+        new PerformanceObserver((list) => {
+          const entries = list.getEntries();
+          const lastEntry = entries[entries.length - 1];
+          resolve(lastEntry.startTime);
+        }).observe({ entryTypes: ['largest-contentful-paint'] });
+      });
+    });
+    
+    expect(lcp).toBeLessThan(2500); // 2.5 seconds LCP threshold
+  });
+});
+```
+
+### Integration with PinPoint Multi-Tenant Architecture
+
+**Organization-Scoped Progressive Enhancement**
+- Progressive enhancement patterns respect organizational boundaries ensuring security boundaries maintained across enhancement layers
+- Multi-tenant progressive loading with organization-specific performance optimization strategies
+- Context-aware enhancement prioritization based on organizational subscription levels and feature access
+- Progressive enhancement fallbacks that maintain multi-tenant data isolation and security requirements
+
+**Performance and Accessibility Integration**
+- Server-first architecture enhances multi-tenant performance through reduced client-side processing overhead
+- Progressive enhancement patterns integrated with organization context resolution for optimal user experience
+- Accessibility-first design ensuring compliance with organizational accessibility requirements and regulatory standards
+- Performance monitoring integration tracking progressive enhancement effectiveness across organizational boundaries while maintaining privacy
+
+**Scalability and Operational Excellence**
+- Progressive enhancement strategies designed to scale with multi-tenant architecture growth and geographic distribution
+- Enhancement layer monitoring providing insights into user experience improvements and performance gains
+- Integration with existing error handling and recovery mechanisms ensuring graceful degradation during enhancement failures
+- Progressive enhancement patterns supporting organizational customization while maintaining consistent core functionality across all tenants
+
+## 10. File Storage & Media Handling
 
 ### Core Storage Architecture
 

@@ -22,7 +22,7 @@ import {
   issues,
 } from "~/server/db/schema";
 
-export interface SyncResult {
+interface SyncResult {
   success: boolean;
   added: number;
   updated: number;

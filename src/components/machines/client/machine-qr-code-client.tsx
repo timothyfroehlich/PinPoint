@@ -41,7 +41,7 @@ export function MachineQRCodeClient({
   qrCodeGeneratedAt,
   machineName,
   showBulkActions: _showBulkActions = false,
-}: MachineQRCodeClientProps) {
+}: MachineQRCodeClientProps): JSX.Element {
   const [currentQRCode, setCurrentQRCode] = useState(qrCodeUrl);
   const [generatedAt, setGeneratedAt] = useState(qrCodeGeneratedAt);
   const [isPending, startTransition] = useTransition();
@@ -50,7 +50,7 @@ export function MachineQRCodeClient({
     text: string;
   } | null>(null);
 
-  const handleRegenerate = () => {
+  const handleRegenerate = (): void => {
     startTransition(async () => {
       try {
         const result = await regenerateQRCodeAction(machineId);
@@ -79,7 +79,7 @@ export function MachineQRCodeClient({
     });
   };
 
-  const handleDownload = () => {
+  const handleDownload = (): void => {
     if (!currentQRCode) return;
 
     try {
@@ -100,7 +100,7 @@ export function MachineQRCodeClient({
     }
   };
 
-  const handlePrint = () => {
+  const handlePrint = (): void => {
     if (!currentQRCode) return;
 
     try {

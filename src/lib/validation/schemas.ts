@@ -259,11 +259,11 @@ export const searchQuerySchema = z
  */
 export const emailSchema = z
   .string()
-  .transform((s) => s.trim())
   .email({ message: "Invalid email address" })
   .max(LIMITS.EMAIL_MAX, {
     message: `Email must be less than ${String(LIMITS.EMAIL_MAX)} characters`,
-  });
+  })
+  .transform((s: string) => s.trim().toLowerCase());
 
 /**
  * Optional email schema for contexts where email may not be required.
@@ -404,7 +404,7 @@ export const commentCreationSchema = createCommentSchema;
  * });
  * ```
  */
-export function makeCreateSchema<T extends z.ZodRawShape>(shape: T) {
+export function makeCreateSchema<T extends z.ZodRawShape>(shape: T): z.ZodObject<T> {
   return z.object(shape).strict();
 }
 
@@ -421,7 +421,7 @@ export function makeCreateSchema<T extends z.ZodRawShape>(shape: T) {
  * }); // All fields become optional
  * ```
  */
-export function makeUpdateSchema<T extends z.ZodRawShape>(shape: T) {
+export function makeUpdateSchema<T extends z.ZodRawShape>(shape: T): z.ZodObject<Record<string, z.ZodType>> {
   const partialShape: Record<string, z.ZodType> = {};
   for (const [k, v] of Object.entries(shape)) {
     partialShape[k] = (v as z.ZodType).optional();

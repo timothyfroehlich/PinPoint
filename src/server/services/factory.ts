@@ -79,4 +79,3 @@ export class ServiceFactory {
   }
 }
 
-export type IServiceFactory = ServiceFactory;

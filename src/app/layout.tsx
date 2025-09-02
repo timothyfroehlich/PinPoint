@@ -16,7 +16,7 @@ export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
-}) {
+}): Promise<React.JSX.Element> {
   const organizationContext = await getOrganizationContext();
 
   return (

@@ -18,7 +18,7 @@ interface MachinesErrorProps {
  * Error boundary for machines page - machine management functionality
  * Provides context-specific error handling for machine inventory
  */
-export default function MachinesError({ error, reset }: MachinesErrorProps) {
+export default function MachinesError({ error, reset }: MachinesErrorProps): React.JSX.Element {
   const config = errorConfigs.machines(reset);
 
   return <ErrorBoundaryCard error={error} reset={reset} config={config} />;

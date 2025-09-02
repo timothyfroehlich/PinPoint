@@ -77,7 +77,7 @@ describe("Mock System Usage Examples", () => {
 
     it("demonstrates mocking DAL functions with realistic data", async () => {
       // Mock auth context
-      const authContext = MockAuthContextFactory.createPrimaryOrgContext();
+      const _authContext = MockAuthContextFactory.createPrimaryOrgContext();
 
       // Mock database would return our seed-based data
       const expectedIssues = SeedBasedMockFactory.createMockIssues(3);

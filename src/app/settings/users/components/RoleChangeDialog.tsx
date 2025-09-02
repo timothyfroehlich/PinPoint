@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useActionState, useEffect } from "react";
+import React, { useState, useActionState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -51,7 +51,7 @@ export function RoleChangeDialog({
   user,
   availableRoles,
   children,
-}: RoleChangeDialogProps) {
+}: RoleChangeDialogProps): JSX.Element {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedRoleId, setSelectedRoleId] = useState(user.role.id);
   const [state, formAction, isPending] = useActionState(

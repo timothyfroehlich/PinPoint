@@ -7,13 +7,13 @@ import { type DrizzleClient } from "../db/drizzle";
 import { machines } from "../db/schema";
 import { constructReportUrl } from "../utils/qrCodeUtils";
 
-export interface QRCodeInfo {
+interface QRCodeInfo {
   id: string;
   url: string | null;
   generatedAt: Date | null;
 }
 
-export interface MachineFromQRCode {
+interface MachineFromQRCode {
   id: string;
   name: string;
   organizationId: string;
@@ -31,7 +31,7 @@ export interface MachineFromQRCode {
   };
 }
 
-export interface BulkGenerationResult {
+interface BulkGenerationResult {
   generated: number;
   failed: number;
   total: number;

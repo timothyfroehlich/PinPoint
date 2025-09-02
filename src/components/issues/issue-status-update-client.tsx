@@ -49,7 +49,7 @@ export function IssueStatusUpdateClient({
   currentStatusId,
   currentStatusName,
   availableStatuses,
-}: IssueStatusUpdateClientProps) {
+}: IssueStatusUpdateClientProps): JSX.Element {
   const statusOptions = availableStatuses ?? FALLBACK_STATUS_OPTIONS;
 
   const [state, formAction, isPending] = useActionState(

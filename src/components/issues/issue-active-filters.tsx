@@ -21,7 +21,7 @@ interface IssueActiveFiltersProps {
 export function IssueActiveFilters({
   filters,
   searchParams,
-}: IssueActiveFiltersProps) {
+}: IssueActiveFiltersProps): JSX.Element | null {
   const activeFilters = [];
 
   // Status filters
@@ -124,7 +124,7 @@ export function IssueActiveFilters({
 
   return (
     <>
-      {activeFilters.map((filter) => (
+      {activeFilters.map((filter): JSX.Element => (
         <Badge
           key={filter.key}
           variant="secondary"
