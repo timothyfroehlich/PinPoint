@@ -32,8 +32,8 @@ import {
 import {
   sendMagicLink,
   signInWithOAuth,
-  type ActionResult,
 } from "~/lib/actions/auth-actions";
+import { type ActionResult } from "~/lib/actions/auth-actions";
 import { type OrganizationOption } from "~/lib/dal/public-organizations";
 
 // Development auth integration
