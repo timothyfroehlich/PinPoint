@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -28,7 +28,7 @@ import { CalendarIcon, FilterIcon, XIcon, SearchIcon } from "lucide-react";
 import { format, subDays } from "date-fns";
 import { cn } from "~/lib/utils";
 
-export function ActivityLogFilter() {
+export function ActivityLogFilter(): JSX.Element {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -69,7 +69,7 @@ export function ActivityLogFilter() {
     [searchParams],
   );
 
-  const applyFilters = () => {
+  const applyFilters = (): void => {
     const queryString = createQueryString({
       dateFrom: dateFrom?.toISOString().split("T")[0],
       dateTo: dateTo?.toISOString().split("T")[0],
@@ -82,7 +82,7 @@ export function ActivityLogFilter() {
     router.push(`?${queryString}`);
   };
 
-  const clearFilters = () => {
+  const clearFilters = (): void => {
     setDateFrom(undefined);
     setDateeTo(undefined);
     setSelectedUser("");
@@ -91,7 +91,7 @@ export function ActivityLogFilter() {
     router.push(window.location.pathname);
   };
 
-  const setQuickDateRange = (days: number) => {
+  const setQuickDateRange = (days: number): void => {
     const to = new Date();
     const from = subDays(to, days);
     setDateFrom(from);

@@ -20,13 +20,13 @@ interface GlobalSearchShortcutProps {
   children?: React.ReactNode;
 }
 
-export function GlobalSearchShortcut({ children }: GlobalSearchShortcutProps) {
+export function GlobalSearchShortcut({ children }: GlobalSearchShortcutProps): JSX.Element {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
 
   // Handle keyboard shortcut
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
       // Cmd+K or Ctrl+K to open search
       if ((event.metaKey || event.ctrlKey) && event.key === "k") {
         event.preventDefault();
@@ -40,7 +40,7 @@ export function GlobalSearchShortcut({ children }: GlobalSearchShortcutProps) {
     };
 
     document.addEventListener("keydown", handleKeyDown);
-    return () => {
+    return (): void => {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isOpen]);
@@ -49,16 +49,14 @@ export function GlobalSearchShortcut({ children }: GlobalSearchShortcutProps) {
   useEffect(() => {
     if (isOpen) {
       // Small delay to ensure dialog is fully rendered
-      const timer = setTimeout(() => {
+      const timer = setTimeout((): void => {
         const input = document.querySelector(
           "[data-search-input]",
         ) as HTMLInputElement;
-        if (input) {
-          input.focus();
-        }
+        input.focus();
       }, 100);
 
-      return () => {
+      return (): void => {
         clearTimeout(timer);
       };
     }
@@ -66,12 +64,12 @@ export function GlobalSearchShortcut({ children }: GlobalSearchShortcutProps) {
     return undefined;
   }, [isOpen]);
 
-  const handleResultSelect = (result: SearchResult) => {
+  const handleResultSelect = (result: SearchResult): void => {
     setIsOpen(false);
     router.push(result.url);
   };
 
-  const handleOpenChange = (open: boolean) => {
+  const handleOpenChange = (open: boolean): void => {
     setIsOpen(open);
   };
 
@@ -143,7 +141,7 @@ export function SearchButtonTrigger({
   size = "sm",
   showShortcut = true,
   className = "",
-}: SearchButtonTriggerProps) {
+}: SearchButtonTriggerProps): JSX.Element {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -207,11 +205,15 @@ export function SearchButtonTrigger({
  * Hook for global search shortcut functionality
  * Can be used in other components to implement search shortcuts
  */
-export function useGlobalSearchShortcut() {
+export function useGlobalSearchShortcut(): {
+  isSearchOpen: boolean;
+  openSearch: () => void;
+  closeSearch: () => void;
+} {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
       if ((event.metaKey || event.ctrlKey) && event.key === "k") {
         event.preventDefault();
         setIsSearchOpen(true);
@@ -219,17 +221,17 @@ export function useGlobalSearchShortcut() {
     };
 
     document.addEventListener("keydown", handleKeyDown);
-    return () => {
+    return (): void => {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
 
   return {
     isSearchOpen,
-    openSearch: () => {
+    openSearch: (): void => {
       setIsSearchOpen(true);
     },
-    closeSearch: () => {
+    closeSearch: (): void => {
       setIsSearchOpen(false);
     },
   };

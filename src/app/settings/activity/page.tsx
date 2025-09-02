@@ -4,6 +4,7 @@
  * Phase 4B.4: Activity Log
  */
 
+import React from "react";
 import {
   Card,
   CardContent,
@@ -33,7 +34,7 @@ export default async function ActivityLogPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}): Promise<React.JSX.Element> {
   const { organization } = await requireMemberAccess();
   const organizationId = organization.id;
 
@@ -67,7 +68,7 @@ export default async function ActivityLogPage({
     totalPages,
   } = activityResult;
 
-  const getActionIcon = (action: string) => {
+  const getActionIcon = (action: string): React.ComponentType<{ className?: string }> => {
     switch (action) {
       case "USER_LOGIN":
       case "USER_LOGOUT":
@@ -84,7 +85,7 @@ export default async function ActivityLogPage({
     }
   };
 
-  const getSeverityColor = (severity: string) => {
+  const getSeverityColor = (severity: string): string => {
     switch (severity) {
       case "error":
         return "text-on-error-container bg-error-container";

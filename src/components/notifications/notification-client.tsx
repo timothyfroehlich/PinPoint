@@ -94,13 +94,13 @@ export function NotificationClient({
   organizationId,
   maxNotifications = 5,
   autoHideDelay = 5000,
-}: NotificationClientProps) {
+}: NotificationClientProps): JSX.Element | null {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isConnected, setIsConnected] = useState(false);
 
   // Listen for custom events from other client islands
   useEffect(() => {
-    const handleIssueUpdate: EventListener = (_event) => {
+    const handleIssueUpdate: EventListener = (_event): void => {
       addNotification({
         type: "success",
         title: "Issue Updated",
@@ -109,17 +109,17 @@ export function NotificationClient({
       });
     };
 
-    const handleMachineUpdate = (event: Event) => {
+    const handleMachineUpdate = (event: Event): void => {
       const customEvent = event as MachineUpdateEvent;
       addNotification({
         type: "info",
         title: "Machine Updated",
-        message: `Machine "${String(customEvent.detail?.machineName ?? "Unknown")}" has been updated`,
+        message: `Machine "${customEvent.detail.machineName}" has been updated`,
         autoHide: true,
       });
     };
 
-    const handleFormSubmission = (event: Event) => {
+    const handleFormSubmission = (event: Event): void => {
       const customEvent = event as FormSubmissionEvent;
       if (customEvent.detail.success) {
         addNotification({
@@ -143,7 +143,7 @@ export function NotificationClient({
     window.addEventListener("machineUpdated", handleMachineUpdate);
     window.addEventListener("formSubmission", handleFormSubmission);
 
-    return () => {
+    return (): void => {
       window.removeEventListener("issueUpdated", handleIssueUpdate);
       window.removeEventListener("machineUpdated", handleMachineUpdate);
       window.removeEventListener("formSubmission", handleFormSubmission);
@@ -154,7 +154,7 @@ export function NotificationClient({
   useEffect(() => {
     if (!userId || !organizationId) return;
 
-    const initializeNotificationStream = async () => {
+    const initializeNotificationStream = async (): Promise<() => void> => {
       try {
         const { createClient } = await import("~/utils/supabase/client");
         const supabase = createClient();
@@ -173,34 +173,32 @@ export function NotificationClient({
               filter: `organization_id=eq.${organizationId}`,
             },
             (payload) => {
-              if (payload.new) {
-                const notification = payload.new as NotificationPayload;
-                addNotification({
-                  type: notification.type ?? "info",
-                  title: notification.title ?? "Notification",
-                  message: notification.message ?? "",
-                  autoHide: notification.auto_hide,
-                });
-              }
+              const notification = payload.new as NotificationPayload;
+              addNotification({
+                type: notification.type,
+                title: notification.title,
+                message: notification.message,
+                autoHide: notification.auto_hide,
+              });
             },
           )
           .subscribe();
 
-        return () => {
+        return (): void => {
           void supabase.removeChannel(orgChannel);
           setIsConnected(false);
         };
       } catch (error) {
         console.error("Failed to initialize notification stream:", error);
         setIsConnected(false);
-        return () => {
+        return (): void => {
           // No-op cleanup function on error
         };
       }
     };
 
     const cleanup = initializeNotificationStream();
-    return () => {
+    return (): void => {
       void cleanup.then((fn) => {
         fn();
       });
@@ -209,7 +207,7 @@ export function NotificationClient({
 
   const addNotification = (
     notification: Omit<Notification, "id" | "timestamp">,
-  ) => {
+  ): void => {
     const newNotification: Notification = {
       ...notification,
       id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
@@ -229,7 +227,7 @@ export function NotificationClient({
     }
   };
 
-  const removeNotification = (id: string) => {
+  const removeNotification = (id: string): void => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   };
 

@@ -22,7 +22,7 @@ interface IssueDetailErrorProps {
 export default function IssueDetailError({
   error,
   reset,
-}: IssueDetailErrorProps) {
+}: IssueDetailErrorProps): React.JSX.Element {
   const config = errorConfigs.issueDetail(reset);
 
   return <ErrorBoundaryCard error={error} reset={reset} config={config} />;

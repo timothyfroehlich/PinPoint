@@ -20,7 +20,7 @@ import { env } from "~/env";
  *
  * @returns Promise resolving to Supabase server client instance
  */
-export async function createClient() {
+export async function createClient(): Promise<SupabaseClient> {
   // These environment variables are required in non-test environments
   // In test environment, Supabase client creation is mocked at the module level
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
@@ -81,7 +81,7 @@ export async function createClient() {
  *
  * @returns Promise resolving to Supabase admin client instance
  */
-export async function createAdminClient() {
+export async function createAdminClient(): Promise<SupabaseClient> {
   // These environment variables are required in non-test environments
   // In test environment, Supabase client creation is mocked at the module level
   const supabaseUrl = env.SUPABASE_URL;

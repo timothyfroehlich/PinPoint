@@ -79,7 +79,7 @@ export function MachineInventoryServer({
   pagination: _pagination,
   sorting: _sorting,
   searchParams,
-}: MachineInventoryServerProps) {
+}: MachineInventoryServerProps): JSX.Element {
   // Empty state
   if (machines.items.length === 0) {
     return (

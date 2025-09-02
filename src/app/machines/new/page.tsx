@@ -16,7 +16,7 @@ export const metadata = {
   description: "Add a new pinball machine to your inventory",
 };
 
-export default async function NewMachinePage() {
+export default async function NewMachinePage(): Promise<React.JSX.Element> {
   await requireMemberAccess();
 
   // Fetch required data for form

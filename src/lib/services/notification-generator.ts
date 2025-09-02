@@ -56,7 +56,7 @@ async function createNotificationForUser(
   userId: string,
   notificationData: BaseNotificationData,
   context: NotificationContext,
-) {
+): Promise<string | null> {
   // Don't notify the actor of their own actions
   if (userId === context.actorId) {
     return null;
@@ -87,7 +87,15 @@ async function createNotificationForUser(
 /**
  * Get users who should be notified about an issue
  */
-async function getIssueStakeholders(issueId: string, organizationId: string) {
+async function getIssueStakeholders(
+  issueId: string,
+  organizationId: string,
+): Promise<{
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}[]> {
   const issue = await db.query.issues.findFirst({
     where: and(
       eq(issues.id, issueId),
@@ -172,7 +180,7 @@ export async function generateCommentNotifications(
   issueId: string,
   _commentId: string,
   context: NotificationContext,
-) {
+): Promise<string[]> {
   try {
     // Get issue details and stakeholders
     const issue = await db.query.issues.findFirst({
@@ -238,7 +246,7 @@ export async function generateAssignmentNotifications(
   newAssigneeId: string | null,
   _previousAssigneeId: string | null,
   context: NotificationContext,
-) {
+): Promise<string[]> {
   try {
     const issue = await db.query.issues.findFirst({
       where: and(
@@ -296,7 +304,7 @@ export async function generateStatusChangeNotifications(
   issueId: string,
   newStatusName: string,
   context: NotificationContext,
-) {
+): Promise<string[]> {
   try {
     const issue = await db.query.issues.findFirst({
       where: and(
@@ -360,7 +368,7 @@ export async function generateStatusChangeNotifications(
 export async function generateIssueCreationNotifications(
   issueId: string,
   context: NotificationContext,
-) {
+): Promise<string[]> {
   try {
     const issue = await db.query.issues.findFirst({
       where: and(

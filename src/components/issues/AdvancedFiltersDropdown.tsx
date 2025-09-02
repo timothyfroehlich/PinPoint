@@ -38,7 +38,7 @@ export function AdvancedFiltersDropdown({
   onAssigneeChange,
   onReporterChange,
   onOwnerChange,
-}: AdvancedFiltersDropdownProps) {
+}: AdvancedFiltersDropdownProps): JSX.Element {
   const [open, setOpen] = useState(false);
 
   const { data: users, isLoading } = api.user.getAllInOrganization.useQuery();

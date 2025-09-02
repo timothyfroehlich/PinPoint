@@ -22,7 +22,7 @@ interface SettingsLayoutProps {
 
 export default async function SettingsLayout({
   children,
-}: SettingsLayoutProps) {
+}: SettingsLayoutProps): Promise<React.JSX.Element> {
   // Ensure user is authenticated and has organization access
   await requireMemberAccess();
 

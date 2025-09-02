@@ -51,7 +51,7 @@ export function CreateIssueFormServer({
   className,
   action,
   initialMachineId,
-}: CreateIssueFormServerProps) {
+}: CreateIssueFormServerProps): JSX.Element {
   const [state, formAction, isPending] = useActionState(action, null);
   // Local state to ensure Radix Select values are included in HTML form submission
   const [machineId, setMachineId] = useState<string | undefined>(
@@ -244,7 +244,7 @@ export function CreateIssueFormServer({
             >
               {Object.entries(state.fieldErrors).map(([field, errors]) => (
                 <li key={field} data-field={field}>
-                  <strong>{field}:</strong> {errors?.[0]}
+                  <strong>{field}:</strong> {errors[0]}
                 </li>
               ))}
             </ul>

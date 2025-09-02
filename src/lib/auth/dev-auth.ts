@@ -16,7 +16,7 @@
  */
 
 import { shouldEnableDevFeatures } from "~/lib/environment-client";
-import type { DevUserData, DevAuthResult } from "~/lib/types";
+import type { DevUserData, DevAuthResult, TypedSupabaseClient } from "~/lib/types";
 
 /**
  * Fixed password for all dev users
@@ -48,7 +48,7 @@ function isValidDevEmail(email: string): boolean {
  * No OTP or email confirmation required
  */
 async function signInDevUser(
-  clientSupabase: import("~/types/supabase-client").TypedSupabaseClient,
+  clientSupabase: TypedSupabaseClient,
   email: string,
 ): Promise<DevAuthResult> {
   try {
@@ -111,7 +111,7 @@ async function signInDevUser(
  * This provides the "click button, immediately logged in" experience for seeded users only
  */
 export async function authenticateDevUser(
-  clientSupabase: import("~/types/supabase-client").TypedSupabaseClient,
+  clientSupabase: TypedSupabaseClient,
   userData: DevUserData,
 ): Promise<DevAuthResult> {
   // Environment safety check

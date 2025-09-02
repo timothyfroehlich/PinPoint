@@ -1,7 +1,8 @@
+import React from "react";
 import { Skeleton } from "~/components/ui/skeleton";
 import { Separator } from "~/components/ui/separator";
 
-export function NavigationSkeleton() {
+export function NavigationSkeleton(): JSX.Element {
   return (
     <div className="flex flex-col h-full">
       {/* Header skeleton */}
