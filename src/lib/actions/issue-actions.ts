@@ -9,7 +9,12 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { cache } from "react"; // React 19 cache API
 import { z } from "zod";
-import { titleSchema, commentContentSchema, uuidSchema, idSchema } from "~/lib/validation/schemas";
+import {
+  titleSchema,
+  commentContentSchema,
+  uuidSchema,
+  idSchema,
+} from "~/lib/validation/schemas";
 import { and, eq, inArray } from "drizzle-orm";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import {
@@ -40,7 +45,9 @@ import {
 const createIssueSchema = z.object({
   title: titleSchema,
   description: z.string().optional(),
-  machineId: uuidSchema.or(idSchema.refine(() => false, "Please select a machine")),
+  machineId: uuidSchema.or(
+    idSchema.refine(() => false, "Please select a machine"),
+  ),
   priority: z.enum(["low", "medium", "high"]).optional().default("medium"),
   assigneeId: uuidSchema.optional(),
 });
@@ -144,7 +151,9 @@ export async function createIssueAction(
 
     // Background processing (runs after response sent to user)
     runAfterResponse(async () => {
-      console.log(`Issue ${issueData.id} created by ${user.email}`);
+      console.log(
+        `Issue ${issueData.id} created by ${user.email ?? "unknown"}`,
+      );
 
       // Generate notifications for issue creation
       try {
@@ -217,7 +226,9 @@ export async function updateIssueStatusAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`Issue ${issueId} status updated by ${user.email}`);
+      console.log(
+        `Issue ${issueId} status updated by ${user.email ?? "unknown"}`,
+      );
 
       // Generate notifications for status change
       try {
@@ -441,7 +452,8 @@ export async function bulkUpdateIssuesAction(
     // Build update object
     const updateData: any = {};
     if (statusId) updateData.status_id = statusId;
-    if (assigneeId !== undefined) updateData.assigned_to_id = assigneeId ?? null;
+    if (assigneeId !== undefined)
+      updateData.assigned_to_id = assigneeId ?? null;
 
     if (Object.keys(updateData).length === 0) {
       return actionError("No updates specified");

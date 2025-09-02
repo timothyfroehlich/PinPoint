@@ -34,10 +34,7 @@ import { PERMISSIONS } from "~/server/auth/permissions.constants";
 // Enhanced validation schemas with better error messages
 const inviteUserSchema = z.object({
   email: emailSchema.transform((s) => s.toLowerCase()),
-  name: z
-    .string()
-    .max(100, "Name must be less than 100 characters")
-    .optional(),
+  name: z.string().max(100, "Name must be less than 100 characters").optional(),
   roleId: uuidSchema.optional(),
   message: z
     .string()
@@ -190,7 +187,7 @@ export async function inviteUserAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(
-        `User invitation processed for ${validation.data.email} by ${user.email}`,
+        `User invitation processed for ${validation.data.email} by ${user.email ?? "unknown"}`,
         {
           userId,
           membershipId: newMembership?.id,
@@ -303,7 +300,7 @@ export async function updateUserRoleAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(
-        `User role updated by ${user.email}: ${validation.data.userId} -> ${role.name}`,
+        `User role updated by ${user.email ?? "unknown"}: ${validation.data.userId} -> ${role.name}`,
       );
 
       // Log the activity
@@ -383,7 +380,7 @@ export async function removeUserAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(
-        `User removed from organization by ${user.email}: ${validation.data.confirmEmail}`,
+        `User removed from organization by ${user.email ?? "unknown"}: ${validation.data.confirmEmail}`,
       );
 
       // Log the activity

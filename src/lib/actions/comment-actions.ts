@@ -109,7 +109,9 @@ export async function addCommentAction(
 
     // Background processing (runs after response sent to user)
     runAfterResponse(async () => {
-      console.log(`Comment added to issue ${issueId} by ${user.email}`);
+      console.log(
+        `Comment added to issue ${issueId} by ${user.email ?? "unknown"}`,
+      );
 
       // Generate notifications for issue stakeholders
       try {
