@@ -20,7 +20,7 @@ import { extractFormFields } from "~/lib/utils/form-data";
 import { getCookieDomain } from "~/lib/utils/domain";
 import { actionError } from "./shared";
 
-// Workaround for Turbopack bug PACK-5180: re-export types using import/export pattern  
+// Workaround for Turbopack bug PACK-5180: re-export types using import/export pattern
 import type { ActionResult as _ActionResult } from "./shared";
 export type ActionResult<T = any> = _ActionResult<T>;
 

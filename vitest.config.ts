@@ -28,7 +28,7 @@ export default defineConfig({
     testTimeout: 30000,
     setupFiles: [
       "./src/test/setup/nextjs-mocks.ts",
-      "./src/test/setup/organization-mocks.ts"
+      "./src/test/setup/organization-mocks.ts",
     ],
     coverage: {
       enabled: enableCoverage,

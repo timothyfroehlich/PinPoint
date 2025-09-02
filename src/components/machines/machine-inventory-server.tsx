@@ -71,7 +71,7 @@ interface MachineInventoryServerProps {
   searchParams?: Record<string, string | string[] | undefined>;
 }
 
-export async function MachineInventoryServer({
+export function MachineInventoryServer({
   machines,
   locations,
   viewMode,
@@ -185,7 +185,8 @@ export async function MachineInventoryServer({
                   <MapPinIcon className="h-3 w-3" />
                   <span className="truncate">
                     {machine.location?.name ?? "Unknown Location"}
-                    {machine.location?.city && `, ${String(machine.location.city)}`}
+                    {machine.location?.city &&
+                      `, ${String(machine.location.city)}`}
                   </span>
                 </div>
 

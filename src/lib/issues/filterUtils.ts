@@ -65,15 +65,25 @@ export function mergeFilters(
 export function validateFilters(filters: Partial<IssueFilters>): IssueFilters {
   const defaults = getDefaultFilters();
 
-  const trimmedSearch = typeof filters.search === "string" ? filters.search.trim() : undefined;
+  const trimmedSearch =
+    typeof filters.search === "string" ? filters.search.trim() : undefined;
 
-  const validatedSortBy: IssueFilters["sortBy"] = isValidSortField(filters.sortBy) ? filters.sortBy : defaults.sortBy;
-  const validatedSortOrder: IssueFilters["sortOrder"] = isValidSortOrder(filters.sortOrder) ? filters.sortOrder : defaults.sortOrder;
+  const validatedSortBy: IssueFilters["sortBy"] = isValidSortField(
+    filters.sortBy,
+  )
+    ? filters.sortBy
+    : defaults.sortBy;
+  const validatedSortOrder: IssueFilters["sortOrder"] = isValidSortOrder(
+    filters.sortOrder,
+  )
+    ? filters.sortOrder
+    : defaults.sortOrder;
 
   return {
     ...(filters.locationId && { locationId: filters.locationId }),
     ...(filters.machineId && { machineId: filters.machineId }),
-    ...(Array.isArray(filters.statusIds) && filters.statusIds.length > 0 && { statusIds: filters.statusIds }),
+    ...(Array.isArray(filters.statusIds) &&
+      filters.statusIds.length > 0 && { statusIds: filters.statusIds }),
     ...(trimmedSearch && { search: trimmedSearch }),
     ...(filters.assigneeId && { assigneeId: filters.assigneeId }),
     ...(filters.reporterId && { reporterId: filters.reporterId }),
