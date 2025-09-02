@@ -21,7 +21,6 @@ import {
   parseMachineSearchParams,
   getMachineFilterDescription,
   getMachineCanonicalUrl,
-  buildMachineUrl,
 } from "~/lib/search-params/machine-search-params";
 import { buildMetadataDescription } from "~/lib/search-params/shared";
 
@@ -186,7 +185,7 @@ export default async function MachinesPage({
           entityType="machines"
           fields={MACHINES_FILTER_FIELDS}
           currentParams={rawParams}
-          buildUrl={(params) => buildMachineUrl("/machines", params, rawParams)}
+          basePath="/machines"
           title="Filter Machine Inventory"
           description="Search and filter machines by location, manufacturer, model, year, and more"
           collapsible={true}

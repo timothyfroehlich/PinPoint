@@ -4,6 +4,8 @@
  * Phase 4B.2: User and Role Management
  */
 
+/// <reference types="react" />
+
 import {
   Card,
   CardContent,
