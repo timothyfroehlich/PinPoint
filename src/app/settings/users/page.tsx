@@ -115,7 +115,7 @@ export default async function UsersSettingsPage() {
                   <div className="flex items-center space-x-4">
                     <div className="h-10 w-10 rounded-full bg-gradient-to-r from-primary to-primary-container flex items-center justify-center">
                       <span className="text-sm font-medium text-white">
-                        {user.name?.charAt(0)?.toUpperCase() ||
+                        {user.name?.charAt(0).toUpperCase() ||
                           user.email.charAt(0).toUpperCase()}
                       </span>
                     </div>
