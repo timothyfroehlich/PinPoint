@@ -53,7 +53,7 @@ export function MachineDetailServer({ machine }: MachineDetailServerProps) {
                 <label className="text-sm font-medium text-muted-foreground">
                   Name
                 </label>
-                <p className="text-base">{machine.name ?? "Not specified"}</p>
+                <p className="text-base">{machine.name}</p>
               </div>
 
               <div>

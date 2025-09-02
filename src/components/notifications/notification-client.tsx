@@ -202,7 +202,7 @@ export function NotificationClient({
     const cleanup = initializeNotificationStream();
     return () => {
       void cleanup.then((fn) => {
-        fn?.();
+        fn();
       });
     };
   }, [userId, organizationId]);

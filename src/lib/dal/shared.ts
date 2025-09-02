@@ -128,11 +128,7 @@ export const requireAuthContextWithOrg = cache(
 export const getServerAuthContextWithRole = cache(async () => {
   const baseContext = await getServerAuthContext();
 
-  if (
-    baseContext.user == null ||
-    baseContext.organizationId == null ||
-    baseContext.membership === null
-  ) {
+  if (baseContext.user == null || baseContext.organizationId == null) {
     return {
       user: null,
       organizationId: null,
@@ -249,7 +245,7 @@ export const requireAuthContextWithRole = cache(
       throw new Error("Organization selection required");
     }
 
-    if (context.membership === null || context.role === null) {
+    if (context.role === null) {
       throw new Error("Role assignment required");
     }
 
