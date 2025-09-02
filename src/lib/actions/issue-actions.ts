@@ -6,14 +6,12 @@
 "use server";
 
 import { revalidatePath, revalidateTag } from "next/cache";
-import { redirect } from "next/navigation";
 import { cache } from "react"; // React 19 cache API
 import { z } from "zod";
 import {
   titleSchema,
   commentContentSchema,
   uuidSchema,
-  idSchema,
 } from "~/lib/validation/schemas";
 import { and, eq, inArray } from "drizzle-orm";
 import {
@@ -42,14 +40,23 @@ import {
 } from "~/lib/services/notification-generator";
 
 // Enhanced validation schemas with better error messages
+// Accept either a UUID or a deterministic seeded machine id (e.g. "machine-mm-001")
+const machineIdentifierSchema = z
+  .string()
+  .min(1, { message: "Please select a machine" })
+  .refine(
+    (v) =>
+      /^machine-[a-z0-9_-]+$/i.test(v) ||
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v),
+    { message: "Invalid machine selection" },
+  );
+
 const createIssueSchema = z.object({
   title: titleSchema,
   description: z.string().optional(),
-  machineId: uuidSchema.or(
-    idSchema.refine(() => false, "Please select a machine"),
-  ),
+  machineId: machineIdentifierSchema,
   priority: z.enum(["low", "medium", "high"]).optional().default("medium"),
-  assigneeId: uuidSchema.optional(),
+  assigneeId: z.union([uuidSchema, z.literal("unassigned")]).optional(),
 });
 
 const updateIssueStatusSchema = z.object({
@@ -59,7 +66,7 @@ const updateIssueStatusSchema = z.object({
 const addCommentSchema = z.object({ content: commentContentSchema });
 
 const updateIssueAssignmentSchema = z.object({
-  assigneeId: uuidSchema.optional(),
+  assigneeId: z.union([uuidSchema, z.literal("unassigned")]).optional(),
 });
 
 const bulkUpdateIssuesSchema = z.object({
@@ -103,10 +110,14 @@ export async function createIssueAction(
       await requireAuthContextWithRole();
 
     // Enhanced validation with Zod
+    // Perform validation but adapt success shape to our expected return type later
     const validation = validateFormData(formData, createIssueSchema);
     if (!validation.success) {
-      return validation;
+      // Pass through error/fieldErrors (already correct shape)
+      return validation as ActionResult<{ id: string }>;
     }
+    // Extract validated fields (do not return validation directly since type expects id)
+    const validated = validation.data as z.infer<typeof createIssueSchema>;
 
     await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
 
@@ -115,21 +126,46 @@ export async function createIssueAction(
       getDefaultStatus(organizationId),
       getDefaultPriority(organizationId),
     ]);
-
-    if (!defaultStatus || !defaultPriority) {
-      return actionError("System configuration error. Please contact support.");
+    let resolvedStatus = defaultStatus;
+    let resolvedPriority = defaultPriority;
+    // Fallback: pick first available status/priority to avoid hard failure in mis-seeded envs
+    if (!resolvedStatus) {
+      resolvedStatus = await db.query.issueStatuses.findFirst({
+        where: eq(issueStatuses.organization_id, organizationId),
+      });
+      if (!resolvedStatus) {
+        return actionError(
+          "No issue statuses configured for organization. Please contact support.",
+        );
+      }
     }
+    if (!resolvedPriority) {
+      resolvedPriority = await db.query.priorities.findFirst({
+        where: eq(priorities.organization_id, organizationId),
+      });
+      if (!resolvedPriority) {
+        return actionError(
+          "No priorities configured for organization. Please contact support.",
+        );
+      }
+    }
+
+    // Handle special "unassigned" case
+    const assigneeId =
+      validated.assigneeId === "unassigned"
+        ? null
+        : (validated.assigneeId ?? null);
 
     // Create issue with validated data
     const issueData = {
       id: generatePrefixedId("issue"),
-      title: validation.data.title,
-      description: validation.data.description ?? "",
-      machineId: validation.data.machineId,
+      title: validated.title,
+      description: validated.description ?? "",
+      machineId: validated.machineId,
       organizationId,
-      statusId: defaultStatus.id,
-      priorityId: defaultPriority.id,
-      assigneeId: validation.data.assigneeId,
+      statusId: resolvedStatus.id,
+      priorityId: resolvedPriority.id,
+      assigneeId,
       createdById: user.id,
     };
 
@@ -167,9 +203,10 @@ export async function createIssueAction(
       }
     });
 
-    // Redirect to new issue
-    redirect(`/issues/${issueData.id}`);
+    // Return success (client enhancement layer will handle navigation)
+    return actionSuccess({ id: issueData.id }, "Issue created successfully");
   } catch (error) {
+    // (Legacy redirect handling removed – action now returns success and client redirects)
     console.error("Create issue error:", error);
     return actionError(
       error instanceof Error
@@ -195,7 +232,7 @@ export async function updateIssueStatusAction(
     // Enhanced validation
     const validation = validateFormData(formData, updateIssueStatusSchema);
     if (!validation.success) {
-      return validation;
+      return validation as ActionResult<{ statusId: string }>;
     }
 
     await requirePermission(membership, PERMISSIONS.ISSUE_EDIT, db);
@@ -272,7 +309,7 @@ export async function addCommentAction(
     // Enhanced validation
     const validation = validateFormData(formData, addCommentSchema);
     if (!validation.success) {
-      return validation;
+      return validation as ActionResult<{ commentId: string }>;
     }
 
     await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
@@ -341,7 +378,7 @@ export async function updateIssueAssignmentAction(
     // Enhanced validation
     const validation = validateFormData(formData, updateIssueAssignmentSchema);
     if (!validation.success) {
-      return validation;
+      return validation as ActionResult<{ assigneeId: string | null }>;
     }
 
     await requirePermission(membership, PERMISSIONS.ISSUE_ASSIGN, db);
@@ -357,10 +394,16 @@ export async function updateIssueAssignmentAction(
 
     const previousAssigneeId = currentIssue?.assigned_to_id ?? null;
 
+    // Handle special "unassigned" case
+    const assigneeId =
+      validation.data.assigneeId === "unassigned"
+        ? null
+        : (validation.data.assigneeId ?? null);
+
     // Update assignment with organization scoping
     const [updatedIssue] = await db
       .update(issues)
-      .set({ assigned_to_id: validation.data.assigneeId ?? null })
+      .set({ assigned_to_id: assigneeId })
       .where(
         and(eq(issues.id, issueId), eq(issues.organization_id, organizationId)),
       )
@@ -386,7 +429,7 @@ export async function updateIssueAssignmentAction(
       try {
         await generateAssignmentNotifications(
           issueId,
-          validation.data.assigneeId ?? null,
+          assigneeId,
           previousAssigneeId,
           {
             organizationId,

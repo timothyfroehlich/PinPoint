@@ -171,7 +171,7 @@ export function ActivityLogFilter() {
                 mode="single"
                 selected={dateFrom}
                 onSelect={setDateFrom}
-                initialFocus
+                autoFocus
               />
             </PopoverContent>
           </Popover>
@@ -198,7 +198,7 @@ export function ActivityLogFilter() {
                 mode="single"
                 selected={dateTo}
                 onSelect={setDateeTo}
-                initialFocus
+                autoFocus
                 disabled={(date) => (dateFrom ? date < dateFrom : false)}
               />
             </PopoverContent>

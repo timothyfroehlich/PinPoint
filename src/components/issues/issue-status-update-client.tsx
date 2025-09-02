@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
+import { updateIssueStatusAction } from "~/lib/actions/issue-actions";
 
 interface IssueStatusUpdateClientProps {
   issueId: string;
@@ -21,8 +22,8 @@ interface IssueStatusUpdateClientProps {
   }[];
 }
 
-// Mock status options - in real implementation, these would come from props or a hook
-const DEFAULT_STATUS_OPTIONS = [
+// Fallback status options - used only if availableStatuses prop is not provided
+const FALLBACK_STATUS_OPTIONS = [
   { id: "status-new", name: "Open", category: "NEW" as const },
   {
     id: "status-investigating",
@@ -43,41 +44,13 @@ const DEFAULT_STATUS_OPTIONS = [
   { id: "status-closed", name: "Closed", category: "RESOLVED" as const },
 ];
 
-// Placeholder action - will be replaced with actual Server Action
-async function updateIssueStatusAction(
-  issueId: string,
-  _prevState: any,
-  formData: FormData,
-) {
-  // Simulate API delay
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  const newStatusId = formData.get("statusId") as string;
-  const selectedStatus = DEFAULT_STATUS_OPTIONS.find(
-    (s) => s.id === newStatusId,
-  );
-
-  if (!selectedStatus) {
-    return { error: "Invalid status selected" };
-  }
-
-  // In real implementation, this would update the database via Server Action
-  console.log(`Would update issue ${issueId} to status ${selectedStatus.name}`);
-
-  return {
-    success: true,
-    message: `Status updated to ${selectedStatus.name}`,
-    newStatus: selectedStatus,
-  };
-}
-
 export function IssueStatusUpdateClient({
   issueId,
   currentStatusId,
   currentStatusName,
   availableStatuses,
 }: IssueStatusUpdateClientProps) {
-  const statusOptions = availableStatuses ?? DEFAULT_STATUS_OPTIONS;
+  const statusOptions = availableStatuses ?? FALLBACK_STATUS_OPTIONS;
 
   const [state, formAction, isPending] = useActionState(
     updateIssueStatusAction.bind(null, issueId),
@@ -103,10 +76,12 @@ export function IssueStatusUpdateClient({
         </SelectContent>
       </Select>
 
-      {state?.error && <p className="text-error text-sm">{state.error}</p>}
+      {state && !state.success && (
+        <p className="text-error text-sm">{state.error}</p>
+      )}
 
-      {state?.success && (
-        <p className="text-tertiary text-sm">✅ {state.message}</p>
+      {state && state.success && (
+        <p className="text-tertiary text-sm">✅ Status updated successfully</p>
       )}
 
       <Button type="submit" disabled={isPending} size="sm" className="w-full">
