@@ -328,10 +328,9 @@ export function UniversalSearch({
                 )}
                 {suggestions.map((suggestion) => {
                   const IconComponent =
-                    ENTITY_ICONS[suggestion.entity as EntityType] || SearchIcon;
+                    ENTITY_ICONS[suggestion.entity as EntityType];
                   const colorClass =
-                    ENTITY_COLORS[suggestion.entity as EntityType] ||
-                    "bg-surface-variant text-on-surface-variant";
+                    ENTITY_COLORS[suggestion.entity as EntityType];
 
                   return (
                     <button
