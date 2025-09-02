@@ -451,7 +451,7 @@ export async function updateSystemSettingsAction(
         action: ACTIVITY_ACTIONS.SETTINGS_UPDATED,
         entity: ACTIVITY_ENTITIES.SETTINGS,
         entityId: "system-settings",
-        details: `Updated system settings: ${Object.keys(validation.data.settings).join(", ") ?? "none"}`,
+        details: `Updated system settings: ${Object.keys(validation.data.settings).join(", ")}`,
         severity: "info",
       });
     });
