@@ -22,6 +22,8 @@ export type * from "./supabase";
 
 // DB model types (snake_case) under Db namespace
 export type * from "./db";
+// Also export as namespace for: import type { Db } from "~/lib/types"
+export type * as Db from "./db";
 
 // Search param types (Zod inferred)
 export type * from "./search";

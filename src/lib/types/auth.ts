@@ -59,22 +59,18 @@ export type TypedSupabaseClient = SupabaseClient<
 // Browser client type alias
 export type SupabaseBrowserClient = TypedSupabaseClient;
 
-// Auth-related DB model types (snake_case)
-import type { InferSelectModel } from "drizzle-orm";
+// Auth-related DB model types (snake_case) - import from centralized location
 import type { DrizzleToCamelCase } from "~/lib/utils/case-transformers";
 import type {
-  users,
-  organizations,
-  roles,
-  permissions,
-  memberships,
-} from "~/server/db/schema";
+  User as DbUser,
+  Organization as DbOrganization,
+  Role as DbRole,
+  Permission as DbPermission,
+  Membership as DbMembership,
+} from "./db";
 
-export type DbUser = InferSelectModel<typeof users>;
-export type DbOrganization = InferSelectModel<typeof organizations>;
-export type DbRole = InferSelectModel<typeof roles>;
-export type DbPermission = InferSelectModel<typeof permissions>;
-export type DbMembership = InferSelectModel<typeof memberships>;
+// Re-export for convenience
+export type { DbUser, DbOrganization, DbRole, DbPermission, DbMembership };
 
 // Application types (camelCase) - use for business logic and UI
 export type AuthUser = DrizzleToCamelCase<DbUser>;
