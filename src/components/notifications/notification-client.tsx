@@ -142,15 +142,13 @@ export function NotificationClient({
               filter: `organization_id=eq.${organizationId}`,
             },
             (payload) => {
-              if (payload.new) {
-                const notification = payload.new as any;
-                addNotification({
-                  type: notification.type ?? "info",
-                  title: notification.title ?? "Notification",
-                  message: notification.message ?? "",
-                  autoHide: notification.auto_hide !== false,
-                });
-              }
+              const notification = payload.new as any;
+              addNotification({
+                type: notification.type ?? "info",
+                title: notification.title ?? "Notification",
+                message: notification.message ?? "",
+                autoHide: notification.auto_hide !== false,
+              });
             },
           )
           .subscribe();
@@ -171,7 +169,7 @@ export function NotificationClient({
     const cleanup = initializeNotificationStream();
     return () => {
       void cleanup.then((fn) => {
-        fn?.();
+        fn();
       });
     };
   }, [userId, organizationId]);
