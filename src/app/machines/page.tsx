@@ -75,7 +75,7 @@ export async function generateMetadata({ searchParams }: MachinesPageProps) {
   // Generate canonical URL for SEO
   const canonicalUrl = getMachineCanonicalUrl("/machines", parsedParams);
 
-  const title = `Machine Inventory (${totalCount} machines) - PinPoint`;
+  const title = `Machine Inventory (${String(totalCount)} machines) - PinPoint`;
 
   return {
     title,

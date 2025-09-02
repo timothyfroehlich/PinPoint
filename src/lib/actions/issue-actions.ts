@@ -148,7 +148,9 @@ export async function createIssueAction(
 
     // Background processing (runs after response sent to user)
     runAfterResponse(async () => {
-      console.log(`Issue ${issueData.id} created by ${user.email}`);
+      console.log(
+        `Issue ${issueData.id} created by ${user.email ?? "unknown"}`,
+      );
 
       // Generate notifications for issue creation
       try {
@@ -220,7 +222,9 @@ export async function updateIssueStatusAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`Issue ${issueId} status updated by ${user.email}`);
+      console.log(
+        `Issue ${issueId} status updated by ${user.email ?? "unknown"}`,
+      );
 
       // Generate notifications for status change
       try {
@@ -308,7 +312,9 @@ export async function addCommentAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`Comment added to issue ${issueId} by ${user.email}`);
+      console.log(
+        `Comment added to issue ${issueId} by ${user.email ?? "unknown"}`,
+      );
     });
 
     return actionSuccess(
@@ -375,7 +381,9 @@ export async function updateIssueAssignmentAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`Issue ${issueId} assignment updated by ${user.email}`);
+      console.log(
+        `Issue ${issueId} assignment updated by ${user.email ?? "unknown"}`,
+      );
 
       // Generate notifications for assignment change
       try {
@@ -468,13 +476,13 @@ export async function bulkUpdateIssuesAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(
-        `Bulk updated ${updatedIssues.length} issues by ${user.email}`,
+        `Bulk updated ${String(updatedIssues.length)} issues by ${user.email ?? "unknown"}`,
       );
     });
 
     return actionSuccess(
       { updatedCount: updatedIssues.length },
-      `Successfully updated ${updatedIssues.length} issue${updatedIssues.length !== 1 ? "s" : ""}`,
+      `Successfully updated ${String(updatedIssues.length)} issue${updatedIssues.length !== 1 ? "s" : ""}`,
     );
   } catch (error) {
     console.error("Bulk update issues error:", error);

@@ -147,7 +147,7 @@ export function PaginationServer({
           {pageNumbers.map((pageNum, index) => {
             if (pageNum === "ellipsis") {
               return (
-                <div key={`ellipsis-${index}`} className="px-2">
+                <div key={`ellipsis-${String(index)}`} className="px-2">
                   <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
                 </div>
               );

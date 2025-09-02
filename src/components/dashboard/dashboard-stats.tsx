@@ -46,7 +46,7 @@ export function DashboardStats({ stats }: DashboardStatsProps) {
 
       <StatCard
         title="Resolution Rate"
-        value={`${resolutionRate}%`}
+        value={`${String(resolutionRate)}%`}
         icon={<CheckCircleIcon className="h-4 w-4" />}
         description="Issues resolved"
         trend={
