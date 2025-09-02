@@ -171,6 +171,9 @@ export function UniversalSearch({
         document.removeEventListener("keydown", handleKeyDown);
       };
     }
+    
+    // Explicit return for consistency when showDropdown is false
+    return undefined;
   }, [mounted, showDropdown]);
 
   const saveRecentSearch = (query: string) => {
