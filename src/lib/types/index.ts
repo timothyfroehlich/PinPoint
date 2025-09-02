@@ -40,5 +40,8 @@ export type * from "./validation";
 // External service types - re-export for centralized access
 export type * from "./external";
 
+// Test-related types and mock interfaces
+export type * from "./test";
+
 // Common DAL utility types
 export type { PaginationOptions } from "~/lib/dal/shared";

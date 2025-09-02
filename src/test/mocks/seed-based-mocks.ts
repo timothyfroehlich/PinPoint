@@ -4,69 +4,24 @@
  */
 
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
+import type {
+  MockUser,
+  MockOrganization,
+  MockMachine,
+  MockIssue,
+  MockIssueStatus,
+  MockPriority,
+} from "~/lib/types/test";
 
-// Type definitions for seed-based mocks
-export interface MockUser {
-  id: string;
-  name: string;
-  email: string;
-  organization_id: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface MockOrganization {
-  id: string;
-  name: string;
-  slug: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface MockMachine {
-  id: string;
-  name: string;
-  model_id: string;
-  location_id: string;
-  organization_id: string;
-  status: "active" | "maintenance" | "retired";
-  created_at: string;
-  updated_at: string;
-}
-
-export interface MockIssue {
-  id: string;
-  title: string;
-  description: string;
-  machine_id: string;
-  organization_id: string;
-  status_id: string;
-  priority_id: string;
-  assigned_to_id: string | null;
-  created_by_id: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface MockIssueStatus {
-  id: string;
-  name: string;
-  organization_id: string;
-  is_default: boolean;
-  sort_order: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface MockPriority {
-  id: string;
-  name: string;
-  organization_id: string;
-  is_default: boolean;
-  sort_order: number;
-  created_at: string;
-  updated_at: string;
-}
+// Re-export for convenience
+export type {
+  MockUser,
+  MockOrganization,
+  MockMachine,
+  MockIssue,
+  MockIssueStatus,
+  MockPriority,
+};
 
 /**
  * Mock data factory based on seed data patterns

@@ -15,6 +15,20 @@ import type { LoggerInterface } from "~/lib/logger";
 import type { SupabaseServerClient } from "~/lib/supabase/server";
 import type { PinPointSupabaseUser } from "~/lib/types";
 import type { DrizzleClient } from "~/server/db/drizzle";
+import type {
+  TRPCContext,
+  ProtectedTRPCContext,
+  RLSOrganizationTRPCContext,
+  OrganizationTRPCContext,
+} from "~/lib/types/api";
+
+// Re-export for backward compatibility
+export type {
+  TRPCContext,
+  ProtectedTRPCContext,
+  RLSOrganizationTRPCContext,
+  OrganizationTRPCContext,
+};
 
 import { logger } from "~/lib/logger";
 import {
@@ -74,47 +88,6 @@ interface Membership {
   userId: string;
   role: Role;
 }
-
-/**
- * tRPC context type that includes all available properties
- */
-export interface TRPCContext {
-  db: DrizzleClient;
-  user: PinPointSupabaseUser | null;
-  supabase: SupabaseServerClient;
-  organizationId: string | null;
-  organization: Organization | null;
-  services: ServiceFactory;
-  headers: Headers;
-  logger: LoggerInterface;
-  traceId?: string;
-  requestId?: string;
-}
-
-/**
- * Enhanced context for protected procedures with authenticated user
- */
-export interface ProtectedTRPCContext extends TRPCContext {
-  user: PinPointSupabaseUser;
-  organizationId: string | null;
-}
-
-/**
- * Enhanced context for RLS-aware organization procedures
- * organizationId is guaranteed non-null and automatically used by RLS policies
- */
-export interface RLSOrganizationTRPCContext extends ProtectedTRPCContext {
-  organizationId: string; // Override to be non-null (guaranteed by middleware)
-  organization: Organization; // Override to be non-null (guaranteed by middleware)
-  membership: Membership;
-  userPermissions: string[];
-}
-
-/**
- * Legacy organization context for backward compatibility
- * @deprecated Use RLSOrganizationTRPCContext directly
- */
-export type OrganizationTRPCContext = RLSOrganizationTRPCContext;
 
 /**
  * Context creation for tRPC with RLS-aware organization handling

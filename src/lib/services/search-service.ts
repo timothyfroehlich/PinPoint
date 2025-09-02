@@ -16,48 +16,15 @@ import {
   priorities,
   issueStatuses,
 } from "~/server/db/schema";
+import type {
+  SearchEntity,
+  SearchOptions,
+  SearchResult,
+  SearchResponse,
+} from "~/lib/types/search";
 
-export type SearchEntity =
-  | "issues"
-  | "machines"
-  | "users"
-  | "locations"
-  | "all";
-
-export interface SearchOptions {
-  query: string;
-  entities: SearchEntity[];
-  organizationId: string;
-  filters?: Record<string, any>;
-  pagination?: {
-    page: number;
-    limit: number;
-  };
-  sorting?: {
-    field: string;
-    order: "asc" | "desc";
-  };
-}
-
-export interface SearchResult {
-  entity: SearchEntity;
-  id: string;
-  title: string;
-  subtitle?: string;
-  description?: string;
-  url: string;
-  metadata: Record<string, any>;
-  relevance: number;
-}
-
-export interface SearchResponse {
-  results: SearchResult[];
-  totalCount: number;
-  entityCounts: Record<SearchEntity, number>;
-  hasMore: boolean;
-  page: number;
-  limit: number;
-}
+// Re-export for backward compatibility
+export type { SearchEntity, SearchOptions, SearchResult, SearchResponse };
 
 /**
  * Request-level cached universal search
@@ -257,7 +224,7 @@ async function searchIssues(
     title: issue.title,
     subtitle: issue.machineName
       ? `${issue.machineName} • ${issue.statusName}`
-      : issue.statusName ?? "No status",
+      : (issue.statusName ?? "No status"),
     description:
       (issue.description?.slice(0, 150) ?? "") +
       (issue.description && issue.description.length > 150 ? "..." : ""),
