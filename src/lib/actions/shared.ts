@@ -138,7 +138,7 @@ export function actionError(
  */
 export function validateFormData<T>(
   formData: FormData,
-  schema: z.ZodSchema<T>,
+  schema: z.ZodType<T>,
 ): ActionResult<T> {
   const rawData = Object.fromEntries(formData.entries());
 

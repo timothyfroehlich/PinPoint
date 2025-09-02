@@ -21,7 +21,7 @@ import {
   performUniversalSearch,
   type SearchEntity,
 } from "~/lib/services/search-service";
-import { requireAuthContext } from "~/lib/dal/shared";
+import { requireAuthContextWithRole } from "~/lib/organization-context";
 import { formatDistanceToNow } from "date-fns";
 
 interface UniversalSearchResultsProps {
@@ -79,7 +79,7 @@ export async function UniversalSearchResults({
   }
 
   // Get authentication context
-  const { organizationId } = await requireAuthContext();
+  const { organizationId } = await requireAuthContextWithRole();
 
   // Perform search
   const searchResponse = await performUniversalSearch({
@@ -137,10 +137,13 @@ export async function UniversalSearchResults({
                 if (count === 0) return null;
 
                 const colorClass =
-                  (entity in ENTITY_COLORS ? ENTITY_COLORS[entity as keyof typeof ENTITY_COLORS] : null) ??
-                  "bg-surface-variant text-on-surface-variant";
+                  (entity in ENTITY_COLORS
+                    ? ENTITY_COLORS[entity as keyof typeof ENTITY_COLORS]
+                    : null) ?? "bg-surface-variant text-on-surface-variant";
                 const label =
-                  (entity in ENTITY_LABELS ? ENTITY_LABELS[entity as keyof typeof ENTITY_LABELS] : null) ?? entity;
+                  (entity in ENTITY_LABELS
+                    ? ENTITY_LABELS[entity as keyof typeof ENTITY_LABELS]
+                    : null) ?? entity;
 
                 return (
                   <Badge
@@ -161,14 +164,17 @@ export async function UniversalSearchResults({
       <div className="space-y-3">
         {searchResponse.results.map((result) => {
           const IconComponent =
-            (result.entity in ENTITY_ICONS ? ENTITY_ICONS[result.entity as keyof typeof ENTITY_ICONS] : null) ??
-            FileTextIcon;
+            (result.entity in ENTITY_ICONS
+              ? ENTITY_ICONS[result.entity as keyof typeof ENTITY_ICONS]
+              : null) ?? FileTextIcon;
           const colorClass =
-            (result.entity in ENTITY_COLORS ? ENTITY_COLORS[result.entity as keyof typeof ENTITY_COLORS] : null) ??
-            "bg-surface-variant text-on-surface-variant";
+            (result.entity in ENTITY_COLORS
+              ? ENTITY_COLORS[result.entity as keyof typeof ENTITY_COLORS]
+              : null) ?? "bg-surface-variant text-on-surface-variant";
           const label =
-            (result.entity in ENTITY_LABELS ? ENTITY_LABELS[result.entity as keyof typeof ENTITY_LABELS] : null) ??
-            result.entity;
+            (result.entity in ENTITY_LABELS
+              ? ENTITY_LABELS[result.entity as keyof typeof ENTITY_LABELS]
+              : null) ?? result.entity;
 
           return (
             <Card

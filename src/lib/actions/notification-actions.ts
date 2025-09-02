@@ -21,12 +21,30 @@ import {
 
 // Validation schemas
 const markAsReadSchema = z.object({
-  notificationId: z.string().uuid("Invalid notification ID"),
+  notificationId: z
+    .string()
+    .refine(
+      (val) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          val,
+        ),
+      { message: "Invalid notification ID" },
+    ),
 });
 
 const bulkMarkAsReadSchema = z.object({
   notificationIds: z
-    .array(z.string().uuid())
+    .array(
+      z
+        .string()
+        .refine(
+          (val) =>
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+              val,
+            ),
+          { message: "Invalid notification ID" },
+        ),
+    )
     .min(1, "No notifications selected")
     .max(50, "Cannot update more than 50 notifications at once"),
 });

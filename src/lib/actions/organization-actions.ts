@@ -33,20 +33,27 @@ const updateOrganizationProfileSchema = z.object({
     .optional(),
   website: z
     .string()
-    .url("Please enter a valid website URL")
+    .refine((val) => !val || /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(val), {
+      message: "Please enter a valid website URL",
+    })
     .optional()
     .or(z.literal("")),
   phone: z
     .string()
     .max(20, "Phone number must be less than 20 characters")
     .optional(),
-  address: z.string().max(LIMITS.TITLE_MAX, "Address must be less than 200 characters").optional(),
+  address: z
+    .string()
+    .max(LIMITS.TITLE_MAX, "Address must be less than 200 characters")
+    .optional(),
 });
 
 const updateOrganizationLogoSchema = z.object({
   logoUrl: z
     .string()
-    .url("Please enter a valid logo URL")
+    .refine((val) => !val || /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(val), {
+      message: "Please enter a valid logo URL",
+    })
     .optional()
     .or(z.literal("")),
 });
