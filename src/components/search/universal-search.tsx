@@ -111,7 +111,7 @@ export function UniversalSearch({
         const response = await fetch(`/api/search/suggestions?${params}`);
         if (response.ok) {
           const data: SearchSuggestionsResponse = await response.json();
-          setSuggestions(data.suggestions ?? []);
+          setSuggestions(data.suggestions);
         } else {
           console.error("Failed to fetch suggestions:", response.statusText);
           setSuggestions([]);
