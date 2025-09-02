@@ -108,7 +108,7 @@ export function NotificationBellClient({
     const cleanup = initializeRealtimeConnection();
     return () => {
       cleanup.then((fn) => {
-        fn?.();
+        fn();
       });
     };
   }, [userId]);
