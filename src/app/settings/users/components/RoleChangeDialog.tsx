@@ -64,9 +64,9 @@ export function RoleChangeDialog({
     if (state?.success) {
       toast.success(state.message || "User role updated successfully!");
       setIsOpen(false);
-    } else if (state && !state.success) {
+    } else if (!state.success) {
       // Handle field errors or general error
-      if ("fieldErrors" in state && state.fieldErrors) {
+      if (state.fieldErrors) {
         Object.entries(state.fieldErrors).forEach(([field, errors]) => {
           if (Array.isArray(errors)) {
             errors.forEach((error) => toast.error(`${field}: ${error}`));
@@ -78,13 +78,8 @@ export function RoleChangeDialog({
     }
   }, [state]);
 
-  // Filter out roles that shouldn't be assignable
-  const assignableRoles = availableRoles.filter(
-    (_role) =>
-      // Allow all roles for now, but you could add logic here
-      // For example: !role.isSystem || role.id === user.role.id
-      true,
-  );
+  // All roles are assignable for now
+  const assignableRoles = availableRoles;
 
   const selectedRole = assignableRoles.find(
     (role) => role.id === selectedRoleId,
@@ -158,7 +153,7 @@ export function RoleChangeDialog({
               </Select>
               {state &&
                 "fieldErrors" in state &&
-                state.fieldErrors?.["roleId"] && (
+                state.fieldErrors["roleId"] && (
                   <p className="text-xs text-destructive">
                     {state.fieldErrors["roleId"][0]}
                   </p>
