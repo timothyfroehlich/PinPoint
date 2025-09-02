@@ -9,8 +9,6 @@ import type {
   OrganizationResponse,
   UserProfileResponse,
   IssueWithRelationsResponse,
-  PinPointSupabaseUser,
-  Db,
 } from "~/lib/types";
 import { transformKeysToCamelCase } from "~/lib/utils/case-transformers";
 
@@ -22,13 +20,8 @@ interface IssueStats {
   urgentCount: number;
 }
 
-interface AuthContextWithRole {
-  user: PinPointSupabaseUser | null;
-  organizationId: string | null;
-  membership: Db.Membership | null;
-  role: Db.Role | null;
-  permissions: string[];
-}
+// AuthContextWithRole should match the actual return type of getServerAuthContextWithRole
+type AuthContextWithRole = Awaited<ReturnType<typeof import("./shared").getServerAuthContextWithRole>>;
 
 // =================================
 // SHARED UTILITIES AND AUTH CONTEXT

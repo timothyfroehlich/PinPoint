@@ -57,7 +57,7 @@ export function UniversalSearch({
   className = "",
   autoFocus = false,
   onResultSelect,
-}: UniversalSearchProps) {
+}: UniversalSearchProps): JSX.Element {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -112,7 +112,7 @@ export function UniversalSearch({
       return undefined;
     }
 
-    const fetchSuggestions = async () => {
+    const fetchSuggestions = async (): Promise<void> => {
       setIsLoadingSuggestions(true);
       try {
         const params = new URLSearchParams({
@@ -143,7 +143,7 @@ export function UniversalSearch({
   useEffect(() => {
     if (!mounted) return undefined;
 
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent): void => {
       if (
         dropdownRef.current &&
         !dropdownRef.current.contains(event.target as Node) &&
@@ -155,7 +155,7 @@ export function UniversalSearch({
     };
 
     document.addEventListener("mousedown", handleClickOutside);
-    return () => {
+    return (): void => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [mounted]);
@@ -164,7 +164,7 @@ export function UniversalSearch({
   useEffect(() => {
     if (!mounted) return undefined;
 
-    const handleKeyDown = (event: KeyboardEvent) => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key === "Escape") {
         setShowDropdown(false);
         inputRef.current?.blur();
@@ -173,7 +173,7 @@ export function UniversalSearch({
 
     if (showDropdown) {
       document.addEventListener("keydown", handleKeyDown);
-      return () => {
+      return (): void => {
         document.removeEventListener("keydown", handleKeyDown);
       };
     }
@@ -182,7 +182,7 @@ export function UniversalSearch({
     return undefined;
   }, [mounted, showDropdown]);
 
-  const saveRecentSearch = (query: string) => {
+  const saveRecentSearch = (query: string): void => {
     if (!mounted || !showRecentSearches || !query.trim()) return;
 
     const newRecentSearches = [
@@ -197,7 +197,7 @@ export function UniversalSearch({
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
 
     if (searchValue.trim()) {
@@ -209,11 +209,11 @@ export function UniversalSearch({
     }
   };
 
-  const handleInputFocus = () => {
+  const handleInputFocus = (): void => {
     setShowDropdown(true);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const value = e.target.value;
     setSearchValue(value);
 
@@ -222,14 +222,14 @@ export function UniversalSearch({
     }
   };
 
-  const clearSearch = () => {
+  const clearSearch = (): void => {
     setSearchValue("");
     setSuggestions([]);
     setShowDropdown(false);
     inputRef.current?.focus();
   };
 
-  const selectSuggestion = (result: SearchResult) => {
+  const selectSuggestion = (result: SearchResult): void => {
     if (onResultSelect) {
       onResultSelect(result);
     } else {
@@ -241,7 +241,7 @@ export function UniversalSearch({
     setShowDropdown(false);
   };
 
-  const selectRecentSearch = (recentSearch: string) => {
+  const selectRecentSearch = (recentSearch: string): void => {
     setSearchValue(recentSearch);
     startTransition(() => {
       router.push(`/search?q=${encodeURIComponent(recentSearch)}`);
@@ -312,7 +312,7 @@ export function UniversalSearch({
                 {recentSearches.map((recentSearch, index) => (
                   <button
                     key={index}
-                    onClick={() => {
+                    onClick={(): void => {
                       selectRecentSearch(recentSearch);
                     }}
                     className="w-full text-left px-3 py-2 hover:bg-muted rounded-md flex items-center gap-2 transition-colors"
@@ -352,7 +352,7 @@ export function UniversalSearch({
                   return (
                     <button
                       key={`${suggestion.entity}-${suggestion.id}`}
-                      onClick={() => {
+                      onClick={(): void => {
                         selectSuggestion(suggestion);
                       }}
                       className="w-full text-left px-3 py-3 hover:bg-muted rounded-md transition-colors"

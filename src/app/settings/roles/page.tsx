@@ -72,7 +72,7 @@ function getPermissionsArray(role: unknown): { id: string; name: string }[] {
   return [];
 }
 
-export default async function RolesSettingsPage() {
+export default async function RolesSettingsPage(): Promise<React.JSX.Element> {
   await requireMemberAccess();
 
   // Fetch roles using the existing role router

@@ -15,7 +15,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { createCallerFactory } from "~/server/api/trpc";
 import { ROUTER_NAMERouter } from "~/server/api/routers/ROUTER_NAME"; // Replace with actual router
 import { anonymousTestUtils } from "../helpers/anonymous-test-helpers";
-import type { AnonymousTestContext } from "../helpers/anonymous-test-helpers";
+import type { AnonymousTestContext } from "~/lib/types";
 
 /**
  * Template: Anonymous User RLS Tests

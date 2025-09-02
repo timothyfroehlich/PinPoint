@@ -62,7 +62,12 @@ export type EntityType = keyof typeof ENTITY_ICONS;
 /**
  * Utility function to get entity display information
  */
-export function getEntityInfo(entityType: EntityType) {
+export function getEntityInfo(entityType: EntityType): {
+  icon: (typeof ENTITY_ICONS)[EntityType];
+  colors: string;
+  name: string;
+  singular: string;
+} {
   return {
     icon: ENTITY_ICONS[entityType],
     colors: ENTITY_COLORS[entityType],

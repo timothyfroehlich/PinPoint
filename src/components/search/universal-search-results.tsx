@@ -61,7 +61,7 @@ export async function UniversalSearchResults({
   limit = 20,
   showEntityCounts = true,
   showMetadata = true,
-}: UniversalSearchResultsProps) {
+}: UniversalSearchResultsProps): Promise<JSX.Element> {
   // Handle empty or invalid query
   if (!query || query.trim().length < 2) {
     return (
@@ -356,7 +356,7 @@ export async function UniversalSearchResults({
 /**
  * Loading skeleton for search results
  */
-export function UniversalSearchResultsSkeleton() {
+export function UniversalSearchResultsSkeleton(): JSX.Element {
   return (
     <div className="space-y-6">
       {/* Header skeleton */}

@@ -89,13 +89,6 @@ export default tseslint.config(
             "CallExpression[callee.property.name='update']:not([arguments.0])",
           message: "UPDATE operations must include WHERE clause",
         },
-        // Type-only imports for search params must go through ~/lib/types
-        {
-          selector:
-            "ImportDeclaration[importKind='type'][source.value=/^~\\/lib\\/search-params\\/(issue|machine)-search-params$/]",
-          message:
-            "Import search param types from '~/lib/types' (or '~/lib/types/search'), not directly from '~/lib/search-params/*'. Keep value imports (parsers/builders) from '~/lib/search-params/*'.",
-        },
       ],
 
       // Rule to enforce use of validated env object
@@ -253,27 +246,10 @@ export default tseslint.config(
           ],
         },
       ],
-      // Disallow exported type/interface declarations in app code outside of the
-      // canonical `src/lib/types` and other allowed locations. This prevents
-      // ad-hoc domain types from being declared in random modules and enforces
-      // the types consolidation plan (WS-08).
-      "no-restricted-syntax": [
-        "error",
-        {
-          // export interface Foo { ... }
-          selector:
-            "ExportNamedDeclaration[declaration.type='TSInterfaceDeclaration']",
-          message:
-            "Exported interfaces must be declared under 'src/lib/types' (or an allowed exception). Move this interface to '~/lib/types' or keep it internal to a component/test.",
-        },
-        {
-          // export type Foo = ...
-          selector:
-            "ExportNamedDeclaration[declaration.type='TSTypeAliasDeclaration']",
-          message:
-            "Exported type aliases must be declared under 'src/lib/types' (or an allowed exception). Move this type to '~/lib/types' or keep it internal to a component/test.",
-        },
-      ],
+      // Type declaration location enforcement removed - was too restrictive
+      // Component props, external API types, and module-specific interfaces
+      // should remain co-located with their code. Only truly reusable business
+      // domain types should be centralized via code review when duplication occurs.
     },
   },
   {

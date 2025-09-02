@@ -48,7 +48,7 @@ export function ErrorBoundaryCard({
   error,
   reset: _reset,
   config,
-}: ErrorBoundaryCardProps) {
+}: ErrorBoundaryCardProps): JSX.Element {
   const {
     title,
     description,
@@ -70,7 +70,11 @@ export function ErrorBoundaryCard({
     });
   }, [error]);
 
-  const getSeverityColors = (severity: string) => {
+  const getSeverityColors = (severity: string): {
+    iconBg: string;
+    iconColor: string;
+    titleColor: string;
+  } => {
     switch (severity) {
       case "warning":
         return {

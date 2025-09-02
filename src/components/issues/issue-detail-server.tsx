@@ -20,7 +20,7 @@ interface IssueDetailServerProps {
   issueId: string;
 }
 
-export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
+export async function IssueDetailServer({ issueId }: IssueDetailServerProps): Promise<JSX.Element> {
   // Parallel data fetching for optimal performance
   const { user } = await requireMemberAccess();
   const userId = user.id;
@@ -34,7 +34,7 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
     ]);
 
   // Dynamic status colors based on status category
-  const getStatusColorClass = (category?: string) => {
+  const getStatusColorClass = (category?: string): string => {
     switch (category) {
       case "NEW":
         return "bg-error-container text-on-error-container border-error";
@@ -47,7 +47,7 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
     }
   };
 
-  const statusColor = getStatusColorClass(issue.status?.category);
+  const statusColor = getStatusColorClass(issue.status.category);
 
   return (
     <div className="space-y-6">
@@ -74,7 +74,7 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
             className={statusColor}
             data-testid="issue-status-badge"
           >
-            {issue.status?.name ?? "Unknown"}
+            {issue.status.name}
           </Badge>
         </div>
       </div>
@@ -179,18 +179,16 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
               <div className="space-y-2">
                 <div>
                   <p className="font-medium">
-                    {issue.machine?.name ?? "Unknown Machine"}
+                    {issue.machine.name}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {issue.machine?.model?.name ?? "Unknown Model"}
+                    {issue.machine.model.name}
                   </p>
                 </div>
-                {issue.machine?.location && (
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                    <MapPinIcon className="h-4 w-4" />
-                    <span>{issue.machine.location.name}</span>
-                  </div>
-                )}
+                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <MapPinIcon className="h-4 w-4" />
+                  <span>{issue.machine.location.name}</span>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -260,15 +258,15 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
                 <div className="flex items-center justify-between">
                   <span className="text-sm">Current Status:</span>
                   <Badge variant="outline" className={statusColor}>
-                    {issue.status?.name ?? "Unknown"}
+                    {issue.status.name}
                   </Badge>
                 </div>
 
                 {/* Status Update - Client Island */}
                 <IssueStatusUpdateClient
                   issueId={issue.id}
-                  currentStatusId={issue.status?.id ?? ""}
-                  currentStatusName={issue.status?.name ?? "Unknown"}
+                  currentStatusId={issue.status.id}
+                  currentStatusName={issue.status.name}
                   availableStatuses={availableStatuses}
                 />
               </div>

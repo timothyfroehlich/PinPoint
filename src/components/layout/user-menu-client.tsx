@@ -26,7 +26,7 @@ interface UserMenuClientProps {
   };
 }
 
-export function UserMenuClient({ user }: UserMenuClientProps) {
+export function UserMenuClient({ user }: UserMenuClientProps): JSX.Element {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

@@ -18,7 +18,7 @@ interface SettingsErrorProps {
  * Error boundary for settings pages - administrative functionality
  * Provides context-specific error handling for organization management
  */
-export default function SettingsError({ error, reset }: SettingsErrorProps) {
+export default function SettingsError({ error, reset }: SettingsErrorProps): React.JSX.Element {
   const config = errorConfigs.settings(reset);
 
   return <ErrorBoundaryCard error={error} reset={reset} config={config} />;

@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { Button } from "~/components/ui/button";
 import { PlusIcon } from "lucide-react";
 import { IssuesListServer } from "~/components/issues/issues-list-server";
@@ -27,7 +28,7 @@ interface IssuesPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export async function generateMetadata({ searchParams }: IssuesPageProps) {
+export async function generateMetadata({ searchParams }: IssuesPageProps): Promise<Metadata> {
   await requireMemberAccess();
 
   // Parse search params using centralized utility
@@ -87,7 +88,7 @@ async function IssuesWithData({
   searchParams,
 }: {
   searchParams: IssuesPageProps["searchParams"];
-}) {
+}): Promise<React.JSX.Element> {
   const rawParams = await searchParams;
 
   // Parse URL parameters using centralized utility

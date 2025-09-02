@@ -92,7 +92,7 @@ const MemoizedFieldRenderer = memo(function FieldRenderer({
             id={field.id}
             type="text"
             placeholder={field.placeholder}
-            value={(formState[field.id] as string) ?? ""}
+            value={(formState[field.id] as string) || ""}
             onChange={handleTextChange}
           />
         </div>
@@ -103,7 +103,7 @@ const MemoizedFieldRenderer = memo(function FieldRenderer({
         <div className="space-y-2">
           <Label htmlFor={field.id}>{field.label}</Label>
           <Select
-            value={(formState[field.id] as string) ?? ""}
+            value={(formState[field.id] as string) || ""}
             onValueChange={handleSelectChange}
           >
             <SelectTrigger>
@@ -172,7 +172,7 @@ const MemoizedFieldRenderer = memo(function FieldRenderer({
               <Input
                 type="date"
                 placeholder="Start date"
-                value={(formState[`${field.id}_start`] as string) ?? ""}
+                value={(formState[`${field.id}_start`] as string) || ""}
                 onChange={(e) => {
                   updateFormField(`${field.id}_start`, e.target.value);
                 }}
@@ -182,7 +182,7 @@ const MemoizedFieldRenderer = memo(function FieldRenderer({
               <Input
                 type="date"
                 placeholder="End date"
-                value={(formState[`${field.id}_end`] as string) ?? ""}
+                value={(formState[`${field.id}_end`] as string) || ""}
                 onChange={(e) => {
                   updateFormField(`${field.id}_end`, e.target.value);
                 }}
@@ -203,7 +203,7 @@ const MemoizedFieldRenderer = memo(function FieldRenderer({
                 placeholder={`Min ${field.label.toLowerCase()}`}
                 min={field.min}
                 max={field.max}
-                value={(formState[`${field.id}_min`] as string) ?? ""}
+                value={(formState[`${field.id}_min`] as string) || ""}
                 onChange={(e) => {
                   updateFormField(`${field.id}_min`, e.target.value);
                 }}
@@ -215,7 +215,7 @@ const MemoizedFieldRenderer = memo(function FieldRenderer({
                 placeholder={`Max ${field.label.toLowerCase()}`}
                 min={field.min}
                 max={field.max}
-                value={(formState[`${field.id}_max`] as string) ?? ""}
+                value={(formState[`${field.id}_max`] as string) || ""}
                 onChange={(e) => {
                   updateFormField(`${field.id}_max`, e.target.value);
                 }}

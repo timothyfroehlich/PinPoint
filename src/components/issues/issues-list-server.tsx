@@ -81,7 +81,7 @@ const statusColors = {
   RESOLVED: "bg-surface-container-low text-on-surface border-outline-variant",
 } as const;
 
-function IssueCard({ issue }: { issue: Issue }) {
+function IssueCard({ issue }: { issue: Issue }): JSX.Element {
   const priorityColor =
     issue.priority?.name && issue.priority.name in priorityColors
       ? priorityColors[issue.priority.name as keyof typeof priorityColors]
@@ -173,7 +173,7 @@ function IssueCard({ issue }: { issue: Issue }) {
 }
 
 // Direct data fetching version for pages
-export async function IssuesListWithData({ limit }: { limit?: number }) {
+export async function IssuesListWithData({ limit }: { limit?: number }): Promise<JSX.Element> {
   const issues = await getIssuesForOrg();
   const displayIssues = limit ? issues.slice(0, limit) : issues;
 
@@ -194,7 +194,7 @@ export async function IssuesListWithData({ limit }: { limit?: number }) {
 
   return (
     <div className="space-y-4" data-testid="issues-list">
-      {displayIssues.map((issue) => (
+      {displayIssues.map((issue): JSX.Element => (
         <IssueCard key={issue.id} issue={issue} />
       ))}
     </div>
@@ -210,11 +210,11 @@ function PaginationControls({
   pagination: PaginationResult;
   filters: IssueFilters;
   sorting: IssueSorting;
-}) {
+}): JSX.Element | null {
   if (pagination.totalPages <= 1) return null;
 
   // Build query parameters
-  const buildUrl = (page: number) => {
+  const buildUrl = (page: number): string => {
     const params = new URLSearchParams();
     if (filters.status?.length) params.set("status", filters.status.join(","));
     if (filters.priority?.length)
@@ -273,7 +273,7 @@ export function IssuesListServer({
   filters,
   sorting,
   limit,
-}: IssuesListServerProps) {
+}: IssuesListServerProps): JSX.Element {
   if (!issues) {
     return (
       <Suspense fallback={<IssuesListSkeleton />}>
@@ -305,7 +305,7 @@ export function IssuesListServer({
 
   return (
     <div className="space-y-4" data-testid="issues-list">
-      {displayIssues.map((issue) => (
+      {displayIssues.map((issue): JSX.Element => (
         <IssueCard key={issue.id} issue={issue} />
       ))}
 
@@ -321,10 +321,10 @@ export function IssuesListServer({
   );
 }
 
-function IssuesListSkeleton() {
+function IssuesListSkeleton(): JSX.Element {
   return (
     <div className="space-y-4">
-      {Array.from({ length: 3 }).map((_, i) => (
+      {Array.from({ length: 3 }).map((_, i): JSX.Element => (
         <Card key={i}>
           <CardHeader className="pb-3">
             <div className="space-y-2">

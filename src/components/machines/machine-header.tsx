@@ -32,7 +32,7 @@ interface MachineHeaderProps {
   machine: Machine;
 }
 
-export function MachineHeader({ machine }: MachineHeaderProps) {
+export function MachineHeader({ machine }: MachineHeaderProps): JSX.Element {
   const displayName = machine.name;
   const locationName = machine.location?.name ?? "Unknown Location";
   const modelInfo = machine.model

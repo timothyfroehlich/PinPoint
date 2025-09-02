@@ -11,7 +11,7 @@ import {
 } from "~/components/ui/sheet";
 // import { Menu } from "lucide-react";
 
-export function MobileNavToggle() {
+export function MobileNavToggle(): JSX.Element {
   const [isOpen, setIsOpen] = useState(false);
 
   return (

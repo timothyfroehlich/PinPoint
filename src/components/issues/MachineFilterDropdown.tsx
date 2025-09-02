@@ -29,7 +29,7 @@ export function MachineFilterDropdown({
   value,
   disabled = false,
   showCounts = true,
-}: MachineFilterDropdownProps) {
+}: MachineFilterDropdownProps): JSX.Element {
   // Fetch real machine data from API
   const { data: machines, isLoading: machinesLoading } =
     api.machine.core.getAllForIssues.useQuery();
@@ -45,7 +45,7 @@ export function MachineFilterDropdown({
 
     const counts: Record<string, number> = {};
     issues.forEach((issue: IssueWithRelationsResponse) => {
-      if (issue.machine?.id) {
+      if (issue.machine.id) {
         counts[issue.machine.id] = (counts[issue.machine.id] ?? 0) + 1;
       }
     });

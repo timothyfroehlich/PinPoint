@@ -4,6 +4,7 @@
  * Fixed: Removed server component children to prevent bundling issues
  */
 
+import React from "react";
 import { NotificationBellClient } from "./notification-bell-client";
 import { getUnreadNotificationCount } from "~/lib/dal/notifications";
 
@@ -21,7 +22,7 @@ interface NotificationBellWrapperProps {
  */
 export async function NotificationBellWrapper({
   userId,
-}: NotificationBellWrapperProps) {
+}: NotificationBellWrapperProps): Promise<JSX.Element> {
   const unreadCount = await getUnreadNotificationCount();
 
   return (

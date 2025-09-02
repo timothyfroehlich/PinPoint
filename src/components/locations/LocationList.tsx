@@ -13,7 +13,7 @@ interface LocationListProps {
   user: PinPointSupabaseUser | null;
 }
 
-export function LocationList({ locations }: LocationListProps) {
+export function LocationList({ locations }: LocationListProps): JSX.Element {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="space-y-6">

@@ -43,14 +43,14 @@ export function CreateMachineFormClient({
   locations,
   models,
   action,
-}: CreateMachineFormClientProps) {
+}: CreateMachineFormClientProps): JSX.Element {
   const router = useRouter();
 
   // Wrapper to adapt Server Action for useActionState
   const actionWrapper = async (
     _prevState: ActionResult<{ machineId: string }> | null,
     formData: FormData,
-  ) => {
+  ): Promise<ActionResult<{ machineId: string }>> => {
     return await action(formData);
   };
 

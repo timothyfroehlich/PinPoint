@@ -21,7 +21,7 @@ import { UserTableActions } from "./components/UserTableActions";
 import { InviteUserDialog } from "./components/InviteUserDialog";
 import { format } from "date-fns";
 
-export default async function UsersSettingsPage() {
+export default async function UsersSettingsPage(): Promise<React.JSX.Element> {
   await requireMemberAccess();
 
   // Fetch organization users and roles using the existing admin router

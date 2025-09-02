@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import {
@@ -18,7 +19,7 @@ import {
 import { IssuesListServer } from "~/components/issues/issues-list-server";
 import { DashboardStats } from "~/components/dashboard/dashboard-stats";
 
-export async function generateMetadata() {
+export async function generateMetadata(): Promise<Metadata> {
   const { organization } = await requireMemberAccess();
   const org = await getOrganizationById(organization.id);
 
@@ -28,7 +29,7 @@ export async function generateMetadata() {
   };
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage(): Promise<React.JSX.Element> {
   // Authentication validation with automatic redirect
   const { user, organization } = await requireMemberAccess();
   const organizationId = organization.id;
@@ -72,7 +73,7 @@ export default async function DashboardPage() {
 }
 
 // Dashboard-specific Quick Actions (focused on task creation and management)
-function DashboardQuickActions() {
+function DashboardQuickActions(): React.JSX.Element {
   return (
     <Card>
       <CardHeader>
@@ -134,7 +135,7 @@ async function DashboardStatsWithData({
   organizationId: _organizationId,
 }: {
   organizationId: string;
-}) {
+}): Promise<React.JSX.Element> {
   const stats = await getOrganizationStats();
 
   // Transform to match DashboardStats component interface
@@ -154,7 +155,7 @@ async function RecentIssuesWithData({
   organizationId: _organizationId,
 }: {
   organizationId: string;
-}) {
+}): Promise<React.JSX.Element> {
   const issues = await getIssuesForOrg();
   const recentIssues = issues.slice(0, 5);
 
@@ -195,7 +196,7 @@ async function RecentIssuesWithData({
 
 // Loading Skeletons
 
-function StatsLoadingSkeleton() {
+function StatsLoadingSkeleton(): React.JSX.Element {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       {Array.from({ length: 4 }).map((_, i) => (
@@ -212,7 +213,7 @@ function StatsLoadingSkeleton() {
   );
 }
 
-function RecentIssuesLoadingSkeleton() {
+function RecentIssuesLoadingSkeleton(): React.JSX.Element {
   return (
     <div className="space-y-4">
       {Array.from({ length: 3 }).map((_, i) => (
