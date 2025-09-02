@@ -10,6 +10,7 @@ import type {
   UserProfileResponse,
   IssueWithRelationsResponse,
   PinPointSupabaseUser,
+  Db,
 } from "~/lib/types";
 import { transformKeysToCamelCase } from "~/lib/utils/case-transformers";
 
@@ -24,8 +25,8 @@ interface IssueStats {
 interface AuthContextWithRole {
   user: PinPointSupabaseUser | null;
   organizationId: string | null;
-  membership: any | null;
-  role: any | null;
+  membership: Db.Membership | null;
+  role: Db.Role | null;
   permissions: string[];
 }
 
