@@ -141,7 +141,7 @@ async function getIssueStakeholders(issueId: string, organizationId: string) {
   }
 
   // Add machine owner
-  if (issue.machine?.owner) {
+  if (issue.machine.owner) {
     stakeholders.push({
       ...issue.machine.owner,
       name:
@@ -199,7 +199,7 @@ export async function generateCommentNotifications(
     );
     const notificationIds: string[] = [];
 
-    const message = `${context.actorName} commented on issue "${issue.title}" (${issue.machine?.name ?? "Unknown Machine"})`;
+    const message = `${context.actorName} commented on issue "${issue.title}" (${issue.machine.name})`;
 
     // Create notifications for all stakeholders
     for (const stakeholder of stakeholders) {
@@ -259,7 +259,7 @@ export async function generateAssignmentNotifications(
     }
 
     const notificationIds: string[] = [];
-    const message = `${context.actorName} assigned you to issue "${issue.title}" (${issue.machine?.name ?? "Unknown Machine"})`;
+    const message = `${context.actorName} assigned you to issue "${issue.title}" (${issue.machine.name})`;
 
     // Notify new assignee (if different from actor)
     if (newAssigneeId && newAssigneeId !== context.actorId) {
@@ -324,7 +324,7 @@ export async function generateStatusChangeNotifications(
     );
     const notificationIds: string[] = [];
 
-    const message = `${context.actorName} updated the status of "${issue.title}" to ${newStatusName} (${issue.machine?.name ?? "Unknown Machine"})`;
+    const message = `${context.actorName} updated the status of "${issue.title}" to ${newStatusName} (${issue.machine.name})`;
 
     // Create notifications for all stakeholders
     for (const stakeholder of stakeholders) {
@@ -386,10 +386,10 @@ export async function generateIssueCreationNotifications(
     }
 
     const notificationIds: string[] = [];
-    const message = `New issue "${issue.title}" reported for ${issue.machine?.name ?? "Unknown Machine"}`;
+    const message = `New issue "${issue.title}" reported for ${issue.machine.name}`;
 
     // Notify machine owner (if different from creator)
-    if (issue.machine?.owner && issue.machine.owner.id !== context.actorId) {
+    if (issue.machine.owner && issue.machine.owner.id !== context.actorId) {
       const notificationId = await createNotificationForUser(
         issue.machine.owner.id,
         {
