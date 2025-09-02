@@ -259,7 +259,7 @@ export function AdvancedSearchForm({
               id={field.id}
               type="text"
               placeholder={field.placeholder}
-              value={formState[field.id] ?? ""}
+              value={(formState[field.id] as string) ?? ""}
               onChange={(e) => {
                 updateFormField(field.id, e.target.value);
               }}
@@ -272,7 +272,7 @@ export function AdvancedSearchForm({
           <div key={field.id} className="space-y-2">
             <Label htmlFor={field.id}>{field.label}</Label>
             <Select
-              value={formState[field.id] ?? ""}
+              value={(formState[field.id] as string) ?? ""}
               onValueChange={(value) => {
                 updateFormField(field.id, value);
               }}
@@ -346,7 +346,7 @@ export function AdvancedSearchForm({
                 <Input
                   type="date"
                   placeholder="Start date"
-                  value={formState[`${field.id}_start`] ?? ""}
+                  value={(formState[`${field.id}_start`] as string) ?? ""}
                   onChange={(e) => {
                     updateFormField(`${field.id}_start`, e.target.value);
                   }}
@@ -356,7 +356,7 @@ export function AdvancedSearchForm({
                 <Input
                   type="date"
                   placeholder="End date"
-                  value={formState[`${field.id}_end`] ?? ""}
+                  value={(formState[`${field.id}_end`] as string) ?? ""}
                   onChange={(e) => {
                     updateFormField(`${field.id}_end`, e.target.value);
                   }}
@@ -377,7 +377,7 @@ export function AdvancedSearchForm({
                   placeholder={`Min ${field.label.toLowerCase()}`}
                   min={field.min}
                   max={field.max}
-                  value={formState[`${field.id}_min`] ?? ""}
+                  value={(formState[`${field.id}_min`] as string) ?? ""}
                   onChange={(e) => {
                     updateFormField(`${field.id}_min`, e.target.value);
                   }}
@@ -389,7 +389,7 @@ export function AdvancedSearchForm({
                   placeholder={`Max ${field.label.toLowerCase()}`}
                   min={field.min}
                   max={field.max}
-                  value={formState[`${field.id}_max`] ?? ""}
+                  value={(formState[`${field.id}_max`] as string) ?? ""}
                   onChange={(e) => {
                     updateFormField(`${field.id}_max`, e.target.value);
                   }}
