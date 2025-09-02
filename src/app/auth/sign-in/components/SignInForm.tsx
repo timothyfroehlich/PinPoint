@@ -29,10 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import {
-  sendMagicLink,
-  signInWithOAuth,
-} from "~/lib/actions/auth-actions";
+import { sendMagicLink, signInWithOAuth } from "~/lib/actions/auth-actions";
 import { type ActionResult } from "~/lib/actions/auth-actions";
 import { type OrganizationOption } from "~/lib/dal/public-organizations";
 

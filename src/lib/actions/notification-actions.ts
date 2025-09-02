@@ -74,10 +74,11 @@ export async function markNotificationAsReadAction(
     revalidateTag(`notification-count-${user.id}`);
 
     // Background processing
-    runAfterResponse(async () => {
+    runAfterResponse(() => {
       console.log(
         `Notification ${validation.data.notificationId} marked as read by ${user.email ?? "unknown"}`,
       );
+      return Promise.resolve();
     });
 
     return actionSuccess({ success: true }, "Notification marked as read");
@@ -135,10 +136,11 @@ export async function bulkMarkNotificationsAsReadAction(
     revalidateTag(`notification-count-${user.id}`);
 
     // Background processing
-    runAfterResponse(async () => {
+    runAfterResponse(() => {
       console.log(
         `Bulk marked ${String(updatedNotifications.length)} notifications as read by ${user.email ?? "unknown"}`,
       );
+      return Promise.resolve();
     });
 
     return actionSuccess(
@@ -190,10 +192,11 @@ export async function markAllNotificationsAsReadAction(
     revalidateTag(`notification-count-${user.id}`);
 
     // Background processing
-    runAfterResponse(async () => {
+    runAfterResponse(() => {
       console.log(
         `All notifications marked as read by ${user.email ?? "unknown"} (${String(updatedNotifications.length)} notifications)`,
       );
+      return Promise.resolve();
     });
 
     return actionSuccess(
@@ -248,10 +251,11 @@ export async function markNotificationAsUnreadAction(
     revalidateTag(`notification-count-${user.id}`);
 
     // Background processing
-    runAfterResponse(async () => {
+    runAfterResponse(() => {
       console.log(
         `Notification ${validation.data.notificationId} marked as unread by ${user.email ?? "unknown"}`,
       );
+      return Promise.resolve();
     });
 
     return actionSuccess({ success: true }, "Notification marked as unread");

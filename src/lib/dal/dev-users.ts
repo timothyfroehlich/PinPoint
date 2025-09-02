@@ -13,12 +13,12 @@ import { users, memberships, roles, organizations } from "~/server/db/schema";
 import { transformKeysToCamelCase } from "~/lib/utils/case-transformers";
 import type { DevUserResponse } from "~/lib/types";
 
-// Internal type for query result transformation  
+// Internal type for query result transformation
 type DevUserRaw = {
   id: string;
   name: string | null;
-  email: string | null;  // email can be null in database
-  email_verified: Date | null;  // Fixed: email_verified is timestamp in database
+  email: string | null; // email can be null in database
+  email_verified: Date | null; // Fixed: email_verified is timestamp in database
   image: string | null;
   bio: string | null;
   notification_frequency: "IMMEDIATE" | "DAILY" | "WEEKLY" | "NEVER";
@@ -79,7 +79,7 @@ export const getDevUsers = cache(async (): Promise<DevUserResponse[]> => {
         roles: [],
       });
     }
-    
+
     // Add role if it exists
     if (row.role_name) {
       const user = userMap.get(userId)!;
