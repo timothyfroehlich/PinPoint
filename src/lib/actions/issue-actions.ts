@@ -9,15 +9,20 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { cache } from "react"; // React 19 cache API
 import { z } from "zod";
-import { titleSchema, commentContentSchema, uuidSchema, idSchema } from "~/lib/validation/schemas";
+import {
+  titleSchema,
+  commentContentSchema,
+  uuidSchema,
+  idSchema,
+} from "~/lib/validation/schemas";
 import { and, eq, inArray } from "drizzle-orm";
-import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import {
   issues,
   issueStatuses,
   priorities,
   comments,
 } from "~/server/db/schema";
+import { db } from "~/lib/dal/shared";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { transformKeysToSnakeCase } from "~/lib/utils/case-transformers";
 import {
@@ -40,7 +45,9 @@ import {
 const createIssueSchema = z.object({
   title: titleSchema,
   description: z.string().optional(),
-  machineId: uuidSchema.or(idSchema.refine(() => false, "Please select a machine")),
+  machineId: uuidSchema.or(
+    idSchema.refine(() => false, "Please select a machine"),
+  ),
   priority: z.enum(["low", "medium", "high"]).optional().default("medium"),
   assigneeId: uuidSchema.optional(),
 });
@@ -66,7 +73,6 @@ const bulkUpdateIssuesSchema = z.object({
 
 // Performance: Cached database queries for default values
 const getDefaultStatus = cache(async (organizationId: string) => {
-  const db = getGlobalDatabaseProvider().getClient();
   return await db.query.issueStatuses.findFirst({
     where: and(
       eq(issueStatuses.is_default, true),
@@ -76,7 +82,6 @@ const getDefaultStatus = cache(async (organizationId: string) => {
 });
 
 const getDefaultPriority = cache(async (organizationId: string) => {
-  const db = getGlobalDatabaseProvider().getClient();
   return await db.query.priorities.findFirst({
     where: and(
       eq(priorities.is_default, true),
@@ -103,7 +108,6 @@ export async function createIssueAction(
       return validation;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
 
     // Parallel queries for better performance
@@ -193,7 +197,6 @@ export async function updateIssueStatusAction(
       return validation;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ISSUE_EDIT, db);
 
     // Update with organization scoping for security
@@ -272,7 +275,6 @@ export async function addCommentAction(
       return validation;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
 
     // Verify issue exists and user has access
@@ -339,7 +341,6 @@ export async function updateIssueAssignmentAction(
       return validation;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ISSUE_ASSIGN, db);
 
     // Get current assignee for notification comparison
@@ -434,14 +435,14 @@ export async function bulkUpdateIssuesAction(
       return actionError("Invalid bulk update data");
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ISSUE_BULK_MANAGE, db);
     const { issueIds, statusId, assigneeId } = validation.data;
 
     // Build update object
     const updateData: any = {};
     if (statusId) updateData.status_id = statusId;
-    if (assigneeId !== undefined) updateData.assigned_to_id = assigneeId ?? null;
+    if (assigneeId !== undefined)
+      updateData.assigned_to_id = assigneeId ?? null;
 
     if (Object.keys(updateData).length === 0) {
       return actionError("No updates specified");
