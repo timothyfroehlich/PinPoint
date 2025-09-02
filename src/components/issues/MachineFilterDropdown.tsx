@@ -45,7 +45,7 @@ export function MachineFilterDropdown({
     const counts: Record<string, number> = {};
     issues.forEach((issue: any) => {
       if (issue.machine?.id) {
-        counts[issue.machine.id] = (counts[issue.machine.id] || 0) + 1;
+        counts[issue.machine.id] = (counts[issue.machine.id] ?? 0) + 1;
       }
     });
 
@@ -86,7 +86,7 @@ export function MachineFilterDropdown({
         <SelectContent>
           <SelectItem value="">All Machines</SelectItem>
           {machines.map((machine) => {
-            const issueCount = machineIssueCounts[machine.id] || 0;
+            const issueCount = machineIssueCounts[machine.id] ?? 0;
             return (
               <SelectItem key={machine.id} value={machine.id}>
                 <div className="flex items-center justify-between w-full">

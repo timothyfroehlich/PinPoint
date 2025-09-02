@@ -141,7 +141,7 @@ export function MachineDetailServer({ machine }: MachineDetailServerProps) {
                   </label>
                   <p className="text-base">
                     {machine.location.street}
-                    {(machine.location.city || machine.location.state) && (
+                    {(machine.location.city ?? machine.location.state) && (
                       <>
                         <br />
                         {[machine.location.city, machine.location.state]

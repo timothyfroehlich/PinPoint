@@ -11,6 +11,7 @@ import type {
   IssueWithRelationsResponse,
   PinPointSupabaseUser,
 } from "~/lib/types";
+import { transformKeysToCamelCase } from "~/lib/utils/case-transformers";
 
 // Issue stats and dashboard types
 interface IssueStats {
@@ -121,10 +122,12 @@ export async function getDashboardData(): Promise<{
   ]);
 
   return {
-    organization: orgData,
-    user: userProfile,
-    issueStats,
-    recentIssues,
+    organization: transformKeysToCamelCase(orgData) as OrganizationResponse,
+    user: transformKeysToCamelCase(userProfile) as UserProfileResponse,
+    issueStats: transformKeysToCamelCase(issueStats) as IssueStats,
+    recentIssues: transformKeysToCamelCase(
+      recentIssues,
+    ) as IssueWithRelationsResponse[],
   };
 }
 
@@ -148,7 +151,9 @@ export async function getUserContextData(): Promise<
 
   return {
     ...authContext,
-    profile: userProfile,
+    profile: userProfile
+      ? (transformKeysToCamelCase(userProfile) as UserProfileResponse)
+      : null,
   };
 }
 
@@ -178,10 +183,14 @@ export async function getOrganizationOverviewData(): Promise<{
   ]);
 
   return {
-    organization,
-    stats,
+    organization: transformKeysToCamelCase(
+      organization,
+    ) as OrganizationResponse,
+    stats: transformKeysToCamelCase(stats) as IssueStats,
     memberCount,
-    recentIssues,
+    recentIssues: transformKeysToCamelCase(
+      recentIssues,
+    ) as IssueWithRelationsResponse[],
   };
 }
 

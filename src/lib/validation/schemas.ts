@@ -48,7 +48,8 @@ export const LIMITS = {
  * const optionalName = optional(requiredName); // z.ZodOptional<z.ZodString>
  * ```
  */
-export const optional = <T extends z.ZodType>(schema: T): z.ZodOptional<T> => schema.optional();
+export const optional = <T extends z.ZodType>(schema: T): z.ZodOptional<T> =>
+  schema.optional();
 
 /**
  * Create a simple non-empty ID schema with a customizable error message.
@@ -64,7 +65,10 @@ export const optional = <T extends z.ZodType>(schema: T): z.ZodOptional<T> => sc
  * ```
  */
 export const createIdSchema = (message = "ID is required") =>
-  z.string().min(1, { message }).transform((s) => s.trim());
+  z
+    .string()
+    .min(1, { message })
+    .transform((s) => s.trim());
 
 // -----------------------------------------------------------------------------
 // Core ID Schemas
@@ -129,8 +133,8 @@ export const locationIdSchema = uuidSchema;
 export const commentContentSchema = z
   .string()
   .min(1, { message: "Comment cannot be empty" })
-  .max(LIMITS.COMMENT_MAX, { 
-    message: `Comment must be less than ${LIMITS.COMMENT_MAX.toString()} characters` 
+  .max(LIMITS.COMMENT_MAX, {
+    message: `Comment must be less than ${LIMITS.COMMENT_MAX.toString()} characters`,
   })
   .transform((s) => s.trim());
 
@@ -157,8 +161,8 @@ export const optionalCommentSchema = optional(commentContentSchema);
 export const titleSchema = z
   .string()
   .min(1, { message: "Title is required" })
-  .max(LIMITS.TITLE_MAX, { 
-    message: `Title must be less than ${LIMITS.TITLE_MAX.toString()} characters` 
+  .max(LIMITS.TITLE_MAX, {
+    message: `Title must be less than ${LIMITS.TITLE_MAX.toString()} characters`,
   })
   .transform((s) => s.trim());
 
@@ -186,8 +190,8 @@ export const optionalIssueTitleSchema = optionalTitleSchema;
 export const nameSchema = z
   .string()
   .min(1, { message: "Name is required" })
-  .max(LIMITS.NAME_MAX, { 
-    message: `Name must be less than ${LIMITS.NAME_MAX.toString()} characters` 
+  .max(LIMITS.NAME_MAX, {
+    message: `Name must be less than ${LIMITS.NAME_MAX.toString()} characters`,
   })
   .transform((s) => s.trim());
 
@@ -213,8 +217,8 @@ export const submitterNameSchema = optionalNameSchema;
  */
 export const descriptionSchema = z
   .string()
-  .max(LIMITS.DESCRIPTION_MAX, { 
-    message: `Description must be less than ${LIMITS.DESCRIPTION_MAX.toString()} characters` 
+  .max(LIMITS.DESCRIPTION_MAX, {
+    message: `Description must be less than ${LIMITS.DESCRIPTION_MAX.toString()} characters`,
   })
   .transform((s) => s.trim())
   .optional();
@@ -231,8 +235,8 @@ export const descriptionSchema = z
  */
 export const searchQuerySchema = z
   .string()
-  .max(LIMITS.SEARCH_QUERY_MAX, { 
-    message: `Search query must be less than ${LIMITS.SEARCH_QUERY_MAX.toString()} characters` 
+  .max(LIMITS.SEARCH_QUERY_MAX, {
+    message: `Search query must be less than ${LIMITS.SEARCH_QUERY_MAX.toString()} characters`,
   })
   .transform((s) => s.trim())
   .optional();
@@ -250,8 +254,8 @@ export const searchQuerySchema = z
 export const emailSchema = z
   .string()
   .email({ message: "Invalid email address" })
-  .max(LIMITS.EMAIL_MAX, { 
-    message: `Email must be less than ${LIMITS.EMAIL_MAX} characters` 
+  .max(LIMITS.EMAIL_MAX, {
+    message: `Email must be less than ${String(LIMITS.EMAIL_MAX)} characters`,
   })
   .transform((s) => s.trim());
 
@@ -432,7 +436,7 @@ export function makeUpdateSchema<T extends z.ZodRawShape>(shape: T) {
 export function withId<IdKey extends string>(
   idKey: IdKey,
   idSchema: z.ZodTypeAny,
-  payload: z.ZodObject<any>
+  payload: z.ZodObject<any>,
 ): z.ZodObject<any> {
   return z.object({ [idKey]: idSchema }).merge(payload);
 }
