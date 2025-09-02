@@ -221,7 +221,7 @@ export function NotificationClient({
   ) => {
     const newNotification: Notification = {
       ...notification,
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
       timestamp: new Date(),
     };
 

@@ -18,7 +18,7 @@ vi.mock("./shared", async () => {
   const actual = await vi.importActual("./shared");
   return {
     ...actual,
-    requireAuthContext: vi.fn(),
+    requireAuthContextWithRole: vi.fn(),
     db: {
       query: {
         issues: {
@@ -37,7 +37,7 @@ vi.mock("./shared", async () => {
   };
 });
 
-const mockRequireAuthContext = vi.mocked(dalShared.requireAuthContext);
+const mockRequireAuthContextWithRole = vi.mocked(dalShared.requireAuthContextWithRole);
 const mockDb = vi.mocked(dalShared.db);
 
 describe("Issues DAL (Business Logic Tests - Archetype 2)", () => {
@@ -48,12 +48,25 @@ describe("Issues DAL (Business Logic Tests - Archetype 2)", () => {
       email: "tim@pinpoint.dev",
     },
     organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+    membership: {
+      id: "test-membership-1",
+      user_id: SEED_TEST_IDS.USERS.ADMIN,
+      organization_id: SEED_TEST_IDS.ORGANIZATIONS.primary,
+      role_id: "admin-role",
+    },
+    role: {
+      id: "admin-role",
+      name: "admin",
+      is_system: true,
+      is_default: false,
+    },
+    permissions: ["read:issues", "write:issues", "admin:issues"],
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
     // Setup default mock auth context
-    mockRequireAuthContext.mockResolvedValue(mockAuthContext);
+    mockRequireAuthContextWithRole.mockResolvedValue(mockAuthContext);
   });
 
   afterEach(() => {
