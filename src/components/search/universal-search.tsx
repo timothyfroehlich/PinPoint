@@ -109,7 +109,7 @@ export function UniversalSearch({
       debouncedSearchValue.length < 2
     ) {
       setSuggestions([]);
-      return;
+      return undefined;
     }
 
     const fetchSuggestions = async () => {
@@ -141,7 +141,7 @@ export function UniversalSearch({
 
   // Close dropdown when clicking outside
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted) return undefined;
 
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -162,7 +162,7 @@ export function UniversalSearch({
 
   // Handle keyboard navigation
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted) return undefined;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
