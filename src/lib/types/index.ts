@@ -20,8 +20,8 @@ export type * from "./auth";
 // Supabase auth/session/admin/database types
 export type * from "./supabase";
 
-// DB model types (snake_case) under Db namespace
-export type * from "./db";
+// DB model types (snake_case) are NOT exported to components/routers
+// Per CORE-TS-003: DB types only for DB modules/services, import directly from "./db"
 
 // Search param types (Zod inferred)
 export type * from "./search";

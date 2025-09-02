@@ -65,6 +65,7 @@ export interface AdvancedSearchFormProps {
 
   // Event handlers
   onFormSubmit?: (params: Record<string, any>) => void;
+  buildUrl: (params: Record<string, any>) => string;
 }
 
 type FormState = Record<string, any>;
