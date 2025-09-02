@@ -39,9 +39,9 @@ import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 // Import functions to test
 import {
-  requireAuthContext,
   getServerAuthContext,
   getServerAuthContextWithRole,
+  requireAuthContextWithRole,
 } from "~/lib/dal/shared";
 
 // Mock secure organization context
@@ -168,29 +168,35 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
     });
   });
 
-  describe("requireAuthContext", () => {
-    it("returns auth context when user is authenticated and member", async () => {
-      const { createClient } = await import("~/lib/supabase/server");
-      vi.mocked(createClient).mockReturnValue({
-        auth: {
-          getUser: vi.fn().mockResolvedValue({
-            data: { user: mockUser },
-            error: null,
-          }),
+  describe("requireAuthContextWithRole", () => {
+    it("returns complete auth context when user is authenticated and has role", async () => {
+      // Mock getServerAuthContextWithRole to return complete context
+      const mockCompleteContext = {
+        user: {
+          id: SEED_TEST_IDS.USERS.ADMIN,
+          email: "tim.froehlich@example.com",
         },
-      } as any);
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+        membership: {
+          id: "test-membership-1",
+          user_id: SEED_TEST_IDS.USERS.ADMIN,
+          organization_id: SEED_TEST_IDS.ORGANIZATIONS.primary,
+          role_id: "admin-role",
+        },
+        role: {
+          id: "admin-role",
+          name: "admin",
+          is_system: true,
+          is_default: false,
+        },
+        permissions: ["read:issues", "write:issues", "admin:issues"],
+      };
 
-      const { requireMemberAccess } = await import(
-        "~/lib/organization-context"
-      );
-      vi.mocked(requireMemberAccess).mockResolvedValue({
-        user: { id: mockUser.id },
-        organization: { id: SEED_TEST_IDS.ORGANIZATIONS.primary },
-        membership: {},
-        accessLevel: "member",
-      } as any);
+      // Mock getServerAuthContextWithRole via shared module
+      const { getServerAuthContextWithRole } = await import("~/lib/dal/shared");
+      vi.mocked(getServerAuthContextWithRole).mockResolvedValue(mockCompleteContext);
 
-      const context = await requireAuthContext();
+      const context = await requireAuthContextWithRole();
 
       expect(context).toMatchObject({
         user: expect.objectContaining({
@@ -198,6 +204,14 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
           email: "tim.froehlich@example.com",
         }),
         organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+        membership: expect.objectContaining({
+          user_id: SEED_TEST_IDS.USERS.ADMIN,
+          organization_id: SEED_TEST_IDS.ORGANIZATIONS.primary,
+        }),
+        role: expect.objectContaining({
+          name: "admin",
+        }),
+        permissions: expect.arrayContaining(["read:issues", "write:issues"]),
       });
     });
 
@@ -212,7 +226,7 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
         },
       } as any);
 
-      await expect(requireAuthContext()).rejects.toThrow(
+      await expect(requireAuthContextWithRole()).rejects.toThrow(
         "Authentication required",
       );
     });
@@ -235,7 +249,7 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
         new Error("Access denied"),
       );
 
-      await expect(requireAuthContext()).rejects.toThrow("Access denied");
+      await expect(requireAuthContextWithRole()).rejects.toThrow("Access denied");
     });
   });
 
@@ -330,7 +344,7 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
     it("should use cache() for request-level memoization", () => {
       // Verify that functions are wrapped with cache()
       expect(typeof getServerAuthContext).toBe("function");
-      expect(typeof requireAuthContext).toBe("function");
+      expect(typeof requireAuthContextWithRole).toBe("function");
       expect(typeof getServerAuthContextWithRole).toBe("function");
 
       // In real implementation, could test memoization by calling
@@ -347,7 +361,7 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
       vi.mocked(requireMemberAccess).mockRejectedValueOnce(
         new Error("Organization selection required"),
       );
-      await expect(requireAuthContext()).rejects.toThrow(
+      await expect(requireAuthContextWithRole()).rejects.toThrow(
         "Organization selection required",
       );
     });
@@ -374,7 +388,7 @@ describe("DAL Auth Context (Business Logic Tests - Archetype 6)", () => {
         accessLevel: "member",
       } as any);
 
-      const context = await requireAuthContext();
+      const context = await requireAuthContextWithRole();
       expect(context.organizationId).toBe(
         SEED_TEST_IDS.ORGANIZATIONS.competitor,
       );

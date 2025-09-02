@@ -72,10 +72,11 @@ export async function createMachineAction(
   });
 
   if (!result.success) {
+    const treeifiedError = z.treeifyError(result.error);
     return {
       success: false,
       error: "Validation failed",
-      fieldErrors: result.error.flatten().fieldErrors,
+      fieldErrors: treeifiedError.fieldErrors,
     };
   }
 
@@ -132,10 +133,11 @@ export async function updateMachineAction(
   });
 
   if (!result.success) {
+    const treeifiedError = z.treeifyError(result.error);
     return {
       success: false,
       error: "Validation failed",
-      fieldErrors: result.error.flatten().fieldErrors,
+      fieldErrors: treeifiedError.fieldErrors,
     };
   }
 
@@ -253,10 +255,11 @@ export async function bulkUpdateMachinesAction(
   });
 
   if (!result.success) {
+    const treeifiedError = z.treeifyError(result.error);
     return {
       success: false,
       error: "Validation failed",
-      fieldErrors: result.error.flatten().fieldErrors,
+      fieldErrors: treeifiedError.fieldErrors,
     };
   }
 
@@ -312,10 +315,11 @@ export async function generateQRCodeAction(
   });
 
   if (!result.success) {
+    const treeifiedError = z.treeifyError(result.error);
     return {
       success: false,
       error: "Validation failed",
-      fieldErrors: result.error.flatten().fieldErrors,
+      fieldErrors: treeifiedError.fieldErrors,
     };
   }
 
@@ -448,10 +452,11 @@ export async function bulkGenerateQRCodesAction(
   const result = BulkQRGenerateSchema.safeParse({ machineIds });
 
   if (!result.success) {
+    const treeifiedError = z.treeifyError(result.error);
     return {
       success: false,
       error: "Validation failed",
-      fieldErrors: result.error.flatten().fieldErrors,
+      fieldErrors: treeifiedError.fieldErrors,
     };
   }
 
