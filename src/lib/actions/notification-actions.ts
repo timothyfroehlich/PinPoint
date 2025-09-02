@@ -76,7 +76,7 @@ export async function markNotificationAsReadAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(
-        `Notification ${validation.data.notificationId} marked as read by ${user.email}`,
+        `Notification ${validation.data.notificationId} marked as read by ${user.email ?? "unknown"}`,
       );
     });
 
@@ -137,13 +137,13 @@ export async function bulkMarkNotificationsAsReadAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(
-        `Bulk marked ${updatedNotifications.length} notifications as read by ${user.email}`,
+        `Bulk marked ${String(updatedNotifications.length)} notifications as read by ${user.email ?? "unknown"}`,
       );
     });
 
     return actionSuccess(
       { updatedCount: updatedNotifications.length },
-      `Successfully marked ${updatedNotifications.length} notification${updatedNotifications.length !== 1 ? "s" : ""} as read`,
+      `Successfully marked ${String(updatedNotifications.length)} notification${updatedNotifications.length !== 1 ? "s" : ""} as read`,
     );
   } catch (error) {
     console.error("Bulk mark notifications as read error:", error);
@@ -192,13 +192,13 @@ export async function markAllNotificationsAsReadAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(
-        `All notifications marked as read by ${user.email} (${updatedNotifications.length} notifications)`,
+        `All notifications marked as read by ${user.email ?? "unknown"} (${String(updatedNotifications.length)} notifications)`,
       );
     });
 
     return actionSuccess(
       { updatedCount: updatedNotifications.length },
-      `Successfully marked all ${updatedNotifications.length} notification${updatedNotifications.length !== 1 ? "s" : ""} as read`,
+      `Successfully marked all ${String(updatedNotifications.length)} notification${updatedNotifications.length !== 1 ? "s" : ""} as read`,
     );
   } catch (error) {
     console.error("Mark all notifications as read error:", error);
@@ -250,7 +250,7 @@ export async function markNotificationAsUnreadAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(
-        `Notification ${validation.data.notificationId} marked as unread by ${user.email}`,
+        `Notification ${validation.data.notificationId} marked as unread by ${user.email ?? "unknown"}`,
       );
     });
 
