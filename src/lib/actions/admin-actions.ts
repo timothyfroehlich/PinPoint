@@ -9,6 +9,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { emailSchema, uuidSchema } from "~/lib/validation/schemas";
 import { eq, and } from "drizzle-orm";
+import { users, memberships, roles } from "~/server/db/schema";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { updateSystemSettings } from "~/lib/dal/system-settings";
 import {
