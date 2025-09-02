@@ -9,10 +9,7 @@ import type {
   RoleAssignmentInput,
   RoleManagementContext,
 } from "~/lib/users/roleManagementValidation";
-import type {
-  RoleResponseWithDetails,
-  PermissionResponse,
-} from "~/lib/types";
+import type { RoleResponseWithDetails, PermissionResponse } from "~/lib/types";
 
 // Internal utilities (alphabetical)
 import { generatePrefixedId } from "~/lib/utils/id-generation";

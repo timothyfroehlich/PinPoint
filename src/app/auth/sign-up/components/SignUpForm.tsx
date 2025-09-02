@@ -28,10 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import {
-  signInWithOAuth,
-  sendMagicLink,
-} from "~/lib/actions/auth-actions";
+import { signInWithOAuth, sendMagicLink } from "~/lib/actions/auth-actions";
 import { type ActionResult } from "~/lib/actions/auth-actions";
 import { type OrganizationOption } from "~/lib/dal/public-organizations";
 
