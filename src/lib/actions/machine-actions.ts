@@ -101,7 +101,14 @@ export async function createMachineAction(
     revalidateTag(`dashboard-${organizationId}`);
     revalidatePath("/machines");
 
-    return { success: true, data: { machineId: machine!.id } };
+    if (!machine) {
+      return {
+        success: false,
+        error: "Failed to create machine. No data returned.",
+      };
+    }
+
+    return { success: true, data: { machineId: machine.id } };
   } catch (error) {
     console.error("Create machine error:", error);
     return {
@@ -466,7 +473,7 @@ export async function bulkGenerateQRCodesAction(
         try {
           // Validate machine ID before processing
           if (!validateQRCodeParams(machineId)) {
-            console.error(`Invalid machine ID format: ${machineId}`);
+            console.error(`Invalid machine ID format: ${String(machineId)}`);
             continue;
           }
 
@@ -494,7 +501,7 @@ export async function bulkGenerateQRCodesAction(
           }
         } catch (error) {
           console.error(
-            `Failed to generate QR for machine ${machineId}:`,
+            `Failed to generate QR for machine ${String(machineId)}:`,
             error,
           );
         }

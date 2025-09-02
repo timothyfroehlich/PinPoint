@@ -201,8 +201,8 @@ export function getMachineFilterDescription(
 
   if (filters.year_min || filters.year_max) {
     const yearRange = [];
-    if (filters.year_min) yearRange.push(`from ${filters.year_min}`);
-    if (filters.year_max) yearRange.push(`to ${filters.year_max}`);
+    if (filters.year_min) yearRange.push(`from ${String(filters.year_min)}`);
+    if (filters.year_max) yearRange.push(`to ${String(filters.year_max)}`);
     descriptions.push(`year: ${yearRange.join(" ")}`);
   }
 

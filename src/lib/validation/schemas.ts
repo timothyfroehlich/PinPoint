@@ -262,7 +262,7 @@ export const emailSchema = z
   .transform((s) => s.trim())
   .email({ message: "Invalid email address" })
   .max(LIMITS.EMAIL_MAX, {
-    message: `Email must be less than ${LIMITS.EMAIL_MAX} characters`,
+    message: `Email must be less than ${String(LIMITS.EMAIL_MAX)} characters`,
   });
 
 /**
@@ -441,7 +441,7 @@ export function makeUpdateSchema<T extends z.ZodRawShape>(shape: T) {
  */
 export function withId<IdKey extends string>(
   idKey: IdKey,
-  idSchema: z.ZodType,
+  idSchema: z.ZodTypeAny,
   payload: z.ZodObject<any>,
 ): z.ZodObject<any> {
   return z.object({ [idKey]: idSchema }).extend(payload.shape);

@@ -125,7 +125,7 @@ export async function UniversalSearchResults({
             {searchResponse.totalCount} result
             {searchResponse.totalCount !== 1 ? "s" : ""} found for "{query}"
             {page > 1 &&
-              ` • Page ${page} of ${Math.ceil(searchResponse.totalCount / limit)}`}
+              ` • Page ${String(page)} of ${String(Math.ceil(searchResponse.totalCount / limit))}`}
           </p>
         </div>
 
@@ -332,7 +332,7 @@ export async function UniversalSearchResults({
             {page > 1 && (
               <Button variant="outline" asChild>
                 <Link
-                  href={`/search?q=${encodeURIComponent(query)}&page=${page - 1}&limit=${limit}`}
+                  href={`/search?q=${encodeURIComponent(query)}&page=${String(page - 1)}&limit=${String(limit)}`}
                 >
                   Previous
                 </Link>
@@ -342,7 +342,7 @@ export async function UniversalSearchResults({
             {searchResponse.hasMore && (
               <Button variant="outline" asChild>
                 <Link
-                  href={`/search?q=${encodeURIComponent(query)}&page=${page + 1}&limit=${limit}`}
+                  href={`/search?q=${encodeURIComponent(query)}&page=${String(page + 1)}&limit=${String(limit)}`}
                 >
                   Next
                 </Link>

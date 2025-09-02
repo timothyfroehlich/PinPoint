@@ -86,10 +86,10 @@ export function buildMetadataDescription(
   totalCount: number,
 ): string {
   if (filterDescriptions.length === 0) {
-    return `${baseDescription} - ${totalCount} total`;
+    return `${baseDescription} - ${String(totalCount)} total`;
   }
 
-  return `${baseDescription} (${filterDescriptions.join(", ")}) - ${totalCount} found`;
+  return `${baseDescription} (${filterDescriptions.join(", ")}) - ${String(totalCount)} found`;
 }
 
 /**

@@ -9,8 +9,8 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { nameSchema, LIMITS } from "~/lib/validation/schemas";
 import { eq } from "drizzle-orm";
-import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { organizations } from "~/server/db/schema";
+import { db } from "~/lib/dal/shared";
 import { transformKeysToSnakeCase } from "~/lib/utils/case-transformers";
 import {
   requireAuthContextWithRole,
@@ -69,7 +69,6 @@ export async function updateOrganizationProfileAction(
   try {
     const { user, organizationId, membership } =
       await requireAuthContextWithRole();
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ORGANIZATION_MANAGE, db);
 
     // Enhanced validation with Zod
@@ -113,10 +112,11 @@ export async function updateOrganizationProfileAction(
     revalidateTag(`organization-${organizationId}`);
 
     // Background processing
-    runAfterResponse(async () => {
+    runAfterResponse(() => {
       console.log(
-        `Organization ${organizationId} profile updated by ${user.email}`,
+        `Organization ${organizationId} profile updated by ${user.email ?? "unknown"}`,
       );
+      return Promise.resolve();
     });
 
     return actionSuccess(
@@ -143,7 +143,6 @@ export async function updateOrganizationLogoAction(
   try {
     const { user, organizationId, membership } =
       await requireAuthContextWithRole();
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ORGANIZATION_MANAGE, db);
 
     // Enhanced validation
@@ -173,10 +172,11 @@ export async function updateOrganizationLogoAction(
     revalidateTag(`organization-${organizationId}`);
 
     // Background processing
-    runAfterResponse(async () => {
+    runAfterResponse(() => {
       console.log(
-        `Organization ${organizationId} logo updated by ${user.email}`,
+        `Organization ${organizationId} logo updated by ${user.email ?? "unknown"}`,
       );
+      return Promise.resolve();
     });
 
     return actionSuccess(

@@ -12,8 +12,7 @@ import type { z } from "zod";
 import { createClient } from "~/lib/supabase/server";
 import { requireMemberAccess } from "~/lib/organization-context";
 import { requirePermission as baseRequirePermission } from "~/server/auth/permissions";
-import { getGlobalDatabaseProvider } from "~/server/db/provider";
-import { requireAuthContextWithRole } from "~/lib/dal/shared";
+import { requireAuthContextWithRole, db } from "~/lib/dal/shared";
 export { requireAuthContextWithRole };
 
 /**
@@ -59,7 +58,6 @@ export async function requireActionAuthContextWithPermission(
 ) {
   const { user, organizationId, membership } =
     await requireAuthContextWithRole();
-  const db = getGlobalDatabaseProvider().getClient();
   await baseRequirePermission(
     { roleId: membership?.role_id ?? null },
     permission,
