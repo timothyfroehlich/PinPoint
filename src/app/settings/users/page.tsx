@@ -34,9 +34,7 @@ export default async function UsersSettingsPage() {
   const usersByRole = users.reduce<Record<string, typeof users>>(
     (acc, user) => {
       const roleName = user.role.name;
-      if (!acc[roleName]) {
-        acc[roleName] = [];
-      }
+      acc[roleName] ??= [];
       acc[roleName].push(user);
       return acc;
     },
@@ -49,7 +47,7 @@ export default async function UsersSettingsPage() {
   const availableRoles = roles.map((role) => ({
     id: role.id,
     name: role.name,
-    description: (role as any).description || undefined,
+    description: (role as any).description ?? undefined,
     isSystem: role.isSystem,
   }));
 

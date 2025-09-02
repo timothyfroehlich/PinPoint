@@ -33,7 +33,7 @@ export function transformMembershipForValidation(
       id: transformed.user.id,
       name: transformed.user.name,
       // Convert null emails to empty string to match validation interface expectations
-      email: transformed.user.email || "",
+      email: transformed.user.email ?? "",
     },
     role: {
       id: transformed.role.id,
