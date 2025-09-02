@@ -124,7 +124,7 @@ export function UniversalSearch({
       }
     };
 
-    fetchSuggestions();
+    void fetchSuggestions();
   }, [debouncedSearchValue, showSuggestions, maxSuggestions]);
 
   // Close dropdown when clicking outside

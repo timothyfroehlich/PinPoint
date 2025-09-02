@@ -103,8 +103,10 @@ export function createFilteredUrl(
   if (filters.ownerId) params.set("ownerId", filters.ownerId);
 
   // Only include sort parameters if they differ from defaults
-  if (filters.sortBy !== "created") params.set("sortBy", filters.sortBy);
-  if (filters.sortOrder !== "desc") params.set("sortOrder", filters.sortOrder);
+  if (filters.sortBy && filters.sortBy !== "created")
+    params.set("sortBy", filters.sortBy);
+  if (filters.sortOrder && filters.sortOrder !== "desc")
+    params.set("sortOrder", filters.sortOrder);
 
   const queryString = params.toString();
   return queryString ? `${basePath}?${queryString}` : basePath;
