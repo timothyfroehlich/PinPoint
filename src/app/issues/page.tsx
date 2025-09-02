@@ -16,12 +16,12 @@ import {
   parseIssueSearchParams,
   getIssueFilterDescription,
   getIssueCanonicalUrl,
-  buildIssueUrl,
 } from "~/lib/search-params/issue-search-params";
 import { buildMetadataDescription } from "~/lib/search-params/shared";
 
 // Force dynamic rendering for auth-dependent content
 export const dynamic = "force-dynamic";
+
 
 interface IssuesPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -163,7 +163,7 @@ async function IssuesWithData({
           entityType="issues"
           fields={ISSUES_FILTER_FIELDS}
           currentParams={rawParams}
-          buildUrl={(params) => buildIssueUrl("/issues", params, rawParams)}
+          basePath="/issues"
           title="Filter Issues"
           description="Search and filter issues by status, priority, assignee, and more"
           collapsible={true}

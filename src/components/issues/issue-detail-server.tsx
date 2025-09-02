@@ -7,6 +7,8 @@ import {
   getCommentsForIssue,
   getCommentCountForIssue,
 } from "~/lib/dal/comments";
+import { getAssignableUsers } from "~/lib/dal/users";
+import { getAvailableStatuses } from "~/lib/dal/organizations";
 import { requireMemberAccess } from "~/lib/organization-context";
 import { formatDistanceToNow, format } from "date-fns";
 import { IssueStatusUpdateClient } from "./issue-status-update-client";
@@ -22,22 +24,38 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
   // Parallel data fetching for optimal performance
   const { user } = await requireMemberAccess();
   const userId = user.id;
-  const [issue, comments, commentCount] = await Promise.all([
+  const [issue, comments, commentCount, assignableUsers, availableStatuses] = await Promise.all([
     getIssueById(issueId),
     getCommentsForIssue(issueId),
     getCommentCountForIssue(issueId),
+    getAssignableUsers(),
+    getAvailableStatuses(),
   ]);
 
-  // TODO: Status colors will be implemented when issue schema includes these fields
-  const statusColor =
-    "bg-surface-container-low text-on-surface border-outline-variant";
+  // Dynamic status colors based on status category
+  const getStatusColorClass = (category?: string) => {
+    switch (category) {
+      case "NEW":
+        return "bg-error-container text-on-error-container border-error";
+      case "IN_PROGRESS":
+        return "bg-primary-container text-on-primary-container border-primary";
+      case "RESOLVED":
+        return "bg-tertiary-container text-on-tertiary-container border-tertiary";
+      default:
+        return "bg-surface-container-low text-on-surface border-outline-variant";
+    }
+  };
+
+  const statusColor = getStatusColorClass(issue.status?.category);
 
   return (
     <div className="space-y-6">
       {/* Issue Header */}
       <div className="flex justify-between items-start">
         <div className="flex-1">
-          <h1 className="text-3xl font-bold">{issue.title}</h1>
+          <h1 className="text-3xl font-bold" data-testid="issue-title">
+            {issue.title}
+          </h1>
           <div className="flex items-center gap-4 mt-2 text-muted-foreground">
             <span>Issue #{issue.id.slice(0, 8)}</span>
             <span>•</span>
@@ -50,9 +68,12 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
         </div>
 
         <div className="flex gap-2">
-          {/* TODO: Priority and status will be implemented when schema is expanded */}
-          <Badge variant="outline" className={statusColor}>
-            Open
+          <Badge
+            variant="outline"
+            className={statusColor}
+            data-testid="issue-status-badge"
+          >
+            {issue.status?.name ?? "Unknown"}
           </Badge>
         </div>
       </div>
@@ -157,17 +178,18 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
               <div className="space-y-2">
                 <div>
                   <p className="font-medium">
-                    {issue.machine.name ?? "Unknown Machine"}
+                    {issue.machine?.name ?? "Unknown Machine"}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {issue.machine.model.name ?? "Unknown Model"}
+                    {issue.machine?.model?.name ?? "Unknown Model"}
                   </p>
                 </div>
-                {/* Location info would need to be added to DAL query */}
-                <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                  <MapPinIcon className="h-4 w-4" />
-                  <span>Location information coming soon</span>
-                </div>
+                {issue.machine?.location && (
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <MapPinIcon className="h-4 w-4" />
+                    <span>{issue.machine.location.name}</span>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -208,6 +230,14 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
               <div className="mt-4">
                 <IssueAssignmentClient
                   issueId={issue.id}
+                  availableUsers={[
+                    { id: "unassigned", name: "Unassigned", email: "" },
+                    ...assignableUsers.map(user => ({
+                      id: user.id,
+                      name: user.name ?? user.email,
+                      email: user.email,
+                    }))
+                  ]}
                   {...(issue.assignedTo && {
                     currentAssigneeId: issue.assignedTo.id,
                     ...(issue.assignedTo.name && {
@@ -229,15 +259,16 @@ export async function IssueDetailServer({ issueId }: IssueDetailServerProps) {
                 <div className="flex items-center justify-between">
                   <span className="text-sm">Current Status:</span>
                   <Badge variant="outline" className={statusColor}>
-                    {issue.status.name}
+                    {issue.status?.name ?? "Unknown"}
                   </Badge>
                 </div>
 
                 {/* Status Update - Client Island */}
                 <IssueStatusUpdateClient
                   issueId={issue.id}
-                  currentStatusId={issue.status.id ?? ""}
-                  currentStatusName={issue.status.name ?? "Unknown"}
+                  currentStatusId={issue.status?.id ?? ""}
+                  currentStatusName={issue.status?.name ?? "Unknown"}
+                  availableStatuses={availableStatuses}
                 />
               </div>
             </CardContent>
