@@ -34,7 +34,7 @@ import { type Membership, type Role } from "~/server/db/types";
  * Create role service using factory pattern
  */
 function createRoleService(ctx: RLSOrganizationTRPCContext): RoleService {
-  return ctx.services.createRoleService();
+  return ctx.services.createRoleService(ctx.organizationId);
 }
 
 export const roleRouter = createTRPCRouter({

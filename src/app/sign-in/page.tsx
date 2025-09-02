@@ -18,7 +18,7 @@ import { useAuth } from "~/app/auth-provider";
 import { authenticateDevUser, getAuthResultMessage } from "~/lib/auth/dev-auth";
 import { isDevAuthAvailable } from "~/lib/environment-client";
 import { createClient } from "~/utils/supabase/client";
-import type { User, Role } from "~/lib/types";
+import type { User, Role } from "~/lib/types/db";
 
 type UserWithRole = User & { role: Role | null };
 

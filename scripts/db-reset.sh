@@ -191,6 +191,20 @@ reset_supabase_database() {
     # Execute our modular seed files (includes RLS policies)
     execute_sql_seeds "$env"
     
+    # Create dev users via Supabase Admin API (only for dev environments)
+    if [[ "$env" == "local" || "$env" == "preview" ]]; then
+        log_info "Creating dev users via Supabase Admin API..."
+        if command -v tsx >/dev/null 2>&1; then
+            if tsx scripts/create-dev-users.ts; then
+                log_success "Dev users created successfully"
+            else
+                log_warning "Dev user creation failed, but continuing..."
+            fi
+        else
+            log_warning "tsx not found, skipping dev user creation"
+        fi
+    fi
+    
     # Sync schema definitions back to Drizzle
     log_info "Syncing schema definitions..."
     if [[ "$env" == "preview" ]]; then
