@@ -9,7 +9,7 @@
 import { useState, useEffect, useRef, Suspense } from "react";
 import { type ComponentType } from "react";
 
-interface LazyClientIslandProps<T = any> {
+interface LazyClientIslandProps<T = Record<string, unknown>> {
   /** Component to lazy load */
   importComponent: () => Promise<{ default: ComponentType<T> }>;
   /** Props to pass to the lazy component */
@@ -30,7 +30,7 @@ interface LazyClientIslandProps<T = any> {
  * Lazy loading wrapper for client islands
  * Uses Intersection Observer or requestIdleCallback for optimal loading
  */
-export function LazyClientIsland<T = any>({
+export function LazyClientIsland<T = Record<string, unknown>>({
   importComponent,
   componentProps,
   fallback = <div className="h-16 bg-muted animate-pulse rounded" />,
@@ -157,7 +157,7 @@ export function LazyClientIsland<T = any>({
  * Hook for preloading components
  * Useful for critical components that should be preloaded on route change
  */
-export function usePreloadComponent<T = any>(
+export function usePreloadComponent<T = Record<string, unknown>>(
   importComponent: () => Promise<{ default: ComponentType<T> }>,
 ) {
   const [isPreloaded, setIsPreloaded] = useState(false);
@@ -179,7 +179,7 @@ export function usePreloadComponent<T = any>(
 /**
  * Higher-order component for creating lazy client islands
  */
-export function createLazyClientIsland<T = any>(
+export function createLazyClientIsland<T = Record<string, unknown>>(
   importComponent: () => Promise<{ default: ComponentType<T> }>,
   defaultProps?: Partial<LazyClientIslandProps<T>>,
 ) {
@@ -191,12 +191,12 @@ export function createLazyClientIsland<T = any>(
       strategy,
       name,
       ...componentProps
-    } = props as any;
+    } = props;
 
     return (
       <LazyClientIsland
         importComponent={importComponent}
-        componentProps={componentProps}
+        componentProps={componentProps as T}
         fallback={fallback ?? defaultProps?.fallback}
         loadImmediately={loadImmediately ?? defaultProps?.loadImmediately}
         threshold={threshold ?? defaultProps?.threshold}

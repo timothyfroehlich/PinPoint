@@ -17,7 +17,6 @@
  */
 
 import type { Database } from "~/lib/types";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Re-export the auto-generated Database type
 export type { Database };
