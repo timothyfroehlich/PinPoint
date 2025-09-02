@@ -12,7 +12,7 @@ import {
 } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Separator } from "~/components/ui/separator";
-import { Chrome, Loader2 } from "lucide-react";
+import { Globe, Loader2 } from "lucide-react";
 
 import { useAuth } from "~/app/auth-provider";
 import { authenticateDevUser, getAuthResultMessage } from "~/lib/auth/dev-auth";
@@ -164,7 +164,7 @@ export default function SignInPage(): React.ReactElement | null {
             {isLoading ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
-              <Chrome className="mr-2 h-4 w-4" />
+              <Globe className="mr-2 h-4 w-4" />
             )}
             Sign in with Google
           </Button>

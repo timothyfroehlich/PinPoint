@@ -97,8 +97,14 @@ export const idSchema = createIdSchema();
  */
 export const uuidSchema = z
   .string()
-  .uuid("ID must be a valid UUID")
-  .transform((s: string) => s.trim());
+  .transform((s: string) => s.trim())
+  .refine(
+    (val) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        val,
+      ),
+    { message: "ID must be a valid UUID" },
+  );
 
 /**
  * Entity-specific ID schemas for type safety and documentation.
@@ -253,11 +259,11 @@ export const searchQuerySchema = z
  */
 export const emailSchema = z
   .string()
+  .transform((s) => s.trim())
   .email({ message: "Invalid email address" })
   .max(LIMITS.EMAIL_MAX, {
     message: `Email must be less than ${String(LIMITS.EMAIL_MAX)} characters`,
-  })
-  .transform((s) => s.trim());
+  });
 
 /**
  * Optional email schema for contexts where email may not be required.
@@ -416,9 +422,9 @@ export function makeCreateSchema<T extends z.ZodRawShape>(shape: T) {
  * ```
  */
 export function makeUpdateSchema<T extends z.ZodRawShape>(shape: T) {
-  const partialShape: Record<string, z.ZodTypeAny> = {};
+  const partialShape: Record<string, z.ZodType> = {};
   for (const [k, v] of Object.entries(shape)) {
-    partialShape[k] = (v as z.ZodTypeAny).optional();
+    partialShape[k] = (v as z.ZodType).optional();
   }
   return z.object(partialShape).strict();
 }
@@ -435,10 +441,10 @@ export function makeUpdateSchema<T extends z.ZodRawShape>(shape: T) {
  */
 export function withId<IdKey extends string>(
   idKey: IdKey,
-  idSchema: z.ZodTypeAny,
+  idSchema: z.ZodType,
   payload: z.ZodObject<any>,
 ): z.ZodObject<any> {
-  return z.object({ [idKey]: idSchema }).merge(payload);
+  return z.object({ [idKey]: idSchema }).extend(payload.shape);
 }
 
 // -----------------------------------------------------------------------------
