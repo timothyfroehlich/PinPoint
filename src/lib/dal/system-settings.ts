@@ -173,7 +173,7 @@ export async function updateSystemSettings(
   }[] = [];
 
   for (const [category, categorySettings] of Object.entries(settings)) {
-    if (typeof categorySettings === "object" && categorySettings !== null) {
+    if (typeof categorySettings === "object") {
       for (const [key, value] of Object.entries(categorySettings)) {
         settingsToUpsert.push({
           key: `${category}.${key}`,
