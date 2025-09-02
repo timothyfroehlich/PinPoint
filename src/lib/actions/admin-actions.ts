@@ -9,7 +9,6 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { emailSchema, uuidSchema } from "~/lib/validation/schemas";
 import { eq, and } from "drizzle-orm";
-import type { Db } from "~/lib/types";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { updateSystemSettings } from "~/lib/dal/system-settings";
 import {
@@ -26,6 +25,7 @@ import {
   runAfterResponse,
   type ActionResult,
 } from "./shared";
+import { db } from "~/lib/dal/shared";
 import { requirePermission } from "./shared";
 import { PERMISSIONS } from "~/server/auth/permissions.constants";
 // Removed unused getDB alias import
@@ -33,10 +33,7 @@ import { PERMISSIONS } from "~/server/auth/permissions.constants";
 // Enhanced validation schemas with better error messages
 const inviteUserSchema = z.object({
   email: emailSchema.transform((s) => s.toLowerCase()),
-  name: z
-    .string()
-    .max(100, "Name must be less than 100 characters")
-    .optional(),
+  name: z.string().max(100, "Name must be less than 100 characters").optional(),
   roleId: uuidSchema.optional(),
   message: z
     .string()
@@ -91,7 +88,6 @@ export async function inviteUserAction(
       return validation;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.USER_MANAGE, db);
 
     // Check if user already exists in the system
@@ -262,7 +258,6 @@ export async function updateUserRoleAction(
       return validation;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.USER_MANAGE, db);
 
     // Verify role exists in this organization
@@ -346,7 +341,6 @@ export async function removeUserAction(
       return validation;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.USER_MANAGE, db);
 
     // Verify user exists and email matches (safety check)
@@ -434,7 +428,6 @@ export async function updateSystemSettingsAction(
     }
 
     // Permission check for settings update
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ORGANIZATION_MANAGE, db);
 
     // Update system settings in database
@@ -485,7 +478,6 @@ export async function exportActivityLogAction(): Promise<Response> {
     const { user, organizationId, membership } =
       await requireAuthContextWithRole();
 
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ADMIN_VIEW_ANALYTICS, db);
 
     // Export activity log to CSV
