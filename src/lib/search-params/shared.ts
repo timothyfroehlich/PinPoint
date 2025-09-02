@@ -215,7 +215,7 @@ export function buildUrlWithOptions<T extends Record<string, any>>(
       const stringValue = value.toString();
 
       // Skip default values unless explicitly requested
-      if (!includeDefaults && defaults && typeof defaults === "object") {
+      if (!includeDefaults && typeof defaults === "object") {
         const defaultValue = (defaults as any)[key];
         if (
           defaultValue !== undefined &&
