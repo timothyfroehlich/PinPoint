@@ -79,7 +79,7 @@ export function RealtimeCommentsClient({
               // Only show comments from other users and not already loaded
               if (
                 payload.new["author_id"] !== currentUserId &&
-                !existingCommentIds.includes(payload.new["id"])
+                !existingCommentIds.includes(String(payload.new["id"]))
               ) {
                 const newComment = payload.new as Comment;
 

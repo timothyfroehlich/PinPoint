@@ -14,7 +14,7 @@ export function NavigationSkeleton() {
 
       {/* Navigation skeleton */}
       <div className="flex-1 px-4 py-6 space-y-1">
-        {[...Array(6)].map((_, i) => (
+        {Array.from({ length: 6 }, (_, i) => (
           <Skeleton key={i} className="h-10 w-full" />
         ))}
       </div>

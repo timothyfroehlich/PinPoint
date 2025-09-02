@@ -69,7 +69,7 @@ export function extractFormFields<T extends Record<string, unknown>>(
         existing.push(value);
       } else {
         // We know existing exists because of the 'key in data' check
-        data[key] = [existing as FormDataEntryValue, value];
+        data[key] = [existing!, value];
       }
     } else {
       data[key] = value;
