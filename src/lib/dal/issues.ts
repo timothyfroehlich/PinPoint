@@ -227,6 +227,9 @@ export const getIssueById = cache(async (issueId: string) => {
             model: {
               columns: { id: true, name: true },
             },
+            location: {
+              columns: { id: true, name: true },
+            },
           },
         },
         status: {
