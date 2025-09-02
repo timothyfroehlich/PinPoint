@@ -13,6 +13,7 @@ import {
   memberships,
   roles,
   issueStatuses,
+  priorities,
 } from "~/server/db/schema";
 import { db } from "./shared";
 import { ensureOrgContextAndBindRLS } from "~/lib/organization-context";
@@ -249,5 +250,47 @@ export const getOrganizationDashboardData = cache(async () => {
     ]);
 
     return { organization, stats };
+  });
+});
+
+/**
+ * Get available issue statuses for organization
+ * Returns statuses that can be used for issue status updates
+ * Uses React 19 cache() for request-level memoization
+ */
+export const getAvailableStatuses = cache(async () => {
+  return ensureOrgContextAndBindRLS(async (tx, context) => {
+    const organizationId = context.organization.id;
+    
+    return await tx.query.issueStatuses.findMany({
+      where: eq(issueStatuses.organization_id, organizationId),
+      columns: {
+        id: true,
+        name: true,
+        category: true,
+      },
+      orderBy: [issueStatuses.name],
+    });
+  });
+});
+
+/**
+ * Get available priorities for organization
+ * Returns priorities that can be used for issue creation and updates
+ * Uses React 19 cache() for request-level memoization
+ */
+export const getAvailablePriorities = cache(async () => {
+  return ensureOrgContextAndBindRLS(async (tx, context) => {
+    const organizationId = context.organization.id;
+    
+    return await tx.query.priorities.findMany({
+      where: eq(priorities.organization_id, organizationId),
+      columns: {
+        id: true,
+        name: true,
+        order: true,
+      },
+      orderBy: [priorities.order],
+    });
   });
 });
