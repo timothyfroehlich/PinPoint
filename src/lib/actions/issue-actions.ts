@@ -157,7 +157,7 @@ export async function createIssueAction(
         await generateIssueCreationNotifications(issueData.id, {
           organizationId,
           actorId: user.id,
-          actorName: (user.user_metadata?.["name"] as string) ?? user.email,
+          actorName: user.user_metadata["name"] || user.email,
         });
       } catch (error) {
         console.error(
@@ -237,7 +237,7 @@ export async function updateIssueStatusAction(
           await generateStatusChangeNotifications(issueId, statusResult.name, {
             organizationId,
             actorId: user.id,
-            actorName: (user.user_metadata?.["name"] as string) ?? user.email,
+            actorName: user.user_metadata["name"] || user.email,
           });
         }
       } catch (error) {
@@ -391,7 +391,7 @@ export async function updateIssueAssignmentAction(
           {
             organizationId,
             actorId: user.id,
-            actorName: (user.user_metadata?.["name"] as string) ?? user.email,
+            actorName: user.user_metadata["name"] || user.email,
           },
         );
       } catch (error) {
