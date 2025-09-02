@@ -56,10 +56,10 @@ export const booleanParamTransformer = z
  * Date range schema for filtering
  */
 export const DateRangeSchema = z.object({
-  created_after: z.string().datetime().optional(),
-  created_before: z.string().datetime().optional(),
-  updated_after: z.string().datetime().optional(),
-  updated_before: z.string().datetime().optional(),
+  created_after: z.string().iso().datetime().optional(),
+  created_before: z.string().iso().datetime().optional(),
+  updated_after: z.string().iso().datetime().optional(),
+  updated_before: z.string().iso().datetime().optional(),
 });
 
 /**
@@ -126,7 +126,7 @@ export interface SearchParamError {
 export function extractSearchParamErrors(
   error: z.ZodError,
 ): SearchParamError[] {
-  return error.issues.map((err: z.ZodIssue) => ({
+  return error.issues.map((err) => ({
     field: err.path.join("."),
     message: err.message,
     code: err.code,
@@ -138,7 +138,7 @@ export function extractSearchParamErrors(
  */
 export function safeParseSearchParams<T>(
   searchParams: Record<string, string | string[] | undefined>,
-  schema: z.ZodSchema<T>,
+  schema: z.ZodType<T>,
   entityName: string,
 ): T {
   const parsed = schema.safeParse(searchParams);

@@ -21,7 +21,7 @@ import {
   performUniversalSearch,
   type SearchEntity,
 } from "~/lib/services/search-service";
-import { requireAuthContext } from "~/lib/dal/shared";
+import { requireAuthContextWithRole } from "~/lib/organization-context";
 import { formatDistanceToNow } from "date-fns";
 
 interface UniversalSearchResultsProps {
@@ -79,7 +79,7 @@ export async function UniversalSearchResults({
   }
 
   // Get authentication context
-  const { organizationId } = await requireAuthContext();
+  const { organizationId } = await requireAuthContextWithRole();
 
   // Perform search
   const searchResponse = await performUniversalSearch({
