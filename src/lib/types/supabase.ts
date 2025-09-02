@@ -14,16 +14,113 @@ export type {
   Session as SupabaseSession,
 } from "@supabase/supabase-js";
 
-// PinPoint-specific auth types
-export type {
-  PinPointSupabaseUser,
-  PinPointSupabaseSession,
-  SupabaseJWTPayload,
-  AuthErrorType,
-  AuthResult,
-  SupabaseClientConfig,
-  AdminOperationContext,
-} from "~/lib/supabase/types";
+// PinPoint-specific auth types (moved from ~/lib/supabase/types.ts)
+
+/**
+ * Extended Supabase user with PinPoint-specific app_metadata
+ */
+export interface PinPointSupabaseUser extends SupabaseUser {
+  app_metadata: {
+    organization_id?: string;
+    role?: string;
+  } & Record<string, unknown>;
+}
+
+/**
+ * Supabase session with PinPoint-specific user data
+ */
+export interface PinPointSupabaseSession extends SupabaseSession {
+  user: PinPointSupabaseUser;
+}
+
+/**
+ * JWT Payload Structure
+ *
+ * Expected structure of the Supabase JWT token payload
+ */
+export interface SupabaseJWTPayload {
+  aud: string; // audience
+  exp: number; // expiration time
+  iat: number; // issued at
+  iss: string; // issuer
+  sub: string; // subject (user ID)
+  email?: string;
+  phone?: string;
+  app_metadata: {
+    organization_id?: string;
+    role?: string;
+  } & Record<string, unknown>;
+  user_metadata: Record<string, unknown>;
+  role?: string;
+  aal?: string; // authentication assurance level
+  amr?: { method: string; timestamp: number }[]; // authentication methods references
+  session_id?: string;
+}
+
+/**
+ * Organization Context
+ *
+ * Extracted organization information from JWT or session
+ */
+export interface OrganizationContext {
+  organizationId: string;
+  role: string;
+}
+
+/**
+ * Auth Error Types
+ *
+ * Specific error types that can occur during authentication operations
+ */
+export type AuthErrorType =
+  | "INVALID_SESSION"
+  | "EXPIRED_TOKEN"
+  | "MISSING_ORGANIZATION"
+  | "INVALID_JWT"
+  | "NETWORK_ERROR"
+  | "UNAUTHORIZED"
+  | "FORBIDDEN";
+
+/**
+ * Authentication Result
+ *
+ * Generic result type for authentication operations
+ */
+export type AuthResult<T> =
+  | {
+      success: true;
+      data: T;
+    }
+  | {
+      success: false;
+      error: AuthErrorType;
+      message: string;
+    };
+
+/**
+ * Supabase Client Configuration
+ */
+export interface SupabaseClientConfig {
+  url: string;
+  anonKey: string;
+  options?: {
+    auth?: {
+      autoRefreshToken?: boolean;
+      persistSession?: boolean;
+    };
+  };
+}
+
+/**
+ * Admin Operation Context
+ *
+ * Context for operations that require elevated privileges
+ */
+export interface AdminOperationContext {
+  adminUserId: string;
+  organizationId: string;
+  reason?: string;
+}
 
 // Database schema types (generated)
 export type {

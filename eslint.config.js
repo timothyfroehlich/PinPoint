@@ -291,6 +291,26 @@ export default tseslint.config(
     },
   },
   {
+    // Allow all type exports in the centralized types directory
+    files: ["src/lib/types/**/*.ts"],
+    rules: {
+      "no-restricted-syntax": "off",
+      "no-restricted-imports": "off", // Allow imports from server modules for centralization
+    },
+  },
+  {
+    // Allow type exports in validation files (business logic validation types)
+    files: [
+      "src/lib/**/validation.ts", 
+      "src/lib/**/*Validation.ts",
+      "src/lib/**/validators.ts",
+      "src/lib/**/*Validators.ts"
+    ],
+    rules: {
+      "no-restricted-syntax": "off",
+    },
+  },
+  {
     // Strategic exemptions: API layer files - allow necessary tRPC patterns (limited scope)
     files: ["src/server/api/routers/**/*.ts"],
     rules: {
