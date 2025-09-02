@@ -468,7 +468,7 @@ export async function bulkGenerateQRCodesAction(
         try {
           // Validate machine ID before processing
           if (!validateQRCodeParams(machineId)) {
-            console.error(`Invalid machine ID format: ${machineId}`);
+            console.error(`Invalid machine ID format: ${String(machineId)}`);
             continue;
           }
 
@@ -496,7 +496,7 @@ export async function bulkGenerateQRCodesAction(
           }
         } catch (error) {
           console.error(
-            `Failed to generate QR for machine ${machineId}:`,
+            `Failed to generate QR for machine ${String(machineId)}:`,
             error,
           );
         }

@@ -54,7 +54,7 @@ export function UserTableActions({
 }: UserTableActionsProps) {
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleResendInvitation = async () => {
+  const handleResendInvitation = () => {
     setIsLoading(true);
     try {
       // TODO: Implement resend invitation
@@ -66,7 +66,7 @@ export function UserTableActions({
     }
   };
 
-  const handleRemoveUser = async () => {
+  const handleRemoveUser = () => {
     setIsLoading(true);
     try {
       // TODO: Implement user removal with confirmation dialog

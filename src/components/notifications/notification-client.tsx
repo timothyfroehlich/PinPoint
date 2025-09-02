@@ -83,7 +83,7 @@ export function NotificationClient({
       addNotification({
         type: "info",
         title: "Machine Updated",
-        message: `Machine "${customEvent.detail.machineName}" has been updated`,
+        message: `Machine "${String(customEvent.detail?.machineName ?? "Unknown")}" has been updated`,
         autoHide: true,
       });
     };
