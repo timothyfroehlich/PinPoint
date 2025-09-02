@@ -4,8 +4,7 @@
  * Phase 4B.2: User and Role Management
  */
 
-/// <reference types="react" />
-
+import React from "react";
 import {
   Card,
   CardContent,
@@ -73,7 +72,7 @@ function getPermissionsArray(role: unknown): { id: string; name: string }[] {
   return [];
 }
 
-export default async function RolesSettingsPage(): Promise<JSX.Element> {
+export default async function RolesSettingsPage() {
   await requireMemberAccess();
 
   // Fetch roles using the existing role router

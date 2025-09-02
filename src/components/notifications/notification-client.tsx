@@ -43,11 +43,6 @@ interface FormSubmissionEventDetail {
   message?: string;
 }
 
-interface IssueCreatedEventDetail {
-  title: string;
-  machineId?: string;
-}
-
 // Supabase notification payload type
 interface NotificationPayload {
   id: string;
@@ -66,10 +61,6 @@ interface MachineUpdateEvent extends CustomEvent {
 
 interface FormSubmissionEvent extends CustomEvent {
   detail: FormSubmissionEventDetail;
-}
-
-interface IssueCreatedEvent extends CustomEvent {
-  detail: IssueCreatedEventDetail;
 }
 
 interface NotificationClientProps {
