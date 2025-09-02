@@ -339,15 +339,13 @@ export async function UniversalSearchResults({
               </Button>
             )}
 
-            {searchResponse.hasMore && (
-              <Button variant="outline" asChild>
-                <Link
-                  href={`/search?q=${encodeURIComponent(query)}&page=${String(page + 1)}&limit=${String(limit)}`}
-                >
-                  Next
-                </Link>
-              </Button>
-            )}
+            <Button variant="outline" asChild>
+              <Link
+                href={`/search?q=${encodeURIComponent(query)}&page=${String(page + 1)}&limit=${String(limit)}`}
+              >
+                Next
+              </Link>
+            </Button>
           </div>
         </div>
       )}

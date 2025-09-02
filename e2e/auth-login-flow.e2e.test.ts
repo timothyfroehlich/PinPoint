@@ -10,9 +10,14 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Auth Login Flow", () => {
-  test("logs in as Tim via dev auth and reaches dashboard", async ({ page, baseURL }) => {
+  test("logs in as Tim via dev auth and reaches dashboard", async ({
+    page,
+    baseURL,
+  }) => {
     const consoleMessages: string[] = [];
-    page.on("console", (msg) => consoleMessages.push(`[${msg.type()}] ${msg.text()}`));
+    page.on("console", (msg) =>
+      consoleMessages.push(`[${msg.type()}] ${msg.text()}`),
+    );
     // 1. Home page
     await page.goto("/");
     await page.waitForLoadState("networkidle");
@@ -31,7 +36,11 @@ test.describe("Auth Login Flow", () => {
 
     // Organization dropdown should default to Austin Pinball Collective
     // Open the organization select trigger (label: Organization)
-    const orgTrigger = page.locator("label:has-text('Organization')").locator("..").locator("button").first();
+    const orgTrigger = page
+      .locator("label:has-text('Organization')")
+      .locator("..")
+      .locator("button")
+      .first();
     await expect(orgTrigger).toBeVisible({ timeout: 10000 });
 
     // It may already show the org name; capture text
@@ -39,7 +48,9 @@ test.describe("Auth Login Flow", () => {
     if (!/Austin Pinball Collective/i.test(triggerText)) {
       // Open and pick explicitly
       await orgTrigger.click();
-      const option = page.locator('[role="option"]:has-text("Austin Pinball Collective")');
+      const option = page.locator(
+        '[role="option"]:has-text("Austin Pinball Collective")',
+      );
       await expect(option).toBeVisible({ timeout: 5000 });
       await option.click();
     }
@@ -70,6 +81,8 @@ test.describe("Auth Login Flow", () => {
     }
     expect(currentUrl).toMatch(/apc\.localhost:3000\/dashboard|\/dashboard$/);
 
-    await expect(page.locator("h1")).toContainText(/Dashboard|Issues|Machines/i);
+    await expect(page.locator("h1")).toContainText(
+      /Dashboard|Issues|Machines/i,
+    );
   });
 });
