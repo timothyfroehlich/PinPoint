@@ -132,7 +132,7 @@ export function buildMachineUrl(
 
   // Add new parameters
   Object.entries(params).forEach(([key, value]) => {
-    if (value === undefined || value === null) {
+    if (value === undefined) {
       url.searchParams.delete(key);
       return;
     }
