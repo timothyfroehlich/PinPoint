@@ -261,7 +261,7 @@ export const getOrganizationDashboardData = cache(async () => {
 export const getAvailableStatuses = cache(async () => {
   return ensureOrgContextAndBindRLS(async (tx, context) => {
     const organizationId = context.organization.id;
-    
+
     return await tx.query.issueStatuses.findMany({
       where: eq(issueStatuses.organization_id, organizationId),
       columns: {
@@ -282,7 +282,7 @@ export const getAvailableStatuses = cache(async () => {
 export const getAvailablePriorities = cache(async () => {
   return ensureOrgContextAndBindRLS(async (tx, context) => {
     const organizationId = context.organization.id;
-    
+
     return await tx.query.priorities.findMany({
       where: eq(priorities.organization_id, organizationId),
       columns: {

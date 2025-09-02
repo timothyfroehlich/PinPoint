@@ -4,6 +4,7 @@
  * Phase 4B.2: User and Role Management
  */
 
+import React from "react";
 import {
   Card,
   CardContent,
@@ -25,13 +26,59 @@ import {
 import { requireMemberAccess } from "~/lib/organization-context";
 import { api } from "~/trpc/server";
 
+// Type definitions for role statistics
+interface RoleStatistic {
+  id: string;
+  _count: {
+    members: number;
+  };
+}
+
+// Type guard for role statistics
+function isValidRoleStatistic(value: unknown): value is RoleStatistic {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "id" in value &&
+    "_count" in value &&
+    typeof (value as RoleStatistic).id === "string" &&
+    typeof (value as RoleStatistic)._count === "object" &&
+    typeof (value as RoleStatistic)._count.members === "number"
+  );
+}
+
+// Type guard for role with description
+function getRoleDescription(role: { description?: string }): string {
+  return role.description ?? "No description provided";
+}
+
+// Type guard for checking if role has permissions
+function hasPermissions(
+  role: unknown,
+): role is { permissions: { id: string; name: string }[] } {
+  return (
+    typeof role === "object" &&
+    role !== null &&
+    "permissions" in role &&
+    Array.isArray((role as { permissions: unknown }).permissions)
+  );
+}
+
+// Safe permission access function
+function getPermissionsArray(role: unknown): { id: string; name: string }[] {
+  if (hasPermissions(role)) {
+    return role.permissions;
+  }
+  return [];
+}
+
 export default async function RolesSettingsPage() {
   await requireMemberAccess();
 
   // Fetch roles using the existing role router
   const roles = await api.role.getAll();
   // TODO: Implement role statistics API
-  const roleStats: any[] = [];
+  const roleStats: RoleStatistic[] = [];
 
   return (
     <div className="space-y-6">
@@ -94,10 +141,12 @@ export default async function RolesSettingsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {roleStats.reduce(
-                (total, stat) => total + stat._count.members,
-                0,
-              )}
+              {roleStats.reduce((total, stat) => {
+                if (isValidRoleStatistic(stat)) {
+                  return total + stat._count.members;
+                }
+                return total;
+              }, 0)}
             </div>
           </CardContent>
         </Card>
@@ -132,16 +181,20 @@ export default async function RolesSettingsPage() {
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {(role as any).description ?? "No description provided"}
+                        {getRoleDescription(role as { description?: string })}
                       </p>
                       <div className="flex items-center space-x-4 mt-2 text-xs text-muted-foreground">
                         <span>
-                          {roleStats.find((stat) => stat.id === role.id)?._count
-                            .members ?? 0}{" "}
+                          {roleStats.find(
+                            (stat) =>
+                              isValidRoleStatistic(stat) && stat.id === role.id,
+                          )?._count.members ?? 0}{" "}
                           users
                         </span>
                         <span>•</span>
-                        <span>{role.permissions?.length ?? 0} permissions</span>
+                        <span>
+                          {getPermissionsArray(role).length} permissions
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -159,22 +212,24 @@ export default async function RolesSettingsPage() {
                 </div>
 
                 {/* Role Permissions Preview */}
-                {role.permissions && role.permissions.length > 0 && (
+                {getPermissionsArray(role).length > 0 && (
                   <div className="mt-4 ml-14">
                     <h4 className="text-sm font-medium mb-2">Permissions</h4>
                     <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-                      {role.permissions.slice(0, 6).map((permission) => (
-                        <div
-                          key={permission.id}
-                          className="flex items-center space-x-2 text-sm"
-                        >
-                          <CheckIcon className="h-3 w-3 text-tertiary" />
-                          <span>{permission.name}</span>
-                        </div>
-                      ))}
-                      {role.permissions.length > 6 && (
+                      {getPermissionsArray(role)
+                        .slice(0, 6)
+                        .map((permission) => (
+                          <div
+                            key={permission.id}
+                            className="flex items-center space-x-2 text-sm"
+                          >
+                            <CheckIcon className="h-3 w-3 text-tertiary" />
+                            <span>{permission.name}</span>
+                          </div>
+                        ))}
+                      {getPermissionsArray(role).length > 6 && (
                         <div className="text-sm text-muted-foreground">
-                          +{role.permissions.length - 6} more...
+                          +{getPermissionsArray(role).length - 6} more...
                         </div>
                       )}
                     </div>
