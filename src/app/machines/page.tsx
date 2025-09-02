@@ -21,6 +21,7 @@ import {
   parseMachineSearchParams,
   getMachineFilterDescription,
   getMachineCanonicalUrl,
+  buildMachineUrl,
 } from "~/lib/search-params/machine-search-params";
 import { buildMetadataDescription } from "~/lib/search-params/shared";
 
@@ -191,6 +192,7 @@ export default async function MachinesPage({
           collapsible={true}
           defaultExpanded={false}
           showActiveFilters={true}
+          buildUrl={buildMachineUrl}
         />
       </Suspense>
 
