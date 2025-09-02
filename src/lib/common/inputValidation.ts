@@ -408,7 +408,9 @@ export function validateNonEmptyStringArray(
     }
     const trimmed = raw.trim();
     if (trimmed.length === 0) {
-      throw new Error(`${fieldName}[${String(index)}] must be a non-empty string`);
+      throw new Error(
+        `${fieldName}[${String(index)}] must be a non-empty string`,
+      );
     }
     result.push(trimmed);
   }

@@ -125,7 +125,9 @@ export async function getDashboardData(): Promise<{
     organization: transformKeysToCamelCase(orgData) as OrganizationResponse,
     user: transformKeysToCamelCase(userProfile) as UserProfileResponse,
     issueStats: transformKeysToCamelCase(issueStats) as IssueStats,
-    recentIssues: transformKeysToCamelCase(recentIssues) as IssueWithRelationsResponse[],
+    recentIssues: transformKeysToCamelCase(
+      recentIssues,
+    ) as IssueWithRelationsResponse[],
   };
 }
 
@@ -149,7 +151,9 @@ export async function getUserContextData(): Promise<
 
   return {
     ...authContext,
-    profile: userProfile ? transformKeysToCamelCase(userProfile) as UserProfileResponse : null,
+    profile: userProfile
+      ? (transformKeysToCamelCase(userProfile) as UserProfileResponse)
+      : null,
   };
 }
 
@@ -179,10 +183,14 @@ export async function getOrganizationOverviewData(): Promise<{
   ]);
 
   return {
-    organization: transformKeysToCamelCase(organization) as OrganizationResponse,
+    organization: transformKeysToCamelCase(
+      organization,
+    ) as OrganizationResponse,
     stats: transformKeysToCamelCase(stats) as IssueStats,
     memberCount,
-    recentIssues: transformKeysToCamelCase(recentIssues) as IssueWithRelationsResponse[],
+    recentIssues: transformKeysToCamelCase(
+      recentIssues,
+    ) as IssueWithRelationsResponse[],
   };
 }
 

@@ -108,10 +108,11 @@ export async function updateOrganizationProfileAction(
     revalidateTag(`organization-${organizationId}`);
 
     // Background processing
-    runAfterResponse(async () => {
+    runAfterResponse(() => {
       console.log(
         `Organization ${organizationId} profile updated by ${user.email ?? "unknown"}`,
       );
+      return Promise.resolve();
     });
 
     return actionSuccess(
@@ -167,10 +168,11 @@ export async function updateOrganizationLogoAction(
     revalidateTag(`organization-${organizationId}`);
 
     // Background processing
-    runAfterResponse(async () => {
+    runAfterResponse(() => {
       console.log(
         `Organization ${organizationId} logo updated by ${user.email ?? "unknown"}`,
       );
+      return Promise.resolve();
     });
 
     return actionSuccess(
