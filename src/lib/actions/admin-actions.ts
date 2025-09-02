@@ -9,8 +9,6 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { emailSchema, uuidSchema } from "~/lib/validation/schemas";
 import { eq, and } from "drizzle-orm";
-import { getGlobalDatabaseProvider } from "~/server/db/provider";
-import { users, memberships, roles } from "~/server/db/schema";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { updateSystemSettings } from "~/lib/dal/system-settings";
 import {
@@ -27,6 +25,7 @@ import {
   runAfterResponse,
   type ActionResult,
 } from "./shared";
+import { db } from "~/lib/dal/shared";
 import { requirePermission } from "./shared";
 import { PERMISSIONS } from "~/server/auth/permissions.constants";
 // Removed unused getDB alias import
@@ -34,10 +33,7 @@ import { PERMISSIONS } from "~/server/auth/permissions.constants";
 // Enhanced validation schemas with better error messages
 const inviteUserSchema = z.object({
   email: emailSchema.transform((s) => s.toLowerCase()),
-  name: z
-    .string()
-    .max(100, "Name must be less than 100 characters")
-    .optional(),
+  name: z.string().max(100, "Name must be less than 100 characters").optional(),
   roleId: uuidSchema.optional(),
   message: z
     .string()
@@ -92,7 +88,6 @@ export async function inviteUserAction(
       return validation;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.USER_MANAGE, db);
 
     // Check if user already exists in the system
@@ -142,7 +137,7 @@ export async function inviteUserAction(
         .values({
           id: generatePrefixedId("user"),
           email: validation.data.email,
-          name: validation.data.name || null,
+          name: validation.data.name ?? null,
           email_verified: null, // Email not verified until they complete signup
         })
         .returning({ id: users.id });
@@ -190,7 +185,7 @@ export async function inviteUserAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(
-        `User invitation processed for ${validation.data.email} by ${user.email}`,
+        `User invitation processed for ${validation.data.email} by ${user.email ?? "unknown"}`,
         {
           userId,
           membershipId: newMembership?.id,
@@ -263,7 +258,6 @@ export async function updateUserRoleAction(
       return validation;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.USER_MANAGE, db);
 
     // Verify role exists in this organization
@@ -303,7 +297,7 @@ export async function updateUserRoleAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(
-        `User role updated by ${user.email}: ${validation.data.userId} -> ${role.name}`,
+        `User role updated by ${user.email ?? "unknown"}: ${validation.data.userId} -> ${role.name}`,
       );
 
       // Log the activity
@@ -347,7 +341,6 @@ export async function removeUserAction(
       return validation;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.USER_MANAGE, db);
 
     // Verify user exists and email matches (safety check)
@@ -383,7 +376,7 @@ export async function removeUserAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(
-        `User removed from organization by ${user.email}: ${validation.data.confirmEmail}`,
+        `User removed from organization by ${user.email ?? "unknown"}: ${validation.data.confirmEmail}`,
       );
 
       // Log the activity
@@ -435,7 +428,6 @@ export async function updateSystemSettingsAction(
     }
 
     // Permission check for settings update
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ORGANIZATION_MANAGE, db);
 
     // Update system settings in database
@@ -450,7 +442,7 @@ export async function updateSystemSettingsAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`System settings updated by ${user.email}`);
+      console.log(`System settings updated by ${user.email ?? "unknown"}`);
 
       // Log the activity
       await logActivity({
@@ -459,7 +451,7 @@ export async function updateSystemSettingsAction(
         action: ACTIVITY_ACTIONS.SETTINGS_UPDATED,
         entity: ACTIVITY_ENTITIES.SETTINGS,
         entityId: "system-settings",
-        details: `Updated system settings: ${Object.keys(validation.data.settings).join(", ")}`,
+        details: `Updated system settings: ${Object.keys(validation.data.settings).join(", ") ?? "none"}`,
         severity: "info",
       });
     });
@@ -486,7 +478,6 @@ export async function exportActivityLogAction(): Promise<Response> {
     const { user, organizationId, membership } =
       await requireAuthContextWithRole();
 
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ADMIN_VIEW_ANALYTICS, db);
 
     // Export activity log to CSV
@@ -508,14 +499,14 @@ export async function exportActivityLogAction(): Promise<Response> {
 
     // Generate filename with timestamp
     const timestamp = new Date().toISOString().split("T")[0];
-    const filename = `activity-log-${timestamp}.csv`;
+    const filename = `activity-log-${timestamp ?? "unknown"}.csv`;
 
     // Return CSV file response
     return new Response(csvData, {
       status: 200,
       headers: {
         "Content-Type": "text/csv",
-        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Disposition": `attachment; filename="${String(filename)}"`,
       },
     });
   } catch (error) {

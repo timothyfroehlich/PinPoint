@@ -88,7 +88,7 @@ export function MachineInventoryServer({
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1">
             <GenericSearch
-              initialSearch={filters.search}
+              {...(filters.search && { initialSearch: filters.search })}
               basePath="/machines"
               placeholder="Search machines, locations, or models..."
             />
@@ -134,7 +134,7 @@ export function MachineInventoryServer({
       <div className="flex flex-col md:flex-row gap-4">
         <div className="flex-1">
           <GenericSearch
-            initialSearch={filters.search}
+            {...(filters.search && { initialSearch: filters.search })}
             basePath="/machines"
             placeholder="Search machines, locations, or models..."
             size="sm"
@@ -177,7 +177,7 @@ export function MachineInventoryServer({
                   </Link>
                   <p className="text-sm text-muted-foreground">
                     {machine.model?.manufacturer} {machine.model?.name}
-                    {machine.model?.year && ` (${machine.model.year})`}
+                    {machine.model?.year && ` (${String(machine.model.year)})`}
                   </p>
                 </div>
 
@@ -185,7 +185,8 @@ export function MachineInventoryServer({
                   <MapPinIcon className="h-3 w-3" />
                   <span className="truncate">
                     {machine.location?.name ?? "Unknown Location"}
-                    {machine.location?.city && `, ${machine.location.city}`}
+                    {machine.location?.city &&
+                      `, ${String(machine.location.city)}`}
                   </span>
                 </div>
 
@@ -259,7 +260,8 @@ export function MachineInventoryServer({
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {machine.model?.manufacturer}
-                        {machine.model?.year && ` (${machine.model.year})`}
+                        {machine.model?.year &&
+                          ` (${String(machine.model.year)})`}
                       </div>
                     </div>
                   </TableCell>

@@ -8,8 +8,8 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { and, eq, inArray } from "drizzle-orm";
-import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { notifications } from "~/server/db/schema";
+import { db } from "~/lib/dal/shared";
 import {
   requireAuthContextWithRole,
   validateFormData,
@@ -51,8 +51,6 @@ export async function markNotificationAsReadAction(
       return validation;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
-
     // Update notification with proper access control
     const [updatedNotification] = await db
       .update(notifications)
@@ -78,7 +76,7 @@ export async function markNotificationAsReadAction(
     // Background processing
     runAfterResponse(() => {
       console.log(
-        `Notification ${validation.data.notificationId} marked as read by ${user.email}`,
+        `Notification ${validation.data.notificationId} marked as read by ${user.email ?? "unknown"}`,
       );
       return Promise.resolve();
     });
@@ -116,7 +114,6 @@ export async function bulkMarkNotificationsAsReadAction(
       return actionError("Invalid bulk update data");
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
     const { notificationIds } = validation.data;
 
     // Bulk update with proper access control
@@ -141,14 +138,14 @@ export async function bulkMarkNotificationsAsReadAction(
     // Background processing
     runAfterResponse(() => {
       console.log(
-        `Bulk marked ${updatedNotifications.length} notifications as read by ${user.email}`,
+        `Bulk marked ${String(updatedNotifications.length)} notifications as read by ${user.email ?? "unknown"}`,
       );
       return Promise.resolve();
     });
 
     return actionSuccess(
       { updatedCount: updatedNotifications.length },
-      `Successfully marked ${updatedNotifications.length} notification${updatedNotifications.length !== 1 ? "s" : ""} as read`,
+      `Successfully marked ${String(updatedNotifications.length)} notification${updatedNotifications.length !== 1 ? "s" : ""} as read`,
     );
   } catch (error) {
     console.error("Bulk mark notifications as read error:", error);
@@ -176,8 +173,6 @@ export async function markAllNotificationsAsReadAction(
       return validation;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
-
     // Mark all unread notifications as read
     const updatedNotifications = await db
       .update(notifications)
@@ -199,14 +194,14 @@ export async function markAllNotificationsAsReadAction(
     // Background processing
     runAfterResponse(() => {
       console.log(
-        `All notifications marked as read by ${user.email} (${updatedNotifications.length} notifications)`,
+        `All notifications marked as read by ${user.email ?? "unknown"} (${String(updatedNotifications.length)} notifications)`,
       );
       return Promise.resolve();
     });
 
     return actionSuccess(
       { updatedCount: updatedNotifications.length },
-      `Successfully marked all ${updatedNotifications.length} notification${updatedNotifications.length !== 1 ? "s" : ""} as read`,
+      `Successfully marked all ${String(updatedNotifications.length)} notification${updatedNotifications.length !== 1 ? "s" : ""} as read`,
     );
   } catch (error) {
     console.error("Mark all notifications as read error:", error);
@@ -233,8 +228,6 @@ export async function markNotificationAsUnreadAction(
       return validation;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
-
     // Update notification with proper access control
     const [updatedNotification] = await db
       .update(notifications)
@@ -260,7 +253,7 @@ export async function markNotificationAsUnreadAction(
     // Background processing
     runAfterResponse(() => {
       console.log(
-        `Notification ${validation.data.notificationId} marked as unread by ${user.email}`,
+        `Notification ${validation.data.notificationId} marked as unread by ${user.email ?? "unknown"}`,
       );
       return Promise.resolve();
     });

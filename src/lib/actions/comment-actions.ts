@@ -10,8 +10,8 @@ import { cache } from "react"; // React 19 cache API
 import { z } from "zod";
 import { commentContentSchema } from "~/lib/validation/schemas";
 import { and, eq, isNull } from "drizzle-orm";
-import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { comments, issues } from "~/server/db/schema";
+import { db } from "~/lib/dal/shared";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import {
   requireAuthContextWithRole,
@@ -37,7 +37,6 @@ const editCommentSchema = z.object({
 // Performance: Cached database queries for verification
 const getCommentWithAccess = cache(
   async (commentId: string, organizationId: string, userId: string) => {
-    const db = getGlobalDatabaseProvider().getClient();
     return await db.query.comments.findFirst({
       where: and(
         eq(comments.id, commentId),
@@ -51,7 +50,6 @@ const getCommentWithAccess = cache(
 
 const getIssueWithAccess = cache(
   async (issueId: string, organizationId: string) => {
-    const db = getGlobalDatabaseProvider().getClient();
     return await db.query.issues.findFirst({
       where: and(
         eq(issues.id, issueId),
@@ -82,7 +80,6 @@ export async function addCommentAction(
 
     // Note: Commenting is allowed for any authenticated member who can view the issue.
     // Do NOT require ISSUE_CREATE here; visibility of the issue implies comment permission.
-    const db = getGlobalDatabaseProvider().getClient();
 
     // Verify issue exists and user has access
     const issue = await getIssueWithAccess(issueId, organizationId);
@@ -109,7 +106,9 @@ export async function addCommentAction(
 
     // Background processing (runs after response sent to user)
     runAfterResponse(async () => {
-      console.log(`Comment added to issue ${issueId} by ${user.email}`);
+      console.log(
+        `Comment added to issue ${issueId} by ${user.email ?? "unknown"}`,
+      );
 
       // Generate notifications for issue stakeholders
       try {
@@ -117,7 +116,7 @@ export async function addCommentAction(
           organizationId,
           actorId: user.id,
           actorName:
-            (user.user_metadata?.["name"] as string) || user.email || "Someone",
+            (user.user_metadata?.["name"] as string) ?? user.email ?? "Someone",
         });
       } catch (error) {
         console.error("Failed to generate comment notifications:", error);
@@ -148,7 +147,6 @@ export async function editCommentAction(
   try {
     const { user, organizationId, membership } =
       await requireAuthContextWithRole();
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
 
     // Enhanced validation
@@ -186,7 +184,7 @@ export async function editCommentAction(
 
     // Background processing
     runAfterResponse(() => {
-      console.log(`Comment ${commentId} edited by ${user.email}`);
+      console.log(`Comment ${commentId} edited by ${user.email ?? "unknown"}`);
       return Promise.resolve();
     });
 
@@ -211,7 +209,6 @@ export async function deleteCommentAction(
   try {
     const { user, organizationId, membership } =
       await requireAuthContextWithRole();
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
 
     // Verify comment exists and user has permission to delete
@@ -243,7 +240,7 @@ export async function deleteCommentAction(
 
     // Background processing
     runAfterResponse(() => {
-      console.log(`Comment ${commentId} deleted by ${user.email}`);
+      console.log(`Comment ${commentId} deleted by ${user.email ?? "unknown"}`);
       return Promise.resolve();
     });
 
@@ -267,7 +264,6 @@ export async function restoreCommentAction(
   try {
     const { user, organizationId, membership } =
       await requireAuthContextWithRole();
-    const db = getGlobalDatabaseProvider().getClient();
     await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
 
     // Find soft-deleted comment that user authored
@@ -300,7 +296,9 @@ export async function restoreCommentAction(
 
     // Background processing
     runAfterResponse(() => {
-      console.log(`Comment ${commentId} restored by ${user.email}`);
+      console.log(
+        `Comment ${commentId} restored by ${user.email ?? "unknown"}`,
+      );
       return Promise.resolve();
     });
 

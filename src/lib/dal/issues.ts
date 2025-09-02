@@ -502,13 +502,18 @@ export const getIssueTrendData = cache(async (days = 30) => {
     const trendData = recentIssues.reduce<
       Record<string, { created: number; resolved: number }>
     >((acc, issue) => {
-      const [dateKey] = issue.created_at.toISOString().split("T");
-      acc[dateKey] ??= { created: 0, resolved: 0 };
-      acc[dateKey].created += 1;
+      const dateKey = issue.created_at.toISOString().split("T")[0];
+      if (dateKey) {
+        acc[dateKey] ??= { created: 0, resolved: 0 };
+        acc[dateKey].created += 1;
+      }
 
-      const statusName = (issue.status.name ?? "").toLowerCase();
-      if (statusName.includes("resolved") || statusName.includes("closed")) {
-        acc[dateKey].resolved += 1;
+      if (dateKey) {
+        const statusName = (issue.status.name ?? "").toLowerCase();
+        if (statusName.includes("resolved") || statusName.includes("closed")) {
+          acc[dateKey] ??= { created: 0, resolved: 0 };
+          acc[dateKey].resolved += 1;
+        }
       }
 
       return acc;
