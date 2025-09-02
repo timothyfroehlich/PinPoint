@@ -509,8 +509,11 @@ export const getIssueTrendData = cache(async (days = 30) => {
       }
 
       const statusName = issue.status.name.toLowerCase();
-      if (statusName.includes("resolved") || statusName.includes("closed")) {
-        acc[dateKey].resolved += 1;
+      if (
+        dateKey &&
+        (statusName.includes("resolved") || statusName.includes("closed"))
+      ) {
+        acc[dateKey]!.resolved += 1;
       }
 
       return acc;
