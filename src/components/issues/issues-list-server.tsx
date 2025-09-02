@@ -92,13 +92,18 @@ function IssueCard({ issue }: { issue: Issue }) {
     : "bg-surface-container-low text-on-surface border-outline-variant";
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card
+      className="hover:shadow-md transition-shadow"
+      data-testid="issue-card"
+      data-issue-id={issue.id}
+    >
       <CardHeader className="pb-3">
         <div className="flex justify-between items-start">
           <div className="flex-1">
             <Link
               href={`/issues/${issue.id}`}
               className="text-lg font-semibold hover:text-primary transition-colors"
+              data-testid="issue-link"
             >
               {issue.title}
             </Link>
@@ -188,7 +193,7 @@ export async function IssuesListWithData({ limit }: { limit?: number }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="issues-list">
       {displayIssues.map((issue) => (
         <IssueCard key={issue.id} issue={issue} />
       ))}
@@ -299,7 +304,7 @@ export function IssuesListServer({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="issues-list">
       {displayIssues.map((issue) => (
         <IssueCard key={issue.id} issue={issue} />
       ))}

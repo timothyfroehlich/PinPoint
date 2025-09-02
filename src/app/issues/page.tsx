@@ -16,7 +16,6 @@ import {
   parseIssueSearchParams,
   getIssueFilterDescription,
   getIssueCanonicalUrl,
-  buildIssueUrl,
 } from "~/lib/search-params/issue-search-params";
 import { buildMetadataDescription } from "~/lib/search-params/shared";
 
@@ -163,7 +162,7 @@ async function IssuesWithData({
           entityType="issues"
           fields={ISSUES_FILTER_FIELDS}
           currentParams={rawParams}
-          buildUrl={(params) => buildIssueUrl("/issues", params, rawParams)}
+          basePath="/issues"
           title="Filter Issues"
           description="Search and filter issues by status, priority, assignee, and more"
           collapsible={true}
