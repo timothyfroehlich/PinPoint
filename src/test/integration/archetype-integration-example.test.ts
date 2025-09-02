@@ -5,6 +5,7 @@
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { z } from "zod";
+import { uuidSchema } from "~/lib/validation/schemas";
 import {
   SeedBasedMockFactory,
   MockAuthContextFactory,
@@ -29,7 +30,7 @@ describe("Archetype Integration: RSC Test System Working Together", () => {
 
       const schema = z.object({
         title: z.string().min(1),
-        machineId: z.string().uuid(),
+        machineId: uuidSchema,
         priority: z.enum(["low", "medium", "high"]).default("medium"),
       });
 
@@ -48,7 +49,7 @@ describe("Archetype Integration: RSC Test System Working Together", () => {
 
       const schema = z.object({
         title: z.string().min(1, "Title required"),
-        machineId: z.string().uuid("Invalid machine ID"),
+        machineId: uuidSchema,
       });
 
       const result = validateFormData(invalidFormData, schema);
@@ -167,7 +168,7 @@ describe("Archetype Integration: RSC Test System Working Together", () => {
           // Validate FormData
           const schema = z.object({
             title: z.string().min(1),
-            machineId: z.string().uuid(),
+            machineId: uuidSchema,
           });
 
           const validation = validateFormData(formData, schema);
@@ -216,7 +217,7 @@ describe("Archetype Integration: RSC Test System Working Together", () => {
 
           const schema = z.object({
             title: z.string().min(1, "Title is required"),
-            machineId: z.string().uuid("Invalid machine ID"),
+            machineId: uuidSchema,
           });
 
           return validateFormData(formData, schema);
@@ -253,7 +254,7 @@ describe("Archetype Integration: RSC Test System Working Together", () => {
       // 2. Validate FormData (Archetype 1: Pure function)
       const schema = z.object({
         title: z.string().min(1),
-        machineId: z.string().uuid(),
+        machineId: uuidSchema,
         priority: z.enum(["low", "medium", "high"]).default("medium"),
       });
 
@@ -305,7 +306,7 @@ describe("Archetype Integration: RSC Test System Working Together", () => {
       });
 
       const schema = z.object({
-        machineId: z.string().uuid(),
+        machineId: uuidSchema,
       });
 
       const validation = validateFormData(formData, schema);
