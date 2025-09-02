@@ -8,7 +8,7 @@
  * import { IssueFilters, MachineResponse, PinPointSupabaseUser } from "~/lib/types";
  */
 
-// API response types and related aliases
+// API response types and related aliases (preferred versions)
 export type * from "./api";
 
 // Shared filter types (avoid IssueSortBy conflict)
@@ -20,8 +20,24 @@ export type * from "./auth";
 // Supabase auth/session/admin/database types
 export type * from "./supabase";
 
-// DB model types (snake_case) under Db namespace
-export type * from "./db";
+// DB model types (snake_case) - selective exports to avoid conflicts
+export type {
+  User,
+  NewUser,
+  Role,
+  NewRole,
+  Permission,
+  NewPermission,
+  Organization,
+  NewOrganization,
+  Membership,
+  NewMembership,
+  Machine,
+  NewMachine,
+  Model,
+  NewModel,
+  // Note: Issue, Comment, IssueStatus, Location are from api.ts
+} from "./db";
 
 // Search param types (Zod inferred)
 export type * from "./search";
