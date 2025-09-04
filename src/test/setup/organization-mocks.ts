@@ -128,7 +128,7 @@ export function setupOrganizationMocks() {
     const actual = await vi.importActual("~/lib/dal/shared");
     return {
       ...actual,
-      getServerAuthContext: vi.fn(async () => ({
+      getDALAuthContext: vi.fn(async () => ({
         user: {
           id: SEED_TEST_IDS.USERS.ADMIN,
           email: "tim@pinpoint.dev",

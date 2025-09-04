@@ -84,7 +84,7 @@ export {
  * Combines organization, user, and issue data for dashboard pages
  * Uses parallel queries for optimal performance
  */
-export async function getDashboardData(): Promise<{
+export async function getDashboardData(organizationId: string): Promise<{
   organization: OrganizationResponse;
   user: UserProfileResponse;
   issueStats: IssueStats;
@@ -97,8 +97,8 @@ export async function getDashboardData(): Promise<{
   const [orgData, userProfile, issueStats, recentIssues] = await Promise.all([
     getCurrentOrganization(),
     getCurrentUserProfile(),
-    getIssueDashboardStats(),
-    getRecentIssues(5),
+    getIssueDashboardStats(organizationId),
+    getRecentIssues(organizationId, 5),
   ]);
 
   return {
@@ -118,7 +118,7 @@ export async function getDashboardData(): Promise<{
  * Combines organization info with key statistics
  * Useful for admin pages and organization management
  */
-export async function getOrganizationOverviewData(): Promise<{
+export async function getOrganizationOverviewData(organizationId: string): Promise<{
   organization: OrganizationResponse;
   stats: IssueStats;
   memberCount: number;
@@ -135,7 +135,7 @@ export async function getOrganizationOverviewData(): Promise<{
     getCurrentOrganization(),
     getOrganizationStats(),
     getOrganizationMemberCount(),
-    getRecentIssues(10),
+    getRecentIssues(organizationId, 10),
   ]);
 
   return {

@@ -9,7 +9,6 @@ import {
 } from "~/lib/dal/comments";
 import { getAssignableUsers } from "~/lib/dal/users";
 import { getAvailableStatuses } from "~/lib/dal/organizations";
-import { requireMemberAccess } from "~/lib/organization-context";
 import { formatDistanceToNow, format } from "date-fns";
 import { IssueStatusUpdateClient } from "./issue-status-update-client";
 import { IssueAssignmentClient } from "./issue-assignment-client";
@@ -18,15 +17,14 @@ import { RealtimeCommentsClient } from "./realtime-comments-client";
 
 interface IssueDetailServerProps {
   issueId: string;
+  organizationId: string;
+  userId: string;
 }
 
-export async function IssueDetailServer({ issueId }: IssueDetailServerProps): Promise<JSX.Element> {
-  // Parallel data fetching for optimal performance
-  const { user } = await requireMemberAccess();
-  const userId = user.id;
+export async function IssueDetailServer({ issueId, organizationId, userId }: IssueDetailServerProps): Promise<JSX.Element> {
   const [issue, comments, commentCount, assignableUsers, availableStatuses] =
     await Promise.all([
-      getIssueById(issueId),
+      getIssueById(issueId, organizationId),
       getCommentsForIssue(issueId),
       getCommentCountForIssue(issueId),
       getAssignableUsers(),

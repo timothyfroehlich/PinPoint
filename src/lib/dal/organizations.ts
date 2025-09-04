@@ -132,6 +132,53 @@ export const getOrganizationStats = cache(async () => {
 });
 
 /**
+ * Get comprehensive organization statistics by ID
+ * Alternative to getOrganizationStats when organization context is already resolved
+ * Uses React 19 cache() for request-level memoization
+ */
+export const getOrganizationStatsById = cache(async (organizationId: string) => {
+  return withOrgRLS(db, organizationId, async (tx) => {
+    const [issueStats, machineCount, memberCount] = await Promise.all([
+      tx
+        .select({
+          total: count(issues.id),
+          new: sql<number>`count(*) filter (where ${issueStatuses.category} = 'NEW')`,
+          inProgress: sql<number>`count(*) filter (where ${issueStatuses.category} = 'IN_PROGRESS')`,
+          resolved: sql<number>`count(*) filter (where ${issueStatuses.category} = 'RESOLVED')`,
+        })
+        .from(issues)
+        .innerJoin(issueStatuses, eq(issues.status_id, issueStatuses.id))
+        .where(eq(issues.organization_id, organizationId)),
+
+      tx
+        .select({ count: count() })
+        .from(machines)
+        .where(eq(machines.organization_id, organizationId)),
+
+      tx
+        .select({ count: count() })
+        .from(memberships)
+        .where(eq(memberships.organization_id, organizationId)),
+    ]);
+
+    return {
+      issues: {
+        total: issueStats[0]?.total ?? 0,
+        new: issueStats[0]?.new ?? 0,
+        inProgress: issueStats[0]?.inProgress ?? 0,
+        resolved: issueStats[0]?.resolved ?? 0,
+      },
+      machines: {
+        total: safeCount(machineCount),
+      },
+      members: {
+        total: safeCount(memberCount),
+      },
+    };
+  });
+});
+
+/**
  * Get organization members with user and role information
  * Includes pagination support for large organizations
  * Uses React 19 cache() for request-level memoization per page

@@ -9,12 +9,11 @@ import {
   AdvancedSearchForm,
   MACHINES_FILTER_FIELDS,
 } from "~/components/search";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/lib/organization-context";
 import {
   getMachinesWithFilters,
   getMachineStats,
   getLocationsForOrg,
-  type MachinePagination,
   type MachineSorting,
 } from "~/lib/dal/machines";
 import type { MachineFilters } from "~/lib/types";
@@ -23,7 +22,6 @@ import {
   getMachineFilterDescription,
   getMachineCanonicalUrl,
 } from "~/lib/search-params/machine-search-params";
-import { buildMetadataDescription } from "~/lib/search-params/shared";
 
 // Force dynamic rendering for auth-dependent content
 export const dynamic = "force-dynamic";
@@ -33,7 +31,7 @@ interface MachinesPageProps {
 }
 
 export async function generateMetadata({ searchParams }: MachinesPageProps): Promise<Metadata> {
-  await requireMemberAccess();
+  // Note: Authentication happens at page component level to avoid race conditions
 
   // Parse search params using centralized utility
   const rawParams = await searchParams;
@@ -47,35 +45,19 @@ export async function generateMetadata({ searchParams }: MachinesPageProps): Pro
   if (parsedParams.search) filters.search = parsedParams.search;
   if (parsedParams.hasQR !== undefined) filters.hasQR = parsedParams.hasQR;
 
-  const pagination: MachinePagination = {
-    page: parsedParams.page,
-    limit: parsedParams.view === "grid" ? 12 : parsedParams.limit,
-  };
-
-  const sorting: MachineSorting = {
-    field: parsedParams.sort as MachineSorting["field"],
-    order: parsedParams.order,
-  };
-
-  // Get machine count for metadata
-  const { totalCount } = await getMachinesWithFilters(
-    filters,
-    pagination,
-    sorting,
-  );
-
-  // Generate filter descriptions using centralized utility
+  // Generate filter descriptions using centralized utility (without org-specific data)
   const filterDescriptions = getMachineFilterDescription(parsedParams);
-  const description = buildMetadataDescription(
-    "Manage your pinball machine fleet and track maintenance",
-    filterDescriptions,
-    totalCount,
-  );
+  const description = filterDescriptions.length > 0
+    ? `Manage your pinball machine fleet and track maintenance. Current filters: ${filterDescriptions.join(", ")}`
+    : "Manage your pinball machine fleet and track maintenance";
 
   // Generate canonical URL for SEO
   const canonicalUrl = getMachineCanonicalUrl("/machines", parsedParams);
 
-  const title = `Machine Inventory (${String(totalCount)} machines) - PinPoint`;
+  // Generic title without organization-specific count to avoid auth race conditions
+  const title = filterDescriptions.length > 0
+    ? `Machine Inventory (${filterDescriptions.join(", ")}) - PinPoint`
+    : `Machine Inventory - PinPoint`;
 
   return {
     title,
@@ -94,7 +76,8 @@ export async function generateMetadata({ searchParams }: MachinesPageProps): Pro
 export default async function MachinesPage({
   searchParams,
 }: MachinesPageProps): Promise<React.JSX.Element> {
-  await requireMemberAccess();
+  // Single authentication resolution for entire request
+  await getRequestAuthContext();
 
   // Parse URL parameters using centralized utility
   const rawParams = await searchParams;
@@ -108,21 +91,11 @@ export default async function MachinesPage({
   if (parsedParams.search) filters.search = parsedParams.search;
   if (parsedParams.hasQR !== undefined) filters.hasQR = parsedParams.hasQR;
 
-  const pagination: MachinePagination = {
-    page: parsedParams.page,
-    limit: parsedParams.view === "grid" ? 12 : parsedParams.limit,
-  };
-
-  const sorting: MachineSorting = {
-    field: parsedParams.sort as MachineSorting["field"],
-    order: parsedParams.order,
-  };
-
   const viewMode = parsedParams.view;
 
   // Parallel data fetching for optimal performance
   const [machines, machineStats, locations] = await Promise.all([
-    getMachinesWithFilters(filters, pagination, sorting),
+    getMachinesWithFilters(filters, { page: parsedParams.page, limit: parsedParams.view === "grid" ? 12 : parsedParams.limit }, { field: parsedParams.sort as MachineSorting["field"], order: parsedParams.order }),
     getMachineStats(),
     getLocationsForOrg(),
   ]);
@@ -224,8 +197,8 @@ export default async function MachinesPage({
           locations={locations}
           viewMode={viewMode}
           filters={filters}
-          pagination={pagination}
-          sorting={sorting}
+          pagination={{ page: parsedParams.page, limit: parsedParams.view === "grid" ? 12 : parsedParams.limit }}
+          sorting={{ field: parsedParams.sort as MachineSorting["field"], order: parsedParams.order }}
           searchParams={rawParams}
         />
       </Suspense>

@@ -188,11 +188,11 @@ export async function getCurrentUserOrganizationId(): Promise<string | null> {
  *
  * @example
  * ```typescript
- * const { user, organizationId } = await requireOrganizationContext();
- * // Safe to proceed with organization-scoped operations
+ * const { user, organizationId } = await requireSupabaseUserContext();
+ * // Safe to proceed with user-scoped operations using app_metadata
  * ```
  */
-export async function requireOrganizationContext(): Promise<{
+export async function requireSupabaseUserContext(): Promise<{
   user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
   organizationId: string;
 }> {

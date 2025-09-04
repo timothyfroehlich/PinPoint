@@ -25,7 +25,7 @@ import {
   DownloadIcon,
   FilterIcon,
 } from "lucide-react";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 import { getActivityLog, getActivityStats } from "~/lib/dal/activity-log";
 import { ActivityLogFilter } from "./components/ActivityLogFilter";
 import { format } from "date-fns";
@@ -35,8 +35,11 @@ export default async function ActivityLogPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<React.JSX.Element> {
-  const { organization } = await requireMemberAccess();
-  const organizationId = organization.id;
+  const auth = await getRequestAuthContext();
+  if (auth.kind !== 'authorized') {
+    throw new Error('Member access required');
+  }
+  const organizationId = auth.org.id;
 
   // Await searchParams as required by Next.js 15
   const resolvedSearchParams = await searchParams;
