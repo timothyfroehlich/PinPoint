@@ -13,11 +13,11 @@ import { getGlobalDatabaseProvider } from "~/server/db/provider";
 export const db = getGlobalDatabaseProvider().getClient();
 
 /**
- * Get current authenticated user (no organization context)
+ * Get current authenticated user for DAL functions (no organization context)
  * Pure auth context without organizational dependencies
  * Uses React 19 cache() for request-level memoization to eliminate duplicate auth queries
  */
-export const getServerAuthContext = cache(async () => {
+export const getDALAuthContext = cache(async () => {
   const supabase = await createClient();
   const {
     data: { user },

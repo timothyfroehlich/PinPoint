@@ -13,6 +13,7 @@ import {
   ChevronRightIcon,
 } from "lucide-react";
 import { getIssuesForOrg, type IssueSorting } from "~/lib/dal/issues";
+import { getRequestAuthContext } from "~/lib/organization-context";
 import type { IssueFilters } from "~/lib/types";
 import { formatDistanceToNow } from "date-fns";
 
@@ -174,7 +175,12 @@ function IssueCard({ issue }: { issue: Issue }): JSX.Element {
 
 // Direct data fetching version for pages
 export async function IssuesListWithData({ limit }: { limit?: number }): Promise<JSX.Element> {
-  const issues = await getIssuesForOrg();
+  // Fetch auth context once for organization scope
+  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
+  // import placed inline to ensure availability
+  // (If path alias not resolving adjust tsconfig paths.)
+  const { organization } = await getRequestAuthContext();
+  const issues = await getIssuesForOrg(organization.id);
   const displayIssues = limit ? issues.slice(0, limit) : issues;
 
   if (displayIssues.length === 0) {

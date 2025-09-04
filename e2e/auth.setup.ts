@@ -5,8 +5,8 @@ const authFile = "e2e/.auth/user.json";
 setup("authenticate as Tim dev user", async ({ page }) => {
   console.log("Setting up authentication for Tim dev user...");
   
-  // Go directly to sign-in page
-  await page.goto("/auth/sign-in");
+  // Go directly to sign-in page on the correct subdomain
+  await page.goto("http://apc.localhost:3000/auth/sign-in");
   await expect(page.locator("h1")).toContainText(/Welcome back|Sign In/i);
   
   // Handle organization selection
@@ -52,17 +52,8 @@ setup("authenticate as Tim dev user", async ({ page }) => {
     await devLoginBtn.click({ force: true });
   }
 
-  // Wait for successful login and dashboard redirect
-  for (let i = 0; i < 40; i++) {
-    await page.waitForTimeout(500);
-    const url = page.url();
-    if (/apc\.localhost:3000\/dashboard|\/dashboard$/.test(url)) break;
-  }
-  
-  // Fallback navigate if needed
-  if (!/apc\.localhost:3000\/dashboard|\/dashboard$/.test(page.url())) {
-    await page.goto("/dashboard");
-  }
+  // Wait for successful login and dashboard redirect 
+  await page.waitForURL("**/dashboard", { timeout: 20000 });
   
   // Verify we're logged in successfully
   await expect(page.locator("h1")).toContainText(/Dashboard|Issues|Machines/i);

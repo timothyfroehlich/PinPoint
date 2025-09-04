@@ -1,7 +1,7 @@
 # PinPoint Non‑Negotiables (Core)
 
-**Last Updated**: September 1, 2025  
-**Last Reviewed**: September 1, 2025  
+**Last Updated**: September 1, 2025
+**Last Reviewed**: September 1, 2025
 
 **Status:** Adopted v2 structure for clarity and enforcement. This document organizes rules into scannable sections with consistent rule cards.
 
@@ -23,7 +23,7 @@
 4) Use `DrizzleToCamelCase` and/or `transformKeysToCamelCase` at DB→app boundaries.
 5) Use Supabase SSR wrapper `~/lib/supabase/server` (`createClient()`), call `auth.getUser()` immediately.
 6) Ensure Next.js middleware for Supabase SSR token refresh is present.
-7) Always scope queries by `organizationId` (RLS-compatible org scoping).
+7) Always scope queries by `organizationId` (RLS-compatible org scoping). Exception: global/root pages may only query public/global data and must not attempt org-scoped queries.
 8) Wrap server data access with `cache()` to prevent duplicate queries.
 9) Avoid deep relative imports; use `~/` aliases.
 10) Never use `any`, non‑null `!`, or unsafe `as`; write proper guards.
@@ -138,12 +138,17 @@
 - **Don’t:** Use PGlite in ways that circumvent RLS checks.
 - **Reference:** `supabase/tests/*`
 
-**CORE-SEC-004:** Server Components must receive organization context
+**CORE-SEC-004:** Server Components must receive organization context (unless in global context)
 - **Severity:** High (CORE‑SEC‑004)
 - **Why:** Ensures multi‑tenant scoping is preserved in UI data fetches.
-- **Do:** Pass/derive `organizationId` for Server Components via context/props and bind RLS at the boundary.
-- **Don’t:** Render Server Components that fetch data without org context.
+- **Do:** Pass/derive `organizationId` for Server Components via context/props and bind RLS at the boundary. For root/apex (global) pages, org context is intentionally absent; components must treat that as global scope and MUST NOT perform org-scoped queries.
+- **Don’t:** Render Server Components that fetch org-scoped data without org context. For global pages, do not attempt org membership or org-scoped queries.
 - **Reference:** Organization context utilities, RLS binding helpers
+## Global Context Clarification
+
+**Global (Root/Apex) Context:**
+- Pages/routes rendered at the root domain (no subdomain) operate in global context. These must not invoke org-scoped fetchers or attempt org membership resolution. Org-scoped functions must assert presence of `organizationId` and fail loudly if absent.
+
 
 ---
 

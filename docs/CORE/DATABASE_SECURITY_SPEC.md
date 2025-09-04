@@ -1,7 +1,7 @@
 # Database Security Specification
 
-**Last Updated**: September 1, 2025  
-**Last Reviewed**: September 1, 2025  
+**Last Updated**: September 1, 2025
+**Last Reviewed**: September 1, 2025
 
 Authoritative specification for data visibility, containment, permissions, and row‑level security (RLS) behavior in PinPoint.
 
@@ -132,9 +132,9 @@ Notes:
 
 ### 9.1 Organization Access & Public Listing
 - Organization data is accessed only within its subdomain context.
-- Public listing (root, no subdomain) returns only: `id`, `name`, `subdomain` (optional lightweight logo) for rows with `organizations.is_public = TRUE`.
+- Public listing (root, no subdomain/global context) returns only: `id`, `name`, `subdomain` (optional lightweight logo) for rows with `organizations.is_public = TRUE`. Front page/global context must not attempt org membership or org-scoped queries.
 - Members may view their own memberships; org admins may list their members.
-  
+
 Note: Organization visibility toggling is governed by general organization update authority (admin role / `organization:update`), not a separate permission.
 
 Implementation note: Anon listing is exposed via a dedicated minimal view/function pair (`public_organizations_minimal` / `fn_public_organizations_minimal`) that returns only public organizations with minimal fields. The base `organizations` table remains unavailable to anonymous users.
