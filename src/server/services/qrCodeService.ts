@@ -6,6 +6,8 @@ import { logger } from "~/lib/logger";
 import { type DrizzleClient } from "../db/drizzle";
 import { machines } from "../db/schema";
 import { constructReportUrl } from "../utils/qrCodeUtils";
+import { getErrorMessage } from "~/lib/utils/type-guards";
+import { safeCount, type CountResult } from "~/lib/types/database-results";
 
 interface QRCodeInfo {
   id: string;
@@ -164,7 +166,7 @@ export class QRCodeService {
             operation: "delete_old_qr_image",
           },
           error: {
-            message: error instanceof Error ? error.message : String(error),
+            message: getErrorMessage(error),
           },
         });
       }
@@ -251,7 +253,7 @@ export class QRCodeService {
             stats: { generated, failed, total },
           },
           error: {
-            message: error instanceof Error ? error.message : String(error),
+            message: getErrorMessage(error),
           },
         });
         failed++;
@@ -287,7 +289,7 @@ export class QRCodeService {
             stats: { generated, failed, total },
           },
           error: {
-            message: error instanceof Error ? error.message : String(error),
+            message: getErrorMessage(error),
           },
         });
         failed++;
@@ -315,7 +317,10 @@ export class QRCodeService {
     withQRCodes: number;
     withoutQRCodes: number;
   }> {
-    const [totalResult, withoutQRCodesResult] = await Promise.all([
+    const [totalResult, withoutQRCodesResult]: [
+      CountResult[],
+      CountResult[]
+    ] = await Promise.all([
       this.db.select({ count: count() }).from(machines),
       this.db
         .select({ count: count() })
@@ -323,8 +328,8 @@ export class QRCodeService {
         .where(isNull(machines.qr_code_url)),
     ]);
 
-    const total = totalResult[0]?.count ?? 0;
-    const withoutQRCodes = withoutQRCodesResult[0]?.count ?? 0;
+    const total = safeCount(totalResult);
+    const withoutQRCodes = safeCount(withoutQRCodesResult);
     const withQRCodes = total - withoutQRCodes;
 
     return {

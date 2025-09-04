@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { AlertTriangle, RefreshCw, Home, HelpCircle } from "lucide-react";
 import { isDevelopment } from "~/lib/environment-client";
+import { getErrorMessage } from "~/lib/utils/type-guards";
 
 export interface ErrorAction {
   label: string;
@@ -63,7 +64,7 @@ export function ErrorBoundaryCard({
   useEffect(() => {
     // Log error for monitoring (future integration point)
     console.error("ErrorBoundary caught error:", {
-      message: error.message,
+      message: getErrorMessage(error),
       stack: error.stack,
       digest: error.digest,
       timestamp: new Date().toISOString(),
@@ -128,7 +129,7 @@ export function ErrorBoundaryCard({
           {showErrorDetails && (
             <div className="bg-muted p-4 rounded text-sm">
               <strong>Error details:</strong>
-              <pre className="mt-2 whitespace-pre-wrap">{error.message}</pre>
+              <pre className="mt-2 whitespace-pre-wrap">{getErrorMessage(error)}</pre>
             </div>
           )}
 

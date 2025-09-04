@@ -13,6 +13,8 @@ import type { DrizzleClient } from "~/server/db/drizzle";
 
 import { transformPinballMapMachineToModel } from "~/lib/external/pinballmapTransformer";
 import { logger } from "~/lib/logger";
+import { getErrorMessage } from "~/lib/utils/type-guards";
+import { safeCount, type CountResult } from "~/lib/types/database-results";
 // Drizzle ORM imports
 import {
   machines,
@@ -176,7 +178,7 @@ export class PinballMapService {
         added: 0,
         updated: 0,
         removed: 0,
-        error: error instanceof Error ? error.message : "Unknown sync error",
+        error: getErrorMessage(error),
       };
     }
   }
@@ -273,7 +275,7 @@ export class PinballMapService {
             operation: "sync_machine",
           },
           error: {
-            message: error instanceof Error ? error.message : String(error),
+            message: getErrorMessage(error),
           },
         });
         // Continue processing other machines
@@ -287,12 +289,12 @@ export class PinballMapService {
 
     for (const machine of machinesToRemove) {
       // Check if machine has issues before removing
-      const [issueCountResult] = await this.db
+      const issueCountResult: CountResult[] = await this.db
         .select({ count: count() })
         .from(issues)
         .where(eq(issues.machine_id, machine.id));
 
-      if (issueCountResult?.count === 0) {
+      if (safeCount(issueCountResult) === 0) {
         // Only remove machines with no issues
         await this.db.delete(machines).where(eq(machines.id, machine.id));
         removed++;
@@ -396,7 +398,7 @@ export class PinballMapService {
           operation: "api_fetch",
         },
         error: {
-          message: error instanceof Error ? error.message : String(error),
+          message: getErrorMessage(error),
         },
       });
       return null;
@@ -496,7 +498,7 @@ export async function processFixtureData(
   } catch (error) {
     return {
       created: 0,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: getErrorMessage(error),
     };
   }
 }

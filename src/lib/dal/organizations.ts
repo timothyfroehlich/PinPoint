@@ -18,6 +18,7 @@ import {
 import { db } from "./shared";
 import { ensureOrgContextAndBindRLS } from "~/lib/organization-context";
 import { withOrgRLS } from "~/server/db/utils/rls";
+import { safeCount, type CountResult } from "~/lib/types/database-results";
 
 /**
  * Get organization by ID with caching
@@ -121,10 +122,10 @@ export const getOrganizationStats = cache(async () => {
         resolved: issueStats[0]?.resolved ?? 0,
       },
       machines: {
-        total: machineCount[0]?.count ?? 0,
+        total: safeCount(machineCount),
       },
       members: {
-        total: memberCount[0]?.count ?? 0,
+        total: safeCount(memberCount),
       },
     };
   });
@@ -174,11 +175,11 @@ export const getOrganizationMembers = cache(async (page = 1, limit = 20) => {
 export const getOrganizationMemberCount = cache(async () => {
   return ensureOrgContextAndBindRLS(async (tx, context) => {
     const organizationId = context.organization.id;
-    const result = await tx
+    const result: CountResult[] = await tx
       .select({ count: count() })
       .from(memberships)
       .where(eq(memberships.organization_id, organizationId));
-    return result[0]?.count ?? 0;
+    return safeCount(result);
   });
 });
 

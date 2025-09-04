@@ -8,6 +8,7 @@ import { and, desc, eq, sql, isNull, inArray, type SQL } from "drizzle-orm";
 import { issues, issueStatuses, priorities } from "~/server/db/schema";
 import { ensureOrgContextAndBindRLS } from "~/lib/organization-context";
 import type { IssueFilters } from "~/lib/types";
+import { safeCount, type CountResult } from "~/lib/types/database-results";
 
 /**
  * Get issues for the current organization with machine and assignee details
@@ -154,11 +155,11 @@ export const getIssuesWithFilters = cache(
       }
 
       // Get total count for pagination info
-      const totalCount = await tx
+      const totalCountResult: CountResult[] = await tx
         .select({ count: sql<number>`count(*)::int` })
         .from(issues)
-        .where(and(...whereConditions))
-        .then((result) => result[0]?.count ?? 0);
+        .where(and(...whereConditions));
+      const totalCount = safeCount(totalCountResult);
 
       // Get paginated results
       const issuesResult = await tx.query.issues.findMany({
