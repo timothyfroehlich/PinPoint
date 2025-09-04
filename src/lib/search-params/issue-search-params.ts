@@ -133,7 +133,7 @@ export function buildIssueUrl(
       const defaults = IssueSearchParamsSchema.parse({});
 
       // Don't include default values in URL for cleaner URLs
-      const defaultValue = (defaults as IssueSearchParams)[key as keyof IssueSearchParams];
+      const defaultValue = (defaults)[key as keyof IssueSearchParams];
       if (defaultValue !== undefined && stringValue === String(defaultValue)) {
         url.searchParams.delete(key);
       } else {

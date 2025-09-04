@@ -17,18 +17,10 @@ import type {
   Transform,
   FileInfo,
   API,
-  Collection,
-  JSCodeshift,
   CallExpression,
   ArrowFunctionExpression,
-  FunctionDeclaration,
-  VariableDeclarator,
-  ImportDeclaration,
-  StringLiteral,
-  Identifier,
   BlockStatement,
   ReturnStatement,
-  AwaitExpression,
 } from 'jscodeshift';
 
 const transform: Transform = (fileInfo: FileInfo, api: API) => {

@@ -132,7 +132,7 @@ export function transformMembershipResponse(
       id: string;
       name: string;
       permissions?: unknown[];
-      rolePermissions?: Array<{ permission?: unknown }>;
+      rolePermissions?: { permission?: unknown }[];
     }
     const role = transformed.role as RoleWithPermissions;
     if (Array.isArray(role.rolePermissions)) {
