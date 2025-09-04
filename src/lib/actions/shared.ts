@@ -72,7 +72,7 @@ export async function requireActionAuthContextWithPermission(
   const organizationId = organization.id;
   await baseRequirePermission({ roleId: membership.role.id }, permission, db);
   const name = ((user as any).user_metadata?.name as string | undefined) ?? user.email ?? "";
-  return { user: { id: user.id, email: user.email!, name }, organizationId, membership };
+  return { user: { id: user.id, email: user.email, name }, organizationId, membership };
 }
 
 /**
