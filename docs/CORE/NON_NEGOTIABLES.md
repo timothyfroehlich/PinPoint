@@ -206,6 +206,13 @@
 - Tailwind v4 projects adding v3 `tailwind.config.js`.
 - Overuse of Client Components.
 - New Material UI components (use shadcn/ui).
+- **SQL injection patterns**: Raw string interpolation in SQL (`sql.raw(\`SET var = '${value}'\`)`).
+- **Architectural SQL misuse**: Using `sql.raw()` when `sql` templates provide safe parameterization.
+- **Session variable abuse**: Application code setting database session variables instead of explicit filtering.
+- **Circular dependencies via dynamic imports**: `await import()` used to hide architectural boundary violations.
+- **Infrastructure doing business logic**: Context/utility files performing direct database queries.
+- **Over-abstraction**: Functions with single call sites that add no architectural value.
+- **Multiple auth context systems**: Duplicate authentication resolution patterns instead of consolidated approach.
 
 ---
 

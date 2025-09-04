@@ -7,8 +7,8 @@
 import "server-only";
 
 import { cache } from "react";
-import { eq } from "drizzle-orm";
-import { organizations } from "~/server/db/schema";
+import { eq, and } from "drizzle-orm";
+import { organizations, memberships } from "~/server/db/schema";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 
 /**
@@ -159,5 +159,31 @@ export const getOrganizationSubdomainById = cache(
     });
 
     return organization?.subdomain ?? null;
+  },
+);
+
+/**
+ * Get user membership in specific organization (public/no auth context)
+ * Used for infrastructure-level membership checks
+ * Uses React 19 cache() for request-level memoization
+ */
+export const getUserMembershipPublic = cache(
+  async (userId: string, organizationId: string) => {
+    const membership = await db.query.memberships.findFirst({
+      where: and(
+        eq(memberships.user_id, userId),
+        eq(memberships.organization_id, organizationId),
+      ),
+      with: {
+        role: {
+          columns: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    return membership;
   },
 );

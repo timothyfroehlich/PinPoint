@@ -56,16 +56,16 @@ export const booleanParamTransformer = z
  * Date range schema for filtering
  */
 export const DateRangeSchema = z.object({
-  created_after: z.string().datetime().optional(),
-  created_before: z.string().datetime().optional(),
-  updated_after: z.string().datetime().optional(),
-  updated_before: z.string().datetime().optional(),
+  created_after: z.iso.datetime().optional(),
+  created_before: z.iso.datetime().optional(),
+  updated_after: z.iso.datetime().optional(),
+  updated_before: z.iso.datetime().optional(),
 });
 
 /**
  * Generate SEO-friendly URL by removing default parameters
  */
-export function cleanUrlParameters<T extends Record<string, any>>(
+export function cleanUrlParameters<T extends Record<string, unknown>>(
   url: string,
   parser: (params: Record<string, string | string[] | undefined>) => T,
   builder: (basePath: string, params: Partial<T>) => string,
@@ -95,7 +95,7 @@ export function buildMetadataDescription(
 /**
  * Generate canonical URL without pagination
  */
-export function generateCanonicalUrl<T extends Record<string, any>>(
+export function generateCanonicalUrl<T extends Record<string, unknown>>(
   basePath: string,
   params: T,
   builder: (basePath: string, params: Partial<T>) => string,
@@ -103,12 +103,12 @@ export function generateCanonicalUrl<T extends Record<string, any>>(
   const canonicalParams = { ...params };
 
   // Remove pagination from canonical URLs
-  const cleanedParams = { ...canonicalParams };
-  if ("page" in cleanedParams) {
-    delete (cleanedParams as any).page;
+  if ("page" in canonicalParams) {
+    const { page, ...cleanedParams } = canonicalParams;
+    return builder(basePath, cleanedParams);
   }
 
-  return builder(basePath, cleanedParams);
+  return builder(basePath, canonicalParams);
 }
 
 /**
@@ -169,13 +169,13 @@ export interface UrlBuilderOptions {
 /**
  * Advanced URL builder with options
  */
-export function buildUrlWithOptions<T extends Record<string, any>>(
+export function buildUrlWithOptions<T extends Record<string, unknown>>(
   basePath: string,
   params: Partial<T>,
   currentSearchParams:
     | Record<string, string | string[] | undefined>
     | undefined,
-  defaultParser: (params: any) => T,
+  defaultParser: (params: unknown) => T,
   options: UrlBuilderOptions = {},
 ): string {
   const { preserveUnrelated = true, includeDefaults = false } = options;
@@ -215,8 +215,8 @@ export function buildUrlWithOptions<T extends Record<string, any>>(
       const stringValue = value.toString();
 
       // Skip default values unless explicitly requested
-      if (!includeDefaults && typeof defaults === "object") {
-        const defaultValue = (defaults as any)[key];
+      if (!includeDefaults && typeof defaults === "object" && defaults !== null) {
+        const defaultValue = (defaults as Record<string, unknown>)[key];
         if (
           defaultValue !== undefined &&
           stringValue === String(defaultValue)

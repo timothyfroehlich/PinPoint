@@ -4,7 +4,7 @@
  */
 
 import { db } from "~/lib/dal/shared";
-import { notifications, issues } from "~/server/db/schema";
+import type { Notification, Issue } from "~/lib/types/db";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { createNotificationActionUrl } from "~/lib/dal/notifications";
 import { eq, and } from "drizzle-orm";

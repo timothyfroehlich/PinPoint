@@ -13,12 +13,13 @@ import { createClient } from "~/lib/supabase/server";
 import { requireMemberAccess } from "~/lib/organization-context";
 import { requirePermission as baseRequirePermission } from "~/server/auth/permissions";
 import { requireAuthContextWithRole, db } from "~/lib/dal/shared";
+import { getErrorMessage } from "~/lib/utils/type-guards";
 export { requireAuthContextWithRole };
 
 /**
  * Server Action result types (React 19 useActionState compatible)
  */
-export type ActionResult<T = any> =
+export type ActionResult<T = unknown> =
   | { success: true; data: T; message?: string }
   | { success: false; error: string; fieldErrors?: Record<string, string[]> };
 
@@ -121,10 +122,11 @@ export function actionSuccess<T>(data: T, message?: string): ActionResult<T> {
 }
 
 export function actionError(
-  error: string,
+  error: unknown,
   fieldErrors?: Record<string, string[]>,
 ): ActionResult<never> {
-  const result: ActionResult<never> = { success: false, error };
+  const safeMessage = getErrorMessage(error);
+  const result: ActionResult<never> = { success: false, error: safeMessage };
   if (fieldErrors) {
     result.fieldErrors = fieldErrors;
   }
@@ -141,7 +143,7 @@ export function validateFormData<T>(
   const rawData = Object.fromEntries(formData.entries());
 
   // Convert empty strings to undefined for optional fields
-  const processedData = Object.entries(rawData).reduce<Record<string, any>>(
+  const processedData = Object.entries(rawData).reduce<Record<string, unknown>>(
     (acc, [key, value]) => {
       acc[key] = value === "" ? undefined : value;
       return acc;

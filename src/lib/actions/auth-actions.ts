@@ -19,10 +19,9 @@ import { isDevelopment } from "~/lib/environment";
 import { extractFormFields } from "~/lib/utils/form-data";
 import { getCookieDomain } from "~/lib/utils/domain";
 import { actionError } from "./shared";
+import { env } from "~/env";
 
-// Workaround for Turbopack bug PACK-5180: re-export types using import/export pattern
-import type { ActionResult as _ActionResult } from "./shared";
-export type ActionResult<T = any> = _ActionResult<T>;
+import type { ActionResult } from "./shared";
 
 // Validation schemas
 const magicLinkSchema = z.object({
@@ -199,7 +198,7 @@ export async function devSignIn(
   email: string,
   _userData?: { name?: string; role?: string },
 ): Promise<ActionResult<{ message: string }>> {
-  if (process.env.NODE_ENV !== "development") {
+  if (env.NODE_ENV !== "development") {
     return actionError("Dev authentication only available in development");
   }
 

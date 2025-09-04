@@ -17,6 +17,7 @@ import type { PinPointSupabaseUser } from "~/lib/types";
 import type { DrizzleClient } from "~/server/db/drizzle";
 
 import { logger } from "~/lib/logger";
+import { isError, isErrorWithCode } from "~/lib/utils/type-guards";
 import {
   ERROR_MESSAGE_TRUNCATE_LENGTH,
   SLOW_OPERATION_THRESHOLD_MS,
@@ -282,10 +283,10 @@ const loggingMiddleware = t.middleware(async ({ path, type, next, ctx }) => {
         msg: `${type} ${path} failed`,
         error: {
           type: error instanceof Error ? error.constructor.name : "Unknown",
-          code: (error as { code?: string }).code ?? "UNKNOWN",
+          code: isErrorWithCode(error) ? error.code : "UNKNOWN",
           message:
             error instanceof Error
-              ? error.message.substring(0, ERROR_MESSAGE_TRUNCATE_LENGTH)
+              ? (isError(error) ? error.message.substring(0, ERROR_MESSAGE_TRUNCATE_LENGTH) : "Unknown error")
               : "Unknown error",
         },
         context: {
@@ -390,7 +391,7 @@ export const organizationProcedure = protectedProcedure.use(
             operation: "membership_lookup_failed",
           },
           error: {
-            message: error instanceof Error ? error.message : String(error),
+            message: isError(error) ? error.message : String(error),
           },
         });
       }
@@ -495,7 +496,7 @@ export const orgScopedProcedure = protectedProcedure.use(
         ctx: {
           ...ctx,
           db: tx,
-          organizationId: ctx.organizationId as string, // Type assertion: already checked for null above
+          organizationId: ctx.organizationId!, // Non-null assertion: already checked for null above
         } satisfies TRPCContext & { organizationId: string },
       });
     });

@@ -9,7 +9,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { nameSchema, LIMITS } from "~/lib/validation/schemas";
 import { eq } from "drizzle-orm";
-import { organizations } from "~/server/db/schema";
+import type { Organization } from "~/lib/types/db";
 import { db } from "~/lib/dal/shared";
 import { transformKeysToSnakeCase } from "~/lib/utils/case-transformers";
 import {

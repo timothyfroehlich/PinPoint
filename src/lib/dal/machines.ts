@@ -21,6 +21,7 @@ import { machines, locations, models } from "~/server/db/schema";
 // No direct db access; use ensureOrgContextAndBindRLS to run under RLS-bound tx
 import { ensureOrgContextAndBindRLS } from "~/lib/organization-context";
 import type { MachineFilters } from "~/lib/types";
+import { safeCount, type CountResult } from "~/lib/types/database-results";
 
 // ================================
 // TYPE DEFINITIONS
@@ -177,7 +178,7 @@ export const getMachinesWithFilters = cache(
           .select({ count: count() })
           .from(machines)
           .where(and(...whereConditions))
-          .then((result) => result[0]?.count ?? 0),
+          .then((result: CountResult[]) => safeCount(result)),
       ]);
 
       const hasNextPage = machineResults.length > pagination.limit;
@@ -266,7 +267,7 @@ export const getMachineStats = cache(async (): Promise<MachineStats> => {
           .select({ count: count() })
           .from(machines)
           .where(eq(machines.organization_id, organizationId))
-          .then((result) => result[0]?.count ?? 0),
+          .then((result: CountResult[]) => safeCount(result)),
 
         // Machines with QR codes
         tx
@@ -278,7 +279,7 @@ export const getMachineStats = cache(async (): Promise<MachineStats> => {
               sql`${machines.qr_code_url} IS NOT NULL`,
             ),
           )
-          .then((result) => result[0]?.count ?? 0),
+          .then((result: CountResult[]) => safeCount(result)),
 
         // Machines by location
         tx

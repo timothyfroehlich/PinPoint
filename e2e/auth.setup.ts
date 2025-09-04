@@ -14,7 +14,7 @@ setup("authenticate as Tim dev user", async ({ page }) => {
   await expect(orgTrigger).toBeVisible({ timeout: 15000 });
 
   // Ensure an organization is selected
-  let triggerTextInitial = (await orgTrigger.textContent()) || "";
+  const triggerTextInitial = (await orgTrigger.textContent()) ?? "";
   if (!triggerTextInitial.trim()) {
     await orgTrigger.click();
     for (let i = 0; i < 12; i++) {

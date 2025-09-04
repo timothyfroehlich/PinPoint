@@ -29,7 +29,6 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { signInWithOAuth, sendMagicLink } from "~/lib/actions/auth-actions";
-import { type ActionResult } from "~/lib/actions/auth-actions";
 import { type OrganizationOption } from "~/lib/dal/public-organizations";
 
 // API Response validation schema for security
@@ -65,10 +64,10 @@ function isValidOrganizationArray(data: unknown): data is OrganizationOption[] {
 }
 
 export function SignUpForm(): React.JSX.Element {
-  const [magicLinkState, magicLinkAction, magicLinkPending] = useActionState<
-    ActionResult<{ message: string }> | null,
-    FormData
-  >(sendMagicLink, null);
+  const [magicLinkState, magicLinkAction, magicLinkPending] = useActionState(
+    sendMagicLink,
+    null,
+  );
 
   const [isOAuthLoading, setIsOAuthLoading] = useState(false);
 
@@ -233,10 +232,9 @@ export function SignUpForm(): React.JSX.Element {
               required
               disabled={magicLinkPending || isOAuthLoading}
             />
-            {magicLinkState?.success === false &&
-              magicLinkState.fieldErrors?.["email"] && (
+            {magicLinkState && !magicLinkState.success && magicLinkState.fieldErrors?.["email"] && (
                 <p className="text-sm text-error">
-                  {magicLinkState.fieldErrors["email"]}
+                  {magicLinkState.fieldErrors["email"][0]}
                 </p>
               )}
           </div>
@@ -265,7 +263,7 @@ export function SignUpForm(): React.JSX.Element {
         </form>
 
         {/* Action Results */}
-        {magicLinkState?.success === true && (
+        {magicLinkState && magicLinkState.success && (
           <Alert className="border-tertiary bg-tertiary-container">
             <div className="text-on-tertiary-container">
               <p className="font-medium">Account creation initiated!</p>
@@ -274,7 +272,7 @@ export function SignUpForm(): React.JSX.Element {
           </Alert>
         )}
 
-        {magicLinkState?.success === false && !magicLinkState.fieldErrors && (
+        {magicLinkState && !magicLinkState.success && !magicLinkState.fieldErrors && (
           <Alert className="border-error bg-error-container">
             <div className="text-on-error-container">
               <p className="font-medium">Account creation failed</p>

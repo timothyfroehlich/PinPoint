@@ -5,17 +5,18 @@
 
 import { cache } from "react";
 import { and, eq, sql, desc, count } from "drizzle-orm";
-import { db } from "~/lib/dal/shared";
-import {
-  issues,
-  machines,
-  users,
-  locations,
-  models,
-  memberships,
-  priorities,
-  issueStatuses,
+import { 
+  issues, 
+  machines, 
+  users, 
+  memberships, 
+  locations, 
+  models, 
+  priorities, 
+  issueStatuses 
 } from "~/server/db/schema";
+import { db } from "~/lib/dal/shared";
+import type { Issue, Machine, User, Membership, Priority, IssueStatus, Location, Model } from "~/lib/types/db";
 
 export type SearchEntity =
   | "issues"
@@ -28,7 +29,7 @@ export interface SearchOptions {
   query: string;
   entities: SearchEntity[];
   organizationId: string;
-  filters?: Record<string, any>;
+  filters?: Record<string, unknown>;
   pagination?: {
     page: number;
     limit: number;
@@ -46,7 +47,7 @@ export interface SearchResult {
   subtitle?: string;
   description?: string;
   url: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   relevance: number;
 }
 

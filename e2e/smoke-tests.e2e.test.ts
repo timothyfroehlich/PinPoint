@@ -13,7 +13,7 @@ async function devLoginAsTim(page: import("@playwright/test").Page) {
   await expect(orgTrigger).toBeVisible({ timeout: 15000 });
 
   // Ensure an organization is selected (generic approach). If empty, open and pick first available option.
-  let triggerTextInitial = (await orgTrigger.textContent()) || "";
+  const triggerTextInitial = (await orgTrigger.textContent()) ?? "";
   if (!triggerTextInitial.trim()) {
     await orgTrigger.click();
     for (let i = 0; i < 12; i++) {

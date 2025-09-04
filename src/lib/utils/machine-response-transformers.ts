@@ -135,7 +135,10 @@ export function transformLocationResponse(location: unknown): LocationResponse {
 
   // Handle nested machines array if present
   if ("machines" in transformed) {
-    const locationWithMachines = transformed as any;
+    interface LocationWithMachines {
+      machines?: unknown[];
+    }
+    const locationWithMachines = transformed as LocationWithMachines;
     if (Array.isArray(locationWithMachines.machines)) {
       locationWithMachines.machines = transformMachinesResponse(
         locationWithMachines.machines,

@@ -193,7 +193,6 @@ export default async function MachinesPage({
           collapsible={true}
           defaultExpanded={false}
           showActiveFilters={true}
-          buildUrl={(params) => buildMachineUrl("/machines", params, rawParams)}
         />
       </Suspense>
 
