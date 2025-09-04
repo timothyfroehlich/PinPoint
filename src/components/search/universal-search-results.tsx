@@ -21,7 +21,7 @@ import {
   performUniversalSearch,
   type SearchEntity,
 } from "~/lib/services/search-service";
-import { requireAuthContextWithRole } from "~/lib/dal/shared";
+import { requireMemberAccess } from "~/lib/organization-context";
 import { formatDistanceToNow } from "date-fns";
 
 interface UniversalSearchResultsProps {
@@ -79,7 +79,8 @@ export async function UniversalSearchResults({
   }
 
   // Get authentication context
-  const { organizationId } = await requireAuthContextWithRole();
+  const { organization } = await requireMemberAccess();
+  const organizationId = organization.id;
 
   // Perform search
   const searchResponse = await performUniversalSearch({
@@ -98,7 +99,7 @@ export async function UniversalSearchResults({
           <AlertCircleIcon className="h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-medium mb-2">No results found</h3>
           <p className="text-muted-foreground text-center max-w-md">
-            We couldn't find anything matching "{query}". Try adjusting your
+            We couldn't find anything matching "${query}". Try adjusting your
             search terms or checking your spelling.
           </p>
           <div className="mt-4 text-sm text-muted-foreground">
@@ -123,7 +124,7 @@ export async function UniversalSearchResults({
           <h2 className="text-2xl font-semibold">Search Results</h2>
           <p className="text-sm text-muted-foreground mt-1">
             {searchResponse.totalCount} result
-            {searchResponse.totalCount !== 1 ? "s" : ""} found for "{query}"
+            {searchResponse.totalCount !== 1 ? "s" : ""} found for "${query}"
             {page > 1 &&
               ` • Page ${String(page)} of ${String(Math.ceil(searchResponse.totalCount / limit))}`}
           </p>
@@ -191,26 +192,26 @@ export async function UniversalSearchResults({
                           href={result.url}
                           className="font-semibold text-foreground hover:text-primary line-clamp-2 group"
                         >
-                          {result.title}
+                          {String(result.title)}
                           <ArrowRightIcon className="inline h-4 w-4 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </Link>
                         <Badge
                           variant="secondary"
                           className={`shrink-0 ${colorClass}`}
                         >
-                          {label}
+                          {String(label)}
                         </Badge>
                       </div>
 
                       {result.subtitle && (
                         <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
-                          {result.subtitle}
+                          {String(result.subtitle)}
                         </p>
                       )}
 
                       {result.description && (
                         <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                          {result.description}
+                          {String(result.description)}
                         </p>
                       )}
                     </div>
@@ -225,22 +226,22 @@ export async function UniversalSearchResults({
                     {/* Entity-specific metadata badges */}
                     {result.entity === "issues" && (
                       <>
-                        {result.metadata["status"] && (
+                        {typeof result.metadata["status"] === "string" && (
                           <Badge variant="outline" className="text-xs">
                             Status: {result.metadata["status"]}
                           </Badge>
                         )}
-                        {result.metadata["priority"] && (
+                        {typeof result.metadata["priority"] === "string" && (
                           <Badge variant="outline" className="text-xs">
                             Priority: {result.metadata["priority"]}
                           </Badge>
                         )}
-                        {result.metadata["machine"] && (
+                        {typeof result.metadata["machine"] === "string" && (
                           <Badge variant="outline" className="text-xs">
                             Machine: {result.metadata["machine"]}
                           </Badge>
                         )}
-                        {result.metadata["assignee"] && (
+                        {typeof result.metadata["assignee"] === "string" && (
                           <Badge variant="outline" className="text-xs">
                             Assigned: {result.metadata["assignee"]}
                           </Badge>
@@ -248,65 +249,65 @@ export async function UniversalSearchResults({
                       </>
                     )}
 
-                    {result.entity === "machines" && (
+                    {result.entity === "machines" ? (
                       <>
-                        {result.metadata["manufacturer"] && (
+                        {typeof result.metadata["manufacturer"] === "string" && (
                           <Badge variant="outline" className="text-xs">
                             {result.metadata["manufacturer"]}
                           </Badge>
                         )}
-                        {result.metadata["location"] && (
+                        {typeof result.metadata["location"] === "string" && (
                           <Badge variant="outline" className="text-xs">
                             📍 {result.metadata["location"]}
                           </Badge>
                         )}
                         {typeof result.metadata["issueCount"] === "number" &&
-                          result.metadata["issueCount"] > 0 && (
-                            <Badge
-                              variant="outline"
-                              className="text-xs text-error"
-                            >
-                              {result.metadata["issueCount"]} open issue
-                              {result.metadata["issueCount"] !== 1 ? "s" : ""}
-                            </Badge>
-                          )}
+                        result.metadata["issueCount"] > 0 ? (
+                          <Badge
+                            variant="outline"
+                            className="text-xs text-error"
+                          >
+                            {String(result.metadata["issueCount"])} open issue
+                            {result.metadata["issueCount"] !== 1 ? "s" : ""}
+                          </Badge>
+                        ) : null}
                       </>
-                    )}
+                    ) : null}
 
-                    {result.entity === "users" && result.metadata["email"] && (
+                    {result.entity === "users" && typeof result.metadata["email"] === "string" && (
                       <Badge variant="outline" className="text-xs">
                         {result.metadata["email"]}
                       </Badge>
                     )}
 
-                    {result.entity === "locations" && (
+                    {result.entity === "locations" ? (
                       <>
                         {typeof result.metadata["machineCount"] ===
-                          "number" && (
+                          "number" ? (
                           <Badge variant="outline" className="text-xs">
-                            {result.metadata["machineCount"]} machine
+                            {String(result.metadata["machineCount"])} machine
                             {result.metadata["machineCount"] !== 1 ? "s" : ""}
                           </Badge>
-                        )}
-                        {result.metadata["city"] &&
-                          result.metadata["state"] && (
+                        ) : null}
+                        {typeof result.metadata["city"] === "string" &&
+                          typeof result.metadata["state"] === "string" && (
                             <Badge variant="outline" className="text-xs">
                               📍 {result.metadata["city"]},{" "}
                               {result.metadata["state"]}
                             </Badge>
                           )}
                       </>
-                    )}
+                    ) : null}
 
                     {/* Date information */}
-                    {result.metadata["createdAt"] && (
+                    {typeof result.metadata["createdAt"] === "string" && (
                       <Badge
                         variant="outline"
                         className="text-xs flex items-center gap-1"
                       >
                         <CalendarIcon className="h-3 w-3" />
                         {formatDistanceToNow(
-                          new Date(String(result.metadata["createdAt"])),
+                          new Date(result.metadata["createdAt"]),
                           { addSuffix: true },
                         )}
                       </Badge>
@@ -323,9 +324,9 @@ export async function UniversalSearchResults({
       {searchResponse.hasMore && (
         <div className="text-center py-4">
           <p className="text-sm text-muted-foreground mb-4">
-            Showing {(page - 1) * limit + 1} -{" "}
-            {Math.min(page * limit, searchResponse.totalCount)} of{" "}
-            {searchResponse.totalCount} results
+            Showing {String((page - 1) * limit + 1)} -{" "}
+            {String(Math.min(page * limit, searchResponse.totalCount))} of{" "}
+            {String(searchResponse.totalCount)} results
           </p>
 
           <div className="flex gap-2 justify-center">

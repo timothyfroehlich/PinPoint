@@ -8,7 +8,7 @@ import "server-only";
 
 import { cache } from "react";
 import { eq } from "drizzle-orm";
-import { machines, models, locations } from "~/server/db/schema";
+import { machines } from "~/server/db/schema";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 
 /**

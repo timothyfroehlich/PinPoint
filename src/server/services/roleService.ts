@@ -19,6 +19,7 @@ import {
   rolePermissions,
   memberships,
 } from "~/server/db/schema";
+import { getErrorMessage } from "~/lib/utils/type-guards";
 
 // Define Role type from Drizzle schema
 type Role = typeof roles.$inferSelect;
@@ -552,8 +553,7 @@ export class RoleService {
         } catch (error) {
           // Ignore unique constraint violations - permission already exists
           // This can happen with concurrent test execution
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
+          const errorMessage = getErrorMessage(error);
           if (
             !errorMessage.includes("unique") &&
             !errorMessage.includes("duplicate")

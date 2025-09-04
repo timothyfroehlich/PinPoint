@@ -12,9 +12,8 @@ import type { z } from "zod";
 import { createClient } from "~/lib/supabase/server";
 import { requireMemberAccess } from "~/lib/organization-context";
 import { requirePermission as baseRequirePermission } from "~/server/auth/permissions";
-import { requireAuthContextWithRole, db } from "~/lib/dal/shared";
+import { db } from "~/lib/dal/shared";
 import { getErrorMessage } from "~/lib/utils/type-guards";
-export { requireAuthContextWithRole };
 
 /**
  * Server Action result types (React 19 useActionState compatible)
@@ -57,19 +56,15 @@ export const getServerAuthContext = getActionAuthContext;
 export async function requireActionAuthContextWithPermission(
   permission: string,
 ): Promise<{
-  user: { id: string };
+  user: { id: string; email: string; name?: string; };
   organizationId: string;
-  membership: { role_id?: string | null };
+  membership: { id: string; role: any; };
 }> {
-  const { user, organizationId, membership } =
-    await requireAuthContextWithRole();
-  await baseRequirePermission({ roleId: membership.role_id }, permission, db);
+  const { user, organization, membership } = await requireMemberAccess();
+  const organizationId = organization.id;
+  await baseRequirePermission({ roleId: membership.role.id }, permission, db);
   return { user, organizationId, membership };
 }
-
-export type ActionAuthContextWithRole = Awaited<
-  ReturnType<typeof requireAuthContextWithRole>
->;
 
 /**
  * Safe FormData extraction with validation

@@ -20,21 +20,7 @@ interface IssueStats {
   urgentCount: number;
 }
 
-// AuthContextWithRole should match the actual return type of getServerAuthContextWithRole
-type AuthContextWithRole = Awaited<ReturnType<typeof import("./shared").getServerAuthContextWithRole>>;
 
-// =================================
-// SHARED UTILITIES AND AUTH CONTEXT
-// =================================
-export {
-  getServerAuthContext,
-  requireAuthContext,
-  getServerAuthContextWithRole,
-  requireAuthContextWithRole,
-  getPaginationParams,
-  db,
-  type PaginationOptions,
-} from "./shared";
 
 // =================================
 // ORGANIZATIONS - Stats & Management
@@ -125,31 +111,7 @@ export async function getDashboardData(): Promise<{
   };
 }
 
-/**
- * Common user context data for layouts
- * Gets authentication context with role and organization info
- * Optimized for layout components needing user state
- */
-export async function getUserContextData(): Promise<
-  AuthContextWithRole & {
-    profile: UserProfileResponse | null;
-  }
-> {
-  const { getServerAuthContextWithRole } = await import("./shared");
-  const { getCurrentUserProfile } = await import("./users");
 
-  const [authContext, userProfile] = await Promise.all([
-    getServerAuthContextWithRole(),
-    getCurrentUserProfile().catch(() => null), // Handle unauthenticated case
-  ]);
-
-  return {
-    ...authContext,
-    profile: userProfile
-      ? (transformKeysToCamelCase(userProfile) as UserProfileResponse)
-      : null,
-  };
-}
 
 /**
  * Common organization overview data

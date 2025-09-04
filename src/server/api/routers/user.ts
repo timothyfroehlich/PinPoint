@@ -14,6 +14,8 @@ import type {
 import { imageStorage } from "~/lib/image-storage/local-storage";
 import { transformKeysToCamelCase } from "~/lib/utils/case-transformers";
 import { getDefaultAvatarUrl } from "~/lib/utils/image-processing";
+import { getErrorMessage } from "~/lib/utils/type-guards";
+import { safeCount, type CountResult } from "~/lib/types/database-results";
 
 // Server modules (alphabetical)
 import { getUserPermissionsForSupabaseUser } from "~/server/auth/permissions";
@@ -65,8 +67,11 @@ export const userRouter = createTRPCRouter({
       }
 
       // Get counts separately using individual queries
-      const [ownedMachinesCount, issuesCreatedCount, commentsCount] =
-        await Promise.all([
+      const [ownedMachinesCount, issuesCreatedCount, commentsCount]: [
+        CountResult[],
+        CountResult[],
+        CountResult[]
+      ] = await Promise.all([
           ctx.db
             .select({ count: count() })
             .from(machines)
@@ -94,9 +99,9 @@ export const userRouter = createTRPCRouter({
           user.memberships,
         ) as UserProfileResponse["memberships"],
         _count: {
-          ownedMachines: ownedMachinesCount[0]?.count ?? 0,
-          issuesCreated: issuesCreatedCount[0]?.count ?? 0,
-          comments: commentsCount[0]?.count ?? 0,
+          ownedMachines: safeCount(ownedMachinesCount),
+          issuesCreated: safeCount(issuesCreatedCount),
+          comments: safeCount(commentsCount),
         },
       };
     },
@@ -218,8 +223,7 @@ export const userRouter = createTRPCRouter({
                   operation: "delete_old_image",
                 },
                 error: {
-                  message:
-                    error instanceof Error ? error.message : String(error),
+                  message: getErrorMessage(error),
                 },
               });
             }
@@ -253,7 +257,7 @@ export const userRouter = createTRPCRouter({
               operation: "upload_profile_picture",
             },
             error: {
-              message: error instanceof Error ? error.message : String(error),
+              message: getErrorMessage(error),
             },
           });
           throw new TRPCError({
@@ -292,8 +296,11 @@ export const userRouter = createTRPCRouter({
       }
 
       // Get counts separately using individual queries
-      const [ownedMachinesCount, issuesCreatedCount, commentsCount] =
-        await Promise.all([
+      const [ownedMachinesCount, issuesCreatedCount, commentsCount]: [
+        CountResult[],
+        CountResult[],
+        CountResult[]
+      ] = await Promise.all([
           ctx.db
             .select({ count: count() })
             .from(machines)
@@ -311,9 +318,9 @@ export const userRouter = createTRPCRouter({
       return {
         ...membership.user,
         _count: {
-          ownedMachines: ownedMachinesCount[0]?.count ?? 0,
-          issuesCreated: issuesCreatedCount[0]?.count ?? 0,
-          comments: commentsCount[0]?.count ?? 0,
+          ownedMachines: safeCount(ownedMachinesCount),
+          issuesCreated: safeCount(issuesCreatedCount),
+          comments: safeCount(commentsCount),
         },
       };
     }),
