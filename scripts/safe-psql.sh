@@ -5,6 +5,12 @@
 
 set -euo pipefail
 
+# Disable interactive pager unless explicitly allowed
+if [[ -z "${PP_ALLOW_PAGER:-}" ]]; then
+    export PAGER=cat
+    export LESS=FRX
+fi
+
 # Safety configuration
 ALLOWED_HOSTS=("localhost" "127.0.0.1" "::1")
 ALLOWED_DATABASES=("postgres" "pinpoint_test" "pinpoint_dev" "test")
@@ -153,6 +159,11 @@ if [[ -n "$FILE" ]]; then
 elif [[ -z "$COMMAND" ]]; then
     # Interactive mode - no additional flags needed
     :
+fi
+
+# Always disable pager inside psql unless PP_ALLOW_PAGER is set
+if [[ -z "${PP_ALLOW_PAGER:-}" ]]; then
+    PSQL_CMD+=" --pset pager=off"
 fi
 
 # Add any additional arguments

@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import { type ComponentType } from "react";
+import { isDevelopment } from "~/lib/environment-client";
 
 interface LazyClientIslandProps<T = Record<string, unknown>> {
   /** Component to lazy load */
@@ -101,7 +102,7 @@ export function LazyClientIsland<T = Record<string, unknown>>({
       setComponent(() => ImportedComponent);
 
       // Performance monitoring
-      if (process.env.NODE_ENV === "development") {
+      if (isDevelopment()) {
         console.log(`✅ Lazy loaded client island: ${name}`);
       }
     } catch (err) {
@@ -147,7 +148,7 @@ export function LazyClientIsland<T = Record<string, unknown>>({
   return (
     <div ref={containerRef} data-lazy-loaded={name}>
       <Suspense fallback={fallback}>
-        <Component {...(componentProps as any)} />
+        <Component {...componentProps} />
       </Suspense>
     </div>
   );

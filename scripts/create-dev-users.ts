@@ -11,6 +11,7 @@ config({ path: ".env.local" });
 
 // eslint-disable-next-line no-restricted-imports -- Admin script needs direct Supabase client
 import { createClient } from "@supabase/supabase-js";
+import { isError } from "../src/lib/utils/type-guards";
 
 interface DevUser {
   id: string;
@@ -88,10 +89,10 @@ async function createDevUsers() {
 
       if (error) {
         // Check if user already exists
-        if (error.message.includes("User already registered")) {
+        if (isError(error) && error.message.includes("User already registered")) {
           console.log(`  ✓ User ${user.email} already exists`);
         } else {
-          console.error(`  ❌ Failed to create ${user.email}:`, error.message);
+          console.error(`  ❌ Failed to create ${user.email}:`, isError(error) ? error.message : String(error));
         }
       } else {
         console.log(`  ✅ Successfully created ${user.email}`);

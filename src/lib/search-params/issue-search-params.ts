@@ -41,10 +41,10 @@ const IssueSearchParamsSchema = z.object({
   location: uuidSchema.optional(),
 
   // Date range filtering
-  created_after: z.string().datetime().optional(),
-  created_before: z.string().datetime().optional(),
-  updated_after: z.string().datetime().optional(),
-  updated_before: z.string().datetime().optional(),
+  created_after: z.iso.datetime().optional(),
+  created_before: z.iso.datetime().optional(),
+  updated_after: z.iso.datetime().optional(),
+  updated_before: z.iso.datetime().optional(),
 
   // Sorting
   sort: z
@@ -133,7 +133,7 @@ export function buildIssueUrl(
       const defaults = IssueSearchParamsSchema.parse({});
 
       // Don't include default values in URL for cleaner URLs
-      const defaultValue = (defaults as any)[key];
+      const defaultValue = (defaults as IssueSearchParams)[key as keyof IssueSearchParams];
       if (defaultValue !== undefined && stringValue === String(defaultValue)) {
         url.searchParams.delete(key);
       } else {
@@ -202,8 +202,7 @@ export function getIssueCanonicalUrl(
   const canonicalParams = { ...params };
 
   // Remove pagination from canonical URLs
-  const cleanedParams = { ...canonicalParams };
-  delete (cleanedParams as any).page;
+  const { page, ...cleanedParams } = canonicalParams;
 
   // Use cleaned URL for consistent canonical URLs
   return cleanIssueUrl(buildIssueUrl(basePath, cleanedParams));

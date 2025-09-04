@@ -136,7 +136,7 @@ function IssueCard({ issue }: { issue: Issue }): JSX.Element {
               <span>
                 {issue.machine?.name ?? "Unknown Machine"}
                 {issue.machine?.model?.name &&
-                  ` (${String(issue.machine.model.name)})`}
+                  ` (${issue.machine.model.name})`}
               </span>
             </div>
 

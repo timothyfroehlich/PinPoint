@@ -128,18 +128,24 @@ export function transformMembershipResponse(
     };
 
     // Handle role permissions array if present
-    const role = transformed.role as any; // Temporary any for permission processing
+    interface RoleWithPermissions {
+      id: string;
+      name: string;
+      permissions?: unknown[];
+      rolePermissions?: Array<{ permission?: unknown }>;
+    }
+    const role = transformed.role as RoleWithPermissions;
     if (Array.isArray(role.rolePermissions)) {
       role.permissions = role.rolePermissions.map(
-        (rp: Record<string, unknown>) => {
-          return rp["permission"] ?? rp;
+        (rp: { permission?: unknown }) => {
+          return rp.permission ?? rp;
         },
       );
       delete role.rolePermissions;
     }
 
     if (Array.isArray(role.permissions)) {
-      role.permissions = role.permissions.map((p: Record<string, unknown>) => {
+      role.permissions = role.permissions.map((p: unknown) => {
         if (typeof p === "object") {
           return transformKeysToCamelCase(p) as Record<string, unknown>;
         }

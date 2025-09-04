@@ -14,12 +14,7 @@ import {
   uuidSchema,
 } from "~/lib/validation/schemas";
 import { and, eq, inArray } from "drizzle-orm";
-import {
-  issues,
-  issueStatuses,
-  priorities,
-  comments,
-} from "~/server/db/schema";
+import { issues, issueStatuses, priorities, machines, organizations, comments } from "~/server/db/schema";
 import { db } from "~/lib/dal/shared";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { transformKeysToSnakeCase } from "~/lib/utils/case-transformers";
@@ -38,6 +33,7 @@ import {
   generateStatusChangeNotifications,
   generateAssignmentNotifications,
 } from "~/lib/services/notification-generator";
+import { getInMemoryRateLimiter } from "~/lib/rate-limit/inMemory";
 
 // Enhanced validation schemas with better error messages
 // Accept either a UUID or a deterministic seeded machine id (e.g. "machine-mm-001")
@@ -55,7 +51,10 @@ const createIssueSchema = z.object({
   title: titleSchema,
   description: z.string().optional(),
   machineId: machineIdentifierSchema,
+  // Priority = internal scheduling weight (hidden for anonymous)
   priority: z.enum(["low", "medium", "high"]).optional().default("medium"),
+  // Severity = inherent impact (can be set by anonymous reporters)
+  severity: z.enum(["low", "medium", "high", "critical"]).optional().default("medium"),
   assigneeId: z.union([uuidSchema, z.literal("unassigned")]).optional(),
 });
 
@@ -117,9 +116,25 @@ export async function createIssueAction(
       return validation as ActionResult<{ id: string }>;
     }
     // Extract validated fields (do not return validation directly since type expects id)
-    const validated = validation.data as z.infer<typeof createIssueSchema>;
+    const validated = validation.data;
 
-    await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
+    // Determine creation permission tier
+    let hasFull = false;
+    try {
+      await requirePermission(membership, PERMISSIONS.ISSUE_CREATE_FULL, db);
+      hasFull = true;
+    } catch {
+      // Try basic (or legacy) permission
+      try {
+        await requirePermission(
+          membership,
+          PERMISSIONS.ISSUE_CREATE_BASIC,
+          db,
+        );
+      } catch {
+        return actionError("Not authorized to create issues");
+      }
+    }
 
     // Parallel queries for better performance
     const [defaultStatus, defaultPriority] = await Promise.all([
@@ -151,10 +166,11 @@ export async function createIssueAction(
     }
 
     // Handle special "unassigned" case
-    const assigneeId =
-      validated.assigneeId === "unassigned"
+    const assigneeId = hasFull
+      ? validated.assigneeId === "unassigned"
         ? null
-        : (validated.assigneeId ?? null);
+        : (validated.assigneeId ?? null)
+      : null; // Basic cannot assign
 
     // Create issue with validated data
     const issueData = {
@@ -164,9 +180,10 @@ export async function createIssueAction(
       machineId: validated.machineId,
       organizationId,
       statusId: resolvedStatus.id,
-      priorityId: resolvedPriority.id,
+  priorityId: resolvedPriority.id, // Basic cannot override (UI hides)
       assigneeId,
       createdById: user.id,
+      severity: validated.severity,
     };
 
     // Create issue in database
@@ -193,7 +210,7 @@ export async function createIssueAction(
         await generateIssueCreationNotifications(issueData.id, {
           organizationId,
           actorId: user.id,
-          actorName: user.user_metadata["name"] || user.email,
+          actorName: String(user.user_metadata["name"] ?? user.email ?? ""),
         });
       } catch (error) {
         console.error(
@@ -212,6 +229,113 @@ export async function createIssueAction(
       error instanceof Error
         ? error.message
         : "Failed to create issue. Please try again.",
+    );
+  }
+}
+
+/**
+ * Public (anonymous or guest) issue creation.
+ * - No authentication required.
+ * - Restricts ability to set priority / assignee.
+ * - Allows specifying severity + title/description + machine.
+ * - Records reporter metadata (optional name/email).
+ */
+export async function createPublicIssueAction(
+  _prevState: ActionResult<{ id: string }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ id: string }>> {
+  // Basic rate limiting (IP + machine) – naive in-memory (single instance)
+  try {
+    const { headers } = await import("next/headers");
+  const h = await headers();
+    const raw =
+      h.get("x-forwarded-for") ??
+      h.get("cf-connecting-ip") ??
+      h.get("x-real-ip") ??
+      "";
+    const issueRateLimitIp = "ISSUE_RATE_LIMIT_IP" in globalThis ? (globalThis as { ISSUE_RATE_LIMIT_IP: string }).ISSUE_RATE_LIMIT_IP : undefined;
+    const ip: string = issueRateLimitIp ?? raw.split(",")[0]?.trim() ?? "unknown";
+    const machineIdValue = formData.get("machineId");
+    const machineId = machineIdValue && typeof machineIdValue === "string" ? machineIdValue : "none";
+    const key = `public_issue:${ip}:${machineId}`;
+    const limiter = getInMemoryRateLimiter();
+    if (!limiter.check(key, { windowMs: 60_000, max: 5 })) {
+      return actionError("Too many submissions. Please wait a minute and try again.");
+    }
+  } catch {
+    // ignore rate limit errors
+  }
+  // Validate (priority/assignee will be ignored even if passed)
+  const validation = validateFormData(formData, createIssueSchema);
+  if (!validation.success) {
+    if (validation.fieldErrors) {
+      delete validation.fieldErrors.priority;
+      delete validation.fieldErrors.assigneeId;
+    }
+    return validation as ActionResult<{ id: string }>;
+  }
+  const { machineId, title, description, severity } = validation.data;
+
+  try {
+    // Fetch machine
+  const machineRecord = await db.query.machines.findFirst({
+      where: eq(machines.id, machineId),
+      columns: { id: true, organization_id: true, is_public: true },
+    });
+    if (!machineRecord) return actionError("Machine not found");
+
+    // Fetch organization settings
+  const orgRecord = await db.query.organizations.findFirst({
+      where: eq(organizations.id, machineRecord.organization_id),
+      columns: { allow_anonymous_issues: true, is_public: true },
+    });
+    if (!orgRecord) return actionError("Organization not found");
+    if (!orgRecord.is_public || machineRecord.is_public !== true)
+      return actionError("Machine not available for public reporting");
+    if (!orgRecord.allow_anonymous_issues)
+      return actionError("Anonymous reporting disabled");
+    // At public path we implicitly allow BASIC creation only (no priority / assignee fields honored)
+
+    const organizationId = machineRecord.organization_id;
+    const [defaultStatus, defaultPriority] = await Promise.all([
+      getDefaultStatus(organizationId),
+      getDefaultPriority(organizationId),
+    ]);
+    if (!defaultStatus || !defaultPriority)
+      return actionError("Organization not fully configured for issues");
+
+    const reporterEmailValue = formData.get("reporterEmail");
+    const reporterNameValue = formData.get("reporterName");
+    const reporterEmail = reporterEmailValue && typeof reporterEmailValue === "string" ? reporterEmailValue : null;
+    const reporterName = reporterNameValue && typeof reporterNameValue === "string" ? reporterNameValue : null;
+
+    const issueData = {
+      id: generatePrefixedId("issue"),
+      title,
+      description: description ?? "",
+      machineId,
+      organizationId,
+      statusId: defaultStatus.id,
+      priorityId: defaultPriority.id,
+      assigneeId: null,
+      createdById: null,
+      reporterType: "anonymous" as const,
+      reporterEmail,
+      submitterName: reporterName,
+      severity,
+    };
+
+    await db.insert(issues).values(
+      transformKeysToSnakeCase(issueData) as typeof issues.$inferInsert,
+    );
+
+    revalidatePath(`/machines/${machineId}`);
+    revalidateTag("issues");
+    return actionSuccess({ id: issueData.id }, "Issue reported successfully");
+  } catch (error) {
+    console.error("createPublicIssueAction error:", error);
+    return actionError(
+      error instanceof Error ? error.message : "Failed to submit issue",
     );
   }
 }
@@ -274,7 +398,7 @@ export async function updateIssueStatusAction(
           await generateStatusChangeNotifications(issueId, statusResult.name, {
             organizationId,
             actorId: user.id,
-            actorName: user.user_metadata["name"] || user.email,
+            actorName: String(user.user_metadata["name"] ?? user.email ?? ""),
           });
         }
       } catch (error) {
@@ -312,7 +436,7 @@ export async function addCommentAction(
       return validation as ActionResult<{ commentId: string }>;
     }
 
-    await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
+    await requirePermission(membership, PERMISSIONS.ISSUE_CREATE_BASIC, db);
 
     // Verify issue exists and user has access
     const issue = await db.query.issues.findFirst({
@@ -381,7 +505,7 @@ export async function updateIssueAssignmentAction(
       return validation as ActionResult<{ assigneeId: string | null }>;
     }
 
-    await requirePermission(membership, PERMISSIONS.ISSUE_ASSIGN, db);
+    await requirePermission(membership, PERMISSIONS.ISSUE_EDIT, db); // was ISSUE_ASSIGN (deprecated)
 
     // Get current assignee for notification comparison
     const currentIssue = await db.query.issues.findFirst({
@@ -434,7 +558,7 @@ export async function updateIssueAssignmentAction(
           {
             organizationId,
             actorId: user.id,
-            actorName: user.user_metadata["name"] || user.email,
+            actorName: String(user.user_metadata["name"] ?? user.email ?? ""),
           },
         );
       } catch (error) {
@@ -469,18 +593,18 @@ export async function bulkUpdateIssuesAction(
       await requireAuthContextWithRole();
 
     // Parse JSON data from form
-    const jsonData = formData.get("data") as string;
-    if (!jsonData) {
+    const jsonData = formData.get("data");
+    if (!jsonData || typeof jsonData !== "string") {
       return actionError("No data provided for bulk update");
     }
 
-    const data = JSON.parse(jsonData);
+    const data: unknown = JSON.parse(jsonData);
     const validation = bulkUpdateIssuesSchema.safeParse(data);
     if (!validation.success) {
       return actionError("Invalid bulk update data");
     }
 
-    await requirePermission(membership, PERMISSIONS.ISSUE_BULK_MANAGE, db);
+    await requirePermission(membership, PERMISSIONS.ISSUE_EDIT, db); // was ISSUE_BULK_MANAGE (deprecated)
     const { issueIds, statusId, assigneeId } = validation.data;
 
     // Build update object

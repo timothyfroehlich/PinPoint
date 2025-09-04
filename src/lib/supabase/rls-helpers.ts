@@ -13,6 +13,7 @@
 
 import { createAdminClient, createClient } from "./server";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isError } from "~/lib/utils/type-guards";
 
 /**
  * Error thrown when user lacks organization context
@@ -58,7 +59,7 @@ export async function updateUserOrganization(
   });
 
   if (error) {
-    throw new Error(`Failed to update user organization: ${error.message}`);
+    throw new Error(`Failed to update user organization: ${isError(error) ? error.message : String(error)}`);
   }
 }
 
@@ -167,7 +168,7 @@ export async function removeUserOrganization(userId: string): Promise<void> {
   });
 
   if (error) {
-    throw new Error(`Failed to remove user organization: ${error.message}`);
+    throw new Error(`Failed to remove user organization: ${isError(error) ? error.message : String(error)}`);
   }
 }
 

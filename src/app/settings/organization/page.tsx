@@ -20,6 +20,7 @@ import {
   getOrganizationStats,
 } from "~/lib/dal/organizations";
 import { OrganizationProfileForm } from "./components/OrganizationProfileForm";
+import { AnonymousIssueToggle } from "./components/AnonymousIssueToggle";
 import { OrganizationLogoForm } from "./components/OrganizationLogoForm";
 import { format } from "date-fns";
 
@@ -101,6 +102,9 @@ export default async function OrganizationSettingsPage(): Promise<React.JSX.Elem
                 address: organization.address ?? "",
               }}
             />
+            <div className="mt-6">
+              <AnonymousIssueToggle initialEnabled={organization.allow_anonymous_issues ?? false} />
+            </div>
           </CardContent>
         </Card>
 

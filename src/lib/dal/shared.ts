@@ -15,8 +15,8 @@ import { memberships } from "~/server/db/schema";
 export const db = getGlobalDatabaseProvider().getClient();
 
 /**
- * Get current authenticated user with organization context
- * Uses the new organization context system for request-time organization resolution
+ * Get current authenticated user (no organization context)
+ * Pure auth context without organizational dependencies
  * Uses React 19 cache() for request-level memoization to eliminate duplicate auth queries
  */
 export const getServerAuthContext = cache(async () => {
@@ -27,64 +27,31 @@ export const getServerAuthContext = cache(async () => {
   } = await supabase.auth.getUser();
 
   if (error || !user) {
-    return { user: null, organizationId: null, membership: null, role: null };
+    return { user: null };
   }
 
-  // Import here to avoid circular dependency
-  const { getOrganizationContext } = await import("~/lib/organization-context");
-
-  try {
-    // Get organization context from the new system
-    const orgContext = await getOrganizationContext();
-
-    if (
-      orgContext?.user?.id === user.id &&
-      orgContext.accessLevel === "member" &&
-      orgContext.membership
-    ) {
-      return {
-        user,
-        organizationId: orgContext.organization.id,
-        membership: orgContext.membership,
-        role: orgContext.membership.role,
-      };
-    }
-  } catch (error) {
-    console.warn("Failed to get organization context:", error);
-  }
-
-  // Return user without organization context if not a member or context unavailable
-  return {
-    user,
-    organizationId: null,
-    membership: null,
-    role: null,
-  };
+  return { user };
 });
 
 /**
- * Require authenticated user and organization for Server Components
- * TEMPORARY: Keeping this working during architecture transition
+ * Require authenticated user for Server Components
+ * DEPRECATED: Use organization-context functions directly instead
  * Uses React 19 cache() for request-level memoization
  *
- * @deprecated This function will be replaced with request-time organization context
+ * @deprecated This function creates circular dependencies. Use getServerAuthContext() + organization-context functions instead
  */
 export const requireAuthContext = cache(async () => {
-  // Fetch full Supabase AuthUser first for compatibility
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user } = await getServerAuthContext();
 
   if (!user) {
     throw new Error("Authentication required");
   }
 
-  // Use secure organization resolution and membership validation
-  const { requireMemberAccess } = await import("~/lib/organization-context");
-  const { organization } = await requireMemberAccess();
-
-  return { user, organizationId: organization.id };
+  // Note: Callers should use organization-context functions for org resolution
+  // This avoids circular dependency between DAL and organization-context
+  throw new Error(
+    "requireAuthContext is deprecated. Use getServerAuthContext() + organization-context functions to avoid circular dependencies."
+  );
 });
 
 /**
@@ -121,76 +88,16 @@ export const requireAuthContextWithOrg = cache(
 );
 
 /**
- * Get authenticated user context with role and permissions
- * Uses the new organization context system with enhanced role information
+ * Get user role and permissions for specific organization
+ * DEPRECATED: Creates circular dependency patterns
  * Uses React 19 cache() for request-level memoization
+ * 
+ * @deprecated Use organization-context functions + getUserRoleInOrganization(userId, orgId) instead
  */
 export const getServerAuthContextWithRole = cache(async () => {
-  const baseContext = await getServerAuthContext();
-
-  if (baseContext.user == null || baseContext.organizationId == null) {
-    return {
-      user: null,
-      organizationId: null,
-      membership: null,
-      role: null,
-      permissions: [],
-    };
-  }
-
-  // Get enhanced role information with permissions from database
-  const enhancedMembership = await db.query.memberships.findFirst({
-    where: and(
-      eq(memberships.user_id, baseContext.user.id),
-      eq(memberships.organization_id, baseContext.organizationId),
-    ),
-    with: {
-      role: {
-        columns: {
-          id: true,
-          name: true,
-          is_system: true,
-          is_default: true,
-        },
-        with: {
-          rolePermissions: {
-            with: {
-              permission: {
-                columns: {
-                  id: true,
-                  name: true,
-                  description: true,
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-  });
-
-  if (!enhancedMembership) {
-    return {
-      user: baseContext.user,
-      organizationId: baseContext.organizationId,
-      membership: null,
-      role: null,
-      permissions: [],
-    };
-  }
-
-  // Extract permissions for easy access
-  const permissions = enhancedMembership.role.rolePermissions.map(
-    (rp) => rp.permission.name,
+  throw new Error(
+    "getServerAuthContextWithRole is deprecated. Use organization-context functions + explicit organizationId parameters to avoid circular dependencies."
   );
-
-  return {
-    user: baseContext.user,
-    organizationId: baseContext.organizationId,
-    membership: enhancedMembership,
-    role: enhancedMembership.role,
-    permissions,
-  };
 });
 
 /**
@@ -230,30 +137,16 @@ function hasCompleteAuthContext(
 
 /**
  * Require authenticated user context with role validation
- * Throws if not authenticated, no organization, or no role assigned
+ * DEPRECATED: Creates circular dependency patterns
  * Uses React 19 cache() for request-level memoization
+ * 
+ * @deprecated Use organization-context functions + explicit role validation instead
  */
 export const requireAuthContextWithRole = cache(
   async (): Promise<CompleteAuthContext> => {
-    const context = await getServerAuthContextWithRole();
-
-    if (!context.user) {
-      throw new Error("Authentication required");
-    }
-
-    if (!context.organizationId) {
-      throw new Error("Organization selection required");
-    }
-
-    if (context.role === null) {
-      throw new Error("Role assignment required");
-    }
-
-    if (!hasCompleteAuthContext(context)) {
-      throw new Error("Incomplete authentication context");
-    }
-
-    return context;
+    throw new Error(
+      "requireAuthContextWithRole is deprecated. Use organization-context functions + explicit role validation to avoid circular dependencies."
+    );
   },
 );
 

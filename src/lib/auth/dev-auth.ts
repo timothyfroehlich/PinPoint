@@ -17,6 +17,7 @@
 
 import { shouldEnableDevFeatures } from "~/lib/environment-client";
 import type { DevUserData, DevAuthResult, TypedSupabaseClient } from "~/lib/types";
+import { isError, isErrorWithStatus } from "~/lib/utils/type-guards";
 
 /**
  * Fixed password for all dev users
@@ -64,22 +65,22 @@ async function signInDevUser(
     if (error) {
       // Log detailed error information for debugging
       console.error(`Dev sign-in failed for ${email.replace(/\n|\r/g, "")}:`, {
-        code: error.status,
-        message: error.message,
+        code: isErrorWithStatus(error) ? error.status : undefined,
+        message: isError(error) ? error.message : String(error),
         possibleCauses: [
-          error.message.includes("Invalid login credentials")
+          (isError(error) && error.message.includes("Invalid login credentials"))
             ? "User doesn't exist or wrong password"
             : null,
-          error.message.includes("Email not confirmed")
+          (isError(error) && error.message.includes("Email not confirmed"))
             ? "Email needs confirmation"
             : null,
-          error.message.includes("Too many requests") ? "Rate limited" : null,
+          (isError(error) && error.message.includes("Too many requests")) ? "Rate limited" : null,
         ].filter(Boolean),
       });
 
       return {
         success: false,
-        error: `Sign-in failed: ${error.message}`,
+        error: `Sign-in failed: ${isError(error) ? error.message : String(error)}`,
       };
     }
 
@@ -94,7 +95,7 @@ async function signInDevUser(
       requiresEmailConfirmation: false,
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage = isError(error) ? error.message : String(error);
     console.error(
       `Dev sign-in exception for ${email.replace(/\n|\r/g, "")}:`,
       errorMessage,
@@ -164,7 +165,7 @@ export async function authenticateDevUser(
         `Specific error: ${signInResult.error ?? ""}`,
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage = isError(error) ? error.message : String(error);
     console.error("Dev authentication error:", errorMessage);
     return {
       success: false,
