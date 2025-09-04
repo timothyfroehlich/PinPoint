@@ -10,17 +10,13 @@ import { cache } from "react";
 import { sql } from "drizzle-orm";
 import { db } from "~/lib/dal/shared";
 import { getOrganizationBySubdomain, getUserMembershipPublic } from "~/lib/dal/public-organizations";
-// Phase 1: Import adapters for legacy function compatibility
-import {
-  getOrganizationContextAdapter,
-  requireOrganizationContextAdapter,
-  requireMemberAccessAdapter,
-} from "~/server/auth/legacy-adapters";
+// Phase 1: Import canonical resolver directly (adapters removed)
+import { getRequestAuthContext, requireAuthorized } from "~/server/auth/context";
 import { withOrgRLS } from "~/server/db/utils/rls";
 import type { DrizzleClient } from "~/server/db/drizzle";
 import type { OrganizationContext } from "~/lib/types";
 // Re-export canonical resolver (Phase 1 consolidation)
-export { getRequestAuthContext } from "~/server/auth/context";
+export { getRequestAuthContext, requireAuthorized } from "~/server/auth/context";
 
 
 /**
@@ -43,21 +39,75 @@ export const getUserMembership = cache(
 
 /**
  * Get current organization context from request
- * Phase 1: Now using adapter with deprecation warning
+ * Phase 1: Thin wrapper around canonical resolver
  */
-export const getOrganizationContext = getOrganizationContextAdapter;
+export const getOrganizationContext = cache(async () => {
+  const ctx = await getRequestAuthContext();
+  
+  if (ctx.kind === 'authorized') {
+    return {
+      user: ctx.user,
+      organization: {
+        id: ctx.org.id,
+        name: ctx.org.name,
+        subdomain: ctx.org.subdomain,
+      },
+      membership: ctx.membership,
+      accessLevel: 'member' as const,
+    };
+  }
+
+  // Return null for legacy compatibility (doesn't throw)
+  return null;
+});
 
 /**
  * Require organization context (throws if not available)
- * Phase 1: Now using adapter with deprecation warning
+ * Phase 1: Thin wrapper around canonical resolver
  */
-export const requireOrganizationContext = requireOrganizationContextAdapter;
+export const requireOrganizationContext = cache(async () => {
+  const ctx = await requireAuthorized();
+
+  // Map to legacy OrganizationContext shape
+  return {
+    user: ctx.user,
+    organization: {
+      id: ctx.org.id,
+      name: ctx.org.name,
+      subdomain: ctx.org.subdomain,
+    },
+    membership: ctx.membership,
+    accessLevel: 'member' as const,
+  };
+});
 
 /**
  * Require member-level access (throws if user is not a member)
- * Phase 1: Now using adapter with deprecation warning
+ * Phase 1: Thin wrapper around canonical resolver
  */
-export const requireMemberAccess = requireMemberAccessAdapter;
+export const requireMemberAccess = cache(async () => {
+  const ctx = await requireAuthorized();
+
+  // Map to legacy shape
+  return {
+    user: {
+      id: ctx.user.id,
+      email: ctx.user.email,
+      name: ctx.user.name,
+    },
+    organization: {
+      id: ctx.org.id,
+      name: ctx.org.name,
+      subdomain: ctx.org.subdomain,
+    },
+    membership: {
+      id: ctx.membership.id,
+      role: ctx.membership.role,
+      userId: ctx.membership.userId,
+      organizationId: ctx.membership.organizationId,
+    },
+  };
+});
 
 /**
  * Set database session variable for RLS policies

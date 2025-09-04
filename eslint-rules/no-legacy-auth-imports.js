@@ -4,10 +4,20 @@
  */
 
 const LEGACY_FUNCTIONS = [
+  // Original functions
   'requireMemberAccess',
   'requireOrganizationContext', 
   'getOrganizationContext',
-  'ensureOrgContextAndBindRLS'
+  'ensureOrgContextAndBindRLS',
+  // Added from Lane A inventory - action context functions
+  'getActionAuthContext',
+  'getServerAuthContext', 
+  'requireActionAuthContextWithPermission',
+  'getDALAuthContext',
+  // Added from Lane A inventory - supabase and RLS functions
+  'getUserWithOrganization',
+  'requireSupabaseUserContext',
+  'getUploadAuthContext'
 ];
 
 const ALLOWED_FILES = [
@@ -25,7 +35,7 @@ export default {
     fixable: null,
     schema: [],
     messages: {
-      legacyAuthImport: 'Legacy authentication function "{{functionName}}" should not be imported. Use getRequestAuthContext() instead.',
+      legacyAuthImport: 'Legacy authentication function "{{functionName}}" should not be imported. Use getRequestAuthContext() from ~/server/auth/context instead.',
     },
   },
 

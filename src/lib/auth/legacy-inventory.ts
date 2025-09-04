@@ -152,7 +152,7 @@ export function getTotalUsageCount(): number {
 /**
  * Update usage count for a function
  */
-export function updateUsageCount(name: string, location: string, increment: number = 1): void {
+export function updateUsageCount(name: string, location: string, increment = 1): void {
   const fn = getLegacyFunction(name, location);
   if (fn) {
     fn.usageCount += increment;
@@ -203,10 +203,10 @@ export function generateInventoryReport(): string {
     '',
     'Functions by pattern:',
     ...Object.entries(
-      LEGACY_AUTH_INVENTORY.reduce((acc, fn) => {
+      LEGACY_AUTH_INVENTORY.reduce<Record<string, number>>((acc, fn) => {
         acc[fn.pattern] = (acc[fn.pattern] || 0) + 1;
         return acc;
-      }, {} as Record<string, number>)
+      }, {})
     ).map(([pattern, count]) => `  ${pattern}: ${count} functions`),
     '',
     'Function name collisions:',
