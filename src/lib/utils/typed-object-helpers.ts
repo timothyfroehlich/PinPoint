@@ -7,7 +7,7 @@ export function setTypedProperty<T, K extends keyof T>(
 }
 
 export function buildTypedPartial<T>(
-  entries: Array<[keyof T, T[keyof T]]>
+  entries: [keyof T, T[keyof T]][]
 ): Partial<T> {
   const result: Partial<T> = {};
   for (const [key, value] of entries) {

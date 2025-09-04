@@ -88,7 +88,7 @@ export const getRequestAuthContext = cache(async (): Promise<AuthContext> => {
     // 3. Org Context Layer: Resolve orgId (precedence order)
     // Priority: subdomain header > user.app_metadata.organizationId
     const headersList = await headers();
-    const subdomain = await extractTrustedSubdomain(headersList);
+    const subdomain = extractTrustedSubdomain(headersList);
     const metadataOrgId = user.app_metadata?.['organizationId'] as string;
     
     let orgId: string;
@@ -143,7 +143,7 @@ export const getRequestAuthContext = cache(async (): Promise<AuthContext> => {
  * Legacy enforcement helper (thin wrapper)
  * Throws error for backward compatibility
  */
-export async function requireAuthorized() {
+export async function requireAuthorized(): Promise<Extract<AuthContext, { kind: 'authorized' }>> {
   const ctx = await getRequestAuthContext();
   if (ctx.kind !== 'authorized') {
     throw new Error('Member access required');

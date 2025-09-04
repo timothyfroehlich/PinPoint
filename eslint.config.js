@@ -15,6 +15,9 @@ import {
 } from "./tooling.config.js";
 // Custom ESLint rules
 import noLegacyAuthImports from "./eslint-rules/no-legacy-auth-imports.js";
+import noDuplicateAuthResolution from "./eslint-rules/no-duplicate-auth-resolution.js";
+import noMissingCacheWrapper from "./eslint-rules/no-missing-cache-wrapper.js";
+import noDirectSupabaseClient from "./eslint-rules/no-direct-supabase-client.js";
 
 export default tseslint.config(
   // TypeScript ESLint base configurations
@@ -56,6 +59,21 @@ export default tseslint.config(
           "no-legacy-auth-imports": noLegacyAuthImports,
         },
       },
+      "duplicateAuth": {
+        rules: {
+          "no-duplicate-auth-resolution": noDuplicateAuthResolution,
+        },
+      },
+      "missingCache": {
+        rules: {
+          "no-missing-cache-wrapper": noMissingCacheWrapper,
+        },
+      },
+      "directSupabase": {
+        rules: {
+          "no-direct-supabase-client": noDirectSupabaseClient,
+        },
+      },
     },
     rules: {
       // Existing Next.js rules
@@ -84,7 +102,7 @@ export default tseslint.config(
       "vitest/no-disabled-tests": "off", // Enable only in test files
       "vitest/no-focused-tests": "off", // Enable only in test files
 
-      // Custom Drizzle safety (replaces problematic plugin)
+      // Custom Drizzle safety and Lane B cache enforcement
       "no-restricted-syntax": [
         "error",
         {
@@ -97,6 +115,15 @@ export default tseslint.config(
             "CallExpression[callee.property.name='update']:not([arguments.0])",
           message: "UPDATE operations must include WHERE clause",
         },
+        // Lane B: Mandatory cache() rules for async server functions
+        {
+          selector: "ExportNamedDeclaration[declaration.type='FunctionDeclaration'][declaration.async=true]:not([declaration.id.name=/cache$/])",
+          message: "Async server functions should be wrapped in cache() per CORE-PERF-001. Use: export const funcName = cache(async (...) => { ... });"
+        },
+        {
+          selector: "VariableDeclarator[id.name!=/cache$/] > ArrowFunctionExpression[async=true]",
+          message: "Async server functions should be wrapped in cache() per CORE-PERF-001"
+        }
       ],
 
       // Rule to enforce use of validated env object
@@ -127,12 +154,27 @@ export default tseslint.config(
       "no-restricted-imports": [
         "error",
         {
+          paths: [
+            {
+              name: "~/server/auth/legacy-adapters",
+              message: "Legacy auth adapters have been removed. Use getRequestAuthContext() from ~/server/auth/context instead."
+            },
+          ],
           patterns: [
             {
               group: ["../../*", "../../../*", "../../../../*"],
               message:
                 "Use the '~/' path alias instead of deep relative imports (../../). This improves maintainability and prevents broken imports when files are moved.",
             },
+            // Lane B: DAL cross-import prevention
+            {
+              group: ["../lib/dal/*", "../../lib/dal/*"],
+              message: "Use '~/lib/dal/*' alias instead of relative DAL imports"
+            },
+            {
+              group: ["**/organization-context", "../organization-context"],  
+              message: "Import getRequestAuthContext from '~/server/auth/context' instead"
+            }
           ],
         },
       ],
@@ -153,19 +195,26 @@ export default tseslint.config(
       // Type-aware rules from shared config
       ...ESLINT_RULES.production,
 
-      // Additional strict rules for better type safety
+      // Additional strict rules for better type safety (upgraded from warn to error)
       "@typescript-eslint/explicit-function-return-type": [
-        "warn",
+        "error",
         {
           allowExpressions: true,
           allowTypedFunctionExpressions: true,
           allowHigherOrderFunctions: true,
           allowDirectConstAssertionInArrowFunctions: true,
+          // Lane B enhancement: Require return types for all async functions
+          allowConciseArrowFunctionExpressionsStartingWithVoid: false,
         },
       ],
 
       // Custom rules for legacy auth prevention
       "legacyAuth/no-legacy-auth-imports": "error",
+      
+      // Lane B: Enhanced ESLint enforcement rules
+      "duplicateAuth/no-duplicate-auth-resolution": "error", // Critical safety
+      "missingCache/no-missing-cache-wrapper": "warn", // Start as warning, escalate later
+      "directSupabase/no-direct-supabase-client": "error", // SSR safety
 
       // Ban problematic TypeScript comment directives
       "@typescript-eslint/ban-ts-comment": [
