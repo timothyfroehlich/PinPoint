@@ -23,7 +23,7 @@ import {
   SettingsIcon,
   CheckIcon,
 } from "lucide-react";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 import { api } from "~/trpc/server";
 
 // Type definitions for role statistics
@@ -73,7 +73,10 @@ function getPermissionsArray(role: unknown): { id: string; name: string }[] {
 }
 
 export default async function RolesSettingsPage(): Promise<React.JSX.Element> {
-  await requireMemberAccess();
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
 
   // Fetch roles using the existing role router
   const roles = await api.role.getAll();

@@ -1,6 +1,7 @@
 /**
  * Server Action Test Helpers - RSC Integration
- * New Archetype: Server Action Tests with FormData and database mutations
+ * New Archetype: Server Action Tests with canonical resolver mocks
+ * Updated to use getRequestAuthContext discriminated union pattern
  */
 
 import { createMockAuthContext } from "./dal-test-helpers";
@@ -28,57 +29,54 @@ export function createTestFormData(
 
 /**
  * Mock Server Action auth context
- * Server Actions call getActionAuthContext()
+ * Server Actions use canonical getRequestAuthContext()
  */
 export function mockServerActionAuth(mockContext = createMockAuthContext()) {
-  // Mock the createClient function for Server Actions
-  vi.mock("~/lib/supabase/server", () => ({
-    createClient: vi.fn(() => ({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: mockContext.user },
-          error: null,
-        }),
+  // Mock the canonical auth resolver for Server Actions
+  vi.mock("~/server/auth/context", () => ({
+    getRequestAuthContext: vi.fn(async () => ({
+      kind: "authorized",
+      user: {
+        id: mockContext.user.id,
+        email: mockContext.user.email,
+        name: mockContext.user.user_metadata?.name,
       },
-    })),
-  }));
-
-  // Mock secure organization context to align with new implementation
-  vi.mock("~/lib/organization-context", () => ({
-    requireMemberAccess: vi.fn(async () => ({
-      organization: { id: mockContext.organizationId },
-      user: { id: mockContext.user.id },
-      accessLevel: "member",
+      org: {
+        id: mockContext.organizationId,
+        name: "Test Organization",
+        subdomain: "test-org",
+      },
       membership: {
         id: "membership-test",
-        user_id: mockContext.user.id,
-        organization_id: mockContext.organizationId,
-        role_id: mockContext.membership?.role_id ?? "role-test",
-      },
-    })),
-  }));
-
-  // Mock DAL requireAuthContextWithRole pathway used by actions helper
-  vi.mock("~/lib/dal/shared", () => ({
-    requireAuthContextWithRole: vi.fn(async () => ({
-      user: mockContext.user,
-      organizationId: mockContext.organizationId,
-      membership: {
-        id: "membership-test",
-        user_id: mockContext.user.id,
-        organization_id: mockContext.organizationId,
         role: {
-          id: mockContext.membership?.role_id ?? "role-test",
-          name: "Member",
+          id: mockContext.membership?.role_id ?? "role-admin",
+          name: "Admin",
         },
-        role_id: mockContext.membership?.role_id ?? "role-test",
-        rolePermissions: [],
+        userId: mockContext.user.id,
+        organizationId: mockContext.organizationId,
       },
-      role: {
-        id: mockContext.membership?.role_id ?? "role-test",
-        name: "Member",
+    })),
+    requireAuthorized: vi.fn(async () => ({
+      kind: "authorized",
+      user: {
+        id: mockContext.user.id,
+        email: mockContext.user.email,
+        name: mockContext.user.user_metadata?.name,
       },
-      permissions: mockContext.permissions ?? [],
+      org: {
+        id: mockContext.organizationId,
+        name: "Test Organization",
+        subdomain: "test-org",
+      },
+      membership: {
+        id: "membership-test",
+        role: {
+          id: mockContext.membership?.role_id ?? "role-admin",
+          name: "Admin",
+        },
+        userId: mockContext.user.id,
+        organizationId: mockContext.organizationId,
+      },
     })),
   }));
 

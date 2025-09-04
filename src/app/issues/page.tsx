@@ -6,7 +6,7 @@ import { PlusIcon } from "lucide-react";
 import { IssuesListServer } from "~/components/issues/issues-list-server";
 import { IssueActiveFilters } from "~/components/issues/issue-active-filters";
 import { AdvancedSearchForm, ISSUES_FILTER_FIELDS } from "~/components/search";
-import { getRequestAuthContext } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 import type { OrganizationContext } from "~/lib/types";
 import {
   getIssuesWithFilters,
@@ -161,7 +161,8 @@ async function IssuesWithData({
         issues={result.issues}
         pagination={result}
         filters={filters}
-        sorting={sorting}
+  sorting={sorting}
+  organizationId={orgContext.organization.id}
       />
     </>
   );
@@ -171,7 +172,19 @@ export default async function IssuesPage({
   searchParams,
 }: IssuesPageProps): Promise<React.JSX.Element> {
   // Single authentication resolution for entire request
-  const orgContext = await getRequestAuthContext();
+  const authContext = await getRequestAuthContext();
+
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
+
+  // Convert to legacy OrganizationContext format for compatibility
+  const orgContext = {
+    organization: authContext.org,
+    user: authContext.user,
+    accessLevel: "member" as const,
+    membership: authContext.membership,
+  };
 
   return (
     <div className="space-y-6">

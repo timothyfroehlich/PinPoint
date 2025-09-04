@@ -14,7 +14,7 @@ import {
 import { Separator } from "~/components/ui/separator";
 import { Badge } from "~/components/ui/badge";
 import { CalendarIcon, GlobeIcon } from "lucide-react";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 import {
   getCurrentOrganization,
   getOrganizationStats,
@@ -25,12 +25,15 @@ import { OrganizationLogoForm } from "./components/OrganizationLogoForm";
 import { format } from "date-fns";
 
 export default async function OrganizationSettingsPage(): Promise<React.JSX.Element> {
-  const { organization: _organization } = await requireMemberAccess();
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
 
   // Fetch organization details and statistics in parallel
   const [organization, stats] = await Promise.all([
-    getCurrentOrganization(),
-    getOrganizationStats(),
+    getCurrentOrganization(authContext.org.id),
+    getOrganizationStats(authContext.org.id),
   ]);
 
   return (

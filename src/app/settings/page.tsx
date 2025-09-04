@@ -31,7 +31,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
     throw new Error('Member access required');
   }
   const { user } = auth;
-  const orgDetails = await getCurrentOrganization();
+  const orgDetails = await getCurrentOrganization(auth.org.id);
 
   const settingsCards = [
     {

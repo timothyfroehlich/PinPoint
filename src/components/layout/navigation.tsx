@@ -123,7 +123,7 @@ export function Navigation({ organizationContext }: NavigationProps): JSX.Elemen
 
           {/* Right Section - User Context */}
           <div className="flex items-center gap-3">
-            <NotificationBellWrapper userId={organizationContext.user.id} />
+            <NotificationBellWrapper userId={organizationContext.user.id} organizationId={organizationContext.organization.id} />
 
             <UserContextDisplay
               user={organizationContext.user}
