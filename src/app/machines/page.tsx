@@ -5,10 +5,7 @@ import { Button } from "~/components/ui/button";
 import { PlusIcon } from "lucide-react";
 import { MachineInventoryServer } from "~/components/machines/machine-inventory-server";
 import { MachineStatsServer } from "~/components/machines/machine-stats-server";
-import {
-  AdvancedSearchForm,
-  MACHINES_FILTER_FIELDS,
-} from "~/components/search";
+import { AdvancedSearchForm, MACHINES_FILTER_FIELDS } from "~/components/search";
 import { getRequestAuthContext } from "~/lib/organization-context";
 import {
   getMachinesWithFilters,
@@ -77,7 +74,10 @@ export default async function MachinesPage({
   searchParams,
 }: MachinesPageProps): Promise<React.JSX.Element> {
   // Single authentication resolution for entire request
-  await getRequestAuthContext();
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
 
   // Parse URL parameters using centralized utility
   const rawParams = await searchParams;
@@ -95,9 +95,9 @@ export default async function MachinesPage({
 
   // Parallel data fetching for optimal performance
   const [machines, machineStats, locations] = await Promise.all([
-    getMachinesWithFilters(filters, { page: parsedParams.page, limit: parsedParams.view === "grid" ? 12 : parsedParams.limit }, { field: parsedParams.sort as MachineSorting["field"], order: parsedParams.order }),
-    getMachineStats(),
-    getLocationsForOrg(),
+    getMachinesWithFilters(filters, { page: parsedParams.page, limit: parsedParams.view === "grid" ? 12 : parsedParams.limit }, { field: parsedParams.sort as MachineSorting["field"], order: parsedParams.order }, authContext.org.id),
+    getMachineStats(authContext.org.id),
+    getLocationsForOrg(authContext.org.id),
   ]);
 
   return (

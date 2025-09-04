@@ -25,10 +25,10 @@ export async function IssueDetailServer({ issueId, organizationId, userId }: Iss
   const [issue, comments, commentCount, assignableUsers, availableStatuses] =
     await Promise.all([
       getIssueById(issueId, organizationId),
-      getCommentsForIssue(issueId),
-      getCommentCountForIssue(issueId),
-      getAssignableUsers(),
-      getAvailableStatuses(),
+      getCommentsForIssue(issueId, organizationId),
+      getCommentCountForIssue(issueId, organizationId),
+      getAssignableUsers(organizationId),
+      getAvailableStatuses(organizationId),
     ]);
 
   // Dynamic status colors based on status category

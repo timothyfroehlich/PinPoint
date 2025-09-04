@@ -18,10 +18,11 @@ import {
   type SQL,
 } from "drizzle-orm";
 import { machines, locations, models } from "~/server/db/schema";
-// No direct db access; use ensureOrgContextAndBindRLS to run under RLS-bound tx
-import { ensureOrgContextAndBindRLS } from "~/lib/organization-context";
 import type { MachineFilters } from "~/lib/types";
 import { safeCount, type CountResult } from "~/lib/types/database-results";
+
+import { withOrgRLS } from "~/server/db/utils/rls";
+import { db } from "./shared";
 
 // ================================
 // TYPE DEFINITIONS
@@ -66,9 +67,9 @@ export const getMachinesWithFilters = cache(
     filters: MachineFilters = {},
     pagination: MachinePagination = { page: 1, limit: 20 },
     sorting: MachineSorting = { field: "created_at", order: "desc" },
+    organizationId: string
   ) => {
-    return ensureOrgContextAndBindRLS(async (tx, context) => {
-      const organizationId = context.organization.id;
+    return withOrgRLS(db, organizationId, async tx => {
       const offset = (pagination.page - 1) * pagination.limit;
 
       // Build where conditions
@@ -200,8 +201,8 @@ export const getMachinesWithFilters = cache(
  * Includes location and model information
  * Uses React 19 cache() for request-level memoization
  */
-export const getMachinesForOrg = cache(async () => {
-  return await getMachinesWithFilters();
+export const getMachinesForOrg = cache(async (organizationId: string) => {
+  return await getMachinesWithFilters({}, { page: 1, limit: 20 }, { field: "created_at", order: "desc" }, organizationId);
 });
 
 /**
@@ -209,10 +210,8 @@ export const getMachinesForOrg = cache(async () => {
  * Enforces organization scoping
  * Uses React 19 cache() for request-level memoization per machineId
  */
-export const getMachineById = cache(async (machineId: string) => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    const organizationId = context.organization.id;
-
+export const getMachineById = cache(async (machineId: string, organizationId: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
     const machine = await tx.query.machines.findFirst({
       where: and(
         eq(machines.id, machineId),
@@ -255,10 +254,8 @@ export const getMachineById = cache(async (machineId: string) => {
  * Includes counts by location, model, and QR code status
  * Uses React 19 cache() for request-level memoization
  */
-export const getMachineStats = cache(async (): Promise<MachineStats> => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    const organizationId = context.organization.id;
-
+export const getMachineStats = cache(async (organizationId: string): Promise<MachineStats> => {
+  return withOrgRLS(db, organizationId, async tx => {
     // Get basic counts
     const [totalMachines, machinesWithQR, byLocation, byModel] =
       await Promise.all([
@@ -327,9 +324,8 @@ export const getMachineStats = cache(async (): Promise<MachineStats> => {
  * Get locations for the current organization (for filters)
  * Uses React 19 cache() for request-level memoization
  */
-export const getLocationsForOrg = cache(async () => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    const organizationId = context.organization.id;
+export const getLocationsForOrg = cache(async (organizationId: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
     return await tx.query.locations.findMany({
       where: eq(locations.organization_id, organizationId),
       columns: { id: true, name: true, city: true, state: true },
@@ -343,9 +339,8 @@ export const getLocationsForOrg = cache(async () => {
  * Includes both global commercial models and org-specific custom models
  * Uses React 19 cache() for request-level memoization
  */
-export const getModelsForOrg = cache(async () => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    const organizationId = context.organization.id;
+export const getModelsForOrg = cache(async (organizationId: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
     return await tx.query.models.findMany({
       where: or(
         sql`${models.organization_id} IS NULL`, // Global commercial models
@@ -368,9 +363,9 @@ export const getModelsForOrg = cache(async () => {
  * Useful for machine management dashboard
  * Benefits from getMachinesForOrg() React 19 cache()
  */
-export async function getMachinesWithIssueCounts(): Promise<
+export async function getMachinesWithIssueCounts(organizationId: string): Promise<
   Awaited<ReturnType<typeof getMachinesForOrg>>
 > {
   // For now, return basic machines - can enhance with issue counts later
-  return await getMachinesForOrg();
+  return await getMachinesForOrg(organizationId);
 }

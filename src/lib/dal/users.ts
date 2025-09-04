@@ -7,20 +7,21 @@
 import { cache } from "react";
 import { and, eq, desc, or } from "drizzle-orm";
 import { users, memberships, issues } from "~/server/db/schema";
-import { ensureOrgContextAndBindRLS } from "~/lib/organization-context";
+import { withOrgRLS } from "~/server/db/utils/rls";
+import { db } from "./shared";
 
 /**
  * Get current authenticated user profile
  * Uses authenticated context with automatic organization scoping
  * Uses React 19 cache() for request-level memoization
  */
-export const getCurrentUserProfile = cache(async () => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    if (!context.user) {
-      throw new Error("Authentication required");
+export const getCurrentUserProfile = cache(async (userId: string, organizationId: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
+    if (!userId) {
+      throw new Error("User ID required");
     }
     const userProfile = await tx.query.users.findFirst({
-      where: eq(users.id, context.user.id),
+      where: eq(users.id, userId),
       columns: {
         id: true,
         name: true,
@@ -46,9 +47,8 @@ export const getCurrentUserProfile = cache(async () => {
  * Ensures user access is limited to organization members
  * Uses React 19 cache() for request-level memoization per userId
  */
-export const getUserById = cache(async (userId: string) => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    const organizationId = context.organization.id;
+export const getUserById = cache(async (userId: string, organizationId: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
     const membership = await tx.query.memberships.findFirst({
       where: and(
         eq(memberships.user_id, userId),
@@ -81,15 +81,14 @@ export const getUserById = cache(async (userId: string) => {
  * Includes role permissions and organization context
  * Uses React 19 cache() for request-level memoization
  */
-export const getCurrentUserMembership = cache(async () => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    if (!context.user) {
-      throw new Error("Authentication required");
+export const getCurrentUserMembership = cache(async (userId: string, organizationId: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
+    if (!userId) {
+      throw new Error("User ID required");
     }
-    const organizationId = context.organization.id;
     const membership = await tx.query.memberships.findFirst({
       where: and(
-        eq(memberships.user_id, context.user.id),
+        eq(memberships.user_id, userId),
         eq(memberships.organization_id, organizationId),
       ),
       with: {
@@ -135,8 +134,8 @@ export const getCurrentUserMembership = cache(async () => {
  * Extracts permissions from role for authorization logic
  * Uses React 19 cache() for request-level memoization
  */
-export const getCurrentUserPermissions = cache(async () => {
-  const membership = await getCurrentUserMembership();
+export const getCurrentUserPermissions = cache(async (userId: string, organizationId: string) => {
+  const membership = await getCurrentUserMembership(userId, organizationId);
 
   const permissions = membership.role.rolePermissions.map(
     (rp) => rp.permission.name,
@@ -150,13 +149,12 @@ export const getCurrentUserPermissions = cache(async () => {
  * Includes issue creation, assignment, and comment counts
  * Uses React 19 cache() for request-level memoization per userId
  */
-export const getUserActivityStats = cache(async (userId?: string) => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    if (!context.user) {
-      throw new Error("Authentication required");
+export const getUserActivityStats = cache(async (currentUserId: string, organizationId: string, userId?: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
+    if (!currentUserId) {
+      throw new Error("Current user ID required");
     }
-    const organizationId = context.organization.id;
-    const targetUserId = userId ?? context.user.id;
+    const targetUserId = userId ?? currentUserId;
 
     const membership = await tx.query.memberships.findFirst({
       where: and(
@@ -197,9 +195,8 @@ export const getUserActivityStats = cache(async (userId?: string) => {
  * Returns organization members suitable for issue assignment
  * Uses React 19 cache() for request-level memoization
  */
-export const getAssignableUsers = cache(async () => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    const organizationId = context.organization.id;
+export const getAssignableUsers = cache(async (organizationId: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
     const assignableUsers = await tx.query.memberships.findMany({
       where: eq(memberships.organization_id, organizationId),
       with: {
@@ -232,13 +229,12 @@ export const getAssignableUsers = cache(async () => {
  * Uses React 19 cache() for request-level memoization per limit
  */
 export const getUserRecentActivity = cache(
-  async (limit = 10, userId?: string) => {
-    return ensureOrgContextAndBindRLS(async (tx, context) => {
-      if (!context.user) {
-        throw new Error("Authentication required");
+  async (currentUserId: string, organizationId: string, limit = 10, userId?: string) => {
+    return withOrgRLS(db, organizationId, async tx => {
+      if (!currentUserId) {
+        throw new Error("Current user ID required");
       }
-      const organizationId = context.organization.id;
-      const targetUserId = userId ?? context.user.id;
+      const targetUserId = userId ?? currentUserId;
       const membership = await tx.query.memberships.findFirst({
         where: and(
           eq(memberships.user_id, targetUserId),
@@ -285,9 +281,9 @@ export const getUserRecentActivity = cache(
  * Convenience function for authorization checks
  * Uses React 19 cache() for request-level memoization per permission
  */
-export const userHasPermission = cache(async (permission: string) => {
+export const userHasPermission = cache(async (userId: string, organizationId: string, permission: string) => {
   try {
-    const permissions = await getCurrentUserPermissions();
+    const permissions = await getCurrentUserPermissions(userId, organizationId);
     return permissions.includes(permission);
   } catch {
     return false;
@@ -299,9 +295,8 @@ export const userHasPermission = cache(async (permission: string) => {
  * Includes organization context and basic statistics
  * Uses React 19 cache() for request-level memoization per userId
  */
-export const getUserPublicProfile = cache(async (userId: string) => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    const organizationId = context.organization.id;
+export const getUserPublicProfile = cache(async (userId: string, organizationId: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
     const membership = await tx.query.memberships.findFirst({
       where: and(
         eq(memberships.user_id, userId),
@@ -327,7 +322,7 @@ export const getUserPublicProfile = cache(async (userId: string) => {
     if (!membership) {
       throw new Error("User not found or access denied");
     }
-    const activityStats = await getUserActivityStats(userId);
+    const activityStats = await getUserActivityStats(userId, organizationId, userId);
     return { ...membership.user, role: membership.role, activityStats };
   });
 });

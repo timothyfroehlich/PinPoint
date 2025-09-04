@@ -15,14 +15,17 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Separator } from "~/components/ui/separator";
 import { UsersIcon, MailIcon, CalendarIcon, ShieldIcon } from "lucide-react";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 import { api } from "~/trpc/server";
 import { UserTableActions } from "./components/UserTableActions";
 import { InviteUserDialog } from "./components/InviteUserDialog";
 import { format } from "date-fns";
 
 export default async function UsersSettingsPage(): Promise<React.JSX.Element> {
-  await requireMemberAccess();
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
 
   // Fetch organization users and roles using the existing admin router
   const [users, roles] = await Promise.all([

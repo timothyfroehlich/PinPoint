@@ -6,7 +6,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "~/components/ui/button";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 import { getLocationsForOrg, getModelsForOrg } from "~/lib/dal/machines";
 import { createMachineAction } from "~/lib/actions/machine-actions";
 import { CreateMachineFormClient } from "~/components/machines/client/create-machine-form-client";
@@ -17,12 +17,15 @@ export const metadata = {
 };
 
 export default async function NewMachinePage(): Promise<React.JSX.Element> {
-  await requireMemberAccess();
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
 
   // Fetch required data for form
   const [locations, models] = await Promise.all([
-    getLocationsForOrg(),
-    getModelsForOrg(),
+    getLocationsForOrg(authContext.org.id),
+    getModelsForOrg(authContext.org.id),
   ]);
 
   return (

@@ -13,7 +13,6 @@ import {
   ChevronRightIcon,
 } from "lucide-react";
 import { getIssuesForOrg, type IssueSorting } from "~/lib/dal/issues";
-import { getRequestAuthContext } from "~/lib/organization-context";
 import type { IssueFilters } from "~/lib/types";
 import { formatDistanceToNow } from "date-fns";
 
@@ -174,13 +173,8 @@ function IssueCard({ issue }: { issue: Issue }): JSX.Element {
 }
 
 // Direct data fetching version for pages
-export async function IssuesListWithData({ limit }: { limit?: number }): Promise<JSX.Element> {
-  // Fetch auth context once for organization scope
-  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-  // import placed inline to ensure availability
-  // (If path alias not resolving adjust tsconfig paths.)
-  const { organization } = await getRequestAuthContext();
-  const issues = await getIssuesForOrg(organization.id);
+export async function IssuesListWithData({ limit, organizationId }: { limit?: number; organizationId: string }): Promise<JSX.Element> {
+  const issues = await getIssuesForOrg(organizationId);
   const displayIssues = limit ? issues.slice(0, limit) : issues;
 
   if (displayIssues.length === 0) {
@@ -273,17 +267,26 @@ function PaginationControls({
 }
 
 // Props-based version for reuse
+/**
+ * IssuesListServer
+ * If pre-fetched issues are supplied we don't require organizationId.
+ * If issues are undefined/null we will fetch them and thus require organizationId.
+ */
 export function IssuesListServer({
   issues,
   pagination,
   filters,
   sorting,
   limit,
-}: IssuesListServerProps): JSX.Element {
+  organizationId,
+}: IssuesListServerProps & { organizationId?: string }): React.JSX.Element {
   if (!issues) {
+    if (!organizationId) {
+      throw new Error("organizationId required when issues are not pre-fetched");
+    }
     return (
       <Suspense fallback={<IssuesListSkeleton />}>
-        <IssuesListWithData limit={limit ?? 20} />
+        <IssuesListWithData limit={limit ?? 20} organizationId={organizationId} />
       </Suspense>
     );
   }
@@ -311,7 +314,7 @@ export function IssuesListServer({
 
   return (
     <div className="space-y-4" data-testid="issues-list">
-      {displayIssues.map((issue): JSX.Element => (
+      {displayIssues.map((issue): React.JSX.Element => (
         <IssueCard key={issue.id} issue={issue} />
       ))}
 
@@ -327,10 +330,10 @@ export function IssuesListServer({
   );
 }
 
-function IssuesListSkeleton(): JSX.Element {
+function IssuesListSkeleton(): React.JSX.Element {
   return (
     <div className="space-y-4">
-      {Array.from({ length: 3 }).map((_, i): JSX.Element => (
+      {Array.from({ length: 3 }).map((_, i): React.JSX.Element => (
         <Card key={i}>
           <CardHeader className="pb-3">
             <div className="space-y-2">
