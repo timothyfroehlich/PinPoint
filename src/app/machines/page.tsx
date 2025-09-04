@@ -22,7 +22,6 @@ import {
   parseMachineSearchParams,
   getMachineFilterDescription,
   getMachineCanonicalUrl,
-  buildMachineUrl,
 } from "~/lib/search-params/machine-search-params";
 import { buildMetadataDescription } from "~/lib/search-params/shared";
 

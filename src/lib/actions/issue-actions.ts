@@ -19,13 +19,14 @@ import { db } from "~/lib/dal/shared";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { transformKeysToSnakeCase } from "~/lib/utils/case-transformers";
 import {
-  requireAuthContextWithRole,
   validateFormData,
   actionSuccess,
   actionError,
   runAfterResponse,
   type ActionResult,
 } from "./shared";
+import { isError, getErrorMessage } from "~/lib/utils/type-guards";
+import { requireMemberAccess } from "~/lib/organization-context";
 import { requirePermission } from "./shared";
 import { PERMISSIONS } from "~/server/auth/permissions.constants";
 import {
@@ -105,8 +106,9 @@ export async function createIssueAction(
   formData: FormData,
 ): Promise<ActionResult<{ id: string }>> {
   try {
-    const { user, organizationId, membership } =
-      await requireAuthContextWithRole();
+    const { user, organization, membership } =
+      await requireMemberAccess();
+    const organizationId = organization.id;
 
     // Enhanced validation with Zod
     // Perform validation but adapt success shape to our expected return type later
@@ -121,13 +123,13 @@ export async function createIssueAction(
     // Determine creation permission tier
     let hasFull = false;
     try {
-      await requirePermission(membership, PERMISSIONS.ISSUE_CREATE_FULL, db);
+      await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ISSUE_CREATE_FULL, db);
       hasFull = true;
     } catch {
       // Try basic (or legacy) permission
       try {
         await requirePermission(
-          membership,
+          { role_id: membership.role.id },
           PERMISSIONS.ISSUE_CREATE_BASIC,
           db,
         );
@@ -210,12 +212,12 @@ export async function createIssueAction(
         await generateIssueCreationNotifications(issueData.id, {
           organizationId,
           actorId: user.id,
-          actorName: String(user.user_metadata["name"] ?? user.email ?? ""),
+          actorName: user.name ?? user.email ?? "",
         });
       } catch (error) {
         console.error(
           "Failed to generate issue creation notifications:",
-          error,
+          getErrorMessage(error),
         );
       }
     });
@@ -225,11 +227,7 @@ export async function createIssueAction(
   } catch (error) {
     // (Legacy redirect handling removed – action now returns success and client redirects)
     console.error("Create issue error:", error);
-    return actionError(
-      error instanceof Error
-        ? error.message
-        : "Failed to create issue. Please try again.",
-    );
+    return actionError(getErrorMessage(error));
   }
 }
 
@@ -253,7 +251,7 @@ export async function createPublicIssueAction(
       h.get("cf-connecting-ip") ??
       h.get("x-real-ip") ??
       "";
-    const issueRateLimitIp = "ISSUE_RATE_LIMIT_IP" in globalThis ? (globalThis as { ISSUE_RATE_LIMIT_IP: string }).ISSUE_RATE_LIMIT_IP : undefined;
+    const issueRateLimitIp = "ISSUE_RATE_LIMIT_IP" in globalThis ? (globalThis as unknown as { ISSUE_RATE_LIMIT_IP: string }).ISSUE_RATE_LIMIT_IP : undefined;
     const ip: string = issueRateLimitIp ?? raw.split(",")[0]?.trim() ?? "unknown";
     const machineIdValue = formData.get("machineId");
     const machineId = machineIdValue && typeof machineIdValue === "string" ? machineIdValue : "none";
@@ -269,8 +267,8 @@ export async function createPublicIssueAction(
   const validation = validateFormData(formData, createIssueSchema);
   if (!validation.success) {
     if (validation.fieldErrors) {
-      delete validation.fieldErrors.priority;
-      delete validation.fieldErrors.assigneeId;
+      delete validation.fieldErrors['priority'];
+      delete validation.fieldErrors['assigneeId'];
     }
     return validation as ActionResult<{ id: string }>;
   }
@@ -335,7 +333,7 @@ export async function createPublicIssueAction(
   } catch (error) {
     console.error("createPublicIssueAction error:", error);
     return actionError(
-      error instanceof Error ? error.message : "Failed to submit issue",
+      isError(error) ? error.message : "Failed to submit issue",
     );
   }
 }
@@ -350,8 +348,9 @@ export async function updateIssueStatusAction(
   formData: FormData,
 ): Promise<ActionResult<{ statusId: string }>> {
   try {
-    const { user, organizationId, membership } =
-      await requireAuthContextWithRole();
+    const { user, organization, membership } =
+      await requireMemberAccess();
+    const organizationId = organization.id;
 
     // Enhanced validation
     const validation = validateFormData(formData, updateIssueStatusSchema);
@@ -359,7 +358,7 @@ export async function updateIssueStatusAction(
       return validation as ActionResult<{ statusId: string }>;
     }
 
-    await requirePermission(membership, PERMISSIONS.ISSUE_EDIT, db);
+    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ISSUE_EDIT, db);
 
     // Update with organization scoping for security
     const [updatedIssue] = await db
@@ -398,11 +397,11 @@ export async function updateIssueStatusAction(
           await generateStatusChangeNotifications(issueId, statusResult.name, {
             organizationId,
             actorId: user.id,
-            actorName: String(user.user_metadata["name"] ?? user.email ?? ""),
+            actorName: user.name ?? user.email ?? "",
           });
         }
       } catch (error) {
-        console.error("Failed to generate status change notifications:", error);
+        console.error("Failed to generate status change notifications:", getErrorMessage(error));
       }
     });
 
@@ -413,7 +412,7 @@ export async function updateIssueStatusAction(
   } catch (error) {
     console.error("Update issue status error:", error);
     return actionError(
-      error instanceof Error ? error.message : "Failed to update issue status",
+      isError(error) ? error.message : "Failed to update issue status",
     );
   }
 }
@@ -427,8 +426,9 @@ export async function addCommentAction(
   formData: FormData,
 ): Promise<ActionResult<{ commentId: string }>> {
   try {
-    const { user, organizationId, membership } =
-      await requireAuthContextWithRole();
+    const { user, organization, membership } =
+      await requireMemberAccess();
+    const organizationId = organization.id;
 
     // Enhanced validation
     const validation = validateFormData(formData, addCommentSchema);
@@ -436,7 +436,7 @@ export async function addCommentAction(
       return validation as ActionResult<{ commentId: string }>;
     }
 
-    await requirePermission(membership, PERMISSIONS.ISSUE_CREATE_BASIC, db);
+    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ISSUE_CREATE_BASIC, db);
 
     // Verify issue exists and user has access
     const issue = await db.query.issues.findFirst({
@@ -482,7 +482,7 @@ export async function addCommentAction(
   } catch (error) {
     console.error("Add comment error:", error);
     return actionError(
-      error instanceof Error ? error.message : "Failed to add comment",
+      isError(error) ? error.message : "Failed to add comment",
     );
   }
 }
@@ -496,8 +496,9 @@ export async function updateIssueAssignmentAction(
   formData: FormData,
 ): Promise<ActionResult<{ assigneeId: string | null }>> {
   try {
-    const { user, organizationId, membership } =
-      await requireAuthContextWithRole();
+    const { user, organization, membership } =
+      await requireMemberAccess();
+    const organizationId = organization.id;
 
     // Enhanced validation
     const validation = validateFormData(formData, updateIssueAssignmentSchema);
@@ -505,7 +506,7 @@ export async function updateIssueAssignmentAction(
       return validation as ActionResult<{ assigneeId: string | null }>;
     }
 
-    await requirePermission(membership, PERMISSIONS.ISSUE_EDIT, db); // was ISSUE_ASSIGN (deprecated)
+    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ISSUE_EDIT, db); // was ISSUE_ASSIGN (deprecated)
 
     // Get current assignee for notification comparison
     const currentIssue = await db.query.issues.findFirst({
@@ -558,13 +559,13 @@ export async function updateIssueAssignmentAction(
           {
             organizationId,
             actorId: user.id,
-            actorName: String(user.user_metadata["name"] ?? user.email ?? ""),
+            actorName: user.name ?? user.email ?? "",
           },
         );
       } catch (error) {
         console.error(
           "Failed to generate assignment change notifications:",
-          error,
+          getErrorMessage(error),
         );
       }
     });
@@ -576,7 +577,7 @@ export async function updateIssueAssignmentAction(
   } catch (error) {
     console.error("Update issue assignment error:", error);
     return actionError(
-      error instanceof Error ? error.message : "Failed to update assignment",
+      isError(error) ? error.message : "Failed to update assignment",
     );
   }
 }
@@ -589,8 +590,9 @@ export async function bulkUpdateIssuesAction(
   formData: FormData,
 ): Promise<ActionResult<{ updatedCount: number }>> {
   try {
-    const { user, organizationId, membership } =
-      await requireAuthContextWithRole();
+    const { user, organization, membership } =
+      await requireMemberAccess();
+    const organizationId = organization.id;
 
     // Parse JSON data from form
     const jsonData = formData.get("data");
@@ -604,7 +606,7 @@ export async function bulkUpdateIssuesAction(
       return actionError("Invalid bulk update data");
     }
 
-    await requirePermission(membership, PERMISSIONS.ISSUE_EDIT, db); // was ISSUE_BULK_MANAGE (deprecated)
+    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ISSUE_EDIT, db); // was ISSUE_BULK_MANAGE (deprecated)
     const { issueIds, statusId, assigneeId } = validation.data;
 
     // Build update object
@@ -648,7 +650,7 @@ export async function bulkUpdateIssuesAction(
   } catch (error) {
     console.error("Bulk update issues error:", error);
     return actionError(
-      error instanceof Error ? error.message : "Failed to bulk update issues",
+      isError(error) ? error.message : "Failed to bulk update issues",
     );
   }
 }

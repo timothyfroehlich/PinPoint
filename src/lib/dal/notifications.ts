@@ -7,6 +7,7 @@ import { cache } from "react";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { notifications } from "~/server/db/schema";
 import { ensureOrgContextAndBindRLS } from "~/lib/organization-context";
+import { safeCount, type CountResult } from "~/lib/types/database-results";
 
 /**
  * Get notifications for the current user with pagination
@@ -62,7 +63,7 @@ export const getUnreadNotificationCount = cache(async () => {
     const userId = context.user.id;
     const organizationId = context.organization.id;
 
-    const result = await tx
+    const result: CountResult[] = await tx
       .select({ count: sql<number>`count(*)` })
       .from(notifications)
       .where(
@@ -73,7 +74,7 @@ export const getUnreadNotificationCount = cache(async () => {
         ),
       );
 
-    return result[0]?.count ?? 0;
+    return safeCount(result);
   });
 });
 
@@ -208,43 +209,50 @@ export const getNotificationStats = cache(async () => {
     const userId = context.user.id;
     const organizationId = context.organization.id;
 
-    const totalResult = await tx
-      .select({ count: sql<number>`count(*)` })
-      .from(notifications)
-      .where(
-        and(
-          eq(notifications.user_id, userId),
-          eq(notifications.organization_id, organizationId),
+    const [totalResult, unreadResult, todayResult]: [
+      CountResult[],
+      CountResult[],
+      CountResult[]
+    ] = await Promise.all([
+      tx
+        .select({ count: sql<number>`count(*)` })
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.user_id, userId),
+            eq(notifications.organization_id, organizationId),
+          ),
         ),
-      );
-
-    const unreadResult = await tx
-      .select({ count: sql<number>`count(*)` })
-      .from(notifications)
-      .where(
-        and(
-          eq(notifications.user_id, userId),
-          eq(notifications.organization_id, organizationId),
-          eq(notifications.read, false),
+      tx
+        .select({ count: sql<number>`count(*)` })
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.user_id, userId),
+            eq(notifications.organization_id, organizationId),
+            eq(notifications.read, false),
+          ),
         ),
-      );
+      tx
+        .select({ count: sql<number>`count(*)` })
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.user_id, userId),
+            eq(notifications.organization_id, organizationId),
+            sql`DATE(created_at) = CURRENT_DATE`,
+          ),
+        )
+    ]);
 
-    const todayResult = await tx
-      .select({ count: sql<number>`count(*)` })
-      .from(notifications)
-      .where(
-        and(
-          eq(notifications.user_id, userId),
-          eq(notifications.organization_id, organizationId),
-          sql`DATE(created_at) = CURRENT_DATE`,
-        ),
-      );
-
+    const total = safeCount(totalResult);
+    const unread = safeCount(unreadResult);
+    
     return {
-      total: totalResult[0]?.count ?? 0,
-      unread: unreadResult[0]?.count ?? 0,
-      read: (totalResult[0]?.count ?? 0) - (unreadResult[0]?.count ?? 0),
-      today: todayResult[0]?.count ?? 0,
+      total,
+      unread,
+      read: total - unread,
+      today: safeCount(todayResult),
     };
   });
 });

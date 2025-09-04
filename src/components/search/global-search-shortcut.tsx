@@ -15,6 +15,7 @@ import {
 } from "~/components/ui/dialog";
 import { UniversalSearch } from "./universal-search";
 import { type SearchResult } from "~/lib/services/search-service";
+import { hasProperty } from "~/lib/utils/type-guards";
 
 interface GlobalSearchShortcutProps {
   children?: React.ReactNode;
@@ -50,10 +51,10 @@ export function GlobalSearchShortcut({ children }: GlobalSearchShortcutProps): J
     if (isOpen) {
       // Small delay to ensure dialog is fully rendered
       const timer = setTimeout((): void => {
-        const input = document.querySelector(
-          "[data-search-input]",
-        )!;
-        input.focus();
+        const input = document.querySelector("[data-search-input]");
+        if (input && hasProperty(input, 'focus') && typeof input.focus === 'function') {
+          input.focus();
+        }
       }, 100);
 
       return (): void => {

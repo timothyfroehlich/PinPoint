@@ -11,13 +11,14 @@ import { and, eq, inArray } from "drizzle-orm";
 import { notifications } from "~/server/db/schema";
 import { db } from "~/lib/dal/shared";
 import {
-  requireAuthContextWithRole,
   validateFormData,
   actionSuccess,
   actionError,
   runAfterResponse,
   type ActionResult,
 } from "./shared";
+import { isError } from "~/lib/utils/type-guards";
+import { requireMemberAccess } from "~/lib/organization-context";
 
 // Validation schemas
 const markAsReadSchema = z.object({
@@ -61,7 +62,8 @@ export async function markNotificationAsReadAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId } = await requireAuthContextWithRole();
+    const { user, organization } = await requireMemberAccess();
+    const organizationId = organization.id;
 
     // Enhanced validation
     const validation = validateFormData(formData, markAsReadSchema);
@@ -103,7 +105,7 @@ export async function markNotificationAsReadAction(
   } catch (error) {
     console.error("Mark notification as read error:", error);
     return actionError(
-      error instanceof Error
+      isError(error)
         ? error.message
         : "Failed to mark notification as read",
     );
@@ -118,7 +120,8 @@ export async function bulkMarkNotificationsAsReadAction(
   formData: FormData,
 ): Promise<ActionResult<{ updatedCount: number }>> {
   try {
-    const { user, organizationId } = await requireAuthContextWithRole();
+    const { user, organization } = await requireMemberAccess();
+    const organizationId = organization.id;
 
     // Parse JSON data from form with proper type safety
     const jsonData = formData.get("data");
@@ -173,7 +176,7 @@ export async function bulkMarkNotificationsAsReadAction(
   } catch (error) {
     console.error("Bulk mark notifications as read error:", error);
     return actionError(
-      error instanceof Error
+      isError(error)
         ? error.message
         : "Failed to bulk mark notifications as read",
     );
@@ -188,7 +191,8 @@ export async function markAllNotificationsAsReadAction(
   formData: FormData,
 ): Promise<ActionResult<{ updatedCount: number }>> {
   try {
-    const { user, organizationId } = await requireAuthContextWithRole();
+    const { user, organization } = await requireMemberAccess();
+    const organizationId = organization.id;
 
     // Enhanced validation
     const validation = validateFormData(formData, markAllAsReadSchema);
@@ -229,7 +233,7 @@ export async function markAllNotificationsAsReadAction(
   } catch (error) {
     console.error("Mark all notifications as read error:", error);
     return actionError(
-      error instanceof Error
+      isError(error)
         ? error.message
         : "Failed to mark all notifications as read",
     );
@@ -244,7 +248,8 @@ export async function markNotificationAsUnreadAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId } = await requireAuthContextWithRole();
+    const { user, organization } = await requireMemberAccess();
+    const organizationId = organization.id;
 
     const validation = validateFormData(formData, markAsReadSchema);
     if (!validation.success) {
@@ -285,7 +290,7 @@ export async function markNotificationAsUnreadAction(
   } catch (error) {
     console.error("Mark notification as unread error:", error);
     return actionError(
-      error instanceof Error
+      isError(error)
         ? error.message
         : "Failed to mark notification as unread",
     );

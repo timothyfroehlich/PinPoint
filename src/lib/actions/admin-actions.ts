@@ -22,13 +22,14 @@ import {
   exportActivityLog,
 } from "~/lib/dal/activity-log";
 import {
-  requireAuthContextWithRole,
   validateFormData,
   actionSuccess,
   actionError,
   runAfterResponse,
   type ActionResult,
 } from "./shared";
+import { isError, getErrorMessage } from "~/lib/utils/type-guards";
+import { requireMemberAccess } from "~/lib/organization-context";
 import { db } from "~/lib/dal/shared";
 import { requirePermission } from "./shared";
 import { PERMISSIONS } from "~/server/auth/permissions.constants";
@@ -92,8 +93,9 @@ export async function inviteUserAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId, membership } =
-      await requireAuthContextWithRole();
+    const { user, organization, membership } =
+      await requireMemberAccess();
+    const organizationId = organization.id;
 
     // Enhanced validation with Zod
     const validation: ActionResult<InviteUserData> = validateFormData(formData, inviteUserSchema);
@@ -101,7 +103,7 @@ export async function inviteUserAction(
       return validation;
     }
 
-    await requirePermission(membership, PERMISSIONS.USER_MANAGE, db);
+    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.USER_MANAGE, db);
 
     // Check if user already exists in the system
     const existingUser = await db.query.users.findFirst({
@@ -247,11 +249,7 @@ export async function inviteUserAction(
     );
   } catch (error) {
     console.error("Invite user error:", error);
-    return actionError(
-      error instanceof Error
-        ? error.message
-        : "Failed to send invitation. Please try again.",
-    );
+    return actionError(getErrorMessage(error));
   }
 }
 
@@ -263,8 +261,9 @@ export async function updateUserRoleAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId, membership } =
-      await requireAuthContextWithRole();
+    const { user, organization, membership } =
+      await requireMemberAccess();
+    const organizationId = organization.id;
 
     // Enhanced validation
     const validation: ActionResult<UpdateUserRoleData> = validateFormData(formData, updateUserRoleSchema);
@@ -272,7 +271,7 @@ export async function updateUserRoleAction(
       return validation;
     }
 
-    await requirePermission(membership, PERMISSIONS.USER_MANAGE, db);
+    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.USER_MANAGE, db);
 
     // Verify role exists in this organization
     const role = await db.query.roles.findFirst({
@@ -333,7 +332,7 @@ export async function updateUserRoleAction(
   } catch (error) {
     console.error("Update user role error:", error);
     return actionError(
-      error instanceof Error ? error.message : "Failed to update user role",
+      isError(error) ? error.message : "Failed to update user role",
     );
   }
 }
@@ -346,8 +345,9 @@ export async function removeUserAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId, membership } =
-      await requireAuthContextWithRole();
+    const { user, organization, membership } =
+      await requireMemberAccess();
+    const organizationId = organization.id;
 
     // Enhanced validation
     const validation: ActionResult<RemoveUserData> = validateFormData(formData, removeUserSchema);
@@ -355,7 +355,7 @@ export async function removeUserAction(
       return validation;
     }
 
-    await requirePermission(membership, PERMISSIONS.USER_MANAGE, db);
+    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.USER_MANAGE, db);
 
     // Verify user exists and email matches (safety check)
     const targetUser = await db.query.users.findFirst({
@@ -412,7 +412,7 @@ export async function removeUserAction(
   } catch (error) {
     console.error("Remove user error:", error);
     return actionError(
-      error instanceof Error ? error.message : "Failed to remove user",
+      isError(error) ? error.message : "Failed to remove user",
     );
   }
 }
@@ -425,8 +425,9 @@ export async function updateSystemSettingsAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId, membership } =
-      await requireAuthContextWithRole();
+    const { user, organization, membership } =
+      await requireMemberAccess();
+    const organizationId = organization.id;
 
     // Parse JSON data from form
     const settingsData = String(formData.get("settings") ?? "");
@@ -442,7 +443,7 @@ export async function updateSystemSettingsAction(
     }
 
     // Permission check for settings update
-    await requirePermission(membership, PERMISSIONS.ORGANIZATION_MANAGE, db);
+    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ORGANIZATION_MANAGE, db);
 
     // Convert flat form data to nested SystemSettingsData structure
     const flatSettings = validation.data.settings;
@@ -505,11 +506,7 @@ export async function updateSystemSettingsAction(
     );
   } catch (error) {
     console.error("Update system settings error:", error);
-    return actionError(
-      error instanceof Error
-        ? error.message
-        : "Failed to update system settings",
-    );
+    return actionError(getErrorMessage(error));
   }
 }
 
@@ -518,10 +515,11 @@ export async function updateSystemSettingsAction(
  */
 export async function exportActivityLogAction(): Promise<Response> {
   try {
-    const { user, organizationId, membership } =
-      await requireAuthContextWithRole();
+    const { user, organization, membership } =
+      await requireMemberAccess();
+    const organizationId = organization.id;
 
-    await requirePermission(membership, PERMISSIONS.ADMIN_VIEW_ANALYTICS, db);
+    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ADMIN_VIEW_ANALYTICS, db);
 
     // Export activity log to CSV
     const csvData = await exportActivityLog(organizationId, {
@@ -542,7 +540,7 @@ export async function exportActivityLogAction(): Promise<Response> {
 
     // Generate filename with timestamp
     const timestamp = new Date().toISOString().split("T")[0];
-    const filename = `activity-log-${timestamp ?? "unknown"}.csv`;
+    const filename = `activity-log-${timestamp}.csv`;
 
     // Return CSV file response
     return new Response(csvData, {
@@ -556,11 +554,14 @@ export async function exportActivityLogAction(): Promise<Response> {
     console.error("Export activity log error:", error);
 
     // Return error response
-    return new Response("Failed to export activity log", {
-      status: 500,
-      headers: {
-        "Content-Type": "text/plain",
+    return new Response(
+      `Failed to export activity log: ${getErrorMessage(error)}`,
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "text/plain",
+        },
       },
-    });
+    );
   }
 }

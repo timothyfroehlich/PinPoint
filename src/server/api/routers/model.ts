@@ -12,6 +12,7 @@ import { env } from "~/env";
 import { generateId } from "~/lib/utils/id-generation";
 import { transformKeysToCamelCase } from "~/lib/utils/case-transformers";
 import { OPDBClient } from "~/lib/opdb/client";
+import { getErrorMessage } from "~/lib/utils/type-guards";
 
 // Server modules (alphabetical)
 import {
@@ -232,7 +233,7 @@ export const modelRouter = createTRPCRouter({
               operation: "opdb_sync",
             },
             error: {
-              message: error instanceof Error ? error.message : String(error),
+              message: getErrorMessage(error),
             },
           });
         }
