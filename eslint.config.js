@@ -13,6 +13,8 @@ import {
   ESLINT_RULES,
   convertPatterns,
 } from "./tooling.config.js";
+// Custom ESLint rules
+import noLegacyAuthImports from "./eslint-rules/no-legacy-auth-imports.js";
 
 export default tseslint.config(
   // TypeScript ESLint base configurations
@@ -48,6 +50,12 @@ export default tseslint.config(
       vitest: vitestPlugin,
       security: securityPlugin,
       "@microsoft/sdl": sdlPlugin,
+      // Custom rules
+      "legacyAuth": {
+        rules: {
+          "no-legacy-auth-imports": noLegacyAuthImports,
+        },
+      },
     },
     rules: {
       // Existing Next.js rules
@@ -155,6 +163,9 @@ export default tseslint.config(
           allowDirectConstAssertionInArrowFunctions: true,
         },
       ],
+
+      // Custom rules for legacy auth prevention
+      "legacyAuth/no-legacy-auth-imports": "error",
 
       // Ban problematic TypeScript comment directives
       "@typescript-eslint/ban-ts-comment": [

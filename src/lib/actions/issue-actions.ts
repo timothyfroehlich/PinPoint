@@ -26,7 +26,7 @@ import {
   type ActionResult,
 } from "./shared";
 import { isError, getErrorMessage } from "~/lib/utils/type-guards";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 import { requirePermission } from "./shared";
 import { PERMISSIONS } from "~/server/auth/permissions.constants";
 import {
@@ -106,8 +106,11 @@ export async function createIssueAction(
   formData: FormData,
 ): Promise<ActionResult<{ id: string }>> {
   try {
-    const { user, organization, membership } =
-      await requireMemberAccess();
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization, membership } = authContext;
     const organizationId = organization.id;
 
     // Enhanced validation with Zod
@@ -348,8 +351,11 @@ export async function updateIssueStatusAction(
   formData: FormData,
 ): Promise<ActionResult<{ statusId: string }>> {
   try {
-    const { user, organization, membership } =
-      await requireMemberAccess();
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization, membership } = authContext;
     const organizationId = organization.id;
 
     // Enhanced validation
@@ -426,8 +432,11 @@ export async function addCommentAction(
   formData: FormData,
 ): Promise<ActionResult<{ commentId: string }>> {
   try {
-    const { user, organization, membership } =
-      await requireMemberAccess();
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization, membership } = authContext;
     const organizationId = organization.id;
 
     // Enhanced validation
@@ -496,8 +505,11 @@ export async function updateIssueAssignmentAction(
   formData: FormData,
 ): Promise<ActionResult<{ assigneeId: string | null }>> {
   try {
-    const { user, organization, membership } =
-      await requireMemberAccess();
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization, membership } = authContext;
     const organizationId = organization.id;
 
     // Enhanced validation
@@ -590,8 +602,11 @@ export async function bulkUpdateIssuesAction(
   formData: FormData,
 ): Promise<ActionResult<{ updatedCount: number }>> {
   try {
-    const { user, organization, membership } =
-      await requireMemberAccess();
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization, membership } = authContext;
     const organizationId = organization.id;
 
     // Parse JSON data from form

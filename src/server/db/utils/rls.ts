@@ -10,13 +10,18 @@ export async function bindRLSContext(
   tx: DrizzleClient,
   organizationId: string,
 ): Promise<void> {
-  // PostgreSQL doesn't allow parameters in DDL commands like SET LOCAL
-  // We need to use sql.raw() with proper escaping for security
-  await tx.execute(
-    sql.raw(
-      `SET LOCAL app.current_organization_id = '${organizationId.replace(/'/g, "''")}'`,
-    ),
-  );
+  try {
+    // PostgreSQL doesn't allow parameters in DDL commands like SET LOCAL
+    // We need to use sql.raw() with proper escaping for security
+    await tx.execute(
+      sql.raw(
+        `SET LOCAL app.current_organization_id = '${organizationId.replace(/'/g, "''")}'`,
+      ),
+    );
+  } catch (error) {
+    console.error('Failed to set RLS organization context:', error);
+    throw new Error(`Failed query: SET LOCAL app.current_organization_id = '${organizationId}'`);
+  }
 }
 
 /**

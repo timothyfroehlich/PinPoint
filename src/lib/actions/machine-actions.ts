@@ -10,7 +10,7 @@ import { revalidateTag, revalidatePath } from "next/cache";
 import { z } from "zod";
 import { nameSchema, idSchema } from "~/lib/validation/schemas";
 import { eq, and, inArray } from "drizzle-orm";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 import { db } from "~/lib/dal/shared";
 import { machines } from "~/server/db/schema";
 import {
@@ -68,7 +68,11 @@ const BulkQRGenerateSchema = z.object({
 export async function createMachineAction(
   formData: FormData,
 ): Promise<ActionResult<{ machineId: string }>> {
-  const { organization } = await requireMemberAccess();
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
+  const { org: organization } = authContext;
   const organizationId = organization.id;
 
   // Enhanced validation with validateFormData
@@ -119,7 +123,11 @@ export async function createMachineAction(
 export async function updateMachineAction(
   formData: FormData,
 ): Promise<ActionResult<{ machineId: string }>> {
-  const { organization } = await requireMemberAccess();
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
+  const { org: organization } = authContext;
   const organizationId = organization.id;
 
   // Enhanced validation with validateFormData
@@ -180,7 +188,11 @@ export async function updateMachineAction(
 export async function deleteMachineAction(
   machineId: string,
 ): Promise<ActionResult<{ deleted: boolean }>> {
-  const { organization } = await requireMemberAccess();
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
+  const { org: organization } = authContext;
   const organizationId = organization.id;
 
   if (!machineId) {
@@ -233,7 +245,11 @@ export async function deleteMachineAction(
 export async function bulkUpdateMachinesAction(
   formData: FormData,
 ): Promise<ActionResult<{ updatedCount: number }>> {
-  const { organization } = await requireMemberAccess();
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
+  const { org: organization } = authContext;
   const organizationId = organization.id;
 
   const machineIdsValue = formData.get("machineIds");
@@ -300,7 +316,11 @@ export async function bulkUpdateMachinesAction(
 export async function generateQRCodeAction(
   formData: FormData,
 ): Promise<ActionResult<{ qrCodeUrl: string }>> {
-  const { organization } = await requireMemberAccess();
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
+  const { org: organization } = authContext;
   const organizationId = organization.id;
 
   const machineIdValue = formData.get("machineId");
@@ -372,7 +392,11 @@ export async function generateQRCodeAction(
 export async function regenerateQRCodeAction(
   machineId: string,
 ): Promise<ActionResult<{ qrCodeUrl: string }>> {
-  const { organization } = await requireMemberAccess();
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
+  const { org: organization } = authContext;
   const organizationId = organization.id;
 
   if (!machineId) {
@@ -439,7 +463,11 @@ export async function regenerateQRCodeAction(
 export async function bulkGenerateQRCodesAction(
   formData: FormData,
 ): Promise<ActionResult<{ processedCount: number }>> {
-  const { organization } = await requireMemberAccess();
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
+  const { org: organization } = authContext;
   const organizationId = organization.id;
 
   const machineIdsValue = formData.get("machineIds");

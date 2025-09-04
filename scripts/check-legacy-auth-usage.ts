@@ -17,6 +17,7 @@ const LEGACY_FUNCTIONS = [
 const ALLOWED_FILES = [
   'src/server/auth/legacy-adapters.ts',
   'src/lib/auth/legacy-inventory.ts',
+  'src/lib/organization-context.ts', // Contains adapter exports - allowed during Phase 1
   'docs/TASKS/phase1-auth-migration.md',
 ];
 

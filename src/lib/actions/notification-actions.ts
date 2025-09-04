@@ -18,7 +18,7 @@ import {
   type ActionResult,
 } from "./shared";
 import { isError } from "~/lib/utils/type-guards";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 
 // Validation schemas
 const markAsReadSchema = z.object({
@@ -62,7 +62,11 @@ export async function markNotificationAsReadAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organization } = await requireMemberAccess();
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization } = authContext;
     const organizationId = organization.id;
 
     // Enhanced validation
@@ -120,7 +124,11 @@ export async function bulkMarkNotificationsAsReadAction(
   formData: FormData,
 ): Promise<ActionResult<{ updatedCount: number }>> {
   try {
-    const { user, organization } = await requireMemberAccess();
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization } = authContext;
     const organizationId = organization.id;
 
     // Parse JSON data from form with proper type safety
@@ -191,7 +199,11 @@ export async function markAllNotificationsAsReadAction(
   formData: FormData,
 ): Promise<ActionResult<{ updatedCount: number }>> {
   try {
-    const { user, organization } = await requireMemberAccess();
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization } = authContext;
     const organizationId = organization.id;
 
     // Enhanced validation
@@ -248,7 +260,11 @@ export async function markNotificationAsUnreadAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organization } = await requireMemberAccess();
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization } = authContext;
     const organizationId = organization.id;
 
     const validation = validateFormData(formData, markAsReadSchema);

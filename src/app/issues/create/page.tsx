@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Home, Wrench } from "lucide-react";
 
 import { CreateIssueFormServer } from "~/components/forms/CreateIssueFormServer";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 import { createIssueAction } from "~/lib/actions/issue-actions";
 import { getMachinesForOrg } from "~/lib/dal/machines";
 import { getAssignableUsers } from "~/lib/dal/users";
@@ -81,13 +81,16 @@ export const metadata: Metadata = {
 export default async function CreateIssuePage({
   searchParams,
 }: CreateIssuePageProps): Promise<React.JSX.Element> {
-  await requireMemberAccess(); // Ensure authenticated user with organization membership
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
   const resolvedSearchParams = await searchParams;
 
   // Parallel data fetching using real DAL functions with React 19 cache()
   const [machinesRaw, assignableUsersRaw] = await Promise.all([
-    getMachinesForOrg(),
-    getAssignableUsers(),
+    getMachinesForOrg(authContext.org.id),
+    getAssignableUsers(authContext.org.id),
   ]);
 
   // Transform data to match component expectations

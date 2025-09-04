@@ -21,7 +21,7 @@ import {
   performUniversalSearch,
   type SearchEntity,
 } from "~/lib/services/search-service";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 import { formatDistanceToNow } from "date-fns";
 
 interface UniversalSearchResultsProps {
@@ -79,7 +79,11 @@ export async function UniversalSearchResults({
   }
 
   // Get authentication context
-  const { organization } = await requireMemberAccess();
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
+  const { org: organization } = authContext;
   const organizationId = organization.id;
 
   // Perform search
