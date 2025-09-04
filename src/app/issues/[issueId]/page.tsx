@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import * as React from "react";
 
 import { IssueDetailServer } from "~/components/issues/issue-detail-server";
-import { getRequestAuthContext } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 
 interface IssuePageProps {
   params: Promise<{
@@ -29,12 +29,16 @@ export default async function IssuePage({
     // Single authentication resolution for entire request
     const authContext = await getRequestAuthContext();
 
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+
     // Resolve params for issue ID
     const resolvedParams = await params;
 
     return (
       <main aria-label="Issue details" className="container mx-auto px-4 py-6">
-        <IssueDetailServer issueId={resolvedParams.issueId} organizationId={authContext.organization.id} userId={authContext.user.id} />
+        <IssueDetailServer issueId={resolvedParams.issueId} organizationId={authContext.org.id} userId={authContext.user.id} />
       </main>
     );
   } catch {

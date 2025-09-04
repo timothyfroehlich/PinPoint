@@ -16,7 +16,6 @@ import {
   priorities,
 } from "~/server/db/schema";
 import { db } from "./shared";
-import { ensureOrgContextAndBindRLS } from "~/lib/organization-context";
 import { withOrgRLS } from "~/server/db/utils/rls";
 import { safeCount, type CountResult } from "~/lib/types/database-results";
 
@@ -58,9 +57,8 @@ export const getOrganizationById = cache(async (organizationId: string) => {
  * Uses authenticated context to get organization with automatic scoping
  * Uses React 19 cache() for request-level memoization
  */
-export const getCurrentOrganization = cache(async () => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    const organizationId = context.organization.id;
+export const getCurrentOrganization = cache(async (organizationId: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
     const org = await tx.query.organizations.findFirst({
       where: eq(organizations.id, organizationId),
       columns: {
@@ -87,10 +85,8 @@ export const getCurrentOrganization = cache(async () => {
  * Includes issues, machines, and member counts with parallel queries
  * Uses React 19 cache() for request-level memoization
  */
-export const getOrganizationStats = cache(async () => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    const organizationId = context.organization.id;
-
+export const getOrganizationStats = cache(async (organizationId: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
     const [issueStats, machineCount, memberCount] = await Promise.all([
       tx
         .select({
@@ -183,9 +179,8 @@ export const getOrganizationStatsById = cache(async (organizationId: string) => 
  * Includes pagination support for large organizations
  * Uses React 19 cache() for request-level memoization per page
  */
-export const getOrganizationMembers = cache(async (page = 1, limit = 20) => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    const organizationId = context.organization.id;
+export const getOrganizationMembers = cache(async (page = 1, limit = 20, organizationId: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
     const offset = (page - 1) * limit;
 
     return await tx.query.memberships.findMany({
@@ -219,9 +214,8 @@ export const getOrganizationMembers = cache(async (page = 1, limit = 20) => {
  * Get organization member count for pagination
  * Uses React 19 cache() for request-level memoization
  */
-export const getOrganizationMemberCount = cache(async () => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    const organizationId = context.organization.id;
+export const getOrganizationMemberCount = cache(async (organizationId: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
     const result: CountResult[] = await tx
       .select({ count: count() })
       .from(memberships)
@@ -235,9 +229,8 @@ export const getOrganizationMemberCount = cache(async () => {
  * Includes system vs custom role identification
  * Uses React 19 cache() for request-level memoization
  */
-export const getOrganizationRoles = cache(async () => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    const organizationId = context.organization.id;
+export const getOrganizationRoles = cache(async (organizationId: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
     return await tx.query.roles.findMany({
       where: eq(roles.organization_id, organizationId),
       columns: {
@@ -256,9 +249,8 @@ export const getOrganizationRoles = cache(async () => {
  * Returns membership with role information if valid
  * Uses React 19 cache() for request-level memoization per userId
  */
-export const validateUserMembership = cache(async (userId: string) => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    const organizationId = context.organization.id;
+export const validateUserMembership = cache(async (userId: string, organizationId: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
     return await tx.query.memberships.findFirst({
       where: and(
         eq(memberships.user_id, userId),
@@ -282,10 +274,8 @@ export const validateUserMembership = cache(async (userId: string) => {
  * Optimized query combining key statistics for dashboard display
  * Uses React 19 cache() for request-level memoization
  */
-export const getOrganizationDashboardData = cache(async () => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    const organizationId = context.organization.id;
-
+export const getOrganizationDashboardData = cache(async (organizationId: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
     const [organization, stats] = await Promise.all([
       tx.query.organizations
         .findFirst({
@@ -296,7 +286,7 @@ export const getOrganizationDashboardData = cache(async () => {
           if (!o) throw new Error("Organization not found");
           return o;
         }),
-      getOrganizationStats(),
+      getOrganizationStats(organizationId),
     ]);
 
     return { organization, stats };
@@ -308,10 +298,8 @@ export const getOrganizationDashboardData = cache(async () => {
  * Returns statuses that can be used for issue status updates
  * Uses React 19 cache() for request-level memoization
  */
-export const getAvailableStatuses = cache(async () => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    const organizationId = context.organization.id;
-
+export const getAvailableStatuses = cache(async (organizationId: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
     return await tx.query.issueStatuses.findMany({
       where: eq(issueStatuses.organization_id, organizationId),
       columns: {
@@ -329,10 +317,8 @@ export const getAvailableStatuses = cache(async () => {
  * Returns priorities that can be used for issue creation and updates
  * Uses React 19 cache() for request-level memoization
  */
-export const getAvailablePriorities = cache(async () => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    const organizationId = context.organization.id;
-
+export const getAvailablePriorities = cache(async (organizationId: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
     return await tx.query.priorities.findMany({
       where: eq(priorities.organization_id, organizationId),
       columns: {

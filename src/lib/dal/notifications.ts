@@ -6,8 +6,10 @@
 import { cache } from "react";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { notifications } from "~/server/db/schema";
-import { ensureOrgContextAndBindRLS } from "~/lib/organization-context";
 import { safeCount, type CountResult } from "~/lib/types/database-results";
+
+import { withOrgRLS } from "~/server/db/utils/rls";
+import { db } from "./shared";
 
 /**
  * Get notifications for the current user with pagination
@@ -15,13 +17,11 @@ import { safeCount, type CountResult } from "~/lib/types/database-results";
  * Uses React 19 cache() for request-level memoization
  */
 export const getUserNotifications = cache(
-  async (limit = 20, includeRead = true) => {
-    return ensureOrgContextAndBindRLS(async (tx, context) => {
-      if (!context.user) {
-        throw new Error("Authentication required");
+  async (userId: string, organizationId: string, limit = 20, includeRead = true) => {
+    return withOrgRLS(db, organizationId, async tx => {
+      if (!userId) {
+        throw new Error("User ID required");
       }
-      const userId = context.user.id;
-      const organizationId = context.organization.id;
 
       const whereConditions = [
         eq(notifications.user_id, userId),
@@ -55,13 +55,11 @@ export const getUserNotifications = cache(
  * Get unread notification count for the current user
  * Critical for notification bell badge display
  */
-export const getUnreadNotificationCount = cache(async () => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    if (!context.user) {
-      throw new Error("Authentication required");
+export const getUnreadNotificationCount = cache(async (userId: string, organizationId: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
+    if (!userId) {
+      throw new Error("User ID required");
     }
-    const userId = context.user.id;
-    const organizationId = context.organization.id;
 
     const result: CountResult[] = await tx
       .select({ count: sql<number>`count(*)` })
@@ -82,13 +80,11 @@ export const getUnreadNotificationCount = cache(async () => {
  * Get recent unread notifications for real-time display
  * Limited count to prevent performance issues
  */
-export const getRecentUnreadNotifications = cache(async (limit = 5) => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    if (!context.user) {
-      throw new Error("Authentication required");
+export const getRecentUnreadNotifications = cache(async (userId: string, organizationId: string, limit = 5) => {
+  return withOrgRLS(db, organizationId, async tx => {
+    if (!userId) {
+      throw new Error("User ID required");
     }
-    const userId = context.user.id;
-    const organizationId = context.organization.id;
 
     return await tx.query.notifications.findMany({
       where: and(
@@ -117,6 +113,8 @@ export const getRecentUnreadNotifications = cache(async (limit = 5) => {
  */
 export const getNotificationsByType = cache(
   async (
+    userId: string,
+    organizationId: string,
     notificationType:
       | "ISSUE_CREATED"
       | "ISSUE_UPDATED"
@@ -124,14 +122,12 @@ export const getNotificationsByType = cache(
       | "ISSUE_COMMENTED"
       | "MACHINE_ASSIGNED"
       | "SYSTEM_ANNOUNCEMENT",
-    limit = 10,
+    limit = 10
   ) => {
-    return ensureOrgContextAndBindRLS(async (tx, context) => {
-      if (!context.user) {
-        throw new Error("Authentication required");
+    return withOrgRLS(db, organizationId, async tx => {
+      if (!userId) {
+        throw new Error("User ID required");
       }
-      const userId = context.user.id;
-      const organizationId = context.organization.id;
 
       return await tx.query.notifications.findMany({
         where: and(
@@ -160,13 +156,11 @@ export const getNotificationsByType = cache(
  * Get notification by ID with access control
  * Ensures user can only access their own notifications
  */
-export const getNotificationById = cache(async (notificationId: string) => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    if (!context.user) {
-      throw new Error("Authentication required");
+export const getNotificationById = cache(async (userId: string, organizationId: string, notificationId: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
+    if (!userId) {
+      throw new Error("User ID required");
     }
-    const userId = context.user.id;
-    const organizationId = context.organization.id;
 
     return await tx.query.notifications.findFirst({
       where: and(
@@ -192,8 +186,8 @@ export const getNotificationById = cache(async (notificationId: string) => {
  * Check if user has any unread notifications
  * Quick boolean check for UI state management
  */
-export const hasUnreadNotifications = cache(async () => {
-  const count = await getUnreadNotificationCount();
+export const hasUnreadNotifications = cache(async (userId: string, organizationId: string) => {
+  const count = await getUnreadNotificationCount(userId, organizationId);
   return count > 0;
 });
 
@@ -201,13 +195,11 @@ export const hasUnreadNotifications = cache(async () => {
  * Get notification statistics for dashboard/analytics
  * Shows breakdown by type and read status
  */
-export const getNotificationStats = cache(async () => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    if (!context.user) {
-      throw new Error("Authentication required");
+export const getNotificationStats = cache(async (userId: string, organizationId: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
+    if (!userId) {
+      throw new Error("User ID required");
     }
-    const userId = context.user.id;
-    const organizationId = context.organization.id;
 
     const [totalResult, unreadResult, todayResult]: [
       CountResult[],
@@ -247,7 +239,7 @@ export const getNotificationStats = cache(async () => {
 
     const total = safeCount(totalResult);
     const unread = safeCount(unreadResult);
-    
+
     return {
       total,
       unread,

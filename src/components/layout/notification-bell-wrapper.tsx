@@ -10,6 +10,7 @@ import { getUnreadNotificationCount } from "~/lib/dal/notifications";
 
 interface NotificationBellWrapperProps {
   userId: string;
+  organizationId: string;
 }
 
 /**
@@ -22,8 +23,9 @@ interface NotificationBellWrapperProps {
  */
 export async function NotificationBellWrapper({
   userId,
+  organizationId,
 }: NotificationBellWrapperProps): Promise<JSX.Element> {
-  const unreadCount = await getUnreadNotificationCount();
+  const unreadCount = await getUnreadNotificationCount(userId, organizationId);
 
   return (
     <div className="relative">

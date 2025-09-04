@@ -21,7 +21,7 @@ import {
   type ActionResult,
 } from "./shared";
 import { isError, getErrorMessage } from "~/lib/utils/type-guards";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 import { requirePermission } from "./shared";
 import { PERMISSIONS } from "~/server/auth/permissions.constants";
 import { generateCommentNotifications } from "~/lib/services/notification-generator";
@@ -71,7 +71,11 @@ export async function addCommentAction(
   formData: FormData,
 ): Promise<ActionResult<{ commentId: string }>> {
   try {
-    const { user, organization } = await requireMemberAccess();
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization } = authContext;
     const organizationId = organization.id;
 
     // Enhanced validation
@@ -146,8 +150,11 @@ export async function editCommentAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organization, membership } =
-      await requireMemberAccess();
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization, membership } = authContext;
     const organizationId = organization.id;
     await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ISSUE_CREATE_BASIC, db);
 
@@ -209,8 +216,11 @@ export async function deleteCommentAction(
   _formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organization, membership } =
-      await requireMemberAccess();
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization, membership } = authContext;
     const organizationId = organization.id;
     await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ISSUE_CREATE_BASIC, db);
 
@@ -265,8 +275,11 @@ export async function restoreCommentAction(
   _formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organization, membership } =
-      await requireMemberAccess();
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization, membership } = authContext;
     const organizationId = organization.id;
     await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ISSUE_CREATE_BASIC, db);
 

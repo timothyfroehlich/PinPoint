@@ -22,6 +22,8 @@ import {
 import Link from "next/link";
 
 interface NotificationListServerProps {
+  userId: string;
+  organizationId: string;
   limit?: number;
 }
 
@@ -68,12 +70,14 @@ function getNotificationColor(type: string): string {
 }
 
 export async function NotificationsListServer({
+  userId,
+  organizationId,
   limit = 10,
 }: NotificationListServerProps): Promise<JSX.Element> {
   // Parallel data fetching for optimal performance
   const [notifications, stats] = await Promise.all([
-    getUserNotifications(limit),
-    getNotificationStats(),
+    getUserNotifications(userId, organizationId, limit),
+    getNotificationStats(userId, organizationId),
   ]);
 
   if (notifications.length === 0) {

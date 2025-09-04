@@ -84,7 +84,7 @@ export {
  * Combines organization, user, and issue data for dashboard pages
  * Uses parallel queries for optimal performance
  */
-export async function getDashboardData(organizationId: string): Promise<{
+export async function getDashboardData(userId: string, organizationId: string): Promise<{
   organization: OrganizationResponse;
   user: UserProfileResponse;
   issueStats: IssueStats;
@@ -95,8 +95,8 @@ export async function getDashboardData(organizationId: string): Promise<{
   const { getIssueDashboardStats, getRecentIssues } = await import("./issues");
 
   const [orgData, userProfile, issueStats, recentIssues] = await Promise.all([
-    getCurrentOrganization(),
-    getCurrentUserProfile(),
+    getCurrentOrganization(organizationId),
+    getCurrentUserProfile(userId, organizationId),
     getIssueDashboardStats(organizationId),
     getRecentIssues(organizationId, 5),
   ]);
@@ -132,9 +132,9 @@ export async function getOrganizationOverviewData(organizationId: string): Promi
   const { getRecentIssues } = await import("./issues");
 
   const [organization, stats, memberCount, recentIssues] = await Promise.all([
-    getCurrentOrganization(),
-    getOrganizationStats(),
-    getOrganizationMemberCount(),
+    getCurrentOrganization(organizationId),
+    getOrganizationStats(organizationId),
+    getOrganizationMemberCount(organizationId),
     getRecentIssues(organizationId, 10),
   ]);
 

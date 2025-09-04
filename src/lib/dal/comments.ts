@@ -6,19 +6,18 @@
 import { cache } from "react";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { comments } from "~/server/db/schema";
-// No direct db access; use ensureOrgContextAndBindRLS to run under RLS-bound tx
-import { ensureOrgContextAndBindRLS } from "~/lib/organization-context";
 import { safeCount, type CountResult } from "~/lib/types/database-results";
+
+import { withOrgRLS } from "~/server/db/utils/rls";
+import { db } from "./shared";
 
 /**
  * Get comments for a specific issue with author details
  * Includes proper organization scoping and excludes soft-deleted comments
  * Uses React 19 cache() for request-level memoization
  */
-export const getCommentsForIssue = cache(async (issueId: string) => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    const organizationId = context.organization.id;
-
+export const getCommentsForIssue = cache(async (issueId: string, organizationId: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
     return await tx.query.comments.findMany({
       where: and(
         eq(comments.issue_id, issueId),
@@ -44,10 +43,8 @@ export const getCommentsForIssue = cache(async (issueId: string) => {
  * Get a single comment by ID with organization scoping
  * Returns null if comment doesn't exist or user doesn't have access
  */
-export const getCommentById = cache(async (commentId: string) => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    const organizationId = context.organization.id;
-
+export const getCommentById = cache(async (commentId: string, organizationId: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
     return await tx.query.comments.findFirst({
       where: and(
         eq(comments.id, commentId),
@@ -79,10 +76,8 @@ export const getCommentById = cache(async (commentId: string) => {
  * Get recent comments for the organization (for activity feeds)
  * Limited to prevent performance issues
  */
-export const getRecentCommentsForOrg = cache(async (limit = 10) => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    const organizationId = context.organization.id;
-
+export const getRecentCommentsForOrg = cache(async (limit = 10, organizationId: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
     return await tx.query.comments.findMany({
       where: and(
         eq(comments.organization_id, organizationId),
@@ -123,9 +118,8 @@ export const getRecentCommentsForOrg = cache(async (limit = 10) => {
  * Used before allowing edit/delete operations
  */
 export const canUserAccessComment = cache(
-  async (commentId: string, userId: string) => {
-    return ensureOrgContextAndBindRLS(async (tx, context) => {
-      const organizationId = context.organization.id;
+  async (commentId: string, userId: string, organizationId: string) => {
+    return withOrgRLS(db, organizationId, async tx => {
       const comment = await tx.query.comments.findFirst({
         where: and(
           eq(comments.id, commentId),
@@ -145,9 +139,8 @@ export const canUserAccessComment = cache(
 /**
  * Get comment count for an issue (for display purposes)
  */
-export const getCommentCountForIssue = cache(async (issueId: string) => {
-  return ensureOrgContextAndBindRLS(async (tx, context) => {
-    const organizationId = context.organization.id;
+export const getCommentCountForIssue = cache(async (issueId: string, organizationId: string) => {
+  return withOrgRLS(db, organizationId, async tx => {
     const result: CountResult[] = await tx
       .select({ count: sql<number>`count(*)` })
       .from(comments)
