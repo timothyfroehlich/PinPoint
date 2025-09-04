@@ -1,4 +1,4 @@
-import { pgTable, index, pgPolicy, uuid, varchar, text, timestamp, boolean, unique, integer, json, real, foreignKey, jsonb, inet, primaryKey, pgView, pgEnum } from "drizzle-orm/pg-core"
+import { pgTable, text, timestamp, unique, index, pgPolicy, boolean, integer, json, varchar, uuid, foreignKey, jsonb, inet, real, primaryKey, pgView, pgEnum } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 export const activityType = pgEnum("activity_type", ['CREATED', 'STATUS_CHANGED', 'ASSIGNED', 'PRIORITY_CHANGED', 'COMMENTED', 'COMMENT_DELETED', 'ATTACHMENT_ADDED', 'MERGED', 'RESOLVED', 'REOPENED', 'SYSTEM'])
@@ -8,57 +8,10 @@ export const notificationEntity = pgEnum("notification_entity", ['ISSUE', 'MACHI
 export const notificationFrequency = pgEnum("notification_frequency", ['IMMEDIATE', 'DAILY', 'WEEKLY', 'NEVER'])
 export const notificationType = pgEnum("notification_type", ['ISSUE_CREATED', 'ISSUE_UPDATED', 'ISSUE_ASSIGNED', 'ISSUE_COMMENTED', 'MACHINE_ASSIGNED', 'SYSTEM_ANNOUNCEMENT'])
 export const reporterType = pgEnum("reporter_type", ['authenticated', 'anonymous'])
+export const severity = pgEnum("severity", ['low', 'medium', 'high', 'critical'])
 export const statusCategory = pgEnum("status_category", ['NEW', 'IN_PROGRESS', 'RESOLVED'])
 export const voterType = pgEnum("voter_type", ['authenticated', 'anonymous'])
 
-
-export const anonymousRateLimits = pgTable("anonymous_rate_limits", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	sessionId: varchar("session_id", { length: 255 }).notNull(),
-	ipAddress: text("ip_address"),
-	actionType: varchar("action_type", { length: 50 }).notNull(),
-	organizationId: text("organization_id").notNull(),
-	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
-}, (table) => [
-	index("rate_limits_cleanup_idx").using("btree", table.createdAt.asc().nullsLast().op("timestamp_ops")),
-	index("rate_limits_session_org_action_idx").using("btree", table.sessionId.asc().nullsLast().op("text_ops"), table.organizationId.asc().nullsLast().op("text_ops"), table.actionType.asc().nullsLast().op("text_ops")),
-	pgPolicy("anonymous_rate_limits_member_access", { as: "permissive", for: "all", to: ["authenticated"], using: sql`((organization_id = current_setting('app.current_organization_id'::text, true)) AND fn_is_org_member((auth.uid())::text, current_setting('app.current_organization_id'::text, true)))`, withCheck: sql`((organization_id = current_setting('app.current_organization_id'::text, true)) AND fn_is_org_member((auth.uid())::text, current_setting('app.current_organization_id'::text, true)))`  }),
-	pgPolicy("anonymous_rate_limits_system_insert", { as: "permissive", for: "insert", to: ["anon"] }),
-]);
-
-export const notifications = pgTable("notifications", {
-	id: text().primaryKey().notNull(),
-	message: text().notNull(),
-	read: boolean().default(false).notNull(),
-	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
-	userId: text("user_id").notNull(),
-	type: notificationType().notNull(),
-	entityType: notificationEntity("entity_type"),
-	entityId: text("entity_id"),
-	actionUrl: text("action_url"),
-	organizationId: text("organization_id").notNull(),
-}, (table) => [
-	index("notifications_organization_id_idx").using("btree", table.organizationId.asc().nullsLast().op("text_ops")),
-	index("notifications_user_id_created_at_idx").using("btree", table.userId.asc().nullsLast().op("timestamp_ops"), table.createdAt.asc().nullsLast().op("timestamp_ops")),
-	index("notifications_user_id_read_idx").using("btree", table.userId.asc().nullsLast().op("text_ops"), table.read.asc().nullsLast().op("text_ops")),
-	pgPolicy("notifications_user_access", { as: "permissive", for: "all", to: ["authenticated"], using: sql`(user_id = (auth.uid())::text)`, withCheck: sql`(user_id = (auth.uid())::text)`  }),
-]);
-
-export const pinballMapConfigs = pgTable("pinball_map_configs", {
-	id: text().primaryKey().notNull(),
-	organizationId: text("organization_id").notNull(),
-	apiEnabled: boolean("api_enabled").default(false).notNull(),
-	apiKey: text("api_key"),
-	autoSyncEnabled: boolean("auto_sync_enabled").default(false).notNull(),
-	syncIntervalHours: integer("sync_interval_hours").default(24).notNull(),
-	lastGlobalSync: timestamp("last_global_sync", { mode: 'string' }),
-	createMissingModels: boolean("create_missing_models").default(true).notNull(),
-	updateExistingData: boolean("update_existing_data").default(false).notNull(),
-}, (table) => [
-	index("pinball_map_configs_organization_id_idx").using("btree", table.organizationId.asc().nullsLast().op("text_ops")),
-	unique("pinball_map_configs_organization_id_unique").on(table.organizationId),
-	pgPolicy("pinball_map_configs_member_access", { as: "permissive", for: "all", to: ["authenticated"], using: sql`((organization_id = current_setting('app.current_organization_id'::text, true)) AND fn_is_org_member((auth.uid())::text, current_setting('app.current_organization_id'::text, true)))`, withCheck: sql`((organization_id = current_setting('app.current_organization_id'::text, true)) AND fn_is_org_member((auth.uid())::text, current_setting('app.current_organization_id'::text, true)))`  }),
-]);
 
 export const accounts = pgTable("accounts", {
 	id: text().primaryKey().notNull(),
@@ -151,22 +104,6 @@ export const users = pgTable("users", {
 	pgPolicy("users_no_anon_access", { as: "permissive", for: "all", to: ["anon"] }),
 ]);
 
-export const issueHistory = pgTable("issue_history", {
-	id: text().primaryKey().notNull(),
-	field: text().notNull(),
-	oldValue: text("old_value"),
-	newValue: text("new_value"),
-	changedAt: timestamp("changed_at", { mode: 'string' }).defaultNow().notNull(),
-	organizationId: text("organization_id").notNull(),
-	actorId: text("actor_id"),
-	type: activityType().notNull(),
-	issueId: text("issue_id").notNull(),
-}, (table) => [
-	index("issue_history_issue_id_idx").using("btree", table.issueId.asc().nullsLast().op("text_ops")),
-	index("issue_history_organization_id_idx").using("btree", table.organizationId.asc().nullsLast().op("text_ops")),
-	index("issue_history_type_idx").using("btree", table.type.asc().nullsLast().op("enum_ops")),
-]);
-
 export const issues = pgTable("issues", {
 	id: text().primaryKey().notNull(),
 	title: text().notNull(),
@@ -182,6 +119,7 @@ export const issues = pgTable("issues", {
 	submitterName: text("submitter_name"),
 	anonymousSessionId: varchar("anonymous_session_id", { length: 255 }),
 	anonymousContactMethod: varchar("anonymous_contact_method", { length: 255 }),
+	severity: severity().default('medium').notNull(),
 	moderationStatus: moderationStatus("moderation_status").default('approved').notNull(),
 	organizationId: text("organization_id").notNull(),
 	machineId: text("machine_id").notNull(),
@@ -199,6 +137,7 @@ export const issues = pgTable("issues", {
 	index("issues_priority_id_idx").using("btree", table.priorityId.asc().nullsLast().op("text_ops")),
 	index("issues_public_org_idx").using("btree", table.organizationId.asc().nullsLast().op("bool_ops"), table.isPublic.asc().nullsLast().op("bool_ops")),
 	index("issues_reporter_type_idx").using("btree", table.reporterType.asc().nullsLast().op("enum_ops"), table.organizationId.asc().nullsLast().op("text_ops")),
+	index("issues_severity_idx").using("btree", table.severity.asc().nullsLast().op("enum_ops")),
 	index("issues_status_id_idx").using("btree", table.statusId.asc().nullsLast().op("text_ops")),
 	pgPolicy("issues_anon_create", { as: "permissive", for: "insert", to: ["anon"], withCheck: sql`((organization_id = current_setting('app.current_organization_id'::text, true)) AND (reporter_type = 'anonymous'::reporter_type) AND (created_by_id IS NULL) AND (EXISTS ( SELECT 1
    FROM organizations o
@@ -212,17 +151,52 @@ export const issues = pgTable("issues", {
 	pgPolicy("issues_delete_owner_or_perms", { as: "permissive", for: "delete", to: ["authenticated"] }),
 ]);
 
-export const upvotes = pgTable("upvotes", {
+export const notifications = pgTable("notifications", {
 	id: text().primaryKey().notNull(),
+	message: text().notNull(),
+	read: boolean().default(false).notNull(),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
-	issueId: text("issue_id").notNull(),
-	voterType: voterType("voter_type").default('authenticated').notNull(),
-	userId: text("user_id"),
-	anonymousSessionId: varchar("anonymous_session_id", { length: 255 }),
+	userId: text("user_id").notNull(),
+	type: notificationType().notNull(),
+	entityType: notificationEntity("entity_type"),
+	entityId: text("entity_id"),
+	actionUrl: text("action_url"),
+	organizationId: text("organization_id").notNull(),
 }, (table) => [
-	index("upvotes_anon_session_issue_idx").using("btree", table.issueId.asc().nullsLast().op("text_ops"), table.anonymousSessionId.asc().nullsLast().op("text_ops")),
-	index("upvotes_issue_id_idx").using("btree", table.issueId.asc().nullsLast().op("text_ops")),
-	index("upvotes_user_id_issue_id_idx").using("btree", table.userId.asc().nullsLast().op("text_ops"), table.issueId.asc().nullsLast().op("text_ops")),
+	index("notifications_organization_id_idx").using("btree", table.organizationId.asc().nullsLast().op("text_ops")),
+	index("notifications_user_id_created_at_idx").using("btree", table.userId.asc().nullsLast().op("timestamp_ops"), table.createdAt.asc().nullsLast().op("timestamp_ops")),
+	index("notifications_user_id_read_idx").using("btree", table.userId.asc().nullsLast().op("text_ops"), table.read.asc().nullsLast().op("text_ops")),
+	pgPolicy("notifications_user_access", { as: "permissive", for: "all", to: ["authenticated"], using: sql`(user_id = (auth.uid())::text)`, withCheck: sql`(user_id = (auth.uid())::text)`  }),
+]);
+
+export const pinballMapConfigs = pgTable("pinball_map_configs", {
+	id: text().primaryKey().notNull(),
+	organizationId: text("organization_id").notNull(),
+	apiEnabled: boolean("api_enabled").default(false).notNull(),
+	apiKey: text("api_key"),
+	autoSyncEnabled: boolean("auto_sync_enabled").default(false).notNull(),
+	syncIntervalHours: integer("sync_interval_hours").default(24).notNull(),
+	lastGlobalSync: timestamp("last_global_sync", { mode: 'string' }),
+	createMissingModels: boolean("create_missing_models").default(true).notNull(),
+	updateExistingData: boolean("update_existing_data").default(false).notNull(),
+}, (table) => [
+	index("pinball_map_configs_organization_id_idx").using("btree", table.organizationId.asc().nullsLast().op("text_ops")),
+	unique("pinball_map_configs_organization_id_unique").on(table.organizationId),
+	pgPolicy("pinball_map_configs_member_access", { as: "permissive", for: "all", to: ["authenticated"], using: sql`((organization_id = current_setting('app.current_organization_id'::text, true)) AND fn_is_org_member((auth.uid())::text, current_setting('app.current_organization_id'::text, true)))`, withCheck: sql`((organization_id = current_setting('app.current_organization_id'::text, true)) AND fn_is_org_member((auth.uid())::text, current_setting('app.current_organization_id'::text, true)))`  }),
+]);
+
+export const anonymousRateLimits = pgTable("anonymous_rate_limits", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	sessionId: varchar("session_id", { length: 255 }).notNull(),
+	ipAddress: text("ip_address"),
+	actionType: varchar("action_type", { length: 50 }).notNull(),
+	organizationId: text("organization_id").notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("rate_limits_cleanup_idx").using("btree", table.createdAt.asc().nullsLast().op("timestamp_ops")),
+	index("rate_limits_session_org_action_idx").using("btree", table.sessionId.asc().nullsLast().op("text_ops"), table.organizationId.asc().nullsLast().op("text_ops"), table.actionType.asc().nullsLast().op("text_ops")),
+	pgPolicy("anonymous_rate_limits_member_access", { as: "permissive", for: "all", to: ["authenticated"], using: sql`((organization_id = current_setting('app.current_organization_id'::text, true)) AND fn_is_org_member((auth.uid())::text, current_setting('app.current_organization_id'::text, true)))`, withCheck: sql`((organization_id = current_setting('app.current_organization_id'::text, true)) AND fn_is_org_member((auth.uid())::text, current_setting('app.current_organization_id'::text, true)))`  }),
+	pgPolicy("anonymous_rate_limits_system_insert", { as: "permissive", for: "insert", to: ["anon"] }),
 ]);
 
 export const issueStatuses = pgTable("issue_statuses", {
@@ -236,44 +210,17 @@ export const issueStatuses = pgTable("issue_statuses", {
 	pgPolicy("issue_statuses_member_access", { as: "permissive", for: "all", to: ["authenticated"], using: sql`((organization_id = current_setting('app.current_organization_id'::text, true)) AND fn_is_org_member((auth.uid())::text, current_setting('app.current_organization_id'::text, true)))`, withCheck: sql`((organization_id = current_setting('app.current_organization_id'::text, true)) AND fn_is_org_member((auth.uid())::text, current_setting('app.current_organization_id'::text, true)))`  }),
 ]);
 
-export const locations = pgTable("locations", {
+export const upvotes = pgTable("upvotes", {
 	id: text().primaryKey().notNull(),
-	name: text().notNull(),
-	organizationId: text("organization_id").notNull(),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
-	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
-	street: text(),
-	city: text(),
-	state: text(),
-	zip: text(),
-	phone: text(),
-	website: text(),
-	latitude: real(),
-	longitude: real(),
-	description: text(),
-	pinballMapId: integer("pinball_map_id"),
-	regionId: text("region_id"),
-	lastSyncAt: timestamp("last_sync_at", { mode: 'string' }),
-	syncEnabled: boolean("sync_enabled").default(false).notNull(),
-	isPublic: boolean("is_public"),
+	issueId: text("issue_id").notNull(),
+	voterType: voterType("voter_type").default('authenticated').notNull(),
+	userId: text("user_id"),
+	anonymousSessionId: varchar("anonymous_session_id", { length: 255 }),
 }, (table) => [
-	index("locations_organization_id_idx").using("btree", table.organizationId.asc().nullsLast().op("text_ops")),
-	index("locations_public_org_idx").using("btree", table.organizationId.asc().nullsLast().op("text_ops"), table.isPublic.asc().nullsLast().op("text_ops")),
-	pgPolicy("locations_public_read", { as: "permissive", for: "select", to: ["anon", "authenticated"], using: sql`((organization_id = current_setting('app.current_organization_id'::text, true)) AND ((is_public IS TRUE) OR ((is_public IS NULL) AND (EXISTS ( SELECT 1
-   FROM organizations o
-  WHERE ((o.id = locations.organization_id) AND (o.is_public = true)))))))` }),
-	pgPolicy("locations_member_modify", { as: "permissive", for: "all", to: ["authenticated"] }),
-]);
-
-export const priorities = pgTable("priorities", {
-	id: text().primaryKey().notNull(),
-	name: text().notNull(),
-	order: integer().notNull(),
-	organizationId: text("organization_id").notNull(),
-	isDefault: boolean("is_default").default(false).notNull(),
-}, (table) => [
-	index("priorities_organization_id_idx").using("btree", table.organizationId.asc().nullsLast().op("text_ops")),
-	pgPolicy("priorities_member_access", { as: "permissive", for: "all", to: ["authenticated"], using: sql`((organization_id = current_setting('app.current_organization_id'::text, true)) AND fn_is_org_member((auth.uid())::text, current_setting('app.current_organization_id'::text, true)))`, withCheck: sql`((organization_id = current_setting('app.current_organization_id'::text, true)) AND fn_is_org_member((auth.uid())::text, current_setting('app.current_organization_id'::text, true)))`  }),
+	index("upvotes_anon_session_issue_idx").using("btree", table.issueId.asc().nullsLast().op("text_ops"), table.anonymousSessionId.asc().nullsLast().op("text_ops")),
+	index("upvotes_issue_id_idx").using("btree", table.issueId.asc().nullsLast().op("text_ops")),
+	index("upvotes_user_id_issue_id_idx").using("btree", table.userId.asc().nullsLast().op("text_ops"), table.issueId.asc().nullsLast().op("text_ops")),
 ]);
 
 export const models = pgTable("models", {
@@ -327,124 +274,6 @@ export const invitations = pgTable("invitations", {
 	unique("invitations_token_unique").on(table.token),
 ]);
 
-export const rolePermissions = pgTable("role_permissions", {
-	roleId: text("role_id").notNull(),
-	permissionId: text("permission_id").notNull(),
-}, (table) => [
-	index("role_permissions_permission_id_idx").using("btree", table.permissionId.asc().nullsLast().op("text_ops")),
-	index("role_permissions_role_id_idx").using("btree", table.roleId.asc().nullsLast().op("text_ops")),
-	foreignKey({
-			columns: [table.roleId],
-			foreignColumns: [roles.id],
-			name: "role_permissions_role_id_roles_id_fk"
-		}).onDelete("cascade"),
-	foreignKey({
-			columns: [table.permissionId],
-			foreignColumns: [permissions.id],
-			name: "role_permissions_permission_id_permissions_id_fk"
-		}).onDelete("cascade"),
-]);
-
-export const systemSettings = pgTable("system_settings", {
-	id: text().primaryKey().notNull(),
-	organizationId: text("organization_id").notNull(),
-	settingKey: text("setting_key").notNull(),
-	settingValue: jsonb("setting_value").notNull(),
-	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
-	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
-}, (table) => [
-	index("system_settings_org_key_idx").using("btree", table.organizationId.asc().nullsLast().op("text_ops"), table.settingKey.asc().nullsLast().op("text_ops")),
-	index("system_settings_organization_id_idx").using("btree", table.organizationId.asc().nullsLast().op("text_ops")),
-	foreignKey({
-			columns: [table.organizationId],
-			foreignColumns: [organizations.id],
-			name: "system_settings_organization_id_organizations_id_fk"
-		}).onDelete("cascade"),
-]);
-
-export const permissions = pgTable("permissions", {
-	id: text().primaryKey().notNull(),
-	name: text().notNull(),
-	description: text(),
-}, (table) => [
-	unique("permissions_name_unique").on(table.name),
-	pgPolicy("permissions_global_read", { as: "permissive", for: "select", to: ["authenticated"], using: sql`true` }),
-]);
-
-export const memberships = pgTable("memberships", {
-	id: text().primaryKey().notNull(),
-	userId: text("user_id").notNull(),
-	organizationId: text("organization_id").notNull(),
-	roleId: text("role_id").notNull(),
-}, (table) => [
-	index("memberships_organization_id_idx").using("btree", table.organizationId.asc().nullsLast().op("text_ops")),
-	index("memberships_user_id_organization_id_idx").using("btree", table.userId.asc().nullsLast().op("text_ops"), table.organizationId.asc().nullsLast().op("text_ops")),
-	pgPolicy("memberships_self_access", { as: "permissive", for: "all", to: ["authenticated"], using: sql`((user_id = (auth.uid())::text) AND (organization_id = current_setting('app.current_organization_id'::text, true)))`, withCheck: sql`((user_id = (auth.uid())::text) AND (organization_id = current_setting('app.current_organization_id'::text, true)))`  }),
-	pgPolicy("memberships_org_member_read", { as: "permissive", for: "select", to: ["authenticated"] }),
-]);
-
-export const activityLog = pgTable("activity_log", {
-	id: text().primaryKey().notNull(),
-	organizationId: text("organization_id").notNull(),
-	userId: text("user_id"),
-	action: text().notNull(),
-	entityType: text("entity_type").notNull(),
-	entityId: text("entity_id"),
-	details: jsonb(),
-	ipAddress: inet("ip_address"),
-	userAgent: text("user_agent"),
-	severity: text().default('info').notNull(),
-	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
-}, (table) => [
-	index("activity_log_action_idx").using("btree", table.action.asc().nullsLast().op("text_ops")),
-	index("activity_log_entity_idx").using("btree", table.entityType.asc().nullsLast().op("text_ops"), table.entityId.asc().nullsLast().op("text_ops")),
-	index("activity_log_org_time_idx").using("btree", table.organizationId.asc().nullsLast().op("timestamp_ops"), table.createdAt.asc().nullsLast().op("timestamp_ops")),
-	index("activity_log_user_id_idx").using("btree", table.userId.asc().nullsLast().op("text_ops")),
-	foreignKey({
-			columns: [table.organizationId],
-			foreignColumns: [organizations.id],
-			name: "activity_log_organization_id_organizations_id_fk"
-		}).onDelete("cascade"),
-]);
-
-export const organizations = pgTable("organizations", {
-	id: text().primaryKey().notNull(),
-	name: text().notNull(),
-	subdomain: text().notNull(),
-	logoUrl: text("logo_url"),
-	description: text(),
-	website: text(),
-	phone: text(),
-	address: text(),
-	allowAnonymousIssues: boolean("allow_anonymous_issues").default(true).notNull(),
-	allowAnonymousComments: boolean("allow_anonymous_comments").default(true).notNull(),
-	allowAnonymousUpvotes: boolean("allow_anonymous_upvotes").default(true).notNull(),
-	requireModerationAnonymous: boolean("require_moderation_anonymous").default(false).notNull(),
-	isPublic: boolean("is_public").default(false).notNull(),
-	publicIssueDefault: text("public_issue_default").default('private').notNull(),
-	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
-	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
-}, (table) => [
-	index("organizations_subdomain_idx").using("btree", table.subdomain.asc().nullsLast().op("text_ops")),
-	unique("organizations_subdomain_unique").on(table.subdomain),
-	pgPolicy("organizations_auth_read", { as: "permissive", for: "select", to: ["authenticated"], using: sql`(id = current_setting('app.current_organization_id'::text, true))` }),
-	pgPolicy("organizations_context_read", { as: "permissive", for: "select", to: ["anon"] }),
-	pgPolicy("organizations_member_modify", { as: "permissive", for: "all", to: ["authenticated"] }),
-]);
-
-export const roles = pgTable("roles", {
-	id: text().primaryKey().notNull(),
-	name: text().notNull(),
-	organizationId: text("organization_id").notNull(),
-	isDefault: boolean("is_default").default(false).notNull(),
-	isSystem: boolean("is_system").default(false).notNull(),
-	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
-	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
-}, (table) => [
-	index("roles_organization_id_idx").using("btree", table.organizationId.asc().nullsLast().op("text_ops")),
-	pgPolicy("roles_member_access", { as: "permissive", for: "all", to: ["authenticated"], using: sql`((organization_id = current_setting('app.current_organization_id'::text, true)) AND fn_is_org_member((auth.uid())::text, current_setting('app.current_organization_id'::text, true)))`, withCheck: sql`((organization_id = current_setting('app.current_organization_id'::text, true)) AND fn_is_org_member((auth.uid())::text, current_setting('app.current_organization_id'::text, true)))`  }),
-]);
-
 export const machines = pgTable("machines", {
 	id: text().primaryKey().notNull(),
 	name: text().notNull(),
@@ -480,6 +309,151 @@ export const machines = pgTable("machines", {
 	pgPolicy("machines_member_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
 	pgPolicy("machines_update_owner_or_perms", { as: "permissive", for: "update", to: ["authenticated"] }),
 	pgPolicy("machines_delete_permission", { as: "permissive", for: "delete", to: ["authenticated"] }),
+]);
+
+export const activityLog = pgTable("activity_log", {
+	id: text().primaryKey().notNull(),
+	organizationId: text("organization_id").notNull(),
+	userId: text("user_id"),
+	action: text().notNull(),
+	entityType: text("entity_type").notNull(),
+	entityId: text("entity_id"),
+	details: jsonb(),
+	ipAddress: inet("ip_address"),
+	userAgent: text("user_agent"),
+	severity: text().default('info').notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("activity_log_action_idx").using("btree", table.action.asc().nullsLast().op("text_ops")),
+	index("activity_log_entity_idx").using("btree", table.entityType.asc().nullsLast().op("text_ops"), table.entityId.asc().nullsLast().op("text_ops")),
+	index("activity_log_org_time_idx").using("btree", table.organizationId.asc().nullsLast().op("timestamp_ops"), table.createdAt.asc().nullsLast().op("timestamp_ops")),
+	index("activity_log_user_id_idx").using("btree", table.userId.asc().nullsLast().op("text_ops")),
+	foreignKey({
+			columns: [table.organizationId],
+			foreignColumns: [organizations.id],
+			name: "activity_log_organization_id_organizations_id_fk"
+		}).onDelete("cascade"),
+]);
+
+export const rolePermissions = pgTable("role_permissions", {
+	roleId: text("role_id").notNull(),
+	permissionId: text("permission_id").notNull(),
+}, (table) => [
+	index("role_permissions_permission_id_idx").using("btree", table.permissionId.asc().nullsLast().op("text_ops")),
+	index("role_permissions_role_id_idx").using("btree", table.roleId.asc().nullsLast().op("text_ops")),
+	foreignKey({
+			columns: [table.roleId],
+			foreignColumns: [roles.id],
+			name: "role_permissions_role_id_roles_id_fk"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.permissionId],
+			foreignColumns: [permissions.id],
+			name: "role_permissions_permission_id_permissions_id_fk"
+		}).onDelete("cascade"),
+]);
+
+export const permissions = pgTable("permissions", {
+	id: text().primaryKey().notNull(),
+	name: text().notNull(),
+	description: text(),
+}, (table) => [
+	unique("permissions_name_unique").on(table.name),
+	pgPolicy("permissions_global_read", { as: "permissive", for: "select", to: ["authenticated"], using: sql`true` }),
+]);
+
+export const systemSettings = pgTable("system_settings", {
+	id: text().primaryKey().notNull(),
+	organizationId: text("organization_id").notNull(),
+	settingKey: text("setting_key").notNull(),
+	settingValue: jsonb("setting_value").notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("system_settings_org_key_idx").using("btree", table.organizationId.asc().nullsLast().op("text_ops"), table.settingKey.asc().nullsLast().op("text_ops")),
+	index("system_settings_organization_id_idx").using("btree", table.organizationId.asc().nullsLast().op("text_ops")),
+	foreignKey({
+			columns: [table.organizationId],
+			foreignColumns: [organizations.id],
+			name: "system_settings_organization_id_organizations_id_fk"
+		}).onDelete("cascade"),
+]);
+
+export const roles = pgTable("roles", {
+	id: text().primaryKey().notNull(),
+	name: text().notNull(),
+	organizationId: text("organization_id").notNull(),
+	isDefault: boolean("is_default").default(false).notNull(),
+	isSystem: boolean("is_system").default(false).notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("roles_organization_id_idx").using("btree", table.organizationId.asc().nullsLast().op("text_ops")),
+	pgPolicy("roles_member_access", { as: "permissive", for: "all", to: ["authenticated"], using: sql`((organization_id = current_setting('app.current_organization_id'::text, true)) AND fn_is_org_member((auth.uid())::text, current_setting('app.current_organization_id'::text, true)))`, withCheck: sql`((organization_id = current_setting('app.current_organization_id'::text, true)) AND fn_is_org_member((auth.uid())::text, current_setting('app.current_organization_id'::text, true)))`  }),
+]);
+
+export const organizations = pgTable("organizations", {
+	id: text().primaryKey().notNull(),
+	name: text().notNull(),
+	subdomain: text().notNull(),
+	logoUrl: text("logo_url"),
+	description: text(),
+	website: text(),
+	phone: text(),
+	address: text(),
+	allowAnonymousIssues: boolean("allow_anonymous_issues").default(true).notNull(),
+	allowAnonymousComments: boolean("allow_anonymous_comments").default(true).notNull(),
+	allowAnonymousUpvotes: boolean("allow_anonymous_upvotes").default(true).notNull(),
+	requireModerationAnonymous: boolean("require_moderation_anonymous").default(false).notNull(),
+	isPublic: boolean("is_public").default(false).notNull(),
+	publicIssueDefault: text("public_issue_default").default('private').notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("organizations_subdomain_idx").using("btree", table.subdomain.asc().nullsLast().op("text_ops")),
+	unique("organizations_subdomain_unique").on(table.subdomain),
+	pgPolicy("organizations_auth_read", { as: "permissive", for: "select", to: ["authenticated"], using: sql`(id = current_setting('app.current_organization_id'::text, true))` }),
+	pgPolicy("organizations_context_read", { as: "permissive", for: "select", to: ["anon"] }),
+	pgPolicy("organizations_member_modify", { as: "permissive", for: "all", to: ["authenticated"] }),
+]);
+
+export const memberships = pgTable("memberships", {
+	id: text().primaryKey().notNull(),
+	userId: text("user_id").notNull(),
+	organizationId: text("organization_id").notNull(),
+	roleId: text("role_id").notNull(),
+}, (table) => [
+	index("memberships_organization_id_idx").using("btree", table.organizationId.asc().nullsLast().op("text_ops")),
+	index("memberships_user_id_organization_id_idx").using("btree", table.userId.asc().nullsLast().op("text_ops"), table.organizationId.asc().nullsLast().op("text_ops")),
+	pgPolicy("memberships_self_access", { as: "permissive", for: "all", to: ["authenticated"], using: sql`((user_id = (auth.uid())::text) AND (organization_id = current_setting('app.current_organization_id'::text, true)))`, withCheck: sql`((user_id = (auth.uid())::text) AND (organization_id = current_setting('app.current_organization_id'::text, true)))`  }),
+	pgPolicy("memberships_org_member_read", { as: "permissive", for: "select", to: ["authenticated"] }),
+]);
+
+export const priorities = pgTable("priorities", {
+	id: text().primaryKey().notNull(),
+	name: text().notNull(),
+	order: integer().notNull(),
+	organizationId: text("organization_id").notNull(),
+	isDefault: boolean("is_default").default(false).notNull(),
+}, (table) => [
+	index("priorities_organization_id_idx").using("btree", table.organizationId.asc().nullsLast().op("text_ops")),
+	pgPolicy("priorities_member_access", { as: "permissive", for: "all", to: ["authenticated"], using: sql`((organization_id = current_setting('app.current_organization_id'::text, true)) AND fn_is_org_member((auth.uid())::text, current_setting('app.current_organization_id'::text, true)))`, withCheck: sql`((organization_id = current_setting('app.current_organization_id'::text, true)) AND fn_is_org_member((auth.uid())::text, current_setting('app.current_organization_id'::text, true)))`  }),
+]);
+
+export const issueHistory = pgTable("issue_history", {
+	id: text().primaryKey().notNull(),
+	field: text().notNull(),
+	oldValue: text("old_value"),
+	newValue: text("new_value"),
+	changedAt: timestamp("changed_at", { mode: 'string' }).defaultNow().notNull(),
+	organizationId: text("organization_id").notNull(),
+	actorId: text("actor_id"),
+	type: activityType().notNull(),
+	issueId: text("issue_id").notNull(),
+}, (table) => [
+	index("issue_history_issue_id_idx").using("btree", table.issueId.asc().nullsLast().op("text_ops")),
+	index("issue_history_organization_id_idx").using("btree", table.organizationId.asc().nullsLast().op("text_ops")),
+	index("issue_history_type_idx").using("btree", table.type.asc().nullsLast().op("enum_ops")),
 ]);
 
 export const comments = pgTable("comments", {
@@ -538,6 +512,35 @@ export const attachments = pgTable("attachments", {
 	pgPolicy("attachments_anon_insert_public", { as: "permissive", for: "insert", to: ["anon"] }),
 	pgPolicy("attachments_member_insert_permission", { as: "permissive", for: "insert", to: ["authenticated"] }),
 	pgPolicy("attachments_delete_permission", { as: "permissive", for: "delete", to: ["authenticated"] }),
+]);
+
+export const locations = pgTable("locations", {
+	id: text().primaryKey().notNull(),
+	name: text().notNull(),
+	organizationId: text("organization_id").notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
+	street: text(),
+	city: text(),
+	state: text(),
+	zip: text(),
+	phone: text(),
+	website: text(),
+	latitude: real(),
+	longitude: real(),
+	description: text(),
+	pinballMapId: integer("pinball_map_id"),
+	regionId: text("region_id"),
+	lastSyncAt: timestamp("last_sync_at", { mode: 'string' }),
+	syncEnabled: boolean("sync_enabled").default(false).notNull(),
+	isPublic: boolean("is_public"),
+}, (table) => [
+	index("locations_organization_id_idx").using("btree", table.organizationId.asc().nullsLast().op("text_ops")),
+	index("locations_public_org_idx").using("btree", table.organizationId.asc().nullsLast().op("text_ops"), table.isPublic.asc().nullsLast().op("text_ops")),
+	pgPolicy("locations_public_read", { as: "permissive", for: "select", to: ["anon", "authenticated"], using: sql`((organization_id = current_setting('app.current_organization_id'::text, true)) AND ((is_public IS TRUE) OR ((is_public IS NULL) AND (EXISTS ( SELECT 1
+   FROM organizations o
+  WHERE ((o.id = locations.organization_id) AND (o.is_public = true)))))))` }),
+	pgPolicy("locations_member_modify", { as: "permissive", for: "all", to: ["authenticated"] }),
 ]);
 
 export const collectionMachines = pgTable("collection_machines", {

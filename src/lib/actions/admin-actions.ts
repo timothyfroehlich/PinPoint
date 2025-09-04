@@ -36,7 +36,7 @@ import { PERMISSIONS } from "~/server/auth/permissions.constants";
 
 // Enhanced validation schemas with better error messages
 const inviteUserSchema = z.object({
-  email: z.string().email().transform((s: string) => s.trim().toLowerCase()),
+  email: z.email().transform((s: string) => s.trim().toLowerCase()),
   name: z.string().max(100, "Name must be less than 100 characters").optional(),
   roleId: uuidSchema.optional(),
   message: z
@@ -58,7 +58,7 @@ type UpdateUserRoleData = z.infer<typeof updateUserRoleSchema>;
 
 const removeUserSchema = z.object({
   userId: uuidSchema,
-  confirmEmail: z.string().email().transform((s: string) => s.trim().toLowerCase()),
+  confirmEmail: z.email().transform((s: string) => s.trim().toLowerCase()),
 });
 
 // Explicit type for better TypeScript inference
@@ -145,7 +145,7 @@ export async function inviteUserAction(
     let userId = existingUser?.id;
     if (!existingUser) {
       // Create a new user record with unverified email
-      const newUser = await db
+      const newUserResult = await db
         .insert(users)
         .values({
           id: generatePrefixedId("user"),
@@ -155,7 +155,8 @@ export async function inviteUserAction(
         })
         .returning({ id: users.id });
 
-      userId = newUser[0]?.id;
+      const [newUser] = newUserResult;
+      userId = newUser?.id;
       if (!userId) {
         return actionError("Failed to create user record");
       }
@@ -428,7 +429,7 @@ export async function updateSystemSettingsAction(
       await requireAuthContextWithRole();
 
     // Parse JSON data from form
-    const settingsData = formData.get("settings") as string;
+    const settingsData = String(formData.get("settings") ?? "");
     if (!settingsData) {
       return actionError("No settings data provided");
     }

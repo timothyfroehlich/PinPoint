@@ -98,7 +98,7 @@ export default tseslint.config(
           object: "process",
           property: "env",
           message:
-            "Use the 'env' object from '~/env.js' instead of 'process.env'. It is validated and type-safe. See src/env.js for available variables and T3 Env documentation: https://env.t3.gg/docs/introduction",
+            "Use the 'env' object from '~/env' (server context) or utilities from '~/lib/environment-client' (client context) instead of 'process.env'. For server: import { env } from '~/env'. For client: import { isDevelopment } from '~/lib/environment-client'. See T3 Env documentation: https://env.t3.gg/docs/introduction",
         },
       ],
 

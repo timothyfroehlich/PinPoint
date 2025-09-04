@@ -66,16 +66,7 @@ export const issueCoreRouter = createTRPCRouter({
   // Public issue creation for anonymous users (via QR codes)
   publicCreate: anonOrgScopedProcedure
     .input(publicIssueCreateSchema)
-    .mutation(async ({ ctx, input }: {
-      ctx: any;
-      input: {
-        title: string;
-        description?: string | undefined;
-        machineId: string;
-        submitterName?: string | undefined;
-        reporterEmail: string;
-      };
-    }): Promise<IssueWithRelationsResponse> => {
+    .mutation(async ({ ctx, input }): Promise<IssueWithRelationsResponse> => {
       // Get machine, status, and priority for validation (RLS handles org scoping)
       const machine = await ctx.db.query.machines.findFirst({
         where: eq(machines.id, input.machineId),

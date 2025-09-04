@@ -39,6 +39,16 @@ interface CreateIssueFormServerProps {
     formData: FormData,
   ) => Promise<ActionResult<{ id: string }>>;
   initialMachineId?: string;
+  /** Show the priority selection (internal authenticated usage) */
+  showPriority?: boolean;
+  /** Show the assignee selection (internal authenticated usage) */
+  showAssignee?: boolean;
+  /** Show severity selection (public + internal unified concept, distinct from priority) */
+  showSeverity?: boolean;
+  /** Show machine selector; disable for fixed machine context (/report/[machineId]) */
+  showMachineSelect?: boolean;
+  /** Whether to show reporter contact optional fields (public anonymous context) */
+  showReporterFields?: boolean;
 }
 
 /**
@@ -51,6 +61,11 @@ export function CreateIssueFormServer({
   className,
   action,
   initialMachineId,
+  showPriority = true,
+  showAssignee = true,
+  showSeverity = false,
+  showMachineSelect = true,
+  showReporterFields = false,
 }: CreateIssueFormServerProps): JSX.Element {
   const [state, formAction, isPending] = useActionState(action, null);
   // Local state to ensure Radix Select values are included in HTML form submission
@@ -59,6 +74,7 @@ export function CreateIssueFormServer({
   );
   const [priority, setPriority] = useState<string>("medium");
   const [assigneeId, setAssigneeId] = useState<string | undefined>(undefined);
+  const [severity, setSeverity] = useState<string>("medium");
   const router = useRouter();
 
   // Client-side redirect after successful creation
@@ -108,90 +124,191 @@ export function CreateIssueFormServer({
             />
           </div>
 
-          {/* Machine selection (Radix Select does not submit value natively, so we mirror into hidden input) */}
-          <div className="space-y-2">
-            <Label htmlFor="machineId">
-              Machine <span className="text-destructive">*</span>
-            </Label>
-            <Select
-              required
-              disabled={isPending}
-              value={machineId ?? ""}
-              onValueChange={(v) => setMachineId(v)}
-            >
-              <SelectTrigger data-testid="machine-select-trigger">
-                <SelectValue
-                  placeholder="Select a machine"
-                  data-testid="machine-select-value"
+          {showMachineSelect ? (
+            <div className="space-y-2">
+              <Label htmlFor="machineId">
+                Machine <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                required
+                disabled={isPending}
+                value={machineId ?? ""}
+                onValueChange={(v) => {
+                  setMachineId(v);
+                }}
+              >
+                <SelectTrigger data-testid="machine-select-trigger">
+                  <SelectValue
+                    placeholder="Select a machine"
+                    data-testid="machine-select-value"
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {machines.map((machine) => (
+                    <SelectItem
+                      key={machine.id}
+                      value={machine.id}
+                      data-testid="machine-option"
+                      data-machine-id={machine.id}
+                    >
+                      {machine.name} ({machine.model.name})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {/* Hidden input to ensure value is submitted */}
+              <input
+                type="hidden"
+                name="machineId"
+                value={machineId ?? ""}
+                data-testid="machineId-hidden"
+                required
+              />
+            </div>
+          ) : (
+            <>
+              <input
+                type="hidden"
+                name="machineId"
+                value={machineId ?? ""}
+                data-testid="machineId-hidden"
+                required
+              />
+            </>
+          )}
+
+          {showReporterFields && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="reporterName">Your Name (optional)</Label>
+                <Input
+                  id="reporterName"
+                  name="reporterName"
+                  placeholder="Name or nickname"
+                  disabled={isPending}
+                  data-testid="reporter-name-input"
                 />
-              </SelectTrigger>
-              <SelectContent>
-                {machines.map((machine) => (
-                  <SelectItem
-                    key={machine.id}
-                    value={machine.id}
-                    data-testid="machine-option"
-                    data-machine-id={machine.id}
-                  >
-                    {machine.name} ({machine.model.name})
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reporterEmail">Email (optional)</Label>
+                <Input
+                  id="reporterEmail"
+                  name="reporterEmail"
+                  type="email"
+                  placeholder="you@example.com"
+                  disabled={isPending}
+                  data-testid="reporter-email-input"
+                />
+                <p className="text-xs text-muted-foreground">
+                  We may contact you for clarification. We'll never share your
+                  email.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {showSeverity && (
+            <div className="space-y-2">
+              <Label htmlFor="severity">
+                Severity <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                disabled={isPending}
+                data-testid="severity-select"
+                value={severity}
+                onValueChange={(v) => setSeverity(v)}
+              >
+                <SelectTrigger data-testid="severity-select-trigger">
+                  <SelectValue
+                    placeholder="Select severity"
+                    data-testid="severity-select-value"
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low" data-testid="severity-option-low">
+                    Low
                   </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {/* Hidden input to ensure value is submitted */}
-            <input
-              type="hidden"
-              name="machineId"
-              value={machineId ?? ""}
-              data-testid="machineId-hidden"
-              required
-            />
-          </div>
+                  <SelectItem
+                    value="medium"
+                    data-testid="severity-option-medium"
+                  >
+                    Medium
+                  </SelectItem>
+                  <SelectItem
+                    value="high"
+                    data-testid="severity-option-high"
+                  >
+                    High
+                  </SelectItem>
+                  <SelectItem
+                    value="critical"
+                    data-testid="severity-option-critical"
+                  >
+                    Critical
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <input
+                type="hidden"
+                name="severity"
+                value={severity}
+                data-testid="severity-hidden"
+              />
+            </div>
+          )}
 
-          {/* Priority selection (mirrored to hidden input) */}
-          <div className="space-y-2">
-            <Label htmlFor="priority">Priority</Label>
-            <Select
-              disabled={isPending}
-              data-testid="priority-select"
-              value={priority}
-              onValueChange={(v) => setPriority(v)}
-            >
-              <SelectTrigger data-testid="priority-select-trigger">
-                <SelectValue
-                  placeholder="Select priority"
-                  data-testid="priority-select-value"
-                />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="low" data-testid="priority-option-low">
-                  Low
-                </SelectItem>
-                <SelectItem value="medium" data-testid="priority-option-medium">
-                  Medium
-                </SelectItem>
-                <SelectItem value="high" data-testid="priority-option-high">
-                  High
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <input
-              type="hidden"
-              name="priority"
-              value={priority}
-              data-testid="priority-hidden"
-            />
-          </div>
+          {showPriority && (
+            <div className="space-y-2">
+              <Label htmlFor="priority">Priority</Label>
+              <Select
+                disabled={isPending}
+                data-testid="priority-select"
+                value={priority}
+                onValueChange={(v) => {
+                  setPriority(v);
+                }}
+              >
+                <SelectTrigger data-testid="priority-select-trigger">
+                  <SelectValue
+                    placeholder="Select priority"
+                    data-testid="priority-select-value"
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low" data-testid="priority-option-low">
+                    Low
+                  </SelectItem>
+                  <SelectItem
+                    value="medium"
+                    data-testid="priority-option-medium"
+                  >
+                    Medium
+                  </SelectItem>
+                  <SelectItem value="high" data-testid="priority-option-high">
+                    High
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <input
+                type="hidden"
+                name="priority"
+                value={priority}
+                data-testid="priority-hidden"
+              />
+            </div>
+          )}
 
-          {/* Assignee selection (optional) */}
-          {users.length > 0 && (
+          {/* Assignee selection (optional + gated) */}
+          {showAssignee && users.length > 0 && (
             <div className="space-y-2">
               <Label htmlFor="assigneeId">Assignee</Label>
               <Select
                 disabled={isPending}
                 data-testid="assignee-select"
                 value={assigneeId ?? ""}
-                onValueChange={(v) => setAssigneeId(v)}
+                onValueChange={(v) => {
+                  setAssigneeId(v);
+                }}
               >
                 <SelectTrigger data-testid="assignee-select-trigger">
                   <SelectValue

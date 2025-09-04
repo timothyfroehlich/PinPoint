@@ -329,14 +329,7 @@ export const adminRouter = createTRPCRouter({
         name: z.string().optional(),
       }),
     )
-    .mutation(async ({ ctx, input }: {
-      ctx: any;
-      input: {
-        email: string;
-        roleId: string;
-        name?: string | undefined;
-      };
-    }): Promise<AdminInvitationResponse> => {
+    .mutation(async ({ ctx, input }): Promise<AdminInvitationResponse> => {
       // Verify the role exists in this organization
       const [role] = await ctx.db
         .select()

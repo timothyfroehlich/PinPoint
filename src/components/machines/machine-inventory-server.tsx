@@ -186,7 +186,7 @@ export function MachineInventoryServer({
                   <span className="truncate">
                     {machine.location?.name ?? "Unknown Location"}
                     {machine.location?.city &&
-                      `, ${String(machine.location.city)}`}
+                      `, ${machine.location.city}`}
                   </span>
                 </div>
 

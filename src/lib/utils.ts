@@ -6,7 +6,7 @@ export function cn(...inputs: ClassValue[]): string {
 }
 
 // Utility for conditional styling with MUI coexistence
-export function muiToTailwind(_muiStyles: Record<string, any>): string {
+export function muiToTailwind(_muiStyles: Record<string, unknown>): string {
   // Helper to convert MUI sx props to Tailwind classes
   // Implementation for gradual migration
   return "";

@@ -7,6 +7,7 @@ import { requireMemberAccess } from "~/lib/organization-context";
 import { createIssueAction } from "~/lib/actions/issue-actions";
 import { getMachinesForOrg } from "~/lib/dal/machines";
 import { getAssignableUsers } from "~/lib/dal/users";
+import { computeIssueCreationGating } from "~/lib/permissions/issueCreationGating";
 
 // Transform DAL data for CreateIssueFormServer component
 function transformMachinesForForm(
@@ -93,6 +94,12 @@ export default async function CreateIssuePage({
   const machines = transformMachinesForForm(machinesRaw);
   const users = transformUsersForForm(assignableUsersRaw);
 
+  // For now, give all authenticated members full creation permissions
+  // TODO: Implement proper permission checking via DAL function
+  const gating = computeIssueCreationGating({ 
+    permissions: ["ISSUE_CREATE_FULL"] 
+  });
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Breadcrumbs */}
@@ -130,6 +137,8 @@ export default async function CreateIssuePage({
         {...(resolvedSearchParams.machineId && {
           initialMachineId: resolvedSearchParams.machineId,
         })}
+        showPriority={gating.showPriority}
+        showAssignee={gating.showAssignee}
       />
     </div>
   );

@@ -11,6 +11,7 @@ import {
   themeFromSourceColor,
   hexFromArgb,
 } from "@material/material-color-utilities";
+import { env } from "~/env";
 
 // Extended Scheme interface for additional surface container properties
 // that may be available in newer versions of Material Color Utilities
@@ -252,7 +253,7 @@ export const pinpointMaterialTheme = generateMaterialTheme(
 );
 
 // Log the generated theme for development purposes
-if (typeof window === "undefined" && process.env.NODE_ENV === "development") {
+if (typeof window === "undefined" && env.NODE_ENV === "development") {
   console.log("🎨 Generated PinPoint Material Design 3 Theme:", {
     source: PINPOINT_PURPLE_SOURCE,
     lightSurface: pinpointMaterialTheme.light.surface,
