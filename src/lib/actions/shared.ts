@@ -56,14 +56,15 @@ export const getServerAuthContext = getActionAuthContext;
 export async function requireActionAuthContextWithPermission(
   permission: string,
 ): Promise<{
-  user: { id: string; email: string; name?: string; };
+  user: { id: string; email: string; name: string };
   organizationId: string;
-  membership: { id: string; role: any; };
+  membership: { id: string; role: any };
 }> {
   const { user, organization, membership } = await requireMemberAccess();
   const organizationId = organization.id;
   await baseRequirePermission({ roleId: membership.role.id }, permission, db);
-  return { user, organizationId, membership };
+  const name = ((user as any).user_metadata?.name as string | undefined) ?? user.email ?? "";
+  return { user: { id: user.id, email: user.email!, name }, organizationId, membership };
 }
 
 /**

@@ -10,29 +10,26 @@ import {
   WrenchIcon,
   BarChart3Icon,
 } from "lucide-react";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/lib/organization-context";
 import { getIssuesForOrg } from "~/lib/dal/issues";
 import {
-  getOrganizationById,
   getOrganizationStats,
 } from "~/lib/dal/organizations";
 import { IssuesListServer } from "~/components/issues/issues-list-server";
 import { DashboardStats } from "~/components/dashboard/dashboard-stats";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const { organization } = await requireMemberAccess();
-  const org = await getOrganizationById(organization.id);
-
+  // Generic metadata to avoid auth race conditions - org-specific title set at page level
   return {
-    title: `Dashboard - ${org.name}`,
-    description: `Issue management dashboard for ${org.name}`,
+    title: "Dashboard - PinPoint",
+    description: "Issue management dashboard for monitoring and tracking maintenance issues",
   };
 }
 
 export default async function DashboardPage(): Promise<React.JSX.Element> {
-  // Authentication validation with automatic redirect
-  const { user, organization } = await requireMemberAccess();
-  const organizationId = organization.id;
+  // Single authentication resolution for entire request
+  const authContext = await getRequestAuthContext();
+  const { user } = authContext;
 
   return (
     <div className="space-y-8">
@@ -46,7 +43,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
 
       {/* Organization Statistics */}
       <Suspense fallback={<StatsLoadingSkeleton />}>
-        <DashboardStatsWithData organizationId={organizationId} />
+        <DashboardStatsWithData />
       </Suspense>
 
       {/* Dashboard Actions */}
@@ -65,7 +62,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
         </div>
 
         <Suspense fallback={<RecentIssuesLoadingSkeleton />}>
-          <RecentIssuesWithData organizationId={organizationId} />
+          <RecentIssuesWithData />
         </Suspense>
       </div>
     </div>
@@ -131,11 +128,7 @@ function DashboardQuickActions(): React.JSX.Element {
 }
 
 // Server Component for dashboard statistics
-async function DashboardStatsWithData({
-  organizationId: _organizationId,
-}: {
-  organizationId: string;
-}): Promise<React.JSX.Element> {
+async function DashboardStatsWithData(): Promise<React.JSX.Element> {
   const stats = await getOrganizationStats();
 
   // Transform to match DashboardStats component interface
@@ -151,12 +144,9 @@ async function DashboardStatsWithData({
 }
 
 // Server Component for recent issues
-async function RecentIssuesWithData({
-  organizationId: _organizationId,
-}: {
-  organizationId: string;
-}): Promise<React.JSX.Element> {
-  const issues = await getIssuesForOrg();
+async function RecentIssuesWithData(): Promise<React.JSX.Element> {
+  const auth = await getRequestAuthContext();
+  const issues = await getIssuesForOrg(auth.organization.id);
   const recentIssues = issues.slice(0, 5);
 
   if (recentIssues.length === 0) {

@@ -7,55 +7,21 @@
  */
 
 import { cache } from "react";
-import { headers } from "next/headers";
 import { sql } from "drizzle-orm";
 import { db } from "~/lib/dal/shared";
 import { getOrganizationBySubdomain, getUserMembershipPublic } from "~/lib/dal/public-organizations";
-import { createClient } from "~/lib/supabase/server";
-import { isDevelopment } from "~/lib/environment";
-import { extractTrustedSubdomain } from "~/lib/subdomain-verification";
+// Phase 1: Import adapters for legacy function compatibility
+import {
+  getOrganizationContextAdapter,
+  requireOrganizationContextAdapter,
+  requireMemberAccessAdapter,
+} from "~/server/auth/legacy-adapters";
 import { withOrgRLS } from "~/server/db/utils/rls";
 import type { DrizzleClient } from "~/server/db/drizzle";
-import type { OrganizationContext, AccessLevel } from "~/lib/types";
+import type { OrganizationContext } from "~/lib/types";
+// Re-export canonical resolver (Phase 1 consolidation)
+export { getRequestAuthContext } from "~/server/auth/context";
 
-/**
- * Extract subdomain from request headers
- * Works with both development (subdomain.localhost:3000) and production patterns
- */
-async function extractSubdomain(): Promise<string | null> {
-  const headersList = await headers();
-
-  // Prefer trusted subdomain header values (set by middleware)
-  const trusted = extractTrustedSubdomain(headersList as unknown as Headers);
-  if (trusted) return trusted;
-
-  // Fall back to Host header parsing
-  const host = headersList.get("host");
-  if (!host) return null;
-
-  // Remove port from host for parsing
-  const hostParts = host.split(":");
-  const hostWithoutPort = hostParts[0];
-
-  if (!hostWithoutPort) return null;
-
-  if (isDevelopment()) {
-    // Development: subdomain.localhost
-    if (hostWithoutPort === "localhost") return null;
-    const parts = hostWithoutPort.split(".");
-    if (parts.length >= 2 && parts[parts.length - 1] === "localhost") {
-      return parts[0] ?? null;
-    }
-    return null;
-  } else {
-    // Production: subdomain.domain.com
-    const parts = hostWithoutPort.split(".");
-    if (parts.length >= 3) {
-      return parts[0] ?? null;
-    }
-    return null;
-  }
-}
 
 /**
  * Resolve organization from subdomain
@@ -77,126 +43,21 @@ export const getUserMembership = cache(
 
 /**
  * Get current organization context from request
- * Determines organization from subdomain and user access level
- *
- * Returns null if no valid organization context can be established
+ * Phase 1: Now using adapter with deprecation warning
  */
-export const getOrganizationContext = cache(
-  async (): Promise<OrganizationContext | null> => {
-    // Extract subdomain from request
-    const subdomain = await extractSubdomain();
-    if (!subdomain) {
-      return null;
-    }
-
-    // Resolve organization from subdomain
-    const organization = await resolveOrganization(subdomain);
-    if (!organization) {
-      return null;
-    }
-
-    // Get current user (if authenticated)
-    let user = null;
-    let accessLevel: AccessLevel = "anonymous";
-    let membership = undefined;
-
-    try {
-      const supabase = await createClient();
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser();
-
-      if (authUser) {
-        const email = authUser.email ?? "";
-        const name =
-          (authUser.user_metadata["name"] as string | undefined) ?? email;
-        user = {
-          id: authUser.id,
-          email,
-          name,
-        };
-
-        accessLevel = "authenticated";
-
-        // Check if user has membership in this organization
-        const userMembership = await getUserMembership(
-          authUser.id,
-          organization.id,
-        );
-        if (userMembership) {
-          accessLevel = "member";
-          membership = {
-            id: userMembership.id,
-            role: userMembership.role,
-          };
-        }
-      }
-    } catch (error) {
-      // If auth fails, continue as anonymous user
-      console.warn("Auth check failed in organization context:", error);
-    }
-
-    const context: OrganizationContext = {
-      organization,
-      user,
-      accessLevel,
-    };
-
-    if (membership) {
-      context.membership = membership;
-    }
-
-    return context;
-  },
-);
+export const getOrganizationContext = getOrganizationContextAdapter;
 
 /**
  * Require organization context (throws if not available)
- * Use this in Server Components that need organization context
+ * Phase 1: Now using adapter with deprecation warning
  */
-export const requireOrganizationContext = cache(
-  async (): Promise<OrganizationContext> => {
-    const context = await getOrganizationContext();
-    if (!context) {
-      throw new Error(
-        "Organization context not available - invalid subdomain or organization not found",
-      );
-    }
-    return context;
-  },
-);
+export const requireOrganizationContext = requireOrganizationContextAdapter;
 
 /**
  * Require member-level access (throws if user is not a member)
- * Use this in Server Components that require organizational membership
+ * Phase 1: Now using adapter with deprecation warning
  */
-export const requireMemberAccess = cache(
-  async (): Promise<
-    OrganizationContext & {
-      user: NonNullable<OrganizationContext["user"]>;
-      accessLevel: "member";
-      membership: NonNullable<OrganizationContext["membership"]>;
-    }
-  > => {
-    const context = await requireOrganizationContext();
-
-    if (
-      context.accessLevel !== "member" ||
-      !context.user ||
-      !context.membership
-    ) {
-      throw new Error(
-        "Member access required - user does not have membership in this organization",
-      );
-    }
-
-    return context as OrganizationContext & {
-      user: NonNullable<OrganizationContext["user"]>;
-      accessLevel: "member";
-      membership: NonNullable<OrganizationContext["membership"]>;
-    };
-  },
-);
+export const requireMemberAccess = requireMemberAccessAdapter;
 
 /**
  * Set database session variable for RLS policies
@@ -237,6 +98,8 @@ export const setupOrganizationContext = cache(
  * Ensure organization context exists and run a function inside an RLS-bound transaction.
  * Returns the result of the function. Use for Server Components and Server Actions.
  */
+// (Removed duplicate getRequestAuthContext implementation; canonical version now lives in ~/server/auth/context)
+
 export async function ensureOrgContextAndBindRLS<T>(
   fn: (tx: DrizzleClient, context: OrganizationContext) => Promise<T>,
 ): Promise<T> {

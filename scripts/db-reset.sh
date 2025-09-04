@@ -4,14 +4,14 @@
 # PinPoint Database Reset Script
 # =============================================================================
 # Unified script for resetting database in local development and preview environments
-# 
+#
 # Usage:
 #   ./scripts/db-reset.sh local    # Reset local Supabase database
 #   ./scripts/db-reset.sh preview  # Reset preview environment database
 #
 # Features:
 # - Uses your existing .env.local; does not auto-pull from Vercel
-# - Uses modular SQL seed files for maintainability  
+# - Uses modular SQL seed files for maintainability
 # - Supports both Supabase (local/preview) and PostgreSQL-only (CI) workflows
 # - Auto-generates TypeScript types after schema changes
 # - Identical RLS policies across all environments
@@ -66,30 +66,30 @@ log_step() {
 
 validate_environment() {
     local env="$1"
-    
+
     if [[ "$env" != "local" && "$env" != "preview" ]]; then
         log_error "Invalid environment: $env"
         log_error "Usage: $0 <local|preview>"
         exit 1
     fi
-    
+
     log_info "Environment validated: $env"
 }
 
 validate_dependencies() {
     local missing_deps=()
-    
+
     # Check for required commands
     command -v supabase >/dev/null || missing_deps+=("supabase")
     command -v npm >/dev/null || missing_deps+=("npm")
     command -v psql >/dev/null || missing_deps+=("psql")
-    
+
     if [[ ${#missing_deps[@]} -gt 0 ]]; then
         log_error "Missing required dependencies: ${missing_deps[*]}"
         log_error "Please install missing tools and try again"
         exit 1
     fi
-    
+
     log_success "All dependencies available"
 }
 
@@ -133,39 +133,39 @@ validate_local_env_safety() {
 
 execute_sql_seeds() {
     local env="$1"
-    
+
     log_step "Executing modular SQL seed files"
-    
+
     # Define seed files in execution order based on environment
     local seed_files=()
-    
+
     # Base infrastructure (all environments)
     seed_files=(
         "base/01-rls-policies.sql"
         "base/02-permissions.sql"
     )
-    
+
     if [[ "$env" == "local" || "$env" == "preview" ]]; then
         # Add development/test data for local and preview
         seed_files+=(
             "dev/01-infrastructure.sql"
-            "dev/02-metadata.sql" 
+            "dev/02-metadata.sql"
             "dev/03-users.sql"
             "dev/04-machines.sql"
             "dev/05-issues.sql"
         )
     fi
-    
+
     # Add Supabase-specific seeds for local and preview
     if [[ "$env" != "ci" ]]; then
         seed_files+=("dev/99-supabase-auth.sql")
     fi
-    
+
     log_info "Executing ${#seed_files[@]} seed files..."
-    
+
     for seed_file in "${seed_files[@]}"; do
         local seed_path="$PROJECT_ROOT/supabase/seeds/$seed_file"
-        
+
         if [[ -f "$seed_path" ]]; then
             log_info "Executing: $seed_file"
             "$PROJECT_ROOT/scripts/safe-psql.sh" -f "$seed_path"
@@ -173,7 +173,7 @@ execute_sql_seeds() {
             log_warning "Seed file not found: $seed_file"
         fi
     done
-    
+
     log_success "All seed files executed successfully"
 
         # Quick verification of critical tables (best-effort; ignore failures)
@@ -189,13 +189,13 @@ execute_sql_seeds() {
 
 reset_supabase_database() {
     local env="$1"
-    
+
     log_step "Resetting Supabase database ($env)"
-    
+
     # Reset database without running seed.sql (we use modular approach)
     log_info "Performing clean database reset..."
     supabase db reset --no-seed
-    
+
     # Push Drizzle schema to database
     log_info "Applying Drizzle schema..."
     if [[ "$env" == "preview" ]]; then
@@ -203,10 +203,10 @@ reset_supabase_database() {
     else
         npm run db:push:local
     fi
-    
+
     # Execute our modular seed files (includes RLS policies)
     execute_sql_seeds "$env"
-    
+
     # Create dev users via Supabase Admin API (only for dev environments)
     if [[ "$env" == "local" || "$env" == "preview" ]]; then
         log_info "Creating dev users via Supabase Admin API..."
@@ -220,7 +220,7 @@ reset_supabase_database() {
             log_warning "tsx not found, skipping dev user creation"
         fi
     fi
-    
+
     # Sync schema definitions back to Drizzle
     log_info "Syncing schema definitions..."
     if [[ "$env" == "preview" ]]; then
@@ -228,15 +228,15 @@ reset_supabase_database() {
     else
         npx drizzle-kit pull --config=drizzle.config.dev.ts
     fi
-    
+
     log_success "Database reset completed for $env environment"
 }
 
 generate_typescript_types() {
     local env="$1"
-    
+
     log_step "Generating TypeScript types from database schema"
-    
+
     if [[ "$env" == "local" || "$env" == "preview" ]]; then
         log_info "Generating types from local database..."
         supabase gen types typescript --local > src/lib/types/database.ts
@@ -249,7 +249,7 @@ generate_typescript_types() {
         fi
         supabase gen types typescript --db-url "$DATABASE_URL" > src/lib/types/database.ts
     fi
-    
+
     log_success "TypeScript types generated successfully"
 }
 
@@ -263,7 +263,7 @@ main() {
     echo "🗄️  PinPoint Database Reset"
     echo "======================================================================"
     echo -e "${NC}"
-    
+
     # Validate arguments
     if [[ $# -lt 1 || $# -gt 2 ]]; then
         log_error "Usage: $0 <local|preview> [--allow-non-local]"
@@ -272,31 +272,31 @@ main() {
         log_error "  --allow-non-local  Proceed even if .env.local looks non-local (DANGEROUS)"
         exit 1
     fi
-    
+
     local environment="$1"
     local allow_non_local="false"
     if [[ "${2:-}" == "--allow-non-local" ]]; then
         allow_non_local="true"
     fi
-    
+
     # Change to project root
     cd "$PROJECT_ROOT"
-    
+
     # Validation
     validate_environment "$environment"
     validate_dependencies
     validate_local_env_safety "$environment" "$allow_non_local"
-    
+
     # Execution steps
     reset_supabase_database "$environment"
     generate_typescript_types "$environment"
-    
+
     echo -e "\n${GREEN}"
     echo "======================================================================"
     echo "✅ Database reset completed successfully!"
     echo "======================================================================"
     echo -e "${NC}"
-    
+
     log_info "Next steps:"
     if [[ "$environment" == "local" ]]; then
         log_info "• Run 'npm run dev' to start development server"
@@ -305,7 +305,7 @@ main() {
         log_info "• Deploy changes: 'vercel --prod'"
         log_info "• Check 'npm run db:studio:preview' to browse database"
     fi
-    
+
     log_info "• Run tests: 'npm run test:all'"
     log_info "• Validate RLS: 'npm run test:rls'"
 }

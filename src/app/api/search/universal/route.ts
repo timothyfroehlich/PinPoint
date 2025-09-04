@@ -5,7 +5,7 @@ import {
   performUniversalSearch,
   type SearchEntity,
 } from "~/lib/services/search-service";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 import { isError, getErrorMessage } from "~/lib/utils/type-guards";
 
 const UniversalSearchQuerySchema = z.object({
@@ -54,9 +54,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    // Require authentication and organization context
-    const { organization } = await requireMemberAccess();
-    const organizationId = organization.id;
+    // Canonical auth resolution
+    const auth = await getRequestAuthContext();
+    if (auth.kind !== 'authorized') {
+      return NextResponse.json({
+        error: 'Authentication required',
+        message: 'Member access required',
+        timestamp: new Date().toISOString(),
+      }, { status: 401 });
+    }
+    const organizationId = auth.org.id;
 
     // Perform universal search
     const searchResponse = await performUniversalSearch({

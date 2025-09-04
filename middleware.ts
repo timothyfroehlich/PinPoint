@@ -3,10 +3,14 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 import { env } from "~/env";
+// Attempt static import first; if build system tree-shakes incorrectly we can dynamically require later.
+import { trackRequest } from "./src/lib/auth/instrumentation";
 import { SUBDOMAIN_VERIFIED_HEADER } from "~/lib/subdomain-verification";
 import { getCookieDomain } from "~/lib/utils/domain";
 
 export async function middleware(request: NextRequest): Promise<NextResponse> {
+  // Phase 1 instrumentation: count each incoming request for auth metrics denominator
+  try { trackRequest(); } catch { /* non-fatal */ }
   const url = request.nextUrl.clone();
   const host = request.headers.get("host") ?? "";
 

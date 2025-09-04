@@ -1,7 +1,7 @@
 # PinPoint Target Architecture
 
-**Last Updated**: September 2, 2025  
-**Last Reviewed**: September 2, 2025  
+**Last Updated**: September 2, 2025
+**Last Reviewed**: September 2, 2025
 
 _The definitive architectural blueprint for PinPoint's server-first, multi-tenant issue tracking platform_
 
@@ -262,13 +262,13 @@ function trackCompilerMetrics() {
   performance.mark('component-render-start');
   // Component rendering with compiler optimizations
   performance.mark('component-render-end');
-  
+
   const measure = performance.measure(
-    'component-render', 
-    'component-render-start', 
+    'component-render',
+    'component-render-start',
     'component-render-end'
   );
-  
+
   // Monitor compiler performance impact
   reportMetrics('react-compiler', measure.duration);
 }
@@ -431,6 +431,9 @@ export function shouldUseReactCompiler(): boolean {
 - Type-safe authentication context propagation through Server Action parameters
 
 ## 4. Organization Context Resolution
+### Global (Root/Apex) Context
+
+If no subdomain is present, the route operates in global context. No organization membership lookup or org-scoped queries should be performed. Only public/global data may be accessed. Org-scoped functions must assert presence of organizationId and fail loudly if absent.
 
 ### Multi-Tenant Organization Context Architecture
 
@@ -446,11 +449,11 @@ export function shouldUseReactCompiler(): boolean {
 export async function middleware(request: NextRequest) {
   const host = request.headers.get('host')
   const subdomain = host?.split('.')[0]
-  
+
   // Set organization context in request headers
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set('x-organization-context', subdomain || 'default')
-  
+
   return NextResponse.next({
     request: { headers: requestHeaders }
   })
@@ -467,11 +470,11 @@ import { cache } from 'react'
 export const getOrganizationContext = cache(async () => {
   const headers = await import('next/headers')
   const orgContext = (await headers.headers()).get('x-organization-context')
-  
+
   if (!orgContext) {
     throw new OrganizationContextError('No organization context found')
   }
-  
+
   return await validateAndResolveOrganization(orgContext)
 })
 
@@ -497,7 +500,7 @@ import { createServerClient } from '@supabase/ssr'
 
 export async function createOrganizationAwareClient() {
   const cookies = await import('next/headers').then(m => m.cookies())
-  
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -512,14 +515,14 @@ export async function createOrganizationAwareClient() {
       },
     }
   )
-  
+
   const { data: { user } } = await supabase.auth.getUser()
   const organizationId = user?.app_metadata?.organizationId
-  
+
   if (!organizationId) {
     throw new OrganizationContextError('User lacks organization context')
   }
-  
+
   return { supabase, organizationId, user }
 }
 ```
@@ -538,7 +541,7 @@ export async function createOrganizationAwareClient() {
 export default async function IssuesPage() {
   const { organizationId } = await getOrganizationContext()
   const issues = await getOrganizationData(organizationId)
-  
+
   return <IssuesList issues={issues} />
 }
 
@@ -549,7 +552,7 @@ export default async function OrganizationLayout({
   children: React.ReactNode
 }) {
   const { organization, user } = await getOrganizationContext()
-  
+
   return (
     <div>
       <OrganizationHeader organization={organization} />
@@ -564,15 +567,15 @@ export default async function OrganizationLayout({
 **Client Island Integration for Organization-Aware Interactions**
 ```typescript
 'use client'
-export function OrganizationProvider({ 
-  children, 
-  organizationId 
+export function OrganizationProvider({
+  children,
+  organizationId
 }: {
   children: React.ReactNode
   organizationId: string
 }) {
   const [orgContext] = useState(organizationId)
-  
+
   return (
     <OrganizationContext.Provider value={orgContext}>
       {children}
@@ -627,19 +630,19 @@ export async function validateOrganizationAccess(
       eq(memberships.organization_id, requestedOrgId)
     )
   })
-  
+
   if (!membership) {
     throw new UnauthorizedError('No membership found')
   }
-  
+
   const organization = await db.query.organizations.findFirst({
     where: eq(organizations.id, requestedOrgId)
   })
-  
+
   if (!organization?.is_active) {
     throw new OrganizationSuspendedError('Organization inactive')
   }
-  
+
   return { organization, membership }
 }
 ```
@@ -653,10 +656,10 @@ export async function switchOrganization(
 ): Promise<{ redirectUrl: string }> {
   await validateOrganizationAccess(userId, targetOrgId)
   await updateUserOrganization(userId, targetOrgId)
-  
+
   const org = await getOrganization(targetOrgId)
   const redirectUrl = `https://${org.subdomain}.${process.env.BASE_DOMAIN}`
-  
+
   return { redirectUrl }
 }
 ```
@@ -675,7 +678,7 @@ export async function repairOrganizationContext(
       const context = await validateOrganizationAccess(user.id, orgId)
       return context
     }
-    
+
     // Find user's default organization
     const defaultMembership = await db.query.memberships.findFirst({
       where: and(
@@ -684,12 +687,12 @@ export async function repairOrganizationContext(
       ),
       orderBy: desc(memberships.created_at)
     })
-    
+
     if (defaultMembership) {
       await updateUserOrganization(user.id, defaultMembership.organization_id)
       return await validateOrganizationAccess(user.id, defaultMembership.organization_id)
     }
-    
+
     return null
   } catch (error) {
     console.warn('Context repair failed:', error)
@@ -710,7 +713,7 @@ export async function getOrganizationContextWithFallback(): Promise<Organization
         return await repairOrganizationContext(user)
       }
     }
-    
+
     console.error('Organization context resolution failed:', error)
     return null
   }
@@ -732,17 +735,17 @@ export async function monitoredOrganizationResolution(
   requestId: string
 ): Promise<OrganizationContext> {
   const startTime = performance.now()
-  
+
   try {
     const context = await getOrganizationContext()
-    
+
     const duration = performance.now() - startTime
     trackMetric('organization_context_resolution', duration, {
       requestId,
       organizationId: context.organization.id,
       success: true
     })
-    
+
     return context
   } catch (error) {
     const duration = performance.now() - startTime
@@ -1222,7 +1225,7 @@ export async function monitoredOrganizationResolution(
 // ~/lib/types/errors.ts - Comprehensive error classification system
 export const ErrorSeverity = {
   LOW: 'low',
-  MEDIUM: 'medium', 
+  MEDIUM: 'medium',
   HIGH: 'high',
   CRITICAL: 'critical'
 } as const
@@ -1242,7 +1245,7 @@ export interface ClassifiedError {
 export class ValidationError extends Error implements ClassifiedError {
   readonly type = 'validation'
   readonly severity = ErrorSeverity.LOW
-  
+
   constructor(
     public readonly userMessage: string,
     public readonly internalMessage: string = userMessage,
@@ -1257,7 +1260,7 @@ export class AuthorizationError extends Error implements ClassifiedError {
   readonly type = 'authorization'
   readonly severity = ErrorSeverity.HIGH
   readonly userMessage = 'Access denied'
-  
+
   constructor(
     public readonly internalMessage: string,
     public readonly organizationId?: string,
@@ -1319,7 +1322,7 @@ async function ServerDataComponent({ orgId }: { orgId: string }) {
 'use client'
 function ClientErrorBoundary({ data }: { data: any }) {
   const [error, setError] = useState<Error | null>(null)
-  
+
   if (error) {
     return (
       <div className="error-boundary">
@@ -1329,7 +1332,7 @@ function ClientErrorBoundary({ data }: { data: any }) {
       </div>
     )
   }
-  
+
   return <DataDisplay data={data} onError={setError} />
 }
 ```
@@ -1365,11 +1368,11 @@ export async function createIssue(
       console.error('Database error:', error) // Server-side logging only
       return { message: 'Unable to create issue. Please try again.' }
     }
-    
+
     if (error instanceof AuthorizationError) {
       return { message: 'You do not have permission to perform this action.' }
     }
-    
+
     // Generic fallback prevents information disclosure
     return { message: 'An unexpected error occurred.' }
   }
@@ -1390,13 +1393,13 @@ export function CreateIssueForm() {
           {state.errors.title.join(', ')}
         </div>
       )}
-      
+
       {state?.message && (
         <div className="form-error" role="alert" aria-live="polite">
           {state.message}
         </div>
       )}
-      
+
       <button disabled={pending} type="submit">
         {pending ? 'Creating...' : 'Create Issue'}
       </button>
@@ -1427,23 +1430,23 @@ export function sanitizeErrorForClient(error: unknown): {
   if (error instanceof ValidationError) {
     return { message: error.userMessage }
   }
-  
+
   if (error instanceof AuthorizationError) {
-    return { 
+    return {
       message: error.userMessage,
       code: 'authorization_error'
     }
   }
-  
+
   if (error instanceof DatabaseError) {
-    return { 
+    return {
       message: 'A system error occurred. Please try again later.',
       digest: generateErrorDigest(error) // For log correlation
     }
   }
-  
+
   // Generic fallback prevents information leakage
-  return { 
+  return {
     message: 'An unexpected error occurred.',
     digest: generateErrorDigest(error)
   }
@@ -1457,7 +1460,7 @@ function generateErrorDigest(error: unknown): string {
 
 **Multi-Tenant Error Context Isolation**
 - Organization-scoped error logging preventing cross-tenant information leakage
-- Error context sanitization removing sensitive organizational data from client responses  
+- Error context sanitization removing sensitive organizational data from client responses
 - Audit trail generation for security events while protecting organizational boundaries
 - Error correlation across organizational boundaries for system-wide issue detection while maintaining data isolation
 
@@ -1468,14 +1471,14 @@ function generateErrorDigest(error: unknown): string {
 // ~/lib/dal/transaction-wrapper.ts
 export async function safeTransaction<T>(
   operation: (tx: typeof db) => Promise<T>,
-  options: { 
+  options: {
     organizationId: string
     maxRetries?: number
     backoffMs?: number
   }
 ): Promise<{ data?: T; error?: ClassifiedError }> {
   const { organizationId, maxRetries = 3, backoffMs = 1000 } = options
-  
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const data = await db.transaction(async (tx) => {
@@ -1483,7 +1486,7 @@ export async function safeTransaction<T>(
         await verifyOrganizationAccess(tx, organizationId)
         return await operation(tx)
       })
-      
+
       return { data }
     } catch (error) {
       console.error(`Transaction attempt ${attempt} failed:`, {
@@ -1491,7 +1494,7 @@ export async function safeTransaction<T>(
         organizationId,
         attempt
       })
-      
+
       if (isDatabaseConstraintError(error)) {
         if (attempt === maxRetries) {
           return {
@@ -1502,18 +1505,18 @@ export async function safeTransaction<T>(
             )
           }
         }
-        
+
         // Exponential backoff before retry
-        await new Promise(resolve => 
+        await new Promise(resolve =>
           setTimeout(resolve, backoffMs * Math.pow(2, attempt - 1))
         )
         continue
       }
-      
+
       // Non-retryable error
       return {
-        error: error instanceof ClassifiedError 
-          ? error 
+        error: error instanceof ClassifiedError
+          ? error
           : new DatabaseError('Unexpected database error', String(error), { organizationId })
       }
     }
@@ -1563,7 +1566,7 @@ export async function safeOrganizationOperation<T>(
     if (error instanceof ClassifiedError) {
       return { error }
     }
-    
+
     return {
       error: new DatabaseError(
         'Database operation failed',
@@ -1614,8 +1617,8 @@ export class StructuredLogger {
         name: error.name,
         message: error.message,
         stack: error.stack,
-        digest: error instanceof ClassifiedError 
-          ? generateErrorDigest(error) 
+        digest: error instanceof ClassifiedError
+          ? generateErrorDigest(error)
           : undefined
       } : undefined,
       context: {
@@ -1624,10 +1627,10 @@ export class StructuredLogger {
       },
       metadata
     }
-    
+
     // Send to monitoring service with organizational context isolation
     await this.sendToMonitoring(entry)
-    
+
     if (process.env.NODE_ENV === 'development') {
       console.error('Structured Error Log:', JSON.stringify(entry, null, 2))
     }
@@ -1654,17 +1657,17 @@ export function ProgressiveErrorBoundary({
 }: ProgressiveErrorBoundaryProps) {
   const [error, setError] = useState<Error | null>(null)
   const [retryCount, setRetryCount] = useState(0)
-  
+
   const retry = useCallback(() => {
     setError(null)
     setRetryCount(count => count + 1)
   }, [])
-  
+
   if (error) {
     if (Fallback) {
       return <Fallback error={error} retry={retry} />
     }
-    
+
     // Progressive fallback based on error boundary level
     switch (level) {
       case 'page':
@@ -1676,7 +1679,7 @@ export function ProgressiveErrorBoundary({
             <a href="/">Return Home</a>
           </div>
         )
-      
+
       case 'section':
         return (
           <div className="section-error">
@@ -1684,7 +1687,7 @@ export function ProgressiveErrorBoundary({
             <button onClick={retry}>Try Again</button>
           </div>
         )
-      
+
       case 'component':
         return (
           <div className="component-error">
@@ -1693,13 +1696,13 @@ export function ProgressiveErrorBoundary({
         )
     }
   }
-  
+
   return (
     <ErrorBoundary onError={(error) => {
       const logger = new StructuredLogger()
-      logger.logError(error, { 
+      logger.logError(error, {
         errorBoundaryLevel: level,
-        retryCount 
+        retryCount
       })
     }}>
       {children}
@@ -1720,11 +1723,11 @@ interface ErrorDisplayProps {
   showDetails?: boolean
 }
 
-export function ErrorDisplay({ 
-  error, 
-  onRetry, 
-  onDismiss, 
-  showDetails = false 
+export function ErrorDisplay({
+  error,
+  onRetry,
+  onDismiss,
+  showDetails = false
 }: ErrorDisplayProps) {
   const getErrorIcon = (severity: ErrorSeverity) => {
     switch (severity) {
@@ -1734,9 +1737,9 @@ export function ErrorDisplay({
       case ErrorSeverity.LOW: return 'ℹ️'
     }
   }
-  
+
   return (
-    <div 
+    <div
       className={`error-display error-display--${error.severity}`}
       role="alert"
       aria-live="polite"
@@ -1749,7 +1752,7 @@ export function ErrorDisplay({
           {error.userMessage}
         </h3>
       </div>
-      
+
       {showDetails && process.env.NODE_ENV === 'development' && (
         <details className="error-display__details">
           <summary>Technical Details</summary>
@@ -1759,10 +1762,10 @@ export function ErrorDisplay({
           )}
         </details>
       )}
-      
+
       <div className="error-display__actions">
         {onRetry && (
-          <button 
+          <button
             className="error-display__retry-button"
             onClick={onRetry}
           >
@@ -1770,7 +1773,7 @@ export function ErrorDisplay({
           </button>
         )}
         {onDismiss && (
-          <button 
+          <button
             className="error-display__dismiss-button"
             onClick={onDismiss}
           >
@@ -2388,12 +2391,12 @@ export function ErrorDisplay({
 // Server Component - Works without JavaScript
 export default async function IssuesPage() {
   const issues = await getIssues(); // Server-side data fetching
-  
+
   return (
     <div>
       {/* Static content renders first */}
       <IssuesList issues={issues} />
-      
+
       {/* Progressive enhancement with Client Components */}
       <Suspense fallback={<FilterSkeleton />}>
         <IssueFilters /> {/* Client Component for interactivity */}
@@ -2406,13 +2409,13 @@ export default async function IssuesPage() {
 'use client'
 function InteractiveNote({ note }) {
   const [expanded, setExpanded] = useState(false);
-  
+
   return (
     <article>
       {/* Static content always visible */}
       <h3>{note.title}</h3>
       <p>{note.preview}</p>
-      
+
       {/* Enhanced functionality */}
       <button onClick={() => setExpanded(!expanded)}>
         {expanded ? 'Collapse' : 'Expand'}
@@ -2432,14 +2435,14 @@ function InteractiveNote({ note }) {
 async function createIssue(formData: FormData) {
   const title = formData.get('title') as string;
   const description = formData.get('description') as string;
-  
+
   // Validate and save with organization scoping
   const issue = await db.issues.create({
     title,
     description,
     organizationId: getOrgId()
   });
-  
+
   // Progressive enhancement: redirect vs. return data
   redirect(`/issues/${issue.id}`);
 }
@@ -2450,23 +2453,23 @@ export default function CreateIssueForm() {
     <form action={createIssue}>
       <div>
         <label htmlFor="title">Issue Title</label>
-        <input 
-          id="title" 
-          name="title" 
-          required 
+        <input
+          id="title"
+          name="title"
+          required
           type="text"
         />
       </div>
-      
+
       <div>
         <label htmlFor="description">Description</label>
-        <textarea 
-          id="description" 
-          name="description" 
+        <textarea
+          id="description"
+          name="description"
           required
         />
       </div>
-      
+
       {/* Works without JavaScript */}
       <button type="submit">Create Issue</button>
     </form>
@@ -2481,24 +2484,24 @@ import { useActionState } from 'react';
 
 export default function EnhancedCreateIssueForm() {
   const [state, formAction, pending] = useActionState(createIssue, null);
-  
+
   return (
     <form action={formAction}>
       {/* Same form fields with progressive enhancement */}
-      
+
       {/* Progressive enhancement features */}
       {state?.errors?.title && (
         <p role="alert" className="error">{state.errors.title}</p>
       )}
-      
-      <button 
-        type="submit" 
+
+      <button
+        type="submit"
         disabled={pending}
         aria-busy={pending}
       >
         {pending ? 'Creating...' : 'Create Issue'}
       </button>
-      
+
       {/* Optimistic UI */}
       {pending && <div>Your issue is being created...</div>}
     </form>
@@ -2516,20 +2519,20 @@ export default async function DashboardPage() {
     getStats(),
     getRecentIssues()
   ]);
-  
+
   return (
     <main>
       {/* Static content - no hydration needed */}
       <StatsDisplay stats={stats} />
-      
+
       {/* Hydration boundary #1: Search functionality */}
       <Suspense fallback={<SearchSkeleton />}>
         <SearchIsland />
       </Suspense>
-      
+
       {/* Static list with progressive enhancement */}
       <IssuesList issues={recentIssues} />
-      
+
       {/* Hydration boundary #2: Interactive filters */}
       <Suspense fallback={<FiltersSkeleton />}>
         <FiltersIsland />
@@ -2541,16 +2544,16 @@ export default async function DashboardPage() {
 // Selective hydration with Activity boundaries
 function TabContainer() {
   const [activeTab, setActiveTab] = useState('issues');
-  
+
   return (
     <>
       <TabButtons activeTab={activeTab} onChange={setActiveTab} />
-      
+
       {/* Each tab is an independent hydration island */}
       <Activity mode={activeTab === "issues" ? "visible" : "hidden"}>
         <IssuesTab />
       </Activity>
-      
+
       <Activity mode={activeTab === "reports" ? "visible" : "hidden"}>
         <ReportsTab />
       </Activity>
@@ -2584,7 +2587,7 @@ export default function AccessibleDataTable({ data }) {
                 <a href={`/issues/${issue.id}`}>{issue.title}</a>
               </td>
               <td>
-                <span 
+                <span
                   className={`status status-${issue.status}`}
                   aria-label={`Status: ${issue.status}`}
                 >
@@ -2596,8 +2599,8 @@ export default function AccessibleDataTable({ data }) {
                 {/* Progressive enhancement: works without JS */}
                 <form action={updateIssueStatus} method="post">
                   <input type="hidden" name="id" value={issue.id} />
-                  <select 
-                    name="status" 
+                  <select
+                    name="status"
                     defaultValue={issue.status}
                     aria-label={`Update status for ${issue.title}`}
                   >
@@ -2612,7 +2615,7 @@ export default function AccessibleDataTable({ data }) {
           ))}
         </tbody>
       </table>
-      
+
       {/* Enhanced features with proper ARIA */}
       <Suspense fallback={null}>
         <EnhancedTableFeatures />
@@ -2627,19 +2630,19 @@ export default function AccessibleDataTable({ data }) {
 'use client'
 export default function LiveUpdates() {
   const [status, setStatus] = useState('');
-  
+
   return (
     <div>
       {/* Screen readers announce changes */}
-      <div 
-        role="status" 
-        aria-live="polite" 
+      <div
+        role="status"
+        aria-live="polite"
         aria-atomic="true"
         className="sr-only"
       >
         {status}
       </div>
-      
+
       {/* Visual updates */}
       <div aria-hidden="true">
         {status && <div className="notification">{status}</div>}
@@ -2668,12 +2671,12 @@ export default async function OptimizedIssuePage({ orgId }) {
     <div>
       {/* Immediate LCP content */}
       <h1>Issues Dashboard</h1>
-      
+
       {/* Critical above-the-fold content */}
       <Suspense fallback={<IssuesListSkeleton />}>
         <IssuesList orgId={orgId} />
       </Suspense>
-      
+
       {/* Below-the-fold: lazy load */}
       <Suspense fallback={<ChartsSkeleton />}>
         <IssueCharts orgId={orgId} />
@@ -2716,14 +2719,14 @@ export function ProgressiveImage({ src, alt, priority = false }) {
 // public/sw.js - Progressive web app enhancement
 self.addEventListener('fetch', (event) => {
   // Cache-first strategy for static assets
-  if (event.request.destination === 'script' || 
+  if (event.request.destination === 'script' ||
       event.request.destination === 'style') {
     event.respondWith(
       caches.match(event.request)
         .then(response => response || fetch(event.request))
     );
   }
-  
+
   // Network-first for API calls with fallback
   if (event.request.url.includes('/api/')) {
     event.respondWith(
@@ -2739,32 +2742,32 @@ self.addEventListener('fetch', (event) => {
 'use client'
 export function OfflineCapableForm() {
   const [isOnline, setIsOnline] = useState(true);
-  
+
   useEffect(() => {
     setIsOnline(navigator.onLine);
-    
+
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-    
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-    
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
-  
+
   return (
     <form action={createIssue}>
       {/* Form fields */}
-      
+
       {!isOnline && (
         <div role="alert" className="offline-notice">
           You're offline. Your form will be submitted when connection resumes.
         </div>
       )}
-      
+
       <button type="submit">
         {isOnline ? 'Submit' : 'Save for Later'}
       </button>
@@ -2782,13 +2785,13 @@ export function ResponsiveIssueCard({ issue }) {
   return (
     <article className="issue-card" data-container="issue-card">
       <h3>{issue.title}</h3>
-      
+
       {/* Content adapts based on container size */}
       <div className="issue-meta">
         <span className="status">{issue.status}</span>
         <span className="priority">{issue.priority}</span>
       </div>
-      
+
       {/* Progressive disclosure on mobile */}
       <Suspense fallback={null}>
         <IssueActions issue={issue} />
@@ -2842,14 +2845,14 @@ export default function OptimizedPage() {
         <h1>Issues Dashboard</h1>
         <p>Manage your team's workflow efficiently</p>
       </section>
-      
+
       {/* CLS prevention: reserved space */}
       <div style={{ minHeight: '400px' }}>
         <Suspense fallback={<div style={{ height: '400px' }}>Loading...</div>}>
           <IssuesList />
         </Suspense>
       </div>
-      
+
       {/* INP optimization: immediate feedback */}
       <Suspense fallback={null}>
         <InteractiveElements />
@@ -2866,7 +2869,7 @@ const nextConfig = {
   experimental: {
     bundlePagesRouterDependencies: true,
   },
-  
+
   // Performance budgets for progressive enhancement
   webpack(config, { isServer }) {
     if (!isServer) {
@@ -2876,7 +2879,7 @@ const nextConfig = {
         'date-fns': 'date-fns/esm',
       };
     }
-    
+
     return config;
   },
 };
@@ -2896,35 +2899,35 @@ test.describe('Progressive Enhancement', () => {
       delete window.fetch;
       delete window.XMLHttpRequest;
     });
-    
+
     await page.goto('/issues/new');
-    
+
     // Fill form
     await page.fill('[name="title"]', 'Test Issue');
     await page.fill('[name="description"]', 'Test Description');
-    
+
     // Submit form (should work without JS)
     await page.click('[type="submit"]');
-    
+
     // Should navigate to success page
     await expect(page).toHaveURL(/\/issues\/\d+/);
   });
-  
+
   test('accessibility with screen reader simulation', async ({ page }) => {
     await page.goto('/issues');
-    
+
     // Check ARIA labels and semantic structure
     await expect(page.locator('[role="main"]')).toBeVisible();
     await expect(page.locator('[aria-label*="Issues list"]')).toBeVisible();
-    
+
     // Test keyboard navigation
     await page.keyboard.press('Tab');
     await expect(page.locator(':focus')).toHaveAttribute('aria-label');
   });
-  
+
   test('Core Web Vitals compliance', async ({ page }) => {
     await page.goto('/issues');
-    
+
     // Measure LCP
     const lcp = await page.evaluate(() => {
       return new Promise((resolve) => {
@@ -2935,7 +2938,7 @@ test.describe('Progressive Enhancement', () => {
         }).observe({ entryTypes: ['largest-contentful-paint'] });
       });
     });
-    
+
     expect(lcp).toBeLessThan(2500); // 2.5 seconds LCP threshold
   });
 });
