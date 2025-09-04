@@ -16,7 +16,7 @@ import {
   issueStatuses 
 } from "~/server/db/schema";
 import { db } from "~/lib/dal/shared";
-import type { Issue, Machine, User, Membership, Priority, IssueStatus, Location, Model } from "~/lib/types/db";
+import { safeCount, type CountResult } from "~/lib/types/database-results";
 
 export type SearchEntity =
   | "issues"
@@ -493,7 +493,7 @@ async function countIssues(
     .map((term) => `${term}:*`)
     .join(" & ")})`;
 
-  const result = await db
+  const result: CountResult[] = await db
     .select({ count: count() })
     .from(issues)
     .where(
@@ -503,7 +503,7 @@ async function countIssues(
       ),
     );
 
-  return result[0]?.count ?? 0;
+  return safeCount(result);
 }
 
 async function countMachines(
@@ -516,7 +516,7 @@ async function countMachines(
     .map((term) => `${term}:*`)
     .join(" & ")})`;
 
-  const result = await db
+  const result: CountResult[] = await db
     .select({ count: count() })
     .from(machines)
     .leftJoin(models, eq(machines.model_id, models.id))
@@ -527,7 +527,7 @@ async function countMachines(
       ),
     );
 
-  return result[0]?.count ?? 0;
+  return safeCount(result);
 }
 
 async function countUsers(
@@ -540,7 +540,7 @@ async function countUsers(
     .map((term) => `${term}:*`)
     .join(" & ")})`;
 
-  const result = await db
+  const result: CountResult[] = await db
     .select({ count: count() })
     .from(users)
     .innerJoin(memberships, eq(users.id, memberships.user_id))
@@ -551,7 +551,7 @@ async function countUsers(
       ),
     );
 
-  return result[0]?.count ?? 0;
+  return safeCount(result);
 }
 
 async function countLocations(
@@ -564,7 +564,7 @@ async function countLocations(
     .map((term) => `${term}:*`)
     .join(" & ")})`;
 
-  const result = await db
+  const result: CountResult[] = await db
     .select({ count: count() })
     .from(locations)
     .where(
@@ -574,7 +574,7 @@ async function countLocations(
       ),
     );
 
-  return result[0]?.count ?? 0;
+  return safeCount(result);
 }
 
 /**

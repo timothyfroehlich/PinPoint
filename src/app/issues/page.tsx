@@ -17,7 +17,6 @@ import {
   parseIssueSearchParams,
   getIssueFilterDescription,
   getIssueCanonicalUrl,
-  buildIssueUrl,
 } from "~/lib/search-params/issue-search-params";
 import { buildMetadataDescription } from "~/lib/search-params/shared";
 

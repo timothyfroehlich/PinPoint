@@ -14,13 +14,14 @@ import { comments, issues } from "~/server/db/schema";
 import { db } from "~/lib/dal/shared";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import {
-  requireAuthContextWithRole,
   validateFormData,
   actionSuccess,
   actionError,
   runAfterResponse,
   type ActionResult,
 } from "./shared";
+import { isError, getErrorMessage } from "~/lib/utils/type-guards";
+import { requireMemberAccess } from "~/lib/organization-context";
 import { requirePermission } from "./shared";
 import { PERMISSIONS } from "~/server/auth/permissions.constants";
 import { generateCommentNotifications } from "~/lib/services/notification-generator";
@@ -70,7 +71,8 @@ export async function addCommentAction(
   formData: FormData,
 ): Promise<ActionResult<{ commentId: string }>> {
   try {
-    const { user, organizationId } = await requireAuthContextWithRole();
+    const { user, organization } = await requireMemberAccess();
+    const organizationId = organization.id;
 
     // Enhanced validation
     const validation = validateFormData(formData, addCommentSchema);
@@ -115,10 +117,10 @@ export async function addCommentAction(
         await generateCommentNotifications(issueId, commentData.id, {
           organizationId,
           actorId: user.id,
-          actorName: String(user.user_metadata["name"] ?? user.email ?? ""),
+          actorName: user.name ?? user.email ?? "",
         });
       } catch (error) {
-        console.error("Failed to generate comment notifications:", error);
+        console.error("Failed to generate comment notifications:", getErrorMessage(error));
       }
     });
 
@@ -129,7 +131,7 @@ export async function addCommentAction(
   } catch (error) {
     console.error("Add comment error:", error);
     return actionError(
-      error instanceof Error ? error.message : "Failed to add comment",
+      isError(error) ? error.message : "Failed to add comment",
     );
   }
 }
@@ -144,9 +146,10 @@ export async function editCommentAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId, membership } =
-      await requireAuthContextWithRole();
-    await requirePermission(membership, PERMISSIONS.ISSUE_CREATE_BASIC, db);
+    const { user, organization, membership } =
+      await requireMemberAccess();
+    const organizationId = organization.id;
+    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ISSUE_CREATE_BASIC, db);
 
     // Enhanced validation
     const validation = validateFormData(formData, editCommentSchema);
@@ -191,7 +194,7 @@ export async function editCommentAction(
   } catch (error) {
     console.error("Edit comment error:", error);
     return actionError(
-      error instanceof Error ? error.message : "Failed to update comment",
+      isError(error) ? error.message : "Failed to update comment",
     );
   }
 }
@@ -206,9 +209,10 @@ export async function deleteCommentAction(
   _formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId, membership } =
-      await requireAuthContextWithRole();
-    await requirePermission(membership, PERMISSIONS.ISSUE_CREATE_BASIC, db);
+    const { user, organization, membership } =
+      await requireMemberAccess();
+    const organizationId = organization.id;
+    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ISSUE_CREATE_BASIC, db);
 
     // Verify comment exists and user has permission to delete
     const comment = await getCommentWithAccess(
@@ -247,7 +251,7 @@ export async function deleteCommentAction(
   } catch (error) {
     console.error("Delete comment error:", error);
     return actionError(
-      error instanceof Error ? error.message : "Failed to delete comment",
+      isError(error) ? error.message : "Failed to delete comment",
     );
   }
 }
@@ -261,9 +265,10 @@ export async function restoreCommentAction(
   _formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId, membership } =
-      await requireAuthContextWithRole();
-    await requirePermission(membership, PERMISSIONS.ISSUE_CREATE_BASIC, db);
+    const { user, organization, membership } =
+      await requireMemberAccess();
+    const organizationId = organization.id;
+    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ISSUE_CREATE_BASIC, db);
 
     // Find soft-deleted comment that user authored
     const comment = await db.query.comments.findFirst({
@@ -305,7 +310,7 @@ export async function restoreCommentAction(
   } catch (error) {
     console.error("Restore comment error:", error);
     return actionError(
-      error instanceof Error ? error.message : "Failed to restore comment",
+      isError(error) ? error.message : "Failed to restore comment",
     );
   }
 }

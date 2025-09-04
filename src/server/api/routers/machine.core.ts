@@ -12,6 +12,7 @@ import {
   transformMachinesForIssuesResponse,
   transformMachinesResponse,
 } from "~/lib/utils/machine-response-transformers";
+import { getErrorMessage } from "~/lib/utils/type-guards";
 
 // Server modules (alphabetical)
 import {
@@ -158,7 +159,7 @@ export const machineCoreRouter = createTRPCRouter({
             operation: "qr_code_generation",
           },
           error: {
-            message: error instanceof Error ? error.message : String(error),
+            message: getErrorMessage(error),
           },
         });
       }

@@ -10,6 +10,7 @@ import { sql } from "drizzle-orm";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { getVersion } from "~/utils/version";
 import type { HealthStatus } from "~/lib/types";
+import { getErrorMessage } from "~/lib/utils/type-guards";
 
 /**
  * Perform database connectivity check
@@ -37,7 +38,7 @@ export const checkSystemHealth = cache(async (): Promise<HealthStatus> => {
       timestamp: new Date().toISOString(),
       database: "disconnected",
       version: getVersion(),
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: getErrorMessage(error),
     };
   } finally {
     await dbProvider.disconnect();

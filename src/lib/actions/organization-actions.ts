@@ -9,17 +9,18 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { nameSchema, LIMITS } from "~/lib/validation/schemas";
 import { eq } from "drizzle-orm";
-import type { Organization } from "~/lib/types/db";
+import { organizations } from "~/server/db/schema";
 import { db } from "~/lib/dal/shared";
 import { transformKeysToSnakeCase } from "~/lib/utils/case-transformers";
 import {
-  requireAuthContextWithRole,
   validateFormData,
   actionSuccess,
   actionError,
   runAfterResponse,
   type ActionResult,
 } from "./shared";
+import { isError, getErrorMessage } from "~/lib/utils/type-guards";
+import { requireMemberAccess } from "~/lib/organization-context";
 import { requirePermission } from "./shared";
 import { PERMISSIONS } from "~/server/auth/permissions.constants";
 // Duplicate import removed
@@ -67,9 +68,10 @@ export async function updateOrganizationProfileAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId, membership } =
-      await requireAuthContextWithRole();
-    await requirePermission(membership, PERMISSIONS.ORGANIZATION_MANAGE, db);
+    const { user, organization, membership } =
+      await requireMemberAccess();
+    const organizationId = organization.id;
+    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ORGANIZATION_MANAGE, db);
 
     // Enhanced validation with Zod
     const validation = validateFormData(
@@ -125,11 +127,7 @@ export async function updateOrganizationProfileAction(
     );
   } catch (error) {
     console.error("Update organization profile error:", error);
-    return actionError(
-      error instanceof Error
-        ? error.message
-        : "Failed to update organization profile. Please try again.",
-    );
+    return actionError(getErrorMessage(error));
   }
 }
 
@@ -141,9 +139,10 @@ export async function updateOrganizationLogoAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId, membership } =
-      await requireAuthContextWithRole();
-    await requirePermission(membership, PERMISSIONS.ORGANIZATION_MANAGE, db);
+    const { user, organization, membership } =
+      await requireMemberAccess();
+    const organizationId = organization.id;
+    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ORGANIZATION_MANAGE, db);
 
     // Enhanced validation
     const validation = validateFormData(formData, updateOrganizationLogoSchema);
@@ -186,7 +185,7 @@ export async function updateOrganizationLogoAction(
   } catch (error) {
     console.error("Update organization logo error:", error);
     return actionError(
-      error instanceof Error ? error.message : "Failed to update logo",
+      isError(error) ? error.message : "Failed to update logo",
     );
   }
 }

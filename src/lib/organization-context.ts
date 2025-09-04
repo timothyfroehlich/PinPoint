@@ -11,7 +11,6 @@ import { headers } from "next/headers";
 import { sql } from "drizzle-orm";
 import { db } from "~/lib/dal/shared";
 import { getOrganizationBySubdomain, getUserMembershipPublic } from "~/lib/dal/public-organizations";
-import type { Organization, Membership } from "~/lib/types/db";
 import { createClient } from "~/lib/supabase/server";
 import { isDevelopment } from "~/lib/environment";
 import { extractTrustedSubdomain } from "~/lib/subdomain-verification";
