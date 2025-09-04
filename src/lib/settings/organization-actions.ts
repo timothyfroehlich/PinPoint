@@ -1,8 +1,8 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { ensureOrgContextAndBindRLS } from "~/lib/organization-context";
-import { updateOrganization } from "~/lib/dal/organizations";
 import { eq } from "drizzle-orm";
+import { organizations } from "../../server/db/schema";
 
 interface ActionResult { success: boolean; message?: string }
 

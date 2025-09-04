@@ -6,7 +6,8 @@ import { PlusIcon } from "lucide-react";
 import { IssuesListServer } from "~/components/issues/issues-list-server";
 import { IssueActiveFilters } from "~/components/issues/issue-active-filters";
 import { AdvancedSearchForm, ISSUES_FILTER_FIELDS } from "~/components/search";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/lib/organization-context";
+import type { OrganizationContext } from "~/lib/types";
 import {
   getIssuesWithFilters,
   type IssuePagination,
@@ -18,65 +19,46 @@ import {
   getIssueFilterDescription,
   getIssueCanonicalUrl,
 } from "~/lib/search-params/issue-search-params";
-import { buildMetadataDescription } from "~/lib/search-params/shared";
 
 // Force dynamic rendering for auth-dependent content
 export const dynamic = "force-dynamic";
+
+// Note: We pass orgContext for future optimization, but current implementation
+// still uses the original getIssuesWithFilters which triggers its own auth resolution
 
 interface IssuesPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export async function generateMetadata({ searchParams }: IssuesPageProps): Promise<Metadata> {
-  await requireMemberAccess();
+  // Note: Authentication happens at page component level to avoid race conditions
 
-  // Parse search params using centralized utility
+  // Parse search params using centralized utility (no auth needed for URL parsing)
   const rawParams = await searchParams;
   const parsedParams = parseIssueSearchParams(rawParams);
 
-  // Convert to legacy DAL format for now (avoid undefined assignment for exactOptionalPropertyTypes)
-  const filters: IssueFilters = {};
-  if (parsedParams.status) filters.status = parsedParams.status;
-  if (parsedParams.priority) filters.priority = parsedParams.priority;
-  if (parsedParams.assignee) filters.assigneeId = parsedParams.assignee;
-  if (parsedParams.search) filters.search = parsedParams.search;
-
-  const pagination: IssuePagination = {
-    page: parsedParams.page,
-    limit: parsedParams.limit,
-  };
-
-  const sorting: IssueSorting = {
-    field: parsedParams.sort,
-    order: parsedParams.order,
-  };
-
-  // Get issue count for metadata
-  const { totalCount } = await getIssuesWithFilters(
-    filters,
-    pagination,
-    sorting,
-  );
-
-  // Generate filter descriptions using centralized utility
+  // Generate filter descriptions using centralized utility (without org-specific data)
   const filterDescriptions = getIssueFilterDescription(parsedParams);
-  const description = buildMetadataDescription(
-    "Track and manage all issues across your organization's pinball machines",
-    filterDescriptions,
-    totalCount,
-  );
+  const description = filterDescriptions.length > 0
+    ? `Track and manage all issues across your organization's pinball machines. Current filters: ${filterDescriptions.join(", ")}`
+    : "Track and manage all issues across your organization's pinball machines";
 
   // Generate canonical URL for SEO
   const canonicalUrl = getIssueCanonicalUrl("/issues", parsedParams);
 
+  // Generic title without organization-specific count to avoid auth race conditions
+  const title = filterDescriptions.length > 0 
+    ? `Issues (${filterDescriptions.join(", ")}) - PinPoint`
+    : "Issues - PinPoint";
+
   return {
-    title: `Issues (${String(totalCount)} found) - PinPoint`,
+    title,
     description,
     alternates: {
       canonical: canonicalUrl,
     },
     openGraph: {
-      title: `Issues (${String(totalCount)} found) - PinPoint`,
+      title,
       description,
       type: "website",
     },
@@ -85,8 +67,10 @@ export async function generateMetadata({ searchParams }: IssuesPageProps): Promi
 
 async function IssuesWithData({
   searchParams,
+  orgContext,
 }: {
   searchParams: IssuesPageProps["searchParams"];
+  orgContext: OrganizationContext;
 }): Promise<React.JSX.Element> {
   const rawParams = await searchParams;
 
@@ -111,7 +95,8 @@ async function IssuesWithData({
   };
 
   // Server-side data fetching with filtering, sorting, and pagination
-  const result = await getIssuesWithFilters(filters, pagination, sorting);
+  // NOTE: This still uses ensureOrgContextAndBindRLS internally, but React 19 cache() should deduplicate
+  const result = await getIssuesWithFilters(orgContext.organization.id, filters, pagination, sorting);
 
   return (
     <>
@@ -185,8 +170,8 @@ async function IssuesWithData({
 export default async function IssuesPage({
   searchParams,
 }: IssuesPageProps): Promise<React.JSX.Element> {
-  // Authentication and organization membership validation
-  await requireMemberAccess();
+  // Single authentication resolution for entire request
+  const orgContext = await getRequestAuthContext();
 
   return (
     <div className="space-y-6">
@@ -206,7 +191,7 @@ export default async function IssuesPage({
           </div>
         }
       >
-        <IssuesWithData searchParams={searchParams} />
+        <IssuesWithData searchParams={searchParams} orgContext={orgContext} />
       </Suspense>
     </div>
   );

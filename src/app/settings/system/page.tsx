@@ -23,15 +23,18 @@ import {
   GlobeIcon,
   ZapIcon,
 } from "lucide-react";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 import { getSystemSettings } from "~/lib/dal/system-settings";
 import { SystemNotificationSettings } from "./components/SystemNotificationSettings";
 import { SystemSecuritySettings } from "./components/SystemSecuritySettings";
 import { SystemPreferences } from "./components/SystemPreferences";
 
 export default async function SystemSettingsPage(): Promise<React.JSX.Element> {
-  const { organization } = await requireMemberAccess();
-  const organizationId = organization.id;
+  const auth = await getRequestAuthContext();
+  if (auth.kind !== 'authorized') {
+    throw new Error('Member access required');
+  }
+  const organizationId = auth.org.id;
 
   // Fetch system settings from database
   const systemSettings = await getSystemSettings(organizationId);
