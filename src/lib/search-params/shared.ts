@@ -105,7 +105,7 @@ export function generateCanonicalUrl<T extends Record<string, unknown>>(
   // Remove pagination from canonical URLs
   if ("page" in canonicalParams) {
     const { page, ...cleanedParams } = canonicalParams;
-    return builder(basePath, cleanedParams);
+    return builder(basePath, cleanedParams as Partial<T>);
   }
 
   return builder(basePath, canonicalParams);

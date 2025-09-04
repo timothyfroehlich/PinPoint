@@ -8,6 +8,7 @@ import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { comments } from "~/server/db/schema";
 // No direct db access; use ensureOrgContextAndBindRLS to run under RLS-bound tx
 import { ensureOrgContextAndBindRLS } from "~/lib/organization-context";
+import { safeCount, type CountResult } from "~/lib/types/database-results";
 
 /**
  * Get comments for a specific issue with author details
@@ -147,7 +148,7 @@ export const canUserAccessComment = cache(
 export const getCommentCountForIssue = cache(async (issueId: string) => {
   return ensureOrgContextAndBindRLS(async (tx, context) => {
     const organizationId = context.organization.id;
-    const result = await tx
+    const result: CountResult[] = await tx
       .select({ count: sql<number>`count(*)` })
       .from(comments)
       .where(
@@ -157,7 +158,7 @@ export const getCommentCountForIssue = cache(async (issueId: string) => {
           isNull(comments.deleted_at),
         ),
       );
-    return result[0]?.count ?? 0;
+    return safeCount(result);
   });
 });
 

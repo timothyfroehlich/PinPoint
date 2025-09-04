@@ -4,6 +4,7 @@
  */
 
 import { z } from "zod";
+import { isError } from "~/lib/utils/type-guards";
 
 /**
  * Extract a single field from FormData with type safety
@@ -23,7 +24,7 @@ export function extractFormField<T>(
     return schema.parse(value);
   } catch (error) {
     throw new Error(
-      `Invalid ${fieldName}: ${error instanceof z.ZodError ? error.message : "Validation failed"}`,
+      `Invalid ${fieldName}: ${error instanceof z.ZodError ? error.message : isError(error) ? error.message : "Validation failed"}`,
     );
   }
 }
@@ -46,7 +47,7 @@ export function extractOptionalFormField<T>(
     return schema.parse(value);
   } catch (error) {
     throw new Error(
-      `Invalid ${fieldName}: ${error instanceof z.ZodError ? error.message : "Validation failed"}`,
+      `Invalid ${fieldName}: ${error instanceof z.ZodError ? error.message : isError(error) ? error.message : "Validation failed"}`,
     );
   }
 }
@@ -85,7 +86,7 @@ export function extractFormFields<T extends Record<string, unknown>>(
         .join(", ");
       throw new Error(`Form validation failed: ${fieldErrors}`);
     }
-    throw new Error("Form validation failed");
+    throw new Error(isError(error) ? error.message : "Form validation failed");
   }
 }
 

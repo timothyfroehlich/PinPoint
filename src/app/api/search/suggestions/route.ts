@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSearchSuggestions } from "~/lib/services/search-service";
 import { requireMemberAccess } from "~/lib/organization-context";
+import { isError, getErrorMessage } from "~/lib/utils/type-guards";
 
 const SuggestionsQuerySchema = z.object({
   q: z.string().min(2, "Query must be at least 2 characters"),
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     // Handle authentication errors
-    if (error instanceof Error && error.message.includes("required")) {
+    if (isError(error) && error.message.includes("required")) {
       return NextResponse.json(
         {
           error: "Authentication required",
@@ -65,7 +66,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json(
       {
         error: "Internal server error",
-        message: error instanceof Error ? error.message : "Unknown error",
+        message: getErrorMessage(error),
         timestamp: new Date().toISOString(),
       },
       { status: 500 },

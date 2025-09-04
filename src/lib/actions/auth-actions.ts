@@ -19,6 +19,7 @@ import { isDevelopment } from "~/lib/environment";
 import { extractFormFields } from "~/lib/utils/form-data";
 import { getCookieDomain } from "~/lib/utils/domain";
 import { actionError } from "./shared";
+import { isError, getErrorMessage } from "~/lib/utils/type-guards";
 import { env } from "~/env";
 
 import type { ActionResult } from "./shared";
@@ -66,7 +67,7 @@ export async function sendMagicLink(
       data = extractFormFields(formData, magicLinkSchema);
     } catch (error) {
       return actionError(
-        error instanceof Error ? error.message : "Form validation failed",
+        isError(error) ? error.message : "Form validation failed",
       );
     }
 
@@ -117,7 +118,7 @@ export async function sendMagicLink(
       },
     };
   } catch (error) {
-    console.error("Magic link action error:", error);
+    console.error("Magic link action error:", getErrorMessage(error));
     return actionError("An unexpected error occurred. Please try again.");
   }
 }
@@ -186,7 +187,7 @@ export async function signInWithOAuth(
 
     redirect("/auth/auth-code-error?error=no_redirect_url");
   } catch (error) {
-    console.error("OAuth action error:", error);
+    console.error("OAuth action error:", getErrorMessage(error));
     redirect("/auth/auth-code-error?error=unexpected");
   }
 }
@@ -227,7 +228,7 @@ export async function devSignIn(
       },
     };
   } catch (error) {
-    console.error("Dev auth error:", error);
+    console.error("Dev auth error:", getErrorMessage(error));
     return actionError("Development authentication failed");
   }
 }
@@ -241,7 +242,7 @@ export async function signOut(): Promise<void> {
     await supabase.auth.signOut();
     revalidatePath("/", "layout");
   } catch (error) {
-    console.error("Sign out error:", error);
+    console.error("Sign out error:", getErrorMessage(error));
   }
   redirect("/auth/sign-in");
 }

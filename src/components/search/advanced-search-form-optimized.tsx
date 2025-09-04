@@ -26,6 +26,8 @@ import {
   type FilterField,
   type AdvancedSearchFormProps,
 } from "./advanced-search-form";
+import { buildIssueUrl } from "~/lib/search-params/issue-search-params";
+import { buildMachineUrl } from "~/lib/search-params/machine-search-params";
 
 // Lazy load heavy components for better initial bundle size
 const Checkbox = dynamic(
@@ -248,7 +250,8 @@ export const AdvancedSearchFormOptimized = memo(
     entityType,
     fields,
     currentParams,
-    buildUrl,
+    basePath,
+    buildUrl: externalBuildUrl,
     title,
     description,
     collapsible = true,
@@ -261,6 +264,25 @@ export const AdvancedSearchFormOptimized = memo(
 
     // Form state management
     const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+
+    // Helper function to build URLs based on entity type
+    const buildUrl = useCallback((params: Record<string, unknown>): string => {
+      // Use external buildUrl function if provided, otherwise use internal logic
+      if (externalBuildUrl) {
+        return externalBuildUrl(params);
+      }
+      
+      if (entityType === "issues") {
+        return buildIssueUrl(basePath, params, currentParams);
+      } else if (entityType === "machines") {
+        return buildMachineUrl(basePath, params, currentParams);
+      } else {
+        // fallback for universal or other types - you could extend this
+        throw new Error(
+          `URL building not implemented for entityType: ${entityType}`,
+        );
+      }
+    }, [externalBuildUrl, entityType, basePath, currentParams]);
 
     // Memoize initial form state to prevent unnecessary recalculations
     const initialFormState = useMemo(() => {

@@ -7,6 +7,7 @@ import type {
   PinballMapLocation,
   PinballMapMachineDetailsResponse,
 } from "./types";
+import { isError } from "~/lib/utils/type-guards";
 
 const API_BASE_URL = "https://pinballmap.com/api/v1";
 
@@ -51,7 +52,7 @@ export class PinballMapClient {
         throw error;
       }
       throw new PinballMapError(
-        `Network error fetching location ${locationId.toString()}: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Network error fetching location ${locationId.toString()}: ${isError(error) ? error.message : "Unknown error"}`,
       );
     }
   }
@@ -82,7 +83,7 @@ export class PinballMapClient {
         throw error;
       }
       throw new PinballMapError(
-        `Network error fetching machine details for location ${locationId.toString()}: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Network error fetching machine details for location ${locationId.toString()}: ${isError(error) ? error.message : "Unknown error"}`,
       );
     }
   }

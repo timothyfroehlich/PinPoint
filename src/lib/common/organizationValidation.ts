@@ -4,6 +4,8 @@
  * Cross-cutting validation patterns used across multiple routers
  */
 
+import { getErrorMessage } from "~/lib/utils/type-guards";
+
 // =============================================================================
 // TYPE DEFINITIONS
 // =============================================================================
@@ -607,7 +609,7 @@ export function validateEntityExistsAndOwned<
   );
 
   if (!result.isValid) {
-    const error = new Error(result.error) as OrganizationValidationError;
+    const error = new Error(getErrorMessage(result.error)) as OrganizationValidationError;
     if (result.errorCode) {
       error.code = result.errorCode;
     }
@@ -633,7 +635,7 @@ export function validatePublicOrganizationContextRequired(
   const result = validatePublicOrganizationContext(organization);
 
   if (!result.isValid) {
-    const error = new Error(result.error) as OrganizationValidationError;
+    const error = new Error(getErrorMessage(result.error)) as OrganizationValidationError;
     if (result.errorCode) {
       error.code = result.errorCode;
     }

@@ -9,8 +9,9 @@
 import { useState, useEffect, useRef, Suspense } from "react";
 import { type ComponentType } from "react";
 import { isDevelopment } from "~/lib/environment-client";
+import { isError } from "~/lib/utils/type-guards";
 
-interface LazyClientIslandProps<T = Record<string, unknown>> {
+interface LazyClientIslandProps<T extends Record<string, unknown> = Record<string, unknown>> {
   /** Component to lazy load */
   importComponent: () => Promise<{ default: ComponentType<T> }>;
   /** Props to pass to the lazy component */
@@ -31,7 +32,7 @@ interface LazyClientIslandProps<T = Record<string, unknown>> {
  * Lazy loading wrapper for client islands
  * Uses Intersection Observer or requestIdleCallback for optimal loading
  */
-export function LazyClientIsland<T = Record<string, unknown>>({
+export function LazyClientIsland<T extends Record<string, unknown> = Record<string, unknown>>({
   importComponent,
   componentProps,
   fallback = <div className="h-16 bg-muted animate-pulse rounded" />,
@@ -106,8 +107,7 @@ export function LazyClientIsland<T = Record<string, unknown>>({
         console.log(`✅ Lazy loaded client island: ${name}`);
       }
     } catch (err) {
-      const error =
-        err instanceof Error ? err : new Error("Failed to load component");
+      const error = isError(err) ? err : new Error("Failed to load component");
       setError(error);
       console.error(`❌ Failed to lazy load client island ${name}:`, error);
     } finally {
@@ -158,7 +158,7 @@ export function LazyClientIsland<T = Record<string, unknown>>({
  * Hook for preloading components
  * Useful for critical components that should be preloaded on route change
  */
-export function usePreloadComponent<T = Record<string, unknown>>(
+export function usePreloadComponent<T extends Record<string, unknown> = Record<string, unknown>>(
   importComponent: () => Promise<{ default: ComponentType<T> }>,
 ): { preload: () => Promise<void>; isPreloaded: boolean } {
   const [isPreloaded, setIsPreloaded] = useState(false);
@@ -169,8 +169,8 @@ export function usePreloadComponent<T = Record<string, unknown>>(
     try {
       await importComponent();
       setIsPreloaded(true);
-    } catch (error) {
-      console.error("Failed to preload component:", error);
+    } catch (err) {
+      console.error("Failed to preload component:", isError(err) ? err.message : String(err));
     }
   };
 
@@ -180,29 +180,37 @@ export function usePreloadComponent<T = Record<string, unknown>>(
 /**
  * Higher-order component for creating lazy client islands
  */
-export function createLazyClientIsland<T = Record<string, unknown>>(
+export function createLazyClientIsland<T extends Record<string, unknown>>(
   importComponent: () => Promise<{ default: ComponentType<T> }>,
   defaultProps?: Partial<LazyClientIslandProps<T>>,
 ): (props: T & Partial<LazyClientIslandProps<T>>) => JSX.Element {
   return function LazyWrapper(props: T & Partial<LazyClientIslandProps<T>>): JSX.Element {
-    const {
-      fallback,
-      loadImmediately,
-      threshold,
-      strategy,
-      name,
-      ...componentProps
-    } = props;
+    // Extract LazyClientIslandProps from the combined props
+    const lazyProps: Partial<LazyClientIslandProps<T>> = {
+      ...(props.fallback !== undefined && { fallback: props.fallback }),
+      ...(props.loadImmediately !== undefined && { loadImmediately: props.loadImmediately }),
+      ...(props.threshold !== undefined && { threshold: props.threshold }),
+      ...(props.strategy !== undefined && { strategy: props.strategy }),
+      ...(props.name !== undefined && { name: props.name }),
+    };
+
+    // Create componentProps by excluding LazyClientIslandProps keys
+    const componentProps = Object.keys(props).reduce((acc, key) => {
+      if (!['fallback', 'loadImmediately', 'threshold', 'strategy', 'name'].includes(key)) {
+        (acc as Record<string, unknown>)[key] = props[key as keyof typeof props];
+      }
+      return acc;
+    }, {} as T);
 
     return (
       <LazyClientIsland
         importComponent={importComponent}
-        componentProps={componentProps as T}
-        fallback={fallback ?? defaultProps?.fallback}
-        loadImmediately={loadImmediately ?? defaultProps?.loadImmediately ?? false}
-        threshold={threshold ?? defaultProps?.threshold ?? 0.1}
-        strategy={strategy ?? defaultProps?.strategy ?? "intersection"}
-        name={name ?? defaultProps?.name ?? "LazyComponent"}
+        componentProps={componentProps}
+        fallback={lazyProps.fallback ?? defaultProps?.fallback}
+        loadImmediately={lazyProps.loadImmediately ?? defaultProps?.loadImmediately ?? false}
+        threshold={lazyProps.threshold ?? defaultProps?.threshold ?? 0.1}
+        strategy={lazyProps.strategy ?? defaultProps?.strategy ?? "intersection"}
+        name={lazyProps.name ?? defaultProps?.name ?? "LazyComponent"}
       />
     );
   };

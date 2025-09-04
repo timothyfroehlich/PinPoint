@@ -18,6 +18,7 @@ import { useAuth } from "~/app/auth-provider";
 import { authenticateDevUser, getAuthResultMessage } from "~/lib/auth/dev-auth";
 import { isDevAuthAvailable } from "~/lib/environment-client";
 import { createClient } from "~/utils/supabase/client";
+import { getErrorMessage } from "~/lib/utils/type-guards";
 import type { User, Role } from "~/lib/types/db";
 type UserWithRole = User & { role: Role | null };
 
@@ -57,7 +58,7 @@ export default function SignInPage(): React.ReactElement | null {
           const { users } = (await res.json()) as { users: UserWithRole[] };
           setUsers(users);
         } catch (error) {
-          console.error("Error fetching dev users:", error);
+          console.error("Error fetching dev users:", getErrorMessage(error));
         } finally {
           setIsLoadingUsers(false);
         }
@@ -81,7 +82,7 @@ export default function SignInPage(): React.ReactElement | null {
         console.error("Google sign in failed:", error.message);
       }
     } catch (error) {
-      console.error("Google sign in failed:", error);
+      console.error("Google sign in failed:", getErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
