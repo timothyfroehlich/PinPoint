@@ -14,7 +14,7 @@ import {
   ActivityIcon,
   ShieldIcon,
 } from "lucide-react";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 
 interface SettingsLayoutProps {
   children: React.ReactNode;
@@ -24,7 +24,10 @@ export default async function SettingsLayout({
   children,
 }: SettingsLayoutProps): Promise<React.JSX.Element> {
   // Ensure user is authenticated and has organization access
-  await requireMemberAccess();
+  const auth = await getRequestAuthContext();
+  if (auth.kind !== 'authorized') {
+    throw new Error('Member access required');
+  }
 
   // requireMemberAccess already ensures user is authenticated and has membership
   // No additional checks needed

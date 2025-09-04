@@ -22,11 +22,15 @@ import {
   ShieldIcon,
   ArrowRightIcon,
 } from "lucide-react";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 import { getCurrentOrganization } from "~/lib/dal/organizations";
 
 export default async function SettingsPage(): Promise<React.JSX.Element> {
-  const { user } = await requireMemberAccess();
+  const auth = await getRequestAuthContext();
+  if (auth.kind !== 'authorized') {
+    throw new Error('Member access required');
+  }
+  const { user } = auth;
   const orgDetails = await getCurrentOrganization();
 
   const settingsCards = [

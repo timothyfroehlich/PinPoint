@@ -7,7 +7,7 @@
 -- ROW LEVEL SECURITY POLICIES
 -- =================================================================
 -- Comprehensive RLS setup for multi-tenant architecture
--- 
+--
 -- Features:
 -- - Organization-level isolation for all multi-tenant tables
 -- - Session variable-based organization context (app.current_organization_id)
@@ -62,14 +62,14 @@ ALTER TABLE anonymous_rate_limits ENABLE ROW LEVEL SECURITY;
 -- =================================================================
 
 -- Helper function to drop all policies for a table
-CREATE OR REPLACE FUNCTION drop_all_policies(table_name text) 
+CREATE OR REPLACE FUNCTION drop_all_policies(table_name text)
 RETURNS void AS $$
 DECLARE
     policy_record RECORD;
 BEGIN
-    FOR policy_record IN 
-        SELECT policyname 
-        FROM pg_policies 
+    FOR policy_record IN
+        SELECT policyname
+        FROM pg_policies
         WHERE schemaname = 'public' AND tablename = table_name
     LOOP
         EXECUTE format('DROP POLICY IF EXISTS %I ON %I', policy_record.policyname, table_name);
@@ -564,7 +564,7 @@ CREATE POLICY "comments_anon_create_public" ON comments
     AND author_id IS NULL
   );
 
--- Members: read comments in their org  
+-- Members: read comments in their org
 CREATE POLICY "comments_member_read" ON comments
   FOR SELECT TO authenticated
   USING (
@@ -610,7 +610,7 @@ CREATE POLICY "comments_author_update" ON comments
     )
   );
 
--- CRITICAL: Authors can ONLY delete their own comments (no cross-user access)  
+-- CRITICAL: Authors can ONLY delete their own comments (no cross-user access)
 CREATE POLICY "comments_author_delete" ON comments
   FOR DELETE TO authenticated
   USING (
@@ -1022,17 +1022,17 @@ GRANT SELECT ON public_organizations_minimal TO anon, authenticated;
 -- =================================================================
 
 -- Count policies created
-SELECT 
+SELECT
   schemaname,
   tablename,
   COUNT(*) as policy_count
-FROM pg_policies 
+FROM pg_policies
 WHERE schemaname = 'public'
 GROUP BY schemaname, tablename
 ORDER BY tablename;
 
 -- Verify RLS is enabled
-SELECT 
+SELECT
   schemaname,
   tablename,
   rowsecurity as rls_enabled
