@@ -31,7 +31,6 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { sendMagicLink, signInWithOAuth } from "~/lib/actions/auth-actions";
-import { type ActionResult } from "~/lib/actions/auth-actions";
 import { type OrganizationOption } from "~/lib/dal/public-organizations";
 
 // Development auth integration
@@ -43,10 +42,10 @@ import { getCurrentDomain } from "~/lib/utils/domain";
 export function SignInForm(): React.JSX.Element {
   const router = useRouter();
 
-  const [magicLinkState, magicLinkAction, magicLinkPending] = useActionState<
-    ActionResult<{ message: string }> | null,
-    FormData
-  >(sendMagicLink, null);
+  const [magicLinkState, magicLinkAction, magicLinkPending] = useActionState(
+    sendMagicLink,
+    null,
+  );
 
   const [isOAuthLoading, setIsOAuthLoading] = useState(false);
   const [devAuthLoading, setDevAuthLoading] = useState(false);
@@ -271,10 +270,9 @@ export function SignInForm(): React.JSX.Element {
               required
               disabled={magicLinkPending || isOAuthLoading || devAuthLoading}
             />
-            {magicLinkState?.success === false &&
-              magicLinkState.fieldErrors?.["email"] && (
+            {magicLinkState && !magicLinkState.success && magicLinkState.fieldErrors?.["email"] && (
                 <p className="text-sm text-error">
-                  {magicLinkState.fieldErrors["email"]}
+                  {magicLinkState.fieldErrors["email"][0]}
                 </p>
               )}
           </div>
@@ -303,7 +301,7 @@ export function SignInForm(): React.JSX.Element {
         </form>
 
         {/* Action Results */}
-        {magicLinkState?.success === true && (
+        {magicLinkState && magicLinkState.success && (
           <Alert className="border-tertiary bg-tertiary-container">
             <div className="text-on-tertiary-container">
               <p className="font-medium">Magic link sent!</p>
@@ -312,7 +310,7 @@ export function SignInForm(): React.JSX.Element {
           </Alert>
         )}
 
-        {magicLinkState?.success === false && !magicLinkState.fieldErrors && (
+        {magicLinkState && !magicLinkState.success && !magicLinkState.fieldErrors && (
           <Alert className="border-error bg-error-container">
             <div className="text-on-error-container">
               <p className="font-medium">Sign-in failed</p>

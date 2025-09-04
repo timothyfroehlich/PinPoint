@@ -19,6 +19,12 @@
 
 set -euo pipefail  # Exit on error, undefined vars, pipe failures
 
+# Force non-interactive output (prevent psql/supabase from invoking less)
+export PAGER=cat
+export LESS=FRX
+export SUPABASE_PAGER=cat 2>/dev/null || true
+export SUPABASE_LOG_LEVEL=${SUPABASE_LOG_LEVEL:-info}
+
 # Colors for output
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
@@ -169,6 +175,16 @@ execute_sql_seeds() {
     done
     
     log_success "All seed files executed successfully"
+
+        # Quick verification of critical tables (best-effort; ignore failures)
+        log_step "Verifying critical seed data (non-fatal)"
+        {
+            "$PROJECT_ROOT/scripts/safe-psql.sh" -c "\
+                SELECT 'organizations' AS table, COUNT(*) AS count FROM organizations UNION ALL\
+                SELECT 'users', COUNT(*) FROM users UNION ALL\
+                SELECT 'machines', COUNT(*) FROM machines UNION ALL\
+                SELECT 'issues', COUNT(*) FROM issues;" || true
+        } | sed 's/^/    /'
 }
 
 reset_supabase_database() {

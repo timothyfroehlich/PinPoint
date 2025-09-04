@@ -4,6 +4,7 @@
  */
 
 import QRCode from "qrcode";
+import { env } from "~/env";
 
 export interface QRCodeOptions {
   size?: number;
@@ -32,8 +33,7 @@ export async function generateMachineQRCode(
 ): Promise<GeneratedQRCode> {
   try {
     // Build the reporting URL that the QR code will link to
-    const baseUrl =
-      process.env["NEXT_PUBLIC_APP_URL"] ?? "https://pinpoint.app";
+    const baseUrl = env.NEXT_PUBLIC_APP_URL;
     const reportingUrl = `${baseUrl}/report?machine=${machineId}`;
 
     // QR code generation options
@@ -78,8 +78,7 @@ export async function generateMachineQRCodeBuffer(
   options: QRCodeOptions = {},
 ): Promise<Buffer> {
   try {
-    const baseUrl =
-      process.env["NEXT_PUBLIC_APP_URL"] ?? "https://pinpoint.app";
+    const baseUrl = env.NEXT_PUBLIC_APP_URL;
     const reportingUrl = `${baseUrl}/report?machine=${machineId}`;
 
     const qrOptions = {

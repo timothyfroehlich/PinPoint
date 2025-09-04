@@ -67,9 +67,9 @@ export function extractFormFields<T extends Record<string, unknown>>(
       const existing = data[key];
       if (Array.isArray(existing)) {
         existing.push(value);
-      } else {
-        // We know existing exists because of the 'key in data' check
-        data[key] = [existing!, value];
+      } else if (existing !== undefined) {
+        // Convert single value to array when adding second value
+        data[key] = [existing, value];
       }
     } else {
       data[key] = value;

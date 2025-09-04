@@ -5,6 +5,7 @@ import type { CookieOptions } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { env } from "~/env";
+import { isError } from "~/lib/utils/type-guards";
 
 /**
  * Creates a Supabase client for use in server components and API routes.
@@ -151,7 +152,7 @@ export async function getCurrentUser(): Promise<
   } = await supabase.auth.getUser();
 
   if (error) {
-    console.warn("Auth error in getCurrentUser:", error.message);
+    console.warn("Auth error in getCurrentUser:", isError(error) ? error.message : String(error));
     return null;
   }
 

@@ -65,7 +65,7 @@ export interface AdvancedSearchFormProps {
 
   // Event handlers - using unknown for type safety
   onFormSubmit?: (params: Record<string, unknown>) => void;
-  buildUrl: (params: Record<string, unknown>) => string;
+  buildUrl?: (params: Record<string, unknown>) => string;
 }
 
 // Form state type - using unknown for type safety
@@ -82,12 +82,18 @@ export function AdvancedSearchForm({
   defaultExpanded = false,
   showActiveFilters = true,
   onFormSubmit,
+  buildUrl: externalBuildUrl,
 }: AdvancedSearchFormProps): JSX.Element {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   // Helper function to build URLs based on entity type
   const buildUrl = (params: Record<string, unknown>): string => {
+    // Use external buildUrl function if provided, otherwise use internal logic
+    if (externalBuildUrl) {
+      return externalBuildUrl(params);
+    }
+    
     if (entityType === "issues") {
       return buildIssueUrl(basePath, params, currentParams);
     } else if (entityType === "machines") {

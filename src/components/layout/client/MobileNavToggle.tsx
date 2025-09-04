@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Button } from "~/components/ui/button";
 import {
   Sheet,
@@ -35,13 +36,13 @@ export function MobileNavToggle(): JSX.Element {
                 <a href="/dashboard">Dashboard</a>
               </Button>
               <Button variant="ghost" className="w-full justify-start" asChild>
-                <a href="/issues">Issues</a>
+                <Link href="/issues">Issues</Link>
               </Button>
               <Button variant="ghost" className="w-full justify-start" asChild>
-                <a href="/machines">Machines</a>
+                <Link href="/machines">Machines</Link>
               </Button>
               <Button variant="ghost" className="w-full justify-start" asChild>
-                <a href="/locations">Locations</a>
+                <Link href="/locations">Locations</Link>
               </Button>
               <Button variant="ghost" className="w-full justify-start" asChild>
                 <a href="/reports">Reports</a>

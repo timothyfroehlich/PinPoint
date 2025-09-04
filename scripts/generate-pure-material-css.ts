@@ -35,7 +35,7 @@ const lightThemeCSS = `
     cssProps.light
       .split("\n")
       .find((line) => line.includes("--primary:"))
-      ?.split(": ")[1] || "256 34% 48%"
+      ?.split(": ")[1] ?? "256 34% 48%"
   };
   --on-primary: ${
     cssProps.light

@@ -59,7 +59,7 @@ export function UserTableActions({
     try {
       // TODO: Implement resend invitation
       toast.info("Resend invitation coming soon");
-    } catch (error) {
+    } catch {
       toast.error("Failed to resend invitation");
     } finally {
       setIsLoading(false);
@@ -71,7 +71,7 @@ export function UserTableActions({
     try {
       // TODO: Implement user removal with confirmation dialog
       toast.info("User removal coming soon");
-    } catch (error) {
+    } catch {
       toast.error("Failed to remove user");
     } finally {
       setIsLoading(false);
