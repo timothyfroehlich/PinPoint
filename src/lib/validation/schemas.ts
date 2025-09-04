@@ -258,7 +258,6 @@ export const searchQuerySchema = z
  * ```
  */
 export const emailSchema = z
-  .string()
   .email({ message: "Invalid email address" })
   .max(LIMITS.EMAIL_MAX, {
     message: `Email must be less than ${String(LIMITS.EMAIL_MAX)} characters`,
@@ -439,11 +438,11 @@ export function makeUpdateSchema<T extends z.ZodRawShape>(shape: T): z.ZodObject
  * // Result: { issueId: string, title: string }
  * ```
  */
-export function withId<IdKey extends string>(
+export function withId<IdKey extends string, T extends z.ZodRawShape>(
   idKey: IdKey,
   idSchema: z.ZodType,
-  payload: z.ZodObject<any>,
-): z.ZodObject<any> {
+  payload: z.ZodObject<T>,
+): z.ZodObject<T & Record<IdKey, z.ZodType>> {
   return z.object({ [idKey]: idSchema }).extend(payload.shape);
 }
 

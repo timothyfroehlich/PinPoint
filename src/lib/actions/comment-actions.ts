@@ -115,7 +115,7 @@ export async function addCommentAction(
         await generateCommentNotifications(issueId, commentData.id, {
           organizationId,
           actorId: user.id,
-          actorName: user.user_metadata["name"] || user.email,
+          actorName: String(user.user_metadata["name"] ?? user.email ?? ""),
         });
       } catch (error) {
         console.error("Failed to generate comment notifications:", error);
@@ -146,7 +146,7 @@ export async function editCommentAction(
   try {
     const { user, organizationId, membership } =
       await requireAuthContextWithRole();
-    await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
+    await requirePermission(membership, PERMISSIONS.ISSUE_CREATE_BASIC, db);
 
     // Enhanced validation
     const validation = validateFormData(formData, editCommentSchema);
@@ -208,7 +208,7 @@ export async function deleteCommentAction(
   try {
     const { user, organizationId, membership } =
       await requireAuthContextWithRole();
-    await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
+    await requirePermission(membership, PERMISSIONS.ISSUE_CREATE_BASIC, db);
 
     // Verify comment exists and user has permission to delete
     const comment = await getCommentWithAccess(
@@ -263,7 +263,7 @@ export async function restoreCommentAction(
   try {
     const { user, organizationId, membership } =
       await requireAuthContextWithRole();
-    await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
+    await requirePermission(membership, PERMISSIONS.ISSUE_CREATE_BASIC, db);
 
     // Find soft-deleted comment that user authored
     const comment = await db.query.comments.findFirst({

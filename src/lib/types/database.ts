@@ -475,6 +475,7 @@ export type Database = {
           reporter_email: string | null
           reporter_type: Database["public"]["Enums"]["reporter_type"]
           resolved_at: string | null
+          severity: Database["public"]["Enums"]["severity"]
           status_id: string
           submitter_name: string | null
           title: string
@@ -498,6 +499,7 @@ export type Database = {
           reporter_email?: string | null
           reporter_type?: Database["public"]["Enums"]["reporter_type"]
           resolved_at?: string | null
+          severity?: Database["public"]["Enums"]["severity"]
           status_id: string
           submitter_name?: string | null
           title: string
@@ -521,6 +523,7 @@ export type Database = {
           reporter_email?: string | null
           reporter_type?: Database["public"]["Enums"]["reporter_type"]
           resolved_at?: string | null
+          severity?: Database["public"]["Enums"]["severity"]
           status_id?: string
           submitter_name?: string | null
           title?: string
@@ -1188,6 +1191,7 @@ export type Database = {
         | "MACHINE_ASSIGNED"
         | "SYSTEM_ANNOUNCEMENT"
       reporter_type: "authenticated" | "anonymous"
+      severity: "low" | "medium" | "high" | "critical"
       status_category: "NEW" | "IN_PROGRESS" | "RESOLVED"
       voter_type: "authenticated" | "anonymous"
     }
@@ -1346,6 +1350,7 @@ export const Constants = {
         "SYSTEM_ANNOUNCEMENT",
       ],
       reporter_type: ["authenticated", "anonymous"],
+      severity: ["low", "medium", "high", "critical"],
       status_category: ["NEW", "IN_PROGRESS", "RESOLVED"],
       voter_type: ["authenticated", "anonymous"],
     },

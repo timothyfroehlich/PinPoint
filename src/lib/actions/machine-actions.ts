@@ -79,7 +79,7 @@ export async function createMachineAction(
 
   try {
     // Create machine with organization scoping
-    const [machine] = await db
+    const machineResult = await db
       .insert(machines)
       .values({
         id: crypto.randomUUID(),
@@ -93,17 +93,18 @@ export async function createMachineAction(
       })
       .returning({ id: machines.id });
 
-    // Cache invalidation
-    revalidateTag(`machines-${organizationId}`);
-    revalidateTag(`dashboard-${organizationId}`);
-    revalidatePath("/machines");
-
+    const [machine] = machineResult;
     if (!machine) {
       return {
         success: false,
         error: "Failed to create machine. No data returned.",
       };
     }
+
+    // Cache invalidation
+    revalidateTag(`machines-${organizationId}`);
+    revalidateTag(`dashboard-${organizationId}`);
+    revalidatePath("/machines");
 
     return { success: true, data: { machineId: machine.id } };
   } catch (error) {
@@ -140,7 +141,7 @@ export async function updateMachineAction(
       updateData.owner_id = validation.data.ownerId ?? null;
 
     // Update with organization scoping
-    const [updatedMachine] = await db
+    const updatedMachineResult = await db
       .update(machines)
       .set(updateData)
       .where(
@@ -150,6 +151,8 @@ export async function updateMachineAction(
         ),
       )
       .returning({ id: machines.id });
+
+    const [updatedMachine] = updatedMachineResult;
 
     if (!updatedMachine) {
       return {
@@ -189,7 +192,7 @@ export async function deleteMachineAction(
 
   try {
     // Delete with organization scoping
-    const [deletedMachine] = await db
+    const deletedMachineResult = await db
       .delete(machines)
       .where(
         and(
@@ -198,6 +201,8 @@ export async function deleteMachineAction(
         ),
       )
       .returning({ id: machines.id });
+
+    const [deletedMachine] = deletedMachineResult;
 
     if (!deletedMachine) {
       return {
@@ -231,11 +236,18 @@ export async function bulkUpdateMachinesAction(
   const { organization } = await requireMemberAccess();
   const organizationId = organization.id;
 
-  const machineIdsString = formData.get("machineIds") as string;
+  const machineIdsValue = formData.get("machineIds");
+  const machineIdsString = typeof machineIdsValue === "string" ? machineIdsValue : "";
   const machineIds = machineIdsString ? machineIdsString.split(",") : [];
 
   // Enhanced validation with validateFormData (using parsed machineIds)
-  const bulkData = { machineIds, locationId: formData.get("locationId") ?? undefined, ownerId: formData.get("ownerId") ?? undefined };
+  const locationIdValue = formData.get("locationId");
+  const ownerIdValue = formData.get("ownerId");
+  const bulkData = { 
+    machineIds, 
+    locationId: typeof locationIdValue === "string" ? locationIdValue : undefined, 
+    ownerId: typeof ownerIdValue === "string" ? ownerIdValue : undefined 
+  };
   const validation = BulkUpdateMachineSchema.safeParse(bulkData);
   if (!validation.success) {
     return {
@@ -291,8 +303,9 @@ export async function generateQRCodeAction(
   const { organization } = await requireMemberAccess();
   const organizationId = organization.id;
 
+  const machineIdValue = formData.get("machineId");
   const result = GenerateQRCodeSchema.safeParse({
-    machineId: formData.get("machineId"),
+    machineId: typeof machineIdValue === "string" ? machineIdValue : "",
   });
 
   if (!result.success) {
@@ -315,7 +328,7 @@ export async function generateQRCodeAction(
     const qrCode = await generateMachineQRCode(result.data.machineId);
 
     // Update machine with QR code information
-    const [updatedMachine] = await db
+    const updatedMachineResult = await db
       .update(machines)
       .set({
         qr_code_id: qrCode.id,
@@ -330,6 +343,8 @@ export async function generateQRCodeAction(
         ),
       )
       .returning({ id: machines.id });
+
+    const [updatedMachine] = updatedMachineResult;
 
     if (!updatedMachine) {
       return {
@@ -380,7 +395,7 @@ export async function regenerateQRCodeAction(
     const qrCode = await generateMachineQRCode(machineId);
 
     // Update machine with new QR code
-    const [updatedMachine] = await db
+    const updatedMachineResult = await db
       .update(machines)
       .set({
         qr_code_id: qrCode.id,
@@ -395,6 +410,8 @@ export async function regenerateQRCodeAction(
         ),
       )
       .returning({ id: machines.id });
+
+    const [updatedMachine] = updatedMachineResult;
 
     if (!updatedMachine) {
       return {
@@ -425,7 +442,8 @@ export async function bulkGenerateQRCodesAction(
   const { organization } = await requireMemberAccess();
   const organizationId = organization.id;
 
-  const machineIdsString = formData.get("machineIds") as string;
+  const machineIdsValue = formData.get("machineIds");
+  const machineIdsString = typeof machineIdsValue === "string" ? machineIdsValue : "";
   const machineIds = machineIdsString ? machineIdsString.split(",") : [];
 
   const result = BulkQRGenerateSchema.safeParse({ machineIds });
@@ -450,14 +468,14 @@ export async function bulkGenerateQRCodesAction(
         try {
           // Validate machine ID before processing
           if (!validateQRCodeParams(machineId)) {
-            console.error(`Invalid machine ID format: ${String(machineId)}`);
+            console.error(`Invalid machine ID format: ${machineId}`);
             continue;
           }
 
           // Generate actual QR code
           const qrCode = await generateMachineQRCode(machineId);
 
-          const [updatedMachine] = await db
+          const updatedMachineResult = await db
             .update(machines)
             .set({
               qr_code_id: qrCode.id,
@@ -473,12 +491,14 @@ export async function bulkGenerateQRCodesAction(
             )
             .returning({ id: machines.id });
 
+          const [updatedMachine] = updatedMachineResult;
+
           if (updatedMachine) {
             processedCount++;
           }
         } catch (error) {
           console.error(
-            `Failed to generate QR for machine ${String(machineId)}:`,
+            `Failed to generate QR for machine ${machineId}:`,
             error,
           );
         }

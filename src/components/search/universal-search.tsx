@@ -87,7 +87,7 @@ export function UniversalSearch({
       const saved = localStorage.getItem("pinpoint-recent-searches");
       if (saved) {
         try {
-          const parsed = JSON.parse(saved);
+          const parsed: unknown = JSON.parse(saved);
           if (
             Array.isArray(parsed) &&
             parsed.every((item) => typeof item === "string")
@@ -122,7 +122,7 @@ export function UniversalSearch({
 
         const response = await fetch(`/api/search/suggestions?${params}`);
         if (response.ok) {
-          const data: SearchSuggestionsResponse = await response.json();
+          const data: SearchSuggestionsResponse = await response.json() as SearchSuggestionsResponse;
           setSuggestions(data.suggestions);
         } else {
           console.error("Failed to fetch suggestions:", response.statusText);

@@ -116,6 +116,11 @@ export const env = createEnv({
       .string()
       .transform((s) => s === "true")
       .default(false),
+    // App URL for QR codes and external links
+    NEXT_PUBLIC_APP_URL: z
+      .string()
+      .url("App URL must be a valid URL")
+      .default("https://pinpoint.app"),
     // Supabase Public Configuration
     NEXT_PUBLIC_SUPABASE_URL:
       getEnvironmentType() === "test"
@@ -157,6 +162,7 @@ export const env = createEnv({
     SUPABASE_DB_URL: process.env["SUPABASE_DB_URL"],
     // Client-side environment variables
     NEXT_PUBLIC_VERCEL_ENV: process.env["NEXT_PUBLIC_VERCEL_ENV"],
+    NEXT_PUBLIC_APP_URL: process.env["NEXT_PUBLIC_APP_URL"],
     NEXT_PUBLIC_SUPABASE_URL: process.env["NEXT_PUBLIC_SUPABASE_URL"],
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
       process.env["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"],

@@ -392,7 +392,7 @@ CREATE POLICY "machines_delete_permission" ON machines
 -- 7. ISSUES SYSTEM - Anonymous reporting, member management
 -- =================================================================
 
--- Anonymous users can create issues (for QR code reporting)
+-- Anonymous users can create issues (for QR code reporting) only when org toggle enabled and machine active
 CREATE POLICY "issues_anon_create" ON issues
   FOR INSERT TO anon
   WITH CHECK (

@@ -102,3 +102,11 @@ export function shouldEnableDemoLogin(): boolean {
 export function shouldRequireGoogleOAuth(): boolean {
   return isPreview() || isProduction();
 }
+
+/**
+ * Get the app URL for server-side usage (QR codes, external links, etc.)
+ * Server-side wrapper around the validated env variable
+ */
+export function getAppUrl(): string {
+  return env.NEXT_PUBLIC_APP_URL;
+}

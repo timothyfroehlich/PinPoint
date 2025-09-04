@@ -120,13 +120,18 @@ export async function bulkMarkNotificationsAsReadAction(
   try {
     const { user, organizationId } = await requireAuthContextWithRole();
 
-    // Parse JSON data from form
-    const jsonData = formData.get("data") as string;
-    if (!jsonData) {
+    // Parse JSON data from form with proper type safety
+    const jsonData = formData.get("data");
+    if (typeof jsonData !== "string") {
       return actionError("No data provided for bulk update");
     }
 
-    const data = JSON.parse(jsonData);
+    let data: unknown;
+    try {
+      data = JSON.parse(jsonData);
+    } catch {
+      return actionError("Invalid JSON data provided");
+    }
     const validation = bulkMarkAsReadSchema.safeParse(data);
     if (!validation.success) {
       return actionError("Invalid bulk update data");

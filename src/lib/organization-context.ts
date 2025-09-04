@@ -8,9 +8,10 @@
 
 import { cache } from "react";
 import { headers } from "next/headers";
-import { eq, and } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { db } from "~/lib/dal/shared";
-import { organizations, memberships } from "~/server/db/schema";
+import { getOrganizationBySubdomain, getUserMembershipPublic } from "~/lib/dal/public-organizations";
+import type { Organization, Membership } from "~/lib/types/db";
 import { createClient } from "~/lib/supabase/server";
 import { isDevelopment } from "~/lib/environment";
 import { extractTrustedSubdomain } from "~/lib/subdomain-verification";
@@ -62,16 +63,7 @@ async function extractSubdomain(): Promise<string | null> {
  * Returns organization entity if found, null otherwise
  */
 export const resolveOrganization = cache(async (subdomain: string) => {
-  const organization = await db.query.organizations.findFirst({
-    where: eq(organizations.subdomain, subdomain),
-    columns: {
-      id: true,
-      name: true,
-      subdomain: true,
-    },
-  });
-
-  return organization;
+  return await getOrganizationBySubdomain(subdomain);
 });
 
 /**
@@ -80,22 +72,7 @@ export const resolveOrganization = cache(async (subdomain: string) => {
  */
 export const getUserMembership = cache(
   async (userId: string, organizationId: string) => {
-    const membership = await db.query.memberships.findFirst({
-      where: and(
-        eq(memberships.user_id, userId),
-        eq(memberships.organization_id, organizationId),
-      ),
-      with: {
-        role: {
-          columns: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-    });
-
-    return membership;
+    return await getUserMembershipPublic(userId, organizationId);
   },
 );
 
@@ -230,8 +207,9 @@ export const setRLSOrganizationContext = async (
   organizationId: string,
 ): Promise<void> => {
   try {
+    // Use Drizzle sql template for safe parameterization
     await db.execute(
-      `SET LOCAL app.current_organization_id = '${organizationId}'`,
+      sql`SET LOCAL app.current_organization_id = ${organizationId}`,
     );
   } catch (error) {
     console.warn("Failed to set RLS organization context:", error);

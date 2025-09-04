@@ -470,7 +470,12 @@ CREATE POLICY "locations_public_read" ON "locations" AS PERMISSIVE FOR SELECT TO
 CREATE POLICY "locations_member_modify" ON "locations" AS PERMISSIVE FOR ALL TO "authenticated";--> statement-breakpoint
 CREATE POLICY "machines_public_read" ON "machines" AS PERMISSIVE FOR SELECT TO "anon", "authenticated" USING (((organization_id = current_setting('app.current_organization_id'::text, true)) AND ((is_public = true) OR (is_public IS NULL))));--> statement-breakpoint
 CREATE POLICY "machines_member_all_access" ON "machines" AS PERMISSIVE FOR ALL TO "authenticated";--> statement-breakpoint
-CREATE POLICY "issues_anon_create" ON "issues" AS PERMISSIVE FOR INSERT TO "anon" WITH CHECK (((organization_id = current_setting('app.current_organization_id'::text, true)) AND (reporter_type = 'anonymous'::reporter_type) AND (created_by_id IS NULL)));--> statement-breakpoint
+CREATE POLICY "issues_anon_create" ON "issues" AS PERMISSIVE FOR INSERT TO "anon" WITH CHECK (((organization_id = current_setting('app.current_organization_id'::text, true))
+	AND (reporter_type = 'anonymous'::reporter_type)
+	AND (created_by_id IS NULL)
+	AND (EXISTS ( SELECT 1 FROM organizations o WHERE (o.id = organization_id) AND (o.allow_anonymous_issues = TRUE)))
+	AND (EXISTS ( SELECT 1 FROM machines m WHERE (m.id = issues.machine_id) AND (m.deleted_at IS NULL)))
+));--> statement-breakpoint
 CREATE POLICY "issues_public_read" ON "issues" AS PERMISSIVE FOR SELECT TO "anon", "authenticated";--> statement-breakpoint
 CREATE POLICY "issues_member_access" ON "issues" AS PERMISSIVE FOR ALL TO "authenticated";--> statement-breakpoint
 CREATE POLICY "priorities_member_access" ON "priorities" AS PERMISSIVE FOR ALL TO "authenticated" USING (((organization_id = current_setting('app.current_organization_id'::text, true)) AND (EXISTS ( SELECT 1

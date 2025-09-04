@@ -9,6 +9,7 @@ import { db } from "./shared";
 import { withOrgRLS } from "~/server/db/utils/rls";
 import { systemSettings } from "~/server/db/schema";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
+import { setTypedProperty } from "~/lib/utils/typed-object-helpers";
 
 // Type definitions for system settings
 export interface SystemSettingsData {
@@ -114,12 +115,12 @@ export const getSystemSettings = cache(
           }
           case "security": {
             const k = key as keyof SystemSettingsData["security"];
-            (securityPartial as any)[k] = value;
+            setTypedProperty(securityPartial, k, value as SystemSettingsData["security"][typeof k]);
             break;
           }
           case "preferences": {
             const k = key as keyof SystemSettingsData["preferences"];
-            (preferencesPartial as any)[k] = value;
+            setTypedProperty(preferencesPartial, k, value as SystemSettingsData["preferences"][typeof k]);
             break;
           }
           case "features": {

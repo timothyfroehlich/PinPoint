@@ -409,7 +409,7 @@ export async function getCurrentTestRole(
     const result = await db.execute(
       sql`SELECT current_setting('app.test_role', true) as test_role`,
     );
-    return result.rows?.[0]?.test_role || null;
+    return result.rows?.[0]?.test_role ?? null;
   } catch {
     return null;
   }
@@ -499,7 +499,7 @@ export async function verifyIntegrationTesterMode(db: TestDatabase): Promise<{
  */
 export function getIntegrationTesterDatabaseUrl(): string {
   const baseUrl =
-    process.env.DATABASE_URL ||
+    process.env.DATABASE_URL ??
     "postgresql://postgres:postgres@localhost:5432/postgres";
 
   // Replace user credentials with integration_tester role
