@@ -152,7 +152,7 @@ export function buildMachineUrl(
       const defaults = MachineSearchParamsSchema.parse({});
 
       // Don't include default values in URL for cleaner URLs
-      const defaultValue = (defaults as MachineSearchParams)[key as keyof MachineSearchParams];
+      const defaultValue = (defaults)[key as keyof MachineSearchParams];
       if (defaultValue !== undefined && stringValue === String(defaultValue)) {
         url.searchParams.delete(key);
       } else {

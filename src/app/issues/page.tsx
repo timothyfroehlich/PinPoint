@@ -47,7 +47,7 @@ export async function generateMetadata({ searchParams }: IssuesPageProps): Promi
   const canonicalUrl = getIssueCanonicalUrl("/issues", parsedParams);
 
   // Generic title without organization-specific count to avoid auth race conditions
-  const title = filterDescriptions.length > 0 
+  const title = filterDescriptions.length > 0
     ? `Issues (${filterDescriptions.join(", ")}) - PinPoint`
     : "Issues - PinPoint";
 

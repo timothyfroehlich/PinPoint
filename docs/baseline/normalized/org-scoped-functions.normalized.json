@@ -1,0 +1,236 @@
+{
+  "inventoryDate": "2025-01-04",
+  "totalFunctions": 32,
+  "scopingPatterns": {
+    "explicitOrgId": 30,
+    "rlsBinding": 1,
+    "contextResolution": 5
+  },
+  "functions": [
+    {
+      "name": "ensureOrgContextAndBindRLS",
+      "location": "src/lib/organization-context.ts:153",
+      "scopingMethod": "requireOrganizationContext + withOrgRLS",
+      "requiresOrgId": false,
+      "usesRLS": true
+    },
+    {
+      "name": "getMachinesWithFilters",
+      "location": "src/lib/dal/machines.ts:65",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getMachinesForOrg",
+      "location": "src/lib/dal/machines.ts:204",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getMachineById",
+      "location": "src/lib/dal/machines.ts:213",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getMachineStats",
+      "location": "src/lib/dal/machines.ts:257",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getLocationsForOrg",
+      "location": "src/lib/dal/machines.ts:327",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getModelsForOrg",
+      "location": "src/lib/dal/machines.ts:342",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getOrganizationById",
+      "location": "src/lib/dal/organizations.ts:27",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getCurrentOrganization",
+      "location": "src/lib/dal/organizations.ts:60",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getOrganizationStats",
+      "location": "src/lib/dal/organizations.ts:88",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getOrganizationMembers",
+      "location": "src/lib/dal/organizations.ts:182",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getOrganizationRoles",
+      "location": "src/lib/dal/organizations.ts:232",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "validateUserMembership",
+      "location": "src/lib/dal/organizations.ts:252",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getCurrentUserProfile",
+      "location": "src/lib/dal/users.ts:18",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getUserById",
+      "location": "src/lib/dal/users.ts:50",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getCurrentUserMembership",
+      "location": "src/lib/dal/users.ts:84",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getCurrentUserPermissions",
+      "location": "src/lib/dal/users.ts:137",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getUserActivityStats",
+      "location": "src/lib/dal/users.ts:152",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getAssignableUsers",
+      "location": "src/lib/dal/users.ts:198",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getUserRecentActivity",
+      "location": "src/lib/dal/users.ts:231",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "userHasPermission",
+      "location": "src/lib/dal/users.ts:284",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getUserPublicProfile",
+      "location": "src/lib/dal/users.ts:298",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getIssuesForOrg",
+      "location": "src/lib/dal/issues.ts:18",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getIssuesWithFilters",
+      "location": "src/lib/dal/issues.ts:59",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getIssueById",
+      "location": "src/lib/dal/issues.ts:213",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getIssueStatusCounts",
+      "location": "src/lib/dal/issues.ts:254",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getRecentIssues",
+      "location": "src/lib/dal/issues.ts:281",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getUserNotifications",
+      "location": "src/lib/dal/notifications.ts:19",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getUnreadNotificationCount",
+      "location": "src/lib/dal/notifications.ts:58",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getCommentsForIssue",
+      "location": "src/lib/dal/comments.ts:19",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getCommentById",
+      "location": "src/lib/dal/comments.ts:46",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    },
+    {
+      "name": "getActivityLog",
+      "location": "src/lib/dal/activity-log.ts:95",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "usesRLS": false
+    }
+  ],
+  "violations": []
+}
