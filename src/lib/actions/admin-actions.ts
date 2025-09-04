@@ -29,7 +29,7 @@ import {
   type ActionResult,
 } from "./shared";
 import { isError, getErrorMessage } from "~/lib/utils/type-guards";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 import { db } from "~/lib/dal/shared";
 import { requirePermission } from "./shared";
 import { PERMISSIONS } from "~/server/auth/permissions.constants";
@@ -93,8 +93,11 @@ export async function inviteUserAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organization, membership } =
-      await requireMemberAccess();
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization, membership } = authContext;
     const organizationId = organization.id;
 
     // Enhanced validation with Zod
@@ -261,8 +264,11 @@ export async function updateUserRoleAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organization, membership } =
-      await requireMemberAccess();
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization, membership } = authContext;
     const organizationId = organization.id;
 
     // Enhanced validation
@@ -345,8 +351,11 @@ export async function removeUserAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organization, membership } =
-      await requireMemberAccess();
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization, membership } = authContext;
     const organizationId = organization.id;
 
     // Enhanced validation
@@ -425,8 +434,11 @@ export async function updateSystemSettingsAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organization, membership } =
-      await requireMemberAccess();
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization, membership } = authContext;
     const organizationId = organization.id;
 
     // Parse JSON data from form
@@ -515,8 +527,11 @@ export async function updateSystemSettingsAction(
  */
 export async function exportActivityLogAction(): Promise<Response> {
   try {
-    const { user, organization, membership } =
-      await requireMemberAccess();
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization, membership } = authContext;
     const organizationId = organization.id;
 
     await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ADMIN_VIEW_ANALYTICS, db);

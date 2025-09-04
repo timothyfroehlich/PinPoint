@@ -6,7 +6,7 @@ import {
   UniversalSearchResultsSkeleton,
 } from "~/components/search/universal-search-results";
 import { UniversalSearch } from "~/components/search/universal-search";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 
 // Force dynamic rendering for search pages
 export const dynamic = "force-dynamic";
@@ -40,7 +40,10 @@ export async function generateMetadata({ searchParams }: SearchPageProps): Promi
 
 export default async function SearchPage({ searchParams }: SearchPageProps): Promise<React.JSX.Element> {
   // Authentication validation with automatic redirect
-  await requireMemberAccess();
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
 
   const params = await searchParams;
   const query = typeof params["q"] === "string" ? params["q"].trim() : "";

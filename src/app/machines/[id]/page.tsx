@@ -6,7 +6,7 @@
 import { type Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 import { getMachineById } from "~/lib/dal/machines";
 import { MachineDetailServer } from "~/components/machines/machine-detail-server";
 import { MachineHeader } from "~/components/machines/machine-header";
@@ -22,8 +22,12 @@ export async function generateMetadata({
   params,
 }: MachinePageProps): Promise<Metadata> {
   try {
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
     const resolvedParams = await params;
-    const machine = await getMachineById(resolvedParams.id);
+    const machine = await getMachineById(resolvedParams.id, authContext.org.id);
 
     const machineName = machine.name || "Unknown Machine";
 
@@ -46,11 +50,14 @@ export async function generateMetadata({
 
 export default async function MachinePage({ params }: MachinePageProps): Promise<React.JSX.Element> {
   // Ensure user is authenticated and get organization context
-  await requireMemberAccess();
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
 
   try {
     const resolvedParams = await params;
-    const machine = await getMachineById(resolvedParams.id);
+    const machine = await getMachineById(resolvedParams.id, authContext.org.id);
 
     return (
       <div className="container mx-auto p-6 max-w-6xl space-y-6">

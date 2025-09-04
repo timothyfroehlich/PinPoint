@@ -15,7 +15,7 @@ const ALLOWED_FILES = [
   '**/legacy-inventory.ts',
 ];
 
-module.exports = {
+export default {
   meta: {
     type: 'problem',
     docs: {

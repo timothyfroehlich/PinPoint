@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Navigation } from "~/components/layout/navigation";
-import { getOrganizationContext } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 import Providers from "./providers";
 import "./globals.css";
 
@@ -17,7 +17,17 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }): Promise<React.JSX.Element> {
-  const organizationContext = await getOrganizationContext();
+  const authContext = await getRequestAuthContext();
+  
+  // Convert to legacy format if authorized, otherwise null
+  const organizationContext = authContext.kind === "authorized" 
+    ? {
+        organization: authContext.org,
+        user: authContext.user,
+        accessLevel: "member" as const,
+        membership: authContext.membership,
+      }
+    : null;
 
   return (
     <html lang="en">

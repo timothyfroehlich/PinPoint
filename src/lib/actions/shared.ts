@@ -10,7 +10,7 @@ import { cache } from "react"; // React 19 cache API
 // import { unstable_after } from "next/server"; // Background tasks
 import type { z } from "zod";
 import { createClient } from "~/lib/supabase/server";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 import { requirePermission as baseRequirePermission } from "~/server/auth/permissions";
 import { db } from "~/lib/dal/shared";
 import { getErrorMessage } from "~/lib/utils/type-guards";
@@ -38,8 +38,12 @@ export const getActionAuthContext = cache(async () => {
     redirect("/sign-in");
   }
 
-  // Validate org access using secure subdomain + membership check
-  const { organization } = await requireMemberAccess();
+  // Validate org access using canonical resolver
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
+  const { org: organization } = authContext;
 
   return { user, organizationId: organization.id };
 });
@@ -60,7 +64,11 @@ export async function requireActionAuthContextWithPermission(
   organizationId: string;
   membership: { id: string; role: any };
 }> {
-  const { user, organization, membership } = await requireMemberAccess();
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
+  const { user, org: organization, membership } = authContext;
   const organizationId = organization.id;
   await baseRequirePermission({ roleId: membership.role.id }, permission, db);
   const name = ((user as any).user_metadata?.name as string | undefined) ?? user.email ?? "";
