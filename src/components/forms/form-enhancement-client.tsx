@@ -17,7 +17,11 @@ import { useEffect, useRef } from "react";
  * Enhanced submit button with loading state
  * Replaces server submit button when JavaScript is available
  */
-function EnhancedSubmitButton({ isPending }: { isPending: boolean }): JSX.Element {
+function EnhancedSubmitButton({
+  isPending,
+}: {
+  isPending: boolean;
+}): JSX.Element {
   const { pending } = useFormStatus();
   const isLoading = isPending || pending;
 

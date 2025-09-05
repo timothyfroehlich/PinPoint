@@ -101,12 +101,19 @@ export async function inviteUserAction(
     const organizationId = organization.id;
 
     // Enhanced validation with Zod
-    const validation: ActionResult<InviteUserData> = validateFormData(formData, inviteUserSchema);
+    const validation: ActionResult<InviteUserData> = validateFormData(
+      formData,
+      inviteUserSchema,
+    );
     if (!validation.success) {
       return validation;
     }
 
-    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.USER_MANAGE, db);
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.USER_MANAGE,
+      db,
+    );
 
     // Check if user already exists in the system
     const existingUser = await db.query.users.findFirst({
@@ -272,12 +279,19 @@ export async function updateUserRoleAction(
     const organizationId = organization.id;
 
     // Enhanced validation
-    const validation: ActionResult<UpdateUserRoleData> = validateFormData(formData, updateUserRoleSchema);
+    const validation: ActionResult<UpdateUserRoleData> = validateFormData(
+      formData,
+      updateUserRoleSchema,
+    );
     if (!validation.success) {
       return validation;
     }
 
-    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.USER_MANAGE, db);
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.USER_MANAGE,
+      db,
+    );
 
     // Verify role exists in this organization
     const role = await db.query.roles.findFirst({
@@ -359,12 +373,19 @@ export async function removeUserAction(
     const organizationId = organization.id;
 
     // Enhanced validation
-    const validation: ActionResult<RemoveUserData> = validateFormData(formData, removeUserSchema);
+    const validation: ActionResult<RemoveUserData> = validateFormData(
+      formData,
+      removeUserSchema,
+    );
     if (!validation.success) {
       return validation;
     }
 
-    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.USER_MANAGE, db);
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.USER_MANAGE,
+      db,
+    );
 
     // Verify user exists and email matches (safety check)
     const targetUser = await db.query.users.findFirst({
@@ -442,20 +463,26 @@ export async function updateSystemSettingsAction(
     const organizationId = organization.id;
 
     // Parse JSON data from form
-    const settingsData = String(formData.get("settings") ?? "");
-    if (!settingsData) {
+    const rawSettings = formData.get("settings");
+    if (typeof rawSettings !== "string" || rawSettings.trim() === "") {
       return actionError("No settings data provided");
     }
 
-    const data = JSON.parse(settingsData);
-    const validation = updateSystemSettingsSchema.safeParse({ settings: data });
+    const parsed: unknown = JSON.parse(rawSettings);
+    const validation = updateSystemSettingsSchema.safeParse({
+      settings: parsed,
+    });
 
     if (!validation.success) {
       return actionError("Invalid settings data");
     }
 
     // Permission check for settings update
-    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ORGANIZATION_MANAGE, db);
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.ORGANIZATION_MANAGE,
+      db,
+    );
 
     // Convert flat form data to nested SystemSettingsData structure
     const flatSettings = validation.data.settings;
@@ -534,7 +561,11 @@ export async function exportActivityLogAction(): Promise<Response> {
     const { user, org: organization, membership } = authContext;
     const organizationId = organization.id;
 
-    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ADMIN_VIEW_ANALYTICS, db);
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.ADMIN_VIEW_ANALYTICS,
+      db,
+    );
 
     // Export activity log to CSV
     const csvData = await exportActivityLog(organizationId, {

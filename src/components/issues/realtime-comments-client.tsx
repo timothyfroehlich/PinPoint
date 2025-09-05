@@ -118,9 +118,9 @@ export function RealtimeCommentsClient({
                   const existingIndex = prev.findIndex(
                     (c) => c.id === updatedComment.id,
                   );
-                  if (existingIndex !== -1) {
+                  if (existingIndex !== -1 && existingIndex < prev.length) {
                     const updated = [...prev];
-                    updated[existingIndex] = updatedComment;
+                    updated.splice(existingIndex, 1, updatedComment);
                     return updated;
                   }
                   return prev;

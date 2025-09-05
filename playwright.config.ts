@@ -47,17 +47,26 @@ export default defineConfig({
     // 3. Authenticated browsers (depend on auth-setup)
     {
       name: "chromium-auth",
-      use: { ...devices["Desktop Chrome"], storageState: "e2e/.auth/user.json" },
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: "e2e/.auth/user.json",
+      },
       dependencies: ["auth-setup"],
     },
     {
       name: "firefox-auth",
-      use: { ...devices["Desktop Firefox"], storageState: "e2e/.auth/user.json" },
+      use: {
+        ...devices["Desktop Firefox"],
+        storageState: "e2e/.auth/user.json",
+      },
       dependencies: ["auth-setup"],
     },
     {
       name: "webkit-auth",
-      use: { ...devices["Desktop Safari"], storageState: "e2e/.auth/user.json" },
+      use: {
+        ...devices["Desktop Safari"],
+        storageState: "e2e/.auth/user.json",
+      },
       dependencies: ["auth-setup"],
     },
   ],

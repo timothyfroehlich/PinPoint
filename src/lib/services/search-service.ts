@@ -5,15 +5,15 @@
 
 import { cache } from "react";
 import { and, eq, sql, desc, count } from "drizzle-orm";
-import { 
-  issues, 
-  machines, 
-  users, 
-  memberships, 
-  locations, 
-  models, 
-  priorities, 
-  issueStatuses 
+import {
+  issues,
+  machines,
+  users,
+  memberships,
+  locations,
+  models,
+  priorities,
+  issueStatuses,
 } from "~/server/db/schema";
 import { db } from "~/lib/dal/shared";
 import { safeCount, type CountResult } from "~/lib/types/database-results";
@@ -177,7 +177,12 @@ export const performUniversalSearch = cache(
     // Build entity count map
     const entityCounts = countResults.reduce(
       (acc, { entity, count }) => {
-        acc[entity] = count;
+        Object.defineProperty(acc, entity, {
+          value: count,
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        });
         return acc;
       },
       {} as Record<SearchEntity, number>,

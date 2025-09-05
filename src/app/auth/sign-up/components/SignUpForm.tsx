@@ -232,7 +232,9 @@ export function SignUpForm(): React.JSX.Element {
               required
               disabled={magicLinkPending || isOAuthLoading}
             />
-            {magicLinkState && !magicLinkState.success && magicLinkState.fieldErrors?.["email"] && (
+            {magicLinkState &&
+              !magicLinkState.success &&
+              magicLinkState.fieldErrors?.["email"] && (
                 <p className="text-sm text-error">
                   {magicLinkState.fieldErrors["email"][0]}
                 </p>
@@ -272,14 +274,16 @@ export function SignUpForm(): React.JSX.Element {
           </Alert>
         )}
 
-        {magicLinkState && !magicLinkState.success && !magicLinkState.fieldErrors && (
-          <Alert className="border-error bg-error-container">
-            <div className="text-on-error-container">
-              <p className="font-medium">Account creation failed</p>
-              <p className="text-sm mt-1">{magicLinkState.error}</p>
-            </div>
-          </Alert>
-        )}
+        {magicLinkState &&
+          !magicLinkState.success &&
+          !magicLinkState.fieldErrors && (
+            <Alert className="border-error bg-error-container">
+              <div className="text-on-error-container">
+                <p className="font-medium">Account creation failed</p>
+                <p className="text-sm mt-1">{magicLinkState.error}</p>
+              </div>
+            </Alert>
+          )}
 
         <div className="text-xs text-center text-muted-foreground space-y-2">
           <p>

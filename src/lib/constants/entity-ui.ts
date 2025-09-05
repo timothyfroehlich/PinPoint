@@ -68,10 +68,30 @@ export function getEntityInfo(entityType: EntityType): {
   name: string;
   singular: string;
 } {
+  // Use safe property access to avoid security warnings
+  const icon = Object.prototype.hasOwnProperty.call(ENTITY_ICONS, entityType)
+    ? ENTITY_ICONS[entityType]
+    : ENTITY_ICONS.issues; // fallback
+
+  const colors = Object.prototype.hasOwnProperty.call(ENTITY_COLORS, entityType)
+    ? ENTITY_COLORS[entityType]
+    : ENTITY_COLORS.issues; // fallback
+
+  const name = Object.prototype.hasOwnProperty.call(ENTITY_NAMES, entityType)
+    ? ENTITY_NAMES[entityType]
+    : ENTITY_NAMES.issues; // fallback
+
+  const singular = Object.prototype.hasOwnProperty.call(
+    ENTITY_SINGULAR,
+    entityType,
+  )
+    ? ENTITY_SINGULAR[entityType]
+    : ENTITY_SINGULAR.issues; // fallback
+
   return {
-    icon: ENTITY_ICONS[entityType],
-    colors: ENTITY_COLORS[entityType],
-    name: ENTITY_NAMES[entityType],
-    singular: ENTITY_SINGULAR[entityType],
+    icon,
+    colors,
+    name,
+    singular,
   };
 }

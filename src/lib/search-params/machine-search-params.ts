@@ -152,7 +152,7 @@ export function buildMachineUrl(
       const defaults = MachineSearchParamsSchema.parse({});
 
       // Don't include default values in URL for cleaner URLs
-      const defaultValue = (defaults)[key as keyof MachineSearchParams];
+      const defaultValue = defaults[key as keyof MachineSearchParams];
       if (defaultValue !== undefined && stringValue === String(defaultValue)) {
         url.searchParams.delete(key);
       } else {
@@ -228,7 +228,7 @@ export function getMachineCanonicalUrl(
   const canonicalParams = { ...params };
 
   // Remove pagination from canonical URLs
-  const { page, ...cleanedParams } = canonicalParams;
+  const { page: _page, ...cleanedParams } = canonicalParams;
 
   // Use cleaned URL for consistent canonical URLs
   return cleanMachineUrl(buildMachineUrl(basePath, cleanedParams));

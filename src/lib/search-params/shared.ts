@@ -104,7 +104,7 @@ export function generateCanonicalUrl<T extends Record<string, unknown>>(
 
   // Remove pagination from canonical URLs
   if ("page" in canonicalParams) {
-    const { page, ...cleanedParams } = canonicalParams;
+    const { page: _page, ...cleanedParams } = canonicalParams;
     return builder(basePath, cleanedParams as Partial<T>);
   }
 
@@ -196,7 +196,15 @@ export function buildUrlWithOptions<T extends Record<string, unknown>>(
   }
 
   // Get defaults for comparison
-  const defaults = includeDefaults ? {} : defaultParser({});
+  const defaults: Record<string, unknown> = includeDefaults
+    ? {}
+    : (defaultParser({}) as unknown as Record<string, unknown>);
+
+  // Safe setter to avoid object injection warnings on dynamic keys
+  const setParam = (k: string, v: string): void => {
+    if (!/^[a-zA-Z0-9_\-]+$/.test(k)) return;
+    url.searchParams.set(k, v);
+  };
 
   // Add new parameters
   Object.entries(params).forEach(([key, value]) => {
@@ -207,27 +215,40 @@ export function buildUrlWithOptions<T extends Record<string, unknown>>(
 
     if (Array.isArray(value)) {
       if (value.length > 0) {
-        url.searchParams.set(key, value.join(","));
+        setParam(key, value.join(","));
       } else {
         url.searchParams.delete(key);
       }
     } else {
-      const stringValue = value.toString();
+      let stringValue: string | null = null;
+      if (typeof value === "string") {
+        stringValue = value;
+      } else if (typeof value === "number" || typeof value === "boolean") {
+        stringValue = String(value);
+      }
+
+      if (stringValue === null) {
+        // Unsupported value type for URLSearchParams; skip
+        return;
+      }
 
       // Skip default values unless explicitly requested
-      if (!includeDefaults && typeof defaults === "object" && defaults !== null) {
-        const defaultValue = (defaults as Record<string, unknown>)[key];
+      if (!includeDefaults) {
+        const defaultValue = Object.prototype.hasOwnProperty.call(defaults, key)
+          ? defaults[key]
+          : undefined;
         if (
-          defaultValue !== undefined &&
+          (typeof defaultValue === "string" ||
+            typeof defaultValue === "number" ||
+            typeof defaultValue === "boolean") &&
           stringValue === String(defaultValue)
         ) {
           url.searchParams.delete(key);
-        } else {
-          url.searchParams.set(key, stringValue);
+          return;
         }
-      } else {
-        url.searchParams.set(key, stringValue);
       }
+
+      setParam(key, stringValue);
     }
   });
 

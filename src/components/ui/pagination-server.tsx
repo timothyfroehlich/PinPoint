@@ -200,7 +200,10 @@ export function PaginationServerCompact({
   totalPages,
   basePath,
   searchParams,
-}: Omit<PaginationServerProps, "totalItems" | "itemsPerPage" | "showSummary">): JSX.Element | null {
+}: Omit<
+  PaginationServerProps,
+  "totalItems" | "itemsPerPage" | "showSummary"
+>): JSX.Element | null {
   if (totalPages <= 1) return null;
 
   const buildPageUrl = (page: number): string => {

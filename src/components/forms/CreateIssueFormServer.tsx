@@ -216,7 +216,9 @@ export function CreateIssueFormServer({
                 disabled={isPending}
                 data-testid="severity-select"
                 value={severity}
-                onValueChange={(v) => { setSeverity(v); }}
+                onValueChange={(v) => {
+                  setSeverity(v);
+                }}
               >
                 <SelectTrigger data-testid="severity-select-trigger">
                   <SelectValue
@@ -234,10 +236,7 @@ export function CreateIssueFormServer({
                   >
                     Medium
                   </SelectItem>
-                  <SelectItem
-                    value="high"
-                    data-testid="severity-option-high"
-                  >
+                  <SelectItem value="high" data-testid="severity-option-high">
                     High
                   </SelectItem>
                   <SelectItem

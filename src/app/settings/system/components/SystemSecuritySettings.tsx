@@ -45,14 +45,20 @@ export function SystemSecuritySettings({
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleInputChange = (key: keyof typeof formData, value: string): void => {
+  const handleInputChange = (
+    key: keyof typeof formData,
+    value: string,
+  ): void => {
     const numValue = parseInt(value, 10);
     if (!isNaN(numValue)) {
       setFormData((prev) => ({ ...prev, [key]: numValue }));
     }
   };
 
-  const handleSelectChange = (key: keyof typeof formData, value: string): void => {
+  const handleSelectChange = (
+    key: keyof typeof formData,
+    value: string,
+  ): void => {
     const numValue = parseInt(value, 10);
     setFormData((prev) => ({ ...prev, [key]: numValue }));
   };

@@ -105,7 +105,10 @@ export function validateIssueCreationInput(
   if ("description" in input && input.description) {
     const descTrimmed = (input.description || "").trim();
     if (descTrimmed.length > LIMITS.DESCRIPTION_MAX) {
-      return { valid: false, error: `Description must be ${String(LIMITS.DESCRIPTION_MAX)} characters or less` };
+      return {
+        valid: false,
+        error: `Description must be ${String(LIMITS.DESCRIPTION_MAX)} characters or less`,
+      };
     }
   }
 
