@@ -31,8 +31,6 @@ export const getDALAuthContext = cache(async () => {
   return { user };
 });
 
-
-
 /**
  * Pagination helpers for Server Components
  */

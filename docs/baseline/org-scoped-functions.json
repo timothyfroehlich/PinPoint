@@ -1,0 +1,325 @@
+{
+  "inventoryDate": "2025-01-04",
+  "totalFunctions": 32,
+  "scopingPatterns": {
+    "explicitOrgId": 30,
+    "rlsBinding": 1,
+    "contextResolution": 5
+  },
+  "functions": [
+    {
+      "name": "ensureOrgContextAndBindRLS",
+      "location": "src/lib/organization-context.ts:153",
+      "scopingMethod": "requireOrganizationContext + withOrgRLS",
+      "requiresOrgId": false,
+      "isPubliclyAccessible": false,
+      "usesRLS": true,
+      "description": "Legacy pattern - resolves org context and binds RLS session"
+    },
+    {
+      "name": "getMachinesWithFilters",
+      "location": "src/lib/dal/machines.ts:65",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "Filtered machine queries with explicit organization scoping"
+    },
+    {
+      "name": "getMachinesForOrg",
+      "location": "src/lib/dal/machines.ts:204",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "All machines for specific organization"
+    },
+    {
+      "name": "getMachineById",
+      "location": "src/lib/dal/machines.ts:213",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "Single machine lookup with org boundary enforcement"
+    },
+    {
+      "name": "getMachineStats",
+      "location": "src/lib/dal/machines.ts:257",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "Machine statistics scoped to organization"
+    },
+    {
+      "name": "getLocationsForOrg",
+      "location": "src/lib/dal/machines.ts:327",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "Location list scoped to organization"
+    },
+    {
+      "name": "getModelsForOrg",
+      "location": "src/lib/dal/machines.ts:342",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "Machine model list scoped to organization"
+    },
+    {
+      "name": "getOrganizationById",
+      "location": "src/lib/dal/organizations.ts:27",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "Organization lookup by ID"
+    },
+    {
+      "name": "getCurrentOrganization",
+      "location": "src/lib/dal/organizations.ts:60",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "Current organization context retrieval"
+    },
+    {
+      "name": "getOrganizationStats",
+      "location": "src/lib/dal/organizations.ts:88",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "Organization statistics and metrics"
+    },
+    {
+      "name": "getOrganizationMembers",
+      "location": "src/lib/dal/organizations.ts:182",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "Member list for organization"
+    },
+    {
+      "name": "getOrganizationRoles",
+      "location": "src/lib/dal/organizations.ts:232",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "Role list for organization"
+    },
+    {
+      "name": "validateUserMembership",
+      "location": "src/lib/dal/organizations.ts:252",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "User membership validation within organization"
+    },
+    {
+      "name": "getCurrentUserProfile",
+      "location": "src/lib/dal/users.ts:18",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "Current user profile with org context"
+    },
+    {
+      "name": "getUserById",
+      "location": "src/lib/dal/users.ts:50",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "User lookup scoped to organization"
+    },
+    {
+      "name": "getCurrentUserMembership",
+      "location": "src/lib/dal/users.ts:84",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "Current user membership details"
+    },
+    {
+      "name": "getCurrentUserPermissions",
+      "location": "src/lib/dal/users.ts:137",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "User permissions within organization"
+    },
+    {
+      "name": "getUserActivityStats",
+      "location": "src/lib/dal/users.ts:152",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "User activity statistics scoped to organization"
+    },
+    {
+      "name": "getAssignableUsers",
+      "location": "src/lib/dal/users.ts:198",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "Users available for assignment within org"
+    },
+    {
+      "name": "getUserRecentActivity",
+      "location": "src/lib/dal/users.ts:231",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "Recent activity for user within organization"
+    },
+    {
+      "name": "userHasPermission",
+      "location": "src/lib/dal/users.ts:284",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "Permission check for user within organization"
+    },
+    {
+      "name": "getUserPublicProfile",
+      "location": "src/lib/dal/users.ts:298",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "Public user profile scoped to organization"
+    },
+    {
+      "name": "getIssuesForOrg",
+      "location": "src/lib/dal/issues.ts:18",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "All issues for organization"
+    },
+    {
+      "name": "getIssuesWithFilters",
+      "location": "src/lib/dal/issues.ts:59",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "Filtered issues with organization scoping"
+    },
+    {
+      "name": "getIssueById",
+      "location": "src/lib/dal/issues.ts:213",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "Single issue lookup with org boundary"
+    },
+    {
+      "name": "getIssueStatusCounts",
+      "location": "src/lib/dal/issues.ts:254",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "Issue status distribution for organization"
+    },
+    {
+      "name": "getRecentIssues",
+      "location": "src/lib/dal/issues.ts:281",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "Recent issues scoped to organization"
+    },
+    {
+      "name": "getUserNotifications",
+      "location": "src/lib/dal/notifications.ts:19",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "User notifications within organization"
+    },
+    {
+      "name": "getUnreadNotificationCount",
+      "location": "src/lib/dal/notifications.ts:58",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "Unread notification count for user in org"
+    },
+    {
+      "name": "getCommentsForIssue",
+      "location": "src/lib/dal/comments.ts:19",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "Comments for issue scoped to organization"
+    },
+    {
+      "name": "getCommentById",
+      "location": "src/lib/dal/comments.ts:46",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "Single comment lookup with org scoping"
+    },
+    {
+      "name": "getActivityLog",
+      "location": "src/lib/dal/activity-log.ts:95",
+      "scopingMethod": "explicitOrgId",
+      "requiresOrgId": true,
+      "isPubliclyAccessible": false,
+      "usesRLS": false,
+      "description": "Activity log entries scoped to organization"
+    }
+  ],
+  "violations": [],
+  "securityCompliance": {
+    "allFunctionsScoped": true,
+    "explicitOrgIdPattern": "30/31 functions use explicit organizationId parameter",
+    "rlsPattern": "1/31 functions use RLS binding (legacy)",
+    "noUnscopedQueries": true,
+    "migrationStatus": "Phase 1A - Explicit organizationId parameters established"
+  },
+  "patterns": {
+    "modernPattern": "explicitOrgId parameter with direct filtering",
+    "legacyPattern": "ensureOrgContextAndBindRLS with RLS session binding",
+    "publicPattern": "Functions without org scoping (system-wide)",
+    "recommendedMigration": "Continue with explicit organizationId parameters"
+  },
+  "rlsIntegration": {
+    "withOrgRLS": "src/server/db/utils/rls.ts",
+    "setRLSOrganizationContext": "src/lib/organization-context.ts:116",
+    "currentUsage": "Minimal - most functions use explicit filtering",
+    "migrationDirection": "Away from RLS session variables toward explicit parameters"
+  },
+  "authenticationIntegration": {
+    "contextResolution": "getRequestAuthContext provides organizationId",
+    "parameterPattern": "organizationId: string as required parameter",
+    "securityBoundary": "Application-level filtering with explicit org parameter",
+    "validationRequired": "All functions must validate organizationId parameter"
+  }
+}

@@ -133,7 +133,7 @@ export function buildIssueUrl(
       const defaults = IssueSearchParamsSchema.parse({});
 
       // Don't include default values in URL for cleaner URLs
-      const defaultValue = (defaults)[key as keyof IssueSearchParams];
+      const defaultValue = defaults[key as keyof IssueSearchParams];
       if (defaultValue !== undefined && stringValue === String(defaultValue)) {
         url.searchParams.delete(key);
       } else {
@@ -202,7 +202,7 @@ export function getIssueCanonicalUrl(
   const canonicalParams = { ...params };
 
   // Remove pagination from canonical URLs
-  const { page, ...cleanedParams } = canonicalParams;
+  const { page: _page, ...cleanedParams } = canonicalParams;
 
   // Use cleaned URL for consistent canonical URLs
   return cleanIssueUrl(buildIssueUrl(basePath, cleanedParams));

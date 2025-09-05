@@ -235,7 +235,9 @@ describe("Server Action Utilities (Unit Tests - Archetype 1)", () => {
     });
 
     it("handles non-Error exceptions", async () => {
+      // Intentionally throw a non-Error to verify normalization
       const failingAction = async () => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error
         throw "String error";
       };
 

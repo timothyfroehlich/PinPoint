@@ -2,7 +2,7 @@
  * Placeholder ProfilePictureUpload Component
  * TODO: Implement full profile picture upload functionality
  */
-
+import Image from "next/image";
 interface UserProfileResponse {
   id: string;
   name: string | null;
@@ -31,9 +31,11 @@ export function ProfilePictureUpload({
       <div className="flex items-center space-x-4">
         <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center">
           {currentImage ? (
-            <img
+            <Image
               src={currentImage}
               alt="Profile"
+              width={80}
+              height={80}
               className="w-full h-full rounded-full object-cover"
             />
           ) : (

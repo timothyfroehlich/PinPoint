@@ -90,12 +90,14 @@ async function createNotificationForUser(
 async function getIssueStakeholders(
   issueId: string,
   organizationId: string,
-): Promise<{
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-}[]> {
+): Promise<
+  {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  }[]
+> {
   const issue = await db.query.issues.findFirst({
     where: and(
       eq(issues.id, issueId),

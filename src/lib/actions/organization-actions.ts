@@ -74,7 +74,11 @@ export async function updateOrganizationProfileAction(
     }
     const { user, org: organization, membership } = authContext;
     const organizationId = organization.id;
-    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ORGANIZATION_MANAGE, db);
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.ORGANIZATION_MANAGE,
+      db,
+    );
 
     // Enhanced validation with Zod
     const validation = validateFormData(
@@ -148,7 +152,11 @@ export async function updateOrganizationLogoAction(
     }
     const { user, org: organization, membership } = authContext;
     const organizationId = organization.id;
-    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ORGANIZATION_MANAGE, db);
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.ORGANIZATION_MANAGE,
+      db,
+    );
 
     // Enhanced validation
     const validation = validateFormData(formData, updateOrganizationLogoSchema);

@@ -402,6 +402,9 @@ export function validateNonEmptyStringArray(
   const arr: unknown[] = array as unknown[];
   const result: string[] = [];
   for (let index = 0; index < arr.length; index++) {
+    if (!Object.prototype.hasOwnProperty.call(arr, index)) {
+      continue; // Skip holes in sparse arrays
+    }
     const raw: unknown = arr[index];
     if (typeof raw !== "string") {
       throw new Error(`${fieldName}[${String(index)}] must be a string`);

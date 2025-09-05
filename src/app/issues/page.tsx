@@ -6,8 +6,8 @@ import { PlusIcon } from "lucide-react";
 import { IssuesListServer } from "~/components/issues/issues-list-server";
 import { IssueActiveFilters } from "~/components/issues/issue-active-filters";
 import { AdvancedSearchForm, ISSUES_FILTER_FIELDS } from "~/components/search";
+import { AuthGuard } from "~/components/auth/auth-guard";
 import { getRequestAuthContext } from "~/server/auth/context";
-import type { OrganizationContext } from "~/lib/types";
 import {
   getIssuesWithFilters,
   type IssuePagination,
@@ -30,7 +30,9 @@ interface IssuesPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export async function generateMetadata({ searchParams }: IssuesPageProps): Promise<Metadata> {
+export async function generateMetadata({
+  searchParams,
+}: IssuesPageProps): Promise<Metadata> {
   // Note: Authentication happens at page component level to avoid race conditions
 
   // Parse search params using centralized utility (no auth needed for URL parsing)
@@ -39,17 +41,19 @@ export async function generateMetadata({ searchParams }: IssuesPageProps): Promi
 
   // Generate filter descriptions using centralized utility (without org-specific data)
   const filterDescriptions = getIssueFilterDescription(parsedParams);
-  const description = filterDescriptions.length > 0
-    ? `Track and manage all issues across your organization's pinball machines. Current filters: ${filterDescriptions.join(", ")}`
-    : "Track and manage all issues across your organization's pinball machines";
+  const description =
+    filterDescriptions.length > 0
+      ? `Track and manage all issues across your organization's pinball machines. Current filters: ${filterDescriptions.join(", ")}`
+      : "Track and manage all issues across your organization's pinball machines";
 
   // Generate canonical URL for SEO
   const canonicalUrl = getIssueCanonicalUrl("/issues", parsedParams);
 
   // Generic title without organization-specific count to avoid auth race conditions
-  const title = filterDescriptions.length > 0
-    ? `Issues (${filterDescriptions.join(", ")}) - PinPoint`
-    : "Issues - PinPoint";
+  const title =
+    filterDescriptions.length > 0
+      ? `Issues (${filterDescriptions.join(", ")}) - PinPoint`
+      : "Issues - PinPoint";
 
   return {
     title,
@@ -65,12 +69,15 @@ export async function generateMetadata({ searchParams }: IssuesPageProps): Promi
   };
 }
 
-async function IssuesWithData({
+async function IssuesContent({
   searchParams,
-  orgContext,
+  authContext,
 }: {
   searchParams: IssuesPageProps["searchParams"];
-  orgContext: OrganizationContext;
+  authContext: Extract<
+    Awaited<ReturnType<typeof getRequestAuthContext>>,
+    { kind: "authorized" }
+  >;
 }): Promise<React.JSX.Element> {
   const rawParams = await searchParams;
 
@@ -94,9 +101,22 @@ async function IssuesWithData({
     order: parsedParams.order,
   };
 
+  // Convert to legacy OrganizationContext format for compatibility
+  const orgContext = {
+    organization: authContext.org,
+    user: authContext.user,
+    accessLevel: "member" as const,
+    membership: authContext.membership,
+  };
+
   // Server-side data fetching with filtering, sorting, and pagination
   // NOTE: This still uses ensureOrgContextAndBindRLS internally, but React 19 cache() should deduplicate
-  const result = await getIssuesWithFilters(orgContext.organization.id, filters, pagination, sorting);
+  const result = await getIssuesWithFilters(
+    orgContext.organization.id,
+    filters,
+    pagination,
+    sorting,
+  );
 
   return (
     <>
@@ -161,8 +181,8 @@ async function IssuesWithData({
         issues={result.issues}
         pagination={result}
         filters={filters}
-  sorting={sorting}
-  organizationId={orgContext.organization.id}
+        sorting={sorting}
+        organizationId={orgContext.organization.id}
       />
     </>
   );
@@ -174,38 +194,40 @@ export default async function IssuesPage({
   // Single authentication resolution for entire request
   const authContext = await getRequestAuthContext();
 
-  if (authContext.kind !== "authorized") {
-    throw new Error("Member access required");
-  }
-
-  // Convert to legacy OrganizationContext format for compatibility
-  const orgContext = {
-    organization: authContext.org,
-    user: authContext.user,
-    accessLevel: "member" as const,
-    membership: authContext.membership,
-  };
-
   return (
-    <div className="space-y-6">
-      <Suspense
-        fallback={
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <div className="space-y-2">
-                <div className="h-9 w-24 bg-muted animate-pulse rounded" />
-                <div className="h-5 w-48 bg-muted animate-pulse rounded" />
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Issues Access Required"
+      fallbackMessage="You need to be signed in as a member to view and manage issues."
+    >
+      <div className="space-y-6">
+        <Suspense
+          fallback={
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <div className="space-y-2">
+                  <div className="h-9 w-24 bg-muted animate-pulse rounded" />
+                  <div className="h-5 w-48 bg-muted animate-pulse rounded" />
+                </div>
+                <div className="h-10 w-32 bg-muted animate-pulse rounded" />
               </div>
-              <div className="h-10 w-32 bg-muted animate-pulse rounded" />
+              <div className="text-center py-8">
+                <div className="h-4 w-32 bg-muted animate-pulse rounded mx-auto" />
+              </div>
             </div>
-            <div className="text-center py-8">
-              <div className="h-4 w-32 bg-muted animate-pulse rounded mx-auto" />
-            </div>
-          </div>
-        }
-      >
-        <IssuesWithData searchParams={searchParams} orgContext={orgContext} />
-      </Suspense>
-    </div>
+          }
+        >
+          <IssuesContent
+            searchParams={searchParams}
+            authContext={
+              authContext as Extract<
+                Awaited<ReturnType<typeof getRequestAuthContext>>,
+                { kind: "authorized" }
+              >
+            }
+          />
+        </Suspense>
+      </div>
+    </AuthGuard>
   );
 }

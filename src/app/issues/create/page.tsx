@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Home, Wrench } from "lucide-react";
 
 import { CreateIssueFormServer } from "~/components/forms/CreateIssueFormServer";
+import { AuthGuard } from "~/components/auth/auth-guard";
 import { getRequestAuthContext } from "~/server/auth/context";
 import { createIssueAction } from "~/lib/actions/issue-actions";
 import { getMachinesForOrg } from "~/lib/dal/machines";
@@ -78,13 +79,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function CreateIssuePage({
+async function CreateIssueContent({
   searchParams,
-}: CreateIssuePageProps): Promise<React.JSX.Element> {
-  const authContext = await getRequestAuthContext();
-  if (authContext.kind !== "authorized") {
-    throw new Error("Member access required");
-  }
+  authContext,
+}: {
+  searchParams: CreateIssuePageProps["searchParams"];
+  authContext: Extract<
+    Awaited<ReturnType<typeof getRequestAuthContext>>,
+    { kind: "authorized" }
+  >;
+}): Promise<React.JSX.Element> {
   const resolvedSearchParams = await searchParams;
 
   // Parallel data fetching using real DAL functions with React 19 cache()
@@ -99,8 +103,8 @@ export default async function CreateIssuePage({
 
   // For now, give all authenticated members full creation permissions
   // TODO: Implement proper permission checking via DAL function
-  const gating = computeIssueCreationGating({ 
-    permissions: ["ISSUE_CREATE_FULL"] 
+  const gating = computeIssueCreationGating({
+    permissions: ["ISSUE_CREATE_FULL"],
   });
 
   return (
@@ -144,5 +148,29 @@ export default async function CreateIssuePage({
         showAssignee={gating.showAssignee}
       />
     </div>
+  );
+}
+
+export default async function CreateIssuePage({
+  searchParams,
+}: CreateIssuePageProps): Promise<React.JSX.Element> {
+  const authContext = await getRequestAuthContext();
+
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Create Issue Access Required"
+      fallbackMessage="You need to be signed in as a member to create new issues."
+    >
+      <CreateIssueContent
+        searchParams={searchParams}
+        authContext={
+          authContext as Extract<
+            Awaited<ReturnType<typeof getRequestAuthContext>>,
+            { kind: "authorized" }
+          >
+        }
+      />
+    </AuthGuard>
   );
 }
