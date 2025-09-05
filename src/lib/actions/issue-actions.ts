@@ -207,7 +207,7 @@ export async function createIssueAction(
     // Background processing (runs after response sent to user)
     runAfterResponse(async () => {
       console.log(
-        `Issue ${issueData.id} created by ${user.email ?? "unknown"}`,
+        `Issue ${issueData.id} created by ${String(user.email)}`,
       );
 
       // Generate notifications for issue creation
@@ -388,7 +388,7 @@ export async function updateIssueStatusAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(
-        `Issue ${issueId} status updated by ${user.email ?? "unknown"}`,
+        `Issue ${issueId} status updated by ${String(user.email)}`,
       );
 
       // Generate notifications for status change
@@ -479,7 +479,7 @@ export async function addCommentAction(
     // Background processing
     runAfterResponse(() => {
       console.log(
-        `Comment added to issue ${issueId} by ${user.email ?? "unknown"}`,
+        `Comment added to issue ${issueId} by ${String(user.email)}`,
       );
       return Promise.resolve();
     });
@@ -559,7 +559,7 @@ export async function updateIssueAssignmentAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(
-        `Issue ${issueId} assignment updated by ${user.email ?? "unknown"}`,
+        `Issue ${issueId} assignment updated by ${String(user.email)}`,
       );
 
       // Generate notifications for assignment change
@@ -653,7 +653,7 @@ export async function bulkUpdateIssuesAction(
     // Background processing
     runAfterResponse(() => {
       console.log(
-        `Bulk updated ${String(updatedIssues.length)} issues by ${user.email ?? "unknown"}`,
+        `Bulk updated ${String(updatedIssues.length)} issues by ${String(user.email)}`,
       );
       return Promise.resolve();
     });

@@ -3,31 +3,9 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 import { env } from "~/env";
-// Attempt static import first; if build system tree-shakes incorrectly we can dynamically require later.
-import { trackRequest, startRequestTimer, endRequestTimer } from "./src/lib/auth/instrumentation";
-import { startTracking, endTracking } from "./src/lib/auth/request-tracker";
 import { SUBDOMAIN_VERIFIED_HEADER } from "~/lib/subdomain-verification";
 import { getCookieDomain } from "~/lib/utils/domain";
-import { initRequestContext, withRequestContext } from "~/server/context/request-context";
-
 export async function middleware(request: NextRequest): Promise<NextResponse> {
-  // Phase 1 instrumentation: count each incoming request for auth metrics denominator
-  try { trackRequest(); } catch { /* non-fatal */ }
-  
-  // Wave 0 enhanced tracking: Start request-scoped metrics
-  const route = request.nextUrl.pathname;
-  let requestId: string | null = null;
-  let requestSummary: any = null;
-  
-  try {
-    requestId = startTracking(route);
-    startRequestTimer(requestId);
-  } catch { /* non-fatal */ }
-  
-  // Phase 2A: Initialize request context
-  const requestContext = await initRequestContext(request);
-  
-  return withRequestContext(requestContext, async () => {
     const url = request.nextUrl.clone();
     const host = request.headers.get("host") ?? "";
 
@@ -140,34 +118,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     }
   });
 
-  // Wave 0 enhanced tracking: End request-scoped metrics and capture summary
-  if (requestId) {
-    try {
-      endRequestTimer(requestId);
-      requestSummary = endTracking(requestId);
-      
-      // Log concerning performance patterns
-      if (requestSummary.authCallCount > 2) {
-        console.warn(`[WAVE-0-METRICS] High auth resolution count: ${requestSummary.authCallCount} for ${route}`);
-      }
-      if (requestSummary.duplicateCallCount > 0) {
-        console.warn(`[WAVE-0-METRICS] Duplicate auth calls detected: ${requestSummary.duplicateCallCount} for ${route}`);
-      }
-      if (requestSummary.totalDuration > 1000) {
-        console.warn(`[WAVE-0-METRICS] Slow request detected: ${requestSummary.totalDuration}ms for ${route}`);
-      }
-      
-      // Add performance headers for debugging (only in development)
-      if (env.NODE_ENV === "development") {
-        supabaseResponse.headers.set("x-auth-calls", requestSummary.authCallCount.toString());
-        supabaseResponse.headers.set("x-request-duration", requestSummary.totalDuration.toString());
-        supabaseResponse.headers.set("x-duplicate-calls", requestSummary.duplicateCallCount.toString());
-      }
-    } catch { /* non-fatal */ }
-  }
-
   return supabaseResponse;
-  });
 }
 
 function getSubdomain(host: string): string | null {

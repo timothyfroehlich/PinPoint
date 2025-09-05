@@ -106,7 +106,7 @@ export default async function OrganizationSettingsPage(): Promise<React.JSX.Elem
               }}
             />
             <div className="mt-6">
-              <AnonymousIssueToggle initialEnabled={organization.allow_anonymous_issues ?? false} />
+              <AnonymousIssueToggle initialEnabled={organization.allow_anonymous_issues} />
             </div>
           </CardContent>
         </Card>

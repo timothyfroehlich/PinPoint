@@ -100,7 +100,7 @@ export async function markNotificationAsReadAction(
     // Background processing
     runAfterResponse(() => {
       console.log(
-        `Notification ${validation.data.notificationId} marked as read by ${user.email ?? "unknown"}`,
+        `Notification ${validation.data.notificationId} marked as read by ${String(user.email)}`,
       );
       return Promise.resolve();
     });
@@ -172,7 +172,7 @@ export async function bulkMarkNotificationsAsReadAction(
     // Background processing
     runAfterResponse(() => {
       console.log(
-        `Bulk marked ${String(updatedNotifications.length)} notifications as read by ${user.email ?? "unknown"}`,
+        `Bulk marked ${String(updatedNotifications.length)} notifications as read by ${String(user.email)}`,
       );
       return Promise.resolve();
     });
@@ -233,7 +233,7 @@ export async function markAllNotificationsAsReadAction(
     // Background processing
     runAfterResponse(() => {
       console.log(
-        `All notifications marked as read by ${user.email ?? "unknown"} (${String(updatedNotifications.length)} notifications)`,
+        `All notifications marked as read by ${String(user.email)} (${String(updatedNotifications.length)} notifications)`,
       );
       return Promise.resolve();
     });
@@ -297,7 +297,7 @@ export async function markNotificationAsUnreadAction(
     // Background processing
     runAfterResponse(() => {
       console.log(
-        `Notification ${validation.data.notificationId} marked as unread by ${user.email ?? "unknown"}`,
+        `Notification ${validation.data.notificationId} marked as unread by ${String(user.email)}`,
       );
       return Promise.resolve();
     });
