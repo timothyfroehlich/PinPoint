@@ -125,7 +125,7 @@ export async function createOptionalOrganizationClient(): Promise<{
   const organizationId = typeof orgId === "string" ? orgId : null;
 
   // Convert Supabase User to BaseUser (matching auth context pattern)
-  const userName = user.user_metadata?.['name'] as string | undefined;
+  const userName = user.user_metadata['name'] as string | undefined;
   const baseUser: BaseUser = {
     id: user.id,
     email: user.email ?? "",
