@@ -64,7 +64,9 @@ export const optional = <T extends z.ZodType>(schema: T): z.ZodOptional<T> =>
  * const genericId = createIdSchema(); // Uses default message
  * ```
  */
-export function createIdSchema(message = "ID is required") {
+export function createIdSchema(
+  message = "ID is required",
+): z.ZodPipe<z.ZodString, z.ZodTransform<string, string>> {
   return z
     .string()
     .min(1, { message })
@@ -404,7 +406,9 @@ export const commentCreationSchema = createCommentSchema;
  * });
  * ```
  */
-export function makeCreateSchema<T extends z.ZodRawShape>(shape: T): z.ZodObject<T> {
+export function makeCreateSchema<T extends z.ZodRawShape>(
+  shape: T,
+): z.ZodObject<T> {
   return z.object(shape).strict();
 }
 
@@ -421,10 +425,17 @@ export function makeCreateSchema<T extends z.ZodRawShape>(shape: T): z.ZodObject
  * }); // All fields become optional
  * ```
  */
-export function makeUpdateSchema(shape: z.ZodRawShape): z.ZodObject<Record<string, z.ZodType>> {
+export function makeUpdateSchema(
+  shape: z.ZodRawShape,
+): z.ZodObject<Record<string, z.ZodType>> {
   const partialShape: Record<string, z.ZodType> = {};
   for (const [k, v] of Object.entries(shape)) {
-    partialShape[k] = (v as z.ZodType).optional();
+    Object.defineProperty(partialShape, k, {
+      value: (v as z.ZodType).optional(),
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
   }
   return z.object(partialShape).strict();
 }

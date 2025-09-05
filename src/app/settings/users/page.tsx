@@ -16,6 +16,7 @@ import { Button } from "~/components/ui/button";
 import { Separator } from "~/components/ui/separator";
 import { UsersIcon, MailIcon, CalendarIcon, ShieldIcon } from "lucide-react";
 import { getRequestAuthContext } from "~/server/auth/context";
+import { AuthGuard } from "~/components/auth/auth-guard";
 import { api } from "~/trpc/server";
 import { UserTableActions } from "./components/UserTableActions";
 import { InviteUserDialog } from "./components/InviteUserDialog";
@@ -23,10 +24,23 @@ import { format } from "date-fns";
 
 export default async function UsersSettingsPage(): Promise<React.JSX.Element> {
   const authContext = await getRequestAuthContext();
-  if (authContext.kind !== "authorized") {
-    throw new Error("Member access required");
-  }
 
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="User Management Access Required"
+      fallbackMessage="You need to be signed in as a member to manage users and team members."
+    >
+      <UsersSettingsPageContent />
+    </AuthGuard>
+  );
+}
+
+async function UsersSettingsPageContent(): Promise<React.JSX.Element> {
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Unauthorized access"); // This should never happen due to AuthGuard
+  }
   // Fetch organization users and roles using the existing admin router
   const [users, roles] = await Promise.all([
     api.admin.getUsers(),
