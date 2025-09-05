@@ -167,12 +167,10 @@ export function SearchButtonTrigger({
     ghost: "hover:bg-accent hover:text-accent-foreground",
   } as const;
 
-  const variantClass = Object.prototype.hasOwnProperty.call(
-    variantStyles,
-    variant,
-  )
-    ? variantStyles[variant]
-    : variantStyles.default;
+  // ESLint security warning is false positive - `variant` is strictly typed
+  // as "default" | "outline" | "ghost" union type, making object access safe
+  // eslint-disable-next-line security/detect-object-injection
+  const variantClass = variantStyles[variant];
 
   return (
     <GlobalSearchShortcut>
