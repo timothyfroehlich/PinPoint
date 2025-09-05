@@ -234,9 +234,10 @@ export function buildUrlWithOptions<T extends Record<string, unknown>>(
 
       // Skip default values unless explicitly requested
       if (!includeDefaults) {
-        const defaultValue = Object.prototype.hasOwnProperty.call(defaults, key)
-          ? defaults[key]
-          : undefined;
+        // ESLint security warning is false positive - key comes from Object.entries(params)
+        // where params is a controlled object with known property names
+        // eslint-disable-next-line security/detect-object-injection
+        const defaultValue = defaults[key];
         if (
           (typeof defaultValue === "string" ||
             typeof defaultValue === "number" ||

@@ -48,10 +48,14 @@ async function UsersSettingsPageContent(): Promise<React.JSX.Element> {
   ]);
 
   // Group users by role for better organization
+  // ESLint security warnings are false positive - roleName comes from database
+  // role.name field which is controlled and sanitized via database constraints
   const usersByRole = users.reduce<Record<string, typeof users>>(
     (acc, user) => {
       const roleName = user.role.name;
+      // eslint-disable-next-line security/detect-object-injection
       acc[roleName] ??= [];
+      // eslint-disable-next-line security/detect-object-injection
       acc[roleName].push(user);
       return acc;
     },

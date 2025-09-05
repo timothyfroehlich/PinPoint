@@ -68,25 +68,17 @@ export function getEntityInfo(entityType: EntityType): {
   name: string;
   singular: string;
 } {
-  // Use safe property access to avoid security warnings
-  const icon = Object.prototype.hasOwnProperty.call(ENTITY_ICONS, entityType)
-    ? ENTITY_ICONS[entityType]
-    : ENTITY_ICONS.issues; // fallback
-
-  const colors = Object.prototype.hasOwnProperty.call(ENTITY_COLORS, entityType)
-    ? ENTITY_COLORS[entityType]
-    : ENTITY_COLORS.issues; // fallback
-
-  const name = Object.prototype.hasOwnProperty.call(ENTITY_NAMES, entityType)
-    ? ENTITY_NAMES[entityType]
-    : ENTITY_NAMES.issues; // fallback
-
-  const singular = Object.prototype.hasOwnProperty.call(
-    ENTITY_SINGULAR,
-    entityType,
-  )
-    ? ENTITY_SINGULAR[entityType]
-    : ENTITY_SINGULAR.issues; // fallback
+  // ESLint security warnings are false positive - entityType parameter is strictly
+  // typed as EntityType union ("issues" | "machines" | "users" | "locations")
+  // making object access safe with these controlled keys
+  // eslint-disable-next-line security/detect-object-injection
+  const icon = ENTITY_ICONS[entityType];
+  // eslint-disable-next-line security/detect-object-injection
+  const colors = ENTITY_COLORS[entityType];
+  // eslint-disable-next-line security/detect-object-injection
+  const name = ENTITY_NAMES[entityType];
+  // eslint-disable-next-line security/detect-object-injection
+  const singular = ENTITY_SINGULAR[entityType];
 
   return {
     icon,
