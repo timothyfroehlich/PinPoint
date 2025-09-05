@@ -30,18 +30,7 @@ import {
 } from "~/components/ui/select";
 import { signInWithOAuth, sendMagicLink } from "~/lib/actions/auth-actions";
 import { type OrganizationOption } from "~/lib/dal/public-organizations";
-
-// API Response validation schema for security
-const organizationSelectOptionsSchema = z.object({
-  organizations: z.array(
-    z.object({
-      id: z.string().min(1),
-      name: z.string().min(1),
-      subdomain: z.string().min(1),
-    }),
-  ),
-  defaultOrganizationId: z.string().nullable(),
-});
+import { organizationSelectOptionsSchema } from "~/lib/validation/schemas";
 
 // Type guard for safe organization access
 function isValidOrganizationArray(data: unknown): data is OrganizationOption[] {

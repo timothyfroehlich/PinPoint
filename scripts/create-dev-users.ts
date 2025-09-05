@@ -12,9 +12,22 @@ config({ path: ".env.local" });
 
 // eslint-disable-next-line no-restricted-imports -- Admin script needs direct Supabase client
 import { createClient } from "@supabase/supabase-js";
-import { getGlobalDatabaseProvider } from "../src/server/db/provider";
-import { memberships } from "../src/server/db/schema";
-import { isError } from "../src/lib/utils/type-guards";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import { pgTable, text } from "drizzle-orm/pg-core";
+
+// Standalone memberships table definition to avoid src/ imports
+const memberships = pgTable("memberships", {
+  id: text().primaryKey(),
+  user_id: text().notNull(),
+  organization_id: text().notNull(),
+  role_id: text().notNull(),
+});
+
+// Standalone type guard to avoid src/ imports
+function isError(error: unknown): error is Error {
+  return error instanceof Error;
+}
 
 interface DevUser {
   id: string;
@@ -63,8 +76,10 @@ async function createDevUsers() {
     process.exit(1);
   }
 
-  // Create DB client
-  const db = getGlobalDatabaseProvider().getClient();
+  // Create standalone DB client using local Supabase connection
+  const connectionString = "postgresql://postgres:postgres@localhost:54322/postgres";
+  const sql = postgres(connectionString);
+  const db = drizzle(sql);
 
   // Create Supabase admin client
   const supabase = createClient(
@@ -140,6 +155,9 @@ async function createDevUsers() {
   }
 
   console.log("✅ Dev user and membership creation complete");
+  
+  // Clean up database connection
+  await sql.end();
 }
 
 // Run if called directly (ES module compatibility)

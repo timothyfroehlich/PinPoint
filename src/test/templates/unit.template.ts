@@ -29,6 +29,7 @@
 
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+import { optionalPrioritySchema } from "~/lib/validation/schemas";
 import {
   {{IMPORTED_FUNCTIONS}}
 } from "{{MODULE_PATH}}";
@@ -81,7 +82,7 @@ describe("{{MODULE_NAME}} (Unit Tests - Archetype 1)", () => {
 describe("validateFormData", () => {
   const testSchema = z.object({
     title: z.string().min(1, "Title is required"),
-    priority: z.enum(["low", "medium", "high"]).default("medium")
+    priority: optionalPrioritySchema.default("medium")
   });
 
   it("validates valid form data successfully", () => {
