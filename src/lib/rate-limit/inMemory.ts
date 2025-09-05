@@ -21,6 +21,6 @@ class InMemoryRateLimiter {
 
 let singleton: InMemoryRateLimiter | null = null;
 export function getInMemoryRateLimiter(): InMemoryRateLimiter {
-  if (!singleton) singleton = new InMemoryRateLimiter();
+  singleton ??= new InMemoryRateLimiter();
   return singleton;
 }
