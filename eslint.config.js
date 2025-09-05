@@ -115,15 +115,8 @@ export default tseslint.config(
             "CallExpression[callee.property.name='update']:not([arguments.0])",
           message: "UPDATE operations must include WHERE clause",
         },
-        // Lane B: Mandatory cache() rules for async server functions
-        {
-          selector: "ExportNamedDeclaration[declaration.type='FunctionDeclaration'][declaration.async=true]:not([declaration.id.name=/cache$/])",
-          message: "Async server functions should be wrapped in cache() per CORE-PERF-001. Use: export const funcName = cache(async (...) => { ... });"
-        },
-        {
-          selector: "VariableDeclarator[id.name!=/cache$/] > ArrowFunctionExpression[async=true]",
-          message: "Async server functions should be wrapped in cache() per CORE-PERF-001"
-        }
+        // Lane B: Cache() rules for data fetching functions only (too broad - disabled for now)
+        // Use the custom missingCache/no-missing-cache-wrapper rule instead for more targeted detection
       ],
 
       // Rule to enforce use of validated env object
