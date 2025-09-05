@@ -18,7 +18,7 @@ import {
 import { IssuesListServer } from "~/components/issues/issues-list-server";
 import { DashboardStats } from "~/components/dashboard/dashboard-stats";
 
-export async function generateMetadata(): Promise<Metadata> {
+export function generateMetadata(): Metadata {
   // Generic metadata to avoid auth race conditions - org-specific title set at page level
   return {
     title: "Dashboard - PinPoint",

@@ -13,15 +13,36 @@ const ALLOWED_FILES = [
   '**/shared.ts', // Action/DAL shared files may have utility functions
 ];
 
+// Function name patterns that should NOT be cached (mutations, actions, etc.)
+const MUTATION_PATTERNS = [
+  /Action$/,           // Server Actions
+  /Mutation$/,         // Mutations
+  /^create/,           // Create operations
+  /^update/,           // Update operations  
+  /^delete/,           // Delete operations
+  /^remove/,           // Remove operations
+  /^add/,              // Add operations
+  /^invite/,           // Invite operations
+  /^send/,             // Send operations (emails, etc.)
+  /^sign/,             // Sign in/out operations
+  /^log(?!.*(get|find|query))/,  // Logging (but not log queries)
+  /^track/,            // Tracking operations
+  /^bind/,             // Binding operations
+  /^ensure/,           // Validation operations
+  /^require/,          // Requirement checks
+  /^has/,              // Boolean checks (usually not cached)
+  /^is/,               // Boolean checks (usually not cached)
+];
+
 const CACHE_FUNCTION_NAMES = [
   'cache' // React's cache function
 ];
 
 const SERVER_DIRECTORIES = [
-  'src/lib/dal/',
-  'src/lib/actions/',
-  'src/server/',
-  'src/lib/services/'
+  'src/lib/dal/',           // Data access layer - should be cached
+  'src/server/db/queries/', // Database queries - should be cached
+  // Note: Actions are mutations and should NOT be cached
+  // Note: Most server/ functions are utilities and may not need caching
 ];
 
 export default {
@@ -91,6 +112,11 @@ export default {
       return 'anonymous';
     }
 
+    function shouldFunctionBeCached(functionName) {
+      // Skip mutations and actions
+      return !MUTATION_PATTERNS.some(pattern => pattern.test(functionName));
+    }
+
     function checkAsyncExport(node) {
       // Skip if already wrapped in cache()
       if (node.type === 'ExportNamedDeclaration') {
@@ -105,21 +131,25 @@ export default {
             // Check if it's an async function that needs caching
             if (declarator && declarator.init && isAsyncFunction(declarator.init)) {
               const functionName = declarator.id.name;
-              context.report({
-                node: declarator.init,
-                messageId: 'missingCacheWrapper',
-                data: { functionName }
-              });
+              if (shouldFunctionBeCached(functionName)) {
+                context.report({
+                  node: declarator.init,
+                  messageId: 'missingCacheWrapper',
+                  data: { functionName }
+                });
+              }
             }
           }
           // export async function fn() {}
           else if (node.declaration.type === 'FunctionDeclaration' && isAsyncFunction(node.declaration)) {
             const functionName = getFunctionName(node.declaration);
-            context.report({
-              node: node.declaration,
-              messageId: 'missingCacheWrapper',
-              data: { functionName }
-            });
+            if (shouldFunctionBeCached(functionName)) {
+              context.report({
+                node: node.declaration,
+                messageId: 'missingCacheWrapper',
+                data: { functionName }
+              });
+            }
           }
         }
       }
@@ -135,7 +165,7 @@ export default {
           
           // Simple check for export statements (not perfect but catches most cases)
           if (text.includes(`export { ${varName}`) || text.includes(`export {${varName}`)) {
-            if (!isCacheWrapped(declarator.init)) {
+            if (!isCacheWrapped(declarator.init) && shouldFunctionBeCached(varName)) {
               context.report({
                 node: declarator.init,
                 messageId: 'missingCacheWrapper',

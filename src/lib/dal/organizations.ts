@@ -330,3 +330,38 @@ export const getAvailablePriorities = cache(async (organizationId: string) => {
     });
   });
 });
+
+/**
+ * Update organization settings
+ * Updates specific organization fields with organization scoping
+ */
+export const updateOrganizationSettings = cache(async (organizationId: string, updates: Partial<{
+  allow_anonymous_issues: boolean;
+  name: string;
+  description: string;
+  website: string;
+  phone: string;
+  address: string;
+}>) => {
+  return withOrgRLS(db, organizationId, async tx => {
+    const result = await tx
+      .update(organizations)
+      .set({
+        ...updates,
+        updated_at: new Date(),
+      })
+      .where(eq(organizations.id, organizationId))
+      .returning({
+        id: organizations.id,
+        name: organizations.name,
+        allow_anonymous_issues: organizations.allow_anonymous_issues,
+        updated_at: organizations.updated_at,
+      });
+    
+    if (result.length === 0) {
+      throw new Error("Organization not found or access denied");
+    }
+    
+    return result[0];
+  });
+});

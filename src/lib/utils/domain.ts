@@ -49,7 +49,7 @@ export function getProductionUrl(host: string): string {
     return `https://${host}`;
   }
 
-  return `https://${hostname}`;
+  return `https://${String(hostname)}`;
 }
 
 /**

@@ -52,7 +52,7 @@ export type OptionalResult<T> = T | null;
  * Helper type for safely accessing count query results
  */
 export function safeCount(result: CountResult[] | undefined): number {
-  return Number(result?.[0]?.count ?? 0);
+  return result?.[0]?.count ?? 0;
 }
 
 /**
