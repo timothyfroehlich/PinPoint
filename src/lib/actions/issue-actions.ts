@@ -207,7 +207,7 @@ export async function createIssueAction(
     // Background processing (runs after response sent to user)
     runAfterResponse(async () => {
       console.log(
-        `Issue ${issueData.id} created by ${String(user.email)}`,
+        `Issue ${issueData.id} created by ${user.email}`,
       );
 
       // Generate notifications for issue creation
@@ -215,7 +215,7 @@ export async function createIssueAction(
         await generateIssueCreationNotifications(issueData.id, {
           organizationId,
           actorId: user.id,
-          actorName: user.name ?? user.email ?? "",
+          actorName: user.name ?? user.email,
         });
       } catch (error) {
         console.error(
@@ -388,7 +388,7 @@ export async function updateIssueStatusAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(
-        `Issue ${issueId} status updated by ${String(user.email)}`,
+        `Issue ${issueId} status updated by ${user.email}`,
       );
 
       // Generate notifications for status change
@@ -403,7 +403,7 @@ export async function updateIssueStatusAction(
           await generateStatusChangeNotifications(issueId, statusResult.name, {
             organizationId,
             actorId: user.id,
-            actorName: user.name ?? user.email ?? "",
+            actorName: user.name ?? user.email,
           });
         }
       } catch (error) {
@@ -479,7 +479,7 @@ export async function addCommentAction(
     // Background processing
     runAfterResponse(() => {
       console.log(
-        `Comment added to issue ${issueId} by ${String(user.email)}`,
+        `Comment added to issue ${issueId} by ${user.email}`,
       );
       return Promise.resolve();
     });
@@ -559,7 +559,7 @@ export async function updateIssueAssignmentAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(
-        `Issue ${issueId} assignment updated by ${String(user.email)}`,
+        `Issue ${issueId} assignment updated by ${user.email}`,
       );
 
       // Generate notifications for assignment change
@@ -571,7 +571,7 @@ export async function updateIssueAssignmentAction(
           {
             organizationId,
             actorId: user.id,
-            actorName: user.name ?? user.email ?? "",
+            actorName: user.name ?? user.email,
           },
         );
       } catch (error) {
@@ -653,7 +653,7 @@ export async function bulkUpdateIssuesAction(
     // Background processing
     runAfterResponse(() => {
       console.log(
-        `Bulk updated ${String(updatedIssues.length)} issues by ${String(user.email)}`,
+        `Bulk updated ${String(updatedIssues.length)} issues by ${user.email}`,
       );
       return Promise.resolve();
     });

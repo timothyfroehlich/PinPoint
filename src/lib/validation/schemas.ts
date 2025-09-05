@@ -64,11 +64,12 @@ export const optional = <T extends z.ZodType>(schema: T): z.ZodOptional<T> =>
  * const genericId = createIdSchema(); // Uses default message
  * ```
  */
-export const createIdSchema = (message = "ID is required") =>
-  z
+export function createIdSchema(message = "ID is required") {
+  return z
     .string()
     .min(1, { message })
-    .transform((s) => s.trim());
+    .transform((s: string) => s.trim());
+}
 
 // -----------------------------------------------------------------------------
 // Core ID Schemas
@@ -420,7 +421,7 @@ export function makeCreateSchema<T extends z.ZodRawShape>(shape: T): z.ZodObject
  * }); // All fields become optional
  * ```
  */
-export function makeUpdateSchema<T extends z.ZodRawShape>(shape: T): z.ZodObject<Record<string, z.ZodType>> {
+export function makeUpdateSchema(shape: z.ZodRawShape): z.ZodObject<Record<string, z.ZodType>> {
   const partialShape: Record<string, z.ZodType> = {};
   for (const [k, v] of Object.entries(shape)) {
     partialShape[k] = (v as z.ZodType).optional();
