@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { sortOrderSchema } from "~/lib/validation/schemas";
 import {
   performUniversalSearch,
   type SearchEntity,
@@ -14,7 +15,7 @@ const UniversalSearchQuerySchema = z.object({
   page: z.coerce.number().min(1).optional().default(1),
   limit: z.coerce.number().min(1).max(50).optional().default(20),
   sort: z.enum(["relevance", "date"]).optional().default("relevance"),
-  order: z.enum(["asc", "desc"]).optional().default("desc"),
+  order: sortOrderSchema.optional(),
 });
 
 export async function GET(request: NextRequest): Promise<NextResponse> {

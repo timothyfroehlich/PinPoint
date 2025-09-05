@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { idSchema, machineIdSchema } from "~/lib/validation/schemas";
+import { idSchema, machineIdSchema, apiPaginationSchema } from "~/lib/validation/schemas";
 
 /**
  * Machine Creation Schema
@@ -48,8 +48,7 @@ export const machineFilterSchema = z.object({
   modelId: z.string().optional(),
   ownerId: z.string().optional(),
   search: z.string().optional(),
-  limit: z.number().min(1).max(1000).optional(),
-  offset: z.number().min(0).optional(),
+  ...apiPaginationSchema.shape,
 });
 
 /**

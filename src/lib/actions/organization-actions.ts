@@ -31,6 +31,7 @@ const updateOrganizationProfileSchema = z.object({
   description: z
     .string()
     .max(500, "Description must be less than 500 characters")
+    .transform((s) => s.trim())
     .optional(),
   website: z
     .string()

@@ -7,10 +7,11 @@
 #
 # Usage:
 #   ./scripts/db-reset.sh local    # Reset local Supabase database
-#   ./scripts/db-reset.sh preview  # Reset preview environment database
+#   ./scripts/db-reset.sh preview  # Reset preview environment database (with safety checks)
 #
 # Features:
-# - Uses your existing .env.local; does not auto-pull from Vercel
+# - Automatic vercel env pull integration for preview environments
+# - Comprehensive safety checks and confirmation prompts for preview
 # - Uses modular SQL seed files for maintainability
 # - Supports both Supabase (local/preview) and PostgreSQL-only (CI) workflows
 # - Auto-generates TypeScript types after schema changes
@@ -78,14 +79,23 @@ validate_environment() {
 
 validate_dependencies() {
     local missing_deps=()
+    local env="$1"
 
     # Check for required commands
     command -v supabase >/dev/null || missing_deps+=("supabase")
     command -v npm >/dev/null || missing_deps+=("npm")
     command -v psql >/dev/null || missing_deps+=("psql")
 
+    # For preview environments, verify Vercel CLI is available
+    if [[ "$env" == "preview" ]]; then
+        command -v vercel >/dev/null || missing_deps+=("vercel")
+    fi
+
     if [[ ${#missing_deps[@]} -gt 0 ]]; then
         log_error "Missing required dependencies: ${missing_deps[*]}"
+        if [[ " ${missing_deps[*]} " =~ " vercel " ]]; then
+            log_error "For preview environments, install Vercel CLI: npm i -g vercel"
+        fi
         log_error "Please install missing tools and try again"
         exit 1
     fi
@@ -128,6 +138,171 @@ validate_local_env_safety() {
 }
 
 # =============================================================================
+# Vercel Environment Integration
+# =============================================================================
+
+backup_current_env() {
+    if [[ -f ".env.local" ]]; then
+        log_info "Backing up current .env.local"
+        cp .env.local ".env.local.reset-backup-$(date +%Y%m%d-%H%M%S)"
+        log_success "Current environment backed up"
+    fi
+}
+
+restore_env_on_cleanup() {
+    local backup_file
+    backup_file=$(ls -t .env.local.reset-backup-* 2>/dev/null | head -n1)
+    if [[ -n "$backup_file" && -f "$backup_file" ]]; then
+        log_info "Restoring original .env.local from $backup_file"
+        mv "$backup_file" .env.local
+        log_success "Original environment restored"
+    fi
+    # Clean up any temporary preview env file
+    [[ -f ".env.preview.tmp" ]] && rm -f .env.preview.tmp
+}
+
+pull_preview_environment() {
+    log_step "Pulling preview environment from Vercel"
+    
+    # Pull preview environment variables to temporary file
+    log_info "Downloading preview environment variables..."
+    vercel env pull .env.preview.tmp --environment=preview
+    
+    # Replace current .env.local with preview environment
+    mv .env.preview.tmp .env.local
+
+    # Load the preview env vars into this shell so child processes see them
+    # Export all variables defined in .env.local (Vercel format: KEY=VALUE per line)
+    # shellcheck disable=SC1091
+    set -a
+    source .env.local
+    set +a
+
+    log_success "Preview environment activated"
+}
+
+confirm_preview_reset() {
+    local database_url
+    database_url=$(grep "^DATABASE_URL=" .env.local 2>/dev/null | cut -d'=' -f2- | tr -d '"' || echo "")
+    
+    if [[ -z "$database_url" ]]; then
+        log_error "DATABASE_URL not found in preview environment"
+        exit 1
+    fi
+    
+    # Extract host for display
+    local host=""
+    if [[ "$database_url" =~ postgresql://[^:]+:[^@]+@([^:]+) ]]; then
+        host="${BASH_REMATCH[1]}"
+    fi
+    
+    echo -e "\n${RED}⚠️  PREVIEW DATABASE RESET WARNING ⚠️${NC}"
+    echo -e "${YELLOW}You are about to COMPLETELY RESET the preview database:${NC}"
+    echo -e "   Host: ${RED}$host${NC}"
+    echo -e "   Database: ${RED}$(basename "$database_url")${NC}"
+    echo -e "\n${YELLOW}This will:${NC}"
+    echo -e "• ${RED}DROP ALL EXISTING DATA${NC}"
+    echo -e "• Apply fresh schema from local codebase"
+    echo -e "• Load development seed data"
+    echo -e "• Create development users"
+    echo -e "\n${YELLOW}This action CANNOT be undone!${NC}"
+    
+    echo ""
+    read -p "Type 'RESET PREVIEW' to confirm (case-sensitive): " confirmation
+    
+    if [[ "$confirmation" != "RESET PREVIEW" ]]; then
+        log_error "Reset cancelled by user"
+        exit 1
+    fi
+    
+    log_success "Preview reset confirmed"
+}
+
+# =============================================================================
+# Cloud Database Support Functions
+# =============================================================================
+
+parse_database_url() {
+    local url="$1"
+    
+    if [[ -z "$url" ]]; then
+        log_error "DATABASE_URL is required for preview environment"
+        return 1
+    fi
+
+    # Parse PostgreSQL URL: postgresql://user:password@host:port/database?options
+    if [[ ! "$url" =~ ^postgresql://([^:]+):([^@]+)@([^:]+):([0-9]+)/([^?]+)(\?(.*))?$ ]]; then
+        log_error "Invalid DATABASE_URL format. Expected: postgresql://user:password@host:port/database"
+        return 1
+    fi
+
+    DB_USER="${BASH_REMATCH[1]}"
+    DB_PASSWORD="${BASH_REMATCH[2]}"
+    DB_HOST="${BASH_REMATCH[3]}"
+    DB_PORT="${BASH_REMATCH[4]}"
+    DB_NAME="${BASH_REMATCH[5]}"
+    DB_OPTIONS="${BASH_REMATCH[7]:-}"
+
+    # Security validation - only allow trusted cloud providers
+    if [[ ! "$DB_HOST" =~ \.(supabase\.co|pooler\.supabase\.com|amazonaws\.com|rds\.amazonaws\.com)$ ]]; then
+        log_error "Untrusted database host: $DB_HOST"
+        log_error "Only Supabase and AWS RDS hosts are allowed for preview environments"
+        return 1
+    fi
+
+    log_success "Parsed DATABASE_URL: $DB_USER@$DB_HOST:$DB_PORT/$DB_NAME"
+    return 0
+}
+
+execute_cloud_sql() {
+    local sql_file="$1"
+    local command="$2"
+
+    if [[ -z "$DB_HOST" ]]; then
+        log_error "Database connection parameters not set. Run parse_database_url first."
+        return 1
+    fi
+
+    # Build psql command for cloud database
+    local psql_cmd="psql"
+    psql_cmd+=" --host=$DB_HOST"
+    psql_cmd+=" --port=$DB_PORT"
+    psql_cmd+=" --username=$DB_USER"
+    psql_cmd+=" --dbname=$DB_NAME"
+    psql_cmd+=" --no-password"  # Use PGPASSWORD environment variable
+    psql_cmd+=" --set ON_ERROR_STOP=1"  # Stop on first error
+    psql_cmd+=" --set AUTOCOMMIT=off"   # Use transactions
+    
+    # SSL is required for cloud databases
+    psql_cmd+=" --set sslmode=require"
+
+    # Disable pager for script execution
+    psql_cmd+=" --pset pager=off"
+    psql_cmd+=" --quiet"
+
+    # Set password environment variable
+    export PGPASSWORD="$DB_PASSWORD"
+
+    log_info "Connecting to cloud database: $DB_USER@$DB_HOST:$DB_PORT/$DB_NAME"
+
+    if [[ -n "$sql_file" ]]; then
+        log_info "Executing SQL file: $sql_file"
+        $psql_cmd --file="$sql_file"
+    elif [[ -n "$command" ]]; then
+        log_info "Executing SQL command"
+        echo "$command" | $psql_cmd
+    else
+        log_error "Either sql_file or command must be provided"
+        return 1
+    fi
+
+    # Clear password from environment
+    unset PGPASSWORD
+
+    return $?
+}
+
+# =============================================================================
 # Database Operations
 # =============================================================================
 
@@ -135,6 +310,20 @@ execute_sql_seeds() {
     local env="$1"
 
     log_step "Executing modular SQL seed files"
+
+    # For preview environments, parse DATABASE_URL first
+    if [[ "$env" == "preview" ]]; then
+        if [[ -z "${DATABASE_URL:-}" ]]; then
+            log_error "DATABASE_URL is required for preview environment"
+            return 1
+        fi
+        
+        log_info "Parsing DATABASE_URL for cloud database connection..."
+        if ! parse_database_url "$DATABASE_URL"; then
+            log_error "Failed to parse DATABASE_URL"
+            return 1
+        fi
+    fi
 
     # Define seed files in execution order based on environment
     local seed_files=()
@@ -168,7 +357,15 @@ execute_sql_seeds() {
 
         if [[ -f "$seed_path" ]]; then
             log_info "Executing: $seed_file"
-            "$PROJECT_ROOT/scripts/safe-psql.sh" -f "$seed_path"
+            
+            # Route to appropriate execution method based on environment
+            if [[ "$env" == "preview" ]]; then
+                # Use direct cloud database connection for preview
+                execute_cloud_sql "$seed_path" ""
+            else
+                # Use safe-psql.sh wrapper for local environments
+                "$PROJECT_ROOT/scripts/safe-psql.sh" -f "$seed_path"
+            fi
         else
             log_warning "Seed file not found: $seed_file"
         fi
@@ -176,15 +373,23 @@ execute_sql_seeds() {
 
     log_success "All seed files executed successfully"
 
-        # Quick verification of critical tables (best-effort; ignore failures)
-        log_step "Verifying critical seed data (non-fatal)"
-        {
-            "$PROJECT_ROOT/scripts/safe-psql.sh" -c "\
-                SELECT 'organizations' AS table, COUNT(*) AS count FROM organizations UNION ALL\
-                SELECT 'users', COUNT(*) FROM users UNION ALL\
-                SELECT 'machines', COUNT(*) FROM machines UNION ALL\
-                SELECT 'issues', COUNT(*) FROM issues;" || true
-        } | sed 's/^/    /'
+    # Quick verification of critical tables (best-effort; ignore failures)
+    log_step "Verifying critical seed data (non-fatal)"
+    {
+        local verification_query="\
+            SELECT 'organizations' AS table, COUNT(*) AS count FROM organizations UNION ALL\
+            SELECT 'users', COUNT(*) FROM users UNION ALL\
+            SELECT 'machines', COUNT(*) FROM machines UNION ALL\
+            SELECT 'issues', COUNT(*) FROM issues;"
+        
+        if [[ "$env" == "preview" ]]; then
+            # Use cloud database connection for verification
+            execute_cloud_sql "" "$verification_query" || true
+        else
+            # Use safe-psql.sh for local verification
+            "$PROJECT_ROOT/scripts/safe-psql.sh" -c "$verification_query" || true
+        fi
+    } | sed 's/^/    /'
 }
 
 reset_supabase_database() {
@@ -192,14 +397,20 @@ reset_supabase_database() {
 
     log_step "Resetting Supabase database ($env)"
 
-    # Reset database without running seed.sql (we use modular approach)
-    log_info "Performing clean database reset..."
-    supabase db reset --no-seed
+    # For local environments, reset the local Supabase instance
+    if [[ "$env" == "local" ]]; then
+        log_info "Performing clean database reset (local Supabase)..."
+        supabase db reset --no-seed
+    else
+        log_info "Skipping local database reset for $env environment (cloud database)"
+        log_warning "Note: Cloud database will be reset by schema push and seed execution"
+    fi
 
-    # Push Drizzle schema to database
+    # Push Drizzle schema to database (this will reset cloud databases)
     log_info "Applying Drizzle schema..."
     if [[ "$env" == "preview" ]]; then
-        npm run db:push:preview
+        # Use --force flag to skip interactive confirmation for cloud databases
+        npm run db:push:preview -- --force
     else
         npm run db:push:local
     fi
@@ -237,17 +448,18 @@ generate_typescript_types() {
 
     log_step "Generating TypeScript types from database schema"
 
-    if [[ "$env" == "local" || "$env" == "preview" ]]; then
+    if [[ "$env" == "local" ]]; then
         log_info "Generating types from local database..."
         supabase gen types typescript --local > src/lib/types/database.ts
-    else
+    elif [[ "$env" == "preview" ]]; then
         log_info "Generating types from preview database..."
-        # For preview, we need the DATABASE_URL from environment
         if [[ -z "${DATABASE_URL:-}" ]]; then
             log_warning "DATABASE_URL not set, skipping type generation"
             return
         fi
         supabase gen types typescript --db-url "$DATABASE_URL" > src/lib/types/database.ts
+    else
+        log_warning "Unknown environment '$env' for type generation; skipping"
     fi
 
     log_success "TypeScript types generated successfully"
@@ -268,7 +480,7 @@ main() {
     if [[ $# -lt 1 || $# -gt 2 ]]; then
         log_error "Usage: $0 <local|preview> [--allow-non-local]"
         log_error "  local   - Reset local Supabase database"
-        log_error "  preview - Reset preview environment database (uses dev seeds)"
+        log_error "  preview - Reset preview environment database (with safety checks)"
         log_error "  --allow-non-local  Proceed even if .env.local looks non-local (DANGEROUS)"
         exit 1
     fi
@@ -282,10 +494,24 @@ main() {
     # Change to project root
     cd "$PROJECT_ROOT"
 
+    # Set up cleanup on exit for preview environments
+    if [[ "$environment" == "preview" ]]; then
+        trap 'restore_env_on_cleanup' EXIT
+    fi
+
     # Validation
     validate_environment "$environment"
-    validate_dependencies
-    validate_local_env_safety "$environment" "$allow_non_local"
+    validate_dependencies "$environment"
+
+    # Handle preview environment setup
+    if [[ "$environment" == "preview" ]]; then
+        backup_current_env
+        pull_preview_environment
+        confirm_preview_reset
+        # Skip local env safety check for preview since we just pulled cloud env
+    else
+        validate_local_env_safety "$environment" "$allow_non_local"
+    fi
 
     # Execution steps
     reset_supabase_database "$environment"

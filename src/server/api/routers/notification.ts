@@ -1,5 +1,6 @@
 // External libraries (alphabetical)
 import { z } from "zod";
+import { notificationPaginationSchema } from "~/lib/validation/schemas";
 
 // Internal types (alphabetical)
 import type {
@@ -19,8 +20,7 @@ export const notificationRouter = createTRPCRouter({
     .input(
       z.object({
         unreadOnly: z.boolean().optional(),
-        limit: z.number().min(1).max(100).optional(),
-        offset: z.number().min(0).optional(),
+        ...notificationPaginationSchema.shape,
       }),
     )
     .query(async ({ ctx, input }): Promise<NotificationResponse[]> => {

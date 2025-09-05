@@ -8,6 +8,7 @@ import {
   locationIdSchema,
   userIdSchema,
   issueIdSchema,
+  idSchema,
 
   // Text Validation Schemas
   nameSchema,
@@ -133,7 +134,7 @@ describe("inputValidation - Basic ID Validation Schemas", () => {
 
     it("should reject empty machine ID", () => {
       const result = machineIdSchema.safeParse({ machineId: "" });
-      expectZodError(result, "Machine ID is required");
+      expectZodError(result, "ID is required");
     });
 
     it("should reject missing machine ID", () => {
@@ -150,7 +151,7 @@ describe("inputValidation - Basic ID Validation Schemas", () => {
 
     it("should reject empty location ID", () => {
       const result = locationIdSchema.safeParse({ locationId: "" });
-      expectZodError(result, "Location ID is required");
+      expectZodError(result, "ID is required");
     });
 
     it("should reject missing location ID", () => {
@@ -167,7 +168,7 @@ describe("inputValidation - Basic ID Validation Schemas", () => {
 
     it("should reject empty user ID", () => {
       const result = userIdSchema.safeParse({ userId: "" });
-      expectZodError(result, "User ID is required");
+      expectZodError(result, "ID is required");
     });
 
     it("should reject missing user ID", () => {
@@ -184,7 +185,7 @@ describe("inputValidation - Basic ID Validation Schemas", () => {
 
     it("should reject empty issue ID", () => {
       const result = issueIdSchema.safeParse({ issueId: "" });
-      expectZodError(result, "Issue ID is required");
+      expectZodError(result, "ID is required");
     });
 
     it("should reject missing issue ID", () => {
@@ -1791,7 +1792,7 @@ describe("inputValidation - Integration and Compatibility", () => {
   describe("Default value handling", () => {
     it("should handle schemas with default values", () => {
       const schemaWithDefaults = z.object({
-        id: z.string().min(1),
+        id: idSchema,
         active: z.boolean().default(true),
         count: z.number().default(0),
       });

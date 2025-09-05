@@ -7,30 +7,25 @@
  */
 
 import { z } from "zod";
-import { uuidSchema } from "~/lib/validation/schemas";
+import {
+  uuidSchema,
+  paginationLimitSchema,
+  paginationOffsetSchema,
+  sortOrderSchema,
+  searchQuerySchema,
+  arrayParamTransformer,
+} from "~/lib/validation/schemas";
 
 // Comprehensive schema for issue filtering
 const IssueSearchParamsSchema = z.object({
   // Text search
-  search: z.string().max(100).optional(),
+  search: searchQuerySchema,
 
   // Status filtering - supports multiple values
-  status: z
-    .union([z.string(), z.array(z.string())])
-    .optional()
-    .transform((val) => {
-      if (!val) return undefined;
-      return Array.isArray(val) ? val : val.split(",").filter(Boolean);
-    }),
+  status: arrayParamTransformer,
 
   // Priority filtering - supports multiple values
-  priority: z
-    .union([z.string(), z.array(z.string())])
-    .optional()
-    .transform((val) => {
-      if (!val) return undefined;
-      return Array.isArray(val) ? val : val.split(",").filter(Boolean);
-    }),
+  priority: arrayParamTransformer,
 
   // User filtering
   assignee: uuidSchema.optional(),
@@ -57,11 +52,11 @@ const IssueSearchParamsSchema = z.object({
       "machine",
     ])
     .default("created_at"),
-  order: z.enum(["asc", "desc"]).default("desc"),
+  order: sortOrderSchema,
 
   // Pagination
-  page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(5).max(100).default(20),
+  page: paginationOffsetSchema,
+  limit: paginationLimitSchema,
 
   // View mode
   view: z.enum(["list", "compact", "table"]).default("list"),
