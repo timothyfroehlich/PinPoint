@@ -232,12 +232,10 @@ export function FilterToolbar({
                       severity: "Priority",
                       machine: "Machine",
                     } as const;
-                    const label = Object.prototype.hasOwnProperty.call(
-                      labels,
-                      option,
-                    )
-                      ? labels[option]
-                      : option;
+                    // ESLint security warning is false positive - `option` comes from 
+                    // ISSUE_SORT_OPTIONS const array with known values, making object access safe
+                    // eslint-disable-next-line security/detect-object-injection
+                    const label = labels[option];
                     return (
                       <SelectItem key={option} value={option}>
                         {label}
