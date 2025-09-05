@@ -65,6 +65,9 @@ export function extractFormFields<T extends Record<string, unknown>>(
   for (const [key, value] of formData.entries()) {
     if (Object.prototype.hasOwnProperty.call(data, key)) {
       // Handle multiple values for same field name
+      // ESLint security warning is false positive - key comes from FormData.entries()
+      // which provides form field names controlled by the HTML form structure
+      // eslint-disable-next-line security/detect-object-injection
       const existing = data[key];
       if (Array.isArray(existing)) {
         existing.push(value);

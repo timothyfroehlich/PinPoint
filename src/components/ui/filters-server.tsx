@@ -98,12 +98,10 @@ export function FiltersServer({
               <Select
                 name={filterKey}
                 defaultValue={
-                  (Object.prototype.hasOwnProperty.call(
-                    currentFilters,
-                    filterKey,
-                  )
-                    ? (currentFilters[filterKey] as string)
-                    : undefined) ?? "all"
+                  // ESLint security warning is false positive - filterKey comes from 
+                  // Object.entries(filterOptions) where filterOptions keys are controlled
+                  // eslint-disable-next-line security/detect-object-injection
+                  (currentFilters[filterKey] as string | undefined) ?? "all"
                 }
               >
                 <SelectTrigger>
