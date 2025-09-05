@@ -97,7 +97,14 @@ export function FiltersServer({
               </Label>
               <Select
                 name={filterKey}
-                defaultValue={(currentFilters[filterKey] as string) || "all"}
+                defaultValue={
+                  (Object.prototype.hasOwnProperty.call(
+                    currentFilters,
+                    filterKey,
+                  )
+                    ? (currentFilters[filterKey] as string)
+                    : undefined) ?? "all"
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -267,13 +274,25 @@ export function createFilterAction(
     const params: Record<string, unknown> = {};
 
     for (const [key, value] of formData.entries()) {
-      if (value && value !== "all") {
-        params[key] = value.toString();
+      if (typeof value === "string" && value !== "all" && value !== "") {
+        // Safe assignment to avoid object injection warnings
+        Object.defineProperty(params, key, {
+          value: value,
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        });
       }
+      // Ignore File values in this server-first filter action
     }
 
     // Reset to first page when filters change
-    params["page"] = 1;
+    Object.defineProperty(params, "page", {
+      value: 1,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
 
     // Build new URL with filters
     const newUrl = urlBuilder(basePath, params);

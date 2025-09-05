@@ -1,7 +1,10 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-import { resolveQRCodeToReportUrl, checkQRCodeExists } from "~/lib/dal/qr-codes";
+import {
+  resolveQRCodeToReportUrl,
+  checkQRCodeExists,
+} from "~/lib/dal/qr-codes";
 
 export async function GET(
   _request: NextRequest,
@@ -14,7 +17,7 @@ export async function GET(
     if (!qrCodeId || qrCodeId.trim().length === 0) {
       return NextResponse.json(
         { error: "QR code ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -26,18 +29,18 @@ export async function GET(
         case "not_found":
           return NextResponse.json(
             { error: `QR code '${qrCodeId}' not found` },
-            { status: 404 }
+            { status: 404 },
           );
         case "invalid_id":
           return NextResponse.json(
             { error: qrResult.message },
-            { status: 400 }
+            { status: 400 },
           );
         default:
           console.error("QR code resolution failed:", qrResult.message);
           return NextResponse.json(
             { error: "Internal server error" },
-            { status: 500 }
+            { status: 500 },
           );
       }
     }
@@ -48,7 +51,7 @@ export async function GET(
     console.error("QR code API error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -286,7 +286,9 @@ const loggingMiddleware = t.middleware(async ({ path, type, next, ctx }) => {
           code: isErrorWithCode(error) ? error.code : "UNKNOWN",
           message:
             error instanceof Error
-              ? (isError(error) ? error.message.substring(0, ERROR_MESSAGE_TRUNCATE_LENGTH) : "Unknown error")
+              ? isError(error)
+                ? error.message.substring(0, ERROR_MESSAGE_TRUNCATE_LENGTH)
+                : "Unknown error"
               : "Unknown error",
         },
         context: {
@@ -484,19 +486,20 @@ export const organizationProcedure = protectedProcedure.use(
  */
 export const orgScopedProcedure = protectedProcedure.use(
   async ({ ctx, next }) => {
-    if (!ctx.organizationId) {
+    const orgId = ctx.organizationId;
+    if (!orgId) {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: "User does not have organization context",
       });
     }
 
-    const result = await withOrgRLS(ctx.db, ctx.organizationId, async (tx) => {
+    const result = await withOrgRLS(ctx.db, orgId, async (tx) => {
       return next({
         ctx: {
           ...ctx,
           db: tx,
-          organizationId: ctx.organizationId!, // Non-null assertion: already checked for null above
+          organizationId: orgId,
         } satisfies TRPCContext & { organizationId: string },
       });
     });

@@ -63,17 +63,27 @@ export function extractFormFields<T extends Record<string, unknown>>(
   const data: Record<string, FormDataEntryValue | FormDataEntryValue[]> = {};
 
   for (const [key, value] of formData.entries()) {
-    if (key in data) {
+    if (Object.prototype.hasOwnProperty.call(data, key)) {
       // Handle multiple values for same field name
       const existing = data[key];
       if (Array.isArray(existing)) {
         existing.push(value);
       } else if (existing !== undefined) {
         // Convert single value to array when adding second value
-        data[key] = [existing, value];
+        Object.defineProperty(data, key, {
+          value: [existing, value],
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        });
       }
     } else {
-      data[key] = value;
+      Object.defineProperty(data, key, {
+        value,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
     }
   }
 

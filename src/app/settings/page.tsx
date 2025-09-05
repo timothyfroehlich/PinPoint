@@ -24,14 +24,29 @@ import {
 } from "lucide-react";
 import { getRequestAuthContext } from "~/server/auth/context";
 import { getCurrentOrganization } from "~/lib/dal/organizations";
+import { AuthGuard } from "~/components/auth/auth-guard";
 
 export default async function SettingsPage(): Promise<React.JSX.Element> {
-  const auth = await getRequestAuthContext();
-  if (auth.kind !== 'authorized') {
-    throw new Error('Member access required');
+  const authContext = await getRequestAuthContext();
+
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Settings Access Required"
+      fallbackMessage="You need to be signed in as a member to view settings."
+    >
+      <SettingsPageContent />
+    </AuthGuard>
+  );
+}
+
+async function SettingsPageContent(): Promise<React.JSX.Element> {
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Unauthorized access"); // This should never happen due to AuthGuard
   }
-  const { user } = auth;
-  const orgDetails = await getCurrentOrganization(auth.org.id);
+  const { user } = authContext;
+  const orgDetails = await getCurrentOrganization(authContext.org.id);
 
   const settingsCards = [
     {

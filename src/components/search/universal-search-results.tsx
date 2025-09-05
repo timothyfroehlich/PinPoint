@@ -196,26 +196,26 @@ export async function UniversalSearchResults({
                           href={result.url}
                           className="font-semibold text-foreground hover:text-primary line-clamp-2 group"
                         >
-                          {String(result.title)}
+                          {result.title}
                           <ArrowRightIcon className="inline h-4 w-4 ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </Link>
                         <Badge
                           variant="secondary"
                           className={`shrink-0 ${colorClass}`}
                         >
-                          {String(label)}
+                          {label}
                         </Badge>
                       </div>
 
                       {result.subtitle && (
                         <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
-                          {String(result.subtitle)}
+                          {result.subtitle}
                         </p>
                       )}
 
                       {result.description && (
                         <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                          {String(result.description)}
+                          {result.description}
                         </p>
                       )}
                     </div>
@@ -255,7 +255,8 @@ export async function UniversalSearchResults({
 
                     {result.entity === "machines" ? (
                       <>
-                        {typeof result.metadata["manufacturer"] === "string" && (
+                        {typeof result.metadata["manufacturer"] ===
+                          "string" && (
                           <Badge variant="outline" className="text-xs">
                             {result.metadata["manufacturer"]}
                           </Badge>
@@ -278,16 +279,16 @@ export async function UniversalSearchResults({
                       </>
                     ) : null}
 
-                    {result.entity === "users" && typeof result.metadata["email"] === "string" && (
-                      <Badge variant="outline" className="text-xs">
-                        {result.metadata["email"]}
-                      </Badge>
-                    )}
+                    {result.entity === "users" &&
+                      typeof result.metadata["email"] === "string" && (
+                        <Badge variant="outline" className="text-xs">
+                          {result.metadata["email"]}
+                        </Badge>
+                      )}
 
                     {result.entity === "locations" ? (
                       <>
-                        {typeof result.metadata["machineCount"] ===
-                          "number" ? (
+                        {typeof result.metadata["machineCount"] === "number" ? (
                           <Badge variant="outline" className="text-xs">
                             {String(result.metadata["machineCount"])} machine
                             {result.metadata["machineCount"] !== 1 ? "s" : ""}

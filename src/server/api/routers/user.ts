@@ -70,21 +70,21 @@ export const userRouter = createTRPCRouter({
       const [ownedMachinesCount, issuesCreatedCount, commentsCount]: [
         CountResult[],
         CountResult[],
-        CountResult[]
+        CountResult[],
       ] = await Promise.all([
-          ctx.db
-            .select({ count: count() })
-            .from(machines)
-            .where(eq(machines.owner_id, ctx.user.id)),
-          ctx.db
-            .select({ count: count() })
-            .from(issues)
-            .where(eq(issues.created_by_id, ctx.user.id)),
-          ctx.db
-            .select({ count: count() })
-            .from(comments)
-            .where(eq(comments.author_id, ctx.user.id)),
-        ]);
+        ctx.db
+          .select({ count: count() })
+          .from(machines)
+          .where(eq(machines.owner_id, ctx.user.id)),
+        ctx.db
+          .select({ count: count() })
+          .from(issues)
+          .where(eq(issues.created_by_id, ctx.user.id)),
+        ctx.db
+          .select({ count: count() })
+          .from(comments)
+          .where(eq(comments.author_id, ctx.user.id)),
+      ]);
 
       return {
         id: user.id,
@@ -299,21 +299,21 @@ export const userRouter = createTRPCRouter({
       const [ownedMachinesCount, issuesCreatedCount, commentsCount]: [
         CountResult[],
         CountResult[],
-        CountResult[]
+        CountResult[],
       ] = await Promise.all([
-          ctx.db
-            .select({ count: count() })
-            .from(machines)
-            .where(eq(machines.owner_id, input.userId)),
-          ctx.db
-            .select({ count: count() })
-            .from(issues)
-            .where(eq(issues.created_by_id, input.userId)),
-          ctx.db
-            .select({ count: count() })
-            .from(comments)
-            .where(eq(comments.author_id, input.userId)),
-        ]);
+        ctx.db
+          .select({ count: count() })
+          .from(machines)
+          .where(eq(machines.owner_id, input.userId)),
+        ctx.db
+          .select({ count: count() })
+          .from(issues)
+          .where(eq(issues.created_by_id, input.userId)),
+        ctx.db
+          .select({ count: count() })
+          .from(comments)
+          .where(eq(comments.author_id, input.userId)),
+      ]);
 
       return {
         ...membership.user,

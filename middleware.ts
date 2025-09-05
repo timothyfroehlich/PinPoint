@@ -6,13 +6,13 @@ import { env } from "~/env";
 import { SUBDOMAIN_VERIFIED_HEADER } from "~/lib/subdomain-verification";
 import { getCookieDomain } from "~/lib/utils/domain";
 export async function middleware(request: NextRequest): Promise<NextResponse> {
-    const url = request.nextUrl.clone();
-    const host = request.headers.get("host") ?? "";
+  const url = request.nextUrl.clone();
+  const host = request.headers.get("host") ?? "";
 
-    console.log(`[MIDDLEWARE] Request to: ${host}${url.pathname}`);
+  console.log(`[MIDDLEWARE] Request to: ${host}${url.pathname}`);
 
-    // Track auth error state to forward to the app
-    let hasAuthError: boolean | undefined = undefined;
+  // Track auth error state to forward to the app
+  let hasAuthError: boolean | undefined = undefined;
 
   // Buffer cookies set by Supabase so we can attach them to the final response
   const bufferedCookies: {

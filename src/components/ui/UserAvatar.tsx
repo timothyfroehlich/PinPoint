@@ -37,11 +37,15 @@ export function UserAvatar({
 }: UserAvatarProps): React.JSX.Element {
   const [imageError, setImageError] = useState(false);
 
+  const sizeClass = Object.prototype.hasOwnProperty.call(SIZE_CLASSES, size)
+    ? SIZE_CLASSES[size]
+    : SIZE_CLASSES.medium;
+
   if (!user) {
     const avatarElement = (
       <Avatar
         className={cn(
-          SIZE_CLASSES[size],
+          sizeClass,
           clickable && "cursor-pointer hover:opacity-80",
         )}
         onClick={onClick}
@@ -76,10 +80,7 @@ export function UserAvatar({
 
   const avatarElement = (
     <Avatar
-      className={cn(
-        SIZE_CLASSES[size],
-        clickable && "cursor-pointer hover:opacity-80",
-      )}
+      className={cn(sizeClass, clickable && "cursor-pointer hover:opacity-80")}
       onClick={onClick}
     >
       {avatarSrc && (

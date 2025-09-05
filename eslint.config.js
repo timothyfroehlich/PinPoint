@@ -54,22 +54,22 @@ export default tseslint.config(
       security: securityPlugin,
       "@microsoft/sdl": sdlPlugin,
       // Custom rules
-      "legacyAuth": {
+      legacyAuth: {
         rules: {
           "no-legacy-auth-imports": noLegacyAuthImports,
         },
       },
-      "duplicateAuth": {
+      duplicateAuth: {
         rules: {
           "no-duplicate-auth-resolution": noDuplicateAuthResolution,
         },
       },
-      "missingCache": {
+      missingCache: {
         rules: {
           "no-missing-cache-wrapper": noMissingCacheWrapper,
         },
       },
-      "directSupabase": {
+      directSupabase: {
         rules: {
           "no-direct-supabase-client": noDirectSupabaseClient,
         },
@@ -150,7 +150,8 @@ export default tseslint.config(
           paths: [
             {
               name: "~/server/auth/legacy-adapters",
-              message: "Legacy auth adapters have been removed. Use getRequestAuthContext() from ~/server/auth/context instead."
+              message:
+                "Legacy auth adapters have been removed. Use getRequestAuthContext() from ~/server/auth/context instead.",
             },
           ],
           patterns: [
@@ -162,12 +163,14 @@ export default tseslint.config(
             // Lane B: DAL cross-import prevention
             {
               group: ["../lib/dal/*", "../../lib/dal/*"],
-              message: "Use '~/lib/dal/*' alias instead of relative DAL imports"
+              message:
+                "Use '~/lib/dal/*' alias instead of relative DAL imports",
             },
             {
-              group: ["**/organization-context", "../organization-context"],  
-              message: "Import getRequestAuthContext from '~/server/auth/context' instead"
-            }
+              group: ["**/organization-context", "../organization-context"],
+              message:
+                "Import getRequestAuthContext from '~/server/auth/context' instead",
+            },
           ],
         },
       ],
@@ -203,7 +206,7 @@ export default tseslint.config(
 
       // Custom rules for legacy auth prevention
       "legacyAuth/no-legacy-auth-imports": "error",
-      
+
       // Lane B: Enhanced ESLint enforcement rules
       "duplicateAuth/no-duplicate-auth-resolution": "error", // Critical safety
       "missingCache/no-missing-cache-wrapper": "warn", // Start as warning, escalate later
