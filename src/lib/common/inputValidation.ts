@@ -405,6 +405,9 @@ export function validateNonEmptyStringArray(
     if (!Object.prototype.hasOwnProperty.call(arr, index)) {
       continue; // Skip holes in sparse arrays
     }
+    // ESLint security warning is false positive - index is controlled loop variable
+    // within array bounds, making array access safe
+    // eslint-disable-next-line security/detect-object-injection
     const raw: unknown = arr[index];
     if (typeof raw !== "string") {
       throw new Error(`${fieldName}[${String(index)}] must be a string`);
