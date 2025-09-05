@@ -15,6 +15,7 @@ import { Separator } from "~/components/ui/separator";
 import { Badge } from "~/components/ui/badge";
 import { CalendarIcon, GlobeIcon } from "lucide-react";
 import { getRequestAuthContext } from "~/server/auth/context";
+import { AuthGuard } from "~/components/auth/auth-guard";
 import {
   getCurrentOrganization,
   getOrganizationStats,
@@ -26,10 +27,23 @@ import { format } from "date-fns";
 
 export default async function OrganizationSettingsPage(): Promise<React.JSX.Element> {
   const authContext = await getRequestAuthContext();
-  if (authContext.kind !== "authorized") {
-    throw new Error("Member access required");
-  }
 
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Organization Settings Access Required"
+      fallbackMessage="You need to be signed in as a member to manage organization settings."
+    >
+      <OrganizationSettingsPageContent />
+    </AuthGuard>
+  );
+}
+
+async function OrganizationSettingsPageContent(): Promise<React.JSX.Element> {
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Unauthorized access"); // This should never happen due to AuthGuard
+  }
   // Fetch organization details and statistics in parallel
   const [organization, stats] = await Promise.all([
     getCurrentOrganization(authContext.org.id),
@@ -106,7 +120,9 @@ export default async function OrganizationSettingsPage(): Promise<React.JSX.Elem
               }}
             />
             <div className="mt-6">
-              <AnonymousIssueToggle initialEnabled={organization.allow_anonymous_issues} />
+              <AnonymousIssueToggle
+                initialEnabled={organization.allow_anonymous_issues}
+              />
             </div>
           </CardContent>
         </Card>

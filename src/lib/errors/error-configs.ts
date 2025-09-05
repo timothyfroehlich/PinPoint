@@ -213,7 +213,9 @@ export function getErrorConfig(
   type: keyof typeof errorConfigs,
   reset: () => void,
 ): ErrorBoundaryConfig {
-  const configFactory = errorConfigs[type];
+  const configFactory = Object.prototype.hasOwnProperty.call(errorConfigs, type)
+    ? errorConfigs[type]
+    : errorConfigs.global; // fallback to global config
   return configFactory(reset);
 }
 

@@ -12,7 +12,9 @@ interface MachineStatsServerProps {
   stats: MachineStats;
 }
 
-export function MachineStatsServer({ stats }: MachineStatsServerProps): JSX.Element {
+export function MachineStatsServer({
+  stats,
+}: MachineStatsServerProps): JSX.Element {
   const qrPercentage =
     stats.total > 0 ? Math.round((stats.withQR / stats.total) * 100) : 0;
 

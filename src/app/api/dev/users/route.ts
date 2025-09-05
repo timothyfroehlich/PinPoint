@@ -47,11 +47,7 @@ export async function GET(): Promise<NextResponse> {
     // Transform current user for consistency
     const transformedUser = transformKeysToCamelCase(user);
 
-    console.log(
-      "[DEV-API] Returning",
-      devUsers.length,
-      "users with roles",
-    );
+    console.log("[DEV-API] Returning", devUsers.length, "users with roles");
 
     return NextResponse.json({
       users: devUsers,

@@ -24,6 +24,7 @@ import {
   CheckIcon,
 } from "lucide-react";
 import { getRequestAuthContext } from "~/server/auth/context";
+import { AuthGuard } from "~/components/auth/auth-guard";
 import { api } from "~/trpc/server";
 
 // Type definitions for role statistics
@@ -74,10 +75,23 @@ function getPermissionsArray(role: unknown): { id: string; name: string }[] {
 
 export default async function RolesSettingsPage(): Promise<React.JSX.Element> {
   const authContext = await getRequestAuthContext();
-  if (authContext.kind !== "authorized") {
-    throw new Error("Member access required");
-  }
 
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Role Management Access Required"
+      fallbackMessage="You need to be signed in as a member to manage roles and permissions."
+    >
+      <RolesSettingsPageContent />
+    </AuthGuard>
+  );
+}
+
+async function RolesSettingsPageContent(): Promise<React.JSX.Element> {
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Unauthorized access"); // This should never happen due to AuthGuard
+  }
   // Fetch roles using the existing role router
   const roles = await api.role.getAll();
   // TODO: Implement role statistics API

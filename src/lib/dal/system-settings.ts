@@ -109,24 +109,40 @@ export const getSystemSettings = cache(
         switch (category) {
           case "notifications": {
             const k = key as keyof SystemSettingsData["notifications"];
-            notificationsPartial[k] =
-              value as SystemSettingsData["notifications"][typeof k];
+            Object.defineProperty(notificationsPartial, k, {
+              value: value as SystemSettingsData["notifications"][typeof k],
+              writable: true,
+              enumerable: true,
+              configurable: true,
+            });
             break;
           }
           case "security": {
             const k = key as keyof SystemSettingsData["security"];
-            setTypedProperty(securityPartial, k, value as SystemSettingsData["security"][typeof k]);
+            setTypedProperty(
+              securityPartial,
+              k,
+              value as SystemSettingsData["security"][typeof k],
+            );
             break;
           }
           case "preferences": {
             const k = key as keyof SystemSettingsData["preferences"];
-            setTypedProperty(preferencesPartial, k, value as SystemSettingsData["preferences"][typeof k]);
+            setTypedProperty(
+              preferencesPartial,
+              k,
+              value as SystemSettingsData["preferences"][typeof k],
+            );
             break;
           }
           case "features": {
             const k = key as keyof SystemSettingsData["features"];
-            featuresPartial[k] =
-              value as SystemSettingsData["features"][typeof k];
+            Object.defineProperty(featuresPartial, k, {
+              value: value as SystemSettingsData["features"][typeof k],
+              writable: true,
+              enumerable: true,
+              configurable: true,
+            });
             break;
           }
           default:
@@ -218,10 +234,7 @@ export async function updateSystemSettings(
  * Get a specific system setting value
  */
 export const getSystemSetting = cache(
-  async (
-    organizationId: string,
-    settingKey: string,
-  ): Promise<unknown | null> => {
+  async (organizationId: string, settingKey: string): Promise<unknown> => {
     try {
       if (!organizationId || !settingKey) {
         return null;
@@ -247,6 +260,7 @@ export const getSystemSetting = cache(
 /**
  * Reset system settings to defaults for organization
  */
+// eslint-disable-next-line missingCache/no-missing-cache-wrapper
 export async function resetSystemSettings(
   organizationId: string,
 ): Promise<void> {

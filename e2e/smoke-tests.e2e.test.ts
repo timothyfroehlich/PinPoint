@@ -145,7 +145,7 @@ test.describe("Smoke Tests", () => {
     let redirected = false;
     for (let i = 0; i < 40; i++) {
       await page.waitForTimeout(500);
-      if (page.url().includes('/issues/issue_')) {
+      if (page.url().includes("/issues/issue_")) {
         redirected = true;
         break;
       }

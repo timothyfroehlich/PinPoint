@@ -36,14 +36,19 @@ interface SystemPreferencesProps {
   };
 }
 
-export function SystemPreferences({ settings }: SystemPreferencesProps): JSX.Element {
+export function SystemPreferences({
+  settings,
+}: SystemPreferencesProps): JSX.Element {
   const [formData, setFormData] = useState(settings);
   const [state, formAction, isPending] = useActionState(
     updateSystemSettingsAction,
     null,
   );
 
-  const handleSelectChange = (key: keyof typeof formData, value: string): void => {
+  const handleSelectChange = (
+    key: keyof typeof formData,
+    value: string,
+  ): void => {
     if (key === "itemsPerPage") {
       setFormData((prev) => ({ ...prev, [key]: parseInt(value, 10) }));
     } else {

@@ -73,9 +73,9 @@ export const machineResponseSchema = z.object({
   updatedAt: z.date().optional(),
   model: z
     .object({
-  id: idSchema,
-  name: z.string(),
-  manufacturer: z.string(),
+      id: idSchema,
+      name: z.string(),
+      manufacturer: z.string(),
       year: z.number().nullable(),
       machineType: z.string(),
       ipdbUrl: z.string().nullable(),
@@ -84,7 +84,7 @@ export const machineResponseSchema = z.object({
     .optional(),
   location: z
     .object({
-  id: idSchema,
+      id: idSchema,
       name: z.string(),
       address: z.string().nullable(),
       city: z.string().nullable(),
@@ -95,9 +95,9 @@ export const machineResponseSchema = z.object({
     .optional(),
   owner: z
     .object({
-  id: idSchema,
-  name: z.string(),
-  email: z.string(),
+      id: idSchema,
+      name: z.string(),
+      email: z.string(),
       profilePicture: z.string().nullable(),
     })
     .nullable()

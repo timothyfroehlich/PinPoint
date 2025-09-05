@@ -10,7 +10,9 @@ interface CommentFormClientProps {
   issueId: string;
 }
 
-export function CommentFormClient({ issueId }: CommentFormClientProps): JSX.Element {
+export function CommentFormClient({
+  issueId,
+}: CommentFormClientProps): JSX.Element {
   const [state, formAction, isPending] = useActionState(
     addCommentAction.bind(null, issueId),
     null,

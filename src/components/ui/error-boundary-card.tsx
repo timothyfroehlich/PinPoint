@@ -71,7 +71,9 @@ export function ErrorBoundaryCard({
     });
   }, [error]);
 
-  const getSeverityColors = (severity: string): {
+  const getSeverityColors = (
+    severity: string,
+  ): {
     iconBg: string;
     iconColor: string;
     titleColor: string;
@@ -101,7 +103,10 @@ export function ErrorBoundaryCard({
   const colors = getSeverityColors(severity);
 
   return (
-    <div className="container mx-auto px-4 py-8" data-testid="error-boundary-card">
+    <div
+      className="container mx-auto px-4 py-8"
+      data-testid="error-boundary-card"
+    >
       <Card className="max-w-2xl mx-auto">
         <CardHeader className="text-center">
           <div
@@ -129,7 +134,9 @@ export function ErrorBoundaryCard({
           {showErrorDetails && (
             <div className="bg-muted p-4 rounded text-sm">
               <strong>Error details:</strong>
-              <pre className="mt-2 whitespace-pre-wrap">{getErrorMessage(error)}</pre>
+              <pre className="mt-2 whitespace-pre-wrap">
+                {getErrorMessage(error)}
+              </pre>
             </div>
           )}
 

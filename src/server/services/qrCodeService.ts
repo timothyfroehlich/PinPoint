@@ -317,16 +317,14 @@ export class QRCodeService {
     withQRCodes: number;
     withoutQRCodes: number;
   }> {
-    const [totalResult, withoutQRCodesResult]: [
-      CountResult[],
-      CountResult[]
-    ] = await Promise.all([
-      this.db.select({ count: count() }).from(machines),
-      this.db
-        .select({ count: count() })
-        .from(machines)
-        .where(isNull(machines.qr_code_url)),
-    ]);
+    const [totalResult, withoutQRCodesResult]: [CountResult[], CountResult[]] =
+      await Promise.all([
+        this.db.select({ count: count() }).from(machines),
+        this.db
+          .select({ count: count() })
+          .from(machines)
+          .where(isNull(machines.qr_code_url)),
+      ]);
 
     const total = safeCount(totalResult);
     const withoutQRCodes = safeCount(withoutQRCodesResult);

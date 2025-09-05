@@ -109,9 +109,7 @@ export async function markNotificationAsReadAction(
   } catch (error) {
     console.error("Mark notification as read error:", error);
     return actionError(
-      isError(error)
-        ? error.message
-        : "Failed to mark notification as read",
+      isError(error) ? error.message : "Failed to mark notification as read",
     );
   }
 }
@@ -306,9 +304,7 @@ export async function markNotificationAsUnreadAction(
   } catch (error) {
     console.error("Mark notification as unread error:", error);
     return actionError(
-      isError(error)
-        ? error.message
-        : "Failed to mark notification as unread",
+      isError(error) ? error.message : "Failed to mark notification as unread",
     );
   }
 }

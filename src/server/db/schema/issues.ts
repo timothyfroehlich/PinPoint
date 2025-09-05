@@ -94,8 +94,8 @@ export const issues = pgTable(
     anonymous_session_id: varchar({ length: 255 }), // Session tracking for anonymous reporters
     anonymous_contact_method: varchar({ length: 255 }), // Optional email/phone for anonymous reporters
 
-  // Severity (impact) separate from priority sequencing
-  severity: severityEnum().default("medium").notNull(),
+    // Severity (impact) separate from priority sequencing
+    severity: severityEnum().default("medium").notNull(),
 
     // Moderation support
     moderation_status: moderationStatusEnum().default("approved").notNull(),
@@ -126,7 +126,7 @@ export const issues = pgTable(
       table.organization_id,
     ),
     index("issues_anon_session_idx").on(table.anonymous_session_id),
-  index("issues_severity_idx").on(table.severity),
+    index("issues_severity_idx").on(table.severity),
     // Moderation queue indexes
     index("issues_moderation_pending_idx").on(
       table.organization_id,
