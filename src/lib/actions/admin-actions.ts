@@ -7,7 +7,7 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
-import { uuidSchema } from "~/lib/validation/schemas";
+import { uuidSchema, emailSchema, nameSchema } from "~/lib/validation/schemas";
 import { eq, and } from "drizzle-orm";
 import { users, memberships, roles } from "~/server/db/schema";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
@@ -37,8 +37,8 @@ import { PERMISSIONS } from "~/server/auth/permissions.constants";
 
 // Enhanced validation schemas with better error messages
 const inviteUserSchema = z.object({
-  email: z.email().transform((s: string) => s.trim().toLowerCase()),
-  name: z.string().max(100, "Name must be less than 100 characters").optional(),
+  email: emailSchema,
+  name: nameSchema.optional(),
   roleId: uuidSchema.optional(),
   message: z
     .string()
@@ -59,7 +59,7 @@ type UpdateUserRoleData = z.infer<typeof updateUserRoleSchema>;
 
 const removeUserSchema = z.object({
   userId: uuidSchema,
-  confirmEmail: z.email().transform((s: string) => s.trim().toLowerCase()),
+  confirmEmail: emailSchema,
 });
 
 // Explicit type for better TypeScript inference

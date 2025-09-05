@@ -18,6 +18,7 @@ import noLegacyAuthImports from "./eslint-rules/no-legacy-auth-imports.js";
 import noDuplicateAuthResolution from "./eslint-rules/no-duplicate-auth-resolution.js";
 import noMissingCacheWrapper from "./eslint-rules/no-missing-cache-wrapper.js";
 import noDirectSupabaseClient from "./eslint-rules/no-direct-supabase-client.js";
+import noDuplicateValidation from "./eslint-rules/no-duplicate-validation.js";
 
 export default tseslint.config(
   // TypeScript ESLint base configurations
@@ -72,6 +73,11 @@ export default tseslint.config(
       directSupabase: {
         rules: {
           "no-direct-supabase-client": noDirectSupabaseClient,
+        },
+      },
+      validation: {
+        rules: {
+          "no-duplicate-validation": noDuplicateValidation,
         },
       },
     },
@@ -211,6 +217,7 @@ export default tseslint.config(
       "duplicateAuth/no-duplicate-auth-resolution": "error", // Critical safety
       "missingCache/no-missing-cache-wrapper": "warn", // Start as warning, escalate later
       "directSupabase/no-direct-supabase-client": "error", // SSR safety
+      "validation/no-duplicate-validation": "error", // Validation consistency
 
       // Ban problematic TypeScript comment directives
       "@typescript-eslint/ban-ts-comment": [

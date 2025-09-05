@@ -135,8 +135,8 @@ describe("Machine Response Transformers", () => {
     });
 
     it("should handle null and undefined values gracefully", () => {
-      expect(transformMachineResponse(null)).toBeNull();
-      expect(transformMachineResponse(undefined)).toBeUndefined();
+      expect(() => transformMachineResponse(null)).toThrow(/object/);
+      expect(() => transformMachineResponse(undefined)).toThrow(/object/);
       expect(transformMachineResponse({})).toEqual({});
     });
 
@@ -192,7 +192,7 @@ describe("Machine Response Transformers", () => {
 
     it("should handle non-array input gracefully", () => {
       const nonArray = { id: "not_an_array" };
-      expect(transformMachinesResponse(nonArray as any)).toBe(nonArray);
+      expect(() => transformMachinesResponse(nonArray as any)).toThrow(/array/);
     });
   });
 
@@ -456,9 +456,9 @@ describe("Machine Response Transformers", () => {
     });
 
     it("should handle non-object inputs", () => {
-      expect(transformMachineResponse("string")).toBe("string");
-      expect(transformMachineResponse(123)).toBe(123);
-      expect(transformMachineResponse(true)).toBe(true);
+      expect(() => transformMachineResponse("string")).toThrow(/object/);
+      expect(() => transformMachineResponse(123)).toThrow(/object/);
+      expect(() => transformMachineResponse(true)).toThrow(/object/);
     });
 
     it("should handle large datasets efficiently", () => {

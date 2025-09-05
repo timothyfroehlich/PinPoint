@@ -3,6 +3,15 @@ import type { InferSelectModel } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 
+// Validation schemas
+import { 
+  idSchema, 
+  statusNameSchema, 
+  optionalStatusNameSchema,
+  statusCategorySchema,
+  optionalStatusCategorySchema
+} from "~/lib/validation/schemas";
+
 import {
   transformKeysToCamelCase,
   type DrizzleToCamelCase,
@@ -46,8 +55,8 @@ export const issueStatusRouter = createTRPCRouter({
   create: orgScopedProcedure
     .input(
       z.object({
-        name: z.string().min(1).max(50),
-        category: z.enum(["NEW", "IN_PROGRESS", "RESOLVED"]),
+        name: statusNameSchema,
+        category: statusCategorySchema,
       }),
     )
     .mutation(async ({ ctx, input }): Promise<IssueStatusResponse> => {
@@ -66,9 +75,9 @@ export const issueStatusRouter = createTRPCRouter({
   update: orgScopedProcedure
     .input(
       z.object({
-        id: z.string(),
-        name: z.string().min(1).max(50).optional(),
-        category: z.enum(["NEW", "IN_PROGRESS", "RESOLVED"]).optional(),
+        id: idSchema,
+        name: optionalStatusNameSchema,
+        category: optionalStatusCategorySchema,
       }),
     )
     .mutation(async ({ ctx, input }): Promise<IssueStatusResponse> => {
@@ -91,7 +100,7 @@ export const issueStatusRouter = createTRPCRouter({
     }),
 
   delete: orgScopedProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ id: idSchema }))
     .mutation(async ({ ctx, input }): Promise<IssueStatusResponse> => {
       // Check if any issues are using this status (RLS handles org scoping)
       const [issueCountResult] = await ctx.db
