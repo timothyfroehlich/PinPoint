@@ -28,11 +28,6 @@
 
 ## 📍 PROJECT CONTEXT
 
-### Current Phase: Dual Evolution
-**RSC Migration Phase 1A**: shadcn/ui + Tailwind foundation (NEARLY COMPLETE)
-- Next: Phase 1B Data Access Layer implementation
-**Test System Reboot**: Archive complete (~130 files removed), ready for archetype implementation
-
 ### Project Status
 - Pre-beta phase, zero production users
 - Solo development, high risk tolerance for breaking changes

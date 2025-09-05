@@ -285,7 +285,10 @@ export class OPDBClient {
       const result = await this.request<{ status: string }>("/health");
       return result.success;
     } catch (error) {
-      console.error("OPDB connection validation failed:", getErrorMessage(error));
+      console.error(
+        "OPDB connection validation failed:",
+        getErrorMessage(error),
+      );
       return false;
     }
   }

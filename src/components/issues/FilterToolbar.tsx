@@ -232,9 +232,15 @@ export function FilterToolbar({
                       severity: "Priority",
                       machine: "Machine",
                     } as const;
+                    const label = Object.prototype.hasOwnProperty.call(
+                      labels,
+                      option,
+                    )
+                      ? labels[option]
+                      : option;
                     return (
                       <SelectItem key={option} value={option}>
-                        {labels[option]}
+                        {label}
                       </SelectItem>
                     );
                   })}

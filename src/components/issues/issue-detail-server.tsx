@@ -21,7 +21,11 @@ interface IssueDetailServerProps {
   userId: string;
 }
 
-export async function IssueDetailServer({ issueId, organizationId, userId }: IssueDetailServerProps): Promise<JSX.Element> {
+export async function IssueDetailServer({
+  issueId,
+  organizationId,
+  userId,
+}: IssueDetailServerProps): Promise<JSX.Element> {
   const [issue, comments, commentCount, assignableUsers, availableStatuses] =
     await Promise.all([
       getIssueById(issueId, organizationId),
@@ -176,9 +180,7 @@ export async function IssueDetailServer({ issueId, organizationId, userId }: Iss
             <CardContent>
               <div className="space-y-2">
                 <div>
-                  <p className="font-medium">
-                    {issue.machine.name}
-                  </p>
+                  <p className="font-medium">{issue.machine.name}</p>
                   <p className="text-sm text-muted-foreground">
                     {issue.machine.model.name}
                   </p>

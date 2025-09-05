@@ -131,7 +131,9 @@ export function SignInForm(): React.JSX.Element {
           const currentSubdomain = window.location.hostname.split(".")[0];
 
           if (currentSubdomain === selectedOrg.subdomain) {
-            // Already on correct subdomain, just navigate to dashboard
+            // Already on correct subdomain, refresh to sync auth state then navigate
+            router.refresh();
+            await new Promise((resolve) => setTimeout(resolve, 200));
             router.push("/dashboard");
             return;
           } else {
@@ -270,7 +272,9 @@ export function SignInForm(): React.JSX.Element {
               required
               disabled={magicLinkPending || isOAuthLoading || devAuthLoading}
             />
-            {magicLinkState && !magicLinkState.success && magicLinkState.fieldErrors?.["email"] && (
+            {magicLinkState &&
+              !magicLinkState.success &&
+              magicLinkState.fieldErrors?.["email"] && (
                 <p className="text-sm text-error">
                   {magicLinkState.fieldErrors["email"][0]}
                 </p>
@@ -310,14 +314,16 @@ export function SignInForm(): React.JSX.Element {
           </Alert>
         )}
 
-        {magicLinkState && !magicLinkState.success && !magicLinkState.fieldErrors && (
-          <Alert className="border-error bg-error-container">
-            <div className="text-on-error-container">
-              <p className="font-medium">Sign-in failed</p>
-              <p className="text-sm mt-1">{magicLinkState.error}</p>
-            </div>
-          </Alert>
-        )}
+        {magicLinkState &&
+          !magicLinkState.success &&
+          !magicLinkState.fieldErrors && (
+            <Alert className="border-error bg-error-container">
+              <div className="text-on-error-container">
+                <p className="font-medium">Sign-in failed</p>
+                <p className="text-sm mt-1">{magicLinkState.error}</p>
+              </div>
+            </Alert>
+          )}
 
         {/* Development Auth (preserved from existing system) */}
         {shouldShowDevLogin && (

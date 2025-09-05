@@ -8,7 +8,9 @@ import { test, expect } from "@playwright/test";
 test.describe("Authenticated Smoke Tests", () => {
   test("can access dashboard (already authenticated)", async ({ page }) => {
     await page.goto("/dashboard");
-    await expect(page.locator("h1")).toContainText(/Dashboard|Issues|Machines/i);
+    await expect(page.locator("h1")).toContainText(
+      /Dashboard|Issues|Machines/i,
+    );
   });
 
   test("can view issues list", async ({ page }) => {
@@ -93,7 +95,7 @@ test.describe("Authenticated Smoke Tests", () => {
     let redirected = false;
     for (let i = 0; i < 40; i++) {
       await page.waitForTimeout(500);
-      if (page.url().includes('/issues/issue_')) {
+      if (page.url().includes("/issues/issue_")) {
         redirected = true;
         break;
       }

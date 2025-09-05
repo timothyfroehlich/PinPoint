@@ -15,6 +15,7 @@ import {
   ShieldIcon,
 } from "lucide-react";
 import { getRequestAuthContext } from "~/server/auth/context";
+import { AuthGuard } from "~/components/auth/auth-guard";
 
 interface SettingsLayoutProps {
   children: React.ReactNode;
@@ -23,15 +24,24 @@ interface SettingsLayoutProps {
 export default async function SettingsLayout({
   children,
 }: SettingsLayoutProps): Promise<React.JSX.Element> {
-  // Ensure user is authenticated and has organization access
-  const auth = await getRequestAuthContext();
-  if (auth.kind !== 'authorized') {
-    throw new Error('Member access required');
-  }
+  const authContext = await getRequestAuthContext();
 
-  // requireMemberAccess already ensures user is authenticated and has membership
-  // No additional checks needed
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Settings Access Required"
+      fallbackMessage="You need to be signed in as a member to access settings."
+    >
+      <SettingsLayoutContent children={children} />
+    </AuthGuard>
+  );
+}
 
+function SettingsLayoutContent({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.JSX.Element {
   const navigationItems = [
     {
       title: "Organization",

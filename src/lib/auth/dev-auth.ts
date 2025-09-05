@@ -16,7 +16,11 @@
  */
 
 import { shouldEnableDevFeatures } from "~/lib/environment-client";
-import type { DevUserData, DevAuthResult, TypedSupabaseClient } from "~/lib/types";
+import type {
+  DevUserData,
+  DevAuthResult,
+  TypedSupabaseClient,
+} from "~/lib/types";
 import { isError, isErrorWithStatus } from "~/lib/utils/type-guards";
 
 /**
@@ -68,13 +72,15 @@ async function signInDevUser(
         code: isErrorWithStatus(error) ? error.status : undefined,
         message: isError(error) ? error.message : String(error),
         possibleCauses: [
-          (isError(error) && error.message.includes("Invalid login credentials"))
+          isError(error) && error.message.includes("Invalid login credentials")
             ? "User doesn't exist or wrong password"
             : null,
-          (isError(error) && error.message.includes("Email not confirmed"))
+          isError(error) && error.message.includes("Email not confirmed")
             ? "Email needs confirmation"
             : null,
-          (isError(error) && error.message.includes("Too many requests")) ? "Rate limited" : null,
+          isError(error) && error.message.includes("Too many requests")
+            ? "Rate limited"
+            : null,
         ].filter(Boolean),
       });
 

@@ -3,6 +3,7 @@
  *
  * Uses Supabase's admin API to properly create authenticated users with correct password hashing.
  * This replaces the manual SQL approach which was incompatible with Supabase's auth system.
+ * This script is now the single source of truth for creating users AND their memberships.
  */
 
 // Load environment variables from .env.local for standalone script execution
@@ -11,6 +12,8 @@ config({ path: ".env.local" });
 
 // eslint-disable-next-line no-restricted-imports -- Admin script needs direct Supabase client
 import { createClient } from "@supabase/supabase-js";
+import { getGlobalDatabaseProvider } from "../src/server/db/provider";
+import { memberships } from "../src/server/db/schema";
 import { isError } from "../src/lib/utils/type-guards";
 
 interface DevUser {
@@ -41,6 +44,11 @@ const DEV_USERS: DevUser[] = [
   },
 ];
 
+const ROLE_IDS = {
+  ADMIN: "role-admin-primary-001",
+  MEMBER: "role-member-primary-001",
+};
+
 const DEV_PASSWORD = "dev-login-123";
 
 async function createDevUsers() {
@@ -55,6 +63,9 @@ async function createDevUsers() {
     process.exit(1);
   }
 
+  // Create DB client
+  const db = getGlobalDatabaseProvider().getClient();
+
   // Create Supabase admin client
   const supabase = createClient(
     supabaseUrl,
@@ -67,7 +78,9 @@ async function createDevUsers() {
     },
   );
 
-  console.log("🔧 Creating dev users via Supabase Admin API...");
+  console.log(
+    "🔧 Creating dev users and memberships via Supabase Admin API...",
+  );
 
   for (const user of DEV_USERS) {
     try {
@@ -80,29 +93,53 @@ async function createDevUsers() {
         email_confirm: true, // Skip email confirmation for dev users
         user_metadata: {
           name: user.name,
-          organizationId: user.organizationId,
         },
         app_metadata: {
           role: user.email.includes("tim") ? "admin" : "member",
+          organizationId: user.organizationId,
         },
       });
 
       if (error) {
         // Check if user already exists
-        if (isError(error) && error.message.includes("User already registered")) {
+        if (
+          isError(error) &&
+          error.message.includes("User already registered")
+        ) {
           console.log(`  ✓ User ${user.email} already exists`);
         } else {
-          console.error(`  ❌ Failed to create ${user.email}:`, isError(error) ? error.message : String(error));
+          console.error(
+            `  ❌ Failed to create ${user.email}:`,
+            isError(error) ? error.message : String(error),
+          );
         }
       } else {
-        console.log(`  ✅ Successfully created ${user.email}`);
+        console.log(`  ✅ Successfully created auth user: ${user.email}`);
       }
+
+      // ALWAYS attempt to create membership, in case it's missing
+      console.log(`    - Upserting membership for ${user.email}`);
+      const roleId = user.email.includes("tim")
+        ? ROLE_IDS.ADMIN
+        : ROLE_IDS.MEMBER;
+
+      await db
+        .insert(memberships)
+        .values({
+          id: `membership-${user.name.toLowerCase().split(" ")[0]}`,
+          user_id: user.id,
+          organization_id: user.organizationId,
+          role_id: roleId,
+        })
+        .onConflictDoNothing();
+
+      console.log(`    - ✅ Membership upserted for role: ${roleId}`);
     } catch (err) {
       console.error(`  ❌ Error creating ${user.email}:`, err);
     }
   }
 
-  console.log("✅ Dev user creation complete");
+  console.log("✅ Dev user and membership creation complete");
 }
 
 // Run if called directly (ES module compatibility)

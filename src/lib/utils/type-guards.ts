@@ -13,15 +13,21 @@ export function isError(value: unknown): value is Error {
 /**
  * Type guard for checking if a value is an Error with a code property
  */
-export function isErrorWithCode(value: unknown): value is Error & { code: string } {
-  return isError(value) && 'code' in value && typeof value.code === 'string';
+export function isErrorWithCode(
+  value: unknown,
+): value is Error & { code: string } {
+  return isError(value) && "code" in value && typeof value.code === "string";
 }
 
 /**
  * Type guard for checking if a value is an Error with a status property
  */
-export function isErrorWithStatus(value: unknown): value is Error & { status: number } {
-  return isError(value) && 'status' in value && typeof value.status === 'number';
+export function isErrorWithStatus(
+  value: unknown,
+): value is Error & { status: number } {
+  return (
+    isError(value) && "status" in value && typeof value.status === "number"
+  );
 }
 
 /**
@@ -31,7 +37,9 @@ export function hasProperty<T, K extends string>(
   obj: T,
   key: K,
 ): obj is T & Record<K, unknown> {
-  return obj !== null && obj !== undefined && typeof obj === 'object' && key in obj;
+  return (
+    obj !== null && obj !== undefined && typeof obj === "object" && key in obj
+  );
 }
 
 /**
@@ -41,9 +49,9 @@ export function hasMessage(value: unknown): value is { message: string } {
   return (
     value !== null &&
     value !== undefined &&
-    typeof value === 'object' &&
-    'message' in value &&
-    typeof (value as { message: unknown }).message === 'string'
+    typeof value === "object" &&
+    "message" in value &&
+    typeof (value as { message: unknown }).message === "string"
   );
 }
 

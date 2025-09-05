@@ -58,7 +58,13 @@ schema_paths = []
 enabled = true
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
-sql_paths = ["./seed.sql"]
+# Note: Avoid psql meta-commands (e.g., \i) in seed files; the CLI does not
+# parse them. Keep CLI seeds to base invariants only; full dev data is applied
+# via the reset script (npm run db:reset).
+sql_paths = [
+  "./seeds/base/01-rls-policies.sql",
+  "./seeds/base/02-permissions.sql",
+]
 
 [db.network_restrictions]
 # Enable management of network restrictions.

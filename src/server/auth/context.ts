@@ -1,10 +1,10 @@
 /**
  * Canonical Authentication Context Resolver - Phase 1
  * Single deterministic, cached request-scoped authentication resolution
- * 
+ *
  * Implements the 4-layer authentication stack:
  * 1. Session - Read cookies / Supabase session
- * 2. Identity - Normalize user (id, email) 
+ * 2. Identity - Normalize user (id, email)
  * 3. Org Context - Resolve orgId + load org
  * 4. Authorization - Fetch membership & role
  */
@@ -51,9 +51,9 @@ interface Membership {
  * Canonical return type - discriminated union (never throws)
  */
 export type AuthContext =
-  | { kind: 'unauthenticated' }
-  | { kind: 'no-membership'; user: BaseUser; orgId: string }
-  | { kind: 'authorized'; user: BaseUser; org: Org; membership: Membership };
+  | { kind: "unauthenticated" }
+  | { kind: "no-membership"; user: BaseUser; orgId: string }
+  | { kind: "authorized"; user: BaseUser; org: Org; membership: Membership };
 
 /**
  * Single canonical authentication resolver
@@ -70,14 +70,14 @@ export const getRequestAuthContext = cache(async (): Promise<AuthContext> => {
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return { kind: 'unauthenticated' };
+      return { kind: "unauthenticated" };
     }
 
     // 2. Identity Layer: Normalize user (strip sensitive fields)
-    const userName = user.user_metadata['name'] as string | undefined;
+    const userName = user.user_metadata["name"] as string | undefined;
     const baseUser: BaseUser = {
       id: user.id,
-      email: user.email ?? '',
+      email: user.email ?? "",
       ...(userName && { name: userName }),
     };
 
@@ -85,32 +85,47 @@ export const getRequestAuthContext = cache(async (): Promise<AuthContext> => {
     // Priority: subdomain header > user.app_metadata.organizationId
     const headersList = await headers();
     const subdomain = extractTrustedSubdomain(headersList);
-    const metadataOrgId = user.app_metadata['organizationId'] as string;
-    
+    const metadataOrgId = user.app_metadata["organizationId"] as string;
+
     let orgId: string;
-    if (subdomain && subdomain !== 'www' && subdomain !== 'api') {
+    if (subdomain && subdomain !== "www" && subdomain !== "api") {
       orgId = subdomain;
     } else if (metadataOrgId) {
       orgId = metadataOrgId;
     } else {
-      return { kind: 'unauthenticated' }; // No valid org resolution
+      return { kind: "unauthenticated" }; // No valid org resolution
     }
 
-    // Fetch organization (1 query)
-    const org = await getOrganizationBySubdomain(orgId);
+    // Fetch organization (1 query) - handle both subdomain and organization ID
+    let org;
+    if (subdomain && subdomain !== "www" && subdomain !== "api") {
+      // Primary path: look up by subdomain
+      org = await getOrganizationBySubdomain(orgId);
+    } else {
+      // Fallback path: orgId is actually an organization ID, need to look up differently
+      const { getPublicOrganizationById } = await import(
+        "~/lib/dal/public-organizations"
+      );
+      try {
+        org = await getPublicOrganizationById(orgId);
+      } catch {
+        org = null;
+      }
+    }
+
     if (!org) {
-      return { kind: 'no-membership', user: baseUser, orgId };
+      return { kind: "no-membership", user: baseUser, orgId };
     }
 
-    // 4. Authorization Layer: Fetch membership (1 query)  
+    // 4. Authorization Layer: Fetch membership (1 query)
     const membership = await getUserMembershipPublic(user.id, org.id);
     if (!membership) {
-      return { kind: 'no-membership', user: baseUser, orgId: org.id };
+      return { kind: "no-membership", user: baseUser, orgId: org.id };
     }
 
     // Success: Full authorization
     return {
-      kind: 'authorized',
+      kind: "authorized",
       user: baseUser,
       org: {
         id: org.id,
@@ -127,11 +142,10 @@ export const getRequestAuthContext = cache(async (): Promise<AuthContext> => {
         organizationId: membership.organization_id,
       },
     };
-
   } catch (error) {
     // Never throw - return structured failure
-    console.error('[AUTH-CONTEXT] Unexpected error during resolution:', error);
-    return { kind: 'unauthenticated' };
+    console.error("[AUTH-CONTEXT] Unexpected error during resolution:", error);
+    return { kind: "unauthenticated" };
   }
 });
 
@@ -139,10 +153,12 @@ export const getRequestAuthContext = cache(async (): Promise<AuthContext> => {
  * Legacy enforcement helper (thin wrapper)
  * Throws error for backward compatibility
  */
-export async function requireAuthorized(): Promise<Extract<AuthContext, { kind: 'authorized' }>> {
+export async function requireAuthorized(): Promise<
+  Extract<AuthContext, { kind: "authorized" }>
+> {
   const ctx = await getRequestAuthContext();
-  if (ctx.kind !== 'authorized') {
-    throw new Error('Member access required');
+  if (ctx.kind !== "authorized") {
+    throw new Error("Member access required");
   }
   return ctx;
 }
@@ -150,10 +166,14 @@ export async function requireAuthorized(): Promise<Extract<AuthContext, { kind: 
 /**
  * Type guards for working with discriminated union
  */
-export function isAuthorized(ctx: AuthContext): ctx is Extract<AuthContext, { kind: 'authorized' }> {
-  return ctx.kind === 'authorized';
+export function isAuthorized(
+  ctx: AuthContext,
+): ctx is Extract<AuthContext, { kind: "authorized" }> {
+  return ctx.kind === "authorized";
 }
 
-export function isAuthenticated(ctx: AuthContext): ctx is Exclude<AuthContext, { kind: 'unauthenticated' }> {
-  return ctx.kind !== 'unauthenticated';
+export function isAuthenticated(
+  ctx: AuthContext,
+): ctx is Exclude<AuthContext, { kind: "unauthenticated" }> {
+  return ctx.kind !== "unauthenticated";
 }

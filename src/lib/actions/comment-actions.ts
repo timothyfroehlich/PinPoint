@@ -112,9 +112,7 @@ export async function addCommentAction(
 
     // Background processing (runs after response sent to user)
     runAfterResponse(async () => {
-      console.log(
-        `Comment added to issue ${issueId} by ${user.email}`,
-      );
+      console.log(`Comment added to issue ${issueId} by ${user.email}`);
 
       // Generate notifications for issue stakeholders
       try {
@@ -124,7 +122,10 @@ export async function addCommentAction(
           actorName: user.name ?? user.email,
         });
       } catch (error) {
-        console.error("Failed to generate comment notifications:", getErrorMessage(error));
+        console.error(
+          "Failed to generate comment notifications:",
+          getErrorMessage(error),
+        );
       }
     });
 
@@ -156,7 +157,11 @@ export async function editCommentAction(
     }
     const { user, org: organization, membership } = authContext;
     const organizationId = organization.id;
-    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ISSUE_CREATE_BASIC, db);
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.ISSUE_CREATE_BASIC,
+      db,
+    );
 
     // Enhanced validation
     const validation = validateFormData(formData, editCommentSchema);
@@ -222,7 +227,11 @@ export async function deleteCommentAction(
     }
     const { user, org: organization, membership } = authContext;
     const organizationId = organization.id;
-    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ISSUE_CREATE_BASIC, db);
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.ISSUE_CREATE_BASIC,
+      db,
+    );
 
     // Verify comment exists and user has permission to delete
     const comment = await getCommentWithAccess(
@@ -281,7 +290,11 @@ export async function restoreCommentAction(
     }
     const { user, org: organization, membership } = authContext;
     const organizationId = organization.id;
-    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ISSUE_CREATE_BASIC, db);
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.ISSUE_CREATE_BASIC,
+      db,
+    );
 
     // Find soft-deleted comment that user authored
     const comment = await db.query.comments.findFirst({
@@ -313,9 +326,7 @@ export async function restoreCommentAction(
 
     // Background processing
     runAfterResponse(() => {
-      console.log(
-        `Comment ${commentId} restored by ${user.email}`,
-      );
+      console.log(`Comment ${commentId} restored by ${user.email}`);
       return Promise.resolve();
     });
 
