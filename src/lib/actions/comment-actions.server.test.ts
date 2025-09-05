@@ -5,13 +5,11 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { addCommentAction } from "./comment-actions";
 
-vi.mock("./shared", async () => {
-  const actual = await vi.importActual("./shared");
-  return {
-    ...actual,
-    requireAuthContextWithRole: vi.fn(),
-  };
-});
+// Mock the canonical auth resolver used by Server Actions
+vi.mock("~/server/auth/context", () => ({
+  getRequestAuthContext: vi.fn(),
+  requireAuthorized: vi.fn(),
+}));
 
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
@@ -44,21 +42,37 @@ vi.mock("~/server/auth/permissions", async (orig) => {
   };
 });
 
-const { requireAuthContextWithRole } = await import("./shared");
-const mockRequireAuthContextWithRole = vi.mocked(requireAuthContextWithRole);
+const { getRequestAuthContext } = await import("~/server/auth/context");
+const mockGetRequestAuthContext = vi.mocked(getRequestAuthContext);
 const { requirePermission } = await import("~/server/auth/permissions");
 const mockRequirePermission = vi.mocked(requirePermission);
 
 describe("addCommentAction permissions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRequireAuthContextWithRole.mockResolvedValue({
-      user: { id: "user-1", email: "user@example.com" } as any,
-      organizationId: "org-1",
-      membership: { roleId: "role-1" } as any,
-      role: { id: "role-1", name: "Member" } as any,
-      permissions: [],
-    } as any);
+    mockGetRequestAuthContext.mockResolvedValue({
+      kind: "authorized",
+      user: {
+        id: "user-1",
+        email: "user@example.com",
+        name: "Test User",
+      },
+      org: {
+        id: "org-1",
+        name: "Test Organization",
+        subdomain: "test-org",
+      },
+      membership: {
+        id: "membership-test",
+        role: {
+          id: "role-1",
+          name: "Member",
+          permissions: [],
+        },
+        userId: "user-1",
+        organizationId: "org-1",
+      },
+    });
   });
 
   it("allows commenting for users who can view the issue (no ISSUE_CREATE required)", async () => {

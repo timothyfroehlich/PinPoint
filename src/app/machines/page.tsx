@@ -6,7 +6,7 @@ import { PlusIcon } from "lucide-react";
 import { MachineInventoryServer } from "~/components/machines/machine-inventory-server";
 import { MachineStatsServer } from "~/components/machines/machine-stats-server";
 import { AdvancedSearchForm, MACHINES_FILTER_FIELDS } from "~/components/search";
-import { getRequestAuthContext } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 import {
   getMachinesWithFilters,
   getMachineStats,

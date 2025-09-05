@@ -71,7 +71,7 @@ export async function requireActionAuthContextWithPermission(
   const { user, org: organization, membership } = authContext;
   const organizationId = organization.id;
   await baseRequirePermission({ roleId: membership.role.id }, permission, db);
-  const name = ((user as any).user_metadata?.name as string | undefined) ?? user.email ?? "";
+  const name = ((user as any).user_metadata?.name as string | undefined) ?? user.email;
   return { user: { id: user.id, email: user.email, name }, organizationId, membership };
 }
 
@@ -165,7 +165,7 @@ export function validateFormData<T>(
   const fieldErrors = result.error.issues.reduce<Record<string, string[]>>(
     (acc: Record<string, string[]>, issue) => {
       const path = issue.path.join(".");
-      acc[path] ??= [];
+      acc[path] = acc[path] ?? [];
       acc[path].push(issue.message);
       return acc;
     },
