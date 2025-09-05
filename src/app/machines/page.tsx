@@ -3,9 +3,13 @@ import { type Metadata } from "next";
 import Link from "next/link";
 import { Button } from "~/components/ui/button";
 import { PlusIcon } from "lucide-react";
+import { AuthGuard } from "~/components/auth/auth-guard";
 import { MachineInventoryServer } from "~/components/machines/machine-inventory-server";
 import { MachineStatsServer } from "~/components/machines/machine-stats-server";
-import { AdvancedSearchForm, MACHINES_FILTER_FIELDS } from "~/components/search";
+import {
+  AdvancedSearchForm,
+  MACHINES_FILTER_FIELDS,
+} from "~/components/search";
 import { getRequestAuthContext } from "~/server/auth/context";
 import {
   getMachinesWithFilters,
@@ -27,7 +31,9 @@ interface MachinesPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export async function generateMetadata({ searchParams }: MachinesPageProps): Promise<Metadata> {
+export async function generateMetadata({
+  searchParams,
+}: MachinesPageProps): Promise<Metadata> {
   // Note: Authentication happens at page component level to avoid race conditions
 
   // Parse search params using centralized utility
@@ -44,17 +50,19 @@ export async function generateMetadata({ searchParams }: MachinesPageProps): Pro
 
   // Generate filter descriptions using centralized utility (without org-specific data)
   const filterDescriptions = getMachineFilterDescription(parsedParams);
-  const description = filterDescriptions.length > 0
-    ? `Manage your pinball machine fleet and track maintenance. Current filters: ${filterDescriptions.join(", ")}`
-    : "Manage your pinball machine fleet and track maintenance";
+  const description =
+    filterDescriptions.length > 0
+      ? `Manage your pinball machine fleet and track maintenance. Current filters: ${filterDescriptions.join(", ")}`
+      : "Manage your pinball machine fleet and track maintenance";
 
   // Generate canonical URL for SEO
   const canonicalUrl = getMachineCanonicalUrl("/machines", parsedParams);
 
   // Generic title without organization-specific count to avoid auth race conditions
-  const title = filterDescriptions.length > 0
-    ? `Machine Inventory (${filterDescriptions.join(", ")}) - PinPoint`
-    : `Machine Inventory - PinPoint`;
+  const title =
+    filterDescriptions.length > 0
+      ? `Machine Inventory (${filterDescriptions.join(", ")}) - PinPoint`
+      : `Machine Inventory - PinPoint`;
 
   return {
     title,
@@ -75,10 +83,36 @@ export default async function MachinesPage({
 }: MachinesPageProps): Promise<React.JSX.Element> {
   // Single authentication resolution for entire request
   const authContext = await getRequestAuthContext();
-  if (authContext.kind !== "authorized") {
-    throw new Error("Member access required");
-  }
 
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Machine Access Required"
+      fallbackMessage="You need to be signed in as a member to view the machine inventory."
+    >
+      <MachinesPageContent
+        authContext={
+          authContext as Extract<
+            Awaited<ReturnType<typeof getRequestAuthContext>>,
+            { kind: "authorized" }
+          >
+        }
+        searchParams={searchParams}
+      />
+    </AuthGuard>
+  );
+}
+
+async function MachinesPageContent({
+  authContext,
+  searchParams,
+}: {
+  authContext: Extract<
+    Awaited<ReturnType<typeof getRequestAuthContext>>,
+    { kind: "authorized" }
+  >;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}): Promise<React.JSX.Element> {
   // Parse URL parameters using centralized utility
   const rawParams = await searchParams;
   const parsedParams = parseMachineSearchParams(rawParams);
@@ -95,7 +129,18 @@ export default async function MachinesPage({
 
   // Parallel data fetching for optimal performance
   const [machines, machineStats, locations] = await Promise.all([
-    getMachinesWithFilters(filters, { page: parsedParams.page, limit: parsedParams.view === "grid" ? 12 : parsedParams.limit }, { field: parsedParams.sort as MachineSorting["field"], order: parsedParams.order }, authContext.org.id),
+    getMachinesWithFilters(
+      filters,
+      {
+        page: parsedParams.page,
+        limit: parsedParams.view === "grid" ? 12 : parsedParams.limit,
+      },
+      {
+        field: parsedParams.sort as MachineSorting["field"],
+        order: parsedParams.order,
+      },
+      authContext.org.id,
+    ),
     getMachineStats(authContext.org.id),
     getLocationsForOrg(authContext.org.id),
   ]);
@@ -197,8 +242,14 @@ export default async function MachinesPage({
           locations={locations}
           viewMode={viewMode}
           filters={filters}
-          pagination={{ page: parsedParams.page, limit: parsedParams.view === "grid" ? 12 : parsedParams.limit }}
-          sorting={{ field: parsedParams.sort as MachineSorting["field"], order: parsedParams.order }}
+          pagination={{
+            page: parsedParams.page,
+            limit: parsedParams.view === "grid" ? 12 : parsedParams.limit,
+          }}
+          sorting={{
+            field: parsedParams.sort as MachineSorting["field"],
+            order: parsedParams.order,
+          }}
           searchParams={rawParams}
         />
       </Suspense>
