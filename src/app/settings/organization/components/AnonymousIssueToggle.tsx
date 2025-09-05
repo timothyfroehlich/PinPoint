@@ -3,7 +3,7 @@ import { useTransition, useState } from "react";
 import { updateAnonymousIssueToggleAction } from "~/lib/settings/organization-actions";
 
 interface Props { initialEnabled: boolean }
-export function AnonymousIssueToggle({ initialEnabled }: Props) {
+export function AnonymousIssueToggle({ initialEnabled }: Props): React.JSX.Element {
   const [enabled, setEnabled] = useState(initialEnabled);
   const [pending, startTransition] = useTransition();
 

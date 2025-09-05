@@ -119,7 +119,7 @@ export async function updateOrganizationProfileAction(
     // Background processing
     runAfterResponse(() => {
       console.log(
-        `Organization ${organizationId} profile updated by ${user.email ?? "unknown"}`,
+        `Organization ${organizationId} profile updated by ${String(user.email)}`,
       );
       return Promise.resolve();
     });
@@ -179,7 +179,7 @@ export async function updateOrganizationLogoAction(
     // Background processing
     runAfterResponse(() => {
       console.log(
-        `Organization ${organizationId} logo updated by ${user.email ?? "unknown"}`,
+        `Organization ${organizationId} logo updated by ${String(user.email)}`,
       );
       return Promise.resolve();
     });

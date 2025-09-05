@@ -15,7 +15,6 @@ import { createClient } from "~/lib/supabase/server";
 import { extractTrustedSubdomain } from "~/lib/subdomain-verification";
 import { getOrganizationBySubdomain } from "~/lib/dal/public-organizations";
 import { getUserMembershipPublic } from "~/lib/dal/public-organizations";
-import { trackAuthResolverCall } from "~/lib/auth/instrumentation";
 
 /**
  * Base user type (identity layer)
@@ -62,9 +61,6 @@ export type AuthContext =
  * Returns structured union (never throws)
  */
 export const getRequestAuthContext = cache(async (): Promise<AuthContext> => {
-  // Track this resolver call for instrumentation
-  trackAuthResolverCall('getRequestAuthContext');
-
   try {
     // 1. Session Layer: Read cookies + Supabase session
     const supabase = await createClient();
@@ -78,7 +74,7 @@ export const getRequestAuthContext = cache(async (): Promise<AuthContext> => {
     }
 
     // 2. Identity Layer: Normalize user (strip sensitive fields)
-    const userName = user.user_metadata?.['name'] as string | undefined;
+    const userName = user.user_metadata['name'] as string | undefined;
     const baseUser: BaseUser = {
       id: user.id,
       email: user.email ?? '',
@@ -89,7 +85,7 @@ export const getRequestAuthContext = cache(async (): Promise<AuthContext> => {
     // Priority: subdomain header > user.app_metadata.organizationId
     const headersList = await headers();
     const subdomain = extractTrustedSubdomain(headersList);
-    const metadataOrgId = user.app_metadata?.['organizationId'] as string;
+    const metadataOrgId = user.app_metadata['organizationId'] as string;
     
     let orgId: string;
     if (subdomain && subdomain !== 'www' && subdomain !== 'api') {
