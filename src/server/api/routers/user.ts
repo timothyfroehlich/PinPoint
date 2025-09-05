@@ -3,6 +3,9 @@ import { TRPCError } from "@trpc/server";
 import { asc, count, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
+// Validation schemas
+import { idSchema, bioSchema, optionalUserNameSchema } from "~/lib/validation/schemas";
+
 // Internal types (alphabetical)
 import type {
   UserMembershipResponse,
@@ -144,8 +147,8 @@ export const userRouter = createTRPCRouter({
   updateProfile: protectedProcedure
     .input(
       z.object({
-        name: z.string().min(1).max(100).optional(),
-        bio: z.string().max(500).optional(),
+        name: optionalUserNameSchema,
+        bio: bioSchema,
       }),
     )
     .mutation(async ({ ctx, input }): Promise<User> => {
@@ -270,7 +273,7 @@ export const userRouter = createTRPCRouter({
 
   // Get user by ID (public info only - within organization context)
   getUser: orgScopedProcedure
-    .input(z.object({ userId: z.string() }))
+    .input(z.object({ userId: idSchema }))
     .query(async ({ ctx, input }): Promise<UserResponse> => {
       // Verify user is a member of the current organization (RLS handles org scoping)
       const [membership] = await ctx.db
@@ -468,8 +471,8 @@ export const userRouter = createTRPCRouter({
   updateMembership: userManageProcedure
     .input(
       z.object({
-        userId: z.string(),
-        roleId: z.string(),
+        userId: idSchema,
+        roleId: idSchema,
       }),
     )
     .mutation(

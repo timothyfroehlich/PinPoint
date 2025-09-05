@@ -82,7 +82,7 @@ export function validateMachineOwnership(
   return { valid: true };
 }
 
-import { titleSchema, emailSchema, LIMITS } from "~/lib/validation/schemas";
+import { titleSchema, emailSchema, LIMITS, machineIdSchema } from "~/lib/validation/schemas";
 
 /**
  * Validate issue creation input parameters
@@ -112,9 +112,13 @@ export function validateIssueCreationInput(
     }
   }
 
-  // Machine ID presence
-  if (!input.machineId || input.machineId.trim().length === 0) {
-    return { valid: false, error: "Machine ID is required" };
+  // Validate Machine ID using centralized schema
+  const machineIdResult = machineIdSchema.safeParse(input.machineId);
+  if (!machineIdResult.success) {
+    return {
+      valid: false,
+      error: machineIdResult.error.issues[0]?.message ?? "Invalid machine ID",
+    };
   }
 
   // Validate email format for public issues using centralized emailSchema

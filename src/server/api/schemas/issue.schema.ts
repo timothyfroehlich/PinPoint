@@ -5,6 +5,8 @@ import {
   idSchema,
   issueIdSchema,
   descriptionSchema,
+  apiPaginationSchema,
+  sortOrderSchema,
 } from "~/lib/validation/schemas";
 import { ISSUE_SORT_OPTIONS } from "~/lib/types/filters";
 
@@ -49,10 +51,9 @@ export const issueFilterSchema = z.object({
   modelId: idSchema.optional(),
   statusId: idSchema.optional(),
   priorityIds: z.array(idSchema).optional(),
-  limit: z.number().min(1).max(1000).optional(),
-  offset: z.number().min(0).optional(),
+  ...apiPaginationSchema.shape,
   sortBy: z.enum(ISSUE_SORT_OPTIONS).optional(),
-  sortOrder: z.enum(["asc", "desc"]).optional(),
+  sortOrder: sortOrderSchema.optional(),
   statusCategory: z.string().optional(),
 });
 

@@ -2,6 +2,9 @@ import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
+// Validation schemas
+import { idSchema, issueIdSchema, commentContentSchema } from "~/lib/validation/schemas";
+
 import { CommentService } from "./utils/commentService";
 import {
   validateCommentDeletion,
@@ -129,8 +132,8 @@ async function createCommentWithAuthor(
 const addCommentProcedure = issueCreateProcedure
   .input(
     z.object({
-      issueId: z.string(),
-      content: z.string().min(1).max(1000),
+      issueId: issueIdSchema,
+      content: commentContentSchema,
     }),
   )
   .mutation(async ({ ctx, input }): Promise<CommentWithAuthorResponse> => {
@@ -148,8 +151,8 @@ export const issueCommentRouter = createTRPCRouter({
   editComment: issueEditProcedure
     .input(
       z.object({
-        commentId: z.string(),
-        content: z.string().min(1).max(1000),
+        commentId: idSchema,
+        content: commentContentSchema,
       }),
     )
     .mutation(async ({ ctx, input }): Promise<CommentWithAuthorResponse> => {
@@ -274,7 +277,7 @@ export const issueCommentRouter = createTRPCRouter({
   deleteComment: organizationProcedure
     .input(
       z.object({
-        commentId: z.string(),
+        commentId: idSchema,
       }),
     )
     .mutation(async ({ ctx, input }): Promise<object> => {
@@ -387,7 +390,7 @@ export const issueCommentRouter = createTRPCRouter({
   restoreComment: organizationProcedure
     .input(
       z.object({
-        commentId: z.string(),
+        commentId: idSchema,
       }),
     )
     .mutation(async ({ ctx, input }): Promise<object> => {

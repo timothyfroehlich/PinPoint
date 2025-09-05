@@ -3,6 +3,9 @@ import { TRPCError } from "@trpc/server";
 import { asc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
+// Validation schemas
+import { idSchema, nameSchema, optionalNameSchema } from "~/lib/validation/schemas";
+
 // Internal types (alphabetical)
 import type {
   LocationResponse,
@@ -36,7 +39,7 @@ export const locationRouter = createTRPCRouter({
   create: locationEditProcedure
     .input(
       z.object({
-        name: z.string().min(1),
+        name: nameSchema,
       }),
     )
     .mutation(async ({ ctx, input }): Promise<LocationResponse> => {
@@ -142,8 +145,8 @@ export const locationRouter = createTRPCRouter({
   update: locationEditProcedure
     .input(
       z.object({
-        id: z.string(),
-        name: z.string().min(1).optional(),
+        id: idSchema,
+        name: optionalNameSchema,
       }),
     )
     .mutation(async ({ ctx, input }): Promise<LocationResponse> => {
@@ -172,7 +175,7 @@ export const locationRouter = createTRPCRouter({
 
   // Get a single location with detailed info
   getById: orgScopedProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ id: idSchema }))
     .query(async ({ ctx, input }): Promise<LocationResponse> => {
       const location = await ctx.db.query.locations.findFirst({
         where: eq(locations.id, input.id),
@@ -205,7 +208,7 @@ export const locationRouter = createTRPCRouter({
     }),
 
   delete: locationDeleteProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ id: idSchema }))
     .mutation(async ({ ctx, input }): Promise<LocationResponse> => {
       const [deletedLocation] = await ctx.db
         .delete(locations)
@@ -226,7 +229,7 @@ export const locationRouter = createTRPCRouter({
   setPinballMapId: organizationManageProcedure
     .input(
       z.object({
-        locationId: z.string(),
+        locationId: idSchema,
         pinballMapId: z.number().int().positive(),
       }),
     )
@@ -250,7 +253,7 @@ export const locationRouter = createTRPCRouter({
     }),
 
   syncWithPinballMap: organizationManageProcedure
-    .input(z.object({ locationId: z.string() }))
+    .input(z.object({ locationId: idSchema }))
     .mutation(async ({ ctx, input }): Promise<LocationResponse> => {
       const { locationId } = input;
       const pinballMapService = ctx.services.createPinballMapService();

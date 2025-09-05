@@ -7,6 +7,7 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
+import { uuidSchema } from "~/lib/validation/schemas";
 import { and, eq, inArray } from "drizzle-orm";
 import { notifications } from "~/server/db/schema";
 import { db } from "~/lib/dal/shared";
@@ -22,30 +23,12 @@ import { getRequestAuthContext } from "~/server/auth/context";
 
 // Validation schemas
 const markAsReadSchema = z.object({
-  notificationId: z
-    .string()
-    .refine(
-      (val) =>
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-          val,
-        ),
-      { message: "Invalid notification ID" },
-    ),
+  notificationId: uuidSchema,
 });
 
 const bulkMarkAsReadSchema = z.object({
   notificationIds: z
-    .array(
-      z
-        .string()
-        .refine(
-          (val) =>
-            /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-              val,
-            ),
-          { message: "Invalid notification ID" },
-        ),
-    )
+    .array(uuidSchema)
     .min(1, "No notifications selected")
     .max(50, "Cannot update more than 50 notifications at once"),
 });
