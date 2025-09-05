@@ -204,7 +204,7 @@ export async function inviteUserAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(
-        `User invitation processed for ${validation.data.email} by ${user.email ?? "unknown"}`,
+        `User invitation processed for ${validation.data.email} by ${user.email}`,
         {
           userId,
           membershipId: newMembership.id,
@@ -316,7 +316,7 @@ export async function updateUserRoleAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(
-        `User role updated by ${user.email ?? "unknown"}: ${validation.data.userId} -> ${role.name}`,
+        `User role updated by ${user.email}: ${validation.data.userId} -> ${role.name}`,
       );
 
       // Log the activity
@@ -399,7 +399,7 @@ export async function removeUserAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(
-        `User removed from organization by ${user.email ?? "unknown"}: ${validation.data.confirmEmail}`,
+        `User removed from organization by ${user.email}: ${validation.data.confirmEmail}`,
       );
 
       // Log the activity
@@ -498,7 +498,7 @@ export async function updateSystemSettingsAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`System settings updated by ${user.email ?? "unknown"}`);
+      console.log(`System settings updated by ${user.email}`);
 
       // Log the activity
       await logActivity({
@@ -554,7 +554,7 @@ export async function exportActivityLogAction(): Promise<Response> {
     });
 
     // Generate filename with timestamp
-    const timestamp = new Date().toISOString().split("T")[0];
+    const timestamp = new Date().toISOString().split("T")[0] ?? "unknown";
     const filename = `activity-log-${timestamp}.csv`;
 
     // Return CSV file response
@@ -562,7 +562,7 @@ export async function exportActivityLogAction(): Promise<Response> {
       status: 200,
       headers: {
         "Content-Type": "text/csv",
-        "Content-Disposition": `attachment; filename="${String(filename)}"`,
+        "Content-Disposition": `attachment; filename="${filename}"`,
       },
     });
   } catch (error) {

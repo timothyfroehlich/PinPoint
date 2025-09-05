@@ -18,7 +18,7 @@ export function computeIssueCreationGating(
   input: IssueCreationGatingInput,
 ): IssueCreationGatingResult {
   const { permissions } = input;
-  const has = (p: string) => permissions.includes(p);
+  const has = (p: string): boolean => permissions.includes(p);
   const canFull = has(PERMISSIONS.ISSUE_CREATE_FULL) || has(PERMISSIONS.ISSUE_CREATE);
   const canBasic = canFull || has(PERMISSIONS.ISSUE_CREATE_BASIC);
   return {
