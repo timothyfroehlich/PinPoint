@@ -4,6 +4,7 @@
  */
 
 import { cache } from "react";
+import { eq, type Column } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 
@@ -51,4 +52,37 @@ export function getPaginationParams(options: PaginationOptions = {}): {
   const offset = (page - 1) * limit;
 
   return { limit, offset, page };
+}
+
+/**
+ * Organization scoping utilities for database queries
+ * Eliminates the manual `eq(table.organization_id, organizationId)` pattern across 50+ files
+ */
+
+/**
+ * Creates organization scoping condition for database queries
+ * 
+ * Replaces: eq(issues.organization_id, organizationId)
+ * With: withOrgScope(organizationId, issues.organization_id)
+ */
+export function withOrgScope(organizationId: string, organizationColumn: Column) {
+  return eq(organizationColumn, organizationId);
+}
+
+/**
+ * Creates an organization-scoped where clause for entity queries
+ * 
+ * Replaces: { where: { id: entityId, organizationId } }
+ * With: withOrgEntityScope(entityId, organizationId, table)
+ */
+export function withOrgEntityScope(
+  entityId: string, 
+  organizationId: string, 
+  entityIdColumn: Column,
+  organizationColumn: Column
+) {
+  return {
+    id: eq(entityIdColumn, entityId),
+    organizationId: eq(organizationColumn, organizationId)
+  };
 }

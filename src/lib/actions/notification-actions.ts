@@ -15,10 +15,10 @@ import {
   actionSuccess,
   actionError,
   runAfterResponse,
+  requireOrgContext,
   type ActionResult,
 } from "./shared";
 import { isError } from "~/lib/utils/type-guards";
-import { getRequestAuthContext } from "~/server/auth/context";
 
 // Validation schemas
 const markAsReadSchema = z.object({
@@ -62,12 +62,7 @@ export async function markNotificationAsReadAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const authContext = await getRequestAuthContext();
-    if (authContext.kind !== "authorized") {
-      throw new Error("Member access required");
-    }
-    const { user, org: organization } = authContext;
-    const organizationId = organization.id;
+    const { user, organizationId } = await requireOrgContext();
 
     // Enhanced validation
     const validation = validateFormData(formData, markAsReadSchema);
@@ -124,12 +119,7 @@ export async function bulkMarkNotificationsAsReadAction(
   formData: FormData,
 ): Promise<ActionResult<{ updatedCount: number }>> {
   try {
-    const authContext = await getRequestAuthContext();
-    if (authContext.kind !== "authorized") {
-      throw new Error("Member access required");
-    }
-    const { user, org: organization } = authContext;
-    const organizationId = organization.id;
+    const { user, organizationId } = await requireOrgContext();
 
     // Parse JSON data from form with proper type safety
     const jsonData = formData.get("data");
@@ -199,12 +189,7 @@ export async function markAllNotificationsAsReadAction(
   formData: FormData,
 ): Promise<ActionResult<{ updatedCount: number }>> {
   try {
-    const authContext = await getRequestAuthContext();
-    if (authContext.kind !== "authorized") {
-      throw new Error("Member access required");
-    }
-    const { user, org: organization } = authContext;
-    const organizationId = organization.id;
+    const { user, organizationId } = await requireOrgContext();
 
     // Enhanced validation
     const validation = validateFormData(formData, markAllAsReadSchema);
@@ -260,12 +245,7 @@ export async function markNotificationAsUnreadAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const authContext = await getRequestAuthContext();
-    if (authContext.kind !== "authorized") {
-      throw new Error("Member access required");
-    }
-    const { user, org: organization } = authContext;
-    const organizationId = organization.id;
+    const { user, organizationId } = await requireOrgContext();
 
     const validation = validateFormData(formData, markAsReadSchema);
     if (!validation.success) {

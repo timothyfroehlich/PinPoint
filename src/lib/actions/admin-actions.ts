@@ -26,10 +26,10 @@ import {
   actionSuccess,
   actionError,
   runAfterResponse,
+  requireOrgContext,
   type ActionResult,
 } from "./shared";
 import { isError, getErrorMessage } from "~/lib/utils/type-guards";
-import { getRequestAuthContext } from "~/server/auth/context";
 import { db } from "~/lib/dal/shared";
 import { requirePermission } from "./shared";
 import { PERMISSIONS } from "~/server/auth/permissions.constants";
@@ -93,12 +93,7 @@ export async function inviteUserAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const authContext = await getRequestAuthContext();
-    if (authContext.kind !== "authorized") {
-      throw new Error("Member access required");
-    }
-    const { user, org: organization, membership } = authContext;
-    const organizationId = organization.id;
+    const { user, organizationId, membership } = await requireOrgContext();
 
     // Enhanced validation with Zod
     const validation: ActionResult<InviteUserData> = validateFormData(formData, inviteUserSchema);
@@ -264,12 +259,7 @@ export async function updateUserRoleAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const authContext = await getRequestAuthContext();
-    if (authContext.kind !== "authorized") {
-      throw new Error("Member access required");
-    }
-    const { user, org: organization, membership } = authContext;
-    const organizationId = organization.id;
+    const { user, organizationId, membership } = await requireOrgContext();
 
     // Enhanced validation
     const validation: ActionResult<UpdateUserRoleData> = validateFormData(formData, updateUserRoleSchema);
@@ -351,12 +341,7 @@ export async function removeUserAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const authContext = await getRequestAuthContext();
-    if (authContext.kind !== "authorized") {
-      throw new Error("Member access required");
-    }
-    const { user, org: organization, membership } = authContext;
-    const organizationId = organization.id;
+    const { user, organizationId, membership } = await requireOrgContext();
 
     // Enhanced validation
     const validation: ActionResult<RemoveUserData> = validateFormData(formData, removeUserSchema);
@@ -434,12 +419,7 @@ export async function updateSystemSettingsAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const authContext = await getRequestAuthContext();
-    if (authContext.kind !== "authorized") {
-      throw new Error("Member access required");
-    }
-    const { user, org: organization, membership } = authContext;
-    const organizationId = organization.id;
+    const { user, organizationId, membership } = await requireOrgContext();
 
     // Parse JSON data from form
     const settingsData = String(formData.get("settings") ?? "");
@@ -527,12 +507,7 @@ export async function updateSystemSettingsAction(
  */
 export async function exportActivityLogAction(): Promise<Response> {
   try {
-    const authContext = await getRequestAuthContext();
-    if (authContext.kind !== "authorized") {
-      throw new Error("Member access required");
-    }
-    const { user, org: organization, membership } = authContext;
-    const organizationId = organization.id;
+    const { user, organizationId, membership } = await requireOrgContext();
 
     await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ADMIN_VIEW_ANALYTICS, db);
 

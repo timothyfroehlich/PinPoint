@@ -1,18 +1,15 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { getRequestAuthContext } from "~/server/auth/context";
+import { requireOrgContext } from "~/lib/actions/shared";
 import { updateOrganizationSettings } from "~/lib/dal/organizations";
 
 interface ActionResult { success: boolean; message?: string }
 
 export async function updateAnonymousIssueToggleAction(enabled: boolean): Promise<ActionResult> {
   try {
-    const authContext = await getRequestAuthContext();
-    if (authContext.kind !== "authorized") {
-      throw new Error("Member access required");
-    }
+    const { organizationId } = await requireOrgContext();
     
-    await updateOrganizationSettings(authContext.org.id, {
+    await updateOrganizationSettings(organizationId, {
       allow_anonymous_issues: enabled,
     });
     

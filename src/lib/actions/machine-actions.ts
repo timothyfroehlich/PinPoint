@@ -10,7 +10,6 @@ import { revalidateTag, revalidatePath } from "next/cache";
 import { z } from "zod";
 import { nameSchema, idSchema } from "~/lib/validation/schemas";
 import { eq, and, inArray } from "drizzle-orm";
-import { getRequestAuthContext } from "~/server/auth/context";
 import { db } from "~/lib/dal/shared";
 import { machines } from "~/server/db/schema";
 import {
@@ -18,7 +17,7 @@ import {
   validateQRCodeParams,
 } from "~/lib/services/qr-code-service";
 import type { ActionResult } from "~/lib/actions/shared";
-import { validateFormData } from "~/lib/actions/shared";
+import { validateFormData, requireOrgContext } from "~/lib/actions/shared";
 
 // ================================
 // VALIDATION SCHEMAS
@@ -68,12 +67,7 @@ const BulkQRGenerateSchema = z.object({
 export async function createMachineAction(
   formData: FormData,
 ): Promise<ActionResult<{ machineId: string }>> {
-  const authContext = await getRequestAuthContext();
-  if (authContext.kind !== "authorized") {
-    throw new Error("Member access required");
-  }
-  const { org: organization } = authContext;
-  const organizationId = organization.id;
+  const { organizationId } = await requireOrgContext();
 
   // Enhanced validation with validateFormData
   const validation: ActionResult<CreateMachineData> = validateFormData(formData, CreateMachineSchema);
@@ -123,12 +117,7 @@ export async function createMachineAction(
 export async function updateMachineAction(
   formData: FormData,
 ): Promise<ActionResult<{ machineId: string }>> {
-  const authContext = await getRequestAuthContext();
-  if (authContext.kind !== "authorized") {
-    throw new Error("Member access required");
-  }
-  const { org: organization } = authContext;
-  const organizationId = organization.id;
+  const { organizationId } = await requireOrgContext();
 
   // Enhanced validation with validateFormData
   const validation: ActionResult<UpdateMachineData> = validateFormData(formData, UpdateMachineSchema);
@@ -188,12 +177,7 @@ export async function updateMachineAction(
 export async function deleteMachineAction(
   machineId: string,
 ): Promise<ActionResult<{ deleted: boolean }>> {
-  const authContext = await getRequestAuthContext();
-  if (authContext.kind !== "authorized") {
-    throw new Error("Member access required");
-  }
-  const { org: organization } = authContext;
-  const organizationId = organization.id;
+  const { organizationId } = await requireOrgContext();
 
   if (!machineId) {
     return {
@@ -245,12 +229,7 @@ export async function deleteMachineAction(
 export async function bulkUpdateMachinesAction(
   formData: FormData,
 ): Promise<ActionResult<{ updatedCount: number }>> {
-  const authContext = await getRequestAuthContext();
-  if (authContext.kind !== "authorized") {
-    throw new Error("Member access required");
-  }
-  const { org: organization } = authContext;
-  const organizationId = organization.id;
+  const { organizationId } = await requireOrgContext();
 
   const machineIdsValue = formData.get("machineIds");
   const machineIdsString = typeof machineIdsValue === "string" ? machineIdsValue : "";
@@ -316,12 +295,7 @@ export async function bulkUpdateMachinesAction(
 export async function generateQRCodeAction(
   formData: FormData,
 ): Promise<ActionResult<{ qrCodeUrl: string }>> {
-  const authContext = await getRequestAuthContext();
-  if (authContext.kind !== "authorized") {
-    throw new Error("Member access required");
-  }
-  const { org: organization } = authContext;
-  const organizationId = organization.id;
+  const { organizationId } = await requireOrgContext();
 
   const machineIdValue = formData.get("machineId");
   const result = GenerateQRCodeSchema.safeParse({
@@ -392,12 +366,7 @@ export async function generateQRCodeAction(
 export async function regenerateQRCodeAction(
   machineId: string,
 ): Promise<ActionResult<{ qrCodeUrl: string }>> {
-  const authContext = await getRequestAuthContext();
-  if (authContext.kind !== "authorized") {
-    throw new Error("Member access required");
-  }
-  const { org: organization } = authContext;
-  const organizationId = organization.id;
+  const { organizationId } = await requireOrgContext();
 
   if (!machineId) {
     return {
@@ -463,12 +432,7 @@ export async function regenerateQRCodeAction(
 export async function bulkGenerateQRCodesAction(
   formData: FormData,
 ): Promise<ActionResult<{ processedCount: number }>> {
-  const authContext = await getRequestAuthContext();
-  if (authContext.kind !== "authorized") {
-    throw new Error("Member access required");
-  }
-  const { org: organization } = authContext;
-  const organizationId = organization.id;
+  const { organizationId } = await requireOrgContext();
 
   const machineIdsValue = formData.get("machineIds");
   const machineIdsString = typeof machineIdsValue === "string" ? machineIdsValue : "";

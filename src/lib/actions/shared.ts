@@ -54,6 +54,40 @@ export const getActionAuthContext = cache(async () => {
 export const getServerAuthContext = getActionAuthContext;
 
 /**
+ * Enhanced organization context utility for Server Actions
+ * Eliminates the common duplication pattern across 70+ files
+ * 
+ * Replaces:
+ *   const authContext = await getRequestAuthContext();
+ *   if (authContext.kind !== "authorized") {
+ *     throw new Error("Member access required");
+ *   }
+ *   const { user, org: organization, membership } = authContext;
+ *   const organizationId = organization.id;
+ * 
+ * With:
+ *   const { user, organizationId, membership } = await requireOrgContext();
+ */
+export const requireOrgContext = cache(async (): Promise<{
+  user: { id: string; email: string; name: string };
+  organizationId: string;
+  membership: { id: string; role: any };
+}> => {
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
+  const { user, org: organization, membership } = authContext;
+  const organizationId = organization.id;
+  const name = ((user as any).user_metadata?.name as string | undefined) ?? user.email;
+  return { 
+    user: { id: user.id, email: user.email, name }, 
+    organizationId, 
+    membership 
+  };
+});
+
+/**
  * Combined auth + permission helper for Server Actions.
  * Ensures user is authenticated, has org context and required permission.
  */
@@ -64,15 +98,9 @@ export async function requireActionAuthContextWithPermission(
   organizationId: string;
   membership: { id: string; role: any };
 }> {
-  const authContext = await getRequestAuthContext();
-  if (authContext.kind !== "authorized") {
-    throw new Error("Member access required");
-  }
-  const { user, org: organization, membership } = authContext;
-  const organizationId = organization.id;
+  const { user, organizationId, membership } = await requireOrgContext();
   await baseRequirePermission({ roleId: membership.role.id }, permission, db);
-  const name = ((user as any).user_metadata?.name as string | undefined) ?? user.email;
-  return { user: { id: user.id, email: user.email, name }, organizationId, membership };
+  return { user, organizationId, membership };
 }
 
 /**
