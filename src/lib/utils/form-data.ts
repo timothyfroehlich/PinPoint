@@ -5,6 +5,7 @@
 
 import { z } from "zod";
 import { isError } from "~/lib/utils/type-guards";
+import { emailSchema, uuidSchema } from "~/lib/validation/schemas";
 
 /**
  * Extract a single field from FormData with type safety
@@ -109,22 +110,8 @@ export function extractFormFields<T extends Record<string, unknown>>(
 export const formFieldTypes = {
   string: z.string().trim(),
   nonEmptyString: z.string().trim().min(1, "Field cannot be empty"),
-  email: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .refine((val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), {
-      message: "Invalid email address",
-    }),
-  uuid: z
-    .string()
-    .refine(
-      (val) =>
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-          val,
-        ),
-      { message: "Invalid ID format" },
-    ),
+  email: emailSchema,
+  uuid: uuidSchema,
   boolean: z
     .union([z.literal("true"), z.literal("false"), z.boolean()])
     .transform((val) => val === true || val === "true"),

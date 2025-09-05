@@ -73,10 +73,14 @@ export default defineConfig({
   ...(SHOULD_START
     ? {
         webServer: {
-          command: `NEXT_PUBLIC_ENABLE_DEV_FEATURES=true PORT=${PORT} npm run dev`,
+          command: `npm run dev`,
           url: BASE_URL,
           reuseExistingServer: true, // don't kill an already running dev server
           timeout: 120_000,
+          env: {
+            NEXT_PUBLIC_ENABLE_DEV_FEATURES: "true",
+            PORT: PORT,
+          },
         },
       }
     : {

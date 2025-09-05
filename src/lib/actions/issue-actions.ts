@@ -12,6 +12,8 @@ import {
   titleSchema,
   commentContentSchema,
   uuidSchema,
+  descriptionSchema,
+  optionalPrioritySchema,
 } from "~/lib/validation/schemas";
 import { and, eq, inArray } from "drizzle-orm";
 import {
@@ -57,10 +59,10 @@ const machineIdentifierSchema = z
 
 const createIssueSchema = z.object({
   title: titleSchema,
-  description: z.string().optional(),
+  description: descriptionSchema,
   machineId: machineIdentifierSchema,
   // Priority = internal scheduling weight (hidden for anonymous)
-  priority: z.enum(["low", "medium", "high"]).optional().default("medium"),
+  priority: optionalPrioritySchema.default("medium"),
   // Severity = inherent impact (can be set by anonymous reporters)
   severity: z
     .enum(["low", "medium", "high", "critical"])

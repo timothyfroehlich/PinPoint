@@ -5,6 +5,7 @@
  */
 
 import { getErrorMessage } from "~/lib/utils/type-guards";
+import { organizationIdSchema } from "~/lib/validation/schemas";
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -138,34 +139,12 @@ export function validateCrossOrganizationAccess(
 export function validateOrganizationId(
   organizationId: string,
 ): ValidationResult {
-  if (!organizationId || organizationId.trim().length === 0) {
+  // Use centralized organization ID schema validation
+  const result = organizationIdSchema.safeParse(organizationId);
+  if (!result.success) {
     return {
       valid: false,
-      error: "Organization ID is required",
-    };
-  }
-
-  if (organizationId.length < 3) {
-    return {
-      valid: false,
-      error: "Organization ID must be at least 3 characters",
-    };
-  }
-
-  if (organizationId.length > 50) {
-    return {
-      valid: false,
-      error: "Organization ID must be 50 characters or less",
-    };
-  }
-
-  // Basic format validation - alphanumeric plus hyphens and underscores
-  const validFormat = /^[a-zA-Z0-9_-]+$/;
-  if (!validFormat.test(organizationId)) {
-    return {
-      valid: false,
-      error:
-        "Organization ID must contain only letters, numbers, hyphens, and underscores",
+      error: result.error.issues[0]?.message ?? "Invalid organization ID",
     };
   }
 
