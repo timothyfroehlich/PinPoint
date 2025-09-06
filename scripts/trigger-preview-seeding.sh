@@ -67,15 +67,13 @@ trigger_workflow() {
     
     local workflow_cmd="gh workflow run preview-seed.yml --field environment=preview"
     
-    if [[ "$wait_flag" == "true" ]]; then
-        workflow_cmd+=" --json"
-    fi
-    
     # Trigger the workflow
     if $workflow_cmd; then
         log_success "Workflow triggered successfully"
         
         if [[ "$wait_flag" == "true" ]]; then
+            # Give GitHub a moment to register the run
+            sleep 2
             wait_for_workflow_completion
         else
             log_info "Workflow running in background"
