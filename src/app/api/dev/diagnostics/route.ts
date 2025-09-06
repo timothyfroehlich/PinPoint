@@ -5,13 +5,9 @@ import { env } from "~/env";
 import { shouldEnableDevFeatures } from "~/lib/environment";
 import { logger } from "~/lib/logger";
 import { checkSystemHealth } from "~/lib/dal/system-health";
-import { createAdminClient } from "~/lib/supabase/server";
+import { createAdminClient, createClient } from "~/lib/supabase/server";
 
-// We only import supabase-js directly for the anon sign-in probe to avoid SSR cookie side effects
-// eslint-disable-next-line no-restricted-imports -- Server-only debug endpoint, safe usage
-import { createClient as createSupabaseJsClient } from "@supabase/supabase-js";
-
-type DiagnosticsResponse = {
+interface DiagnosticsResponse {
   environment: {
     nodeEnv: string;
     vercelEnv: string | undefined;
@@ -47,7 +43,7 @@ type DiagnosticsResponse = {
       error?: string;
     };
   };
-};
+}
 
 function safeHost(urlString: string | undefined): string | null {
   if (!urlString) return null;
@@ -169,7 +165,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1 });
     if (error) throw error as unknown as Error;
     adminOk = true;
-    adminTotalHint = data?.users?.length ?? 0;
+    adminTotalHint = Array.isArray(data.users) ? data.users.length : 0;
   } catch (e) {
     adminOk = false;
     adminErr = e instanceof Error ? e.message : String(e);
@@ -186,31 +182,20 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const testEmail = "harry.williams@example.com"; // seeded member user
     const testPassword = "dev-login-123"; // seeded by scripts/create-dev-users.ts
     try {
-      if (publicUrl && publicKey) {
-        const sb = createSupabaseJsClient(publicUrl, publicKey, {
-          auth: { persistSession: false, autoRefreshToken: false },
-        });
-        const { data, error } = await sb.auth.signInWithPassword({
-          email: testEmail,
-          password: testPassword,
-        });
-        if (error) throw error as unknown as Error;
-        // Immediately sign out to avoid leaving sessions around
-        if (data?.session?.access_token) {
-          await sb.auth.signOut();
-        }
-        authProbe = { attempted: true, ok: true };
-        logger.info({
-          msg: "[DEV-DIAG] Public sign-in probe succeeded",
-          component: "api.dev.diagnostics",
-        });
-      } else {
-        authProbe = {
-          attempted: false,
-          ok: false,
-          error: "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
-        };
-      }
+      // Use SSR-safe client per CORE-SSR-001
+      const sb = await createClient();
+      const { error } = await sb.auth.signInWithPassword({
+        email: testEmail,
+        password: testPassword,
+      });
+      if (error) throw error as unknown as Error;
+      // Sign out regardless to avoid lingering sessions
+      await sb.auth.signOut();
+      authProbe = { attempted: true, ok: true };
+      logger.info({
+        msg: "[DEV-DIAG] Public sign-in probe succeeded",
+        component: "api.dev.diagnostics",
+      });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       authProbe = { attempted: true, ok: false, error: message };
