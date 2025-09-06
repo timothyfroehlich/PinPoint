@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { organizations, invitations, roles, rolePermissions, permissions, activityLog, systemSettings } from "./schema";
+import { organizations, invitations, roles, permissions, rolePermissions, systemSettings, activityLog } from "./schema";
 
 export const invitationsRelations = relations(invitations, ({one}) => ({
 	organization: one(organizations, {
@@ -14,8 +14,8 @@ export const invitationsRelations = relations(invitations, ({one}) => ({
 
 export const organizationsRelations = relations(organizations, ({many}) => ({
 	invitations: many(invitations),
-	activityLogs: many(activityLog),
 	systemSettings: many(systemSettings),
+	activityLogs: many(activityLog),
 }));
 
 export const rolesRelations = relations(roles, ({many}) => ({
@@ -24,13 +24,13 @@ export const rolesRelations = relations(roles, ({many}) => ({
 }));
 
 export const rolePermissionsRelations = relations(rolePermissions, ({one}) => ({
-	role: one(roles, {
-		fields: [rolePermissions.roleId],
-		references: [roles.id]
-	}),
 	permission: one(permissions, {
 		fields: [rolePermissions.permissionId],
 		references: [permissions.id]
+	}),
+	role: one(roles, {
+		fields: [rolePermissions.roleId],
+		references: [roles.id]
 	}),
 }));
 
@@ -38,16 +38,16 @@ export const permissionsRelations = relations(permissions, ({many}) => ({
 	rolePermissions: many(rolePermissions),
 }));
 
-export const activityLogRelations = relations(activityLog, ({one}) => ({
+export const systemSettingsRelations = relations(systemSettings, ({one}) => ({
 	organization: one(organizations, {
-		fields: [activityLog.organizationId],
+		fields: [systemSettings.organizationId],
 		references: [organizations.id]
 	}),
 }));
 
-export const systemSettingsRelations = relations(systemSettings, ({one}) => ({
+export const activityLogRelations = relations(activityLog, ({one}) => ({
 	organization: one(organizations, {
-		fields: [systemSettings.organizationId],
+		fields: [activityLog.organizationId],
 		references: [organizations.id]
 	}),
 }));

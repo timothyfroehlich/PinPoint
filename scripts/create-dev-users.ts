@@ -66,8 +66,12 @@ const DEV_PASSWORD = "dev-login-123";
 
 async function createDevUsers() {
   // Check required environment variables
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
+  // Trim to guard against newline-contaminated values from some env pull tools
+  const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
+  // Accept either SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY
+  const supabaseSecretKey = (
+    process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY ?? ""
+  ).trim();
 
   if (!supabaseUrl || !supabaseSecretKey) {
     console.error("❌ Missing required environment variables:");
@@ -76,10 +80,24 @@ async function createDevUsers() {
     process.exit(1);
   }
 
-  // Create standalone DB client using local Supabase connection
-  const connectionString = "postgresql://postgres:postgres@localhost:54322/postgres";
-  const sql = postgres(connectionString);
-  const db = drizzle(sql);
+// Create standalone DB client using environment-aware connection
+// Prefer DIRECT_URL (direct connection) then DATABASE_URL; fallback to local dev
+const RAW_DIRECT_URL = (process.env.DIRECT_URL ?? "").trim();
+const RAW_DATABASE_URL = (process.env.DATABASE_URL ?? "").trim();
+
+// Choose the most appropriate connection string
+const CONNECTION_STRING =
+  RAW_DIRECT_URL || RAW_DATABASE_URL ||
+  "postgresql://postgres:postgres@localhost:54322/postgres";
+
+// Require SSL for cloud connections (Supabase, etc.)
+// The 'postgres' client accepts { ssl: 'require' } to enforce TLS.
+const needsSsl = /supabase\.co|pooler\.supabase\.com|amazonaws\.com|rds\.amazonaws\.com/.test(
+  CONNECTION_STRING,
+);
+
+const sql = postgres(CONNECTION_STRING, needsSsl ? { ssl: "require" } : undefined);
+const db = drizzle(sql);
 
   // Create Supabase admin client
   const supabase = createClient(

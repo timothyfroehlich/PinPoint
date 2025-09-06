@@ -835,7 +835,7 @@ export function createFormDataSchema<T extends z.ZodRawShape>(
  * isActiveSchema.parse("false"); // false
  * ```
  */
-export function formDataBoolean(): z.ZodEffects<z.ZodString, boolean, string> {
+export function formDataBoolean(): z.ZodPipe<z.ZodString, z.ZodTransform<boolean>> {
   return z.string().transform((val) => val === "true");
 }
 
@@ -852,7 +852,7 @@ export function formDataBoolean(): z.ZodEffects<z.ZodString, boolean, string> {
 export function formDataNumber(options?: {
   min?: number;
   max?: number;
-}): z.ZodType<number, z.ZodTypeDef, string> {
+}): z.ZodPipe<z.ZodString, z.ZodTransform<number>> {
   let schema = z.string().transform((val, ctx) => {
     const parsed = Number(val);
     if (isNaN(parsed)) {
@@ -1054,8 +1054,8 @@ export function makeRequiredOptionalPair<T extends z.ZodRawShape>(shape: T): {
   for (const [key, schema] of Object.entries(shape) as [keyof T, T[keyof T]][]) {
     // TypeScript can't infer that T[keyof T] has an optional() method, but all Zod schemas do
     // This is safe because we know schema is a ZodType from the shape constraint
-    // eslint-disable-next-line security/detect-object-injection
-    optionalShape[key] = (schema as z.ZodType).optional();
+    // eslint-disable-next-line security/detect-object-injection, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    optionalShape[key] = (schema as any).optional() as z.ZodOptional<T[keyof T]>;
   }
   
   const optional = z.object(optionalShape).strict();
