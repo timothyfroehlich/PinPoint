@@ -206,6 +206,11 @@ jobs:
       - name: Install pgTAP
         run: |
           sudo apt-get update
+          # Add PostgreSQL official APT repository for PostgreSQL 17
+          sudo apt-get install -y wget ca-certificates
+          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+          echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
           # Install PostgreSQL client tools and dependencies
           sudo apt-get install -y postgresql-client-17 postgresql-server-dev-17 libtap-parser-sourcehandler-pgtap-perl build-essential
           # Install pgTAP from source since postgresql-17-pgtap doesn't exist
