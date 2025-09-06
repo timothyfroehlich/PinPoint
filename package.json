@@ -74,6 +74,7 @@
     "test:all": "npm-run-all --print-label --parallel test test:rls smoke",
     "test:ci": "npm-run-all --sequential test test:rls smoke",
     "smoke": "playwright test e2e/smoke-tests.e2e.test.ts --project=chromium-auth --reporter=line",
+    "test:e2e:prod": "playwright test -c playwright.prod.config.ts --reporter=line",
     "audit": "npm audit --audit-level=high",
     "audit:brief": "npm audit --audit-level=high",
     "audit:verbose": "npm audit --audit-level=moderate",
