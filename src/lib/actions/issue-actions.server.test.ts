@@ -190,9 +190,7 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.fieldErrors?.statusId?.[0]).toContain(
-          "valid UUID",
-        );
+        expect(result.fieldErrors?.statusId?.[0]).toContain("valid UUID");
       }
     });
 

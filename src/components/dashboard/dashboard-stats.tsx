@@ -100,7 +100,7 @@ function StatCard({
   // as "good" | "neutral" | "needs-attention" union type, making object access safe
   // eslint-disable-next-line security/detect-object-injection
   const trendColor = trendColors[trend];
-  // eslint-disable-next-line security/detect-object-injection  
+  // eslint-disable-next-line security/detect-object-injection
   const bgColor = bgColors[trend];
 
   return (

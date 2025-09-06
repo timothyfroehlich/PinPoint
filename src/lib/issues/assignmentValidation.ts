@@ -421,7 +421,9 @@ export function validateIssueCreationRules(
     if (!emailResult.success) {
       return {
         valid: false,
-        error: emailResult.error.issues[0]?.message ?? "Invalid reporter email format",
+        error:
+          emailResult.error.issues[0]?.message ??
+          "Invalid reporter email format",
       };
     }
   }

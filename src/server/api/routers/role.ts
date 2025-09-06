@@ -4,7 +4,11 @@ import { count, eq } from "drizzle-orm";
 import { z } from "zod";
 
 // Validation schemas
-import { idSchema, roleNameSchema, optionalRoleNameSchema } from "~/lib/validation/schemas";
+import {
+  idSchema,
+  roleNameSchema,
+  optionalRoleNameSchema,
+} from "~/lib/validation/schemas";
 
 // Internal types (alphabetical)
 import type { RLSOrganizationTRPCContext } from "~/server/api/trpc.base";

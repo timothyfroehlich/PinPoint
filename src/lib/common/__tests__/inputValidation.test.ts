@@ -375,7 +375,7 @@ describe("inputValidation - Text Validation Schemas", () => {
         const result = submitterNameSchema.safeParse(name);
         expectZodSuccess(result);
       }
-      
+
       // Test undefined separately
       const undefinedResult = submitterNameSchema.safeParse(undefined);
       expectZodSuccess(undefinedResult);
@@ -632,7 +632,7 @@ describe("inputValidation - Composite Validation Schemas", () => {
       const result = issueCreationCoreSchema.safeParse({
         title: "Issue Title",
         description: "", // Required by current schema (even if empty)
-        machineId: "machine-123", 
+        machineId: "machine-123",
         submitterName: undefined, // Required field but can be undefined
       });
       expectZodSuccess(result);
@@ -657,7 +657,7 @@ describe("inputValidation - Composite Validation Schemas", () => {
     it("should accept optional fields as empty/undefined", () => {
       const result = issueCreationCoreSchema.safeParse({
         title: "Issue Title",
-        machineId: "machine-123", 
+        machineId: "machine-123",
         description: "", // Empty string is valid for optional descriptionSchema
         submitterName: undefined, // undefined is valid for optional submitterNameSchema
       });
