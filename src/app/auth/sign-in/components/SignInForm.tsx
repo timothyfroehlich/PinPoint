@@ -156,6 +156,14 @@ export function SignInForm(): React.JSX.Element {
             return;
           }
 
+          // If org is locked by host alias (e.g., APC custom domain), stay on current host
+          if (isOrgLockedByHost) {
+            router.refresh();
+            await new Promise((resolve) => setTimeout(resolve, 200));
+            router.push("/dashboard");
+            return;
+          }
+
           if (currentSubdomain !== selectedOrg.subdomain) {
             const rootDomain = getCurrentDomain();
             window.location.href = `${window.location.protocol}//${selectedOrg.subdomain}.${rootDomain}/dashboard`;
