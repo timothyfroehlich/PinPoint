@@ -131,6 +131,38 @@ CREATE OR REPLACE FUNCTION test_status_id(suffix TEXT DEFAULT NULL)
 RETURNS TEXT AS $$ SELECT test_id('status', suffix) $$ LANGUAGE SQL;
 
 
+-- =============================================================================
+-- TEST MEMBERSHIP SETUP
+-- =============================================================================
+-- Creates membership data required for RLS tests to pass
+-- Uses safe upserts to avoid conflicts on repeated runs
+
+-- Create test memberships for RLS policy validation
+CREATE OR REPLACE FUNCTION ensure_test_memberships()
+RETURNS VOID AS $$
+BEGIN
+  -- Create membership for test admin user in primary org
+  INSERT INTO memberships (id, user_id, organization_id, role_id) VALUES
+    ('membership-test-admin', test_user_admin(), test_org_primary(), 'role-admin-primary-001')
+    ON CONFLICT (id) DO NOTHING;
+  
+  -- Create membership for test member1 user in primary org  
+  INSERT INTO memberships (id, user_id, organization_id, role_id) VALUES
+    ('membership-test-member1', test_user_member1(), test_org_primary(), 'role-member-primary-001')
+    ON CONFLICT (id) DO NOTHING;
+    
+  -- Create membership for test member2 user in competitor org
+  INSERT INTO memberships (id, user_id, organization_id, role_id) VALUES
+    ('membership-test-member2', test_user_member2(), test_org_competitor(), 'role-member-competitor-001')  
+    ON CONFLICT (id) DO NOTHING;
+    
+  RAISE NOTICE 'Test memberships ensured for RLS validation';
+END;
+$$ LANGUAGE plpgsql;
+
+-- Execute membership setup immediately when constants.sql is loaded
+SELECT ensure_test_memberships();
+
 -- Generated constants summary:
 -- Organizations: test_org_primary(), test_org_competitor()  
 -- Users: test_user_admin(), test_user_member1(), test_user_member2()
@@ -138,3 +170,4 @@ RETURNS TEXT AS $$ SELECT test_id('status', suffix) $$ LANGUAGE SQL;
 -- Names: test_name_admin(), test_name_member1(), test_name_member2()
 -- Helper: set_jwt_claims_for_test(), set_primary_org_context(), set_competitor_org_context()
 -- ID Generators: test_id(), test_issue_id(), test_machine_id(), etc.
+-- Membership Setup: ensure_test_memberships() - executed automatically

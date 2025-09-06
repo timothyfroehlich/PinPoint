@@ -69,6 +69,11 @@ export interface AuthUserProfile {
  * // Result: { emailVerified: Date, notificationFrequency: 'daily' }
  */
 export function transformUserResponse(user: unknown): UserResponse {
+  // Handle null/undefined inputs gracefully
+  if (user == null) {
+    return user as UserResponse;
+  }
+  
   return transformKeysToCamelCase(user) as UserResponse;
 }
 
@@ -87,6 +92,11 @@ export function transformUserResponse(user: unknown): UserResponse {
 export function transformOrganizationResponse(
   org: unknown,
 ): OrganizationResponse {
+  // Handle null/undefined inputs gracefully
+  if (org == null) {
+    return org as OrganizationResponse;
+  }
+  
   return transformKeysToCamelCase(org) as OrganizationResponse;
 }
 
@@ -110,6 +120,11 @@ export function transformOrganizationResponse(
 export function transformMembershipResponse(
   membership: unknown,
 ): MembershipResponse {
+  // Handle null/undefined inputs gracefully
+  if (membership == null) {
+    return membership as MembershipResponse;
+  }
+
   const transformed = transformKeysToCamelCase(
     membership,
   ) as MembershipResponse;
