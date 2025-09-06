@@ -474,7 +474,7 @@ reset_supabase_database() {
         fi
     elif [[ "$env" == "preview" ]]; then
         log_info "Preview environment: Dev users should be created via GitHub Actions"
-        log_warning "For security, the SUPABASE_SERVICE_ROLE_KEY is only available in GitHub Actions"
+        log_warning "For security, the SUPABASE_SECRET_KEY is only available in GitHub Actions"
         log_info "Run 'npm run preview:seed' to trigger secure seeding via GitHub Actions"
     fi
 
