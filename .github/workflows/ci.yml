@@ -206,8 +206,14 @@ jobs:
       - name: Install pgTAP
         run: |
           sudo apt-get update
-          # Install pgTAP for PostgreSQL 17
-          sudo apt-get install -y postgresql-17-pgtap libtap-parser-sourcehandler-pgtap-perl
+          # Install PostgreSQL client tools and dependencies
+          sudo apt-get install -y postgresql-client-17 postgresql-server-dev-17 libtap-parser-sourcehandler-pgtap-perl build-essential
+          # Install pgTAP from source since postgresql-17-pgtap doesn't exist
+          wget https://github.com/theory/pgtap/archive/refs/tags/v1.3.3.tar.gz
+          tar -xzf v1.3.3.tar.gz
+          cd pgtap-1.3.3
+          make
+          sudo make install
       - name: Setup database for RLS testing
         run: |
           npm run db:push:local
