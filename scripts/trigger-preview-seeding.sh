@@ -65,7 +65,7 @@ trigger_workflow() {
     
     log_info "Triggering Preview Environment Seeding workflow..."
     
-    local workflow_cmd="gh workflow run preview-seed.yml --field environment=preview"
+    local workflow_cmd="gh workflow run preview-seed.yml --field environment=preview --ref main"
     
     # Trigger the workflow
     if $workflow_cmd; then
@@ -92,7 +92,7 @@ wait_for_workflow_completion() {
     
     # Get the most recent workflow run
     local run_id
-    run_id=$(gh run list --workflow=preview-seed.yml --limit=1 --json databaseId --jq '.[0].databaseId')
+    run_id=$(gh run list --workflow=preview-seed.yml --branch main --limit=1 --json databaseId --jq '.[0].databaseId')
     
     if [[ -z "$run_id" ]]; then
         log_error "Could not find workflow run ID"
