@@ -5,6 +5,7 @@
 
 "use client";
 
+import React from "react";
 import { useActionState } from "react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -29,11 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import {
-  sendMagicLink,
-  signInWithOAuth,
-  type ActionResult,
-} from "~/lib/actions/auth-actions";
+import { sendMagicLink, signInWithOAuth } from "~/lib/actions/auth-actions";
 import { type OrganizationOption } from "~/lib/dal/public-organizations";
 
 // Development auth integration
@@ -42,13 +39,13 @@ import { isDevAuthAvailable } from "~/lib/environment-client";
 import { createClient } from "~/utils/supabase/client";
 import { getCurrentDomain } from "~/lib/utils/domain";
 
-export function SignInForm() {
+export function SignInForm(): React.JSX.Element {
   const router = useRouter();
-  
-  const [magicLinkState, magicLinkAction, magicLinkPending] = useActionState<
-    ActionResult<{ message: string }> | null,
-    FormData
-  >(sendMagicLink, null);
+
+  const [magicLinkState, magicLinkAction, magicLinkPending] = useActionState(
+    sendMagicLink,
+    null,
+  );
 
   const [isOAuthLoading, setIsOAuthLoading] = useState(false);
   const [devAuthLoading, setDevAuthLoading] = useState(false);
@@ -56,7 +53,8 @@ export function SignInForm() {
 
   // Organization selection state
   const [organizations, setOrganizations] = useState<OrganizationOption[]>([]);
-  const [selectedOrganizationId, setSelectedOrganizationId] = useState<string>("");
+  const [selectedOrganizationId, setSelectedOrganizationId] =
+    useState<string>("");
   const [organizationsLoading, setOrganizationsLoading] = useState(true);
 
   // tRPC: fetch public organizations (anon-safe)
@@ -87,12 +85,12 @@ export function SignInForm() {
     setSelectedOrganizationId(defaultId);
   }, [publicOrganizations, orgsLoading]);
 
-  const handleOAuthSignIn = async (provider: "google") => {
+  const handleOAuthSignIn = async (provider: "google"): Promise<void> => {
     if (!selectedOrganizationId) {
       alert("Please select an organization");
       return;
     }
-    
+
     setIsOAuthLoading(true);
     try {
       await signInWithOAuth(provider, selectedOrganizationId);
@@ -102,12 +100,12 @@ export function SignInForm() {
     }
   };
 
-  const handleDevAuth = async (email: string, role: string) => {
+  const handleDevAuth = async (email: string, role: string): Promise<void> => {
     if (!selectedOrganizationId) {
       alert("Please select an organization");
       return;
     }
-    
+
     setDevAuthLoading(true);
     try {
       const supabase = createClient();
@@ -117,32 +115,42 @@ export function SignInForm() {
         role,
         organizationId: selectedOrganizationId,
       };
-      const result = await authenticateDevUser(supabase as any, userData);
+      const result = await authenticateDevUser(supabase, userData);
 
       if (result.success) {
         console.log("Dev login successful:", result.method);
-        
+
         // CRITICAL: Wait for session to sync between client and server
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
         // Use the selected organization from the dropdown to redirect to proper subdomain
-        const selectedOrg = organizations.find(org => org.id === selectedOrganizationId);
+        const selectedOrg = organizations.find(
+          (org) => org.id === selectedOrganizationId,
+        );
         if (selectedOrg?.subdomain) {
-          const isDev = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-          if (isDev) {
-            window.location.href = `http://${selectedOrg.subdomain}.localhost:3000/dashboard`;
+          const currentSubdomain = window.location.hostname.split(".")[0];
+
+          if (currentSubdomain === selectedOrg.subdomain) {
+            // Already on correct subdomain, refresh to sync auth state then navigate
+            router.refresh();
+            await new Promise((resolve) => setTimeout(resolve, 200));
+            router.push("/dashboard");
+            return;
+          } else {
+            // Need to redirect to correct subdomain
+            const isLocalhost = window.location.hostname.includes("localhost");
+            const rootDomain = isLocalhost
+              ? "localhost:3000"
+              : getCurrentDomain();
+            window.location.href = `${window.location.protocol}//${selectedOrg.subdomain}.${rootDomain}/dashboard`;
             return;
           }
-          // In production, use dynamic domain
-          const currentDomain = getCurrentDomain();
-          window.location.href = `https://${selectedOrg.subdomain}.${currentDomain}/dashboard`;
-          return;
         }
-        
+
         // Fallback: regular navigation if no organization selected
         router.refresh();
-        await new Promise(resolve => setTimeout(resolve, 200));
-        router.push('/dashboard');
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        router.push("/dashboard");
       } else {
         console.error("Login failed:", result.error);
         setDevAuthError(getAuthResultMessage(result));
@@ -168,7 +176,9 @@ export function SignInForm() {
           {organizationsLoading ? (
             <div className="flex items-center space-x-2">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
-              <span className="text-sm text-muted-foreground">Loading organizations...</span>
+              <span className="text-sm text-muted-foreground">
+                Loading organizations...
+              </span>
             </div>
           ) : (
             <Select
@@ -176,12 +186,19 @@ export function SignInForm() {
               onValueChange={setSelectedOrganizationId}
               disabled={isOAuthLoading || magicLinkPending || devAuthLoading}
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Select your organization" />
+              <SelectTrigger data-testid="org-select-trigger">
+                <SelectValue
+                  placeholder="Select your organization"
+                  data-testid="org-select-value"
+                />
               </SelectTrigger>
               <SelectContent>
                 {organizations.map((org) => (
-                  <SelectItem key={org.id} value={org.id}>
+                  <SelectItem
+                    key={org.id}
+                    value={org.id}
+                    data-testid={`org-option-${org.subdomain}`}
+                  >
                     {org.name}
                   </SelectItem>
                 ))}
@@ -199,7 +216,7 @@ export function SignInForm() {
 
         {/* Google OAuth */}
         <Button
-          onClick={() => handleOAuthSignIn("google")}
+          onClick={() => void handleOAuthSignIn("google")}
           disabled={isOAuthLoading || magicLinkPending || devAuthLoading}
           className="w-full"
           variant="outline"
@@ -255,10 +272,11 @@ export function SignInForm() {
               required
               disabled={magicLinkPending || isOAuthLoading || devAuthLoading}
             />
-            {magicLinkState?.success === false &&
+            {magicLinkState &&
+              !magicLinkState.success &&
               magicLinkState.fieldErrors?.["email"] && (
                 <p className="text-sm text-error">
-                  {magicLinkState.fieldErrors["email"]}
+                  {magicLinkState.fieldErrors["email"][0]}
                 </p>
               )}
           </div>
@@ -287,7 +305,7 @@ export function SignInForm() {
         </form>
 
         {/* Action Results */}
-        {magicLinkState?.success === true && (
+        {magicLinkState && magicLinkState.success && (
           <Alert className="border-tertiary bg-tertiary-container">
             <div className="text-on-tertiary-container">
               <p className="font-medium">Magic link sent!</p>
@@ -296,14 +314,16 @@ export function SignInForm() {
           </Alert>
         )}
 
-        {magicLinkState?.success === false && !magicLinkState.fieldErrors && (
-          <Alert className="border-error bg-error-container">
-            <div className="text-on-error-container">
-              <p className="font-medium">Sign-in failed</p>
-              <p className="text-sm mt-1">{magicLinkState.error}</p>
-            </div>
-          </Alert>
-        )}
+        {magicLinkState &&
+          !magicLinkState.success &&
+          !magicLinkState.fieldErrors && (
+            <Alert className="border-error bg-error-container">
+              <div className="text-on-error-container">
+                <p className="font-medium">Sign-in failed</p>
+                <p className="text-sm mt-1">{magicLinkState.error}</p>
+              </div>
+            </Alert>
+          )}
 
         {/* Development Auth (preserved from existing system) */}
         {shouldShowDevLogin && (
@@ -328,7 +348,7 @@ export function SignInForm() {
               <div className="space-y-2">
                 <Button
                   onClick={() =>
-                    handleDevAuth("tim.froehlich@example.com", "Admin")
+                    void handleDevAuth("tim.froehlich@example.com", "Admin")
                   }
                   disabled={
                     devAuthLoading || magicLinkPending || isOAuthLoading
@@ -336,13 +356,14 @@ export function SignInForm() {
                   variant="outline"
                   size="sm"
                   className="w-full text-xs"
+                  data-testid="dev-login-tim"
                 >
                   {devAuthLoading ? "Logging in..." : "Dev Login: Tim (Admin)"}
                 </Button>
 
                 <Button
                   onClick={() =>
-                    handleDevAuth("harry.williams@example.com", "Member")
+                    void handleDevAuth("harry.williams@example.com", "Member")
                   }
                   disabled={
                     devAuthLoading || magicLinkPending || isOAuthLoading
@@ -350,6 +371,7 @@ export function SignInForm() {
                   variant="outline"
                   size="sm"
                   className="w-full text-xs"
+                  data-testid="dev-login-harry"
                 >
                   {devAuthLoading
                     ? "Logging in..."

@@ -1,0 +1,1 @@
+You are already configured to read @CLAUDE.md . The file contains references to various other files, prefaced with an "@". You are to read those files into context at the start of every session, before considering the user's request. Do it now.

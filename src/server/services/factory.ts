@@ -78,5 +78,3 @@ export class ServiceFactory {
     return new ServiceFactory(this.db, organizationId);
   }
 }
-
-export type IServiceFactory = ServiceFactory;

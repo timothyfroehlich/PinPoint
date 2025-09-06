@@ -1,12 +1,12 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
-export function cn(...inputs: ClassValue[]) {
+export function cn(...inputs: ClassValue[]): string {
   return twMerge(clsx(inputs));
 }
 
 // Utility for conditional styling with MUI coexistence
-export function muiToTailwind(_muiStyles: Record<string, any>) {
+export function muiToTailwind(_muiStyles: Record<string, unknown>): string {
   // Helper to convert MUI sx props to Tailwind classes
   // Implementation for gradual migration
   return "";

@@ -3,6 +3,9 @@ import { TRPCError } from "@trpc/server";
 import { and, eq, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 
+// Validation schemas
+import { idSchema, requiredSearchQuerySchema } from "~/lib/validation/schemas";
+
 // Internal types (alphabetical)
 import type { ModelResponse } from "~/lib/types/api";
 import type { OPDBSearchResult } from "~/lib/opdb/types";
@@ -12,6 +15,7 @@ import { env } from "~/env";
 import { generateId } from "~/lib/utils/id-generation";
 import { transformKeysToCamelCase } from "~/lib/utils/case-transformers";
 import { OPDBClient } from "~/lib/opdb/client";
+import { getErrorMessage } from "~/lib/utils/type-guards";
 
 // Server modules (alphabetical)
 import {
@@ -62,7 +66,7 @@ export const modelRouter = createTRPCRouter({
 
   // Get single model by ID (must be accessible to organization)
   getById: orgScopedProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ id: idSchema }))
     .query(async ({ ctx, input }): Promise<ModelResponse> => {
       const model = await ctx.db.query.models.findFirst({
         where: and(
@@ -101,7 +105,7 @@ export const modelRouter = createTRPCRouter({
 
   // Search commercial games for typeahead
   searchOPDB: orgScopedProcedure
-    .input(z.object({ query: z.string().min(1) }))
+    .input(z.object({ query: requiredSearchQuerySchema })) // Required search query with same limits as searchQuerySchema
     .query(async ({ input }): Promise<OPDBSearchResult[]> => {
       const opdbClient = new OPDBClient(env.OPDB_API_KEY, env.OPDB_API_URL);
       return await opdbClient.searchMachines(input.query);
@@ -109,7 +113,7 @@ export const modelRouter = createTRPCRouter({
 
   // Create Model from OPDB data
   createFromOPDB: organizationManageProcedure
-    .input(z.object({ opdbId: z.string() }))
+    .input(z.object({ opdbId: idSchema }))
     .mutation(async ({ ctx, input }): Promise<Model> => {
       // Check if this commercial game already exists globally
       const existingGame = await ctx.db.query.models.findFirst({
@@ -133,7 +137,7 @@ export const modelRouter = createTRPCRouter({
       if (!machineData) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Game not found in OPDB",
+          message: "Model not found in OPDB",
         });
       }
 
@@ -232,7 +236,7 @@ export const modelRouter = createTRPCRouter({
               operation: "opdb_sync",
             },
             error: {
-              message: error instanceof Error ? error.message : String(error),
+              message: getErrorMessage(error),
             },
           });
         }

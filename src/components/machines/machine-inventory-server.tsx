@@ -17,11 +17,11 @@ import {
   TableRow,
 } from "~/components/ui/table";
 import { MapPinIcon, QrCodeIcon, PlusIcon } from "lucide-react";
-import { MachineSearchClient } from "./client/machine-search-client";
+import { GenericSearch } from "~/components/ui/generic-search";
 import { MachineFiltersClient } from "./client/machine-filters-client";
-import { PaginationUniversal } from "~/components/ui/pagination-universal";
+import { PaginationUniversal } from "~/components/ui/pagination-server";
+import type { MachineFilters } from "~/lib/types";
 import type {
-  MachineFilters,
   MachinePagination as MachinePaginationType,
   MachineSorting,
 } from "~/lib/dal/machines";
@@ -71,7 +71,7 @@ interface MachineInventoryServerProps {
   searchParams?: Record<string, string | string[] | undefined>;
 }
 
-export async function MachineInventoryServer({
+export function MachineInventoryServer({
   machines,
   locations,
   viewMode,
@@ -79,7 +79,7 @@ export async function MachineInventoryServer({
   pagination: _pagination,
   sorting: _sorting,
   searchParams,
-}: MachineInventoryServerProps) {
+}: MachineInventoryServerProps): JSX.Element {
   // Empty state
   if (machines.items.length === 0) {
     return (
@@ -87,7 +87,11 @@ export async function MachineInventoryServer({
         {/* Search and Filters */}
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1">
-            <MachineSearchClient initialSearch={filters.search} />
+            <GenericSearch
+              {...(filters.search && { initialSearch: filters.search })}
+              basePath="/machines"
+              placeholder="Search machines, locations, or models..."
+            />
           </div>
           <MachineFiltersClient
             locations={locations}
@@ -129,7 +133,12 @@ export async function MachineInventoryServer({
       {/* Search and Filters */}
       <div className="flex flex-col md:flex-row gap-4">
         <div className="flex-1">
-          <MachineSearchClient initialSearch={filters.search} />
+          <GenericSearch
+            {...(filters.search && { initialSearch: filters.search })}
+            basePath="/machines"
+            placeholder="Search machines, locations, or models..."
+            size="sm"
+          />
         </div>
         <MachineFiltersClient
           locations={locations}
@@ -168,14 +177,14 @@ export async function MachineInventoryServer({
                   </Link>
                   <p className="text-sm text-muted-foreground">
                     {machine.model?.manufacturer} {machine.model?.name}
-                    {machine.model?.year && ` (${machine.model.year})`}
+                    {machine.model?.year && ` (${String(machine.model.year)})`}
                   </p>
                 </div>
 
                 <div className="flex items-center gap-1 text-sm text-muted-foreground">
                   <MapPinIcon className="h-3 w-3" />
                   <span className="truncate">
-                    {machine.location?.name || "Unknown Location"}
+                    {machine.location?.name ?? "Unknown Location"}
                     {machine.location?.city && `, ${machine.location.city}`}
                   </span>
                 </div>
@@ -231,7 +240,7 @@ export async function MachineInventoryServer({
                     <div className="flex items-center gap-1">
                       <MapPinIcon className="h-3 w-3 text-muted-foreground" />
                       <span className="truncate">
-                        {machine.location?.name || "Unknown"}
+                        {machine.location?.name ?? "Unknown"}
                       </span>
                     </div>
                     {machine.location?.city && (
@@ -246,11 +255,12 @@ export async function MachineInventoryServer({
                   <TableCell>
                     <div className="space-y-1">
                       <div className="font-medium">
-                        {machine.model?.name || "Unknown Model"}
+                        {machine.model?.name ?? "Unknown Model"}
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {machine.model?.manufacturer}
-                        {machine.model?.year && ` (${machine.model.year})`}
+                        {machine.model?.year &&
+                          ` (${String(machine.model.year)})`}
                       </div>
                     </div>
                   </TableCell>

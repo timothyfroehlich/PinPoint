@@ -4,28 +4,98 @@
  * Phase 4B.2: User and Role Management
  */
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import React from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Separator } from "~/components/ui/separator";
-import { 
-  ShieldIcon, 
+import {
+  ShieldIcon,
   PlusIcon,
   UsersIcon,
   LockIcon,
   SettingsIcon,
-  CheckIcon
+  CheckIcon,
 } from "lucide-react";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
+import { AuthGuard } from "~/components/auth/auth-guard";
 import { api } from "~/trpc/server";
 
-export default async function RolesSettingsPage() {
-  await requireMemberAccess();
-  
+// Type definitions for role statistics
+interface RoleStatistic {
+  id: string;
+  _count: {
+    members: number;
+  };
+}
+
+// Type guard for role statistics
+function isValidRoleStatistic(value: unknown): value is RoleStatistic {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "id" in value &&
+    "_count" in value &&
+    typeof (value as RoleStatistic).id === "string" &&
+    typeof (value as RoleStatistic)._count === "object" &&
+    typeof (value as RoleStatistic)._count.members === "number"
+  );
+}
+
+// Type guard for role with description
+function getRoleDescription(role: { description?: string }): string {
+  return role.description ?? "No description provided";
+}
+
+// Type guard for checking if role has permissions
+function hasPermissions(
+  role: unknown,
+): role is { permissions: { id: string; name: string }[] } {
+  return (
+    typeof role === "object" &&
+    role !== null &&
+    "permissions" in role &&
+    Array.isArray((role as { permissions: unknown }).permissions)
+  );
+}
+
+// Safe permission access function
+function getPermissionsArray(role: unknown): { id: string; name: string }[] {
+  if (hasPermissions(role)) {
+    return role.permissions;
+  }
+  return [];
+}
+
+export default async function RolesSettingsPage(): Promise<React.JSX.Element> {
+  const authContext = await getRequestAuthContext();
+
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Role Management Access Required"
+      fallbackMessage="You need to be signed in as a member to manage roles and permissions."
+    >
+      <RolesSettingsPageContent />
+    </AuthGuard>
+  );
+}
+
+async function RolesSettingsPageContent(): Promise<React.JSX.Element> {
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Unauthorized access"); // This should never happen due to AuthGuard
+  }
   // Fetch roles using the existing role router
   const roles = await api.role.getAll();
   // TODO: Implement role statistics API
-  const roleStats: any[] = [];
+  const roleStats: RoleStatistic[] = [];
 
   return (
     <div className="space-y-6">
@@ -54,7 +124,7 @@ export default async function RolesSettingsPage() {
             <div className="text-2xl font-bold">{roles.length}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">System Roles</CardTitle>
@@ -62,7 +132,7 @@ export default async function RolesSettingsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {roles.filter(role => role.isSystem).length}
+              {roles.filter((role) => role.isSystem).length}
             </div>
           </CardContent>
         </Card>
@@ -74,19 +144,26 @@ export default async function RolesSettingsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {roles.filter(role => !role.isSystem).length}
+              {roles.filter((role) => !role.isSystem).length}
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Users Assigned</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Users Assigned
+            </CardTitle>
             <UsersIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {roleStats.reduce((total, stat) => total + stat._count.members, 0)}
+              {roleStats.reduce((total, stat) => {
+                if (isValidRoleStatistic(stat)) {
+                  return total + stat._count.members;
+                }
+                return total;
+              }, 0)}
             </div>
           </CardContent>
         </Card>
@@ -109,7 +186,7 @@ export default async function RolesSettingsPage() {
                     <div className="h-10 w-10 rounded-lg bg-gradient-to-r from-primary to-primary-container flex items-center justify-center">
                       <ShieldIcon className="h-5 w-5 text-white" />
                     </div>
-                    
+
                     <div>
                       <div className="flex items-center space-x-2">
                         <h3 className="text-lg font-medium">{role.name}</h3>
@@ -121,15 +198,19 @@ export default async function RolesSettingsPage() {
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {(role as any).description || "No description provided"}
+                        {getRoleDescription(role as { description?: string })}
                       </p>
                       <div className="flex items-center space-x-4 mt-2 text-xs text-muted-foreground">
                         <span>
-                          {roleStats.find(stat => stat.id === role.id)?._count.members || 0} users
+                          {roleStats.find(
+                            (stat) =>
+                              isValidRoleStatistic(stat) && stat.id === role.id,
+                          )?._count.members ?? 0}{" "}
+                          users
                         </span>
                         <span>•</span>
                         <span>
-                          {role.permissions?.length || 0} permissions
+                          {getPermissionsArray(role).length} permissions
                         </span>
                       </div>
                     </div>
@@ -148,19 +229,24 @@ export default async function RolesSettingsPage() {
                 </div>
 
                 {/* Role Permissions Preview */}
-                {role.permissions && role.permissions.length > 0 && (
+                {getPermissionsArray(role).length > 0 && (
                   <div className="mt-4 ml-14">
                     <h4 className="text-sm font-medium mb-2">Permissions</h4>
                     <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-                      {role.permissions.slice(0, 6).map((permission) => (
-                        <div key={permission.id} className="flex items-center space-x-2 text-sm">
-                          <CheckIcon className="h-3 w-3 text-tertiary" />
-                          <span>{permission.name}</span>
-                        </div>
-                      ))}
-                      {role.permissions.length > 6 && (
+                      {getPermissionsArray(role)
+                        .slice(0, 6)
+                        .map((permission) => (
+                          <div
+                            key={permission.id}
+                            className="flex items-center space-x-2 text-sm"
+                          >
+                            <CheckIcon className="h-3 w-3 text-tertiary" />
+                            <span>{permission.name}</span>
+                          </div>
+                        ))}
+                      {getPermissionsArray(role).length > 6 && (
                         <div className="text-sm text-muted-foreground">
-                          +{role.permissions.length - 6} more...
+                          +{getPermissionsArray(role).length - 6} more...
                         </div>
                       )}
                     </div>
@@ -205,24 +291,29 @@ export default async function RolesSettingsPage() {
                 name: "Administrator",
                 description: "Full access to all features",
                 permissions: ["All permissions"],
-                color: "from-error to-error-container"
+                color: "from-error to-error-container",
               },
               {
-                name: "Manager", 
+                name: "Manager",
                 description: "User management and reporting",
                 permissions: ["Manage Users", "View Reports", "Manage Issues"],
-                color: "from-primary to-primary-container"
+                color: "from-primary to-primary-container",
               },
               {
                 name: "Member",
                 description: "Standard user access",
                 permissions: ["Create Issues", "View Machines", "Comment"],
-                color: "from-tertiary to-tertiary-container"
-              }
+                color: "from-tertiary to-tertiary-container",
+              },
             ].map((template) => (
-              <Card key={template.name} className="hover:shadow-md transition-shadow">
+              <Card
+                key={template.name}
+                className="hover:shadow-md transition-shadow"
+              >
                 <CardHeader className="pb-3">
-                  <div className={`h-8 w-8 rounded-lg bg-gradient-to-r ${template.color} flex items-center justify-center mb-2`}>
+                  <div
+                    className={`h-8 w-8 rounded-lg bg-gradient-to-r ${template.color} flex items-center justify-center mb-2`}
+                  >
                     <ShieldIcon className="h-4 w-4 text-white" />
                   </div>
                   <CardTitle className="text-base">{template.name}</CardTitle>
@@ -233,7 +324,10 @@ export default async function RolesSettingsPage() {
                 <CardContent className="pt-0">
                   <div className="space-y-1 mb-4">
                     {template.permissions.map((permission, idx) => (
-                      <div key={idx} className="flex items-center text-xs text-muted-foreground">
+                      <div
+                        key={idx}
+                        className="flex items-center text-xs text-muted-foreground"
+                      >
                         <CheckIcon className="mr-1 h-3 w-3 text-tertiary" />
                         {permission}
                       </div>

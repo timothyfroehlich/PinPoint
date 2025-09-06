@@ -2,6 +2,7 @@ import {
   IMAGE_CONSTRAINTS,
   ISSUE_ATTACHMENT_CONSTRAINTS,
 } from "../image-storage";
+import { isError } from "~/lib/utils/type-guards";
 
 export interface ImageProcessingResult {
   success: boolean;
@@ -93,10 +94,7 @@ export async function processImageFile(
   } catch (error) {
     return {
       success: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Unknown error processing image",
+      error: isError(error) ? error.message : "Unknown error processing image",
     };
   }
 }
@@ -211,10 +209,7 @@ export async function processIssueImageFile(
   } catch (error) {
     return {
       success: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Unknown error processing image",
+      error: isError(error) ? error.message : "Unknown error processing image",
     };
   }
 }

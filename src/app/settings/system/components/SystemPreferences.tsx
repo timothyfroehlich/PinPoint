@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useActionState, useEffect } from "react";
+import React, { useState, useActionState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import {
@@ -16,7 +16,13 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Separator } from "~/components/ui/separator";
-import { SaveIcon, LoaderIcon, GlobeIcon, ClockIcon, PaletteIcon } from "lucide-react";
+import {
+  SaveIcon,
+  LoaderIcon,
+  GlobeIcon,
+  ClockIcon,
+  PaletteIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 import { updateSystemSettingsAction } from "~/lib/actions/admin-actions";
 
@@ -30,23 +36,31 @@ interface SystemPreferencesProps {
   };
 }
 
-export function SystemPreferences({ settings }: SystemPreferencesProps) {
+export function SystemPreferences({
+  settings,
+}: SystemPreferencesProps): JSX.Element {
   const [formData, setFormData] = useState(settings);
-  const [state, formAction, isPending] = useActionState(updateSystemSettingsAction, null);
+  const [state, formAction, isPending] = useActionState(
+    updateSystemSettingsAction,
+    null,
+  );
 
-  const handleSelectChange = (key: keyof typeof formData, value: string) => {
+  const handleSelectChange = (
+    key: keyof typeof formData,
+    value: string,
+  ): void => {
     if (key === "itemsPerPage") {
-      setFormData(prev => ({ ...prev, [key]: parseInt(value, 10) }));
+      setFormData((prev) => ({ ...prev, [key]: parseInt(value, 10) }));
     } else {
-      setFormData(prev => ({ ...prev, [key]: value }));
+      setFormData((prev) => ({ ...prev, [key]: value }));
     }
   };
 
   // Handle successful save
   useEffect(() => {
     if (state?.success) {
-      toast.success(state.message || "System preferences saved successfully!");
-    } else if (state && !state.success) {
+      toast.success(state.message ?? "System preferences saved successfully!");
+    } else if (state) {
       if (state.error) {
         toast.error(state.error);
       }
@@ -69,23 +83,41 @@ export function SystemPreferences({ settings }: SystemPreferencesProps) {
           </p>
           <Select
             value={formData.timezone}
-            onValueChange={(value) => { handleSelectChange("timezone", value); }}
+            onValueChange={(value) => {
+              handleSelectChange("timezone", value);
+            }}
             disabled={isPending}
           >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="UTC">UTC (Coordinated Universal Time)</SelectItem>
-              <SelectItem value="America/New_York">Eastern Time (ET)</SelectItem>
+              <SelectItem value="UTC">
+                UTC (Coordinated Universal Time)
+              </SelectItem>
+              <SelectItem value="America/New_York">
+                Eastern Time (ET)
+              </SelectItem>
               <SelectItem value="America/Chicago">Central Time (CT)</SelectItem>
               <SelectItem value="America/Denver">Mountain Time (MT)</SelectItem>
-              <SelectItem value="America/Los_Angeles">Pacific Time (PT)</SelectItem>
-              <SelectItem value="Europe/London">GMT (Greenwich Mean Time)</SelectItem>
-              <SelectItem value="Europe/Berlin">CET (Central European Time)</SelectItem>
-              <SelectItem value="Asia/Tokyo">JST (Japan Standard Time)</SelectItem>
-              <SelectItem value="Asia/Shanghai">CST (China Standard Time)</SelectItem>
-              <SelectItem value="Australia/Sydney">AEDT (Australian Eastern)</SelectItem>
+              <SelectItem value="America/Los_Angeles">
+                Pacific Time (PT)
+              </SelectItem>
+              <SelectItem value="Europe/London">
+                GMT (Greenwich Mean Time)
+              </SelectItem>
+              <SelectItem value="Europe/Berlin">
+                CET (Central European Time)
+              </SelectItem>
+              <SelectItem value="Asia/Tokyo">
+                JST (Japan Standard Time)
+              </SelectItem>
+              <SelectItem value="Asia/Shanghai">
+                CST (China Standard Time)
+              </SelectItem>
+              <SelectItem value="Australia/Sydney">
+                AEDT (Australian Eastern)
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -98,7 +130,9 @@ export function SystemPreferences({ settings }: SystemPreferencesProps) {
           </p>
           <Select
             value={formData.dateFormat}
-            onValueChange={(value) => { handleSelectChange("dateFormat", value); }}
+            onValueChange={(value) => {
+              handleSelectChange("dateFormat", value);
+            }}
             disabled={isPending}
           >
             <SelectTrigger>
@@ -107,15 +141,20 @@ export function SystemPreferences({ settings }: SystemPreferencesProps) {
             <SelectContent>
               <SelectItem value="MM/DD/YYYY">MM/DD/YYYY (US Format)</SelectItem>
               <SelectItem value="DD/MM/YYYY">DD/MM/YYYY (EU Format)</SelectItem>
-              <SelectItem value="YYYY-MM-DD">YYYY-MM-DD (ISO Format)</SelectItem>
-              <SelectItem value="MMM DD, YYYY">MMM DD, YYYY (Long Format)</SelectItem>
+              <SelectItem value="YYYY-MM-DD">
+                YYYY-MM-DD (ISO Format)
+              </SelectItem>
+              <SelectItem value="MMM DD, YYYY">
+                MMM DD, YYYY (Long Format)
+              </SelectItem>
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
-            Example: {new Date().toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: formData.dateFormat.includes('MMM') ? 'short' : '2-digit',
-              day: '2-digit'
+            Example:{" "}
+            {new Date().toLocaleDateString("en-US", {
+              year: "numeric",
+              month: formData.dateFormat.includes("MMM") ? "short" : "2-digit",
+              day: "2-digit",
             })}
           </p>
         </div>
@@ -131,7 +170,9 @@ export function SystemPreferences({ settings }: SystemPreferencesProps) {
           </p>
           <Select
             value={formData.theme}
-            onValueChange={(value) => { handleSelectChange("theme", value); }}
+            onValueChange={(value) => {
+              handleSelectChange("theme", value);
+            }}
             disabled={isPending}
           >
             <SelectTrigger>
@@ -156,7 +197,9 @@ export function SystemPreferences({ settings }: SystemPreferencesProps) {
           </p>
           <Select
             value={formData.language}
-            onValueChange={(value) => { handleSelectChange("language", value); }}
+            onValueChange={(value) => {
+              handleSelectChange("language", value);
+            }}
             disabled={isPending}
           >
             <SelectTrigger>
@@ -184,7 +227,7 @@ export function SystemPreferences({ settings }: SystemPreferencesProps) {
       {/* Display Preferences */}
       <div className="space-y-4">
         <h4 className="text-sm font-medium">Display Preferences</h4>
-        
+
         <div className="space-y-2">
           <Label>Items Per Page</Label>
           <p className="text-sm text-muted-foreground mb-2">
@@ -192,7 +235,9 @@ export function SystemPreferences({ settings }: SystemPreferencesProps) {
           </p>
           <Select
             value={formData.itemsPerPage.toString()}
-            onValueChange={(value) => { handleSelectChange("itemsPerPage", value); }}
+            onValueChange={(value) => {
+              handleSelectChange("itemsPerPage", value);
+            }}
             disabled={isPending}
           >
             <SelectTrigger className="w-full md:w-48">
@@ -210,12 +255,12 @@ export function SystemPreferences({ settings }: SystemPreferencesProps) {
 
       {/* Save Button */}
       <form action={formAction} className="pt-4">
-        <input 
-          type="hidden" 
-          name="settings" 
+        <input
+          type="hidden"
+          name="settings"
           value={JSON.stringify({ preferences: formData })}
         />
-        <Button 
+        <Button
           type="submit"
           disabled={isPending || !hasChanges}
           className="w-full"

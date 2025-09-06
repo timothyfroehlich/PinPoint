@@ -1,6 +1,6 @@
 import { organizationProcedure } from "./trpc.base";
 
-import type { PinPointSupabaseUser } from "~/lib/supabase/types";
+import type { PinPointSupabaseUser } from "~/lib/types";
 
 // Legacy session type for backward compatibility
 type Session = {

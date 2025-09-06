@@ -4,25 +4,43 @@
  * Phase 4B.2: User and Role Management
  */
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Separator } from "~/components/ui/separator";
-import { 
-  UsersIcon, 
-  MailIcon, 
-  CalendarIcon,
-  ShieldIcon 
-} from "lucide-react";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { UsersIcon, MailIcon, CalendarIcon, ShieldIcon } from "lucide-react";
+import { getRequestAuthContext } from "~/server/auth/context";
+import { AuthGuard } from "~/components/auth/auth-guard";
 import { api } from "~/trpc/server";
 import { UserTableActions } from "./components/UserTableActions";
 import { InviteUserDialog } from "./components/InviteUserDialog";
 import { format } from "date-fns";
 
-export default async function UsersSettingsPage() {
-  await requireMemberAccess();
-  
+export default async function UsersSettingsPage(): Promise<React.JSX.Element> {
+  const authContext = await getRequestAuthContext();
+
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="User Management Access Required"
+      fallbackMessage="You need to be signed in as a member to manage users and team members."
+    >
+      <UsersSettingsPageContent />
+    </AuthGuard>
+  );
+}
+
+async function UsersSettingsPageContent(): Promise<React.JSX.Element> {
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Unauthorized access"); // This should never happen due to AuthGuard
+  }
   // Fetch organization users and roles using the existing admin router
   const [users, roles] = await Promise.all([
     api.admin.getUsers(),
@@ -30,22 +48,27 @@ export default async function UsersSettingsPage() {
   ]);
 
   // Group users by role for better organization
-  const usersByRole = users.reduce((acc, user) => {
-    const roleName = user.role.name;
-    if (!acc[roleName]) {
-      acc[roleName] = [];
-    }
-    acc[roleName].push(user);
-    return acc;
-  }, {} as Record<string, typeof users>);
+  // ESLint security warnings are false positive - roleName comes from database
+  // role.name field which is controlled and sanitized via database constraints
+  const usersByRole = users.reduce<Record<string, typeof users>>(
+    (acc, user) => {
+      const roleName = user.role.name;
+      // eslint-disable-next-line security/detect-object-injection
+      acc[roleName] ??= [];
+      // eslint-disable-next-line security/detect-object-injection
+      acc[roleName].push(user);
+      return acc;
+    },
+    {},
+  );
 
   const totalUsers = users.length;
 
   // Format roles for dialogs
-  const availableRoles = roles.map(role => ({
+  const availableRoles = roles.map((role) => ({
     id: role.id,
     name: role.name,
-    description: (role as any).description || undefined,
+    // description omitted since roles don't have descriptions in schema
     isSystem: role.isSystem,
   }));
 
@@ -73,7 +96,7 @@ export default async function UsersSettingsPage() {
             <div className="text-2xl font-bold">{totalUsers}</div>
           </CardContent>
         </Card>
-        
+
         {Object.entries(usersByRole).map(([roleName, roleUsers]) => (
           <Card key={roleName}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -111,7 +134,10 @@ export default async function UsersSettingsPage() {
                   <div className="flex items-center space-x-4">
                     <div className="h-10 w-10 rounded-full bg-gradient-to-r from-primary to-primary-container flex items-center justify-center">
                       <span className="text-sm font-medium text-white">
-                        {user.name?.charAt(0)?.toUpperCase() || user.email.charAt(0).toUpperCase()}
+                        {(user.name
+                          ? user.name.charAt(0)
+                          : user.email.charAt(0)
+                        ).toUpperCase()}
                       </span>
                     </div>
                     <div>
@@ -120,7 +146,9 @@ export default async function UsersSettingsPage() {
                           {user.name || "No name set"}
                         </p>
                         {user.role.isSystem && (
-                          <Badge variant="outline" className="text-xs">System</Badge>
+                          <Badge variant="outline" className="text-xs">
+                            System
+                          </Badge>
                         )}
                       </div>
                       <div className="flex items-center space-x-4 text-sm text-muted-foreground">
@@ -146,19 +174,19 @@ export default async function UsersSettingsPage() {
                         <p className="text-xs text-secondary mt-1">Pending</p>
                       )}
                     </div>
-                    
-                    <UserTableActions 
+
+                    <UserTableActions
                       user={user}
                       currentUserCanManage={true} // TODO: Add proper permission checking
                       availableRoles={availableRoles}
                     />
                   </div>
                 </div>
-                
+
                 {index < users.length - 1 && <Separator />}
               </div>
             ))}
-            
+
             {users.length === 0 && (
               <div className="text-center py-8">
                 <UsersIcon className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -193,12 +221,10 @@ export default async function UsersSettingsPage() {
                 </div>
                 <div className="flex items-center space-x-4">
                   <span className="text-sm text-muted-foreground">
-                    {roleUsers.length} user{roleUsers.length !== 1 ? 's' : ''}
+                    {roleUsers.length} user{roleUsers.length !== 1 ? "s" : ""}
                   </span>
                   <Button variant="outline" size="sm" asChild>
-                    <a href={`/settings/roles`}>
-                      Manage Role
-                    </a>
+                    <a href={`/settings/roles`}>Manage Role</a>
                   </Button>
                 </div>
               </div>

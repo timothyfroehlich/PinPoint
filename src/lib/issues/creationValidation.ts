@@ -82,6 +82,13 @@ export function validateMachineOwnership(
   return { valid: true };
 }
 
+import {
+  titleSchema,
+  emailSchema,
+  LIMITS,
+  machineIdSchema,
+} from "~/lib/validation/schemas";
+
 /**
  * Validate issue creation input parameters
  * Pure function that validates basic input constraints
@@ -89,41 +96,43 @@ export function validateMachineOwnership(
 export function validateIssueCreationInput(
   input: PublicIssueCreationInput | AuthenticatedIssueCreationInput,
 ): ValidationResult {
-  if (!input.title || input.title.trim().length === 0) {
+  // Validate title via centralized schema
+  const titleStr = input.title;
+  const titleResult = titleSchema.safeParse(titleStr);
+  if (!titleResult.success) {
     return {
       valid: false,
-      error: "Title is required",
+      error: titleResult.error.issues[0]?.message ?? "Invalid title",
     };
   }
 
-  if (input.title.length > 255) {
-    return {
-      valid: false,
-      error: "Title must be 255 characters or less",
-    };
-  }
-
-  if (input.description && input.description.length > 2000) {
-    return {
-      valid: false,
-      error: "Description must be 2000 characters or less",
-    };
-  }
-
-  if (!input.machineId || input.machineId.trim().length === 0) {
-    return {
-      valid: false,
-      error: "Machine ID is required",
-    };
-  }
-
-  // Validate email format for public issues
-  if ("reporterEmail" in input && input.reporterEmail) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(input.reporterEmail)) {
+  // Validate optional description (use commentContentSchema for length constraints but allow empty)
+  if ("description" in input && input.description) {
+    const descTrimmed = (input.description || "").trim();
+    if (descTrimmed.length > LIMITS.DESCRIPTION_MAX) {
       return {
         valid: false,
-        error: "Invalid email format",
+        error: `Description must be ${String(LIMITS.DESCRIPTION_MAX)} characters or less`,
+      };
+    }
+  }
+
+  // Validate Machine ID using centralized schema
+  const machineIdResult = machineIdSchema.safeParse(input.machineId);
+  if (!machineIdResult.success) {
+    return {
+      valid: false,
+      error: machineIdResult.error.issues[0]?.message ?? "Invalid machine ID",
+    };
+  }
+
+  // Validate email format for public issues using centralized emailSchema
+  if ("reporterEmail" in input && input.reporterEmail) {
+    const emailResult = emailSchema.safeParse(input.reporterEmail);
+    if (!emailResult.success) {
+      return {
+        valid: false,
+        error: emailResult.error.issues[0]?.message ?? "Invalid email",
       };
     }
   }

@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useActionState, useEffect } from "react";
+import React, { useState, useActionState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -34,22 +34,25 @@ interface InviteUserDialogProps {
   availableRoles?: { id: string; name: string; description?: string }[];
 }
 
-export function InviteUserDialog({ children, availableRoles = [] }: InviteUserDialogProps) {
+export function InviteUserDialog({
+  children,
+  availableRoles = [],
+}: InviteUserDialogProps): JSX.Element {
   const [isOpen, setIsOpen] = useState(false);
   const [state, formAction, isPending] = useActionState(inviteUserAction, null);
 
   // Handle successful invitation
   useEffect(() => {
     if (state?.success) {
-      toast.success(state.message || "User invitation sent successfully!");
+      toast.success(state.message ?? "User invitation sent successfully!");
       setIsOpen(false);
-    } else if (state && !state.success) {
+    } else if (state) {
       // Handle field errors or general error
       if (state.fieldErrors) {
         // Display field-specific errors
         Object.entries(state.fieldErrors).forEach(([field, errors]) => {
           if (Array.isArray(errors)) {
-            errors.forEach(error => toast.error(`${field}: ${error}`));
+            errors.forEach((error) => toast.error(`${field}: ${error}`));
           }
         });
       } else if (state.error) {
@@ -61,19 +64,20 @@ export function InviteUserDialog({ children, availableRoles = [] }: InviteUserDi
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        {children || (
+        {children ?? (
           <Button>
             <UserPlusIcon className="mr-2 h-4 w-4" />
             Invite User
           </Button>
         )}
       </DialogTrigger>
-      
+
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Invite New User</DialogTitle>
           <DialogDescription>
-            Send an invitation to join your organization. They'll receive an email with setup instructions.
+            Send an invitation to join your organization. They'll receive an
+            email with setup instructions.
           </DialogDescription>
         </DialogHeader>
 
@@ -90,7 +94,9 @@ export function InviteUserDialog({ children, availableRoles = [] }: InviteUserDi
               disabled={isPending}
             />
             {state && !state.success && state.fieldErrors?.["email"] && (
-              <p className="text-xs text-destructive">{state.fieldErrors["email"][0]}</p>
+              <p className="text-xs text-destructive">
+                {state.fieldErrors["email"][0]}
+              </p>
             )}
           </div>
 
@@ -108,7 +114,9 @@ export function InviteUserDialog({ children, availableRoles = [] }: InviteUserDi
               Optional. They can set this up later during onboarding.
             </p>
             {state && !state.success && state.fieldErrors?.["name"] && (
-              <p className="text-xs text-destructive">{state.fieldErrors["name"][0]}</p>
+              <p className="text-xs text-destructive">
+                {state.fieldErrors["name"][0]}
+              </p>
             )}
           </div>
 
@@ -136,7 +144,9 @@ export function InviteUserDialog({ children, availableRoles = [] }: InviteUserDi
               Optional. If not selected, the default role will be assigned.
             </p>
             {state && !state.success && state.fieldErrors?.["roleId"] && (
-              <p className="text-xs text-destructive">{state.fieldErrors["roleId"][0]}</p>
+              <p className="text-xs text-destructive">
+                {state.fieldErrors["roleId"][0]}
+              </p>
             )}
           </div>
 
@@ -154,7 +164,9 @@ export function InviteUserDialog({ children, availableRoles = [] }: InviteUserDi
               This message will be included in the invitation email.
             </p>
             {state && !state.success && state.fieldErrors?.["message"] && (
-              <p className="text-xs text-destructive">{state.fieldErrors["message"][0]}</p>
+              <p className="text-xs text-destructive">
+                {state.fieldErrors["message"][0]}
+              </p>
             )}
           </div>
 
@@ -163,7 +175,9 @@ export function InviteUserDialog({ children, availableRoles = [] }: InviteUserDi
             <Button
               type="button"
               variant="outline"
-              onClick={() => { setIsOpen(false); }}
+              onClick={() => {
+                setIsOpen(false);
+              }}
               disabled={isPending}
             >
               Cancel

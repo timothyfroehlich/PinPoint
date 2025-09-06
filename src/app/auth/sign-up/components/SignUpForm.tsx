@@ -28,70 +28,64 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import {
-  signInWithOAuth,
-  sendMagicLink,
-  type ActionResult,
-} from "~/lib/actions/auth-actions";
+import { signInWithOAuth, sendMagicLink } from "~/lib/actions/auth-actions";
 import { type OrganizationOption } from "~/lib/dal/public-organizations";
-
-// API Response validation schema for security
-const organizationSelectOptionsSchema = z.object({
-  organizations: z.array(z.object({
-    id: z.string().min(1),
-    name: z.string().min(1),
-    subdomain: z.string().min(1)
-  })),
-  defaultOrganizationId: z.string().nullable()
-});
+import { organizationSelectOptionsSchema } from "~/lib/validation/schemas";
 
 // Type guard for safe organization access
 function isValidOrganizationArray(data: unknown): data is OrganizationOption[] {
-  return Array.isArray(data) && data.every(item => 
-    typeof item === 'object' && 
-    item !== null && 
-    'id' in item && 
-    'name' in item && 
-    'subdomain' in item &&
-    typeof item.id === 'string' &&
-    typeof item.name === 'string' &&
-    typeof item.subdomain === 'string'
+  return (
+    Array.isArray(data) &&
+    data.every((item): item is OrganizationOption => {
+      if (typeof item !== "object" || item === null) return false;
+
+      const obj = item as Record<string, unknown>;
+      return (
+        "id" in obj &&
+        "name" in obj &&
+        "subdomain" in obj &&
+        typeof obj["id"] === "string" &&
+        typeof obj["name"] === "string" &&
+        typeof obj["subdomain"] === "string"
+      );
+    })
   );
 }
 
-export function SignUpForm() {
-  const [magicLinkState, magicLinkAction, magicLinkPending] = useActionState<
-    ActionResult<{ message: string }> | null,
-    FormData
-  >(sendMagicLink, null);
+export function SignUpForm(): React.JSX.Element {
+  const [magicLinkState, magicLinkAction, magicLinkPending] = useActionState(
+    sendMagicLink,
+    null,
+  );
 
   const [isOAuthLoading, setIsOAuthLoading] = useState(false);
 
   // Organization selection state
   const [organizations, setOrganizations] = useState<OrganizationOption[]>([]);
-  const [selectedOrganizationId, setSelectedOrganizationId] = useState<string>("");
+  const [selectedOrganizationId, setSelectedOrganizationId] =
+    useState<string>("");
   const [organizationsLoading, setOrganizationsLoading] = useState(true);
 
   // Load organizations on component mount
   useEffect(() => {
-    async function loadOrganizations() {
+    async function loadOrganizations(): Promise<void> {
       try {
         const response = await fetch("/api/organizations/public");
         if (!response.ok) {
           throw new Error("Failed to fetch organizations");
         }
-        
+
         // Security: Validate API response to prevent injection attacks
-        const rawData = await response.json();
+        const rawData: unknown = await response.json();
         const validatedData = organizationSelectOptionsSchema.parse(rawData);
-        
+
         const { organizations: orgs, defaultOrganizationId } = validatedData;
-        
+
         // Additional defensive validation
         if (!isValidOrganizationArray(orgs)) {
           throw new Error("Invalid organization data structure");
         }
-        
+
         setOrganizations(orgs);
         setSelectedOrganizationId(defaultOrganizationId ?? orgs[0]?.id ?? "");
       } catch (error) {
@@ -104,16 +98,16 @@ export function SignUpForm() {
         setOrganizationsLoading(false);
       }
     }
-    
-    loadOrganizations();
+
+    void loadOrganizations();
   }, []);
 
-  const handleOAuthSignUp = async (provider: "google") => {
+  const handleOAuthSignUp = async (provider: "google"): Promise<void> => {
     if (!selectedOrganizationId) {
       alert("Please select an organization");
       return;
     }
-    
+
     setIsOAuthLoading(true);
     try {
       await signInWithOAuth(provider, selectedOrganizationId);
@@ -138,7 +132,9 @@ export function SignUpForm() {
           {organizationsLoading ? (
             <div className="flex items-center space-x-2">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
-              <span className="text-sm text-muted-foreground">Loading organizations...</span>
+              <span className="text-sm text-muted-foreground">
+                Loading organizations...
+              </span>
             </div>
           ) : (
             <Select
@@ -169,7 +165,7 @@ export function SignUpForm() {
 
         {/* Google OAuth */}
         <Button
-          onClick={() => handleOAuthSignUp("google")}
+          onClick={() => void handleOAuthSignUp("google")}
           disabled={isOAuthLoading || magicLinkPending}
           className="w-full"
           variant="outline"
@@ -225,10 +221,11 @@ export function SignUpForm() {
               required
               disabled={magicLinkPending || isOAuthLoading}
             />
-            {magicLinkState?.success === false &&
+            {magicLinkState &&
+              !magicLinkState.success &&
               magicLinkState.fieldErrors?.["email"] && (
                 <p className="text-sm text-error">
-                  {magicLinkState.fieldErrors["email"]}
+                  {magicLinkState.fieldErrors["email"][0]}
                 </p>
               )}
           </div>
@@ -257,7 +254,7 @@ export function SignUpForm() {
         </form>
 
         {/* Action Results */}
-        {magicLinkState?.success === true && (
+        {magicLinkState && magicLinkState.success && (
           <Alert className="border-tertiary bg-tertiary-container">
             <div className="text-on-tertiary-container">
               <p className="font-medium">Account creation initiated!</p>
@@ -266,14 +263,16 @@ export function SignUpForm() {
           </Alert>
         )}
 
-        {magicLinkState?.success === false && !magicLinkState.fieldErrors && (
-          <Alert className="border-error bg-error-container">
-            <div className="text-on-error-container">
-              <p className="font-medium">Account creation failed</p>
-              <p className="text-sm mt-1">{magicLinkState.error}</p>
-            </div>
-          </Alert>
-        )}
+        {magicLinkState &&
+          !magicLinkState.success &&
+          !magicLinkState.fieldErrors && (
+            <Alert className="border-error bg-error-container">
+              <div className="text-on-error-container">
+                <p className="font-medium">Account creation failed</p>
+                <p className="text-sm mt-1">{magicLinkState.error}</p>
+              </div>
+            </Alert>
+          )}
 
         <div className="text-xs text-center text-muted-foreground space-y-2">
           <p>
