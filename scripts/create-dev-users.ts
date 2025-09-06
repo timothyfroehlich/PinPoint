@@ -72,15 +72,12 @@ async function createDevUsers() {
   const rawSupabaseUrl = (
     process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
   ).trim();
-  const supabaseSecretKey = (
-    process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SECRET_KEY ?? ""
-  ).trim();
+  const supabaseSecretKey = (process.env.SUPABASE_SECRET_KEY ?? "").trim();
 
   if (!rawSupabaseUrl || !supabaseSecretKey) {
     console.error("❌ Missing required environment variables:");
     if (!rawSupabaseUrl) console.error("  - SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL)");
-    if (!supabaseSecretKey)
-      console.error("  - SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY)");
+    if (!supabaseSecretKey) console.error("  - SUPABASE_SECRET_KEY");
     process.exit(1);
   }
 
