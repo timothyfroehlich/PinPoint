@@ -35,7 +35,7 @@ import { type OrganizationOption } from "~/lib/dal/public-organizations";
 
 // Development auth integration
 import { authenticateDevUser, getAuthResultMessage } from "~/lib/auth/dev-auth";
-import { isDevAuthAvailable } from "~/lib/environment-client";
+import { isDevAuthAvailable, isPreview } from "~/lib/environment-client";
 import { createClient } from "~/utils/supabase/client";
 import { getCurrentDomain } from "~/lib/utils/domain";
 
@@ -129,22 +129,27 @@ export function SignInForm(): React.JSX.Element {
         );
         if (selectedOrg?.subdomain) {
           const currentSubdomain = window.location.hostname.split(".")[0];
+          const isLocalhost = window.location.hostname.includes("localhost");
 
-          if (currentSubdomain === selectedOrg.subdomain) {
-            // Already on correct subdomain, refresh to sync auth state then navigate
+          // In preview and local dev, avoid cross-domain redirect (wildcard subdomains may not exist)
+          if (isPreview() || isLocalhost) {
             router.refresh();
             await new Promise((resolve) => setTimeout(resolve, 200));
             router.push("/dashboard");
             return;
-          } else {
-            // Need to redirect to correct subdomain
-            const isLocalhost = window.location.hostname.includes("localhost");
-            const rootDomain = isLocalhost
-              ? "localhost:3000"
-              : getCurrentDomain();
+          }
+
+          if (currentSubdomain !== selectedOrg.subdomain) {
+            const rootDomain = getCurrentDomain();
             window.location.href = `${window.location.protocol}//${selectedOrg.subdomain}.${rootDomain}/dashboard`;
             return;
           }
+
+          // Already on correct subdomain (production)
+          router.refresh();
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          router.push("/dashboard");
+          return;
         }
 
         // Fallback: regular navigation if no organization selected
