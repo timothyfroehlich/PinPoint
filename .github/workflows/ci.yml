@@ -97,6 +97,9 @@ jobs:
       - name: ESLint SARIF Report
         run: npm run lint:sarif
         continue-on-error: true
+        env:
+          # Use test environment for SARIF generation to avoid requiring production environment variables
+          NODE_ENV: test
       - name: Upload ESLint SARIF results
         uses: github/codeql-action/upload-sarif@181d5eefc20863364f96762470ba6f862bdef56b # v3
         if: always()
@@ -146,15 +149,18 @@ jobs:
       - run: npm ci
       - name: Run Tests (${{ matrix.shard }}) with Coverage
         run: |
+          # Temporary simplified test setup - using unified config until projects are working
           case "${{ matrix.shard }}" in
             "unit-node")
-              npx vitest run --coverage --project=node --coverage.thresholds=false
+              npx vitest run --coverage --coverage.thresholds=false
               ;;
             "unit-jsdom")
-              npx vitest run --coverage --project=jsdom --coverage.thresholds=false
+              # For now, run the same tests since we have unified config
+              npx vitest run --coverage --coverage.thresholds=false
               ;;
             "integration")
-              npx vitest run --coverage --project=integration --coverage.thresholds=false
+              # For now, run the same tests since we have unified config
+              npx vitest run --coverage --coverage.thresholds=false
               ;;
           esac
       - name: Upload Coverage (${{ matrix.shard }})
@@ -174,7 +180,7 @@ jobs:
       contents: read
     services:
       postgres:
-        image: postgres:15
+        image: postgres:17
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: postgres
@@ -197,15 +203,33 @@ jobs:
           node-version: "24"
           cache: "npm"
       - run: npm ci
-      - name: Install pgTAP
+      - name: Install pg_prove and setup database for RLS testing
         run: |
+          # Add PostgreSQL 17 repository
           sudo apt-get update
-          sudo apt-get install -y postgresql-15-pgtap libtap-parser-sourcehandler-pgtap-perl
-      - name: Setup database for RLS testing
-        run: |
+          sudo apt-get install -y wget ca-certificates
+          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+          echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          
+          # Install PostgreSQL client tools and pg_prove
+          sudo apt-get install -y postgresql-client-17 libtap-parser-sourcehandler-pgtap-perl
+          
+          # Download and setup pgTAP (following established pattern)
+          wget https://github.com/theory/pgtap/archive/refs/tags/v1.3.3.tar.gz
+          tar -xzf "v1.3.3.tar.gz"
+          
+          # Generate pgTAP SQL files (this is the missing step!)
+          cd pgtap-1.3.3
+          make
+          cd ..
+          
+          # Setup database schema
           npm run db:push:local
-          psql $DATABASE_URL -c "CREATE EXTENSION IF NOT EXISTS pgtap;"
-          psql $DATABASE_URL -f supabase/tests/setup/01-test-roles.sql
+          
+          # Load pgTAP directly from SQL file (standard pattern)
+          psql "$DATABASE_URL" -f pgtap-1.3.3/sql/pgtap.sql
+          psql "$DATABASE_URL" -f supabase/tests/setup/01-test-roles.sql
       - name: Run pgTAP RLS tests
         run: |
           if [ -d "supabase/tests/rls" ] && [ -n "$(find supabase/tests/rls -name "*.test.sql" 2>/dev/null)" ]; then

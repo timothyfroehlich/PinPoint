@@ -1,0 +1,108 @@
+name: pgTAP RLS Tests (Supabase)
+
+# Dedicated workflow to evaluate Supabase CLI performance for RLS testing
+# Separate from main CI to avoid blocking other tests if Supabase is slow
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/tests/**'
+      - 'src/server/db/schema/**'
+      - 'supabase/migrations/**'
+      - '.github/workflows/pgtap-rls-supabase.yml'
+  pull_request:
+    paths:
+      - 'supabase/tests/**'
+      - 'src/server/db/schema/**'
+      - 'supabase/migrations/**' 
+      - '.github/workflows/pgtap-rls-supabase.yml'
+
+env:
+  CI: true
+  NODE_ENV: test
+
+# Cancel in-progress runs for the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rls-tests:
+    name: pgTAP RLS Validation (Supabase)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15  # Generous timeout to handle Supabase startup
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: "npm"
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      
+      - name: Start Supabase
+        run: |
+          echo "🚀 Starting Supabase for pgTAP RLS testing..."
+          # Initialize if no config exists
+          if [ ! -f "supabase/config.toml" ]; then
+            echo "No Supabase config found, initializing..."
+            supabase init
+          fi
+          
+          # Start Supabase with minimal services for faster startup
+          supabase start
+          
+          echo "✅ Supabase started successfully"
+          
+      - name: Verify Supabase Connection
+        run: |
+          echo "🔍 Verifying Supabase database connection..."
+          
+          # Test basic connectivity
+          npm run db:push:local
+          
+          # Verify auth functions are available
+          psql "postgresql://postgres:postgres@localhost:54322/postgres" -c "SELECT auth.uid() IS NOT NULL as auth_function_available;" || echo "Auth function check failed (expected if no session)"
+          
+          echo "✅ Database connection verified"
+      
+      - name: Run pgTAP RLS Tests
+        run: |
+          echo "🧪 Running pgTAP RLS tests against Supabase..."
+          
+          # Run RLS tests with proper DATABASE_URL for Supabase
+          export DATABASE_URL="postgresql://postgres:postgres@localhost:54322/postgres"
+          npm run test:rls
+          
+          echo "✅ pgTAP RLS tests completed"
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "🧹 Cleaning up Supabase..."
+          supabase stop || true
+          echo "✅ Cleanup completed"
+      
+      - name: Performance Summary
+        if: always()
+        run: |
+          echo "## 📊 Workflow Performance Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workflow Duration**: Check job timeline above" >> $GITHUB_STEP_SUMMARY
+          echo "- **Supabase Startup**: Monitor 'Start Supabase' step duration" >> $GITHUB_STEP_SUMMARY
+          echo "- **Test Execution**: Monitor 'Run pgTAP RLS Tests' step duration" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Goal**: Evaluate if Supabase CLI is viable for CI RLS testing" >> $GITHUB_STEP_SUMMARY
+          echo "**Alternative**: Use preview database if this workflow is too slow" >> $GITHUB_STEP_SUMMARY

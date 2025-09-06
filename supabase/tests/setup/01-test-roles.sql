@@ -3,7 +3,23 @@
 -- See: docs/testing/dual-track-testing-strategy.md
 
 -- Install pgTAP extension for RLS testing (development/testing only)
-CREATE EXTENSION IF NOT EXISTS pgtap;
+-- Skip if already loaded as SQL functions (e.g., in CI environments)
+DO $$
+BEGIN
+  -- Check if pgTAP functions are already available
+  PERFORM plan(1);
+  RAISE NOTICE 'pgTAP functions already available, skipping extension installation';
+EXCEPTION WHEN undefined_function THEN
+  -- pgTAP functions not available, try to install as extension
+  BEGIN
+    CREATE EXTENSION IF NOT EXISTS pgtap;
+    RAISE NOTICE 'pgTAP extension installed successfully';
+  EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'Could not install pgTAP extension: %', SQLERRM;
+    RAISE EXCEPTION 'pgTAP is required but not available. Please install pgTAP or load it as SQL functions.';
+  END;
+END
+$$;
 
 DO $$
 BEGIN

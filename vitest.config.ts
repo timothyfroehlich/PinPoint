@@ -1,8 +1,8 @@
 /**
  * Simplified Vitest Configuration for PinPoint
  *
- * Minimal configuration to support basic test functionality during
- * test system reboot. Supports single unit test and future archetype system.
+ * Back to single-project setup while we fix the CI issues.
+ * The multi-project setup can be re-enabled once the basic tests are working.
  */
 /// <reference types="vitest" />
 import { defineConfig } from "vitest/config";
@@ -47,6 +47,13 @@ export default defineConfig({
       ],
     },
     include: ["src/**/*.test.{ts,tsx}"],
-    exclude: ["node_modules", "e2e", ".next"],
+    exclude: [
+      "node_modules",
+      "e2e/**",
+      ".next/**",
+      ".archived-tests-*/**",
+      "**/e2e/**",
+      "**/*.e2e.test.*",
+    ],
   },
 });
