@@ -1,8 +1,9 @@
-import type { NextRequest} from "next/server";
+import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSearchSuggestions } from "~/lib/services/search-service";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
+import { isError, getErrorMessage } from "~/lib/utils/type-guards";
 
 const SuggestionsQuerySchema = z.object({
   q: z.string().min(2, "Query must be at least 2 characters"),
@@ -15,22 +16,34 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Extract and validate query parameters
     const { searchParams } = new URL(request.url);
     const queryParams = Object.fromEntries(searchParams.entries());
-    
+
     const { q: query, limit } = SuggestionsQuerySchema.parse(queryParams);
 
-    // Require authentication and organization context
-    const { organization } = await requireMemberAccess();
-    const organizationId = organization.id;
+    const auth = await getRequestAuthContext();
+    if (auth.kind !== "authorized") {
+      return NextResponse.json(
+        {
+          error: "Authentication required",
+          message: "Member access required",
+          timestamp: new Date().toISOString(),
+        },
+        { status: 401 },
+      );
+    }
+    const organizationId = auth.org.id;
 
     // Get search suggestions
-    const suggestions = await getSearchSuggestions(query, organizationId, limit);
+    const suggestions = await getSearchSuggestions(
+      query,
+      organizationId,
+      limit,
+    );
 
     return NextResponse.json({
       suggestions,
       query,
       timestamp: new Date().toISOString(),
     });
-
   } catch (error) {
     console.error("Search suggestions error:", error);
 
@@ -42,19 +55,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           details: error.issues,
           timestamp: new Date().toISOString(),
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Handle authentication errors
-    if (error instanceof Error && error.message.includes("required")) {
+    if (isError(error) && error.message.includes("required")) {
       return NextResponse.json(
         {
           error: "Authentication required",
           message: error.message,
           timestamp: new Date().toISOString(),
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -62,10 +75,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json(
       {
         error: "Internal server error",
-        message: error instanceof Error ? error.message : "Unknown error",
+        message: getErrorMessage(error),
         timestamp: new Date().toISOString(),
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

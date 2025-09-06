@@ -1,10 +1,10 @@
 import { createBrowserClient } from "@supabase/ssr";
-import type { TypedSupabaseClient } from "~/types/supabase-client";
+import type { TypedSupabaseClient } from "~/lib/types";
 import { env } from "~/env";
 
 /**
  * Creates a Supabase client for use in browser (client) components.
- * 
+ *
  * This is the unified Supabase client that works consistently with:
  * - Server-side middleware session management
  * - Modern @supabase/ssr browser client patterns
@@ -13,18 +13,21 @@ import { env } from "~/env";
  */
 export function createClient(): TypedSupabaseClient {
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error(
-      "Supabase environment variables (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY) are required for client creation"
+      "Supabase environment variables (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) are required for client creation",
     );
   }
 
-  return createBrowserClient(supabaseUrl, supabaseAnonKey) as unknown as TypedSupabaseClient;
+  return createBrowserClient(
+    supabaseUrl,
+    supabaseAnonKey,
+  ) as unknown as TypedSupabaseClient;
 }
 
-// Singleton instance for performance optimization  
+// Singleton instance for performance optimization
 let clientInstance: TypedSupabaseClient | null = null;
 
 /**
@@ -36,5 +39,6 @@ export function getClient(): TypedSupabaseClient {
   return clientInstance;
 }
 
-// Export types for TypeScript IntelliSense
-export type SupabaseBrowserClient = TypedSupabaseClient;
+// Types are now centralized in ~/lib/types/auth.ts
+// Re-export for backwards compatibility
+export type { SupabaseBrowserClient } from "~/lib/types";

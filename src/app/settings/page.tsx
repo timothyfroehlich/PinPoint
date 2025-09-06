@@ -4,8 +4,15 @@
  * Phase 4B: Essential Administrative Interfaces
  */
 
+import React from "react";
 import Link from "next/link";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import {
   BuildingIcon,
@@ -15,12 +22,31 @@ import {
   ShieldIcon,
   ArrowRightIcon,
 } from "lucide-react";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 import { getCurrentOrganization } from "~/lib/dal/organizations";
+import { AuthGuard } from "~/components/auth/auth-guard";
 
-export default async function SettingsPage() {
-  const { user } = await requireMemberAccess();
-  const orgDetails = await getCurrentOrganization();
+export default async function SettingsPage(): Promise<React.JSX.Element> {
+  const authContext = await getRequestAuthContext();
+
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Settings Access Required"
+      fallbackMessage="You need to be signed in as a member to view settings."
+    >
+      <SettingsPageContent />
+    </AuthGuard>
+  );
+}
+
+async function SettingsPageContent(): Promise<React.JSX.Element> {
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Unauthorized access"); // This should never happen due to AuthGuard
+  }
+  const { user } = authContext;
+  const orgDetails = await getCurrentOrganization(authContext.org.id);
 
   const settingsCards = [
     {
@@ -31,7 +57,7 @@ export default async function SettingsPage() {
       stats: orgDetails.name,
     },
     {
-      title: "Users & Roles", 
+      title: "Users & Roles",
       description: "Manage team members, roles, and permissions",
       href: "/settings/users",
       icon: UsersIcon,
@@ -40,7 +66,7 @@ export default async function SettingsPage() {
     {
       title: "Role Management",
       description: "Configure roles and permission templates",
-      href: "/settings/roles", 
+      href: "/settings/roles",
       icon: ShieldIcon,
       stats: "Manage roles",
     },

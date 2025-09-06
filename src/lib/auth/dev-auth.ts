@@ -15,26 +15,13 @@
  * when the user upgrades their Supabase plan.
  */
 
-import type { SupabaseClient } from "@supabase/supabase-js";
-
 import { shouldEnableDevFeatures } from "~/lib/environment-client";
-
-export interface DevUserData {
-  email: string;
-  name?: string;
-  role?: string;
-  organizationId?: string;
-}
-
-/**
- * Result of a dev authentication attempt
- */
-export interface DevAuthResult {
-  success: boolean;
-  error?: string;
-  method?: "existing" | "signed_in";
-  requiresEmailConfirmation?: boolean;
-}
+import type {
+  DevUserData,
+  DevAuthResult,
+  TypedSupabaseClient,
+} from "~/lib/types";
+import { isError, isErrorWithStatus } from "~/lib/utils/type-guards";
 
 /**
  * Fixed password for all dev users
@@ -66,7 +53,7 @@ function isValidDevEmail(email: string): boolean {
  * No OTP or email confirmation required
  */
 async function signInDevUser(
-  clientSupabase: SupabaseClient,
+  clientSupabase: TypedSupabaseClient,
   email: string,
 ): Promise<DevAuthResult> {
   try {
@@ -82,34 +69,28 @@ async function signInDevUser(
     if (error) {
       // Log detailed error information for debugging
       console.error(`Dev sign-in failed for ${email.replace(/\n|\r/g, "")}:`, {
-        code: error.status,
-        message: error.message,
+        code: isErrorWithStatus(error) ? error.status : undefined,
+        message: isError(error) ? error.message : String(error),
         possibleCauses: [
-          error.message.includes("Invalid login credentials")
+          isError(error) && error.message.includes("Invalid login credentials")
             ? "User doesn't exist or wrong password"
             : null,
-          error.message.includes("Email not confirmed")
+          isError(error) && error.message.includes("Email not confirmed")
             ? "Email needs confirmation"
             : null,
-          error.message.includes("Too many requests") ? "Rate limited" : null,
+          isError(error) && error.message.includes("Too many requests")
+            ? "Rate limited"
+            : null,
         ].filter(Boolean),
       });
 
       return {
         success: false,
-        error: `Sign-in failed: ${error.message}`,
+        error: `Sign-in failed: ${isError(error) ? error.message : String(error)}`,
       };
     }
 
-    if (!data.user) {
-      console.error(
-        `Sign-in succeeded but no user data returned for: ${email.replace(/\n|\r/g, "")}`,
-      );
-      return {
-        success: false,
-        error: "Sign-in succeeded but no user data returned",
-      };
-    }
+    // On successful sign-in, Supabase should return a user
 
     console.log(
       `Dev user signed in successfully: ${email.replace(/\n|\r/g, "")} (ID: ${data.user.id})`,
@@ -120,7 +101,7 @@ async function signInDevUser(
       requiresEmailConfirmation: false,
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage = isError(error) ? error.message : String(error);
     console.error(
       `Dev sign-in exception for ${email.replace(/\n|\r/g, "")}:`,
       errorMessage,
@@ -137,7 +118,7 @@ async function signInDevUser(
  * This provides the "click button, immediately logged in" experience for seeded users only
  */
 export async function authenticateDevUser(
-  clientSupabase: SupabaseClient,
+  clientSupabase: TypedSupabaseClient,
   userData: DevUserData,
 ): Promise<DevAuthResult> {
   // Environment safety check
@@ -177,7 +158,7 @@ export async function authenticateDevUser(
 
     // Sign-in failed - provide detailed error information for debugging
     console.error(
-      `Dev sign-in failed for ${userData.email.replace(/\n|\r/g, "")}: ${signInResult.error}`,
+      `Dev sign-in failed for ${userData.email.replace(/\n|\r/g, "")}: ${signInResult.error ?? ""}`,
     );
 
     return {
@@ -187,10 +168,10 @@ export async function authenticateDevUser(
         `1. Database wasn't properly seeded (run 'npm run db:reset')\n` +
         `2. User exists but password doesn't match expected dev password\n` +
         `3. Email confirmation issues\n` +
-        `Specific error: ${signInResult.error}`,
+        `Specific error: ${signInResult.error ?? ""}`,
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage = isError(error) ? error.message : String(error);
     console.error("Dev authentication error:", errorMessage);
     return {
       success: false,

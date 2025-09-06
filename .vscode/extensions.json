@@ -1,0 +1,36 @@
+{
+  "recommendations": [
+    // Core Development - Essential
+    "ms-vscode.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "usernamehw.errorlens",
+
+    // TypeScript & Next.js Development  
+    "bradlc.vscode-tailwindcss",
+    "formulahendry.auto-rename-tag",
+
+
+    // Code Quality & Security
+    "ms-vscode.vscode-json",
+    "redhat.vscode-yaml",
+
+    // Database & API Development (for Supabase/Drizzle)
+    "ms-ossdata.vscode-postgresql",
+    
+    // React & Component Development
+    "dsznajder.es7-react-js-snippets",
+    
+    // Markdown & Documentation
+    "yzhang.markdown-all-in-one",
+    
+    // Testing Integration (for Vitest/Playwright)
+    "ms-playwright.playwright"
+  ],
+  "unwantedRecommendations": [
+    // Avoid these extensions that conflict with our stack
+    "ms-vscode.vscode-typescript-next",
+    "hookyqr.beautify",
+    "esbenp.prettier-vscode-legacy",
+    "dbaeumer.vscode-eslint-legacy"
+  ]
+}

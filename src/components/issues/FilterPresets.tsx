@@ -25,22 +25,22 @@ interface FilterPreset {
 
 interface FilterPresetsProps {
   currentUserId?: string | undefined;
-  onPresetClick: (filters: FilterPreset['filters']) => void;
+  onPresetClick: (filters: FilterPreset["filters"]) => void;
   activePresetId?: string | undefined;
   className?: string | undefined;
 }
 
-export function FilterPresets({ 
-  currentUserId, 
-  onPresetClick, 
+export function FilterPresets({
+  currentUserId,
+  onPresetClick,
   activePresetId,
-  className 
-}: FilterPresetsProps) {
+  className,
+}: FilterPresetsProps): JSX.Element {
   // Define preset filter combinations
   const presets: FilterPreset[] = [
     {
       id: "my-issues",
-      label: "My Issues", 
+      label: "My Issues",
       icon: <User className="h-4 w-4" />,
       description: "Issues assigned to me",
       filters: {
@@ -83,18 +83,20 @@ export function FilterPresets({
       <span className="text-sm font-medium text-muted-foreground">
         Quick Filters:
       </span>
-      {presets.map((preset) => {
+      {presets.map((preset): JSX.Element => {
         const isActive = activePresetId === preset.id;
-        
+
         return (
           <Button
             key={preset.id}
             variant={isActive ? "default" : "outline"}
             size="sm"
-            onClick={() => onPresetClick(preset.filters)}
+            onClick={(): void => {
+              onPresetClick(preset.filters);
+            }}
             className={cn(
               "h-8 px-3",
-              isActive && "bg-primary text-primary-foreground"
+              isActive && "bg-primary text-primary-foreground",
             )}
             title={preset.description}
           >
@@ -105,12 +107,14 @@ export function FilterPresets({
           </Button>
         );
       })}
-      
+
       {/* Clear All Filters */}
       <Button
         variant="ghost"
         size="sm"
-        onClick={() => onPresetClick({})}
+        onClick={(): void => {
+          onPresetClick({});
+        }}
         className="h-8 px-3 text-muted-foreground"
         title="Clear all filters"
       >

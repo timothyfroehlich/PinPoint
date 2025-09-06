@@ -8,47 +8,55 @@
 
 import { revalidateTag, revalidatePath } from "next/cache";
 import { z } from "zod";
+import { nameSchema, idSchema } from "~/lib/validation/schemas";
 import { eq, and, inArray } from "drizzle-orm";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 import { db } from "~/lib/dal/shared";
 import { machines } from "~/server/db/schema";
-import { generateMachineQRCode, validateQRCodeParams } from "~/lib/services/qr-code-service";
+import {
+  generateMachineQRCode,
+  validateQRCodeParams,
+} from "~/lib/services/qr-code-service";
 import type { ActionResult } from "~/lib/actions/shared";
+import { validateFormData } from "~/lib/actions/shared";
 
 // ================================
 // VALIDATION SCHEMAS
 // ================================
 
 const CreateMachineSchema = z.object({
-  name: z
-    .string()
-    .min(1, "Machine name is required")
-    .max(100, "Machine name too long"),
-  locationId: z.string().min(1, "Location is required"),
-  modelId: z.string().min(1, "Model is required"),
-  ownerId: z.string().optional(),
+  name: nameSchema,
+  locationId: idSchema,
+  modelId: idSchema,
+  ownerId: idSchema.optional(),
 });
 
+// Explicit type for better TypeScript inference
+type CreateMachineData = z.infer<typeof CreateMachineSchema>;
+
 const UpdateMachineSchema = CreateMachineSchema.partial().extend({
-  id: z.string().min(1, "Machine ID is required"),
+  id: idSchema,
 });
+
+// Explicit type for better TypeScript inference
+type UpdateMachineData = z.infer<typeof UpdateMachineSchema>;
 
 const BulkUpdateMachineSchema = z.object({
   machineIds: z
-    .array(z.string())
+    .array(idSchema)
     .min(1, "At least one machine must be selected")
     .max(50, "Cannot process more than 50 machines at once"),
-  locationId: z.string().optional(),
-  ownerId: z.string().optional(),
+  locationId: idSchema.optional(),
+  ownerId: idSchema.optional(),
 });
 
 const GenerateQRCodeSchema = z.object({
-  machineId: z.string().min(1, "Machine ID is required"),
+  machineId: idSchema,
 });
 
 const BulkQRGenerateSchema = z.object({
   machineIds: z
-    .array(z.string())
+    .array(idSchema)
     .min(1, "At least one machine must be selected")
     .max(50, "Cannot process more than 50 machines at once"),
 });
@@ -60,46 +68,52 @@ const BulkQRGenerateSchema = z.object({
 export async function createMachineAction(
   formData: FormData,
 ): Promise<ActionResult<{ machineId: string }>> {
-  const { organization } = await requireMemberAccess();
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
+  const { org: organization } = authContext;
   const organizationId = organization.id;
 
-  const result = CreateMachineSchema.safeParse({
-    name: formData.get("name"),
-    locationId: formData.get("locationId"),
-    modelId: formData.get("modelId"),
-    ownerId: formData.get("ownerId") || undefined,
-  });
-
-  if (!result.success) {
-    return {
-      success: false,
-      error: "Validation failed",
-      fieldErrors: result.error.flatten().fieldErrors,
-    };
+  // Enhanced validation with validateFormData
+  const validation: ActionResult<CreateMachineData> = validateFormData(
+    formData,
+    CreateMachineSchema,
+  );
+  if (!validation.success) {
+    return validation;
   }
 
   try {
     // Create machine with organization scoping
-    const [machine] = await db
+    const machineResult = await db
       .insert(machines)
       .values({
         id: crypto.randomUUID(),
-        name: result.data.name,
+        name: validation.data.name,
         organization_id: organizationId,
-        location_id: result.data.locationId,
-        model_id: result.data.modelId,
-        owner_id: result.data.ownerId || null,
+        location_id: validation.data.locationId,
+        model_id: validation.data.modelId,
+        owner_id: validation.data.ownerId ?? null,
         created_at: new Date(),
         updated_at: new Date(),
       })
       .returning({ id: machines.id });
+
+    const [machine] = machineResult;
+    if (!machine) {
+      return {
+        success: false,
+        error: "Failed to create machine. No data returned.",
+      };
+    }
 
     // Cache invalidation
     revalidateTag(`machines-${organizationId}`);
     revalidateTag(`dashboard-${organizationId}`);
     revalidatePath("/machines");
 
-    return { success: true, data: { machineId: machine!.id } };
+    return { success: true, data: { machineId: machine.id } };
   } catch (error) {
     console.error("Create machine error:", error);
     return {
@@ -112,23 +126,20 @@ export async function createMachineAction(
 export async function updateMachineAction(
   formData: FormData,
 ): Promise<ActionResult<{ machineId: string }>> {
-  const { organization } = await requireMemberAccess();
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
+  const { org: organization } = authContext;
   const organizationId = organization.id;
 
-  const result = UpdateMachineSchema.safeParse({
-    id: formData.get("id"),
-    name: formData.get("name"),
-    locationId: formData.get("locationId"),
-    modelId: formData.get("modelId"),
-    ownerId: formData.get("ownerId") || undefined,
-  });
-
-  if (!result.success) {
-    return {
-      success: false,
-      error: "Validation failed",
-      fieldErrors: result.error.flatten().fieldErrors,
-    };
+  // Enhanced validation with validateFormData
+  const validation: ActionResult<UpdateMachineData> = validateFormData(
+    formData,
+    UpdateMachineSchema,
+  );
+  if (!validation.success) {
+    return validation;
   }
 
   try {
@@ -137,23 +148,26 @@ export async function updateMachineAction(
       updated_at: new Date(),
     };
 
-    if (result.data.name) updateData.name = result.data.name;
-    if (result.data.locationId) updateData.location_id = result.data.locationId;
-    if (result.data.modelId) updateData.model_id = result.data.modelId;
-    if (result.data.ownerId !== undefined)
-      updateData.owner_id = result.data.ownerId || null;
+    if (validation.data.name) updateData.name = validation.data.name;
+    if (validation.data.locationId)
+      updateData.location_id = validation.data.locationId;
+    if (validation.data.modelId) updateData.model_id = validation.data.modelId;
+    if (validation.data.ownerId !== undefined)
+      updateData.owner_id = validation.data.ownerId ?? null;
 
     // Update with organization scoping
-    const [updatedMachine] = await db
+    const updatedMachineResult = await db
       .update(machines)
       .set(updateData)
       .where(
         and(
-          eq(machines.id, result.data.id),
+          eq(machines.id, validation.data.id),
           eq(machines.organization_id, organizationId),
         ),
       )
       .returning({ id: machines.id });
+
+    const [updatedMachine] = updatedMachineResult;
 
     if (!updatedMachine) {
       return {
@@ -163,12 +177,12 @@ export async function updateMachineAction(
     }
 
     // Cache invalidation
-    revalidateTag(`machine-${result.data.id}`);
+    revalidateTag(`machine-${updatedMachine.id}`);
     revalidateTag(`machines-${organizationId}`);
-    revalidatePath(`/machines/${result.data.id}`);
+    revalidatePath(`/machines/${updatedMachine.id}`);
     revalidatePath("/machines");
 
-    return { success: true, data: { machineId: result.data.id } };
+    return { success: true, data: { machineId: updatedMachine.id } };
   } catch (error) {
     console.error("Update machine error:", error);
     return {
@@ -181,7 +195,11 @@ export async function updateMachineAction(
 export async function deleteMachineAction(
   machineId: string,
 ): Promise<ActionResult<{ deleted: boolean }>> {
-  const { organization } = await requireMemberAccess();
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
+  const { org: organization } = authContext;
   const organizationId = organization.id;
 
   if (!machineId) {
@@ -193,7 +211,7 @@ export async function deleteMachineAction(
 
   try {
     // Delete with organization scoping
-    const [deletedMachine] = await db
+    const deletedMachineResult = await db
       .delete(machines)
       .where(
         and(
@@ -202,6 +220,8 @@ export async function deleteMachineAction(
         ),
       )
       .returning({ id: machines.id });
+
+    const [deletedMachine] = deletedMachineResult;
 
     if (!deletedMachine) {
       return {
@@ -232,23 +252,32 @@ export async function deleteMachineAction(
 export async function bulkUpdateMachinesAction(
   formData: FormData,
 ): Promise<ActionResult<{ updatedCount: number }>> {
-  const { organization } = await requireMemberAccess();
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
+  const { org: organization } = authContext;
   const organizationId = organization.id;
 
-  const machineIdsString = formData.get("machineIds") as string;
+  const machineIdsValue = formData.get("machineIds");
+  const machineIdsString =
+    typeof machineIdsValue === "string" ? machineIdsValue : "";
   const machineIds = machineIdsString ? machineIdsString.split(",") : [];
 
-  const result = BulkUpdateMachineSchema.safeParse({
+  // Enhanced validation with validateFormData (using parsed machineIds)
+  const locationIdValue = formData.get("locationId");
+  const ownerIdValue = formData.get("ownerId");
+  const bulkData = {
     machineIds,
-    locationId: formData.get("locationId") || undefined,
-    ownerId: formData.get("ownerId") || undefined,
-  });
-
-  if (!result.success) {
+    locationId:
+      typeof locationIdValue === "string" ? locationIdValue : undefined,
+    ownerId: typeof ownerIdValue === "string" ? ownerIdValue : undefined,
+  };
+  const validation = BulkUpdateMachineSchema.safeParse(bulkData);
+  if (!validation.success) {
     return {
       success: false,
       error: "Validation failed",
-      fieldErrors: result.error.flatten().fieldErrors,
     };
   }
 
@@ -258,9 +287,10 @@ export async function bulkUpdateMachinesAction(
       updated_at: new Date(),
     };
 
-    if (result.data.locationId) updateData.location_id = result.data.locationId;
-    if (result.data.ownerId !== undefined)
-      updateData.owner_id = result.data.ownerId || null;
+    if (validation.data.locationId)
+      updateData.location_id = validation.data.locationId;
+    if (validation.data.ownerId !== undefined)
+      updateData.owner_id = validation.data.ownerId ?? null;
 
     // Update machines with organization scoping using inArray for multiple IDs
     const updatedMachines = await db
@@ -270,7 +300,7 @@ export async function bulkUpdateMachinesAction(
         and(
           eq(machines.organization_id, organizationId),
           // Use inArray for proper multiple ID handling
-          inArray(machines.id, result.data.machineIds)
+          inArray(machines.id, validation.data.machineIds),
         ),
       )
       .returning({ id: machines.id });
@@ -296,18 +326,22 @@ export async function bulkUpdateMachinesAction(
 export async function generateQRCodeAction(
   formData: FormData,
 ): Promise<ActionResult<{ qrCodeUrl: string }>> {
-  const { organization } = await requireMemberAccess();
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
+  const { org: organization } = authContext;
   const organizationId = organization.id;
 
+  const machineIdValue = formData.get("machineId");
   const result = GenerateQRCodeSchema.safeParse({
-    machineId: formData.get("machineId"),
+    machineId: typeof machineIdValue === "string" ? machineIdValue : "",
   });
 
   if (!result.success) {
     return {
       success: false,
       error: "Validation failed",
-      fieldErrors: result.error.flatten().fieldErrors,
     };
   }
 
@@ -324,7 +358,7 @@ export async function generateQRCodeAction(
     const qrCode = await generateMachineQRCode(result.data.machineId);
 
     // Update machine with QR code information
-    const [updatedMachine] = await db
+    const updatedMachineResult = await db
       .update(machines)
       .set({
         qr_code_id: qrCode.id,
@@ -339,6 +373,8 @@ export async function generateQRCodeAction(
         ),
       )
       .returning({ id: machines.id });
+
+    const [updatedMachine] = updatedMachineResult;
 
     if (!updatedMachine) {
       return {
@@ -366,7 +402,11 @@ export async function generateQRCodeAction(
 export async function regenerateQRCodeAction(
   machineId: string,
 ): Promise<ActionResult<{ qrCodeUrl: string }>> {
-  const { organization } = await requireMemberAccess();
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
+  const { org: organization } = authContext;
   const organizationId = organization.id;
 
   if (!machineId) {
@@ -389,7 +429,7 @@ export async function regenerateQRCodeAction(
     const qrCode = await generateMachineQRCode(machineId);
 
     // Update machine with new QR code
-    const [updatedMachine] = await db
+    const updatedMachineResult = await db
       .update(machines)
       .set({
         qr_code_id: qrCode.id,
@@ -404,6 +444,8 @@ export async function regenerateQRCodeAction(
         ),
       )
       .returning({ id: machines.id });
+
+    const [updatedMachine] = updatedMachineResult;
 
     if (!updatedMachine) {
       return {
@@ -431,10 +473,16 @@ export async function regenerateQRCodeAction(
 export async function bulkGenerateQRCodesAction(
   formData: FormData,
 ): Promise<ActionResult<{ processedCount: number }>> {
-  const { organization } = await requireMemberAccess();
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
+  const { org: organization } = authContext;
   const organizationId = organization.id;
 
-  const machineIdsString = formData.get("machineIds") as string;
+  const machineIdsValue = formData.get("machineIds");
+  const machineIdsString =
+    typeof machineIdsValue === "string" ? machineIdsValue : "";
   const machineIds = machineIdsString ? machineIdsString.split(",") : [];
 
   const result = BulkQRGenerateSchema.safeParse({ machineIds });
@@ -443,7 +491,6 @@ export async function bulkGenerateQRCodesAction(
     return {
       success: false,
       error: "Validation failed",
-      fieldErrors: result.error.flatten().fieldErrors,
     };
   }
 
@@ -467,7 +514,7 @@ export async function bulkGenerateQRCodesAction(
           // Generate actual QR code
           const qrCode = await generateMachineQRCode(machineId);
 
-          const [updatedMachine] = await db
+          const updatedMachineResult = await db
             .update(machines)
             .set({
               qr_code_id: qrCode.id,
@@ -482,6 +529,8 @@ export async function bulkGenerateQRCodesAction(
               ),
             )
             .returning({ id: machines.id });
+
+          const [updatedMachine] = updatedMachineResult;
 
           if (updatedMachine) {
             processedCount++;
@@ -512,4 +561,3 @@ export async function bulkGenerateQRCodesAction(
 // ================================
 // HELPER FUNCTIONS
 // ================================
-

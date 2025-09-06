@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useActionState, useEffect } from "react";
+import React, { useState, useActionState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -38,31 +38,38 @@ interface RoleChangeDialogProps {
       isSystem: boolean;
     };
   };
-  availableRoles: { 
-    id: string; 
-    name: string; 
+  availableRoles: {
+    id: string;
+    name: string;
     description?: string;
     isSystem: boolean;
   }[];
   children?: React.ReactNode;
 }
 
-export function RoleChangeDialog({ user, availableRoles, children }: RoleChangeDialogProps) {
+export function RoleChangeDialog({
+  user,
+  availableRoles,
+  children,
+}: RoleChangeDialogProps): JSX.Element {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedRoleId, setSelectedRoleId] = useState(user.role.id);
-  const [state, formAction, isPending] = useActionState(updateUserRoleAction, null);
+  const [state, formAction, isPending] = useActionState(
+    updateUserRoleAction,
+    null,
+  );
 
   // Handle successful role change
   useEffect(() => {
     if (state?.success) {
-      toast.success(state.message || "User role updated successfully!");
+      toast.success(state.message ?? "User role updated successfully!");
       setIsOpen(false);
-    } else if (state && !state.success) {
-      // Handle field errors or general error  
-      if ('fieldErrors' in state && state.fieldErrors) {
+    } else if (state) {
+      // Handle field errors or general error
+      if (state.fieldErrors) {
         Object.entries(state.fieldErrors).forEach(([field, errors]) => {
           if (Array.isArray(errors)) {
-            errors.forEach(error => toast.error(`${field}: ${error}`));
+            errors.forEach((error) => toast.error(`${field}: ${error}`));
           }
         });
       } else if (state.error) {
@@ -71,32 +78,31 @@ export function RoleChangeDialog({ user, availableRoles, children }: RoleChangeD
     }
   }, [state]);
 
-  // Filter out roles that shouldn't be assignable
-  const assignableRoles = availableRoles.filter(_role => 
-    // Allow all roles for now, but you could add logic here
-    // For example: !role.isSystem || role.id === user.role.id
-    true
-  );
+  // All roles are assignable for now
+  const assignableRoles = availableRoles;
 
-  const selectedRole = assignableRoles.find(role => role.id === selectedRoleId);
+  const selectedRole = assignableRoles.find(
+    (role) => role.id === selectedRoleId,
+  );
   const hasRoleChanged = selectedRoleId !== user.role.id;
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        {children || (
+        {children ?? (
           <Button variant="outline" size="sm">
             <ShieldIcon className="mr-2 h-4 w-4" />
             Change Role
           </Button>
         )}
       </DialogTrigger>
-      
+
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Change User Role</DialogTitle>
           <DialogDescription>
-            Update the role for {user.name || user.email}. This will change their permissions immediately.
+            Update the role for {user.name || user.email}. This will change
+            their permissions immediately.
           </DialogDescription>
         </DialogHeader>
 
@@ -108,7 +114,8 @@ export function RoleChangeDialog({ user, availableRoles, children }: RoleChangeD
               <p className="font-medium">{user.name || "Unnamed User"}</p>
               <p className="text-sm text-muted-foreground">{user.email}</p>
               <p className="text-xs text-muted-foreground">
-                Current role: <span className="font-medium">{user.role.name}</span>
+                Current role:{" "}
+                <span className="font-medium">{user.role.name}</span>
               </p>
             </div>
           </div>
@@ -116,12 +123,12 @@ export function RoleChangeDialog({ user, availableRoles, children }: RoleChangeD
           <form action={formAction} className="space-y-4">
             {/* Hidden fields */}
             <input type="hidden" name="userId" value={user.userId} />
-            
+
             {/* Role Selection */}
             <div className="space-y-2">
               <Label htmlFor="roleId">New Role</Label>
-              <Select 
-                name="roleId" 
+              <Select
+                name="roleId"
                 value={selectedRoleId}
                 onValueChange={setSelectedRoleId}
                 disabled={isPending}
@@ -144,9 +151,13 @@ export function RoleChangeDialog({ user, availableRoles, children }: RoleChangeD
                   ))}
                 </SelectContent>
               </Select>
-              {state && 'fieldErrors' in state && state.fieldErrors?.['roleId'] && (
-                <p className="text-xs text-destructive">{state.fieldErrors['roleId'][0]}</p>
-              )}
+              {state &&
+                "fieldErrors" in state &&
+                state.fieldErrors["roleId"] && (
+                  <p className="text-xs text-destructive">
+                    {state.fieldErrors["roleId"][0]}
+                  </p>
+                )}
             </div>
 
             {/* Role Change Warning */}
@@ -156,8 +167,9 @@ export function RoleChangeDialog({ user, availableRoles, children }: RoleChangeD
                   Role Change Confirmation
                 </p>
                 <p className="text-xs text-secondary mt-1">
-                  {user.name || user.email} will be changed from "{user.role.name}" to "{selectedRole.name}". 
-                  This change takes effect immediately.
+                  {user.name || user.email} will be changed from "
+                  {user.role.name}" to "{selectedRole.name}". This change takes
+                  effect immediately.
                 </p>
               </div>
             )}
@@ -175,10 +187,7 @@ export function RoleChangeDialog({ user, availableRoles, children }: RoleChangeD
               >
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
-                disabled={isPending || !hasRoleChanged}
-              >
+              <Button type="submit" disabled={isPending || !hasRoleChanged}>
                 {isPending ? (
                   <>
                     <LoaderIcon className="mr-2 h-4 w-4 animate-spin" />

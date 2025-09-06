@@ -4,11 +4,18 @@
  * Phase 4B.4: Activity Log
  */
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import React from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import { 
-  ActivityIcon, 
+import {
+  ActivityIcon,
   ClockIcon,
   UserIcon,
   FileTextIcon,
@@ -16,9 +23,10 @@ import {
   AlertTriangleIcon,
   SettingsIcon,
   DownloadIcon,
-  FilterIcon
+  FilterIcon,
 } from "lucide-react";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
+import { AuthGuard } from "~/components/auth/auth-guard";
 import { getActivityLog, getActivityStats } from "~/lib/dal/activity-log";
 import { ActivityLogFilter } from "./components/ActivityLogFilter";
 import { format } from "date-fns";
@@ -27,10 +35,31 @@ export default async function ActivityLogPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const { organization } = await requireMemberAccess();
-  const organizationId = organization.id;
-  
+}): Promise<React.JSX.Element> {
+  const authContext = await getRequestAuthContext();
+
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Activity Log Access Required"
+      fallbackMessage="You need to be signed in as a member to view activity logs."
+    >
+      <ActivityLogPageContent searchParams={searchParams} />
+    </AuthGuard>
+  );
+}
+
+async function ActivityLogPageContent({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}): Promise<React.JSX.Element> {
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Unauthorized access"); // This should never happen due to AuthGuard
+  }
+  const organizationId = authContext.org.id;
+
   // Await searchParams as required by Next.js 15
   const resolvedSearchParams = await searchParams;
 
@@ -55,9 +84,15 @@ export default async function ActivityLogPage({
     getActivityStats(organizationId),
   ]);
 
-  const { entries: mockActivityLog, totalCount: totalEntries, totalPages } = activityResult;
+  const {
+    entries: mockActivityLog,
+    totalCount: totalEntries,
+    totalPages,
+  } = activityResult;
 
-  const getActionIcon = (action: string) => {
+  const getActionIcon = (
+    action: string,
+  ): React.ComponentType<{ className?: string }> => {
     switch (action) {
       case "USER_LOGIN":
       case "USER_LOGOUT":
@@ -74,7 +109,7 @@ export default async function ActivityLogPage({
     }
   };
 
-  const getSeverityColor = (severity: string) => {
+  const getSeverityColor = (severity: string): string => {
     switch (severity) {
       case "error":
         return "text-on-error-container bg-error-container";
@@ -130,7 +165,9 @@ export default async function ActivityLogPage({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Security Events</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Security Events
+            </CardTitle>
             <ShieldIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -144,7 +181,9 @@ export default async function ActivityLogPage({
             <AlertTriangleIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-error">{stats.errorEvents}</div>
+            <div className="text-2xl font-bold text-error">
+              {stats.errorEvents}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -177,14 +216,16 @@ export default async function ActivityLogPage({
           <div className="space-y-4">
             {mockActivityLog.map((entry) => {
               const ActionIcon = getActionIcon(entry.action);
-              
+
               return (
                 <div
                   key={entry.id}
                   className="flex items-start space-x-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
                 >
                   {/* Icon and Severity */}
-                  <div className={`p-2 rounded-lg ${getSeverityColor(entry.severity)}`}>
+                  <div
+                    className={`p-2 rounded-lg ${getSeverityColor(entry.severity)}`}
+                  >
                     <ActionIcon className="h-4 w-4" />
                   </div>
 
@@ -223,14 +264,11 @@ export default async function ActivityLogPage({
           {/* Pagination */}
           <div className="flex items-center justify-between mt-6">
             <div className="text-sm text-muted-foreground">
-              Showing {((page - 1) * limit) + 1} to {Math.min(page * limit, totalEntries)} of {totalEntries} entries
+              Showing {(page - 1) * limit + 1} to{" "}
+              {Math.min(page * limit, totalEntries)} of {totalEntries} entries
             </div>
             <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-              >
+              <Button variant="outline" size="sm" disabled={page <= 1}>
                 Previous
               </Button>
               <div className="flex items-center space-x-1">
@@ -248,11 +286,7 @@ export default async function ActivityLogPage({
                   );
                 })}
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= totalPages}
-              >
+              <Button variant="outline" size="sm" disabled={page >= totalPages}>
                 Next
               </Button>
             </div>

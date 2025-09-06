@@ -7,43 +7,39 @@
  */
 
 import { z } from "zod";
+import {
+  uuidSchema,
+  paginationLimitSchema,
+  paginationOffsetSchema,
+  sortOrderSchema,
+  searchQuerySchema,
+  arrayParamTransformer,
+} from "~/lib/validation/schemas";
 
 // Comprehensive schema for issue filtering
 const IssueSearchParamsSchema = z.object({
   // Text search
-  search: z.string().max(100).optional(),
+  search: searchQuerySchema,
 
   // Status filtering - supports multiple values
-  status: z
-    .union([z.string(), z.array(z.string())])
-    .optional()
-    .transform((val) => {
-      if (!val) return undefined;
-      return Array.isArray(val) ? val : val.split(",").filter(Boolean);
-    }),
+  status: arrayParamTransformer,
 
   // Priority filtering - supports multiple values
-  priority: z
-    .union([z.string(), z.array(z.string())])
-    .optional()
-    .transform((val) => {
-      if (!val) return undefined;
-      return Array.isArray(val) ? val : val.split(",").filter(Boolean);
-    }),
+  priority: arrayParamTransformer,
 
   // User filtering
-  assignee: z.string().uuid().optional(),
-  reporter: z.string().uuid().optional(),
+  assignee: uuidSchema.optional(),
+  reporter: uuidSchema.optional(),
 
   // Machine/location filtering
-  machine: z.string().uuid().optional(),
-  location: z.string().uuid().optional(),
+  machine: uuidSchema.optional(),
+  location: uuidSchema.optional(),
 
   // Date range filtering
-  created_after: z.string().datetime().optional(),
-  created_before: z.string().datetime().optional(),
-  updated_after: z.string().datetime().optional(),
-  updated_before: z.string().datetime().optional(),
+  created_after: z.iso.datetime().optional(),
+  created_before: z.iso.datetime().optional(),
+  updated_after: z.iso.datetime().optional(),
+  updated_before: z.iso.datetime().optional(),
 
   // Sorting
   sort: z
@@ -56,11 +52,11 @@ const IssueSearchParamsSchema = z.object({
       "machine",
     ])
     .default("created_at"),
-  order: z.enum(["asc", "desc"]).default("desc"),
+  order: sortOrderSchema,
 
   // Pagination
-  page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(5).max(100).default(20),
+  page: paginationOffsetSchema,
+  limit: paginationLimitSchema,
 
   // View mode
   view: z.enum(["list", "compact", "table"]).default("list"),
@@ -78,7 +74,10 @@ export function parseIssueSearchParams(
   const parsed = IssueSearchParamsSchema.safeParse(searchParams);
 
   if (!parsed.success) {
-    console.warn("Invalid issue search parameters:", parsed.error.flatten());
+    console.warn(
+      "Invalid issue search parameters:",
+      z.treeifyError(parsed.error),
+    );
     // Return default values on parsing error
     return IssueSearchParamsSchema.parse({});
   }
@@ -112,7 +111,7 @@ export function buildIssueUrl(
 
   // Add new parameters
   Object.entries(params).forEach(([key, value]) => {
-    if (value === undefined || value === null) {
+    if (value === undefined) {
       url.searchParams.delete(key);
       return;
     }
@@ -129,7 +128,7 @@ export function buildIssueUrl(
       const defaults = IssueSearchParamsSchema.parse({});
 
       // Don't include default values in URL for cleaner URLs
-      const defaultValue = (defaults as any)[key];
+      const defaultValue = defaults[key as keyof IssueSearchParams];
       if (defaultValue !== undefined && stringValue === String(defaultValue)) {
         url.searchParams.delete(key);
       } else {
@@ -198,8 +197,7 @@ export function getIssueCanonicalUrl(
   const canonicalParams = { ...params };
 
   // Remove pagination from canonical URLs
-  const cleanedParams = { ...canonicalParams };
-  delete (cleanedParams as any).page;
+  const { page: _page, ...cleanedParams } = canonicalParams;
 
   // Use cleaned URL for consistent canonical URLs
   return cleanIssueUrl(buildIssueUrl(basePath, cleanedParams));

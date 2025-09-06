@@ -7,7 +7,7 @@
 -- ROW LEVEL SECURITY POLICIES
 -- =================================================================
 -- Comprehensive RLS setup for multi-tenant architecture
--- 
+--
 -- Features:
 -- - Organization-level isolation for all multi-tenant tables
 -- - Session variable-based organization context (app.current_organization_id)
@@ -62,14 +62,14 @@ ALTER TABLE anonymous_rate_limits ENABLE ROW LEVEL SECURITY;
 -- =================================================================
 
 -- Helper function to drop all policies for a table
-CREATE OR REPLACE FUNCTION drop_all_policies(table_name text) 
+CREATE OR REPLACE FUNCTION drop_all_policies(table_name text)
 RETURNS void AS $$
 DECLARE
     policy_record RECORD;
 BEGIN
-    FOR policy_record IN 
-        SELECT policyname 
-        FROM pg_policies 
+    FOR policy_record IN
+        SELECT policyname
+        FROM pg_policies
         WHERE schemaname = 'public' AND tablename = table_name
     LOOP
         EXECUTE format('DROP POLICY IF EXISTS %I ON %I', policy_record.policyname, table_name);
@@ -115,6 +115,23 @@ SECURITY DEFINER SET search_path = public AS $$
   SELECT EXISTS (
     SELECT 1 FROM memberships m
     WHERE m.user_id = uid AND m.organization_id = org_id
+  )
+$$;
+
+-- Permission check helper (role -> role_permissions -> permissions)
+CREATE OR REPLACE FUNCTION fn_has_permission(uid text, org_id text, perm_name text)
+RETURNS boolean
+LANGUAGE sql STABLE
+SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM memberships m
+    JOIN roles r ON r.id = m.role_id
+    JOIN role_permissions rp ON rp.role_id = r.id
+    JOIN permissions p ON p.id = rp.permission_id
+    WHERE m.user_id = uid
+      AND m.organization_id = org_id
+      AND p.name = perm_name
   )
 $$;
 
@@ -321,22 +338,61 @@ CREATE POLICY "machines_public_read" ON machines
     )
   );
 
-CREATE POLICY "machines_member_all_access" ON machines
-  FOR ALL TO authenticated
+-- Members: read all machines within their org (including soft-deleted when explicitly filtered)
+CREATE POLICY "machines_member_select_all" ON machines
+  FOR SELECT TO authenticated
+  USING (
+    organization_id = current_setting('app.current_organization_id', true)
+    AND fn_is_org_member(auth.uid()::text, current_setting('app.current_organization_id', true))
+  );
+
+-- Members: insert machines in their org
+CREATE POLICY "machines_member_insert" ON machines
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    organization_id = current_setting('app.current_organization_id', true)
+    AND fn_is_org_member(auth.uid()::text, current_setting('app.current_organization_id', true))
+  );
+
+-- Owner or permission-gated UPDATE
+CREATE POLICY "machines_update_owner_or_perms" ON machines
+  FOR UPDATE TO authenticated
   USING (
     organization_id = current_setting('app.current_organization_id', true)
     AND fn_is_org_member(auth.uid()::text, current_setting('app.current_organization_id', true))
   )
   WITH CHECK (
     organization_id = current_setting('app.current_organization_id', true)
+    AND (
+      -- Non-delete updates: require ownership (or explicit machine:update if granted)
+      (deleted_at IS NULL AND (
+         owner_id = auth.uid()::text
+         OR fn_has_permission(auth.uid()::text, current_setting('app.current_organization_id', true), 'machine:update')
+         OR fn_has_permission(auth.uid()::text, current_setting('app.current_organization_id', true), 'machine:delete')
+       ))
+      OR
+      -- Soft delete: require machine:delete permission
+      (deleted_at IS NOT NULL AND fn_has_permission(auth.uid()::text, current_setting('app.current_organization_id', true), 'machine:delete'))
+    )
+  );
+
+-- Delete requires explicit permission (or owner with delete permission)
+CREATE POLICY "machines_delete_permission" ON machines
+  FOR DELETE TO authenticated
+  USING (
+    organization_id = current_setting('app.current_organization_id', true)
     AND fn_is_org_member(auth.uid()::text, current_setting('app.current_organization_id', true))
+    AND (
+      fn_has_permission(auth.uid()::text, current_setting('app.current_organization_id', true), 'machine:delete')
+      OR (owner_id = auth.uid()::text AND fn_has_permission(auth.uid()::text, current_setting('app.current_organization_id', true), 'machine:delete'))
+    )
   );
 
 -- =================================================================
 -- 7. ISSUES SYSTEM - Anonymous reporting, member management
 -- =================================================================
 
--- Anonymous users can create issues (for QR code reporting)
+-- Anonymous users can create issues (for QR code reporting) only when org toggle enabled and machine active
 CREATE POLICY "issues_anon_create" ON issues
   FOR INSERT TO anon
   WITH CHECK (
@@ -389,8 +445,9 @@ CREATE POLICY "issues_public_read" ON issues
   );
 
 -- Members have full access to all issues in their organization
-CREATE POLICY "issues_member_access" ON issues
-  FOR ALL TO authenticated
+-- Members: read all issues within their org
+CREATE POLICY "issues_member_select_all" ON issues
+  FOR SELECT TO authenticated
   USING (
     organization_id = current_setting('app.current_organization_id', true)
     AND EXISTS (
@@ -398,7 +455,11 @@ CREATE POLICY "issues_member_access" ON issues
       WHERE m.user_id = auth.uid()::text
       AND m.organization_id = current_setting('app.current_organization_id', true)
     )
-  )
+  );
+
+-- Members: insert issues within their org (target machine must not be soft-deleted)
+CREATE POLICY "issues_member_insert" ON issues
+  FOR INSERT TO authenticated
   WITH CHECK (
     organization_id = current_setting('app.current_organization_id', true)
     AND EXISTS (
@@ -410,6 +471,43 @@ CREATE POLICY "issues_member_access" ON issues
       SELECT 1 FROM machines mm
       WHERE mm.id = issues.machine_id
       AND mm.deleted_at IS NULL
+    )
+  );
+
+-- Owner (reporter or assignee) or permission-gated UPDATE
+CREATE POLICY "issues_update_owner_or_perms" ON issues
+  FOR UPDATE TO authenticated
+  USING (
+    organization_id = current_setting('app.current_organization_id', true)
+    AND EXISTS (
+      SELECT 1 FROM memberships m
+      WHERE m.user_id = auth.uid()::text
+      AND m.organization_id = current_setting('app.current_organization_id', true)
+    )
+  )
+  WITH CHECK (
+    organization_id = current_setting('app.current_organization_id', true)
+    AND (
+      created_by_id = auth.uid()::text
+      OR assigned_to_id = auth.uid()::text
+      OR fn_has_permission(auth.uid()::text, current_setting('app.current_organization_id', true), 'issue:update')
+    )
+  );
+
+-- Owner (reporter or assignee) or permission-gated DELETE
+CREATE POLICY "issues_delete_owner_or_perms" ON issues
+  FOR DELETE TO authenticated
+  USING (
+    organization_id = current_setting('app.current_organization_id', true)
+    AND EXISTS (
+      SELECT 1 FROM memberships m
+      WHERE m.user_id = auth.uid()::text
+      AND m.organization_id = current_setting('app.current_organization_id', true)
+    )
+    AND (
+      created_by_id = auth.uid()::text
+      OR assigned_to_id = auth.uid()::text
+      OR fn_has_permission(auth.uid()::text, current_setting('app.current_organization_id', true), 'issue:delete')
     )
   );
 
@@ -466,7 +564,7 @@ CREATE POLICY "comments_anon_create_public" ON comments
     AND author_id IS NULL
   );
 
--- Members: read comments in their org  
+-- Members: read comments in their org
 CREATE POLICY "comments_member_read" ON comments
   FOR SELECT TO authenticated
   USING (
@@ -512,7 +610,7 @@ CREATE POLICY "comments_author_update" ON comments
     )
   );
 
--- CRITICAL: Authors can ONLY delete their own comments (no cross-user access)  
+-- CRITICAL: Authors can ONLY delete their own comments (no cross-user access)
 CREATE POLICY "comments_author_delete" ON comments
   FOR DELETE TO authenticated
   USING (
@@ -592,6 +690,65 @@ CREATE POLICY "comments_auth_create_public" ON comments
     )
     AND commenter_type = 'authenticated'
     AND author_id = auth.uid()::text
+  );
+
+-- =================================================================
+-- 9a. ATTACHMENTS - Upload/Deletion permissions and visibility
+-- =================================================================
+
+-- Public read: guests and authenticated can read attachments for public issues
+CREATE POLICY "attachments_public_read" ON attachments
+  FOR SELECT TO anon, authenticated
+  USING (
+    organization_id = current_setting('app.current_organization_id', true)
+    AND EXISTS (
+      SELECT 1 FROM issues i
+      WHERE i.id = issue_id
+      AND i.organization_id = current_setting('app.current_organization_id', true)
+      AND fn_effective_issue_public(i.id)
+    )
+  );
+
+-- Members: read all attachments within their org
+CREATE POLICY "attachments_member_read" ON attachments
+  FOR SELECT TO authenticated
+  USING (
+    organization_id = current_setting('app.current_organization_id', true)
+    AND fn_is_org_member(auth.uid()::text, current_setting('app.current_organization_id', true))
+  );
+
+-- Anonymous: allow insert on effectively public issues when org allows anonymous issues
+CREATE POLICY "attachments_anon_insert_public" ON attachments
+  FOR INSERT TO anon
+  WITH CHECK (
+    organization_id = current_setting('app.current_organization_id', true)
+    AND EXISTS (
+      SELECT 1 FROM organizations o WHERE o.id = organization_id AND o.allow_anonymous_issues = TRUE
+    )
+    AND EXISTS (
+      SELECT 1 FROM issues i
+      WHERE i.id = issue_id
+      AND i.organization_id = current_setting('app.current_organization_id', true)
+      AND fn_effective_issue_public(i.id)
+    )
+  );
+
+-- Authenticated: post-creation uploads require issue:attachment_upload
+CREATE POLICY "attachments_member_insert_permission" ON attachments
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    organization_id = current_setting('app.current_organization_id', true)
+    AND fn_is_org_member(auth.uid()::text, current_setting('app.current_organization_id', true))
+    AND fn_has_permission(auth.uid()::text, current_setting('app.current_organization_id', true), 'attachment:create')
+  );
+
+-- Deletions require attachment:delete
+CREATE POLICY "attachments_delete_permission" ON attachments
+  FOR DELETE TO authenticated
+  USING (
+    organization_id = current_setting('app.current_organization_id', true)
+    AND fn_is_org_member(auth.uid()::text, current_setting('app.current_organization_id', true))
+    AND fn_has_permission(auth.uid()::text, current_setting('app.current_organization_id', true), 'attachment:delete')
   );
 
 -- =================================================================
@@ -762,7 +919,79 @@ DROP TRIGGER IF EXISTS trg_enforce_comment_org_chain ON comments;
 CREATE TRIGGER trg_enforce_comment_org_chain
   BEFORE INSERT OR UPDATE ON comments
   FOR EACH ROW
-  EXECUTE FUNCTION enforce_comment_org_chain();
+EXECUTE FUNCTION enforce_comment_org_chain();
+
+-- Machines: changing deleted_at requires owner or machine:delete permission
+CREATE OR REPLACE FUNCTION enforce_machine_deleted_at_permission()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NEW.deleted_at IS DISTINCT FROM OLD.deleted_at THEN
+    IF NOT (NEW.owner_id = auth.uid()::text
+            OR fn_has_permission(auth.uid()::text, current_setting('app.current_organization_id', true), 'machine:delete')) THEN
+      RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'changing deleted_at requires owner or machine:delete permission';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_enforce_machine_deleted_at_permission ON machines;
+CREATE TRIGGER trg_enforce_machine_deleted_at_permission
+  BEFORE UPDATE ON machines
+  FOR EACH ROW
+  EXECUTE FUNCTION enforce_machine_deleted_at_permission();
+
+-- Attachments: organization_id must match issue.organization_id
+CREATE OR REPLACE FUNCTION enforce_attachment_org_chain()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  issue_org text;
+BEGIN
+  SELECT organization_id INTO issue_org FROM issues WHERE id = NEW.issue_id;
+  IF issue_org IS NULL THEN
+    RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'Invalid issue_id for attachment';
+  END IF;
+  IF NEW.organization_id IS DISTINCT FROM issue_org THEN
+    RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'attachments.organization_id must equal issues.organization_id';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_enforce_attachment_org_chain ON attachments;
+CREATE TRIGGER trg_enforce_attachment_org_chain
+  BEFORE INSERT OR UPDATE ON attachments
+  FOR EACH ROW
+  EXECUTE FUNCTION enforce_attachment_org_chain();
+
+-- Prevent deleting a location that still has non-deleted machines
+CREATE OR REPLACE FUNCTION enforce_location_delete_guard()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  exists_active boolean;
+BEGIN
+  SELECT EXISTS (
+    SELECT 1 FROM machines m
+    WHERE m.location_id = OLD.id AND m.deleted_at IS NULL
+  ) INTO exists_active;
+  IF exists_active THEN
+    RAISE EXCEPTION USING ERRCODE = '23503', MESSAGE = 'Cannot delete location with active machines';
+  END IF;
+  RETURN OLD;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_enforce_location_delete_guard ON locations;
+CREATE TRIGGER trg_enforce_location_delete_guard
+  BEFORE DELETE ON locations
+  FOR EACH ROW
+  EXECUTE FUNCTION enforce_location_delete_guard();
 
 -- =================================================================
 -- 15. PUBLIC ORGANIZATIONS MINIMAL (Anon-safe listing)
@@ -793,17 +1022,17 @@ GRANT SELECT ON public_organizations_minimal TO anon, authenticated;
 -- =================================================================
 
 -- Count policies created
-SELECT 
+SELECT
   schemaname,
   tablename,
   COUNT(*) as policy_count
-FROM pg_policies 
+FROM pg_policies
 WHERE schemaname = 'public'
 GROUP BY schemaname, tablename
 ORDER BY tablename;
 
 -- Verify RLS is enabled
-SELECT 
+SELECT
   schemaname,
   tablename,
   rowsecurity as rls_enabled
