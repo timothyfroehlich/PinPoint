@@ -65,14 +65,16 @@ const DEV_PASSWORD = "dev-login-123";
 
 async function createDevUsers() {
   // Required environment
-  const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").trim();
+  const supabaseUrl = (
+    process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? ""
+  ).trim();
   const supabaseSecretKey = (
-    process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY ?? ""
+    process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SECRET_KEY ?? ""
   ).trim();
 
   if (!supabaseUrl || !supabaseSecretKey) {
     console.error("❌ Missing required environment variables:");
-    if (!supabaseUrl) console.error("  - NEXT_PUBLIC_SUPABASE_URL");
+    if (!supabaseUrl) console.error("  - NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL)");
     if (!supabaseSecretKey)
       console.error("  - SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY)");
     process.exit(1);
@@ -116,9 +118,13 @@ async function createDevUsers() {
   }
 
   const sql = postgres(CONNECTION_STRING, pgOptions);
+  console.log(
+    `🔌 DB connection ready (ssl=${needsSsl ? "require" : "off"}, pooler=${isPooler ? "yes" : "no"})`,
+  );
   const db = drizzle(sql);
 
   // Supabase admin client
+  console.log(`🔗 Using Supabase URL: ${supabaseUrl}`);
   const supabase = createClient(supabaseUrl, supabaseSecretKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
