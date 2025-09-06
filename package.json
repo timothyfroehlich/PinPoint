@@ -64,7 +64,7 @@
     "lint:verbose": "npm-run-all --parallel lint:eslint:verbose lint:sql",
     "lint:eslint:verbose": "eslint . --max-warnings 0 --format=stylish",
     "lint:fix": "eslint . --fix",
-    "lint:sarif": "NODE_ENV=development next lint --format @microsoft/eslint-formatter-sarif --output-file eslint-results.sarif",
+    "lint:sarif": "next lint --format @microsoft/eslint-formatter-sarif --output-file eslint-results.sarif",
     "test": "vitest run",
     "test:watch": "vitest watch",
     "test:rls": "cd supabase/tests && ./run-tests.sh",
