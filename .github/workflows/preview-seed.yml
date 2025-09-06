@@ -18,7 +18,6 @@ on:
 jobs:
   seed-preview-database:
     name: Seed Preview Database
-    environment: preview-seeding
     runs-on: ubuntu-latest
     timeout-minutes: 10
     
