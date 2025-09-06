@@ -13,8 +13,6 @@ import {
   transformMachineForIssuesResponse,
   transformMachinesForIssuesResponse,
   transformApiRequestToDb,
-  transformMachineWithRelations,
-  transformLocationWithMachines,
   transformDbResultToApiResponse,
   transformApiRequestToDbFormat,
 } from "../machine-response-transformers";
