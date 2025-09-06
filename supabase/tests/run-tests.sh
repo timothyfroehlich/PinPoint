@@ -130,7 +130,7 @@ run_tests_with_pg_prove() {
     cd "${RLS_TEST_DIR}"
     
     # Run tests with pg_prove for better output
-    if pg_prove --ext=.sql --recurse --verbose "${DATABASE_URL}" .; then
+    if pg_prove --ext=.sql --recurse --verbose --dbname "${DATABASE_URL}" .; then
         log_success "All pgTAP tests passed!"
         return 0
     else
