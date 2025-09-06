@@ -75,14 +75,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       entities,
       organizationId,
       pagination: { page, limit },
-      sorting: { field: sort, order },
+      sorting: { field: sort, order: order ?? "desc" },
     });
 
     return NextResponse.json({
       ...searchResponse,
       query,
       entities: entitiesParam,
-      sorting: { field: sort, order },
+      sorting: { field: sort, order: order ?? "desc" },
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
