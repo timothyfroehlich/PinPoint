@@ -65,20 +65,49 @@ const DEV_PASSWORD = "dev-login-123";
 
 async function createDevUsers() {
   // Required environment
-  const supabaseUrl = (
-    process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? ""
+  const rawSupabaseUrl = (
+    process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
   ).trim();
   const supabaseSecretKey = (
     process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SECRET_KEY ?? ""
   ).trim();
 
-  if (!supabaseUrl || !supabaseSecretKey) {
+  if (!rawSupabaseUrl || !supabaseSecretKey) {
     console.error("❌ Missing required environment variables:");
-    if (!supabaseUrl) console.error("  - NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL)");
+    if (!rawSupabaseUrl) console.error("  - SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL)");
     if (!supabaseSecretKey)
       console.error("  - SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY)");
     process.exit(1);
   }
+
+  // Sanitize/build Supabase URL
+  function buildSupabaseUrl(input: string): string {
+    let u = input.replace(/^"|"$/g, "").replace(/\s+/g, "");
+    if (!/^https?:\/\//i.test(u)) {
+      // If it's a bare ref or host, try to normalize
+      if (/^[a-z0-9-]+\.[a-z0-9.-]+$/i.test(u)) {
+        u = `https://${u}`;
+      } else if (/^[a-z0-9]{10,}$/i.test(u)) {
+        // Looks like a project ref
+        u = `https://${u}.supabase.co`;
+      }
+    }
+    // Remove trailing slash for consistency
+    u = u.replace(/\/+$/, "");
+    // Validate
+    try {
+      // eslint-disable-next-line no-new
+      new URL(u);
+      return u;
+    } catch {
+      console.error("❌ Invalid Supabase URL provided:", input);
+      console.error(
+        "   Provide a full URL (e.g., https://xyz.supabase.co) in SUPABASE_URL",
+      );
+      process.exit(1);
+    }
+  }
+  const supabaseUrl = buildSupabaseUrl(rawSupabaseUrl);
 
   // Choose connection string
   const RAW_DIRECT_URL = (process.env.DIRECT_URL ?? "").trim();
