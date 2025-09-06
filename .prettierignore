@@ -43,9 +43,11 @@ pnpm-lock.yaml
 Thumbs.db
 
 # Generated files (codegen output)
-src/lib/types/database.ts         # Supabase type generation
-supabase/migrations/relations.ts  # Drizzle schema codegen  
-supabase/migrations/schema.ts     # Drizzle schema codegen
+# Supabase type generation
+src/lib/types/database.ts
+# Drizzle schema codegen
+supabase/migrations/relations.ts
+supabase/migrations/schema.ts
 
 # Archived test directories
 .archived-tests-*/**
