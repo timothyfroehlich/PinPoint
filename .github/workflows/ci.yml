@@ -215,17 +215,14 @@ jobs:
           # Install PostgreSQL client tools and pg_prove
           sudo apt-get install -y postgresql-client-17 libtap-parser-sourcehandler-pgtap-perl
           
-          # Download and setup pgTAP (no need to install, just load SQL)
+          # Download and setup pgTAP (following established pattern)
           wget https://github.com/theory/pgtap/archive/refs/tags/v1.3.3.tar.gz
           tar -xzf "v1.3.3.tar.gz"
           
-          # Debug: Check what files are actually available
-          echo "Current directory contents:"
-          ls -la
-          echo "pgTAP directory contents:"
-          ls -la pgtap-1.3.3/ || echo "pgtap-1.3.3/ not found"
-          echo "Looking for SQL file:"
-          find . -name "pgtap.sql" -type f
+          # Generate pgTAP SQL files (this is the missing step!)
+          cd pgtap-1.3.3
+          make
+          cd ..
           
           # Setup database schema
           npm run db:push:local
