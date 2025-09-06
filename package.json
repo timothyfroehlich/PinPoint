@@ -34,6 +34,7 @@
     "db:studio:preview": "drizzle-kit studio --config=drizzle.config.prod.ts",
     "db:generate-types": "supabase gen types typescript --local > src/lib/types/database.ts",
     "db:generate-types:preview": "supabase gen types typescript --db-url $DATABASE_URL > src/lib/types/database.ts",
+    "db:seed:local:sb": "./scripts/db-reset.sh local --only-seed",
     "generate:sql-constants": "tsx scripts/generate-sql-constants.ts",
     "preview:seed": "./scripts/trigger-preview-seeding.sh",
     "preview:seed:wait": "./scripts/trigger-preview-seeding.sh --wait",
