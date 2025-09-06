@@ -7,36 +7,37 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
+import { nameSchema, LIMITS } from "~/lib/validation/schemas";
 import { eq } from "drizzle-orm";
-import { getGlobalDatabaseProvider } from "~/server/db/provider";
 import { organizations } from "~/server/db/schema";
+import { db } from "~/lib/dal/shared";
 import { transformKeysToSnakeCase } from "~/lib/utils/case-transformers";
 import {
-  requireAuthContextWithRole,
   validateFormData,
   actionSuccess,
   actionError,
   runAfterResponse,
   type ActionResult,
 } from "./shared";
+import { isError, getErrorMessage } from "~/lib/utils/type-guards";
+import { getRequestAuthContext } from "~/server/auth/context";
 import { requirePermission } from "./shared";
 import { PERMISSIONS } from "~/server/auth/permissions.constants";
 // Duplicate import removed
 
 // Enhanced validation schemas with better error messages
 const updateOrganizationProfileSchema = z.object({
-  name: z
-    .string()
-    .min(1, "Organization name is required")
-    .max(100, "Organization name must be less than 100 characters")
-    .trim(),
+  name: nameSchema,
   description: z
     .string()
     .max(500, "Description must be less than 500 characters")
+    .transform((s) => s.trim())
     .optional(),
   website: z
     .string()
-    .url("Please enter a valid website URL")
+    .refine((val) => !val || /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(val), {
+      message: "Please enter a valid website URL",
+    })
     .optional()
     .or(z.literal("")),
   phone: z
@@ -45,14 +46,16 @@ const updateOrganizationProfileSchema = z.object({
     .optional(),
   address: z
     .string()
-    .max(200, "Address must be less than 200 characters")
+    .max(LIMITS.TITLE_MAX, "Address must be less than 200 characters")
     .optional(),
 });
 
 const updateOrganizationLogoSchema = z.object({
   logoUrl: z
     .string()
-    .url("Please enter a valid logo URL")
+    .refine((val) => !val || /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(val), {
+      message: "Please enter a valid logo URL",
+    })
     .optional()
     .or(z.literal("")),
 });
@@ -66,12 +69,23 @@ export async function updateOrganizationProfileAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId, membership } = await requireAuthContextWithRole();
-    const db = getGlobalDatabaseProvider().getClient();
-    await requirePermission(membership, PERMISSIONS.ORGANIZATION_MANAGE, db);
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization, membership } = authContext;
+    const organizationId = organization.id;
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.ORGANIZATION_MANAGE,
+      db,
+    );
 
     // Enhanced validation with Zod
-    const validation = validateFormData(formData, updateOrganizationProfileSchema);
+    const validation = validateFormData(
+      formData,
+      updateOrganizationProfileSchema,
+    );
     if (!validation.success) {
       return validation;
     }
@@ -79,16 +93,20 @@ export async function updateOrganizationProfileAction(
     // Update organization with validated data
     const updateData = {
       name: validation.data.name,
-      description: validation.data.description || null,
-      website: validation.data.website || null,
-      phone: validation.data.phone || null,
-      address: validation.data.address || null,
+      description: validation.data.description ?? null,
+      website: validation.data.website ?? null,
+      phone: validation.data.phone ?? null,
+      address: validation.data.address ?? null,
       updated_at: new Date(),
     };
 
     const [updatedOrg] = await db
       .update(organizations)
-      .set(transformKeysToSnakeCase(updateData) as typeof organizations.$inferInsert)
+      .set(
+        transformKeysToSnakeCase(
+          updateData,
+        ) as typeof organizations.$inferInsert,
+      )
       .where(eq(organizations.id, organizationId))
       .returning({ id: organizations.id, name: organizations.name });
 
@@ -104,8 +122,11 @@ export async function updateOrganizationProfileAction(
     revalidateTag(`organization-${organizationId}`);
 
     // Background processing
-    runAfterResponse(async () => {
-      console.log(`Organization ${organizationId} profile updated by ${user.email}`);
+    runAfterResponse(() => {
+      console.log(
+        `Organization ${organizationId} profile updated by ${user.email}`,
+      );
+      return Promise.resolve();
     });
 
     return actionSuccess(
@@ -114,11 +135,7 @@ export async function updateOrganizationProfileAction(
     );
   } catch (error) {
     console.error("Update organization profile error:", error);
-    return actionError(
-      error instanceof Error
-        ? error.message
-        : "Failed to update organization profile. Please try again.",
-    );
+    return actionError(getErrorMessage(error));
   }
 }
 
@@ -130,9 +147,17 @@ export async function updateOrganizationLogoAction(
   formData: FormData,
 ): Promise<ActionResult<{ success: boolean }>> {
   try {
-    const { user, organizationId, membership } = await requireAuthContextWithRole();
-    const db = getGlobalDatabaseProvider().getClient();
-    await requirePermission(membership, PERMISSIONS.ORGANIZATION_MANAGE, db);
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization, membership } = authContext;
+    const organizationId = organization.id;
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.ORGANIZATION_MANAGE,
+      db,
+    );
 
     // Enhanced validation
     const validation = validateFormData(formData, updateOrganizationLogoSchema);
@@ -144,7 +169,7 @@ export async function updateOrganizationLogoAction(
     const [updatedOrg] = await db
       .update(organizations)
       .set({
-        logo_url: validation.data.logoUrl || null,
+        logo_url: validation.data.logoUrl ?? null,
         updated_at: new Date(),
       })
       .where(eq(organizations.id, organizationId))
@@ -161,8 +186,11 @@ export async function updateOrganizationLogoAction(
     revalidateTag(`organization-${organizationId}`);
 
     // Background processing
-    runAfterResponse(async () => {
-      console.log(`Organization ${organizationId} logo updated by ${user.email}`);
+    runAfterResponse(() => {
+      console.log(
+        `Organization ${organizationId} logo updated by ${user.email}`,
+      );
+      return Promise.resolve();
     });
 
     return actionSuccess(
@@ -172,7 +200,7 @@ export async function updateOrganizationLogoAction(
   } catch (error) {
     console.error("Update organization logo error:", error);
     return actionError(
-      error instanceof Error ? error.message : "Failed to update logo",
+      isError(error) ? error.message : "Failed to update logo",
     );
   }
 }

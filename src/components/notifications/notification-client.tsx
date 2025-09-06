@@ -10,13 +10,13 @@ import { useState, useEffect } from "react";
 import { Alert, AlertDescription } from "~/components/ui/alert";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import { 
-  CheckCircleIcon, 
-  XCircleIcon, 
-  InfoIcon, 
+import {
+  CheckCircleIcon,
+  XCircleIcon,
+  InfoIcon,
   AlertCircleIcon,
   XIcon,
-  BellIcon
+  BellIcon,
 } from "lucide-react";
 
 interface Notification {
@@ -30,6 +30,37 @@ interface Notification {
     label: string;
     action: () => void;
   }[];
+}
+
+// Custom event type definitions for type safety
+interface MachineUpdateEventDetail {
+  machineName: string;
+}
+
+interface FormSubmissionEventDetail {
+  success: boolean;
+  title?: string;
+  message?: string;
+}
+
+// Supabase notification payload type
+interface NotificationPayload {
+  id: string;
+  type: "success" | "error" | "info" | "warning";
+  title: string;
+  message: string;
+  auto_hide: boolean;
+  organization_id: string;
+  created_at: string;
+}
+
+// Type-safe custom event interfaces
+interface MachineUpdateEvent extends CustomEvent {
+  detail: MachineUpdateEventDetail;
+}
+
+interface FormSubmissionEvent extends CustomEvent {
+  detail: FormSubmissionEventDetail;
 }
 
 interface NotificationClientProps {
@@ -50,7 +81,8 @@ const NOTIFICATION_STYLES = {
   success: "border-tertiary bg-tertiary-container text-on-tertiary-container",
   error: "border-error bg-error-container text-on-error-container",
   info: "border-primary bg-primary-container text-on-primary-container",
-  warning: "border-secondary bg-secondary-container text-on-secondary-container",
+  warning:
+    "border-secondary bg-secondary-container text-on-secondary-container",
 };
 
 /**
@@ -62,13 +94,13 @@ export function NotificationClient({
   organizationId,
   maxNotifications = 5,
   autoHideDelay = 5000,
-}: NotificationClientProps) {
+}: NotificationClientProps): JSX.Element | null {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isConnected, setIsConnected] = useState(false);
 
   // Listen for custom events from other client islands
   useEffect(() => {
-    const handleIssueUpdate: EventListener = (_event) => {
+    const handleIssueUpdate: EventListener = (_event): void => {
       addNotification({
         type: "success",
         title: "Issue Updated",
@@ -77,8 +109,8 @@ export function NotificationClient({
       });
     };
 
-    const handleMachineUpdate: EventListener = (event) => {
-      const customEvent = event as CustomEvent;
+    const handleMachineUpdate = (event: Event): void => {
+      const customEvent = event as MachineUpdateEvent;
       addNotification({
         type: "info",
         title: "Machine Updated",
@@ -87,20 +119,21 @@ export function NotificationClient({
       });
     };
 
-    const handleFormSubmission: EventListener = (event) => {
-      const customEvent = event as CustomEvent;
+    const handleFormSubmission = (event: Event): void => {
+      const customEvent = event as FormSubmissionEvent;
       if (customEvent.detail.success) {
         addNotification({
           type: "success",
-          title: customEvent.detail.title || "Success",
-          message: customEvent.detail.message || "Operation completed successfully",
+          title: customEvent.detail.title ?? "Success",
+          message:
+            customEvent.detail.message ?? "Operation completed successfully",
           autoHide: true,
         });
       } else {
         addNotification({
           type: "error",
-          title: customEvent.detail.title || "Error",
-          message: customEvent.detail.message || "Operation failed",
+          title: customEvent.detail.title ?? "Error",
+          message: customEvent.detail.message ?? "Operation failed",
           autoHide: false,
         });
       }
@@ -110,7 +143,7 @@ export function NotificationClient({
     window.addEventListener("machineUpdated", handleMachineUpdate);
     window.addEventListener("formSubmission", handleFormSubmission);
 
-    return () => {
+    return (): void => {
       window.removeEventListener("issueUpdated", handleIssueUpdate);
       window.removeEventListener("machineUpdated", handleMachineUpdate);
       window.removeEventListener("formSubmission", handleFormSubmission);
@@ -121,7 +154,7 @@ export function NotificationClient({
   useEffect(() => {
     if (!userId || !organizationId) return;
 
-    const initializeNotificationStream = async () => {
+    const initializeNotificationStream = async (): Promise<() => void> => {
       try {
         const { createClient } = await import("~/utils/supabase/client");
         const supabase = createClient();
@@ -140,44 +173,48 @@ export function NotificationClient({
               filter: `organization_id=eq.${organizationId}`,
             },
             (payload) => {
-              if (payload.new) {
-                const notification = payload.new as any;
-                addNotification({
-                  type: notification.type || "info",
-                  title: notification.title || "Notification",
-                  message: notification.message || "",
-                  autoHide: notification.auto_hide !== false,
-                });
-              }
-            }
+              const notification = payload.new as NotificationPayload;
+              addNotification({
+                type: notification.type,
+                title: notification.title,
+                message: notification.message,
+                autoHide: notification.auto_hide,
+              });
+            },
           )
           .subscribe();
 
-        return () => {
-          supabase.removeChannel(orgChannel);
+        return (): void => {
+          void supabase.removeChannel(orgChannel);
           setIsConnected(false);
         };
       } catch (error) {
         console.error("Failed to initialize notification stream:", error);
         setIsConnected(false);
-        return () => {}; // No-op cleanup function
+        return (): void => {
+          // No-op cleanup function on error
+        };
       }
     };
 
     const cleanup = initializeNotificationStream();
-    return () => {
-      cleanup.then(fn => fn?.());
+    return (): void => {
+      void cleanup.then((fn) => {
+        fn();
+      });
     };
   }, [userId, organizationId]);
 
-  const addNotification = (notification: Omit<Notification, "id" | "timestamp">) => {
+  const addNotification = (
+    notification: Omit<Notification, "id" | "timestamp">,
+  ): void => {
     const newNotification: Notification = {
       ...notification,
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
       timestamp: new Date(),
     };
 
-    setNotifications(prev => {
+    setNotifications((prev) => {
       const updated = [newNotification, ...prev].slice(0, maxNotifications);
       return updated;
     });
@@ -190,8 +227,8 @@ export function NotificationClient({
     }
   };
 
-  const removeNotification = (id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+  const removeNotification = (id: string): void => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
   };
 
   // Don't render if no notifications
@@ -230,10 +267,8 @@ export function NotificationClient({
                 <div className="font-medium text-sm mb-1">
                   {notification.title}
                 </div>
-                <div className="text-sm">
-                  {notification.message}
-                </div>
-                
+                <div className="text-sm">{notification.message}</div>
+
                 {/* Action buttons */}
                 {notification.actions && notification.actions.length > 0 && (
                   <div className="flex gap-2 mt-2">
@@ -251,11 +286,13 @@ export function NotificationClient({
                   </div>
                 )}
               </AlertDescription>
-              
+
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => { removeNotification(notification.id); }}
+                onClick={() => {
+                  removeNotification(notification.id);
+                }}
                 className="h-6 w-6 p-0 ml-2"
               >
                 <XIcon className="h-3 w-3" />

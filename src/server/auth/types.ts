@@ -1,11 +1,19 @@
 /**
- * Type definitions for auth-related Drizzle ORM models
- * These provide type safety using inferred types from Drizzle schema
+ * @fileoverview DEPRECATED: Auth-related Drizzle ORM model types
  *
- * This file provides both database types (snake_case) and application types (camelCase).
- * Database types (DbUser, DbOrganization, etc.) use snake_case field names from the database.
- * Application types (User, Organization, etc.) use camelCase field names for the TypeScript application layer.
- * Use database types for database operations and application types for business logic and UI.
+ * **THIS FILE IS DEPRECATED**
+ * Auth-related types have been moved to `~/lib/types/auth.ts` for centralization.
+ * All auth types are now available via `~/lib/types`.
+ *
+ * Migration:
+ * ```typescript
+ * // OLD: import type { DbUser, User } from "~/server/auth/types";
+ * // NEW: import type { DbUser, AuthUser } from "~/lib/types";
+ * ```
+ *
+ * @deprecated Use `~/lib/types` instead
+ * @see ~/lib/types/auth.ts - New location for auth types
+ * @see ~/lib/types/db.ts - Database model types via Db namespace
  */
 
 import type { InferSelectModel } from "drizzle-orm";

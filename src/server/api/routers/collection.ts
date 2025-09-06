@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+// Validation schemas
+import {
+  idSchema,
+  descriptionSchema,
+  collectionNameSchema,
+} from "~/lib/validation/schemas";
+
 import {
   createTRPCRouter,
   publicProcedure,
@@ -13,8 +20,8 @@ export const collectionRouter = createTRPCRouter({
   getForLocation: publicProcedure
     .input(
       z.object({
-        locationId: z.string().min(1, "Location ID cannot be empty"),
-        organizationId: z.string().min(1, "Organization ID cannot be empty"), // Still needed for public API compatibility
+        locationId: idSchema,
+        organizationId: idSchema, // Still needed for public API compatibility
       }),
     )
     .query(async ({ ctx, input }) => {
@@ -26,8 +33,8 @@ export const collectionRouter = createTRPCRouter({
   getMachines: publicProcedure
     .input(
       z.object({
-        collectionId: z.string().min(1, "Collection ID cannot be empty"),
-        locationId: z.string().min(1, "Location ID cannot be empty"),
+        collectionId: idSchema,
+        locationId: idSchema,
       }),
     )
     .query(async ({ ctx, input }) => {
@@ -42,10 +49,10 @@ export const collectionRouter = createTRPCRouter({
   createManual: locationEditProcedure
     .input(
       z.object({
-        name: z.string().min(1).max(50),
-        typeId: z.string(),
-        locationId: z.string().optional(),
-        description: z.string().optional(),
+        name: collectionNameSchema,
+        typeId: idSchema,
+        locationId: z.string().optional(), // Keep as string since it may come from client
+        description: descriptionSchema,
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -76,8 +83,8 @@ export const collectionRouter = createTRPCRouter({
   addMachines: locationEditProcedure
     .input(
       z.object({
-        collectionId: z.string(),
-        machineIds: z.array(z.string()),
+        collectionId: idSchema,
+        machineIds: z.array(idSchema),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -105,7 +112,7 @@ export const collectionRouter = createTRPCRouter({
   toggleType: organizationManageProcedure
     .input(
       z.object({
-        collectionTypeId: z.string(),
+        collectionTypeId: idSchema,
         enabled: z.boolean(),
       }),
     )

@@ -26,6 +26,10 @@ export default defineConfig({
     globals: true,
     env: loadEnv("test", process.cwd(), ""),
     testTimeout: 30000,
+    setupFiles: [
+      "./src/test/setup/nextjs-mocks.ts",
+      "./src/test/setup/organization-mocks.ts",
+    ],
     coverage: {
       enabled: enableCoverage,
       provider: "v8",

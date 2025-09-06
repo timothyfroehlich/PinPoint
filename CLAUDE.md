@@ -28,11 +28,6 @@
 
 ## 📍 PROJECT CONTEXT
 
-### Current Phase: Dual Evolution
-**RSC Migration Phase 1A**: shadcn/ui + Tailwind foundation (NEARLY COMPLETE)
-- Next: Phase 1B Data Access Layer implementation
-**Test System Reboot**: Archive complete (~130 files removed), ready for archetype implementation
-
 ### Project Status
 - Pre-beta phase, zero production users
 - Solo development, high risk tolerance for breaking changes
@@ -146,14 +141,17 @@
 ## 📚 QUICK REFERENCE
 
 ### Essential Documentation
-- **@docs/NON_NEGOTIABLES.md** - Static analysis patterns
-- **@RSC_MIGRATION/** - Current migration plans and status
-- **@docs/latest-updates/quick-reference.md** - Post-training tech updates
-- **@docs/quick-reference/typescript-strictest-patterns.md** - Type safety patterns
+- **@docs/CORE/NON_NEGOTIABLES.md** - Static analysis patterns
+- **RSC_MIGRATION/** - Current migration plans and status
+- **docs/CORE/latest-updates/quick-reference.md** - Post-training tech updates
+- **@docs/CORE/TYPESCRIPT_STRICTEST_PATTERNS.md** - Type safety patterns
 - **@package.json** - Available scripts, dependencies, and project configuration
 
-### Esential but too big to autoload
-- **docs/TARGET_ARCHITECTURE.md** - Architectural authority for all decisions
+### Essential but too big to autoload
+- **docs/CORE/TARGET_ARCHITECTURE.md** - Architectural authority for all decisions
+
+### Documentation Review Requirement
+**CRITICAL**: Any document in `docs/CORE/` that hasn't been reviewed within 5 days must be verified for consistency with the current codebase state before use.
 
 ### Current Priorities
 - **RSC Migration**: Phase 1A → Phase 1B (DAL implementation)

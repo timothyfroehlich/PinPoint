@@ -10,8 +10,6 @@ import {
 import { useState } from "react";
 import { cn } from "~/lib/utils";
 
-import type { JSX } from "react";
-
 interface UserAvatarProps {
   user?: {
     id: string;
@@ -26,7 +24,7 @@ interface UserAvatarProps {
 
 const SIZE_CLASSES = {
   small: "h-8 w-8 text-sm",
-  medium: "h-10 w-10 text-sm", 
+  medium: "h-10 w-10 text-sm",
   large: "h-16 w-16 text-lg",
 } as const;
 
@@ -36,14 +34,19 @@ export function UserAvatar({
   clickable = false,
   showTooltip = true,
   onClick,
-}: UserAvatarProps): JSX.Element {
+}: UserAvatarProps): React.JSX.Element {
   const [imageError, setImageError] = useState(false);
+
+  // ESLint security warning is false positive - `size` is strictly typed
+  // as "small" | "medium" | "large" union type, making object access safe
+  // eslint-disable-next-line security/detect-object-injection
+  const sizeClass = SIZE_CLASSES[size];
 
   if (!user) {
     const avatarElement = (
       <Avatar
         className={cn(
-          SIZE_CLASSES[size],
+          sizeClass,
           clickable && "cursor-pointer hover:opacity-80",
         )}
         onClick={onClick}
@@ -78,17 +81,16 @@ export function UserAvatar({
 
   const avatarElement = (
     <Avatar
-      className={cn(
-        SIZE_CLASSES[size],
-        clickable && "cursor-pointer hover:opacity-80",
-      )}
+      className={cn(sizeClass, clickable && "cursor-pointer hover:opacity-80")}
       onClick={onClick}
     >
       {avatarSrc && (
         <AvatarImage
           src={avatarSrc}
           alt={`${displayName}'s profile picture`}
-          onError={() => setImageError(true)}
+          onError={() => {
+            setImageError(true);
+          }}
         />
       )}
       <AvatarFallback>{initials}</AvatarFallback>

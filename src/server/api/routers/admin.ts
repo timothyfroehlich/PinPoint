@@ -3,6 +3,9 @@ import { TRPCError } from "@trpc/server";
 import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
+// Internal validation schemas
+import { emailSchema, idSchema } from "~/lib/validation/schemas";
+
 // Internal types (alphabetical)
 import type {
   RoleAssignmentInput,
@@ -321,8 +324,8 @@ export const adminRouter = createTRPCRouter({
   inviteUser: organizationProcedure
     .input(
       z.object({
-        email: z.email(),
-        roleId: z.string(),
+        email: emailSchema,
+        roleId: idSchema,
         name: z.string().optional(),
       }),
     )

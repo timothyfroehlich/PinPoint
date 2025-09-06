@@ -133,11 +133,13 @@ export const SEED_TEST_IDS = {
   PERMISSIONS: {
     // Core permissions
     ISSUE_VIEW: "perm-issue-view-001",
-    ISSUE_CREATE: "perm-issue-create-002",
+    ISSUE_CREATE: "perm-issue-create-002", // legacy
+    ISSUE_CREATE_BASIC: "perm-issue-create-basic-002a",
+    ISSUE_CREATE_FULL: "perm-issue-create-full-002b",
     ISSUE_EDIT: "perm-issue-edit-003",
     ISSUE_DELETE: "perm-issue-delete-004",
-    ISSUE_ASSIGN: "perm-issue-assign-005",
-    ISSUE_BULK_MANAGE: "perm-issue-bulk-manage-006",
+    ISSUE_ASSIGN: "perm-issue-assign-005", // deprecated
+    ISSUE_BULK_MANAGE: "perm-issue-bulk-manage-006", // deprecated
     MACHINE_VIEW: "perm-machine-view-007",
     MACHINE_CREATE: "perm-machine-create-008",
     MACHINE_EDIT: "perm-machine-edit-009",
