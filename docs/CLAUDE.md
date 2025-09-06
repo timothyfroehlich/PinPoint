@@ -1,9 +1,21 @@
 @INDEX.md
 
-Documentation has been cleaned up and consolidated for context efficiency:
-- Removed outdated migration references (Prisma removal complete)
-- Simplified INDEX files for better navigation
-- Archived obsolete files to .claude/recycle_bin/
-- Focused on actionable patterns over explanations
+Last Reviewed: 2025-09-06
 
-Any doc file that is more than 500 lines after editing should be flagged for splitting.
+Environments & Domains (Brief)
+- Local: `org.localhost:3000` (org-scoped) and `localhost:3000` (global). Supabase CLI local.
+- Preview: `pin-point-git-<branch>-advacar.vercel.app` with `<org>.…` subdomains. Shares prod DB for now.
+- Production: `pinpoint-tracker.vercel.app`, `pin-point-advacar.vercel.app`, `pin-point-git-main-advacar.vercel.app` (+ `<org>.…`).
+- APC Alias: `pinpoint.austinpinballcollective.org` → APC only. No generic landing. Login has no org dropdown.
+
+Routing Rules
+- Generic hosts: root `/` shows landing; `<org>.host` scopes to that org.
+- APC alias: always APC; `/` redirects to `/auth/sign-in`.
+
+Code Pointers
+- Mapping: `src/lib/domain-org-mapping.ts` (host → org; APC alias → `apc`).
+- Middleware: `middleware.ts` sets trusted `x-subdomain` headers from mapping.
+- Login: `src/app/auth/sign-in/components/SignInForm.tsx` hides org selector when host locks org.
+- Home: `src/app/page.tsx` redirects to sign-in on org-scoped hosts.
+
+Note: Preview and prod share Supabase DB until open beta split.
