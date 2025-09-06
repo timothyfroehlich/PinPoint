@@ -246,7 +246,7 @@ export default tseslint.config(
     rules: {
       // Disable all typescript-eslint rules for auto-generated file
       "@typescript-eslint/consistent-type-definitions": "off",
-      "@typescript-eslint/consistent-indexed-object-style": "off", 
+      "@typescript-eslint/consistent-indexed-object-style": "off",
       "@typescript-eslint/no-redundant-type-constituents": "off",
     },
   },

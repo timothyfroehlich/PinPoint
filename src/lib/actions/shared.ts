@@ -176,7 +176,7 @@ export function validateFormData<T>(
   }
 
   // Format Zod errors for form display
-  // ESLint security warnings are false positive - path comes from Zod validation 
+  // ESLint security warnings are false positive - path comes from Zod validation
   // error.path which contains controlled field names, not user input
   const fieldErrors = result.error.issues.reduce<Record<string, string[]>>(
     (acc: Record<string, string[]>, issue) => {
