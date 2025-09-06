@@ -131,6 +131,58 @@ async function createDevUsers() {
 
   console.log("🔧 Creating dev users and memberships via Supabase Admin API...");
 
+  // Ensure the admin upsert function exists (idempotent safety)
+  const [{ exists: hasFn } = { exists: false } as any] = await sql<
+    [{ exists: boolean }]
+  >`select exists (
+        select 1 from pg_proc p
+        join pg_namespace n on n.oid = p.pronamespace
+        where p.proname = 'fn_upsert_membership_admin'
+          and n.nspname = 'public'
+      ) as exists;`;
+  if (!hasFn) {
+    console.log("🛠️  Admin helper not found; creating public.fn_upsert_membership_admin()...");
+    await sql`
+      CREATE OR REPLACE FUNCTION public.fn_upsert_membership_admin(
+        p_user_id text,
+        p_org_id text,
+        p_role_id text
+      ) RETURNS void
+      LANGUAGE plpgsql
+      SECURITY DEFINER
+      SET search_path = public
+      AS $$
+      DECLARE
+        v_exists boolean;
+        v_id text;
+      BEGIN
+        IF p_user_id IS NULL OR p_org_id IS NULL OR p_role_id IS NULL THEN
+          RAISE EXCEPTION 'fn_upsert_membership_admin: all parameters are required';
+        END IF;
+
+        v_id := 'membership-' || left(replace(p_org_id, ' ', ''), 16) || '-' || left(p_user_id, 8);
+
+        SELECT EXISTS (
+          SELECT 1 FROM memberships m
+          WHERE m.user_id = p_user_id AND m.organization_id = p_org_id
+        ) INTO v_exists;
+
+        IF v_exists THEN
+          UPDATE memberships
+          SET role_id = p_role_id
+          WHERE user_id = p_user_id AND organization_id = p_org_id;
+        ELSE
+          INSERT INTO memberships (id, user_id, organization_id, role_id)
+          VALUES (v_id, p_user_id, p_org_id, p_role_id);
+        END IF;
+      END;
+      $$;
+    `;
+    console.log("   ✅ Helper function created");
+  } else {
+    console.log("🧩 Admin helper already present");
+  }
+
   for (const user of DEV_USERS) {
     try {
       console.log(`  Creating user: ${user.email}`);
