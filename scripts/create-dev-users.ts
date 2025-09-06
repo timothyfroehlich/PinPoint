@@ -17,10 +17,10 @@ import { pgTable, text } from "drizzle-orm/pg-core";
 
 // Standalone memberships table definition to avoid src/ imports
 const memberships = pgTable("memberships", {
-  id: text().primaryKey(),
-  user_id: text().notNull(),
-  organization_id: text().notNull(),
-  role_id: text().notNull(),
+  id: text("id").primaryKey(),
+  user_id: text("user_id").notNull(),
+  organization_id: text("organization_id").notNull(),
+  role_id: text("role_id").notNull(),
 });
 
 // Type guard
@@ -90,7 +90,32 @@ async function createDevUsers() {
     CONNECTION_STRING,
   );
 
-  const sql = postgres(CONNECTION_STRING, needsSsl ? { ssl: "require" } : undefined);
+  // Detect pgBouncer pooler connection (Supabase pooled port/host)
+  let isPooler = false;
+  try {
+    const u = new URL(CONNECTION_STRING);
+    const host = u.hostname;
+    const port = Number(u.port || 5432);
+    if (/pooler\.supabase\.com$/.test(host) || port === 6543) {
+      isPooler = true;
+    }
+    console.log(
+      `🧩 Connecting to DB host=${host} port=${port} (pooler=${isPooler ? "yes" : "no"}) SSL=${needsSsl ? "require" : "off"}`,
+    );
+  } catch {
+    // ignore URL parse errors; fall back to defaults
+  }
+
+  const pgOptions: postgres.Options<Record<string, postgres.PostgresType>> = {};
+  if (needsSsl) pgOptions.ssl = "require" as const;
+  if (isPooler) {
+    // Required for pgBouncer transaction pooling
+    // Ref: https://github.com/porsager/postgres#pgbouncer
+    // Drizzle works fine with prepare=false over pgbouncer
+    pgOptions.prepare = false as const;
+  }
+
+  const sql = postgres(CONNECTION_STRING, pgOptions);
   const db = drizzle(sql);
 
   // Supabase admin client
@@ -127,18 +152,12 @@ async function createDevUsers() {
         console.log(`  ✅ Successfully created auth user: ${data.user.email}`);
       }
 
-      // Upsert membership
+      // Upsert membership via SECURITY DEFINER helper (bypasses RLS)
       console.log(`    - Upserting membership for ${user.email}`);
       const roleId = user.email.includes("tim") ? ROLE_IDS.ADMIN : ROLE_IDS.MEMBER;
-      await db
-        .insert(memberships)
-        .values({
-          id: `membership-${user.name.toLowerCase().split(" ")[0]}`,
-          user_id: user.id,
-          organization_id: user.organizationId,
-          role_id: roleId,
-        })
-        .onConflictDoNothing();
+      await sql`
+        select public.fn_upsert_membership_admin(${user.id}, ${user.organizationId}, ${roleId})
+      `;
       console.log(`    - ✅ Membership upserted for role: ${roleId}`);
     } catch (err) {
       console.error(`  ❌ Error creating ${user.email}:`, err);
