@@ -70,17 +70,11 @@ export const env = createEnv({
         ? z.string().url().optional()
         : z.string().url("Supabase URL must be a valid URL"),
     // Secret key (new Supabase API key)
-    // Required in development and preview. Optional in production, unless code paths
-    // explicitly require admin operations (createAdminClient will throw if missing).
+    // Required in all non-test environments
     SUPABASE_SECRET_KEY:
-      (() => {
-        const envType = getEnvironmentType();
-        if (envType === "test") return z.string().optional();
-        if (envType === "development" || envType === "preview")
-          return z.string().min(1, "Supabase secret key is required");
-        // production
-        return z.string().optional();
-      })(),
+      getEnvironmentType() === "test"
+        ? z.string().optional()
+        : z.string().min(1, "Supabase secret key is required"),
     SUPABASE_JWT_SECRET:
       getEnvironmentType() === "test"
         ? z.string().optional()
