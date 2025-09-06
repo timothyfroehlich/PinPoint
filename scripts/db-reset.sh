@@ -461,7 +461,7 @@ reset_supabase_database() {
     execute_sql_seeds "$env"
 
     # Create dev users via Supabase Admin API (only for dev environments)
-    if [[ "$env" == "local" || "$env" == "preview" ]]; then
+    if [[ "$env" == "local" ]]; then
         log_info "Creating dev users via Supabase Admin API..."
         if command -v tsx >/dev/null 2>&1; then
             if tsx scripts/create-dev-users.ts; then
@@ -472,6 +472,10 @@ reset_supabase_database() {
         else
             log_warning "tsx not found, skipping dev user creation"
         fi
+    elif [[ "$env" == "preview" ]]; then
+        log_info "Preview environment: Dev users should be created via GitHub Actions"
+        log_warning "For security, the SUPABASE_SERVICE_ROLE_KEY is only available in GitHub Actions"
+        log_info "Run 'npm run preview:seed' to trigger secure seeding via GitHub Actions"
     fi
 
     # Sync schema definitions back to Drizzle
@@ -577,6 +581,7 @@ main() {
         log_info "• Run 'npm run dev' to start development server"
         log_info "• Check 'npm run db:studio' to browse database"
     else
+        log_info "• Run 'npm run preview:seed' to create development users securely"
         log_info "• Deploy changes: 'vercel --prod'"
         log_info "• Check 'npm run db:studio:preview' to browse database"
     fi

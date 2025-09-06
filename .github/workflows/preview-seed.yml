@@ -1,0 +1,80 @@
+name: Preview Environment Seeding
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment for seeding'
+        required: true
+        type: choice
+        options: ['preview']
+        default: 'preview'
+      force_reseed:
+        description: 'Force re-seeding even if users already exist'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  seed-preview-database:
+    name: Seed Preview Database
+    environment: preview-seeding
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --production=false
+
+      - name: Validate environment
+        run: |
+          echo "🔍 Validating environment configuration..."
+          if [ "${{ inputs.environment }}" != "preview" ]; then
+            echo "❌ Error: This workflow only supports preview environment"
+            exit 1
+          fi
+          
+          # Validate required secrets are present
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "❌ Error: SUPABASE_SERVICE_ROLE_KEY is required"
+            exit 1
+          fi
+          
+          if [ -z "$DATABASE_URL" ] && [ -z "$DIRECT_URL" ]; then
+            echo "❌ Error: DATABASE_URL or DIRECT_URL is required"
+            exit 1
+          fi
+          
+          echo "✅ Environment validation passed"
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+
+      - name: Run database seeding
+        run: |
+          echo "🌱 Starting Preview environment database seeding..."
+          echo "Force reseed: ${{ inputs.force_reseed }}"
+          npx tsx scripts/create-dev-users.ts
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+
+      - name: Seeding summary
+        if: always()
+        run: |
+          echo "🏁 Preview environment seeding workflow completed"
+          echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Force reseed: ${{ inputs.force_reseed }}"
