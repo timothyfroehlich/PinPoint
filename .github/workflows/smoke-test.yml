@@ -27,7 +27,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20
+          node-version: "24"
           cache: npm
 
       - name: Install dependencies
@@ -55,7 +55,7 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@b2fcdce4bb34caf999d1f1e7bb8e6b2ae5ed0c3e # v1
         with:
           version: latest
 
@@ -91,7 +91,7 @@ jobs:
 
 
       - name: Cache Playwright Browsers
-        uses: actions/cache@v4
+        uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4
         id: playwright-cache
         with:
           path: "~/.cache/ms-playwright"
