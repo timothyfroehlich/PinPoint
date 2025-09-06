@@ -219,6 +219,14 @@ jobs:
           wget https://github.com/theory/pgtap/archive/refs/tags/v1.3.3.tar.gz
           tar -xzf "v1.3.3.tar.gz"
           
+          # Debug: Check what files are actually available
+          echo "Current directory contents:"
+          ls -la
+          echo "pgTAP directory contents:"
+          ls -la pgtap-1.3.3/ || echo "pgtap-1.3.3/ not found"
+          echo "Looking for SQL file:"
+          find . -name "pgtap.sql" -type f
+          
           # Setup database schema
           npm run db:push:local
           
