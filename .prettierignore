@@ -48,6 +48,8 @@ src/lib/types/database.ts
 # Drizzle schema codegen
 supabase/migrations/relations.ts
 supabase/migrations/schema.ts
+# Dev user script (frequently regenerated)
+scripts/create-dev-users.ts
 
 # Archived test directories
 .archived-tests-*/**
