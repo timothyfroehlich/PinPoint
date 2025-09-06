@@ -82,7 +82,12 @@ export function validateMachineOwnership(
   return { valid: true };
 }
 
-import { titleSchema, emailSchema, LIMITS, machineIdSchema } from "~/lib/validation/schemas";
+import {
+  titleSchema,
+  emailSchema,
+  LIMITS,
+  machineIdSchema,
+} from "~/lib/validation/schemas";
 
 /**
  * Validate issue creation input parameters
