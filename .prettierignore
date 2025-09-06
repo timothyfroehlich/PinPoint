@@ -41,3 +41,8 @@ pnpm-lock.yaml
 # OS files
 .DS_Store
 Thumbs.db
+
+# Generated files (codegen output)
+src/lib/types/database.ts         # Supabase type generation
+supabase/migrations/relations.ts  # Drizzle schema codegen  
+supabase/migrations/schema.ts     # Drizzle schema codegen
