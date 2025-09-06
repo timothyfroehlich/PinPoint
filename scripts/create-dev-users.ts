@@ -9,6 +9,18 @@
 import { config } from "dotenv";
 config({ path: ".env.local" });
 
+// Prefer IPv4 to avoid ENETUNREACH on some runners/networks
+try {
+  // Node.js >= 18
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const dns = require("node:dns");
+  if (typeof dns.setDefaultResultOrder === "function") {
+    dns.setDefaultResultOrder("ipv4first");
+  }
+} catch {
+  // best-effort only
+}
+
 // eslint-disable-next-line no-restricted-imports -- Admin script needs direct Supabase client
 import { createClient } from "@supabase/supabase-js";
 import { drizzle } from "drizzle-orm/postgres-js";
