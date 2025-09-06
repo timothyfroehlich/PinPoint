@@ -6,71 +6,92 @@
 "use server";
 
 import { revalidatePath, revalidateTag } from "next/cache";
-import { redirect } from "next/navigation";
 import { cache } from "react"; // React 19 cache API
 import { z } from "zod";
+import {
+  titleSchema,
+  commentContentSchema,
+  uuidSchema,
+  descriptionSchema,
+  optionalPrioritySchema,
+} from "~/lib/validation/schemas";
 import { and, eq, inArray } from "drizzle-orm";
-import { getGlobalDatabaseProvider } from "~/server/db/provider";
-import { issues, issueStatuses, priorities, comments } from "~/server/db/schema";
+import {
+  issues,
+  issueStatuses,
+  priorities,
+  machines,
+  organizations,
+  comments,
+} from "~/server/db/schema";
+import { db } from "~/lib/dal/shared";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { transformKeysToSnakeCase } from "~/lib/utils/case-transformers";
 import {
-  requireAuthContextWithRole,
   validateFormData,
   actionSuccess,
   actionError,
   runAfterResponse,
   type ActionResult,
 } from "./shared";
+import { isError, getErrorMessage } from "~/lib/utils/type-guards";
+import { getRequestAuthContext } from "~/server/auth/context";
 import { requirePermission } from "./shared";
 import { PERMISSIONS } from "~/server/auth/permissions.constants";
-import { 
+import {
   generateIssueCreationNotifications,
   generateStatusChangeNotifications,
   generateAssignmentNotifications,
 } from "~/lib/services/notification-generator";
+import { getInMemoryRateLimiter } from "~/lib/rate-limit/inMemory";
 
 // Enhanced validation schemas with better error messages
+// Accept either a UUID or a deterministic seeded machine id (e.g. "machine-mm-001")
+const machineIdentifierSchema = z
+  .string()
+  .min(1, { message: "Please select a machine" })
+  .refine(
+    (v) =>
+      /^machine-[a-z0-9_-]+$/i.test(v) ||
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v),
+    { message: "Invalid machine selection" },
+  );
+
 const createIssueSchema = z.object({
-  title: z
-    .string()
-    .min(1, "Issue title is required")
-    .max(200, "Title must be less than 200 characters")
-    .trim(),
-  description: z.string().optional(),
-  machineId: z
-    .string()
-    .min(1, "Please select a machine")
-    .uuid("Invalid machine selected"),
-  priority: z.enum(["low", "medium", "high"]).optional().default("medium"),
-  assigneeId: z.string().uuid().optional(),
+  title: titleSchema,
+  description: descriptionSchema,
+  machineId: machineIdentifierSchema,
+  // Priority = internal scheduling weight (hidden for anonymous)
+  priority: optionalPrioritySchema.default("medium"),
+  // Severity = inherent impact (can be set by anonymous reporters)
+  severity: z
+    .enum(["low", "medium", "high", "critical"])
+    .optional()
+    .default("medium"),
+  assigneeId: z.union([uuidSchema, z.literal("unassigned")]).optional(),
 });
 
 const updateIssueStatusSchema = z.object({
-  statusId: z.string().uuid("Invalid status selected"),
+  statusId: uuidSchema, // uses centralized uuid validator (provides proper message)
 });
 
-const addCommentSchema = z.object({
-  content: z
-    .string()
-    .min(1, "Comment cannot be empty")
-    .max(2000, "Comment must be less than 2000 characters")
-    .trim(),
-});
+const addCommentSchema = z.object({ content: commentContentSchema });
 
 const updateIssueAssignmentSchema = z.object({
-  assigneeId: z.string().uuid("Invalid assignee selected").optional(),
+  assigneeId: z.union([uuidSchema, z.literal("unassigned")]).optional(),
 });
 
 const bulkUpdateIssuesSchema = z.object({
-  issueIds: z.array(z.string().uuid()).min(1, "No issues selected").max(50, "Cannot update more than 50 issues at once"),
-  statusId: z.string().uuid().optional(),
-  assigneeId: z.string().uuid().optional(),
+  issueIds: z
+    .array(uuidSchema)
+    .min(1, "No issues selected")
+    .max(50, "Cannot update more than 50 issues at once"),
+  statusId: uuidSchema.optional(),
+  assigneeId: uuidSchema.optional(),
 });
 
 // Performance: Cached database queries for default values
 const getDefaultStatus = cache(async (organizationId: string) => {
-  const db = getGlobalDatabaseProvider().getClient();
   return await db.query.issueStatuses.findFirst({
     where: and(
       eq(issueStatuses.is_default, true),
@@ -80,7 +101,6 @@ const getDefaultStatus = cache(async (organizationId: string) => {
 });
 
 const getDefaultPriority = cache(async (organizationId: string) => {
-  const db = getGlobalDatabaseProvider().getClient();
   return await db.query.priorities.findFirst({
     where: and(
       eq(priorities.is_default, true),
@@ -98,38 +118,93 @@ export async function createIssueAction(
   formData: FormData,
 ): Promise<ActionResult<{ id: string }>> {
   try {
-    const { user, organizationId, membership } = await requireAuthContextWithRole();
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization, membership } = authContext;
+    const organizationId = organization.id;
 
     // Enhanced validation with Zod
+    // Perform validation but adapt success shape to our expected return type later
     const validation = validateFormData(formData, createIssueSchema);
     if (!validation.success) {
-      return validation;
+      // Pass through error/fieldErrors (already correct shape)
+      return validation as ActionResult<{ id: string }>;
     }
+    // Extract validated fields (do not return validation directly since type expects id)
+    const validated = validation.data;
 
-    const db = getGlobalDatabaseProvider().getClient();
-    await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
+    // Determine creation permission tier
+    let hasFull = false;
+    try {
+      await requirePermission(
+        { role_id: membership.role.id },
+        PERMISSIONS.ISSUE_CREATE_FULL,
+        db,
+      );
+      hasFull = true;
+    } catch {
+      // Try basic (or legacy) permission
+      try {
+        await requirePermission(
+          { role_id: membership.role.id },
+          PERMISSIONS.ISSUE_CREATE_BASIC,
+          db,
+        );
+      } catch {
+        return actionError("Not authorized to create issues");
+      }
+    }
 
     // Parallel queries for better performance
     const [defaultStatus, defaultPriority] = await Promise.all([
       getDefaultStatus(organizationId),
       getDefaultPriority(organizationId),
     ]);
-
-    if (!defaultStatus || !defaultPriority) {
-      return actionError("System configuration error. Please contact support.");
+    let resolvedStatus = defaultStatus;
+    let resolvedPriority = defaultPriority;
+    // Fallback: pick first available status/priority to avoid hard failure in mis-seeded envs
+    if (!resolvedStatus) {
+      resolvedStatus = await db.query.issueStatuses.findFirst({
+        where: eq(issueStatuses.organization_id, organizationId),
+      });
+      if (!resolvedStatus) {
+        return actionError(
+          "No issue statuses configured for organization. Please contact support.",
+        );
+      }
     }
+    if (!resolvedPriority) {
+      resolvedPriority = await db.query.priorities.findFirst({
+        where: eq(priorities.organization_id, organizationId),
+      });
+      if (!resolvedPriority) {
+        return actionError(
+          "No priorities configured for organization. Please contact support.",
+        );
+      }
+    }
+
+    // Handle special "unassigned" case
+    const assigneeId = hasFull
+      ? validated.assigneeId === "unassigned"
+        ? null
+        : (validated.assigneeId ?? null)
+      : null; // Basic cannot assign
 
     // Create issue with validated data
     const issueData = {
       id: generatePrefixedId("issue"),
-      title: validation.data.title,
-      description: validation.data.description || "",
-      machineId: validation.data.machineId,
+      title: validated.title,
+      description: validated.description ?? "",
+      machineId: validated.machineId,
       organizationId,
-      statusId: defaultStatus.id,
-      priorityId: defaultPriority.id,
-      assigneeId: validation.data.assigneeId,
+      statusId: resolvedStatus.id,
+      priorityId: resolvedPriority.id, // Basic cannot override (UI hides)
+      assigneeId,
       createdById: user.id,
+      severity: validated.severity,
     };
 
     // Create issue in database
@@ -148,27 +223,152 @@ export async function createIssueAction(
     // Background processing (runs after response sent to user)
     runAfterResponse(async () => {
       console.log(`Issue ${issueData.id} created by ${user.email}`);
-      
+
       // Generate notifications for issue creation
       try {
         await generateIssueCreationNotifications(issueData.id, {
           organizationId,
           actorId: user.id,
-          actorName: user.user_metadata?.['name'] as string || user.email || 'Someone',
+          actorName: user.name ?? user.email,
         });
       } catch (error) {
-        console.error('Failed to generate issue creation notifications:', error);
+        console.error(
+          "Failed to generate issue creation notifications:",
+          getErrorMessage(error),
+        );
       }
     });
 
-    // Redirect to new issue
-    redirect(`/issues/${issueData.id}`);
+    // Return success (client enhancement layer will handle navigation)
+    return actionSuccess({ id: issueData.id }, "Issue created successfully");
   } catch (error) {
+    // (Legacy redirect handling removed – action now returns success and client redirects)
     console.error("Create issue error:", error);
+    return actionError(getErrorMessage(error));
+  }
+}
+
+/**
+ * Public (anonymous or guest) issue creation.
+ * - No authentication required.
+ * - Restricts ability to set priority / assignee.
+ * - Allows specifying severity + title/description + machine.
+ * - Records reporter metadata (optional name/email).
+ */
+export async function createPublicIssueAction(
+  _prevState: ActionResult<{ id: string }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ id: string }>> {
+  // Basic rate limiting (IP + machine) – naive in-memory (single instance)
+  try {
+    const { headers } = await import("next/headers");
+    const h = await headers();
+    const raw =
+      h.get("x-forwarded-for") ??
+      h.get("cf-connecting-ip") ??
+      h.get("x-real-ip") ??
+      "";
+    const issueRateLimitIp =
+      "ISSUE_RATE_LIMIT_IP" in globalThis
+        ? (globalThis as unknown as { ISSUE_RATE_LIMIT_IP: string })
+            .ISSUE_RATE_LIMIT_IP
+        : undefined;
+    const ip: string =
+      issueRateLimitIp ?? raw.split(",")[0]?.trim() ?? "unknown";
+    const machineIdValue = formData.get("machineId");
+    const machineId =
+      machineIdValue && typeof machineIdValue === "string"
+        ? machineIdValue
+        : "none";
+    const key = `public_issue:${ip}:${machineId}`;
+    const limiter = getInMemoryRateLimiter();
+    if (!limiter.check(key, { windowMs: 60_000, max: 5 })) {
+      return actionError(
+        "Too many submissions. Please wait a minute and try again.",
+      );
+    }
+  } catch {
+    // ignore rate limit errors
+  }
+  // Validate (priority/assignee will be ignored even if passed)
+  const validation = validateFormData(formData, createIssueSchema);
+  if (!validation.success) {
+    if (validation.fieldErrors) {
+      delete validation.fieldErrors["priority"];
+      delete validation.fieldErrors["assigneeId"];
+    }
+    return validation as ActionResult<{ id: string }>;
+  }
+  const { machineId, title, description, severity } = validation.data;
+
+  try {
+    // Fetch machine
+    const machineRecord = await db.query.machines.findFirst({
+      where: eq(machines.id, machineId),
+      columns: { id: true, organization_id: true, is_public: true },
+    });
+    if (!machineRecord) return actionError("Machine not found");
+
+    // Fetch organization settings
+    const orgRecord = await db.query.organizations.findFirst({
+      where: eq(organizations.id, machineRecord.organization_id),
+      columns: { allow_anonymous_issues: true, is_public: true },
+    });
+    if (!orgRecord) return actionError("Organization not found");
+    if (!orgRecord.is_public || machineRecord.is_public !== true)
+      return actionError("Machine not available for public reporting");
+    if (!orgRecord.allow_anonymous_issues)
+      return actionError("Anonymous reporting disabled");
+    // At public path we implicitly allow BASIC creation only (no priority / assignee fields honored)
+
+    const organizationId = machineRecord.organization_id;
+    const [defaultStatus, defaultPriority] = await Promise.all([
+      getDefaultStatus(organizationId),
+      getDefaultPriority(organizationId),
+    ]);
+    if (!defaultStatus || !defaultPriority)
+      return actionError("Organization not fully configured for issues");
+
+    const reporterEmailValue = formData.get("reporterEmail");
+    const reporterNameValue = formData.get("reporterName");
+    const reporterEmail =
+      reporterEmailValue && typeof reporterEmailValue === "string"
+        ? reporterEmailValue
+        : null;
+    const reporterName =
+      reporterNameValue && typeof reporterNameValue === "string"
+        ? reporterNameValue
+        : null;
+
+    const issueData = {
+      id: generatePrefixedId("issue"),
+      title,
+      description: description ?? "",
+      machineId,
+      organizationId,
+      statusId: defaultStatus.id,
+      priorityId: defaultPriority.id,
+      assigneeId: null,
+      createdById: null,
+      reporterType: "anonymous" as const,
+      reporterEmail,
+      submitterName: reporterName,
+      severity,
+    };
+
+    await db
+      .insert(issues)
+      .values(
+        transformKeysToSnakeCase(issueData) as typeof issues.$inferInsert,
+      );
+
+    revalidatePath(`/machines/${machineId}`);
+    revalidateTag("issues");
+    return actionSuccess({ id: issueData.id }, "Issue reported successfully");
+  } catch (error) {
+    console.error("createPublicIssueAction error:", error);
     return actionError(
-      error instanceof Error
-        ? error.message
-        : "Failed to create issue. Please try again.",
+      isError(error) ? error.message : "Failed to submit issue",
     );
   }
 }
@@ -183,16 +383,24 @@ export async function updateIssueStatusAction(
   formData: FormData,
 ): Promise<ActionResult<{ statusId: string }>> {
   try {
-    const { user, organizationId, membership } = await requireAuthContextWithRole();
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization, membership } = authContext;
+    const organizationId = organization.id;
 
     // Enhanced validation
     const validation = validateFormData(formData, updateIssueStatusSchema);
     if (!validation.success) {
-      return validation;
+      return validation as ActionResult<{ statusId: string }>;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
-    await requirePermission(membership, PERMISSIONS.ISSUE_EDIT, db);
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.ISSUE_EDIT,
+      db,
+    );
 
     // Update with organization scoping for security
     const [updatedIssue] = await db
@@ -216,7 +424,7 @@ export async function updateIssueStatusAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(`Issue ${issueId} status updated by ${user.email}`);
-      
+
       // Generate notifications for status change
       try {
         // Get status name for notification message
@@ -224,16 +432,19 @@ export async function updateIssueStatusAction(
           where: eq(issueStatuses.id, validation.data.statusId),
           columns: { name: true },
         });
-        
+
         if (statusResult) {
           await generateStatusChangeNotifications(issueId, statusResult.name, {
             organizationId,
             actorId: user.id,
-            actorName: user.user_metadata?.['name'] as string || user.email || 'Someone',
+            actorName: user.name ?? user.email,
           });
         }
       } catch (error) {
-        console.error('Failed to generate status change notifications:', error);
+        console.error(
+          "Failed to generate status change notifications:",
+          getErrorMessage(error),
+        );
       }
     });
 
@@ -244,7 +455,7 @@ export async function updateIssueStatusAction(
   } catch (error) {
     console.error("Update issue status error:", error);
     return actionError(
-      error instanceof Error ? error.message : "Failed to update issue status",
+      isError(error) ? error.message : "Failed to update issue status",
     );
   }
 }
@@ -258,20 +469,31 @@ export async function addCommentAction(
   formData: FormData,
 ): Promise<ActionResult<{ commentId: string }>> {
   try {
-    const { user, organizationId, membership } = await requireAuthContextWithRole();
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization, membership } = authContext;
+    const organizationId = organization.id;
 
     // Enhanced validation
     const validation = validateFormData(formData, addCommentSchema);
     if (!validation.success) {
-      return validation;
+      return validation as ActionResult<{ commentId: string }>;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
-    await requirePermission(membership, PERMISSIONS.ISSUE_CREATE, db);
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.ISSUE_CREATE_BASIC,
+      db,
+    );
 
     // Verify issue exists and user has access
     const issue = await db.query.issues.findFirst({
-      where: and(eq(issues.id, issueId), eq(issues.organization_id, organizationId)),
+      where: and(
+        eq(issues.id, issueId),
+        eq(issues.organization_id, organizationId),
+      ),
       columns: { id: true },
     });
 
@@ -296,8 +518,9 @@ export async function addCommentAction(
     revalidateTag(`comments-${issueId}`);
 
     // Background processing
-    runAfterResponse(async () => {
+    runAfterResponse(() => {
       console.log(`Comment added to issue ${issueId} by ${user.email}`);
+      return Promise.resolve();
     });
 
     return actionSuccess(
@@ -307,7 +530,7 @@ export async function addCommentAction(
   } catch (error) {
     console.error("Add comment error:", error);
     return actionError(
-      error instanceof Error ? error.message : "Failed to add comment",
+      isError(error) ? error.message : "Failed to add comment",
     );
   }
 }
@@ -321,29 +544,46 @@ export async function updateIssueAssignmentAction(
   formData: FormData,
 ): Promise<ActionResult<{ assigneeId: string | null }>> {
   try {
-    const { user, organizationId, membership } = await requireAuthContextWithRole();
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization, membership } = authContext;
+    const organizationId = organization.id;
 
     // Enhanced validation
     const validation = validateFormData(formData, updateIssueAssignmentSchema);
     if (!validation.success) {
-      return validation;
+      return validation as ActionResult<{ assigneeId: string | null }>;
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
-    await requirePermission(membership, PERMISSIONS.ISSUE_ASSIGN, db);
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.ISSUE_EDIT,
+      db,
+    ); // was ISSUE_ASSIGN (deprecated)
 
     // Get current assignee for notification comparison
     const currentIssue = await db.query.issues.findFirst({
-      where: and(eq(issues.id, issueId), eq(issues.organization_id, organizationId)),
+      where: and(
+        eq(issues.id, issueId),
+        eq(issues.organization_id, organizationId),
+      ),
       columns: { assigned_to_id: true },
     });
 
-    const previousAssigneeId = currentIssue?.assigned_to_id || null;
+    const previousAssigneeId = currentIssue?.assigned_to_id ?? null;
+
+    // Handle special "unassigned" case
+    const assigneeId =
+      validation.data.assigneeId === "unassigned"
+        ? null
+        : (validation.data.assigneeId ?? null);
 
     // Update assignment with organization scoping
     const [updatedIssue] = await db
       .update(issues)
-      .set({ assigned_to_id: validation.data.assigneeId || null })
+      .set({ assigned_to_id: assigneeId })
       .where(
         and(eq(issues.id, issueId), eq(issues.organization_id, organizationId)),
       )
@@ -362,21 +602,24 @@ export async function updateIssueAssignmentAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(`Issue ${issueId} assignment updated by ${user.email}`);
-      
+
       // Generate notifications for assignment change
       try {
         await generateAssignmentNotifications(
-          issueId, 
-          validation.data.assigneeId || null, 
+          issueId,
+          assigneeId,
           previousAssigneeId,
           {
             organizationId,
             actorId: user.id,
-            actorName: user.user_metadata?.['name'] as string || user.email || 'Someone',
-          }
+            actorName: user.name ?? user.email,
+          },
         );
       } catch (error) {
-        console.error('Failed to generate assignment change notifications:', error);
+        console.error(
+          "Failed to generate assignment change notifications:",
+          getErrorMessage(error),
+        );
       }
     });
 
@@ -387,7 +630,7 @@ export async function updateIssueAssignmentAction(
   } catch (error) {
     console.error("Update issue assignment error:", error);
     return actionError(
-      error instanceof Error ? error.message : "Failed to update assignment",
+      isError(error) ? error.message : "Failed to update assignment",
     );
   }
 }
@@ -400,26 +643,34 @@ export async function bulkUpdateIssuesAction(
   formData: FormData,
 ): Promise<ActionResult<{ updatedCount: number }>> {
   try {
-    const { user, organizationId, membership } = await requireAuthContextWithRole();
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization, membership } = authContext;
+    const organizationId = organization.id;
 
     // Parse JSON data from form
-    const jsonData = formData.get("data") as string;
-    if (!jsonData) {
+    const jsonData = formData.get("data");
+    if (!jsonData || typeof jsonData !== "string") {
       return actionError("No data provided for bulk update");
     }
 
-    const data = JSON.parse(jsonData);
+    const data: unknown = JSON.parse(jsonData);
     const validation = bulkUpdateIssuesSchema.safeParse(data);
     if (!validation.success) {
       return actionError("Invalid bulk update data");
     }
 
-    const db = getGlobalDatabaseProvider().getClient();
-    await requirePermission(membership, PERMISSIONS.ISSUE_BULK_MANAGE, db);
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.ISSUE_EDIT,
+      db,
+    ); // was ISSUE_BULK_MANAGE (deprecated)
     const { issueIds, statusId, assigneeId } = validation.data;
 
     // Build update object
-    const updateData: any = {};
+    const updateData: Partial<typeof issues.$inferInsert> = {};
     if (statusId) updateData.status_id = statusId;
     if (assigneeId !== undefined) updateData.assigned_to_id = assigneeId;
 
@@ -445,18 +696,21 @@ export async function bulkUpdateIssuesAction(
     revalidateTag("issues");
 
     // Background processing
-    runAfterResponse(async () => {
-      console.log(`Bulk updated ${updatedIssues.length} issues by ${user.email}`);
+    runAfterResponse(() => {
+      console.log(
+        `Bulk updated ${String(updatedIssues.length)} issues by ${user.email}`,
+      );
+      return Promise.resolve();
     });
 
     return actionSuccess(
       { updatedCount: updatedIssues.length },
-      `Successfully updated ${updatedIssues.length} issue${updatedIssues.length !== 1 ? "s" : ""}`,
+      `Successfully updated ${String(updatedIssues.length)} issue${updatedIssues.length !== 1 ? "s" : ""}`,
     );
   } catch (error) {
     console.error("Bulk update issues error:", error);
     return actionError(
-      error instanceof Error ? error.message : "Failed to bulk update issues",
+      isError(error) ? error.message : "Failed to bulk update issues",
     );
   }
 }

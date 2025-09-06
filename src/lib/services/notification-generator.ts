@@ -4,7 +4,7 @@
  */
 
 import { db } from "~/lib/dal/shared";
-import { notifications, issues } from "~/server/db/schema";
+import { issues, notifications } from "~/server/db/schema";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { createNotificationActionUrl } from "~/lib/dal/notifications";
 import { eq, and } from "drizzle-orm";
@@ -12,18 +12,22 @@ import { eq, and } from "drizzle-orm";
 /**
  * Notification types that can be generated
  */
-export type NotificationType = 
-  | "ISSUE_CREATED" 
-  | "ISSUE_UPDATED" 
-  | "ISSUE_ASSIGNED" 
-  | "ISSUE_COMMENTED" 
+export type NotificationType =
+  | "ISSUE_CREATED"
+  | "ISSUE_UPDATED"
+  | "ISSUE_ASSIGNED"
+  | "ISSUE_COMMENTED"
   | "MACHINE_ASSIGNED"
   | "SYSTEM_ANNOUNCEMENT";
 
 /**
  * Entity types for notifications
  */
-export type NotificationEntityType = "ISSUE" | "MACHINE" | "COMMENT" | "ORGANIZATION";
+export type NotificationEntityType =
+  | "ISSUE"
+  | "MACHINE"
+  | "COMMENT"
+  | "ORGANIZATION";
 
 /**
  * Notification generation context
@@ -52,14 +56,14 @@ async function createNotificationForUser(
   userId: string,
   notificationData: BaseNotificationData,
   context: NotificationContext,
-) {
+): Promise<string | null> {
   // Don't notify the actor of their own actions
   if (userId === context.actorId) {
     return null;
   }
 
   const notificationId = generatePrefixedId("notification");
-  
+
   await db.insert(notifications).values({
     id: notificationId,
     user_id: userId,
@@ -68,7 +72,12 @@ async function createNotificationForUser(
     entity_type: notificationData.entityType,
     entity_id: notificationData.entityId,
     message: notificationData.message,
-    action_url: notificationData.actionUrl || createNotificationActionUrl(notificationData.entityType, notificationData.entityId),
+    action_url:
+      notificationData.actionUrl ??
+      createNotificationActionUrl(
+        notificationData.entityType,
+        notificationData.entityId,
+      ),
     read: false,
   });
 
@@ -78,9 +87,22 @@ async function createNotificationForUser(
 /**
  * Get users who should be notified about an issue
  */
-async function getIssueStakeholders(issueId: string, organizationId: string) {
+async function getIssueStakeholders(
+  issueId: string,
+  organizationId: string,
+): Promise<
+  {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  }[]
+> {
   const issue = await db.query.issues.findFirst({
-    where: and(eq(issues.id, issueId), eq(issues.organization_id, organizationId)),
+    where: and(
+      eq(issues.id, issueId),
+      eq(issues.organization_id, organizationId),
+    ),
     with: {
       assignedTo: {
         columns: { id: true, name: true, email: true },
@@ -101,14 +123,19 @@ async function getIssueStakeholders(issueId: string, organizationId: string) {
 
   if (!issue) return [];
 
-  const stakeholders: { id: string; name: string; email: string; role: string }[] = [];
+  const stakeholders: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  }[] = [];
 
   // Add assignee
   if (issue.assignedTo) {
     stakeholders.push({
       ...issue.assignedTo,
-      name: issue.assignedTo.name || issue.assignedTo.email || "Unknown User",
-      email: issue.assignedTo.email || "",
+      name: issue.assignedTo.name ?? issue.assignedTo.email ?? "Unknown User",
+      email: issue.assignedTo.email ?? "",
       role: "assignee",
     });
   }
@@ -117,29 +144,33 @@ async function getIssueStakeholders(issueId: string, organizationId: string) {
   if (issue.createdBy) {
     stakeholders.push({
       ...issue.createdBy,
-      name: issue.createdBy.name || issue.createdBy.email || "Unknown User",
-      email: issue.createdBy.email || "",
+      name: issue.createdBy.name ?? issue.createdBy.email ?? "Unknown User",
+      email: issue.createdBy.email ?? "",
       role: "creator",
     });
   }
 
   // Add machine owner
-  if (issue.machine?.owner) {
+  if (issue.machine.owner) {
     stakeholders.push({
       ...issue.machine.owner,
-      name: issue.machine.owner.name || issue.machine.owner.email || "Unknown User",
-      email: issue.machine.owner.email || "",
+      name:
+        issue.machine.owner.name ?? issue.machine.owner.email ?? "Unknown User",
+      email: issue.machine.owner.email ?? "",
       role: "machine_owner",
     });
   }
 
   // Remove duplicates by user ID
-  const uniqueStakeholders = stakeholders.reduce<typeof stakeholders>((acc, stakeholder) => {
-    if (!acc.find(s => s.id === stakeholder.id)) {
-      acc.push(stakeholder);
-    }
-    return acc;
-  }, []);
+  const uniqueStakeholders = stakeholders.reduce<typeof stakeholders>(
+    (acc, stakeholder) => {
+      if (!acc.find((s) => s.id === stakeholder.id)) {
+        acc.push(stakeholder);
+      }
+      return acc;
+    },
+    [],
+  );
 
   return uniqueStakeholders;
 }
@@ -151,11 +182,14 @@ export async function generateCommentNotifications(
   issueId: string,
   _commentId: string,
   context: NotificationContext,
-) {
+): Promise<string[]> {
   try {
     // Get issue details and stakeholders
     const issue = await db.query.issues.findFirst({
-      where: and(eq(issues.id, issueId), eq(issues.organization_id, context.organizationId)),
+      where: and(
+        eq(issues.id, issueId),
+        eq(issues.organization_id, context.organizationId),
+      ),
       columns: { id: true, title: true },
       with: {
         machine: {
@@ -169,10 +203,13 @@ export async function generateCommentNotifications(
       return [];
     }
 
-    const stakeholders = await getIssueStakeholders(issueId, context.organizationId);
+    const stakeholders = await getIssueStakeholders(
+      issueId,
+      context.organizationId,
+    );
     const notificationIds: string[] = [];
 
-    const message = `${context.actorName} commented on issue "${issue.title}" (${issue.machine?.name || 'Unknown Machine'})`;
+    const message = `${context.actorName} commented on issue "${issue.title}" (${issue.machine.name})`;
 
     // Create notifications for all stakeholders
     for (const stakeholder of stakeholders) {
@@ -193,7 +230,9 @@ export async function generateCommentNotifications(
       }
     }
 
-    console.log(`Generated ${notificationIds.length} comment notifications for issue ${issueId}`);
+    console.log(
+      `Generated ${String(notificationIds.length)} comment notifications for issue ${issueId}`,
+    );
     return notificationIds;
   } catch (error) {
     console.error("Failed to generate comment notifications:", error);
@@ -209,10 +248,13 @@ export async function generateAssignmentNotifications(
   newAssigneeId: string | null,
   _previousAssigneeId: string | null,
   context: NotificationContext,
-) {
+): Promise<string[]> {
   try {
     const issue = await db.query.issues.findFirst({
-      where: and(eq(issues.id, issueId), eq(issues.organization_id, context.organizationId)),
+      where: and(
+        eq(issues.id, issueId),
+        eq(issues.organization_id, context.organizationId),
+      ),
       columns: { id: true, title: true },
       with: {
         machine: {
@@ -227,7 +269,7 @@ export async function generateAssignmentNotifications(
     }
 
     const notificationIds: string[] = [];
-    const message = `${context.actorName} assigned you to issue "${issue.title}" (${issue.machine?.name || 'Unknown Machine'})`;
+    const message = `${context.actorName} assigned you to issue "${issue.title}" (${issue.machine.name})`;
 
     // Notify new assignee (if different from actor)
     if (newAssigneeId && newAssigneeId !== context.actorId) {
@@ -247,7 +289,9 @@ export async function generateAssignmentNotifications(
       }
     }
 
-    console.log(`Generated ${notificationIds.length} assignment notifications for issue ${issueId}`);
+    console.log(
+      `Generated ${String(notificationIds.length)} assignment notifications for issue ${issueId}`,
+    );
     return notificationIds;
   } catch (error) {
     console.error("Failed to generate assignment notifications:", error);
@@ -262,10 +306,13 @@ export async function generateStatusChangeNotifications(
   issueId: string,
   newStatusName: string,
   context: NotificationContext,
-) {
+): Promise<string[]> {
   try {
     const issue = await db.query.issues.findFirst({
-      where: and(eq(issues.id, issueId), eq(issues.organization_id, context.organizationId)),
+      where: and(
+        eq(issues.id, issueId),
+        eq(issues.organization_id, context.organizationId),
+      ),
       columns: { id: true, title: true },
       with: {
         machine: {
@@ -275,14 +322,19 @@ export async function generateStatusChangeNotifications(
     });
 
     if (!issue) {
-      console.error(`Issue ${issueId} not found for status change notification`);
+      console.error(
+        `Issue ${issueId} not found for status change notification`,
+      );
       return [];
     }
 
-    const stakeholders = await getIssueStakeholders(issueId, context.organizationId);
+    const stakeholders = await getIssueStakeholders(
+      issueId,
+      context.organizationId,
+    );
     const notificationIds: string[] = [];
 
-    const message = `${context.actorName} updated the status of "${issue.title}" to ${newStatusName} (${issue.machine?.name || 'Unknown Machine'})`;
+    const message = `${context.actorName} updated the status of "${issue.title}" to ${newStatusName} (${issue.machine.name})`;
 
     // Create notifications for all stakeholders
     for (const stakeholder of stakeholders) {
@@ -302,7 +354,9 @@ export async function generateStatusChangeNotifications(
       }
     }
 
-    console.log(`Generated ${notificationIds.length} status change notifications for issue ${issueId}`);
+    console.log(
+      `Generated ${String(notificationIds.length)} status change notifications for issue ${issueId}`,
+    );
     return notificationIds;
   } catch (error) {
     console.error("Failed to generate status change notifications:", error);
@@ -316,10 +370,13 @@ export async function generateStatusChangeNotifications(
 export async function generateIssueCreationNotifications(
   issueId: string,
   context: NotificationContext,
-) {
+): Promise<string[]> {
   try {
     const issue = await db.query.issues.findFirst({
-      where: and(eq(issues.id, issueId), eq(issues.organization_id, context.organizationId)),
+      where: and(
+        eq(issues.id, issueId),
+        eq(issues.organization_id, context.organizationId),
+      ),
       columns: { id: true, title: true },
       with: {
         machine: {
@@ -339,10 +396,10 @@ export async function generateIssueCreationNotifications(
     }
 
     const notificationIds: string[] = [];
-    const message = `New issue "${issue.title}" reported for ${issue.machine?.name || 'Unknown Machine'}`;
+    const message = `New issue "${issue.title}" reported for ${issue.machine.name}`;
 
     // Notify machine owner (if different from creator)
-    if (issue.machine?.owner && issue.machine.owner.id !== context.actorId) {
+    if (issue.machine.owner && issue.machine.owner.id !== context.actorId) {
       const notificationId = await createNotificationForUser(
         issue.machine.owner.id,
         {
@@ -359,7 +416,9 @@ export async function generateIssueCreationNotifications(
       }
     }
 
-    console.log(`Generated ${notificationIds.length} issue creation notifications for issue ${issueId}`);
+    console.log(
+      `Generated ${String(notificationIds.length)} issue creation notifications for issue ${issueId}`,
+    );
     return notificationIds;
   } catch (error) {
     console.error("Failed to generate issue creation notifications:", error);

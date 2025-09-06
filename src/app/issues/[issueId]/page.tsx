@@ -3,8 +3,8 @@ import { notFound } from "next/navigation";
 import * as React from "react";
 
 import { IssueDetailServer } from "~/components/issues/issue-detail-server";
-import { requireMemberAccess } from "~/lib/organization-context";
-import { getIssueById } from "~/lib/dal/issues";
+import { AuthGuard } from "~/components/auth/auth-guard";
+import { getRequestAuthContext } from "~/server/auth/context";
 
 interface IssuePageProps {
   params: Promise<{
@@ -15,46 +15,64 @@ interface IssuePageProps {
 export async function generateMetadata({
   params,
 }: IssuePageProps): Promise<Metadata> {
-  try {
-    const resolvedParams = await params;
-    // Ensure authentication before generating metadata
-    await requireMemberAccess();
-    const issue = await getIssueById(resolvedParams.issueId);
-
-    return {
-      title: `${issue.title} - PinPoint`,
-      description: issue.description?.slice(0, 160) ?? "Issue details",
-      openGraph: {
-        title: issue.title,
-        description: issue.description ?? "Issue details",
-        type: "article",
-      },
-    };
-  } catch {
-    return {
-      title: "Issue Not Found - PinPoint",
-      description: "The requested issue could not be found.",
-    };
-  }
+  // Generic metadata to avoid auth race conditions - specific details set at page level
+  const resolvedParams = await params;
+  return {
+    title: `Issue ${resolvedParams.issueId} - PinPoint`,
+    description: "Issue details and management",
+  };
 }
 
-export default async function IssuePage({
+async function IssueContent({
   params,
-}: IssuePageProps): Promise<React.JSX.Element> {
+  authContext,
+}: {
+  params: IssuePageProps["params"];
+  authContext: Extract<
+    Awaited<ReturnType<typeof getRequestAuthContext>>,
+    { kind: "authorized" }
+  >;
+}): Promise<React.JSX.Element> {
   try {
-    // Authentication and organization membership validation
-    await requireMemberAccess();
-
     // Resolve params for issue ID
     const resolvedParams = await params;
 
     return (
       <main aria-label="Issue details" className="container mx-auto px-4 py-6">
-        <IssueDetailServer issueId={resolvedParams.issueId} />
+        <IssueDetailServer
+          issueId={resolvedParams.issueId}
+          organizationId={authContext.org.id}
+          userId={authContext.user.id}
+        />
       </main>
     );
   } catch {
     // If issue doesn't exist or user doesn't have access, show 404
     notFound();
   }
+}
+
+export default async function IssuePage({
+  params,
+}: IssuePageProps): Promise<React.JSX.Element> {
+  // Single authentication resolution for entire request
+  const authContext = await getRequestAuthContext();
+
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Issue Access Required"
+      fallbackMessage="You need to be signed in as a member to view issue details."
+    >
+      <IssueContent
+        params={params}
+        authContext={
+          authContext as Extract<
+            Awaited<ReturnType<typeof getRequestAuthContext>>,
+            { kind: "authorized" }
+          >
+        }
+      />
+    </AuthGuard>
+  );
 }

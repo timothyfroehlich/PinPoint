@@ -1,8 +1,13 @@
 import { Suspense } from "react";
+import { type Metadata } from "next";
 import { type SearchEntity } from "~/lib/services/search-service";
-import { UniversalSearchResults, UniversalSearchResultsSkeleton } from "~/components/search/universal-search-results";
-import { UniversalSearchInput } from "~/components/search/universal-search-input";
-import { requireMemberAccess } from "~/lib/organization-context";
+import {
+  UniversalSearchResults,
+  UniversalSearchResultsSkeleton,
+} from "~/components/search/universal-search-results";
+import { UniversalSearch } from "~/components/search/universal-search";
+import { AuthGuard } from "~/components/auth/auth-guard";
+import { getRequestAuthContext } from "~/server/auth/context";
 
 // Force dynamic rendering for search pages
 export const dynamic = "force-dynamic";
@@ -11,17 +16,20 @@ interface SearchPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export async function generateMetadata({ searchParams }: SearchPageProps) {
+export async function generateMetadata({
+  searchParams,
+}: SearchPageProps): Promise<Metadata> {
   const params = await searchParams;
   const query = typeof params["q"] === "string" ? params["q"] : "";
-  
+
   if (!query) {
     return {
       title: "Search - PinPoint",
-      description: "Search across issues, machines, locations, and team members in PinPoint",
+      description:
+        "Search across issues, machines, locations, and team members in PinPoint",
     };
   }
-  
+
   return {
     title: `Search results for "${query}" - PinPoint`,
     description: `Search results for "${query}" across issues, machines, locations, and team members in PinPoint`,
@@ -33,20 +41,27 @@ export async function generateMetadata({ searchParams }: SearchPageProps) {
   };
 }
 
-export default async function SearchPage({ searchParams }: SearchPageProps) {
-  // Authentication validation with automatic redirect
-  await requireMemberAccess();
-
+async function SearchContent({
+  searchParams,
+}: SearchPageProps): Promise<React.JSX.Element> {
   const params = await searchParams;
   const query = typeof params["q"] === "string" ? params["q"].trim() : "";
-  const entitiesParam = typeof params["entities"] === "string" ? params["entities"] : "all";
-  const page = typeof params["page"] === "string" ? Math.max(1, parseInt(params["page"], 10)) : 1;
-  const limit = typeof params["limit"] === "string" ? Math.min(50, Math.max(1, parseInt(params["limit"], 10))) : 20;
+  const entitiesParam =
+    typeof params["entities"] === "string" ? params["entities"] : "all";
+  const page =
+    typeof params["page"] === "string"
+      ? Math.max(1, parseInt(params["page"], 10))
+      : 1;
+  const limit =
+    typeof params["limit"] === "string"
+      ? Math.min(50, Math.max(1, parseInt(params["limit"], 10)))
+      : 20;
 
   // Parse entities
-  const entities: SearchEntity[] = entitiesParam === "all" 
-    ? ["all"]
-    : entitiesParam.split(",").filter(Boolean) as SearchEntity[];
+  const entities: SearchEntity[] =
+    entitiesParam === "all"
+      ? ["all"]
+      : (entitiesParam.split(",").filter(Boolean) as SearchEntity[]);
 
   return (
     <div className="space-y-8">
@@ -61,7 +76,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
         {/* Universal Search Input */}
         <div className="max-w-2xl">
-          <UniversalSearchInput
+          <UniversalSearch
             placeholder="Search issues, machines, users, locations..."
             showSuggestions={true}
             showRecentSearches={true}
@@ -77,15 +92,24 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             <ul className="text-sm text-muted-foreground space-y-2">
               <li className="flex items-start gap-2">
                 <span className="text-primary">•</span>
-                <span>Search for <strong>issue titles</strong>, <strong>machine names</strong>, <strong>locations</strong>, or <strong>team members</strong></span>
+                <span>
+                  Search for <strong>issue titles</strong>,{" "}
+                  <strong>machine names</strong>, <strong>locations</strong>, or{" "}
+                  <strong>team members</strong>
+                </span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-tertiary">•</span>
-                <span>Use specific terms like machine models, issue priorities, or location names</span>
+                <span>
+                  Use specific terms like machine models, issue priorities, or
+                  location names
+                </span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-primary">•</span>
-                <span>Results show the most relevant matches across all entity types</span>
+                <span>
+                  Results show the most relevant matches across all entity types
+                </span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-secondary">•</span>
@@ -99,7 +123,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       {/* Search Results */}
       {query && (
         <Suspense fallback={<UniversalSearchResultsSkeleton />}>
-          <SearchResultsWithData 
+          <SearchResultsWithData
             query={query}
             entities={entities}
             page={page}
@@ -111,18 +135,35 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   );
 }
 
+export default async function SearchPage({
+  searchParams,
+}: SearchPageProps): Promise<React.JSX.Element> {
+  // Authentication validation with automatic redirect
+  const authContext = await getRequestAuthContext();
+
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Search Access Required"
+      fallbackMessage="You need to be signed in as a member to search across your organization's data."
+    >
+      <SearchContent searchParams={searchParams} />
+    </AuthGuard>
+  );
+}
+
 // Server Component for search results with data
-async function SearchResultsWithData({ 
-  query, 
-  entities, 
-  page, 
-  limit 
+function SearchResultsWithData({
+  query,
+  entities,
+  page,
+  limit,
 }: {
   query: string;
   entities: SearchEntity[];
   page: number;
   limit: number;
-}) {
+}): React.JSX.Element {
   return (
     <UniversalSearchResults
       query={query}

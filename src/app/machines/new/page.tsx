@@ -6,7 +6,8 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "~/components/ui/button";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { AuthGuard } from "~/components/auth/auth-guard";
+import { getRequestAuthContext } from "~/server/auth/context";
 import { getLocationsForOrg, getModelsForOrg } from "~/lib/dal/machines";
 import { createMachineAction } from "~/lib/actions/machine-actions";
 import { CreateMachineFormClient } from "~/components/machines/client/create-machine-form-client";
@@ -16,13 +17,39 @@ export const metadata = {
   description: "Add a new pinball machine to your inventory",
 };
 
-export default async function NewMachinePage() {
-  await requireMemberAccess();
-  
+export default async function NewMachinePage(): Promise<React.JSX.Element> {
+  const authContext = await getRequestAuthContext();
+
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Machine Access Required"
+      fallbackMessage="You need to be signed in as a member to add new machines."
+    >
+      <NewMachinePageContent
+        authContext={
+          authContext as Extract<
+            Awaited<ReturnType<typeof getRequestAuthContext>>,
+            { kind: "authorized" }
+          >
+        }
+      />
+    </AuthGuard>
+  );
+}
+
+async function NewMachinePageContent({
+  authContext,
+}: {
+  authContext: Extract<
+    Awaited<ReturnType<typeof getRequestAuthContext>>,
+    { kind: "authorized" }
+  >;
+}): Promise<React.JSX.Element> {
   // Fetch required data for form
   const [locations, models] = await Promise.all([
-    getLocationsForOrg(),
-    getModelsForOrg(),
+    getLocationsForOrg(authContext.org.id),
+    getModelsForOrg(authContext.org.id),
   ]);
 
   return (

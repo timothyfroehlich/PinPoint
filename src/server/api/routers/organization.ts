@@ -3,8 +3,14 @@ import { TRPCError } from "@trpc/server";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
+// Validation schemas
+import { nameSchema } from "~/lib/validation/schemas";
+
 // Internal types (alphabetical)
-import type { OrganizationResponse, PublicOrganizationMinimal } from "~/lib/types/api";
+import type {
+  OrganizationResponse,
+  PublicOrganizationMinimal,
+} from "~/lib/types/api";
 
 // Internal utilities (alphabetical)
 import { transformKeysToCamelCase } from "~/lib/utils/case-transformers";
@@ -32,7 +38,7 @@ export const organizationRouter = createTRPCRouter({
   update: organizationManageProcedure
     .input(
       z.object({
-        name: z.string().min(1),
+        name: nameSchema,
         logoUrl: z.url().optional(),
       }),
     )
@@ -60,13 +66,26 @@ export const organizationRouter = createTRPCRouter({
     }),
 
   // Public minimal listing for sign-in/landing (anon-safe)
-  listPublic: publicProcedure.query(async ({ ctx }): Promise<PublicOrganizationMinimal[]> => {
-    const result = await ctx.db.execute(
-      sql`SELECT id, name, subdomain, logo_url FROM public_organizations_minimal ORDER BY name`,
-    );
+  listPublic: publicProcedure.query(
+    async ({ ctx }): Promise<PublicOrganizationMinimal[]> => {
+      const result = await ctx.db.execute(
+        sql`SELECT id, name, subdomain, logo_url FROM public_organizations_minimal ORDER BY name`,
+      );
 
-    // Drizzle returns a driver-specific result; normalize rows
-    const rows = (result as unknown as { rows: Array<{ id: string; name: string; subdomain: string; logo_url: string | null }> }).rows ?? [];
-    return rows.map((r) => ({ id: r.id, name: r.name, subdomain: r.subdomain, logoUrl: r.logo_url }));
-  }),
+      // Convert RowList to typed array (TypeScript requires 'unknown' intermediate step)
+      const rows = result as unknown as {
+        id: string;
+        name: string;
+        subdomain: string;
+        logo_url: string | null;
+      }[];
+
+      return rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        subdomain: r.subdomain,
+        logoUrl: r.logo_url,
+      }));
+    },
+  ),
 });

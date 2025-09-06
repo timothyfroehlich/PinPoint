@@ -38,7 +38,7 @@ export function AdvancedFiltersDropdown({
   onAssigneeChange,
   onReporterChange,
   onOwnerChange,
-}: AdvancedFiltersDropdownProps) {
+}: AdvancedFiltersDropdownProps): JSX.Element {
   const [open, setOpen] = useState(false);
 
   const { data: users, isLoading } = api.user.getAllInOrganization.useQuery();
@@ -56,14 +56,17 @@ export function AdvancedFiltersDropdown({
           size="sm"
           className={cn(
             "min-w-[120px] justify-between",
-            activeFilters > 0 && "border-primary text-primary"
+            activeFilters > 0 && "border-primary text-primary",
           )}
         >
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4" />
             <span>Filters</span>
             {activeFilters > 0 && (
-              <Badge variant="default" className="h-4 w-4 p-0 text-[10px] min-w-[16px]">
+              <Badge
+                variant="default"
+                className="h-4 w-4 p-0 text-[10px] min-w-[16px]"
+              >
                 {activeFilters}
               </Badge>
             )}
@@ -74,9 +77,7 @@ export function AdvancedFiltersDropdown({
 
       <PopoverContent className="w-80 p-4">
         <div className="space-y-4">
-          <h4 className="text-sm font-semibold">
-            Advanced Filters
-          </h4>
+          <h4 className="text-sm font-semibold">Advanced Filters</h4>
 
           <div className="space-y-2">
             <Label htmlFor="assignee-filter" className="text-xs font-medium">
@@ -92,10 +93,14 @@ export function AdvancedFiltersDropdown({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="">
-                  <span className="italic text-muted-foreground">Any Assignee</span>
+                  <span className="italic text-muted-foreground">
+                    Any Assignee
+                  </span>
                 </SelectItem>
                 <SelectItem value="unassigned">
-                  <span className="italic text-muted-foreground">Unassigned</span>
+                  <span className="italic text-muted-foreground">
+                    Unassigned
+                  </span>
                 </SelectItem>
                 {users && users.length > 0 && (
                   <>
@@ -125,7 +130,9 @@ export function AdvancedFiltersDropdown({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="">
-                  <span className="italic text-muted-foreground">Any Reporter</span>
+                  <span className="italic text-muted-foreground">
+                    Any Reporter
+                  </span>
                 </SelectItem>
                 {users?.map((user) => (
                   <SelectItem key={user.id} value={user.id}>
@@ -150,7 +157,9 @@ export function AdvancedFiltersDropdown({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="">
-                  <span className="italic text-muted-foreground">Any Owner</span>
+                  <span className="italic text-muted-foreground">
+                    Any Owner
+                  </span>
                 </SelectItem>
                 {users?.map((user) => (
                   <SelectItem key={user.id} value={user.id}>
@@ -162,7 +171,12 @@ export function AdvancedFiltersDropdown({
           </div>
 
           <div className="flex justify-end pt-2">
-            <Button size="sm" onClick={() => setOpen(false)}>
+            <Button
+              size="sm"
+              onClick={() => {
+                setOpen(false);
+              }}
+            >
               Done
             </Button>
           </div>

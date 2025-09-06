@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, type JSX, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 import { AuthProvider } from "./auth-provider";
 
@@ -10,7 +10,7 @@ export default function Providers({
   children,
 }: {
   children: ReactNode;
-}): JSX.Element {
+}): React.JSX.Element {
   // Prevent hydration mismatch by ensuring client-side rendering consistency
   const [mounted, setMounted] = useState(false);
 

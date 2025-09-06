@@ -13,8 +13,11 @@ import {
   memberships,
   roles,
   issueStatuses,
+  priorities,
 } from "~/server/db/schema";
-import { db, requireAuthContext } from "./shared";
+import { db } from "./shared";
+import { withOrgRLS } from "~/server/db/utils/rls";
+import { safeCount, type CountResult } from "~/lib/types/database-results";
 
 /**
  * Get organization by ID with caching
@@ -22,28 +25,31 @@ import { db, requireAuthContext } from "./shared";
  * Uses React 19 cache() for request-level memoization
  */
 export const getOrganizationById = cache(async (organizationId: string) => {
-  const organization = await db.query.organizations.findFirst({
-    where: eq(organizations.id, organizationId),
-    columns: {
-      id: true,
-      name: true,
-      subdomain: true,
-      logo_url: true,
-      // Phase 4B.1: Organization profile fields
-      description: true,
-      website: true,
-      phone: true,
-      address: true,
-      created_at: true,
-      updated_at: true,
-    },
+  return withOrgRLS(db, organizationId, async (tx) => {
+    const organization = await tx.query.organizations.findFirst({
+      where: eq(organizations.id, organizationId),
+      columns: {
+        id: true,
+        name: true,
+        subdomain: true,
+        logo_url: true,
+        // Phase 4B.1: Organization profile fields
+        description: true,
+        website: true,
+        phone: true,
+        address: true,
+        allow_anonymous_issues: true,
+        created_at: true,
+        updated_at: true,
+      },
+    });
+
+    if (!organization) {
+      throw new Error("Organization not found");
+    }
+
+    return organization;
   });
-
-  if (!organization) {
-    throw new Error("Organization not found");
-  }
-
-  return organization;
 });
 
 /**
@@ -51,9 +57,27 @@ export const getOrganizationById = cache(async (organizationId: string) => {
  * Uses authenticated context to get organization with automatic scoping
  * Uses React 19 cache() for request-level memoization
  */
-export const getCurrentOrganization = cache(async () => {
-  const { organizationId } = await requireAuthContext();
-  return await getOrganizationById(organizationId);
+export const getCurrentOrganization = cache(async (organizationId: string) => {
+  return withOrgRLS(db, organizationId, async (tx) => {
+    const org = await tx.query.organizations.findFirst({
+      where: eq(organizations.id, organizationId),
+      columns: {
+        id: true,
+        name: true,
+        subdomain: true,
+        logo_url: true,
+        description: true,
+        website: true,
+        phone: true,
+        address: true,
+        allow_anonymous_issues: true,
+        created_at: true,
+        updated_at: true,
+      },
+    });
+    if (!org) throw new Error("Organization not found");
+    return org;
+  });
 });
 
 /**
@@ -61,121 +85,168 @@ export const getCurrentOrganization = cache(async () => {
  * Includes issues, machines, and member counts with parallel queries
  * Uses React 19 cache() for request-level memoization
  */
-export const getOrganizationStats = cache(async () => {
-  const { organizationId } = await requireAuthContext();
+export const getOrganizationStats = cache(async (organizationId: string) => {
+  return withOrgRLS(db, organizationId, async (tx) => {
+    const [issueStats, machineCount, memberCount] = await Promise.all([
+      tx
+        .select({
+          total: count(issues.id),
+          new: sql<number>`count(*) filter (where ${issueStatuses.category} = 'NEW')`,
+          inProgress: sql<number>`count(*) filter (where ${issueStatuses.category} = 'IN_PROGRESS')`,
+          resolved: sql<number>`count(*) filter (where ${issueStatuses.category} = 'RESOLVED')`,
+        })
+        .from(issues)
+        .innerJoin(issueStatuses, eq(issues.status_id, issueStatuses.id))
+        .where(eq(issues.organization_id, organizationId)),
 
-  // Execute all statistics queries in parallel for performance
-  const [issueStats, machineCount, memberCount] = await Promise.all([
-    // Issue statistics with status category breakdown using JOINs for type safety
-    db
-      .select({
-        total: count(issues.id),
-        new: sql<number>`count(*) filter (where ${issueStatuses.category} = 'NEW')`,
-        inProgress: sql<number>`count(*) filter (where ${issueStatuses.category} = 'IN_PROGRESS')`,
-        resolved: sql<number>`count(*) filter (where ${issueStatuses.category} = 'RESOLVED')`,
-      })
-      .from(issues)
-      .innerJoin(issueStatuses, eq(issues.status_id, issueStatuses.id))
-      .where(eq(issues.organization_id, organizationId)),
+      tx
+        .select({ count: count() })
+        .from(machines)
+        .where(eq(machines.organization_id, organizationId)),
 
-    // Machine count
-    db
-      .select({ count: count() })
-      .from(machines)
-      .where(eq(machines.organization_id, organizationId)),
+      tx
+        .select({ count: count() })
+        .from(memberships)
+        .where(eq(memberships.organization_id, organizationId)),
+    ]);
 
-    // Active member count
-    db
-      .select({ count: count() })
-      .from(memberships)
-      .where(eq(memberships.organization_id, organizationId)),
-  ]);
-
-  return {
-    issues: {
-      total: issueStats[0]?.total ?? 0,
-      new: issueStats[0]?.new ?? 0,
-      inProgress: issueStats[0]?.inProgress ?? 0,
-      resolved: issueStats[0]?.resolved ?? 0,
-    },
-    machines: {
-      total: machineCount[0]?.count ?? 0,
-    },
-    members: {
-      total: memberCount[0]?.count ?? 0,
-    },
-  };
+    return {
+      issues: {
+        total: issueStats[0]?.total ?? 0,
+        new: issueStats[0]?.new ?? 0,
+        inProgress: issueStats[0]?.inProgress ?? 0,
+        resolved: issueStats[0]?.resolved ?? 0,
+      },
+      machines: {
+        total: safeCount(machineCount),
+      },
+      members: {
+        total: safeCount(memberCount),
+      },
+    };
+  });
 });
+
+/**
+ * Get comprehensive organization statistics by ID
+ * Alternative to getOrganizationStats when organization context is already resolved
+ * Uses React 19 cache() for request-level memoization
+ */
+export const getOrganizationStatsById = cache(
+  async (organizationId: string) => {
+    return withOrgRLS(db, organizationId, async (tx) => {
+      const [issueStats, machineCount, memberCount] = await Promise.all([
+        tx
+          .select({
+            total: count(issues.id),
+            new: sql<number>`count(*) filter (where ${issueStatuses.category} = 'NEW')`,
+            inProgress: sql<number>`count(*) filter (where ${issueStatuses.category} = 'IN_PROGRESS')`,
+            resolved: sql<number>`count(*) filter (where ${issueStatuses.category} = 'RESOLVED')`,
+          })
+          .from(issues)
+          .innerJoin(issueStatuses, eq(issues.status_id, issueStatuses.id))
+          .where(eq(issues.organization_id, organizationId)),
+
+        tx
+          .select({ count: count() })
+          .from(machines)
+          .where(eq(machines.organization_id, organizationId)),
+
+        tx
+          .select({ count: count() })
+          .from(memberships)
+          .where(eq(memberships.organization_id, organizationId)),
+      ]);
+
+      return {
+        issues: {
+          total: issueStats[0]?.total ?? 0,
+          new: issueStats[0]?.new ?? 0,
+          inProgress: issueStats[0]?.inProgress ?? 0,
+          resolved: issueStats[0]?.resolved ?? 0,
+        },
+        machines: {
+          total: safeCount(machineCount),
+        },
+        members: {
+          total: safeCount(memberCount),
+        },
+      };
+    });
+  },
+);
 
 /**
  * Get organization members with user and role information
  * Includes pagination support for large organizations
  * Uses React 19 cache() for request-level memoization per page
  */
-export const getOrganizationMembers = cache(async (page = 1, limit = 20) => {
-  const { organizationId } = await requireAuthContext();
-  const offset = (page - 1) * limit;
+export const getOrganizationMembers = cache(
+  async (page = 1, limit = 20, organizationId: string) => {
+    return withOrgRLS(db, organizationId, async (tx) => {
+      const offset = (page - 1) * limit;
 
-  const members = await db.query.memberships.findMany({
-    where: eq(memberships.organization_id, organizationId),
-    with: {
-      user: {
-        columns: {
-          id: true,
-          name: true,
-          email: true,
-          profile_picture: true,
-          created_at: true,
+      return await tx.query.memberships.findMany({
+        where: eq(memberships.organization_id, organizationId),
+        with: {
+          user: {
+            columns: {
+              id: true,
+              name: true,
+              email: true,
+              profile_picture: true,
+              created_at: true,
+            },
+          },
+          role: {
+            columns: {
+              id: true,
+              name: true,
+              is_system: true,
+              is_default: true,
+            },
+          },
         },
-      },
-      role: {
-        columns: {
-          id: true,
-          name: true,
-          is_system: true,
-          is_default: true,
-        },
-      },
-    },
-    limit,
-    offset,
-  });
-
-  return members;
-});
+        limit,
+        offset,
+      });
+    });
+  },
+);
 
 /**
  * Get organization member count for pagination
  * Uses React 19 cache() for request-level memoization
  */
-export const getOrganizationMemberCount = cache(async () => {
-  const { organizationId } = await requireAuthContext();
-
-  const result = await db
-    .select({ count: count() })
-    .from(memberships)
-    .where(eq(memberships.organization_id, organizationId));
-
-  return result[0]?.count ?? 0;
-});
+export const getOrganizationMemberCount = cache(
+  async (organizationId: string) => {
+    return withOrgRLS(db, organizationId, async (tx) => {
+      const result: CountResult[] = await tx
+        .select({ count: count() })
+        .from(memberships)
+        .where(eq(memberships.organization_id, organizationId));
+      return safeCount(result);
+    });
+  },
+);
 
 /**
  * Get organization roles for role management
  * Includes system vs custom role identification
  * Uses React 19 cache() for request-level memoization
  */
-export const getOrganizationRoles = cache(async () => {
-  const { organizationId } = await requireAuthContext();
-
-  return await db.query.roles.findMany({
-    where: eq(roles.organization_id, organizationId),
-    columns: {
-      id: true,
-      name: true,
-      is_system: true,
-      is_default: true,
-      created_at: true,
-    },
+export const getOrganizationRoles = cache(async (organizationId: string) => {
+  return withOrgRLS(db, organizationId, async (tx) => {
+    return await tx.query.roles.findMany({
+      where: eq(roles.organization_id, organizationId),
+      columns: {
+        id: true,
+        name: true,
+        is_system: true,
+        is_default: true,
+        created_at: true,
+      },
+    });
   });
 });
 
@@ -184,44 +255,128 @@ export const getOrganizationRoles = cache(async () => {
  * Returns membership with role information if valid
  * Uses React 19 cache() for request-level memoization per userId
  */
-export const validateUserMembership = cache(async (userId: string) => {
-  const { organizationId } = await requireAuthContext();
-
-  const membership = await db.query.memberships.findFirst({
-    where: and(
-      eq(memberships.user_id, userId),
-      eq(memberships.organization_id, organizationId),
-    ),
-    with: {
-      role: {
-        columns: {
-          id: true,
-          name: true,
-          is_system: true,
+export const validateUserMembership = cache(
+  async (userId: string, organizationId: string) => {
+    return withOrgRLS(db, organizationId, async (tx) => {
+      return await tx.query.memberships.findFirst({
+        where: and(
+          eq(memberships.user_id, userId),
+          eq(memberships.organization_id, organizationId),
+        ),
+        with: {
+          role: {
+            columns: {
+              id: true,
+              name: true,
+              is_system: true,
+            },
+          },
         },
-      },
-    },
-  });
-
-  return membership;
-});
+      });
+    });
+  },
+);
 
 /**
  * Get organization dashboard summary data
  * Optimized query combining key statistics for dashboard display
  * Uses React 19 cache() for request-level memoization
  */
-export const getOrganizationDashboardData = cache(async () => {
-  const { organizationId } = await requireAuthContext();
+export const getOrganizationDashboardData = cache(
+  async (organizationId: string) => {
+    return withOrgRLS(db, organizationId, async (tx) => {
+      const [organization, stats] = await Promise.all([
+        tx.query.organizations
+          .findFirst({
+            where: eq(organizations.id, organizationId),
+            columns: { id: true, name: true, subdomain: true, logo_url: true },
+          })
+          .then((o) => {
+            if (!o) throw new Error("Organization not found");
+            return o;
+          }),
+        getOrganizationStats(organizationId),
+      ]);
 
-  // Get organization info and stats in parallel
-  const [organization, stats] = await Promise.all([
-    getOrganizationById(organizationId),
-    getOrganizationStats(),
-  ]);
+      return { organization, stats };
+    });
+  },
+);
 
-  return {
-    organization,
-    stats,
-  };
+/**
+ * Get available issue statuses for organization
+ * Returns statuses that can be used for issue status updates
+ * Uses React 19 cache() for request-level memoization
+ */
+export const getAvailableStatuses = cache(async (organizationId: string) => {
+  return withOrgRLS(db, organizationId, async (tx) => {
+    return await tx.query.issueStatuses.findMany({
+      where: eq(issueStatuses.organization_id, organizationId),
+      columns: {
+        id: true,
+        name: true,
+        category: true,
+      },
+      orderBy: [issueStatuses.name],
+    });
+  });
 });
+
+/**
+ * Get available priorities for organization
+ * Returns priorities that can be used for issue creation and updates
+ * Uses React 19 cache() for request-level memoization
+ */
+export const getAvailablePriorities = cache(async (organizationId: string) => {
+  return withOrgRLS(db, organizationId, async (tx) => {
+    return await tx.query.priorities.findMany({
+      where: eq(priorities.organization_id, organizationId),
+      columns: {
+        id: true,
+        name: true,
+        order: true,
+      },
+      orderBy: [priorities.order],
+    });
+  });
+});
+
+/**
+ * Update organization settings
+ * Updates specific organization fields with organization scoping
+ */
+export const updateOrganizationSettings = cache(
+  async (
+    organizationId: string,
+    updates: Partial<{
+      allow_anonymous_issues: boolean;
+      name: string;
+      description: string;
+      website: string;
+      phone: string;
+      address: string;
+    }>,
+  ) => {
+    return withOrgRLS(db, organizationId, async (tx) => {
+      const result = await tx
+        .update(organizations)
+        .set({
+          ...updates,
+          updated_at: new Date(),
+        })
+        .where(eq(organizations.id, organizationId))
+        .returning({
+          id: organizations.id,
+          name: organizations.name,
+          allow_anonymous_issues: organizations.allow_anonymous_issues,
+          updated_at: organizations.updated_at,
+        });
+
+      if (result.length === 0) {
+        throw new Error("Organization not found or access denied");
+      }
+
+      return result[0];
+    });
+  },
+);

@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useActionState } from "react";
+import React, { useActionState } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -25,7 +25,9 @@ interface OrganizationProfileFormProps {
   };
 }
 
-export function OrganizationProfileForm({ organization }: OrganizationProfileFormProps) {
+export function OrganizationProfileForm({
+  organization,
+}: OrganizationProfileFormProps): JSX.Element {
   const [state, formAction, isPending] = useActionState(
     updateOrganizationProfileAction,
     null,
@@ -55,7 +57,9 @@ export function OrganizationProfileForm({ organization }: OrganizationProfileFor
           required
         />
         {state && !state.success && state.fieldErrors?.["name"] && (
-          <p className="text-sm text-destructive">{state.fieldErrors["name"][0]}</p>
+          <p className="text-sm text-destructive">
+            {state.fieldErrors["name"][0]}
+          </p>
         )}
       </div>
 
@@ -71,7 +75,9 @@ export function OrganizationProfileForm({ organization }: OrganizationProfileFor
           rows={3}
         />
         {state && !state.success && state.fieldErrors?.["description"] && (
-          <p className="text-sm text-destructive">{state.fieldErrors["description"][0]}</p>
+          <p className="text-sm text-destructive">
+            {state.fieldErrors["description"][0]}
+          </p>
         )}
       </div>
 
@@ -87,7 +93,9 @@ export function OrganizationProfileForm({ organization }: OrganizationProfileFor
           disabled={isPending}
         />
         {state && !state.success && state.fieldErrors?.["website"] && (
-          <p className="text-sm text-destructive">{state.fieldErrors["website"][0]}</p>
+          <p className="text-sm text-destructive">
+            {state.fieldErrors["website"][0]}
+          </p>
         )}
       </div>
 
@@ -103,7 +111,9 @@ export function OrganizationProfileForm({ organization }: OrganizationProfileFor
           disabled={isPending}
         />
         {state && !state.success && state.fieldErrors?.["phone"] && (
-          <p className="text-sm text-destructive">{state.fieldErrors["phone"][0]}</p>
+          <p className="text-sm text-destructive">
+            {state.fieldErrors["phone"][0]}
+          </p>
         )}
       </div>
 
@@ -119,7 +129,9 @@ export function OrganizationProfileForm({ organization }: OrganizationProfileFor
           rows={2}
         />
         {state && !state.success && state.fieldErrors?.["address"] && (
-          <p className="text-sm text-destructive">{state.fieldErrors["address"][0]}</p>
+          <p className="text-sm text-destructive">
+            {state.fieldErrors["address"][0]}
+          </p>
         )}
       </div>
 

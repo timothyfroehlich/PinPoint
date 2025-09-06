@@ -19,7 +19,10 @@ interface GlobalErrorProps {
  * Provides fallback UI when any unhandled error occurs
  * Uses automatic error type detection for appropriate messaging
  */
-export default function GlobalError({ error, reset }: GlobalErrorProps) {
+export default function GlobalError({
+  error,
+  reset,
+}: GlobalErrorProps): React.JSX.Element {
   // Automatically detect error type based on error message
   const errorType = detectErrorType(error);
   const config = getErrorConfig(errorType, reset);
@@ -27,11 +30,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
   return (
     <html>
       <body>
-        <ErrorBoundaryCard
-          error={error}
-          reset={reset}
-          config={config}
-        />
+        <ErrorBoundaryCard error={error} reset={reset} config={config} />
       </body>
     </html>
   );

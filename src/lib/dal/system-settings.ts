@@ -6,8 +6,10 @@
 import { cache } from "react";
 import { eq, and } from "drizzle-orm";
 import { db } from "./shared";
+import { withOrgRLS } from "~/server/db/utils/rls";
 import { systemSettings } from "~/server/db/schema";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
+import { setTypedProperty } from "~/lib/utils/typed-object-helpers";
 
 // Type definitions for system settings
 export interface SystemSettingsData {
@@ -73,53 +75,101 @@ const DEFAULT_SYSTEM_SETTINGS: SystemSettingsData = {
  * Get system settings for organization with caching
  * Returns default settings if none exist
  */
-export const getSystemSettings = cache(async (organizationId: string): Promise<SystemSettingsData> => {
-  try {
-    if (!organizationId) {
-      throw new Error("Organization ID is required");
-    }
+export const getSystemSettings = cache(
+  async (organizationId: string): Promise<SystemSettingsData> => {
+    try {
+      if (!organizationId) {
+        throw new Error("Organization ID is required");
+      }
 
-    const settings = await db.query.systemSettings.findMany({
-      where: eq(systemSettings.organization_id, organizationId),
-    });
+      const settings = await withOrgRLS(db, organizationId, async (tx) =>
+        tx.query.systemSettings.findMany({
+          where: eq(systemSettings.organization_id, organizationId),
+        }),
+      );
 
-    if (settings.length === 0) {
+      if (settings.length === 0) {
+        return DEFAULT_SYSTEM_SETTINGS;
+      }
+
+      // Convert settings array to structured object using typed partials
+      const notificationsPartial: Partial<SystemSettingsData["notifications"]> =
+        {};
+      const securityPartial: Partial<SystemSettingsData["security"]> = {};
+      const preferencesPartial: Partial<SystemSettingsData["preferences"]> = {};
+      const featuresPartial: Partial<SystemSettingsData["features"]> = {};
+
+      for (const setting of settings) {
+        const [category, key] = setting.setting_key.split(".");
+
+        if (!category || !key) continue;
+
+        const value = setting.setting_value;
+
+        switch (category) {
+          case "notifications": {
+            const k = key as keyof SystemSettingsData["notifications"];
+            Object.defineProperty(notificationsPartial, k, {
+              value: value as SystemSettingsData["notifications"][typeof k],
+              writable: true,
+              enumerable: true,
+              configurable: true,
+            });
+            break;
+          }
+          case "security": {
+            const k = key as keyof SystemSettingsData["security"];
+            setTypedProperty(
+              securityPartial,
+              k,
+              value as SystemSettingsData["security"][typeof k],
+            );
+            break;
+          }
+          case "preferences": {
+            const k = key as keyof SystemSettingsData["preferences"];
+            setTypedProperty(
+              preferencesPartial,
+              k,
+              value as SystemSettingsData["preferences"][typeof k],
+            );
+            break;
+          }
+          case "features": {
+            const k = key as keyof SystemSettingsData["features"];
+            Object.defineProperty(featuresPartial, k, {
+              value: value as SystemSettingsData["features"][typeof k],
+              writable: true,
+              enumerable: true,
+              configurable: true,
+            });
+            break;
+          }
+          default:
+            // Ignore unknown categories
+            break;
+        }
+      }
+
+      // Merge with defaults to ensure all keys exist
+      return {
+        notifications: {
+          ...DEFAULT_SYSTEM_SETTINGS.notifications,
+          ...notificationsPartial,
+        },
+        security: { ...DEFAULT_SYSTEM_SETTINGS.security, ...securityPartial },
+        preferences: {
+          ...DEFAULT_SYSTEM_SETTINGS.preferences,
+          ...preferencesPartial,
+        },
+        features: { ...DEFAULT_SYSTEM_SETTINGS.features, ...featuresPartial },
+      };
+    } catch (error) {
+      console.error("Error fetching system settings:", error);
       return DEFAULT_SYSTEM_SETTINGS;
     }
-
-    // Convert settings array to structured object
-    const settingsObject: Partial<SystemSettingsData> = {};
-    
-    for (const setting of settings) {
-      const parts = setting.setting_key.split(".");
-      const category = parts[0];
-      const key = parts[1];
-      
-      // Skip invalid setting keys
-      if (!category || !key) {
-        continue;
-      }
-      
-      const categoryKey = category as keyof SystemSettingsData;
-      if (!settingsObject[categoryKey]) {
-        settingsObject[categoryKey] = {} as any;
-      }
-      
-      (settingsObject[categoryKey] as any)[key] = setting.setting_value;
-    }
-
-    // Merge with defaults to ensure all keys exist
-    return {
-      notifications: { ...DEFAULT_SYSTEM_SETTINGS.notifications, ...settingsObject.notifications },
-      security: { ...DEFAULT_SYSTEM_SETTINGS.security, ...settingsObject.security },
-      preferences: { ...DEFAULT_SYSTEM_SETTINGS.preferences, ...settingsObject.preferences },
-      features: { ...DEFAULT_SYSTEM_SETTINGS.features, ...settingsObject.features },
-    };
-  } catch (error) {
-    console.error("Error fetching system settings:", error);
-    return DEFAULT_SYSTEM_SETTINGS;
-  }
-});
+  },
+);
 
 /**
  * Update system settings for organization
@@ -134,13 +184,13 @@ export async function updateSystemSettings(
   }
 
   // Flatten the settings object into key-value pairs
-  const settingsToUpsert: Array<{
+  const settingsToUpsert: {
     key: string;
-    value: any;
-  }> = [];
+    value: unknown;
+  }[] = [];
 
   for (const [category, categorySettings] of Object.entries(settings)) {
-    if (typeof categorySettings === "object" && categorySettings !== null) {
+    if (typeof categorySettings === "object") {
       for (const [key, value] of Object.entries(categorySettings)) {
         settingsToUpsert.push({
           key: `${category}.${key}`,
@@ -151,73 +201,76 @@ export async function updateSystemSettings(
   }
 
   // Update or insert each setting
-  for (const { key, value } of settingsToUpsert) {
-    // Check if setting exists
-    const existingSetting = await db.query.systemSettings.findFirst({
-      where: and(
-        eq(systemSettings.organization_id, organizationId),
-        eq(systemSettings.setting_key, key),
-      ),
-    });
-
-    if (existingSetting) {
-      // Update existing setting
-      await db
-        .update(systemSettings)
-        .set({
-          setting_value: value,
-          updated_at: new Date(),
-        })
-        .where(eq(systemSettings.id, existingSetting.id));
-    } else {
-      // Create new setting
-      await db.insert(systemSettings).values({
-        id: generatePrefixedId("setting"),
-        organization_id: organizationId,
-        setting_key: key,
-        setting_value: value,
+  await withOrgRLS(db, organizationId, async (tx) => {
+    for (const { key, value } of settingsToUpsert) {
+      const existingSetting = await tx.query.systemSettings.findFirst({
+        where: and(
+          eq(systemSettings.organization_id, organizationId),
+          eq(systemSettings.setting_key, key),
+        ),
       });
+
+      if (existingSetting) {
+        await tx
+          .update(systemSettings)
+          .set({
+            setting_value: value,
+            updated_at: new Date(),
+          })
+          .where(eq(systemSettings.id, existingSetting.id));
+      } else {
+        await tx.insert(systemSettings).values({
+          id: generatePrefixedId("setting"),
+          organization_id: organizationId,
+          setting_key: key,
+          setting_value: value,
+        });
+      }
     }
-  }
+  });
 }
 
 /**
  * Get a specific system setting value
  */
-export const getSystemSetting = cache(async (
-  organizationId: string,
-  settingKey: string,
-): Promise<any | null> => {
-  try {
-    if (!organizationId || !settingKey) {
+export const getSystemSetting = cache(
+  async (organizationId: string, settingKey: string): Promise<unknown> => {
+    try {
+      if (!organizationId || !settingKey) {
+        return null;
+      }
+
+      const setting = await withOrgRLS(db, organizationId, async (tx) =>
+        tx.query.systemSettings.findFirst({
+          where: and(
+            eq(systemSettings.organization_id, organizationId),
+            eq(systemSettings.setting_key, settingKey),
+          ),
+        }),
+      );
+
+      return setting?.setting_value ?? null;
+    } catch (error) {
+      console.error("Error fetching system setting:", error);
       return null;
     }
-
-    const setting = await db.query.systemSettings.findFirst({
-      where: and(
-        eq(systemSettings.organization_id, organizationId),
-        eq(systemSettings.setting_key, settingKey),
-      ),
-    });
-
-    return setting?.setting_value || null;
-  } catch (error) {
-    console.error("Error fetching system setting:", error);
-    return null;
-  }
-});
+  },
+);
 
 /**
  * Reset system settings to defaults for organization
  */
-export async function resetSystemSettings(organizationId: string): Promise<void> {
+// eslint-disable-next-line missingCache/no-missing-cache-wrapper
+export async function resetSystemSettings(
+  organizationId: string,
+): Promise<void> {
   if (!organizationId) {
     throw new Error("Organization ID is required");
   }
-
-  // Delete all existing settings for the organization
-  await db.delete(systemSettings).where(eq(systemSettings.organization_id, organizationId));
-
-  // Insert default settings
+  await withOrgRLS(db, organizationId, async (tx) => {
+    await tx
+      .delete(systemSettings)
+      .where(eq(systemSettings.organization_id, organizationId));
+  });
   await updateSystemSettings(organizationId, DEFAULT_SYSTEM_SETTINGS);
 }
