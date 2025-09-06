@@ -205,8 +205,14 @@ jobs:
       - run: npm ci
       - name: Install pg_prove and pgTAP
         run: |
-          # Install PostgreSQL client tools
+          # Add PostgreSQL 17 repository
           sudo apt-get update
+          sudo apt-get install -y wget ca-certificates
+          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+          echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          
+          # Install PostgreSQL client tools and pg_prove
           sudo apt-get install -y postgresql-client-17 libtap-parser-sourcehandler-pgtap-perl
           
           # Download and setup pgTAP (no need to install, just load SQL)
