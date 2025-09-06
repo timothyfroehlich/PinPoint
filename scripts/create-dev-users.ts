@@ -210,12 +210,16 @@ async function createDevUsers() {
         console.log(`  ✅ Successfully created auth user: ${data.user.email}`);
       }
 
-      // Upsert membership via SECURITY DEFINER helper (bypasses RLS)
+      // Upsert membership via SECURITY DEFINER helper through Supabase RPC
       console.log(`    - Upserting membership for ${user.email}`);
       const roleId = user.email.includes("tim") ? ROLE_IDS.ADMIN : ROLE_IDS.MEMBER;
-      await sql`
-        select public.fn_upsert_membership_admin(${user.id}, ${user.organizationId}, ${roleId})
-      `;
+      const { error: rpcError } = await supabase.rpc(
+        "fn_upsert_membership_admin",
+        { p_user_id: user.id, p_org_id: user.organizationId, p_role_id: roleId },
+      );
+      if (rpcError) {
+        throw new Error(`Membership upsert failed: ${rpcError.message}`);
+      }
       console.log(`    - ✅ Membership upserted for role: ${roleId}`);
     } catch (err) {
       console.error(`  ❌ Error creating ${user.email}:`, err);
