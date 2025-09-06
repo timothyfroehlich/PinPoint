@@ -125,7 +125,7 @@ wait_for_workflow_completion() {
                     return 1
                 fi
                 ;;
-            "in_progress"|"queued")
+            "in_progress"|"queued"|"waiting")
                 echo -n "."
                 ;;
             *)
