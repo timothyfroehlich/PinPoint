@@ -208,12 +208,10 @@ export const organizationIdSchema = z
   .max(LIMITS.ORGANIZATION_ID_MAX, {
     message: `Organization ID must be ${String(LIMITS.ORGANIZATION_ID_MAX)} characters or less`,
   })
-  .refine(
-    (val) => /^[a-zA-Z0-9_-]+$/.test(val),
-    {
-      message: "Organization ID must contain only letters, numbers, hyphens, and underscores",
-    },
-  )
+  .refine((val) => /^[a-zA-Z0-9_-]+$/.test(val), {
+    message:
+      "Organization ID must contain only letters, numbers, hyphens, and underscores",
+  })
   .transform((s) => s.trim());
 
 // -----------------------------------------------------------------------------
@@ -835,7 +833,10 @@ export function createFormDataSchema<T extends z.ZodRawShape>(
  * isActiveSchema.parse("false"); // false
  * ```
  */
-export function formDataBoolean(): z.ZodPipe<z.ZodString, z.ZodTransform<boolean>> {
+export function formDataBoolean(): z.ZodPipe<
+  z.ZodString,
+  z.ZodTransform<boolean>
+> {
   return z.string().transform((val) => val === "true");
 }
 
@@ -888,19 +889,23 @@ export function formDataNumber(options?: {
 /**
  * Centralized pagination limit schema with consistent min/max constraints.
  * Replaces duplicated z.coerce.number().min(5).max(100) patterns across search parameters.
- * 
+ *
  * @example
  * ```typescript
  * const limit = paginationLimitSchema.parse("20"); // 20
  * paginationLimitSchema.parse("200"); // ✗ throws validation error
  * ```
  */
-export const paginationLimitSchema = z.coerce.number().min(5).max(100).default(20);
+export const paginationLimitSchema = z.coerce
+  .number()
+  .min(5)
+  .max(100)
+  .default(20);
 
 /**
  * Centralized pagination offset/page schema with consistent validation.
  * Replaces duplicated z.coerce.number().min(1) patterns across search parameters.
- * 
+ *
  * @example
  * ```typescript
  * const page = paginationOffsetSchema.parse("1"); // 1
@@ -912,7 +917,7 @@ export const paginationOffsetSchema = z.coerce.number().min(1).default(1);
 /**
  * Centralized sort order enum with consistent direction options.
  * Replaces duplicated z.enum(["asc", "desc"]).default("desc") patterns.
- * 
+ *
  * @example
  * ```typescript
  * const order = sortOrderSchema.parse("asc"); // "asc"
@@ -924,20 +929,22 @@ export const sortOrderSchema = z.enum(["asc", "desc"]).default("desc");
 /**
  * Centralized view mode enum for consistent UI state management.
  * Covers common view modes used across different entity types.
- * 
+ *
  * @example
  * ```typescript
  * const viewMode = viewModeSchema.parse("table"); // "table"
  * const defaultView = viewModeSchema.parse(undefined); // "card"
  * ```
  */
-export const viewModeSchema = z.enum(["card", "table", "list", "grid", "kanban", "compact"]).default("card");
+export const viewModeSchema = z
+  .enum(["card", "table", "list", "grid", "kanban", "compact"])
+  .default("card");
 
 /**
  * Generic array parameter transformer schema.
  * Handles both single strings and arrays, splitting on commas and filtering empty values.
  * Replaces duplicated array transformation patterns across search parameters.
- * 
+ *
  * @example
  * ```typescript
  * arrayParamTransformer.parse("a,b,c"); // ["a", "b", "c"]
@@ -957,7 +964,7 @@ export const arrayParamTransformer = z
  * Generic boolean parameter transformer schema.
  * Handles string boolean values from URL parameters and native booleans.
  * Replaces duplicated boolean transformation patterns across search parameters.
- * 
+ *
  * @example
  * ```typescript
  * booleanParamTransformer.parse("true"); // true
@@ -975,7 +982,7 @@ export const booleanParamTransformer = z
 /**
  * Date range schema for filtering by creation and update timestamps.
  * Provides consistent ISO datetime validation for temporal filtering.
- * 
+ *
  * @example
  * ```typescript
  * const dateRange = dateRangeSchema.parse({
@@ -1044,22 +1051,29 @@ export function makeServerActionSchema<T extends z.ZodRawShape>(
  * });
  * ```
  */
-export function makeRequiredOptionalPair<T extends z.ZodRawShape>(shape: T): {
+export function makeRequiredOptionalPair<T extends z.ZodRawShape>(
+  shape: T,
+): {
   required: z.ZodObject<T>;
   optional: z.ZodObject<{ [K in keyof T]: z.ZodOptional<T[K]> }>;
 } {
   const required = z.object(shape).strict();
   const optionalShape = {} as { [K in keyof T]: z.ZodOptional<T[K]> };
-  
-  for (const [key, schema] of Object.entries(shape) as [keyof T, T[keyof T]][]) {
+
+  for (const [key, schema] of Object.entries(shape) as [
+    keyof T,
+    T[keyof T],
+  ][]) {
     // TypeScript can't infer that T[keyof T] has an optional() method, but all Zod schemas do
     // This is safe because we know schema is a ZodType from the shape constraint
     // eslint-disable-next-line security/detect-object-injection, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-    optionalShape[key] = (schema as any).optional() as z.ZodOptional<T[keyof T]>;
+    optionalShape[key] = (schema as any).optional() as z.ZodOptional<
+      T[keyof T]
+    >;
   }
-  
+
   const optional = z.object(optionalShape).strict();
-  
+
   return { required, optional };
 }
 

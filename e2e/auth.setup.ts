@@ -61,7 +61,7 @@ setup("authenticate as Tim dev user", async ({ page }) => {
 
   // Navigate back to localhost (without subdomain) to ensure tests run on correct domain
   await page.goto(`${BASE_URL}/dashboard`);
-  
+
   // Verify we're logged in successfully
   await expect(page.locator("h1")).toContainText(/Dashboard|Issues|Machines/i);
 
