@@ -523,19 +523,25 @@ main() {
     echo -e "${NC}"
 
     # Validate arguments
-    if [[ $# -lt 1 || $# -gt 2 ]]; then
-        log_error "Usage: $0 <local|preview> [--allow-non-local]"
+    if [[ $# -lt 1 ]]; then
+        log_error "Usage: $0 <local|preview> [--allow-non-local] [--only-seed]"
         log_error "  local   - Reset local Supabase database"
         log_error "  preview - Reset preview environment database (with safety checks)"
         log_error "  --allow-non-local  Proceed even if .env.local looks non-local (DANGEROUS)"
+        log_error "  --only-seed       Only run SQL seeds and dev user creation (no reset/push) [local]"
         exit 1
     fi
 
-    local environment="$1"
+    local environment="$1"; shift || true
     local allow_non_local="false"
-    if [[ "${2:-}" == "--allow-non-local" ]]; then
-        allow_non_local="true"
-    fi
+    local only_seed="false"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --allow-non-local) allow_non_local="true"; shift ;;
+            --only-seed) only_seed="true"; shift ;;
+            *) log_error "Unknown option: $1"; exit 1 ;;
+        esac
+    done
 
     # Change to project root
     cd "$PROJECT_ROOT"
@@ -566,7 +572,40 @@ main() {
         validate_local_env_safety "$environment" "$allow_non_local"
     fi
 
-    # Execution steps
+    # If only running seeds (no reset/push)
+    if [[ "$only_seed" == "true" ]]; then
+        if [[ "$environment" != "local" ]]; then
+            log_error "--only-seed is currently supported for local environment only"
+            exit 1
+        fi
+
+        log_step "Seed-only mode: applying SQL seeds and creating dev users (local)"
+        execute_sql_seeds "$environment"
+
+        # Create dev users via Supabase Admin API (local only)
+        log_info "Creating dev users via Supabase Admin API..."
+        if command -v tsx >/dev/null 2>&1; then
+            if tsx scripts/create-dev-users.ts; then
+                log_success "Dev users created successfully"
+            else
+                log_warning "Dev user creation failed, but continuing..."
+            fi
+        else
+            log_warning "tsx not found, skipping dev user creation"
+        fi
+
+        generate_typescript_types "$environment"
+
+        trap - ERR
+        echo -e "\n${GREEN}"
+        echo "======================================================================"
+        echo "✅ Seed-only completed successfully!"
+        echo "======================================================================"
+        echo -e "${NC}"
+        return 0
+    fi
+
+    # Full reset + seeds
     reset_supabase_database "$environment"
     generate_typescript_types "$environment"
 
