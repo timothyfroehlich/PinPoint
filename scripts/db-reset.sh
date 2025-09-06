@@ -570,6 +570,9 @@ main() {
     reset_supabase_database "$environment"
     generate_typescript_types "$environment"
 
+    # Disable ERR trap after successful completion to avoid spurious messages
+    trap - ERR
+
     echo -e "\n${GREEN}"
     echo "======================================================================"
     echo "✅ Database reset completed successfully!"
