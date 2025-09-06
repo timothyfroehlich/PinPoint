@@ -54,11 +54,18 @@ jobs:
             exit 1
           fi
           
+          if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ] && [ -z "$SUPABASE_URL" ]; then
+            echo "❌ Error: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL is required"
+            exit 1
+          fi
+          
           echo "✅ Environment validation passed"
         env:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
 
       - name: Run database seeding
         run: |
@@ -67,9 +74,11 @@ jobs:
           npx tsx scripts/create-dev-users.ts
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          FORCE_RESEED: ${{ inputs.force_reseed }}
 
       - name: Seeding summary
         if: always()
