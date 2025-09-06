@@ -5,8 +5,12 @@ const authFile = "e2e/.auth/user.json";
 setup("authenticate as Tim dev user", async ({ page }) => {
   console.log("Setting up authentication for Tim dev user...");
 
+  // Calculate BASE_URL using same logic as playwright.config.ts
+  const PORT = process.env.PORT ?? "3000";
+  const BASE_URL = process.env.BASE_URL ?? `http://localhost:${PORT}`;
+
   // Go directly to sign-in page on the correct subdomain
-  await page.goto("http://apc.localhost:3000/auth/sign-in");
+  await page.goto(`${BASE_URL}/auth/sign-in`);
   await expect(page.locator("h1")).toContainText(/Welcome back|Sign In/i);
 
   // Handle organization selection
@@ -55,6 +59,9 @@ setup("authenticate as Tim dev user", async ({ page }) => {
   // Wait for successful login and dashboard redirect
   await page.waitForURL("**/dashboard", { timeout: 20000 });
 
+  // Navigate back to localhost (without subdomain) to ensure tests run on correct domain
+  await page.goto(`${BASE_URL}/dashboard`);
+  
   // Verify we're logged in successfully
   await expect(page.locator("h1")).toContainText(/Dashboard|Issues|Machines/i);
 

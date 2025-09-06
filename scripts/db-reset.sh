@@ -224,6 +224,13 @@ confirm_preview_reset() {
 
 parse_database_url() {
     local url="$1"
+    # Trim surrounding quotes/whitespace/newlines
+    url="${url%\n}"
+    url="${url%\r}"
+    url="${url#\"}"
+    url="${url%\"}"
+    url="${url#\'}"
+    url="${url%\'}"
     
     if [[ -z "$url" ]]; then
         log_error "DATABASE_URL is required for preview environment"
@@ -273,8 +280,8 @@ execute_cloud_sql() {
     psql_cmd+=" --set ON_ERROR_STOP=1"  # Stop on first error
     psql_cmd+=" --set AUTOCOMMIT=off"   # Use transactions
     
-    # SSL is required for cloud databases
-    psql_cmd+=" --set sslmode=require"
+    # Enforce SSL for cloud databases via libpq env var
+    export PGSSLMODE=require
 
     # Disable pager for script execution
     psql_cmd+=" --pset pager=off"
@@ -296,8 +303,9 @@ execute_cloud_sql() {
         return 1
     fi
 
-    # Clear password from environment
+    # Clear sensitive env vars
     unset PGPASSWORD
+    unset PGSSLMODE
 
     return $?
 }
@@ -406,12 +414,46 @@ reset_supabase_database() {
         log_warning "Note: Cloud database will be reset by schema push and seed execution"
     fi
 
+    # Helper: wait for database readiness
+    wait_for_db() {
+        local tries=0
+        local max_tries=60
+        local sleep_secs=2
+
+        log_info "Waiting for database to become ready..."
+        while (( tries < max_tries )); do
+            if [[ "$env" == "preview" ]]; then
+                # Cloud DB readiness check
+                if [[ -n "${DATABASE_URL:-}" ]]; then
+                    if parse_database_url "$DATABASE_URL" >/dev/null 2>&1; then
+                        if execute_cloud_sql "" "SELECT 1;" >/dev/null 2>&1; then
+                            log_success "Database is ready"
+                            return 0
+                        fi
+                    fi
+                fi
+            else
+                # Local DB readiness check via safe-psql
+                if "$PROJECT_ROOT/scripts/safe-psql.sh" -c "SELECT 1;" >/dev/null 2>&1; then
+                    log_success "Database is ready"
+                    return 0
+                fi
+            fi
+            ((tries++))
+            sleep "$sleep_secs"
+        done
+        log_error "Database did not become ready in time"
+        return 1
+    }
+
     # Push Drizzle schema to database (this will reset cloud databases)
     log_info "Applying Drizzle schema..."
     if [[ "$env" == "preview" ]]; then
         # Use --force flag to skip interactive confirmation for cloud databases
+        wait_for_db
         npm run db:push:preview -- --force
     else
+        wait_for_db
         npm run db:push:local
     fi
 
@@ -508,6 +550,13 @@ main() {
         backup_current_env
         pull_preview_environment
         confirm_preview_reset
+        # Prefer pooler host on port 5432 (session/non-pooling) to avoid IPv6-only direct host
+        if [[ -n "${DATABASE_URL:-}" ]]; then
+            if parse_database_url "$DATABASE_URL"; then
+                export DATABASE_URL="postgresql://$DB_USER:$DB_PASSWORD@$DB_HOST:5432/$DB_NAME"
+                log_warning "Overriding DATABASE_URL to use $DB_HOST:5432 for schema and seed operations"
+            fi
+        fi
         # Skip local env safety check for preview since we just pulled cloud env
     else
         validate_local_env_safety "$environment" "$allow_non_local"

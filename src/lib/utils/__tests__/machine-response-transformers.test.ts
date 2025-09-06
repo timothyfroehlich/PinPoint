@@ -241,7 +241,7 @@ describe("Machine Response Transformers", () => {
 
       const result = transformLocationResponse(dbLocation);
 
-      expect(result._count).toEqual({ machines: 5 });
+      expect(result.count).toEqual({ machines: 5 });
       expect(result.machines).toHaveLength(2);
       expect(result.machines?.[0]).toEqual({
         id: "machine_1",
@@ -279,7 +279,7 @@ describe("Machine Response Transformers", () => {
         { id: "machine_1", qrCodeId: "qr_1" },
       ]);
       expect(result[1].organizationId).toBe("org_456");
-      expect(result[1]._count).toEqual({ machines: 3 });
+      expect(result[1].count).toEqual({ machines: 3 });
     });
   });
 
@@ -352,7 +352,7 @@ describe("Machine Response Transformers", () => {
         location: { id: "location_789", name: "Test Location" },
       };
 
-      const result = transformMachineWithRelations(dbMachine);
+      const result = transformMachineResponse(dbMachine);
 
       expect(result.id).toBe("machine_123");
       expect(result.modelId).toBe("model_456");
@@ -368,7 +368,7 @@ describe("Machine Response Transformers", () => {
         machines: [{ id: "machine_1", qr_code_id: "qr_1" }],
       };
 
-      const result = transformLocationWithMachines(dbLocation);
+      const result = transformLocationResponse(dbLocation);
 
       expect(result.id).toBe("location_123");
       expect(result.organizationId).toBe("org_456");
