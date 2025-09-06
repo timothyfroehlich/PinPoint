@@ -46,3 +46,13 @@ Thumbs.db
 src/lib/types/database.ts         # Supabase type generation
 supabase/migrations/relations.ts  # Drizzle schema codegen  
 supabase/migrations/schema.ts     # Drizzle schema codegen
+
+# Archived test directories
+.archived-tests-*/**
+
+# Coverage reports
+coverage/**
+**/coverage/**
+
+# Claude agent files
+.claude/**
