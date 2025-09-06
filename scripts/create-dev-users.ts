@@ -12,7 +12,6 @@ config({ path: ".env.local" });
 // Prefer IPv4 to avoid ENETUNREACH on some runners/networks
 try {
   // Node.js >= 18
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const dns = require("node:dns");
   if (typeof dns.setDefaultResultOrder === "function") {
     dns.setDefaultResultOrder("ipv4first");
@@ -97,7 +96,6 @@ async function createDevUsers() {
     u = u.replace(/\/+$/, "");
     // Validate
     try {
-      // eslint-disable-next-line no-new
       new URL(u);
       return u;
     } catch {

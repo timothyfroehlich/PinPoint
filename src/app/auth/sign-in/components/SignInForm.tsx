@@ -38,6 +38,7 @@ import { authenticateDevUser, getAuthResultMessage } from "~/lib/auth/dev-auth";
 import { isDevAuthAvailable, isPreview } from "~/lib/environment-client";
 import { createClient } from "~/utils/supabase/client";
 import { getCurrentDomain } from "~/lib/utils/domain";
+import { resolveOrgSubdomainFromLocation } from "~/lib/domain-org-mapping";
 
 export function SignInForm(): React.JSX.Element {
   const router = useRouter();
@@ -56,6 +57,8 @@ export function SignInForm(): React.JSX.Element {
   const [selectedOrganizationId, setSelectedOrganizationId] =
     useState<string>("");
   const [organizationsLoading, setOrganizationsLoading] = useState(true);
+  const [isOrgLockedByHost, setIsOrgLockedByHost] = useState(false);
+  const [lockedOrgLabel, setLockedOrgLabel] = useState<string | null>(null);
 
   // tRPC: fetch public organizations (anon-safe)
   const { data: publicOrganizations, isLoading: orgsLoading } =
@@ -64,7 +67,7 @@ export function SignInForm(): React.JSX.Element {
   // Development auth integration (preserving existing dev auth system)
   const shouldShowDevLogin = isDevAuthAvailable();
 
-  // Load organizations from tRPC when ready
+  // Load organizations from tRPC when ready and apply host-based org locking
   useEffect(() => {
     setOrganizationsLoading(orgsLoading);
     if (orgsLoading) return;
@@ -75,7 +78,21 @@ export function SignInForm(): React.JSX.Element {
       subdomain: o.subdomain,
     }));
 
-    // Prefer APC/test org as default if present, else first
+    // Determine if host locks this session to a specific org (e.g., APC domain alias)
+    const lockedSubdomain = resolveOrgSubdomainFromLocation();
+
+    if (lockedSubdomain) {
+      const locked = orgs.find((o) => o.subdomain === lockedSubdomain);
+      if (locked) {
+        setIsOrgLockedByHost(true);
+        setLockedOrgLabel(locked.name);
+        setOrganizations([locked]);
+        setSelectedOrganizationId(locked.id);
+        return;
+      }
+    }
+
+    // Fallback default: prefer APC/test org as default if present, else first
     const apc = orgs.find(
       (o) => o.subdomain === "apc" || o.id === "test-org-pinpoint",
     );
@@ -175,47 +192,56 @@ export function SignInForm(): React.JSX.Element {
         <CardDescription>Choose your preferred sign-in method</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Organization Selector */}
-        <div className="space-y-2">
-          <Label htmlFor="organization">Organization</Label>
-          {organizationsLoading ? (
-            <div className="flex items-center space-x-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
-              <span className="text-sm text-muted-foreground">
-                Loading organizations...
-              </span>
+        {/* Organization Selector (hidden when host locks to a specific org) */}
+        {!isOrgLockedByHost ? (
+          <div className="space-y-2">
+            <Label htmlFor="organization">Organization</Label>
+            {organizationsLoading ? (
+              <div className="flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
+                <span className="text-sm text-muted-foreground">
+                  Loading organizations...
+                </span>
+              </div>
+            ) : (
+              <Select
+                value={selectedOrganizationId}
+                onValueChange={setSelectedOrganizationId}
+                disabled={isOAuthLoading || magicLinkPending || devAuthLoading}
+              >
+                <SelectTrigger data-testid="org-select-trigger">
+                  <SelectValue
+                    placeholder="Select your organization"
+                    data-testid="org-select-value"
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {organizations.map((org) => (
+                    <SelectItem
+                      key={org.id}
+                      value={org.id}
+                      data-testid={`org-option-${org.subdomain}`}
+                    >
+                      {org.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {organizations.length === 0 && !organizationsLoading && (
+              <p className="text-sm text-error">
+                No organizations available. Please contact support.
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <Label>Organization</Label>
+            <div className="text-sm text-on-surface-variant">
+              {lockedOrgLabel ?? "Organization locked by site"}
             </div>
-          ) : (
-            <Select
-              value={selectedOrganizationId}
-              onValueChange={setSelectedOrganizationId}
-              disabled={isOAuthLoading || magicLinkPending || devAuthLoading}
-            >
-              <SelectTrigger data-testid="org-select-trigger">
-                <SelectValue
-                  placeholder="Select your organization"
-                  data-testid="org-select-value"
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {organizations.map((org) => (
-                  <SelectItem
-                    key={org.id}
-                    value={org.id}
-                    data-testid={`org-option-${org.subdomain}`}
-                  >
-                    {org.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          {organizations.length === 0 && !organizationsLoading && (
-            <p className="text-sm text-error">
-              No organizations available. Please contact support.
-            </p>
-          )}
-        </div>
+          </div>
+        )}
 
         <Separator />
 
