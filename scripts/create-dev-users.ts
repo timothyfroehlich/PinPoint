@@ -23,17 +23,9 @@ try {
 
 // eslint-disable-next-line no-restricted-imports -- Admin script needs direct Supabase client
 import { createClient } from "@supabase/supabase-js";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
-import { pgTable, text } from "drizzle-orm/pg-core";
+// No direct Postgres connection needed; use Supabase service role for DB ops
 
-// Standalone memberships table definition to avoid src/ imports
-const memberships = pgTable("memberships", {
-  id: text("id").primaryKey(),
-  user_id: text("user_id").notNull(),
-  organization_id: text("organization_id").notNull(),
-  role_id: text("role_id").notNull(),
-});
+// Using Supabase REST for memberships to avoid RLS/network issues in CI
 
 // Type guard
 function isError(error: unknown): error is Error {
@@ -121,48 +113,7 @@ async function createDevUsers() {
   }
   const supabaseUrl = buildSupabaseUrl(rawSupabaseUrl);
 
-  // Choose connection string
-  const RAW_DIRECT_URL = (process.env.DIRECT_URL ?? "").trim();
-  const RAW_DATABASE_URL = (process.env.DATABASE_URL ?? "").trim();
-  const CONNECTION_STRING =
-    RAW_DIRECT_URL || RAW_DATABASE_URL ||
-    "postgresql://postgres:postgres@localhost:54322/postgres";
-
-  // Enforce TLS for cloud connections
-  const needsSsl = /supabase\.co|pooler\.supabase\.com|amazonaws\.com|rds\.amazonaws\.com/.test(
-    CONNECTION_STRING,
-  );
-
-  // Detect pgBouncer pooler connection (Supabase pooled port/host)
-  let isPooler = false;
-  try {
-    const u = new URL(CONNECTION_STRING);
-    const host = u.hostname;
-    const port = Number(u.port || 5432);
-    if (/pooler\.supabase\.com$/.test(host) || port === 6543) {
-      isPooler = true;
-    }
-    console.log(
-      `🧩 Connecting to DB host=${host} port=${port} (pooler=${isPooler ? "yes" : "no"}) SSL=${needsSsl ? "require" : "off"}`,
-    );
-  } catch {
-    // ignore URL parse errors; fall back to defaults
-  }
-
-  const pgOptions: postgres.Options<Record<string, postgres.PostgresType>> = {};
-  if (needsSsl) pgOptions.ssl = "require" as const;
-  if (isPooler) {
-    // Required for pgBouncer transaction pooling
-    // Ref: https://github.com/porsager/postgres#pgbouncer
-    // Drizzle works fine with prepare=false over pgbouncer
-    pgOptions.prepare = false as const;
-  }
-
-  const sql = postgres(CONNECTION_STRING, pgOptions);
-  console.log(
-    `🔌 DB connection ready (ssl=${needsSsl ? "require" : "off"}, pooler=${isPooler ? "yes" : "no"})`,
-  );
-  const db = drizzle(sql);
+  // No direct DB connection – rely on Supabase service role for writes
 
   // Supabase admin client
   console.log(`🔗 Using Supabase URL: ${supabaseUrl}`);
@@ -172,57 +123,7 @@ async function createDevUsers() {
 
   console.log("🔧 Creating dev users and memberships via Supabase Admin API...");
 
-  // Ensure the admin upsert function exists (idempotent safety)
-  const [{ exists: hasFn } = { exists: false } as any] = await sql<
-    [{ exists: boolean }]
-  >`select exists (
-        select 1 from pg_proc p
-        join pg_namespace n on n.oid = p.pronamespace
-        where p.proname = 'fn_upsert_membership_admin'
-          and n.nspname = 'public'
-      ) as exists;`;
-  if (!hasFn) {
-    console.log("🛠️  Admin helper not found; creating public.fn_upsert_membership_admin()...");
-    await sql`
-      CREATE OR REPLACE FUNCTION public.fn_upsert_membership_admin(
-        p_user_id text,
-        p_org_id text,
-        p_role_id text
-      ) RETURNS void
-      LANGUAGE plpgsql
-      SECURITY DEFINER
-      SET search_path = public
-      AS $$
-      DECLARE
-        v_exists boolean;
-        v_id text;
-      BEGIN
-        IF p_user_id IS NULL OR p_org_id IS NULL OR p_role_id IS NULL THEN
-          RAISE EXCEPTION 'fn_upsert_membership_admin: all parameters are required';
-        END IF;
-
-        v_id := 'membership-' || left(replace(p_org_id, ' ', ''), 16) || '-' || left(p_user_id, 8);
-
-        SELECT EXISTS (
-          SELECT 1 FROM memberships m
-          WHERE m.user_id = p_user_id AND m.organization_id = p_org_id
-        ) INTO v_exists;
-
-        IF v_exists THEN
-          UPDATE memberships
-          SET role_id = p_role_id
-          WHERE user_id = p_user_id AND organization_id = p_org_id;
-        ELSE
-          INSERT INTO memberships (id, user_id, organization_id, role_id)
-          VALUES (v_id, p_user_id, p_org_id, p_role_id);
-        END IF;
-      END;
-      $$;
-    `;
-    console.log("   ✅ Helper function created");
-  } else {
-    console.log("🧩 Admin helper already present");
-  }
+  // Helper function creation skipped in CI to avoid direct DB connection
 
   for (const user of DEV_USERS) {
     try {
@@ -254,33 +155,21 @@ async function createDevUsers() {
       // Upsert membership via SECURITY DEFINER helper through Supabase RPC
       console.log(`    - Upserting membership for ${user.email}`);
       const roleId = user.email.includes("tim") ? ROLE_IDS.ADMIN : ROLE_IDS.MEMBER;
-      const { error: rpcError } = await supabase.rpc(
-        "fn_upsert_membership_admin",
-        { p_user_id: user.id, p_org_id: user.organizationId, p_role_id: roleId },
-      );
-      if (rpcError) {
-        console.warn(
-          `    - RPC upsert failed (${rpcError.message}); falling back to direct service-role upsert`,
+      // Upsert membership via service-role REST (RLS bypassed)
+      const stableId = `membership-${user.id}-${user.organizationId}`;
+      const { error: upsertErr } = await supabase
+        .from("memberships")
+        .upsert(
+          {
+            id: stableId,
+            user_id: user.id,
+            organization_id: user.organizationId,
+            role_id: roleId,
+          },
+          { onConflict: "id" },
         );
-        // Fallback strategy using service-role table access
-        const stableId = `membership-${user.id}-${user.organizationId}`;
-        const { error: delErr } = await supabase
-          .from("memberships")
-          .delete()
-          .eq("user_id", user.id)
-          .eq("organization_id", user.organizationId);
-        if (delErr) {
-          throw new Error(`Membership delete failed: ${delErr.message}`);
-        }
-        const { error: insErr } = await supabase.from("memberships").insert({
-          id: stableId,
-          user_id: user.id,
-          organization_id: user.organizationId,
-          role_id: roleId,
-        });
-        if (insErr) {
-          throw new Error(`Membership insert failed: ${insErr.message}`);
-        }
+      if (upsertErr) {
+        throw new Error(`Membership upsert failed: ${upsertErr.message}`);
       }
       console.log(`    - ✅ Membership upserted for role: ${roleId}`);
     } catch (err) {
@@ -289,7 +178,6 @@ async function createDevUsers() {
   }
 
   console.log("✅ Dev user and membership creation complete");
-  await sql.end();
 }
 
 // Run if called directly (ES module compatibility)
