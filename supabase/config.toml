@@ -54,13 +54,13 @@ enabled = true
 schema_paths = []
 
 [db.seed]
-# If enabled, seeds the database after migrations during a db reset.
-enabled = true
+# Disable automatic seeding during `supabase start`/reset.
+# We seed via scripts/db-reset.sh after Drizzle push to avoid ordering issues.
+enabled = false
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
-# Note: Avoid psql meta-commands (e.g., \i) in seed files; the CLI does not
-# parse them. Keep CLI seeds to base invariants only; full dev data is applied
-# via the reset script (npm run db:reset).
+# Note: We intentionally disable CLI seeding; all seeds (base + dev) are
+# applied by scripts/db-reset.sh in the right order after schema push.
 sql_paths = [
   "./seeds/base/01-rls-policies.sql",
   "./seeds/base/02-permissions.sql",

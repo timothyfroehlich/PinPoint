@@ -241,6 +241,16 @@ export default tseslint.config(
     },
   },
   {
+    // Exclude auto-generated Supabase database types from all rules
+    files: ["src/lib/types/database.ts"],
+    rules: {
+      // Disable all typescript-eslint rules for auto-generated file
+      "@typescript-eslint/consistent-type-definitions": "off",
+      "@typescript-eslint/consistent-indexed-object-style": "off", 
+      "@typescript-eslint/no-redundant-type-constituents": "off",
+    },
+  },
+  {
     // Guardrails for app code (exclude server code)
     // Target app code files but explicitly exclude directories where exported
     // types/interfaces are allowed (negated globs are used for exclusions).
