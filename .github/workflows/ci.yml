@@ -217,8 +217,8 @@ jobs:
       - name: Setup database for RLS testing
         run: |
           npm run db:push:local
-          psql $DATABASE_URL -c "CREATE EXTENSION IF NOT EXISTS pgtap;"
-          psql $DATABASE_URL -f supabase/tests/setup/01-test-roles.sql
+          psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS pgtap;"
+          psql "$DATABASE_URL" -f supabase/tests/setup/01-test-roles.sql
       - name: Run pgTAP RLS tests
         run: |
           if [ -d "supabase/tests/rls" ] && [ -n "$(find supabase/tests/rls -name "*.test.sql" 2>/dev/null)" ]; then
