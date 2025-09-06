@@ -32,7 +32,7 @@ export function isSubdomainHeaderTrusted(headers: Headers): boolean {
 export function extractTrustedSubdomain(headers: Headers): string | null {
   if (!isSubdomainHeaderTrusted(headers)) return null;
   const value = headers.get(SUBDOMAIN_HEADER);
-  return value ? value : null;
+  return value ?? null;
 }
 
 /**

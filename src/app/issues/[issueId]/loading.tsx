@@ -1,7 +1,7 @@
 import { Skeleton } from "~/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 
-export default function IssueDetailLoading() {
+export default function IssueDetailLoading(): React.JSX.Element {
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="space-y-6">

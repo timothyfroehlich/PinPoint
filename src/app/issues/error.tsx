@@ -18,14 +18,11 @@ interface IssuesErrorProps {
  * Error boundary for the issues page - core PinPoint functionality
  * Provides context-specific error handling for issue management
  */
-export default function IssuesError({ error, reset }: IssuesErrorProps) {
+export default function IssuesError({
+  error,
+  reset,
+}: IssuesErrorProps): React.JSX.Element {
   const config = errorConfigs.issues(reset);
 
-  return (
-    <ErrorBoundaryCard
-      error={error}
-      reset={reset}
-      config={config}
-    />
-  );
+  return <ErrorBoundaryCard error={error} reset={reset} config={config} />;
 }

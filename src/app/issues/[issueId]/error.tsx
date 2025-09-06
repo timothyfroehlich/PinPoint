@@ -19,14 +19,11 @@ interface IssueDetailErrorProps {
  * Provides context-specific error handling for single issue views
  * Includes navigation back to issues list
  */
-export default function IssueDetailError({ error, reset }: IssueDetailErrorProps) {
+export default function IssueDetailError({
+  error,
+  reset,
+}: IssueDetailErrorProps): React.JSX.Element {
   const config = errorConfigs.issueDetail(reset);
 
-  return (
-    <ErrorBoundaryCard
-      error={error}
-      reset={reset}
-      config={config}
-    />
-  );
+  return <ErrorBoundaryCard error={error} reset={reset} config={config} />;
 }

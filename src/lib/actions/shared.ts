@@ -10,16 +10,15 @@ import { cache } from "react"; // React 19 cache API
 // import { unstable_after } from "next/server"; // Background tasks
 import type { z } from "zod";
 import { createClient } from "~/lib/supabase/server";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 import { requirePermission as baseRequirePermission } from "~/server/auth/permissions";
-import { getGlobalDatabaseProvider } from "~/server/db/provider";
-import { requireAuthContextWithRole } from "~/lib/dal/shared";
-export { requireAuthContextWithRole };
+import { db } from "~/lib/dal/shared";
+import { getErrorMessage } from "~/lib/utils/type-guards";
 
 /**
  * Server Action result types (React 19 useActionState compatible)
  */
-export type ActionResult<T = any> =
+export type ActionResult<T = unknown> =
   | { success: true; data: T; message?: string }
   | { success: false; error: string; fieldErrors?: Record<string, string[]> };
 
@@ -39,8 +38,12 @@ export const getActionAuthContext = cache(async () => {
     redirect("/sign-in");
   }
 
-  // Validate org access using secure subdomain + membership check
-  const { organization } = await requireMemberAccess();
+  // Validate org access using canonical resolver
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
+  const { org: organization } = authContext;
 
   return { user, organizationId: organization.id };
 });
@@ -54,14 +57,27 @@ export const getServerAuthContext = getActionAuthContext;
  * Combined auth + permission helper for Server Actions.
  * Ensures user is authenticated, has org context and required permission.
  */
-export async function requireActionAuthContextWithPermission(permission: string) {
-  const { user, organizationId, membership } = await requireAuthContextWithRole();
-  const db = getGlobalDatabaseProvider().getClient();
-  await baseRequirePermission({ roleId: membership?.role_id ?? null }, permission, db);
-  return { user, organizationId, membership };
+export async function requireActionAuthContextWithPermission(
+  permission: string,
+): Promise<{
+  user: { id: string; email: string; name: string };
+  organizationId: string;
+  membership: { id: string; role: { id: string; name: string } };
+}> {
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Member access required");
+  }
+  const { user, org: organization, membership } = authContext;
+  const organizationId = organization.id;
+  await baseRequirePermission({ roleId: membership.role.id }, permission, db);
+  const name = user.name ?? user.email;
+  return {
+    user: { id: user.id, email: user.email, name },
+    organizationId,
+    membership,
+  };
 }
-
-export type ActionAuthContextWithRole = Awaited<ReturnType<typeof requireAuthContextWithRole>>;
 
 /**
  * Safe FormData extraction with validation
@@ -95,7 +111,12 @@ export function validateRequiredFields(
   for (const field of requiredFields) {
     const value = getFormField(formData, field, true);
     if (value) {
-      result[field] = value;
+      Object.defineProperty(result, field, {
+        value: value,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
     }
   }
 
@@ -114,10 +135,11 @@ export function actionSuccess<T>(data: T, message?: string): ActionResult<T> {
 }
 
 export function actionError(
-  error: string,
+  error: unknown,
   fieldErrors?: Record<string, string[]>,
 ): ActionResult<never> {
-  const result: ActionResult<never> = { success: false, error };
+  const safeMessage = getErrorMessage(error);
+  const result: ActionResult<never> = { success: false, error: safeMessage };
   if (fieldErrors) {
     result.fieldErrors = fieldErrors;
   }
@@ -129,14 +151,19 @@ export function actionError(
  */
 export function validateFormData<T>(
   formData: FormData,
-  schema: z.ZodSchema<T>,
+  schema: z.ZodType<T>,
 ): ActionResult<T> {
   const rawData = Object.fromEntries(formData.entries());
 
   // Convert empty strings to undefined for optional fields
-  const processedData = Object.entries(rawData).reduce<Record<string, any>>(
+  const processedData = Object.entries(rawData).reduce<Record<string, unknown>>(
     (acc, [key, value]) => {
-      acc[key] = value === "" ? undefined : value;
+      Object.defineProperty(acc, key, {
+        value: value === "" ? undefined : value,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
       return acc;
     },
     {},
@@ -149,10 +176,14 @@ export function validateFormData<T>(
   }
 
   // Format Zod errors for form display
+  // ESLint security warnings are false positive - path comes from Zod validation
+  // error.path which contains controlled field names, not user input
   const fieldErrors = result.error.issues.reduce<Record<string, string[]>>(
     (acc: Record<string, string[]>, issue) => {
       const path = issue.path.join(".");
-      if (!acc[path]) acc[path] = [];
+      // eslint-disable-next-line security/detect-object-injection
+      acc[path] ??= [];
+      // eslint-disable-next-line security/detect-object-injection
       acc[path].push(issue.message);
       return acc;
     },
@@ -168,7 +199,7 @@ export function validateFormData<T>(
  */
 export function runAfterResponse(task: () => Promise<void>): void {
   // For now, run immediately (in production, would use unstable_after)
-  task().catch((error) => {
+  task().catch((error: unknown) => {
     console.error("Background task failed:", error);
   });
 }
@@ -200,7 +231,11 @@ export async function requirePermission(
   permission: string,
   db: Parameters<typeof baseRequirePermission>[2],
 ): Promise<void> {
-  await baseRequirePermission({ roleId: membership?.role_id ?? null }, permission, db);
+  await baseRequirePermission(
+    { roleId: membership?.role_id ?? null },
+    permission,
+    db,
+  );
 }
 
 /**

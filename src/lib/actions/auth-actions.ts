@@ -7,27 +7,51 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { z } from "zod";
 import { createClient } from "~/lib/supabase/server";
-import { validateOrganizationExists, getOrganizationSubdomainById } from "~/lib/dal/public-organizations";
+import { emailSchema, idSchema } from "~/lib/validation/schemas";
+import {
+  validateOrganizationExists,
+  getOrganizationSubdomainById,
+} from "~/lib/dal/public-organizations";
 import { isDevelopment } from "~/lib/environment";
 import { extractFormFields } from "~/lib/utils/form-data";
-import { actionError, type ActionResult } from "./shared";
+import { getCookieDomain } from "~/lib/utils/domain";
+import { actionError } from "./shared";
+import { isError, getErrorMessage } from "~/lib/utils/type-guards";
+import { env } from "~/env";
 
-// Re-export ActionResult for compatibility with existing components
-export type { ActionResult };
+import type { ActionResult } from "./shared";
 
 // Validation schemas
 const magicLinkSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
-  organizationId: z.string().min(1, "Organization is required"),
+  email: emailSchema,
+  organizationId: idSchema,
 });
 
 const oauthProviderSchema = z.object({
   provider: z.enum(["google"]),
-  organizationId: z.string().min(1, "Organization is required"),
-  redirectTo: z.string().url().optional(),
+  organizationId: idSchema,
+  redirectTo: z.url().optional(),
 });
+
+/**
+ * Get base domain for callback URLs using server-side headers
+ * Handles both development (localhost) and production domains
+ */
+async function getBaseDomain(): Promise<string> {
+  const headersList = await headers();
+  const host = headersList.get("host") ?? "localhost:3000";
+
+  if (isDevelopment()) {
+    return "localhost:3000";
+  }
+
+  // Use getCookieDomain to extract base domain, then remove leading dot
+  // e.g., "org1.mysite.com" -> ".mysite.com" -> "mysite.com"
+  return getCookieDomain(host).replace(/^\./, "");
+}
 
 /**
  * Send Magic Link for passwordless authentication
@@ -42,11 +66,13 @@ export async function sendMagicLink(
     try {
       data = extractFormFields(formData, magicLinkSchema);
     } catch (error) {
-      return actionError(error instanceof Error ? error.message : "Form validation failed");
+      return actionError(
+        isError(error) ? error.message : "Form validation failed",
+      );
     }
 
     const { email, organizationId } = data;
-    
+
     // Validate organization exists
     const organizationValid = await validateOrganizationExists(organizationId);
     if (!organizationValid) {
@@ -55,7 +81,7 @@ export async function sendMagicLink(
       });
     }
     const supabase = await createClient();
-    
+
     // Get organization subdomain for redirect URL
     const subdomain = await getOrganizationSubdomainById(organizationId);
     if (!subdomain) {
@@ -63,10 +89,10 @@ export async function sendMagicLink(
     }
 
     // Build callback URL with organization subdomain
-    const baseUrl = process.env["NEXT_PUBLIC_SITE_URL"] ?? "http://localhost:3000";
-    const callbackUrl = isDevelopment() 
+    const baseDomain = await getBaseDomain();
+    const callbackUrl = isDevelopment()
       ? `https://${subdomain}.localhost:3000/auth/callback`
-      : `https://${subdomain}.${baseUrl.replace(/^https?:\/\//, '')}/auth/callback`;
+      : `https://${subdomain}.${baseDomain}/auth/callback`;
 
     // Send magic link with organization metadata
     const { error } = await supabase.auth.signInWithOtp({
@@ -92,7 +118,7 @@ export async function sendMagicLink(
       },
     };
   } catch (error) {
-    console.error("Magic link action error:", error);
+    console.error("Magic link action error:", getErrorMessage(error));
     return actionError("An unexpected error occurred. Please try again.");
   }
 }
@@ -107,11 +133,15 @@ export async function signInWithOAuth(
 ): Promise<never> {
   try {
     // Validate inputs
-    const validation = oauthProviderSchema.safeParse({ provider, organizationId, redirectTo });
+    const validation = oauthProviderSchema.safeParse({
+      provider,
+      organizationId,
+      redirectTo,
+    });
     if (!validation.success) {
       redirect("/auth/auth-code-error?error=invalid_input");
     }
-    
+
     // Validate organization exists
     const organizationValid = await validateOrganizationExists(organizationId);
     if (!organizationValid) {
@@ -119,7 +149,7 @@ export async function signInWithOAuth(
     }
 
     const supabase = await createClient();
-    
+
     // Get organization subdomain for redirect URL
     const subdomain = await getOrganizationSubdomainById(organizationId);
     if (!subdomain) {
@@ -127,15 +157,15 @@ export async function signInWithOAuth(
     }
 
     // Build callback URL with organization subdomain
-    const baseUrl = process.env["NEXT_PUBLIC_SITE_URL"] ?? "http://localhost:3000";
-    const callbackUrl = isDevelopment() 
+    const baseDomain = await getBaseDomain();
+    const callbackUrl = isDevelopment()
       ? `https://${subdomain}.localhost:3000/auth/callback`
-      : `https://${subdomain}.${baseUrl.replace(/^https?:\/\//, '')}/auth/callback`;
+      : `https://${subdomain}.${baseDomain}/auth/callback`;
 
     // Build query params for callback
     const queryParams = new URLSearchParams({ organizationId });
     if (redirectTo) {
-      queryParams.set('next', redirectTo);
+      queryParams.set("next", redirectTo);
     }
 
     // Initiate OAuth flow
@@ -157,7 +187,7 @@ export async function signInWithOAuth(
 
     redirect("/auth/auth-code-error?error=no_redirect_url");
   } catch (error) {
-    console.error("OAuth action error:", error);
+    console.error("OAuth action error:", getErrorMessage(error));
     redirect("/auth/auth-code-error?error=unexpected");
   }
 }
@@ -169,7 +199,7 @@ export async function devSignIn(
   email: string,
   _userData?: { name?: string; role?: string },
 ): Promise<ActionResult<{ message: string }>> {
-  if (process.env.NODE_ENV !== "development") {
+  if (env.NODE_ENV !== "development") {
     return actionError("Dev authentication only available in development");
   }
 
@@ -198,7 +228,7 @@ export async function devSignIn(
       },
     };
   } catch (error) {
-    console.error("Dev auth error:", error);
+    console.error("Dev auth error:", getErrorMessage(error));
     return actionError("Development authentication failed");
   }
 }
@@ -212,7 +242,7 @@ export async function signOut(): Promise<void> {
     await supabase.auth.signOut();
     revalidatePath("/", "layout");
   } catch (error) {
-    console.error("Sign out error:", error);
+    console.error("Sign out error:", getErrorMessage(error));
   }
   redirect("/auth/sign-in");
 }

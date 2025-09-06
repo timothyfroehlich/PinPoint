@@ -32,11 +32,11 @@ interface MachineHeaderProps {
   machine: Machine;
 }
 
-export function MachineHeader({ machine }: MachineHeaderProps) {
-  const displayName = machine.name || machine.model?.name || "Unknown Machine";
-  const locationName = machine.location?.name || "No Location";
-  const modelInfo = machine.model 
-    ? `${machine.model.manufacturer || ""} ${machine.model.name}`.trim()
+export function MachineHeader({ machine }: MachineHeaderProps): JSX.Element {
+  const displayName = machine.name;
+  const locationName = machine.location?.name ?? "Unknown Location";
+  const modelInfo = machine.model
+    ? `${machine.model.manufacturer ?? ""} ${machine.model.name}`.trim()
     : "Unknown Model";
 
   return (
@@ -56,19 +56,23 @@ export function MachineHeader({ machine }: MachineHeaderProps) {
         <CardHeader>
           <div className="flex justify-between items-start">
             <div className="space-y-2">
-              <CardTitle className="text-2xl font-bold">{displayName}</CardTitle>
+              <CardTitle className="text-2xl font-bold">
+                {displayName}
+              </CardTitle>
               <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <Wrench className="h-4 w-4" />
                   {modelInfo}
                   {machine.model?.year && (
-                    <span className="text-muted-foreground">({machine.model.year})</span>
+                    <span className="text-muted-foreground">
+                      ({machine.model.year})
+                    </span>
                   )}
                 </div>
                 <div className="flex items-center gap-1">
                   <MapPin className="h-4 w-4" />
                   {locationName}
-                  {machine.location?.city && machine.location?.state && (
+                  {machine.location?.city && machine.location.state && (
                     <span className="text-muted-foreground">
                       - {machine.location.city}, {machine.location.state}
                     </span>
@@ -83,9 +87,7 @@ export function MachineHeader({ machine }: MachineHeaderProps) {
             <div className="flex gap-2">
               <Badge variant="outline">Active</Badge>
               <Button variant="outline" size="sm" asChild>
-                <Link href={`/machines/${machine.id}/edit`}>
-                  Edit Machine
-                </Link>
+                <Link href={`/machines/${machine.id}/edit`}>Edit Machine</Link>
               </Button>
             </div>
           </div>

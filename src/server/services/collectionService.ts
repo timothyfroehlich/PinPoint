@@ -7,7 +7,7 @@ import type { InferSelectModel } from "drizzle-orm";
 
 import { generateId } from "~/lib/utils/id-generation";
 
-export interface CreateManualCollectionData {
+interface CreateManualCollectionData {
   name: string;
   typeId: string;
   locationId?: string;
@@ -33,7 +33,7 @@ interface MachineWithModelResult {
 // Drizzle's execute() returns the results directly, not wrapped in a rows object
 type SqlExecuteResult<T = unknown> = T[];
 
-export interface CollectionWithMachines {
+interface CollectionWithMachines {
   id: string;
   name: string;
   type: {

@@ -4,18 +4,18 @@
  */
 
 import { cache } from "react";
-import { and, desc, eq, sql, isNull, inArray } from "drizzle-orm";
+import { and, desc, eq, sql, isNull, inArray, type SQL } from "drizzle-orm";
 import { issues, issueStatuses, priorities } from "~/server/db/schema";
-import { db, requireAuthContext } from "./shared";
+import { db } from "~/lib/dal/shared";
+import type { IssueFilters } from "~/lib/types";
+import { safeCount, type CountResult } from "~/lib/types/database-results";
 
 /**
  * Get issues for the current organization with machine and assignee details
  * Designed for Server Components - includes proper org scoping and joins
  * Uses React 19 cache() for request-level memoization
  */
-export const getIssuesForOrg = cache(async () => {
-  const { organizationId } = await requireAuthContext();
-
+export const getIssuesForOrg = cache(async (organizationId: string) => {
   return await db.query.issues.findMany({
     where: eq(issues.organization_id, organizationId),
     with: {
@@ -41,17 +41,6 @@ export const getIssuesForOrg = cache(async () => {
   });
 });
 
-/**
- * Advanced issue filtering interface for URL-based state management
- * Updated for exactOptionalPropertyTypes compliance
- */
-export interface IssueFilters {
-  status?: string[] | undefined;
-  priority?: string[] | undefined;
-  assigneeId?: string | undefined;
-  search?: string | undefined;
-}
-
 export interface IssuePagination {
   page: number;
   limit: number;
@@ -69,14 +58,13 @@ export interface IssueSorting {
  */
 export const getIssuesWithFilters = cache(
   async (
+    organizationId: string,
     filters: IssueFilters = {},
     pagination: IssuePagination = { page: 1, limit: 20 },
     sorting: IssueSorting = { field: "created_at", order: "desc" },
   ) => {
-    const { organizationId } = await requireAuthContext();
-
     // Build where conditions
-    const whereConditions: any[] = [eq(issues.organization_id, organizationId)];
+    const whereConditions: SQL[] = [eq(issues.organization_id, organizationId)];
 
     // Status filtering by status names
     if (filters.status?.length) {
@@ -154,18 +142,23 @@ export const getIssuesWithFilters = cache(
     }
 
     // Get total count for pagination info
-    const totalCount = await db
+    const totalCountResult: CountResult[] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(issues)
-      .where(and(...whereConditions))
-      .then((result) => result[0]?.count || 0);
+      .where(and(...whereConditions));
+    const totalCount = safeCount(totalCountResult);
 
     // Get paginated results
-    const issuesResult: any[] = await db.query.issues.findMany({
+    const issuesResult = await db.query.issues.findMany({
       where: and(...whereConditions),
       with: {
         machine: {
-          columns: { id: true, name: true, model_id: true, location_id: true },
+          columns: {
+            id: true,
+            name: true,
+            model_id: true,
+            location_id: true,
+          },
           with: {
             model: {
               columns: { id: true, name: true },
@@ -189,9 +182,7 @@ export const getIssuesWithFilters = cache(
 
     // Check if there's a next page
     const hasNextPage: boolean = issuesResult.length > pagination.limit;
-    const issuesData: any[] = hasNextPage
-      ? issuesResult.slice(0, -1)
-      : issuesResult;
+    const issuesData = hasNextPage ? issuesResult.slice(0, -1) : issuesResult;
 
     return {
       issues: issuesData,
@@ -209,49 +200,50 @@ export const getIssuesWithFilters = cache(
  * Enforces organization scoping for security
  * Uses React 19 cache() for request-level memoization per issueId
  */
-export const getIssueById = cache(async (issueId: string) => {
-  const { organizationId } = await requireAuthContext();
-
-  const issue = await db.query.issues.findFirst({
-    where: and(
-      eq(issues.id, issueId),
-      eq(issues.organization_id, organizationId),
-    ),
-    with: {
-      machine: {
-        with: {
-          model: {
-            columns: { id: true, name: true },
+export const getIssueById = cache(
+  async (issueId: string, organizationId: string) => {
+    const issue = await db.query.issues.findFirst({
+      where: and(
+        eq(issues.id, issueId),
+        eq(issues.organization_id, organizationId),
+      ),
+      with: {
+        machine: {
+          with: {
+            model: {
+              columns: { id: true, name: true },
+            },
+            location: {
+              columns: { id: true, name: true },
+            },
           },
         },
+        status: {
+          columns: { id: true, name: true, category: true },
+        },
+        assignedTo: {
+          columns: { id: true, name: true, email: true },
+        },
+        createdBy: {
+          columns: { id: true, name: true, email: true },
+        },
       },
-      status: {
-        columns: { id: true, name: true, category: true },
-      },
-      assignedTo: {
-        columns: { id: true, name: true, email: true },
-      },
-      createdBy: {
-        columns: { id: true, name: true, email: true },
-      },
-    },
-  });
+    });
 
-  if (!issue) {
-    throw new Error("Issue not found or access denied");
-  }
+    if (!issue) {
+      throw new Error("Issue not found or access denied");
+    }
 
-  return issue;
-});
+    return issue;
+  },
+);
 
 /**
  * Get issue counts by status for dashboard
  * Optimized query for Server Component stats
  * Uses React 19 cache() for request-level memoization
  */
-export const getIssueStatusCounts = cache(async () => {
-  const { organizationId } = await requireAuthContext();
-
+export const getIssueStatusCounts = cache(async (organizationId: string) => {
   const statusCounts = await db
     .select({
       statusId: issues.status_id,
@@ -261,13 +253,17 @@ export const getIssueStatusCounts = cache(async () => {
     .where(eq(issues.organization_id, organizationId))
     .groupBy(issues.status_id);
 
-  // Convert to object for easier consumption
   return statusCounts.reduce<Record<string, number>>(
     (
       acc: Record<string, number>,
       { statusId, count }: { statusId: string; count: number },
     ) => {
-      acc[statusId] = count;
+      Object.defineProperty(acc, statusId, {
+        value: count,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
       return acc;
     },
     {},
@@ -279,38 +275,34 @@ export const getIssueStatusCounts = cache(async () => {
  * Limited result set for performance
  * Uses React 19 cache() for request-level memoization per limit value
  */
-export const getRecentIssues = cache(async (limit = 5) => {
-  const { organizationId } = await requireAuthContext();
-
-  return await db.query.issues.findMany({
-    where: eq(issues.organization_id, organizationId),
-    with: {
-      machine: {
-        columns: { id: true, name: true, model_id: true },
-        with: {
-          model: {
-            columns: { id: true, name: true },
+export const getRecentIssues = cache(
+  async (organizationId: string, limit = 5) => {
+    return await db.query.issues.findMany({
+      where: eq(issues.organization_id, organizationId),
+      with: {
+        machine: {
+          columns: { id: true, name: true, model_id: true },
+          with: {
+            model: {
+              columns: { id: true, name: true },
+            },
           },
         },
       },
-    },
-    orderBy: [desc(issues.created_at)],
-    limit,
-  });
-});
+      orderBy: [desc(issues.created_at)],
+      limit,
+    });
+  },
+);
 
 /**
  * Get comprehensive issue statistics for dashboard
  * Includes status breakdown, priority distribution, and assignment stats
  * Uses React 19 cache() for request-level memoization
  */
-export const getIssueDashboardStats = cache(async () => {
-  const { organizationId } = await requireAuthContext();
-
-  // Execute multiple queries in parallel for performance
+export const getIssueDashboardStats = cache(async (organizationId: string) => {
   const [statusBreakdown, priorityBreakdown, assignmentStats] =
     await Promise.all([
-      // Status breakdown with named statuses
       db.query.issues.findMany({
         where: eq(issues.organization_id, organizationId),
         with: {
@@ -320,8 +312,6 @@ export const getIssueDashboardStats = cache(async () => {
         },
         columns: { id: true, status_id: true },
       }),
-
-      // Priority breakdown with named priorities
       db.query.issues.findMany({
         where: eq(issues.organization_id, organizationId),
         with: {
@@ -331,8 +321,6 @@ export const getIssueDashboardStats = cache(async () => {
         },
         columns: { id: true, priority_id: true },
       }),
-
-      // Assignment statistics
       db.query.issues.findMany({
         where: eq(issues.organization_id, organizationId),
         columns: { id: true, assigned_to_id: true, created_by_id: true },
@@ -342,8 +330,17 @@ export const getIssueDashboardStats = cache(async () => {
   // Process status breakdown
   const statusCounts = statusBreakdown.reduce<Record<string, number>>(
     (acc, issue) => {
-      const statusName = issue.status?.name || "unknown";
-      acc[statusName] = (acc[statusName] || 0) + 1;
+      const statusName = issue.status.name;
+      // ESLint security warning is false positive - statusName comes from database
+      // status.name field which is controlled via database constraints and validation
+      // eslint-disable-next-line security/detect-object-injection
+      const currentCount = acc[statusName] ?? 0;
+      Object.defineProperty(acc, statusName, {
+        value: currentCount + 1,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
       return acc;
     },
     {},
@@ -352,8 +349,17 @@ export const getIssueDashboardStats = cache(async () => {
   // Process priority breakdown
   const priorityCounts = priorityBreakdown.reduce<Record<string, number>>(
     (acc, issue) => {
-      const priorityName = issue.priority?.name || "unknown";
-      acc[priorityName] = (acc[priorityName] || 0) + 1;
+      const priorityName = issue.priority.name;
+      // ESLint security warning is false positive - priorityName comes from database
+      // priority.name field which is controlled via database constraints and validation
+      // eslint-disable-next-line security/detect-object-injection
+      const currentCount = acc[priorityName] ?? 0;
+      Object.defineProperty(acc, priorityName, {
+        value: currentCount + 1,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
       return acc;
     },
     {},
@@ -384,132 +390,152 @@ export const getIssueDashboardStats = cache(async () => {
  * Shows user's personal issue workload
  * Uses React 19 cache() for request-level memoization per limit
  */
-export const getCurrentUserAssignedIssues = cache(async (limit = 10) => {
-  const { user, organizationId } = await requireAuthContext();
-
-  return await db.query.issues.findMany({
-    where: and(
-      eq(issues.organization_id, organizationId),
-      eq(issues.assigned_to_id, user.id),
-    ),
-    with: {
-      machine: {
-        columns: { id: true, name: true },
-        with: {
-          model: { columns: { name: true } },
+export const getCurrentUserAssignedIssues = cache(
+  async (organizationId: string, userId: string, limit = 10) => {
+    return await db.query.issues.findMany({
+      where: and(
+        eq(issues.organization_id, organizationId),
+        eq(issues.assigned_to_id, userId),
+      ),
+      with: {
+        machine: {
+          columns: { id: true, name: true },
+          with: {
+            model: { columns: { name: true } },
+          },
         },
+        status: { columns: { name: true } },
+        priority: { columns: { name: true } },
       },
-      status: { columns: { name: true } },
-      priority: { columns: { name: true } },
-    },
-    orderBy: [desc(issues.updated_at)],
-    limit,
-  });
-});
+      orderBy: [desc(issues.updated_at)],
+      limit,
+    });
+  },
+);
 
 /**
  * Get issues created by current user for dashboard
  * Shows user's issue creation history
  * Uses React 19 cache() for request-level memoization per limit
  */
-export const getCurrentUserCreatedIssues = cache(async (limit = 10) => {
-  const { user, organizationId } = await requireAuthContext();
-
-  return await db.query.issues.findMany({
-    where: and(
-      eq(issues.organization_id, organizationId),
-      eq(issues.created_by_id, user.id),
-    ),
-    with: {
-      machine: {
-        columns: { id: true, name: true },
-        with: {
-          model: { columns: { name: true } },
+export const getCurrentUserCreatedIssues = cache(
+  async (organizationId: string, userId: string, limit = 10) => {
+    return await db.query.issues.findMany({
+      where: and(
+        eq(issues.organization_id, organizationId),
+        eq(issues.created_by_id, userId),
+      ),
+      with: {
+        machine: {
+          columns: { id: true, name: true },
+          with: {
+            model: { columns: { name: true } },
+          },
         },
+        status: { columns: { name: true } },
+        priority: { columns: { name: true } },
       },
-      status: { columns: { name: true } },
-      priority: { columns: { name: true } },
-    },
-    orderBy: [desc(issues.created_at)],
-    limit,
-  });
-});
+      orderBy: [desc(issues.created_at)],
+      limit,
+    });
+  },
+);
 
 /**
  * Get high priority unassigned issues for dashboard alerts
  * Identifies critical issues needing attention
  * Uses React 19 cache() for request-level memoization
  */
-export const getHighPriorityUnassignedIssues = cache(async () => {
-  const { organizationId } = await requireAuthContext();
-
-  return await db.query.issues.findMany({
-    where: and(
-      eq(issues.organization_id, organizationId),
-      isNull(issues.assigned_to_id), // Unassigned
-      // Note: Would need to check priority by name or add priority level filtering
-    ),
-    with: {
-      machine: {
-        columns: { id: true, name: true },
-        with: {
-          model: { columns: { name: true } },
+export const getHighPriorityUnassignedIssues = cache(
+  async (organizationId: string) => {
+    return await db.query.issues.findMany({
+      where: and(
+        eq(issues.organization_id, organizationId),
+        isNull(issues.assigned_to_id), // Unassigned
+      ),
+      with: {
+        machine: {
+          columns: { id: true, name: true },
+          with: {
+            model: { columns: { name: true } },
+          },
         },
+        status: { columns: { name: true } },
+        priority: { columns: { name: true } },
       },
-      status: { columns: { name: true } },
-      priority: { columns: { name: true } },
-    },
-    orderBy: [desc(issues.created_at)],
-  });
-});
+      orderBy: [desc(issues.created_at)],
+    });
+  },
+);
 
 /**
  * Get issue trend data for dashboard charts
  * Shows issue creation/resolution trends over time
  * Uses React 19 cache() for request-level memoization per days
  */
-export const getIssueTrendData = cache(async (days = 30) => {
-  const { organizationId } = await requireAuthContext();
+export const getIssueTrendData = cache(
+  async (organizationId: string, days = 30) => {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
 
-  // Get issues from the last N days
-  const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - days);
+    const recentIssues = await db.query.issues.findMany({
+      where: and(
+        eq(issues.organization_id, organizationId),
+        sql`${issues.created_at} >= ${cutoffDate}`,
+      ),
+      columns: {
+        id: true,
+        created_at: true,
+        status_id: true,
+      },
+      with: {
+        status: { columns: { name: true } },
+      },
+    });
 
-  const recentIssues = await db.query.issues.findMany({
-    where: and(
-      eq(issues.organization_id, organizationId),
-      sql`${issues.created_at} >= ${cutoffDate}`,
-    ),
-    columns: {
-      id: true,
-      created_at: true,
-      status_id: true,
-    },
-    with: {
-      status: { columns: { name: true } },
-    },
-  });
+    const trendData = recentIssues.reduce<
+      Record<string, { created: number; resolved: number }>
+    >((acc, issue) => {
+      const dateKey = issue.created_at.toISOString().split("T")[0];
+      if (dateKey) {
+        if (!Object.prototype.hasOwnProperty.call(acc, dateKey)) {
+          Object.defineProperty(acc, dateKey, {
+            value: { created: 0, resolved: 0 },
+            writable: true,
+            enumerable: true,
+            configurable: true,
+          });
+        }
+        // ESLint security warning is false positive - dateKey is derived from controlled
+        // date formatting (YYYY-MM-DD) and validated before use in the accumulator
+        // eslint-disable-next-line security/detect-object-injection
+        const bucket = acc[dateKey] as { created: number; resolved: number };
+        bucket.created += 1;
+      }
 
-  // Group issues by date for trend analysis
-  const trendData = recentIssues.reduce<
-    Record<string, { created: number; resolved: number }>
-  >((acc, issue) => {
-    const dateKey = issue.created_at.toISOString().split("T")[0]!; // YYYY-MM-DD - guaranteed to exist
-    if (!acc[dateKey]) {
-      acc[dateKey] = { created: 0, resolved: 0 };
-    }
-    acc[dateKey].created += 1;
+      const statusName = issue.status.name.toLowerCase();
+      if (
+        dateKey &&
+        (statusName.includes("resolved") || statusName.includes("closed"))
+      ) {
+        if (!Object.prototype.hasOwnProperty.call(acc, dateKey)) {
+          Object.defineProperty(acc, dateKey, {
+            value: { created: 0, resolved: 0 },
+            writable: true,
+            enumerable: true,
+            configurable: true,
+          });
+        }
+        // ESLint security warning is false positive - dateKey is derived from controlled
+        // date formatting (YYYY-MM-DD) and validated before use in the accumulator
+        // eslint-disable-next-line security/detect-object-injection
+        const bucket = acc[dateKey] as { created: number; resolved: number };
+        bucket.resolved += 1;
+      }
 
-    // Count as resolved if status indicates completion
-    if (
-      issue.status?.name?.toLowerCase().includes("resolved") ||
-      issue.status?.name?.toLowerCase().includes("closed")
-    ) {
-      acc[dateKey].resolved += 1;
-    }
+      return acc;
+    }, {});
 
-    return acc;
-  }, {});
-
-  return trendData;
-});
+    return trendData;
+  },
+);

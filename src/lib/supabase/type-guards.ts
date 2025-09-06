@@ -17,6 +17,7 @@ import type {
 } from "@supabase/supabase-js";
 
 import type { PinPointSupabaseUser, AuthErrorType } from "./types";
+import type { SupabaseValidationResult } from "~/lib/types/supabase-validation";
 
 // ============================================================================
 // Core Supabase Type Guards
@@ -45,7 +46,7 @@ export function isPinPointSupabaseUser(
   if (!isSupabaseUser(value)) return false;
 
   const user = value;
-  return typeof user.app_metadata === "object" && user.app_metadata !== null;
+  return typeof user.app_metadata === "object";
 }
 
 /**
@@ -66,11 +67,7 @@ export function isSupabaseAuthError(value: unknown): value is AuthError {
 export function isSuccessfulUserResponse(
   response: UserResponse,
 ): response is { data: { user: User }; error: null } {
-  return (
-    response.error === null &&
-    response.data.user !== undefined &&
-    isSupabaseUser(response.data.user)
-  );
+  return response.error === null && isSupabaseUser(response.data.user);
 }
 
 /**
@@ -81,7 +78,7 @@ export function isSuccessfulAuthResponse(
 ): response is { data: { user: User; session: Session | null }; error: null } {
   return (
     response.error === null &&
-    response.data.user !== undefined &&
+    response.data.user !== null &&
     isSupabaseUser(response.data.user)
   );
 }
@@ -128,9 +125,12 @@ export function isSuccessfulCreateUserResponse(
  * Type guard for successful admin.deleteUser() response
  */
 export function isSuccessfulDeleteUserResponse(
-  response: any,
-): response is { data: {}; error: null } {
-  return response && response.error === null;
+  response: unknown,
+): response is { data: Record<string, never>; error: null } {
+  return (
+    hasValidResponseStructure(response) &&
+    (response as { error: unknown }).error === null
+  );
 }
 
 // ============================================================================
@@ -195,12 +195,16 @@ export function hasValidResponseStructure(
 export function extractUserFromResponse(response: unknown): User | null {
   if (!hasValidResponseStructure(response)) return null;
 
-  const data = (response as any).data;
+  const data = (response as { data: unknown }).data;
   if (!data) return null;
 
   // Handle different response structures
-  if (isSupabaseUser(data.user)) {
-    return data.user;
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (typeof data === "object" && data !== null && "user" in data) {
+    const userData = (data as { user: unknown }).user;
+    if (isSupabaseUser(userData)) {
+      return userData;
+    }
   }
 
   if (isSupabaseUser(data)) {
@@ -221,7 +225,7 @@ export function extractErrorFromResponse(response: unknown): {
     return { error: null, classified: null };
   }
 
-  const error = (response as any).error;
+  const error = (response as { error: unknown }).error;
   if (!isSupabaseAuthError(error)) {
     return { error: null, classified: null };
   }
@@ -244,7 +248,6 @@ export function hasValidPinPointMetadata(
 ): user is PinPointSupabaseUser {
   return (
     typeof user.app_metadata === "object" &&
-    user.app_metadata !== null &&
     typeof user.app_metadata["organization_id"] === "string"
   );
 }
@@ -254,7 +257,8 @@ export function hasValidPinPointMetadata(
  */
 export function extractOrganizationId(user: User): string | null {
   if (!hasValidPinPointMetadata(user)) return null;
-  return user.app_metadata["organization_id"] || null;
+  const orgId = user.app_metadata["organization_id"] as unknown;
+  return typeof orgId === "string" ? orgId : null;
 }
 
 /**
@@ -262,25 +266,13 @@ export function extractOrganizationId(user: User): string | null {
  */
 export function extractUserRole(user: User): string | null {
   if (!hasValidPinPointMetadata(user)) return null;
-  return user.app_metadata["role"] || null;
+  const role = user.app_metadata["role"] as unknown;
+  return typeof role === "string" ? role : null;
 }
 
 // ============================================================================
 // Comprehensive Response Validation
 // ============================================================================
-
-/**
- * Comprehensive validation result for Supabase operations
- */
-export interface SupabaseValidationResult<T = unknown> {
-  success: boolean;
-  data?: T;
-  error?: {
-    type: AuthErrorType;
-    message: string;
-    originalError?: AuthError;
-  };
-}
 
 /**
  * Validate and classify any Supabase response comprehensively
@@ -315,7 +307,7 @@ export function validateSupabaseResponse<T = unknown>(
   }
 
   // Extract and validate data
-  const data = (response as any).data;
+  const data = (response as { data: unknown }).data;
   if (expectedDataValidator && !expectedDataValidator(data)) {
     return {
       success: false,

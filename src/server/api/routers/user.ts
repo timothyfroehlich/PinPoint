@@ -3,6 +3,13 @@ import { TRPCError } from "@trpc/server";
 import { asc, count, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
+// Validation schemas
+import {
+  idSchema,
+  bioSchema,
+  optionalUserNameSchema,
+} from "~/lib/validation/schemas";
+
 // Internal types (alphabetical)
 import type {
   UserMembershipResponse,
@@ -14,6 +21,8 @@ import type {
 import { imageStorage } from "~/lib/image-storage/local-storage";
 import { transformKeysToCamelCase } from "~/lib/utils/case-transformers";
 import { getDefaultAvatarUrl } from "~/lib/utils/image-processing";
+import { getErrorMessage } from "~/lib/utils/type-guards";
+import { safeCount, type CountResult } from "~/lib/types/database-results";
 
 // Server modules (alphabetical)
 import { getUserPermissionsForSupabaseUser } from "~/server/auth/permissions";
@@ -65,21 +74,24 @@ export const userRouter = createTRPCRouter({
       }
 
       // Get counts separately using individual queries
-      const [ownedMachinesCount, issuesCreatedCount, commentsCount] =
-        await Promise.all([
-          ctx.db
-            .select({ count: count() })
-            .from(machines)
-            .where(eq(machines.owner_id, ctx.user.id)),
-          ctx.db
-            .select({ count: count() })
-            .from(issues)
-            .where(eq(issues.created_by_id, ctx.user.id)),
-          ctx.db
-            .select({ count: count() })
-            .from(comments)
-            .where(eq(comments.author_id, ctx.user.id)),
-        ]);
+      const [ownedMachinesCount, issuesCreatedCount, commentsCount]: [
+        CountResult[],
+        CountResult[],
+        CountResult[],
+      ] = await Promise.all([
+        ctx.db
+          .select({ count: count() })
+          .from(machines)
+          .where(eq(machines.owner_id, ctx.user.id)),
+        ctx.db
+          .select({ count: count() })
+          .from(issues)
+          .where(eq(issues.created_by_id, ctx.user.id)),
+        ctx.db
+          .select({ count: count() })
+          .from(comments)
+          .where(eq(comments.author_id, ctx.user.id)),
+      ]);
 
       return {
         id: user.id,
@@ -94,9 +106,9 @@ export const userRouter = createTRPCRouter({
           user.memberships,
         ) as UserProfileResponse["memberships"],
         _count: {
-          ownedMachines: ownedMachinesCount[0]?.count ?? 0,
-          issuesCreated: issuesCreatedCount[0]?.count ?? 0,
-          comments: commentsCount[0]?.count ?? 0,
+          ownedMachines: safeCount(ownedMachinesCount),
+          issuesCreated: safeCount(issuesCreatedCount),
+          comments: safeCount(commentsCount),
         },
       };
     },
@@ -139,8 +151,8 @@ export const userRouter = createTRPCRouter({
   updateProfile: protectedProcedure
     .input(
       z.object({
-        name: z.string().min(1).max(100).optional(),
-        bio: z.string().max(500).optional(),
+        name: optionalUserNameSchema,
+        bio: bioSchema,
       }),
     )
     .mutation(async ({ ctx, input }): Promise<User> => {
@@ -218,8 +230,7 @@ export const userRouter = createTRPCRouter({
                   operation: "delete_old_image",
                 },
                 error: {
-                  message:
-                    error instanceof Error ? error.message : String(error),
+                  message: getErrorMessage(error),
                 },
               });
             }
@@ -253,7 +264,7 @@ export const userRouter = createTRPCRouter({
               operation: "upload_profile_picture",
             },
             error: {
-              message: error instanceof Error ? error.message : String(error),
+              message: getErrorMessage(error),
             },
           });
           throw new TRPCError({
@@ -266,7 +277,7 @@ export const userRouter = createTRPCRouter({
 
   // Get user by ID (public info only - within organization context)
   getUser: orgScopedProcedure
-    .input(z.object({ userId: z.string() }))
+    .input(z.object({ userId: idSchema }))
     .query(async ({ ctx, input }): Promise<UserResponse> => {
       // Verify user is a member of the current organization (RLS handles org scoping)
       const [membership] = await ctx.db
@@ -292,28 +303,31 @@ export const userRouter = createTRPCRouter({
       }
 
       // Get counts separately using individual queries
-      const [ownedMachinesCount, issuesCreatedCount, commentsCount] =
-        await Promise.all([
-          ctx.db
-            .select({ count: count() })
-            .from(machines)
-            .where(eq(machines.owner_id, input.userId)),
-          ctx.db
-            .select({ count: count() })
-            .from(issues)
-            .where(eq(issues.created_by_id, input.userId)),
-          ctx.db
-            .select({ count: count() })
-            .from(comments)
-            .where(eq(comments.author_id, input.userId)),
-        ]);
+      const [ownedMachinesCount, issuesCreatedCount, commentsCount]: [
+        CountResult[],
+        CountResult[],
+        CountResult[],
+      ] = await Promise.all([
+        ctx.db
+          .select({ count: count() })
+          .from(machines)
+          .where(eq(machines.owner_id, input.userId)),
+        ctx.db
+          .select({ count: count() })
+          .from(issues)
+          .where(eq(issues.created_by_id, input.userId)),
+        ctx.db
+          .select({ count: count() })
+          .from(comments)
+          .where(eq(comments.author_id, input.userId)),
+      ]);
 
       return {
         ...membership.user,
         _count: {
-          ownedMachines: ownedMachinesCount[0]?.count ?? 0,
-          issuesCreated: issuesCreatedCount[0]?.count ?? 0,
-          comments: commentsCount[0]?.count ?? 0,
+          ownedMachines: safeCount(ownedMachinesCount),
+          issuesCreated: safeCount(issuesCreatedCount),
+          comments: safeCount(commentsCount),
         },
       };
     }),
@@ -461,8 +475,8 @@ export const userRouter = createTRPCRouter({
   updateMembership: userManageProcedure
     .input(
       z.object({
-        userId: z.string(),
-        roleId: z.string(),
+        userId: idSchema,
+        roleId: idSchema,
       }),
     )
     .mutation(
