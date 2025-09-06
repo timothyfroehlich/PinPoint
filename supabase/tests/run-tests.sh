@@ -72,16 +72,23 @@ test_connection() {
     fi
 }
 
-# Install pgTAP extension if not present
+# Install pgTAP extension if not present, or detect if already loaded as SQL functions
 setup_pgtap() {
-    log_info "Checking pgTAP extension..."
+    log_info "Checking pgTAP availability..."
     
-    # Check if pgTAP is already installed
+    # First check if pgTAP functions are available (loaded as SQL functions, e.g., in CI)
+    if psql "${DATABASE_URL}" -c "SELECT plan(1);" &> /dev/null; then
+        log_success "pgTAP functions already available"
+        return 0
+    fi
+    
+    # Check if pgTAP is installed as an extension
     if psql "${DATABASE_URL}" -c "SELECT 1 FROM pg_extension WHERE extname = 'pgtap';" -t | grep -q 1; then
         log_success "pgTAP extension already installed"
         return 0
     fi
     
+    # Try to install pgTAP as extension (for local development)
     log_info "Installing pgTAP extension..."
     if psql "${DATABASE_URL}" -c "CREATE EXTENSION IF NOT EXISTS pgtap;" &> /dev/null; then
         log_success "pgTAP extension installed successfully"
