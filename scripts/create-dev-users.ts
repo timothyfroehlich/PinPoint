@@ -218,7 +218,28 @@ async function createDevUsers() {
         { p_user_id: user.id, p_org_id: user.organizationId, p_role_id: roleId },
       );
       if (rpcError) {
-        throw new Error(`Membership upsert failed: ${rpcError.message}`);
+        console.warn(
+          `    - RPC upsert failed (${rpcError.message}); falling back to direct service-role upsert`,
+        );
+        // Fallback strategy using service-role table access
+        const stableId = `membership-${user.id}-${user.organizationId}`;
+        const { error: delErr } = await supabase
+          .from("memberships")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("organization_id", user.organizationId);
+        if (delErr) {
+          throw new Error(`Membership delete failed: ${delErr.message}`);
+        }
+        const { error: insErr } = await supabase.from("memberships").insert({
+          id: stableId,
+          user_id: user.id,
+          organization_id: user.organizationId,
+          role_id: roleId,
+        });
+        if (insErr) {
+          throw new Error(`Membership insert failed: ${insErr.message}`);
+        }
       }
       console.log(`    - ✅ Membership upserted for role: ${roleId}`);
     } catch (err) {
