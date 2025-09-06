@@ -210,8 +210,8 @@ jobs:
           sudo apt-get install -y postgresql-client-17 postgresql-server-dev-17 libtap-parser-sourcehandler-pgtap-perl build-essential
           # Install pgTAP from source since postgresql-17-pgtap doesn't exist
           wget https://github.com/theory/pgtap/archive/refs/tags/v1.3.3.tar.gz
-          tar -xzf v1.3.3.tar.gz
-          cd pgtap-1.3.3
+          tar -xzf "v1.3.3.tar.gz"
+          cd "pgtap-1.3.3"
           make
           sudo make install
       - name: Setup database for RLS testing
