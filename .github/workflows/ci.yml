@@ -203,7 +203,7 @@ jobs:
           node-version: "24"
           cache: "npm"
       - run: npm ci
-      - name: Install pg_prove and pgTAP
+      - name: Install pg_prove and setup database for RLS testing
         run: |
           # Add PostgreSQL 17 repository
           sudo apt-get update
@@ -218,9 +218,10 @@ jobs:
           # Download and setup pgTAP (no need to install, just load SQL)
           wget https://github.com/theory/pgtap/archive/refs/tags/v1.3.3.tar.gz
           tar -xzf "v1.3.3.tar.gz"
-      - name: Setup database for RLS testing
-        run: |
+          
+          # Setup database schema
           npm run db:push:local
+          
           # Load pgTAP directly from SQL file (standard pattern)
           psql "$DATABASE_URL" -f pgtap-1.3.3/sql/pgtap.sql
           psql "$DATABASE_URL" -f supabase/tests/setup/01-test-roles.sql
