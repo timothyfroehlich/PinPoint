@@ -7,7 +7,7 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
-import { uuidSchema } from "~/lib/validation/schemas";
+import { uuidSchema, emailSchema, nameSchema } from "~/lib/validation/schemas";
 import { eq, and } from "drizzle-orm";
 import { users, memberships, roles } from "~/server/db/schema";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
@@ -37,8 +37,8 @@ import { PERMISSIONS } from "~/server/auth/permissions.constants";
 
 // Enhanced validation schemas with better error messages
 const inviteUserSchema = z.object({
-  email: z.email().transform((s: string) => s.trim().toLowerCase()),
-  name: z.string().max(100, "Name must be less than 100 characters").optional(),
+  email: emailSchema,
+  name: nameSchema.optional(),
   roleId: uuidSchema.optional(),
   message: z
     .string()
@@ -59,7 +59,7 @@ type UpdateUserRoleData = z.infer<typeof updateUserRoleSchema>;
 
 const removeUserSchema = z.object({
   userId: uuidSchema,
-  confirmEmail: z.email().transform((s: string) => s.trim().toLowerCase()),
+  confirmEmail: emailSchema,
 });
 
 // Explicit type for better TypeScript inference
@@ -101,12 +101,19 @@ export async function inviteUserAction(
     const organizationId = organization.id;
 
     // Enhanced validation with Zod
-    const validation: ActionResult<InviteUserData> = validateFormData(formData, inviteUserSchema);
+    const validation: ActionResult<InviteUserData> = validateFormData(
+      formData,
+      inviteUserSchema,
+    );
     if (!validation.success) {
       return validation;
     }
 
-    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.USER_MANAGE, db);
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.USER_MANAGE,
+      db,
+    );
 
     // Check if user already exists in the system
     const existingUser = await db.query.users.findFirst({
@@ -204,7 +211,7 @@ export async function inviteUserAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(
-        `User invitation processed for ${validation.data.email} by ${user.email ?? "unknown"}`,
+        `User invitation processed for ${validation.data.email} by ${user.email}`,
         {
           userId,
           membershipId: newMembership.id,
@@ -272,12 +279,19 @@ export async function updateUserRoleAction(
     const organizationId = organization.id;
 
     // Enhanced validation
-    const validation: ActionResult<UpdateUserRoleData> = validateFormData(formData, updateUserRoleSchema);
+    const validation: ActionResult<UpdateUserRoleData> = validateFormData(
+      formData,
+      updateUserRoleSchema,
+    );
     if (!validation.success) {
       return validation;
     }
 
-    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.USER_MANAGE, db);
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.USER_MANAGE,
+      db,
+    );
 
     // Verify role exists in this organization
     const role = await db.query.roles.findFirst({
@@ -316,7 +330,7 @@ export async function updateUserRoleAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(
-        `User role updated by ${user.email ?? "unknown"}: ${validation.data.userId} -> ${role.name}`,
+        `User role updated by ${user.email}: ${validation.data.userId} -> ${role.name}`,
       );
 
       // Log the activity
@@ -359,12 +373,19 @@ export async function removeUserAction(
     const organizationId = organization.id;
 
     // Enhanced validation
-    const validation: ActionResult<RemoveUserData> = validateFormData(formData, removeUserSchema);
+    const validation: ActionResult<RemoveUserData> = validateFormData(
+      formData,
+      removeUserSchema,
+    );
     if (!validation.success) {
       return validation;
     }
 
-    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.USER_MANAGE, db);
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.USER_MANAGE,
+      db,
+    );
 
     // Verify user exists and email matches (safety check)
     const targetUser = await db.query.users.findFirst({
@@ -399,7 +420,7 @@ export async function removeUserAction(
     // Background processing
     runAfterResponse(async () => {
       console.log(
-        `User removed from organization by ${user.email ?? "unknown"}: ${validation.data.confirmEmail}`,
+        `User removed from organization by ${user.email}: ${validation.data.confirmEmail}`,
       );
 
       // Log the activity
@@ -442,20 +463,26 @@ export async function updateSystemSettingsAction(
     const organizationId = organization.id;
 
     // Parse JSON data from form
-    const settingsData = String(formData.get("settings") ?? "");
-    if (!settingsData) {
+    const rawSettings = formData.get("settings");
+    if (typeof rawSettings !== "string" || rawSettings.trim() === "") {
       return actionError("No settings data provided");
     }
 
-    const data = JSON.parse(settingsData);
-    const validation = updateSystemSettingsSchema.safeParse({ settings: data });
+    const parsed: unknown = JSON.parse(rawSettings);
+    const validation = updateSystemSettingsSchema.safeParse({
+      settings: parsed,
+    });
 
     if (!validation.success) {
       return actionError("Invalid settings data");
     }
 
     // Permission check for settings update
-    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ORGANIZATION_MANAGE, db);
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.ORGANIZATION_MANAGE,
+      db,
+    );
 
     // Convert flat form data to nested SystemSettingsData structure
     const flatSettings = validation.data.settings;
@@ -498,7 +525,7 @@ export async function updateSystemSettingsAction(
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(`System settings updated by ${user.email ?? "unknown"}`);
+      console.log(`System settings updated by ${user.email}`);
 
       // Log the activity
       await logActivity({
@@ -534,7 +561,11 @@ export async function exportActivityLogAction(): Promise<Response> {
     const { user, org: organization, membership } = authContext;
     const organizationId = organization.id;
 
-    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ADMIN_VIEW_ANALYTICS, db);
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.ADMIN_VIEW_ANALYTICS,
+      db,
+    );
 
     // Export activity log to CSV
     const csvData = await exportActivityLog(organizationId, {
@@ -554,7 +585,7 @@ export async function exportActivityLogAction(): Promise<Response> {
     });
 
     // Generate filename with timestamp
-    const timestamp = new Date().toISOString().split("T")[0];
+    const timestamp = new Date().toISOString().split("T")[0] ?? "unknown";
     const filename = `activity-log-${timestamp}.csv`;
 
     // Return CSV file response
@@ -562,7 +593,7 @@ export async function exportActivityLogAction(): Promise<Response> {
       status: 200,
       headers: {
         "Content-Type": "text/csv",
-        "Content-Disposition": `attachment; filename="${String(filename)}"`,
+        "Content-Disposition": `attachment; filename="${filename}"`,
       },
     });
   } catch (error) {

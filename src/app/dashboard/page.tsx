@@ -10,11 +10,10 @@ import {
   WrenchIcon,
   BarChart3Icon,
 } from "lucide-react";
+import { AuthGuard } from "~/components/auth/auth-guard";
 import { getRequestAuthContext } from "~/server/auth/context";
 import { getIssuesForOrg } from "~/lib/dal/issues";
-import {
-  getOrganizationStatsById,
-} from "~/lib/dal/organizations";
+import { getOrganizationStatsById } from "~/lib/dal/organizations";
 import { IssuesListServer } from "~/components/issues/issues-list-server";
 import { DashboardStats } from "~/components/dashboard/dashboard-stats";
 
@@ -22,17 +21,20 @@ export function generateMetadata(): Metadata {
   // Generic metadata to avoid auth race conditions - org-specific title set at page level
   return {
     title: "Dashboard - PinPoint",
-    description: "Issue management dashboard for monitoring and tracking maintenance issues",
+    description:
+      "Issue management dashboard for monitoring and tracking maintenance issues",
   };
 }
 
-export default async function DashboardPage(): Promise<React.JSX.Element> {
-  // Single authentication resolution for entire request (Phase 1 invariant)
-  const auth = await getRequestAuthContext();
-  if (auth.kind !== 'authorized') {
-    throw new Error('Member access required');
-  }
-  const { user } = auth;
+function DashboardContent({
+  authContext,
+}: {
+  authContext: Extract<
+    Awaited<ReturnType<typeof getRequestAuthContext>>,
+    { kind: "authorized" }
+  >;
+}): React.JSX.Element {
+  const { user } = authContext;
 
   return (
     <div className="space-y-8">
@@ -46,7 +48,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
 
       {/* Organization Statistics */}
       <Suspense fallback={<StatsLoadingSkeleton />}>
-        <DashboardStatsWithData organizationId={auth.org.id} />
+        <DashboardStatsWithData organizationId={authContext.org.id} />
       </Suspense>
 
       {/* Dashboard Actions */}
@@ -65,10 +67,32 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
         </div>
 
         <Suspense fallback={<RecentIssuesLoadingSkeleton />}>
-          <RecentIssuesWithData organizationId={auth.org.id} />
+          <RecentIssuesWithData organizationId={authContext.org.id} />
         </Suspense>
       </div>
     </div>
+  );
+}
+
+export default async function DashboardPage(): Promise<React.JSX.Element> {
+  // Single authentication resolution for entire request (Phase 1 invariant)
+  const authContext = await getRequestAuthContext();
+
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Dashboard Access Required"
+      fallbackMessage="You need to be signed in as a member to view your dashboard."
+    >
+      <DashboardContent
+        authContext={
+          authContext as Extract<
+            Awaited<ReturnType<typeof getRequestAuthContext>>,
+            { kind: "authorized" }
+          >
+        }
+      />
+    </AuthGuard>
   );
 }
 
@@ -131,7 +155,11 @@ function DashboardQuickActions(): React.JSX.Element {
 }
 
 // Server Component for dashboard statistics (receives pre-resolved organizationId)
-async function DashboardStatsWithData({ organizationId }: { organizationId: string }): Promise<React.JSX.Element> {
+async function DashboardStatsWithData({
+  organizationId,
+}: {
+  organizationId: string;
+}): Promise<React.JSX.Element> {
   const stats = await getOrganizationStatsById(organizationId);
 
   // Transform to match DashboardStats component interface
@@ -147,7 +175,11 @@ async function DashboardStatsWithData({ organizationId }: { organizationId: stri
 }
 
 // Server Component for recent issues (receives pre-resolved organizationId)
-async function RecentIssuesWithData({ organizationId }: { organizationId: string }): Promise<React.JSX.Element> {
+async function RecentIssuesWithData({
+  organizationId,
+}: {
+  organizationId: string;
+}): Promise<React.JSX.Element> {
   const issues = await getIssuesForOrg(organizationId);
   const recentIssues = issues.slice(0, 5);
 
@@ -173,7 +205,11 @@ async function RecentIssuesWithData({ organizationId }: { organizationId: string
 
   return (
     <div className="space-y-4">
-      <IssuesListServer issues={recentIssues} limit={5} organizationId={organizationId} />
+      <IssuesListServer
+        issues={recentIssues}
+        limit={5}
+        organizationId={organizationId}
+      />
 
       {issues.length > 5 && (
         <div className="text-center pt-4">

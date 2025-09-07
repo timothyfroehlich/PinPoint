@@ -197,7 +197,9 @@ export function GenericSearch({
 /**
  * Compact variant for dense layouts or sidebars
  */
-export function GenericSearchCompact(props: Omit<GenericSearchProps, "size">): JSX.Element {
+export function GenericSearchCompact(
+  props: Omit<GenericSearchProps, "size">,
+): JSX.Element {
   return <GenericSearch {...props} size="sm" />;
 }
 
@@ -209,7 +211,14 @@ export function useGenericSearch(
   initialSearch = "",
   basePath: string,
   urlBuilder: GenericSearchProps["urlBuilder"] = defaultUrlBuilder,
-): { searchValue: string; deferredSearchValue: string; isPending: boolean; updateSearch: (newValue: string) => void; clearSearch: () => void; commitSearch: (value?: string) => void; } {
+): {
+  searchValue: string;
+  deferredSearchValue: string;
+  isPending: boolean;
+  updateSearch: (newValue: string) => void;
+  clearSearch: () => void;
+  commitSearch: (value?: string) => void;
+} {
   const [searchValue, setSearchValue] = useState(initialSearch);
   const deferredSearchValue = useDeferredValue(searchValue);
   const [isPending, startTransition] = useTransition();

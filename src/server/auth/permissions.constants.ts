@@ -8,15 +8,15 @@
 export const PERMISSIONS = {
   // Issues
   ISSUE_VIEW: "issue:view",
-  /** @deprecated Use ISSUE_CREATE_FULL or ISSUE_CREATE_BASIC */
+  // Legacy alias kept pre-beta; prefer ISSUE_CREATE_FULL or ISSUE_CREATE_BASIC
   ISSUE_CREATE: "issue:create", // legacy alias kept pre-beta
   ISSUE_CREATE_BASIC: "issue:create_basic",
   ISSUE_CREATE_FULL: "issue:create_full",
   ISSUE_EDIT: "issue:edit",
   ISSUE_DELETE: "issue:delete",
-  /** @deprecated Will be merged into ISSUE_EDIT (tracking TODO) */
+  // Deprecated: Will be merged into ISSUE_EDIT (tracking TODO)
   ISSUE_ASSIGN: "issue:assign",
-  /** @deprecated Will be merged into ISSUE_EDIT (tracking TODO) */
+  // Deprecated: Will be merged into ISSUE_EDIT (tracking TODO)
   ISSUE_BULK_MANAGE: "issue:bulk_manage",
 
   // Machines
@@ -95,7 +95,7 @@ export const ROLE_TEMPLATES = {
     description: "Standard organization member with basic permissions",
     permissions: [
       PERMISSIONS.ISSUE_VIEW,
-  PERMISSIONS.ISSUE_CREATE_FULL,
+      PERMISSIONS.ISSUE_CREATE_FULL,
       PERMISSIONS.ISSUE_EDIT,
       PERMISSIONS.ISSUE_DELETE,
       PERMISSIONS.ISSUE_ASSIGN,

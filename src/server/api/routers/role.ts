@@ -3,6 +3,13 @@ import { TRPCError } from "@trpc/server";
 import { count, eq } from "drizzle-orm";
 import { z } from "zod";
 
+// Validation schemas
+import {
+  idSchema,
+  roleNameSchema,
+  optionalRoleNameSchema,
+} from "~/lib/validation/schemas";
+
 // Internal types (alphabetical)
 import type { RLSOrganizationTRPCContext } from "~/server/api/trpc.base";
 import type {
@@ -71,8 +78,8 @@ export const roleRouter = createTRPCRouter({
   create: roleManageProcedure
     .input(
       z.object({
-        name: z.string().min(1).max(50),
-        permissionIds: z.array(z.string()).optional(),
+        name: roleNameSchema,
+        permissionIds: z.array(idSchema).optional(),
         template: z
           .enum(Object.keys(ROLE_TEMPLATES) as [string, ...string[]])
           .optional(),
@@ -134,9 +141,9 @@ export const roleRouter = createTRPCRouter({
   update: roleManageProcedure
     .input(
       z.object({
-        roleId: z.string(),
-        name: z.string().min(1).max(50).optional(),
-        permissionIds: z.array(z.string()).optional(),
+        roleId: idSchema,
+        name: optionalRoleNameSchema,
+        permissionIds: z.array(idSchema).optional(),
         isDefault: z.boolean().optional(),
       }),
     )
@@ -163,7 +170,7 @@ export const roleRouter = createTRPCRouter({
   delete: roleManageProcedure
     .input(
       z.object({
-        roleId: z.string(),
+        roleId: idSchema,
       }),
     )
     .mutation(async ({ ctx, input }): Promise<{ success: boolean }> => {
@@ -183,7 +190,7 @@ export const roleRouter = createTRPCRouter({
   get: organizationManageProcedure
     .input(
       z.object({
-        roleId: z.string(),
+        roleId: idSchema,
       }),
     )
     .query(async ({ ctx, input }): Promise<RoleResponseWithDetails> => {
@@ -280,8 +287,8 @@ export const roleRouter = createTRPCRouter({
   assignToUser: roleManageProcedure
     .input(
       z.object({
-        userId: z.string(),
-        roleId: z.string(),
+        userId: idSchema,
+        roleId: idSchema,
       }),
     )
     .mutation(async ({ ctx, input }): Promise<Membership> => {

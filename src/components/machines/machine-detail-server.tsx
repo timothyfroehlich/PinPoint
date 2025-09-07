@@ -35,7 +35,9 @@ interface MachineDetailServerProps {
   machine: Machine;
 }
 
-export function MachineDetailServer({ machine }: MachineDetailServerProps): JSX.Element {
+export function MachineDetailServer({
+  machine,
+}: MachineDetailServerProps): JSX.Element {
   return (
     <div className="space-y-6">
       {/* Machine Specifications */}

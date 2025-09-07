@@ -19,7 +19,7 @@ import { getErrorMessage } from "~/lib/utils/type-guards";
 export const checkSystemHealth = cache(async (): Promise<HealthStatus> => {
   const dbProvider = getGlobalDatabaseProvider();
   const db = dbProvider.getClient();
-  
+
   try {
     // Check database connectivity with simple query
     await db.execute(sql`SELECT 1`);

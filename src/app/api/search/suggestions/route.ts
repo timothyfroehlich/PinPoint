@@ -20,12 +20,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const { q: query, limit } = SuggestionsQuerySchema.parse(queryParams);
 
     const auth = await getRequestAuthContext();
-    if (auth.kind !== 'authorized') {
-      return NextResponse.json({
-        error: 'Authentication required',
-        message: 'Member access required',
-        timestamp: new Date().toISOString(),
-      }, { status: 401 });
+    if (auth.kind !== "authorized") {
+      return NextResponse.json(
+        {
+          error: "Authentication required",
+          message: "Member access required",
+          timestamp: new Date().toISOString(),
+        },
+        { status: 401 },
+      );
     }
     const organizationId = auth.org.id;
 

@@ -82,8 +82,10 @@ export const getDevUsers = cache(async (): Promise<DevUserResponse[]> => {
 
     // Add role if it exists
     if (row.role_name) {
-      const user = userMap.get(userId)!;
-      user.roles.push(row.role_name);
+      const user = userMap.get(userId);
+      if (user) {
+        user.roles.push(row.role_name);
+      }
     }
   }
 

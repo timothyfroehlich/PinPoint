@@ -76,7 +76,10 @@ export async function createMachineAction(
   const organizationId = organization.id;
 
   // Enhanced validation with validateFormData
-  const validation: ActionResult<CreateMachineData> = validateFormData(formData, CreateMachineSchema);
+  const validation: ActionResult<CreateMachineData> = validateFormData(
+    formData,
+    CreateMachineSchema,
+  );
   if (!validation.success) {
     return validation;
   }
@@ -131,7 +134,10 @@ export async function updateMachineAction(
   const organizationId = organization.id;
 
   // Enhanced validation with validateFormData
-  const validation: ActionResult<UpdateMachineData> = validateFormData(formData, UpdateMachineSchema);
+  const validation: ActionResult<UpdateMachineData> = validateFormData(
+    formData,
+    UpdateMachineSchema,
+  );
   if (!validation.success) {
     return validation;
   }
@@ -143,7 +149,8 @@ export async function updateMachineAction(
     };
 
     if (validation.data.name) updateData.name = validation.data.name;
-    if (validation.data.locationId) updateData.location_id = validation.data.locationId;
+    if (validation.data.locationId)
+      updateData.location_id = validation.data.locationId;
     if (validation.data.modelId) updateData.model_id = validation.data.modelId;
     if (validation.data.ownerId !== undefined)
       updateData.owner_id = validation.data.ownerId ?? null;
@@ -253,16 +260,18 @@ export async function bulkUpdateMachinesAction(
   const organizationId = organization.id;
 
   const machineIdsValue = formData.get("machineIds");
-  const machineIdsString = typeof machineIdsValue === "string" ? machineIdsValue : "";
+  const machineIdsString =
+    typeof machineIdsValue === "string" ? machineIdsValue : "";
   const machineIds = machineIdsString ? machineIdsString.split(",") : [];
 
   // Enhanced validation with validateFormData (using parsed machineIds)
   const locationIdValue = formData.get("locationId");
   const ownerIdValue = formData.get("ownerId");
-  const bulkData = { 
-    machineIds, 
-    locationId: typeof locationIdValue === "string" ? locationIdValue : undefined, 
-    ownerId: typeof ownerIdValue === "string" ? ownerIdValue : undefined 
+  const bulkData = {
+    machineIds,
+    locationId:
+      typeof locationIdValue === "string" ? locationIdValue : undefined,
+    ownerId: typeof ownerIdValue === "string" ? ownerIdValue : undefined,
   };
   const validation = BulkUpdateMachineSchema.safeParse(bulkData);
   if (!validation.success) {
@@ -278,7 +287,8 @@ export async function bulkUpdateMachinesAction(
       updated_at: new Date(),
     };
 
-    if (validation.data.locationId) updateData.location_id = validation.data.locationId;
+    if (validation.data.locationId)
+      updateData.location_id = validation.data.locationId;
     if (validation.data.ownerId !== undefined)
       updateData.owner_id = validation.data.ownerId ?? null;
 
@@ -471,7 +481,8 @@ export async function bulkGenerateQRCodesAction(
   const organizationId = organization.id;
 
   const machineIdsValue = formData.get("machineIds");
-  const machineIdsString = typeof machineIdsValue === "string" ? machineIdsValue : "";
+  const machineIdsString =
+    typeof machineIdsValue === "string" ? machineIdsValue : "";
   const machineIds = machineIdsString ? machineIdsString.split(",") : [];
 
   const result = BulkQRGenerateSchema.safeParse({ machineIds });

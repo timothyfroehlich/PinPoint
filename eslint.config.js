@@ -18,6 +18,7 @@ import noLegacyAuthImports from "./eslint-rules/no-legacy-auth-imports.js";
 import noDuplicateAuthResolution from "./eslint-rules/no-duplicate-auth-resolution.js";
 import noMissingCacheWrapper from "./eslint-rules/no-missing-cache-wrapper.js";
 import noDirectSupabaseClient from "./eslint-rules/no-direct-supabase-client.js";
+import noDuplicateValidation from "./eslint-rules/no-duplicate-validation.js";
 
 export default tseslint.config(
   // TypeScript ESLint base configurations
@@ -54,24 +55,29 @@ export default tseslint.config(
       security: securityPlugin,
       "@microsoft/sdl": sdlPlugin,
       // Custom rules
-      "legacyAuth": {
+      legacyAuth: {
         rules: {
           "no-legacy-auth-imports": noLegacyAuthImports,
         },
       },
-      "duplicateAuth": {
+      duplicateAuth: {
         rules: {
           "no-duplicate-auth-resolution": noDuplicateAuthResolution,
         },
       },
-      "missingCache": {
+      missingCache: {
         rules: {
           "no-missing-cache-wrapper": noMissingCacheWrapper,
         },
       },
-      "directSupabase": {
+      directSupabase: {
         rules: {
           "no-direct-supabase-client": noDirectSupabaseClient,
+        },
+      },
+      validation: {
+        rules: {
+          "no-duplicate-validation": noDuplicateValidation,
         },
       },
     },
@@ -150,7 +156,8 @@ export default tseslint.config(
           paths: [
             {
               name: "~/server/auth/legacy-adapters",
-              message: "Legacy auth adapters have been removed. Use getRequestAuthContext() from ~/server/auth/context instead."
+              message:
+                "Legacy auth adapters have been removed. Use getRequestAuthContext() from ~/server/auth/context instead.",
             },
           ],
           patterns: [
@@ -162,12 +169,14 @@ export default tseslint.config(
             // Lane B: DAL cross-import prevention
             {
               group: ["../lib/dal/*", "../../lib/dal/*"],
-              message: "Use '~/lib/dal/*' alias instead of relative DAL imports"
+              message:
+                "Use '~/lib/dal/*' alias instead of relative DAL imports",
             },
             {
-              group: ["**/organization-context", "../organization-context"],  
-              message: "Import getRequestAuthContext from '~/server/auth/context' instead"
-            }
+              group: ["**/organization-context", "../organization-context"],
+              message:
+                "Import getRequestAuthContext from '~/server/auth/context' instead",
+            },
           ],
         },
       ],
@@ -203,11 +212,12 @@ export default tseslint.config(
 
       // Custom rules for legacy auth prevention
       "legacyAuth/no-legacy-auth-imports": "error",
-      
+
       // Lane B: Enhanced ESLint enforcement rules
       "duplicateAuth/no-duplicate-auth-resolution": "error", // Critical safety
       "missingCache/no-missing-cache-wrapper": "warn", // Start as warning, escalate later
       "directSupabase/no-direct-supabase-client": "error", // SSR safety
+      "validation/no-duplicate-validation": "error", // Validation consistency
 
       // Ban problematic TypeScript comment directives
       "@typescript-eslint/ban-ts-comment": [
@@ -228,6 +238,16 @@ export default tseslint.config(
           allowIndexSignaturePropertyAccess: true,
         },
       ],
+    },
+  },
+  {
+    // Exclude auto-generated Supabase database types from all rules
+    files: ["src/lib/types/database.ts"],
+    rules: {
+      // Disable all typescript-eslint rules for auto-generated file
+      "@typescript-eslint/consistent-type-definitions": "off",
+      "@typescript-eslint/consistent-indexed-object-style": "off",
+      "@typescript-eslint/no-redundant-type-constituents": "off",
     },
   },
   {
