@@ -26,7 +26,8 @@
     "lib/**/*.tsx",
     ".next/types/**/*.ts",
     "types/**/*.d.ts",
-    "middleware.ts"
+    "middleware.ts",
+    "playwright.prod.config.ts"
   ],
   "exclude": [
     "src/_archived_frontend/**/*",
