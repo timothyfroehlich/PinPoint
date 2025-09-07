@@ -5,7 +5,7 @@
  * and upserts memberships directly via a DB connection. Designed to run locally or in CI.
  */
 
-// Load environment variables from .env.local for standalone script execution
+// Load environment variables from .env.local if present (non-fatal if missing)
 import { config } from "dotenv";
 config({ path: ".env.local" });
 
@@ -67,11 +67,18 @@ const ROLE_IDS = {
 const DEV_PASSWORD = "dev-login-123";
 
 async function createDevUsers() {
-  // Required environment
+  // Required environment (prefer explicit envs, fall back to Supabase CLI exports)
   const rawSupabaseUrl = (
-    process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
+    process.env.SUPABASE_URL ??
+    process.env.NEXT_PUBLIC_SUPABASE_URL ??
+    process.env.API_URL ??
+    ""
   ).trim();
-  const supabaseSecretKey = (process.env.SUPABASE_SECRET_KEY ?? "").trim();
+  const supabaseSecretKey = (
+    process.env.SUPABASE_SECRET_KEY ??
+    process.env.SERVICE_ROLE_KEY ??
+    ""
+  ).trim();
 
   if (!rawSupabaseUrl || !supabaseSecretKey) {
     console.error("❌ Missing required environment variables:");
