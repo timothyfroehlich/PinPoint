@@ -74,10 +74,12 @@ jobs:
       - name: Performance Summary
         if: always()
         run: |
-          echo "## 📊 Workflow Performance Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- **Workflow Duration**: Check job timeline above" >> $GITHUB_STEP_SUMMARY
-          echo "- **Supabase Startup**: Monitor 'Start Supabase' step duration" >> $GITHUB_STEP_SUMMARY
-          echo "- **Test Execution**: Monitor 'Run pgTAP RLS Tests' step duration" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Goal**: Evaluate if Supabase CLI is viable for CI RLS testing" >> $GITHUB_STEP_SUMMARY
-          echo "**Alternative**: Use preview database if this workflow is too slow" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## 📊 Workflow Performance Summary"
+            echo "- **Workflow Duration**: Check job timeline above"
+            echo "- **Supabase Startup**: Monitor 'Start Supabase' step duration"
+            echo "- **Test Execution**: Monitor 'Run pgTAP RLS Tests' step duration"
+            echo ""
+            echo "**Goal**: Evaluate if Supabase CLI is viable for CI RLS testing"
+            echo "**Alternative**: Use preview database if this workflow is too slow"
+          } >> "$GITHUB_STEP_SUMMARY"
