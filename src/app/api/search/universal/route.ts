@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { sortOrderSchema } from "~/lib/validation/schemas";
 import {
   performUniversalSearch,
   type SearchEntity,
@@ -14,7 +15,7 @@ const UniversalSearchQuerySchema = z.object({
   page: z.coerce.number().min(1).optional().default(1),
   limit: z.coerce.number().min(1).max(50).optional().default(20),
   sort: z.enum(["relevance", "date"]).optional().default("relevance"),
-  order: z.enum(["asc", "desc"]).optional().default("desc"),
+  order: sortOrderSchema.optional(),
 });
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -56,12 +57,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // Canonical auth resolution
     const auth = await getRequestAuthContext();
-    if (auth.kind !== 'authorized') {
-      return NextResponse.json({
-        error: 'Authentication required',
-        message: 'Member access required',
-        timestamp: new Date().toISOString(),
-      }, { status: 401 });
+    if (auth.kind !== "authorized") {
+      return NextResponse.json(
+        {
+          error: "Authentication required",
+          message: "Member access required",
+          timestamp: new Date().toISOString(),
+        },
+        { status: 401 },
+      );
     }
     const organizationId = auth.org.id;
 
@@ -71,14 +75,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       entities,
       organizationId,
       pagination: { page, limit },
-      sorting: { field: sort, order },
+      sorting: { field: sort, order: order ?? "desc" },
     });
 
     return NextResponse.json({
       ...searchResponse,
       query,
       entities: entitiesParam,
-      sorting: { field: sort, order },
+      sorting: { field: sort, order: order ?? "desc" },
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

@@ -15,13 +15,14 @@ import {
 } from "~/components/ui/dialog";
 import { UniversalSearch } from "./universal-search";
 import { type SearchResult } from "~/lib/services/search-service";
-import { hasProperty } from "~/lib/utils/type-guards";
 
 interface GlobalSearchShortcutProps {
   children?: React.ReactNode;
 }
 
-export function GlobalSearchShortcut({ children }: GlobalSearchShortcutProps): JSX.Element {
+export function GlobalSearchShortcut({
+  children,
+}: GlobalSearchShortcutProps): JSX.Element {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -51,8 +52,10 @@ export function GlobalSearchShortcut({ children }: GlobalSearchShortcutProps): J
     if (isOpen) {
       // Small delay to ensure dialog is fully rendered
       const timer = setTimeout((): void => {
-        const input = document.querySelector("[data-search-input]");
-        if (input && hasProperty(input, 'focus') && typeof input.focus === 'function') {
+        const input = document.querySelector<HTMLElement>(
+          "[data-search-input]",
+        );
+        if (input) {
           input.focus();
         }
       }, 100);
@@ -162,7 +165,12 @@ export function SearchButtonTrigger({
     outline:
       "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
     ghost: "hover:bg-accent hover:text-accent-foreground",
-  };
+  } as const;
+
+  // ESLint security warning is false positive - `variant` is strictly typed
+  // as "default" | "outline" | "ghost" union type, making object access safe
+  // eslint-disable-next-line security/detect-object-injection
+  const variantClass = variantStyles[variant];
 
   return (
     <GlobalSearchShortcut>
@@ -170,7 +178,7 @@ export function SearchButtonTrigger({
         className={`
           inline-flex items-center justify-start gap-2 px-3 py-2 text-sm font-medium rounded-md
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
-          ${variantStyles[variant]}
+          ${variantClass}
           ${size === "sm" ? "h-8 text-xs" : size === "lg" ? "h-12 text-base" : "h-10 text-sm"}
           ${className}
         `}

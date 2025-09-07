@@ -14,6 +14,7 @@ import { LoaderIcon, UploadIcon, ImageIcon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { updateOrganizationLogoAction } from "~/lib/actions/organization-actions";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 
 interface OrganizationLogoFormProps {
   currentLogoUrl: string;
@@ -63,9 +64,11 @@ export function OrganizationLogoForm({
             <div className="flex items-center space-x-3">
               <div className="h-12 w-12 rounded border flex items-center justify-center overflow-hidden bg-muted">
                 {previewUrl && !hasImageError ? (
-                  <img
+                  <Image
                     src={previewUrl}
                     alt="Organization logo"
+                    width={48}
+                    height={48}
                     className="h-full w-full object-contain"
                     onError={() => {
                       setHasImageError(true);

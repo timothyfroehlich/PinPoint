@@ -1,9 +1,9 @@
 # PinPoint Non‑Negotiables (Core)
 
-**Last Updated**: September 1, 2025
-**Last Reviewed**: September 1, 2025
+**Last Updated**: September 5, 2025
+**Last Reviewed**: September 5, 2025
 
-**Status:** Adopted v2 structure for clarity and enforcement. This document organizes rules into scannable sections with consistent rule cards.
+**Status:** Successfully resolved authentication infrastructure over-engineering. Authentication cleanup complete with 53% ESLint improvement through parallel agent strategy. Document updated to reflect infrastructure complexity lessons learned.
 
 ## Overview
 
@@ -218,6 +218,8 @@
 - **Infrastructure doing business logic**: Context/utility files performing direct database queries.
 - **Over-abstraction**: Functions with single call sites that add no architectural value.
 - **Multiple auth context systems**: Duplicate authentication resolution patterns instead of consolidated approach.
+- **Enterprise infrastructure in pre-beta**: Complex error hierarchies, request context tracking, performance monitoring before operational scale demands it.
+- **Infrastructure fighting TypeScript strictness**: Complex patterns that generate `exactOptionalPropertyTypes` violations indicate wrong complexity level.
 
 ---
 
@@ -240,4 +242,5 @@
   - CORE‑TEST‑001..003: Archetypes, server components, non‑manual tests
 
 - **Changelog:**
+  - 2025‑09‑05: **Authentication cleanup success**: Eliminated ~500 lines of over-engineered infrastructure. Reduced ESLint errors from 87 to 41 (53% improvement) through parallel agent strategy. Added enterprise infrastructure anti-patterns. Confirmed authentication system was already well-architected with canonical `getRequestAuthContext()` resolver.
   - 2025‑09‑01: v2 restructure adopted; added TYPE_INVENTORY.md reference.

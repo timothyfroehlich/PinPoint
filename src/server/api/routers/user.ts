@@ -3,6 +3,13 @@ import { TRPCError } from "@trpc/server";
 import { asc, count, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
+// Validation schemas
+import {
+  idSchema,
+  bioSchema,
+  optionalUserNameSchema,
+} from "~/lib/validation/schemas";
+
 // Internal types (alphabetical)
 import type {
   UserMembershipResponse,
@@ -70,21 +77,21 @@ export const userRouter = createTRPCRouter({
       const [ownedMachinesCount, issuesCreatedCount, commentsCount]: [
         CountResult[],
         CountResult[],
-        CountResult[]
+        CountResult[],
       ] = await Promise.all([
-          ctx.db
-            .select({ count: count() })
-            .from(machines)
-            .where(eq(machines.owner_id, ctx.user.id)),
-          ctx.db
-            .select({ count: count() })
-            .from(issues)
-            .where(eq(issues.created_by_id, ctx.user.id)),
-          ctx.db
-            .select({ count: count() })
-            .from(comments)
-            .where(eq(comments.author_id, ctx.user.id)),
-        ]);
+        ctx.db
+          .select({ count: count() })
+          .from(machines)
+          .where(eq(machines.owner_id, ctx.user.id)),
+        ctx.db
+          .select({ count: count() })
+          .from(issues)
+          .where(eq(issues.created_by_id, ctx.user.id)),
+        ctx.db
+          .select({ count: count() })
+          .from(comments)
+          .where(eq(comments.author_id, ctx.user.id)),
+      ]);
 
       return {
         id: user.id,
@@ -144,8 +151,8 @@ export const userRouter = createTRPCRouter({
   updateProfile: protectedProcedure
     .input(
       z.object({
-        name: z.string().min(1).max(100).optional(),
-        bio: z.string().max(500).optional(),
+        name: optionalUserNameSchema,
+        bio: bioSchema,
       }),
     )
     .mutation(async ({ ctx, input }): Promise<User> => {
@@ -270,7 +277,7 @@ export const userRouter = createTRPCRouter({
 
   // Get user by ID (public info only - within organization context)
   getUser: orgScopedProcedure
-    .input(z.object({ userId: z.string() }))
+    .input(z.object({ userId: idSchema }))
     .query(async ({ ctx, input }): Promise<UserResponse> => {
       // Verify user is a member of the current organization (RLS handles org scoping)
       const [membership] = await ctx.db
@@ -299,21 +306,21 @@ export const userRouter = createTRPCRouter({
       const [ownedMachinesCount, issuesCreatedCount, commentsCount]: [
         CountResult[],
         CountResult[],
-        CountResult[]
+        CountResult[],
       ] = await Promise.all([
-          ctx.db
-            .select({ count: count() })
-            .from(machines)
-            .where(eq(machines.owner_id, input.userId)),
-          ctx.db
-            .select({ count: count() })
-            .from(issues)
-            .where(eq(issues.created_by_id, input.userId)),
-          ctx.db
-            .select({ count: count() })
-            .from(comments)
-            .where(eq(comments.author_id, input.userId)),
-        ]);
+        ctx.db
+          .select({ count: count() })
+          .from(machines)
+          .where(eq(machines.owner_id, input.userId)),
+        ctx.db
+          .select({ count: count() })
+          .from(issues)
+          .where(eq(issues.created_by_id, input.userId)),
+        ctx.db
+          .select({ count: count() })
+          .from(comments)
+          .where(eq(comments.author_id, input.userId)),
+      ]);
 
       return {
         ...membership.user,
@@ -468,8 +475,8 @@ export const userRouter = createTRPCRouter({
   updateMembership: userManageProcedure
     .input(
       z.object({
-        userId: z.string(),
-        roleId: z.string(),
+        userId: idSchema,
+        roleId: idSchema,
       }),
     )
     .mutation(

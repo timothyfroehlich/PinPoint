@@ -7,6 +7,7 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
+import { uuidSchema } from "~/lib/validation/schemas";
 import { and, eq, inArray } from "drizzle-orm";
 import { notifications } from "~/server/db/schema";
 import { db } from "~/lib/dal/shared";
@@ -22,30 +23,12 @@ import { getRequestAuthContext } from "~/server/auth/context";
 
 // Validation schemas
 const markAsReadSchema = z.object({
-  notificationId: z
-    .string()
-    .refine(
-      (val) =>
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-          val,
-        ),
-      { message: "Invalid notification ID" },
-    ),
+  notificationId: uuidSchema,
 });
 
 const bulkMarkAsReadSchema = z.object({
   notificationIds: z
-    .array(
-      z
-        .string()
-        .refine(
-          (val) =>
-            /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-              val,
-            ),
-          { message: "Invalid notification ID" },
-        ),
-    )
+    .array(uuidSchema)
     .min(1, "No notifications selected")
     .max(50, "Cannot update more than 50 notifications at once"),
 });
@@ -100,7 +83,7 @@ export async function markNotificationAsReadAction(
     // Background processing
     runAfterResponse(() => {
       console.log(
-        `Notification ${validation.data.notificationId} marked as read by ${String(user.email)}`,
+        `Notification ${validation.data.notificationId} marked as read by ${user.email}`,
       );
       return Promise.resolve();
     });
@@ -109,9 +92,7 @@ export async function markNotificationAsReadAction(
   } catch (error) {
     console.error("Mark notification as read error:", error);
     return actionError(
-      isError(error)
-        ? error.message
-        : "Failed to mark notification as read",
+      isError(error) ? error.message : "Failed to mark notification as read",
     );
   }
 }
@@ -172,7 +153,7 @@ export async function bulkMarkNotificationsAsReadAction(
     // Background processing
     runAfterResponse(() => {
       console.log(
-        `Bulk marked ${String(updatedNotifications.length)} notifications as read by ${String(user.email)}`,
+        `Bulk marked ${String(updatedNotifications.length)} notifications as read by ${user.email}`,
       );
       return Promise.resolve();
     });
@@ -233,7 +214,7 @@ export async function markAllNotificationsAsReadAction(
     // Background processing
     runAfterResponse(() => {
       console.log(
-        `All notifications marked as read by ${String(user.email)} (${String(updatedNotifications.length)} notifications)`,
+        `All notifications marked as read by ${user.email} (${String(updatedNotifications.length)} notifications)`,
       );
       return Promise.resolve();
     });
@@ -297,7 +278,7 @@ export async function markNotificationAsUnreadAction(
     // Background processing
     runAfterResponse(() => {
       console.log(
-        `Notification ${validation.data.notificationId} marked as unread by ${String(user.email)}`,
+        `Notification ${validation.data.notificationId} marked as unread by ${user.email}`,
       );
       return Promise.resolve();
     });
@@ -306,9 +287,7 @@ export async function markNotificationAsUnreadAction(
   } catch (error) {
     console.error("Mark notification as unread error:", error);
     return actionError(
-      isError(error)
-        ? error.message
-        : "Failed to mark notification as unread",
+      isError(error) ? error.message : "Failed to mark notification as unread",
     );
   }
 }

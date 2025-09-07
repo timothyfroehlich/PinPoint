@@ -285,7 +285,10 @@ function SidebarTrigger({
   );
 }
 
-function SidebarRail({ className, ...props }: React.ComponentProps<"button">): JSX.Element {
+function SidebarRail({
+  className,
+  ...props
+}: React.ComponentProps<"button">): JSX.Element {
   const { toggleSidebar } = useSidebar();
 
   return (
@@ -310,7 +313,10 @@ function SidebarRail({ className, ...props }: React.ComponentProps<"button">): J
   );
 }
 
-function SidebarInset({ className, ...props }: React.ComponentProps<"main">): JSX.Element {
+function SidebarInset({
+  className,
+  ...props
+}: React.ComponentProps<"main">): JSX.Element {
   return (
     <main
       data-slot="sidebar-inset"
@@ -338,7 +344,10 @@ function SidebarInput({
   );
 }
 
-function SidebarHeader({ className, ...props }: React.ComponentProps<"div">): JSX.Element {
+function SidebarHeader({
+  className,
+  ...props
+}: React.ComponentProps<"div">): JSX.Element {
   return (
     <div
       data-slot="sidebar-header"
@@ -349,7 +358,10 @@ function SidebarHeader({ className, ...props }: React.ComponentProps<"div">): JS
   );
 }
 
-function SidebarFooter({ className, ...props }: React.ComponentProps<"div">): JSX.Element {
+function SidebarFooter({
+  className,
+  ...props
+}: React.ComponentProps<"div">): JSX.Element {
   return (
     <div
       data-slot="sidebar-footer"
@@ -374,7 +386,10 @@ function SidebarSeparator({
   );
 }
 
-function SidebarContent({ className, ...props }: React.ComponentProps<"div">): JSX.Element {
+function SidebarContent({
+  className,
+  ...props
+}: React.ComponentProps<"div">): JSX.Element {
   return (
     <div
       data-slot="sidebar-content"
@@ -388,7 +403,10 @@ function SidebarContent({ className, ...props }: React.ComponentProps<"div">): J
   );
 }
 
-function SidebarGroup({ className, ...props }: React.ComponentProps<"div">): JSX.Element {
+function SidebarGroup({
+  className,
+  ...props
+}: React.ComponentProps<"div">): JSX.Element {
   return (
     <div
       data-slot="sidebar-group"
@@ -457,7 +475,10 @@ function SidebarGroupContent({
   );
 }
 
-function SidebarMenu({ className, ...props }: React.ComponentProps<"ul">): JSX.Element {
+function SidebarMenu({
+  className,
+  ...props
+}: React.ComponentProps<"ul">): JSX.Element {
   return (
     <ul
       data-slot="sidebar-menu"
@@ -468,7 +489,10 @@ function SidebarMenu({ className, ...props }: React.ComponentProps<"ul">): JSX.E
   );
 }
 
-function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">): JSX.Element {
+function SidebarMenuItem({
+  className,
+  ...props
+}: React.ComponentProps<"li">): JSX.Element {
   return (
     <li
       data-slot="sidebar-menu-item"
@@ -643,7 +667,10 @@ function SidebarMenuSkeleton({
   );
 }
 
-function SidebarMenuSub({ className, ...props }: React.ComponentProps<"ul">): JSX.Element {
+function SidebarMenuSub({
+  className,
+  ...props
+}: React.ComponentProps<"ul">): JSX.Element {
   return (
     <ul
       data-slot="sidebar-menu-sub"

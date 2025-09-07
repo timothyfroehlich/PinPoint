@@ -4,11 +4,15 @@ const authFile = "e2e/.auth/user.json";
 
 setup("authenticate as Tim dev user", async ({ page }) => {
   console.log("Setting up authentication for Tim dev user...");
-  
+
+  // Calculate BASE_URL using same logic as playwright.config.ts
+  const PORT = process.env.PORT ?? "3000";
+  const BASE_URL = process.env.BASE_URL ?? `http://localhost:${PORT}`;
+
   // Go directly to sign-in page on the correct subdomain
-  await page.goto("http://apc.localhost:3000/auth/sign-in");
+  await page.goto(`${BASE_URL}/auth/sign-in`);
   await expect(page.locator("h1")).toContainText(/Welcome back|Sign In/i);
-  
+
   // Handle organization selection
   const orgTrigger = page.locator("[data-testid='org-select-trigger']");
   await expect(orgTrigger).toBeVisible({ timeout: 15000 });
@@ -26,7 +30,7 @@ setup("authenticate as Tim dev user", async ({ page }) => {
       await page.waitForTimeout(250);
     }
   }
-  
+
   // Close any lingering dropdown overlays
   await page.keyboard.press("Escape");
   await page.waitForTimeout(100);
@@ -36,7 +40,7 @@ setup("authenticate as Tim dev user", async ({ page }) => {
   // Click dev login button
   const devLoginBtn = page.locator("[data-testid='dev-login-tim']");
   await expect(devLoginBtn).toBeVisible({ timeout: 10000 });
-  
+
   let clicked = false;
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
@@ -52,16 +56,19 @@ setup("authenticate as Tim dev user", async ({ page }) => {
     await devLoginBtn.click({ force: true });
   }
 
-  // Wait for successful login and dashboard redirect 
+  // Wait for successful login and dashboard redirect
   await page.waitForURL("**/dashboard", { timeout: 20000 });
-  
+
+  // Navigate back to localhost (without subdomain) to ensure tests run on correct domain
+  await page.goto(`${BASE_URL}/dashboard`);
+
   // Verify we're logged in successfully
   await expect(page.locator("h1")).toContainText(/Dashboard|Issues|Machines/i);
-  
+
   console.log("Authentication successful, saving state...");
-  
+
   // Save signed-in state to 'e2e/.auth/user.json'
   await page.context().storageState({ path: authFile });
-  
+
   console.log("Authentication state saved to", authFile);
 });

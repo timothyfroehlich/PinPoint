@@ -78,4 +78,3 @@ export class ServiceFactory {
     return new ServiceFactory(this.db, organizationId);
   }
 }
-

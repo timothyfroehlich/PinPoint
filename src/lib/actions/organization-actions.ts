@@ -31,6 +31,7 @@ const updateOrganizationProfileSchema = z.object({
   description: z
     .string()
     .max(500, "Description must be less than 500 characters")
+    .transform((s) => s.trim())
     .optional(),
   website: z
     .string()
@@ -74,7 +75,11 @@ export async function updateOrganizationProfileAction(
     }
     const { user, org: organization, membership } = authContext;
     const organizationId = organization.id;
-    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ORGANIZATION_MANAGE, db);
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.ORGANIZATION_MANAGE,
+      db,
+    );
 
     // Enhanced validation with Zod
     const validation = validateFormData(
@@ -119,7 +124,7 @@ export async function updateOrganizationProfileAction(
     // Background processing
     runAfterResponse(() => {
       console.log(
-        `Organization ${organizationId} profile updated by ${String(user.email)}`,
+        `Organization ${organizationId} profile updated by ${user.email}`,
       );
       return Promise.resolve();
     });
@@ -148,7 +153,11 @@ export async function updateOrganizationLogoAction(
     }
     const { user, org: organization, membership } = authContext;
     const organizationId = organization.id;
-    await requirePermission({ role_id: membership.role.id }, PERMISSIONS.ORGANIZATION_MANAGE, db);
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.ORGANIZATION_MANAGE,
+      db,
+    );
 
     // Enhanced validation
     const validation = validateFormData(formData, updateOrganizationLogoSchema);
@@ -179,7 +188,7 @@ export async function updateOrganizationLogoAction(
     // Background processing
     runAfterResponse(() => {
       console.log(
-        `Organization ${organizationId} logo updated by ${String(user.email)}`,
+        `Organization ${organizationId} logo updated by ${user.email}`,
       );
       return Promise.resolve();
     });

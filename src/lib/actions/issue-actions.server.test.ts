@@ -72,7 +72,7 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.fieldErrors?.title).toBeDefined();
-        expect(result.fieldErrors?.title?.[0]).toContain("required");
+        expect(result.fieldErrors?.title?.[0]).toContain("expected string");
       }
     });
 
@@ -86,7 +86,7 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.fieldErrors?.machineId).toContain(
-          "Invalid machine selected",
+          "Invalid machine selection",
         );
       }
     });
@@ -121,7 +121,7 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
       // Should fail on auth, not validation
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error).toBe("Auth required");
+        expect(result.error).toBe("Member access required");
         expect(result.fieldErrors).toBeUndefined(); // No validation errors
       }
     });
@@ -141,7 +141,7 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
       // Should fail on auth, not validation (empty description is fine)
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error).toBe("Auth required");
+        expect(result.error).toBe("Member access required");
         expect(result.fieldErrors).toBeUndefined();
       }
     });
@@ -160,7 +160,7 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
       // Should fail on auth, not validation (trimmed title should pass)
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error).toBe("Auth required");
+        expect(result.error).toBe("Member access required");
         expect(result.fieldErrors).toBeUndefined();
       }
     });
@@ -190,9 +190,7 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.fieldErrors?.statusId).toContain(
-          "Invalid status selected",
-        );
+        expect(result.fieldErrors?.statusId?.[0]).toContain("valid UUID");
       }
     });
 
@@ -210,7 +208,7 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
       // Should fail on auth, not validation
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error).toBe("Auth required");
+        expect(result.error).toBe("Member access required");
         expect(result.fieldErrors).toBeUndefined();
       }
     });

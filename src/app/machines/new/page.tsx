@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "~/components/ui/button";
+import { AuthGuard } from "~/components/auth/auth-guard";
 import { getRequestAuthContext } from "~/server/auth/context";
 import { getLocationsForOrg, getModelsForOrg } from "~/lib/dal/machines";
 import { createMachineAction } from "~/lib/actions/machine-actions";
@@ -18,10 +19,33 @@ export const metadata = {
 
 export default async function NewMachinePage(): Promise<React.JSX.Element> {
   const authContext = await getRequestAuthContext();
-  if (authContext.kind !== "authorized") {
-    throw new Error("Member access required");
-  }
 
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Machine Access Required"
+      fallbackMessage="You need to be signed in as a member to add new machines."
+    >
+      <NewMachinePageContent
+        authContext={
+          authContext as Extract<
+            Awaited<ReturnType<typeof getRequestAuthContext>>,
+            { kind: "authorized" }
+          >
+        }
+      />
+    </AuthGuard>
+  );
+}
+
+async function NewMachinePageContent({
+  authContext,
+}: {
+  authContext: Extract<
+    Awaited<ReturnType<typeof getRequestAuthContext>>,
+    { kind: "authorized" }
+  >;
+}): Promise<React.JSX.Element> {
   // Fetch required data for form
   const [locations, models] = await Promise.all([
     getLocationsForOrg(authContext.org.id),

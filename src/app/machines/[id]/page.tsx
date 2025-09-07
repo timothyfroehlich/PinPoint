@@ -6,6 +6,7 @@
 import { type Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { AuthGuard } from "~/components/auth/auth-guard";
 import { getRequestAuthContext } from "~/server/auth/context";
 import { getMachineById } from "~/lib/dal/machines";
 import { MachineDetailServer } from "~/components/machines/machine-detail-server";
@@ -24,7 +25,11 @@ export async function generateMetadata({
   try {
     const authContext = await getRequestAuthContext();
     if (authContext.kind !== "authorized") {
-      throw new Error("Member access required");
+      return {
+        title: "Machine Access Required - PinPoint",
+        description:
+          "You need to be signed in as a member to view machine details.",
+      };
     }
     const resolvedParams = await params;
     const machine = await getMachineById(resolvedParams.id, authContext.org.id);
@@ -48,13 +53,40 @@ export async function generateMetadata({
   }
 }
 
-export default async function MachinePage({ params }: MachinePageProps): Promise<React.JSX.Element> {
-  // Ensure user is authenticated and get organization context
+export default async function MachinePage({
+  params,
+}: MachinePageProps): Promise<React.JSX.Element> {
   const authContext = await getRequestAuthContext();
-  if (authContext.kind !== "authorized") {
-    throw new Error("Member access required");
-  }
 
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Machine Access Required"
+      fallbackMessage="You need to be signed in as a member to view machine details."
+    >
+      <MachinePageContent
+        authContext={
+          authContext as Extract<
+            Awaited<ReturnType<typeof getRequestAuthContext>>,
+            { kind: "authorized" }
+          >
+        }
+        params={params}
+      />
+    </AuthGuard>
+  );
+}
+
+async function MachinePageContent({
+  authContext,
+  params,
+}: {
+  authContext: Extract<
+    Awaited<ReturnType<typeof getRequestAuthContext>>,
+    { kind: "authorized" }
+  >;
+  params: Promise<{ id: string }>;
+}): Promise<React.JSX.Element> {
   try {
     const resolvedParams = await params;
     const machine = await getMachineById(resolvedParams.id, authContext.org.id);

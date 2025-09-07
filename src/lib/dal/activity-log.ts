@@ -355,29 +355,31 @@ export const getRecentActivity = cache(
 /**
  * Export activity log to CSV format
  */
-export async function exportActivityLog(
-  organizationId: string,
-  filters: ActivityLogFilters = {},
-): Promise<string> {
-  try {
-    const result = await getActivityLog(organizationId, {
-      ...filters,
-      limit: 10000,
-    });
+export const exportActivityLog = cache(
+  async (
+    organizationId: string,
+    filters: ActivityLogFilters = {},
+  ): Promise<string> => {
+    try {
+      const result = await getActivityLog(organizationId, {
+        ...filters,
+        limit: 10000,
+      });
 
-    const csvHeader =
-      "Timestamp,Action,Entity,Entity ID,User Name,User Email,Details,Severity,IP Address\n";
+      const csvHeader =
+        "Timestamp,Action,Entity,Entity ID,User Name,User Email,Details,Severity,IP Address\n";
 
-    const csvRows = result.entries
-      .map(
-        (entry) =>
-          `"${entry.created_at.toISOString()}","${entry.action}","${entry.entity_type}","${entry.entity_id ?? ""}","${entry.userName}","${entry.userEmail}","${entry.details}","${entry.severity}","${entry.ip_address ?? ""}"`,
-      )
-      .join("\n");
+      const csvRows = result.entries
+        .map(
+          (entry) =>
+            `"${entry.created_at.toISOString()}","${entry.action}","${entry.entity_type}","${entry.entity_id ?? ""}","${entry.userName}","${entry.userEmail}","${entry.details}","${entry.severity}","${entry.ip_address ?? ""}"`,
+        )
+        .join("\n");
 
-    return csvHeader + csvRows;
-  } catch (error) {
-    console.error("Error exporting activity log:", error);
-    throw new Error("Failed to export activity log");
-  }
-}
+      return csvHeader + csvRows;
+    } catch (error) {
+      console.error("Error exporting activity log:", error);
+      throw new Error("Failed to export activity log");
+    }
+  },
+);

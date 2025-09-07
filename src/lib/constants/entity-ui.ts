@@ -68,10 +68,22 @@ export function getEntityInfo(entityType: EntityType): {
   name: string;
   singular: string;
 } {
+  // ESLint security warnings are false positive - entityType parameter is strictly
+  // typed as EntityType union ("issues" | "machines" | "users" | "locations")
+  // making object access safe with these controlled keys
+  // eslint-disable-next-line security/detect-object-injection
+  const icon = ENTITY_ICONS[entityType];
+  // eslint-disable-next-line security/detect-object-injection
+  const colors = ENTITY_COLORS[entityType];
+  // eslint-disable-next-line security/detect-object-injection
+  const name = ENTITY_NAMES[entityType];
+  // eslint-disable-next-line security/detect-object-injection
+  const singular = ENTITY_SINGULAR[entityType];
+
   return {
-    icon: ENTITY_ICONS[entityType],
-    colors: ENTITY_COLORS[entityType],
-    name: ENTITY_NAMES[entityType],
-    singular: ENTITY_SINGULAR[entityType],
+    icon,
+    colors,
+    name,
+    singular,
   };
 }

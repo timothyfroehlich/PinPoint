@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import * as React from "react";
 
 import { IssueDetailServer } from "~/components/issues/issue-detail-server";
+import { AuthGuard } from "~/components/auth/auth-guard";
 import { getRequestAuthContext } from "~/server/auth/context";
 
 interface IssuePageProps {
@@ -22,27 +23,56 @@ export async function generateMetadata({
   };
 }
 
-export default async function IssuePage({
+async function IssueContent({
   params,
-}: IssuePageProps): Promise<React.JSX.Element> {
+  authContext,
+}: {
+  params: IssuePageProps["params"];
+  authContext: Extract<
+    Awaited<ReturnType<typeof getRequestAuthContext>>,
+    { kind: "authorized" }
+  >;
+}): Promise<React.JSX.Element> {
   try {
-    // Single authentication resolution for entire request
-    const authContext = await getRequestAuthContext();
-
-    if (authContext.kind !== "authorized") {
-      throw new Error("Member access required");
-    }
-
     // Resolve params for issue ID
     const resolvedParams = await params;
 
     return (
       <main aria-label="Issue details" className="container mx-auto px-4 py-6">
-        <IssueDetailServer issueId={resolvedParams.issueId} organizationId={authContext.org.id} userId={authContext.user.id} />
+        <IssueDetailServer
+          issueId={resolvedParams.issueId}
+          organizationId={authContext.org.id}
+          userId={authContext.user.id}
+        />
       </main>
     );
   } catch {
     // If issue doesn't exist or user doesn't have access, show 404
     notFound();
   }
+}
+
+export default async function IssuePage({
+  params,
+}: IssuePageProps): Promise<React.JSX.Element> {
+  // Single authentication resolution for entire request
+  const authContext = await getRequestAuthContext();
+
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Issue Access Required"
+      fallbackMessage="You need to be signed in as a member to view issue details."
+    >
+      <IssueContent
+        params={params}
+        authContext={
+          authContext as Extract<
+            Awaited<ReturnType<typeof getRequestAuthContext>>,
+            { kind: "authorized" }
+          >
+        }
+      />
+    </AuthGuard>
+  );
 }

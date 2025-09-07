@@ -5,6 +5,7 @@
 
 import QRCode from "qrcode";
 import { env } from "~/env";
+import { uuidSchema } from "~/lib/validation/schemas";
 
 export interface QRCodeOptions {
   size?: number;
@@ -108,14 +109,13 @@ export function validateQRCodeParams(machineId: string): boolean {
     return false;
   }
 
-  if (machineId.length < 1 || machineId.length > 100) {
+  // Use centralized UUID validation (includes length and format validation)
+  try {
+    uuidSchema.parse(machineId);
+    return true;
+  } catch {
     return false;
   }
-
-  // Basic UUID format validation
-  const uuidRegex =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(machineId);
 }
 
 /**

@@ -17,8 +17,13 @@ import { db } from "./shared";
  * Uses React 19 cache() for request-level memoization
  */
 export const getUserNotifications = cache(
-  async (userId: string, organizationId: string, limit = 20, includeRead = true) => {
-    return withOrgRLS(db, organizationId, async tx => {
+  async (
+    userId: string,
+    organizationId: string,
+    limit = 20,
+    includeRead = true,
+  ) => {
+    return withOrgRLS(db, organizationId, async (tx) => {
       if (!userId) {
         throw new Error("User ID required");
       }
@@ -55,57 +60,61 @@ export const getUserNotifications = cache(
  * Get unread notification count for the current user
  * Critical for notification bell badge display
  */
-export const getUnreadNotificationCount = cache(async (userId: string, organizationId: string) => {
-  return withOrgRLS(db, organizationId, async tx => {
-    if (!userId) {
-      throw new Error("User ID required");
-    }
+export const getUnreadNotificationCount = cache(
+  async (userId: string, organizationId: string) => {
+    return withOrgRLS(db, organizationId, async (tx) => {
+      if (!userId) {
+        throw new Error("User ID required");
+      }
 
-    const result: CountResult[] = await tx
-      .select({ count: sql<number>`count(*)` })
-      .from(notifications)
-      .where(
-        and(
-          eq(notifications.user_id, userId),
-          eq(notifications.organization_id, organizationId),
-          eq(notifications.read, false),
-        ),
-      );
+      const result: CountResult[] = await tx
+        .select({ count: sql<number>`count(*)` })
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.user_id, userId),
+            eq(notifications.organization_id, organizationId),
+            eq(notifications.read, false),
+          ),
+        );
 
-    return safeCount(result);
-  });
-});
+      return safeCount(result);
+    });
+  },
+);
 
 /**
  * Get recent unread notifications for real-time display
  * Limited count to prevent performance issues
  */
-export const getRecentUnreadNotifications = cache(async (userId: string, organizationId: string, limit = 5) => {
-  return withOrgRLS(db, organizationId, async tx => {
-    if (!userId) {
-      throw new Error("User ID required");
-    }
+export const getRecentUnreadNotifications = cache(
+  async (userId: string, organizationId: string, limit = 5) => {
+    return withOrgRLS(db, organizationId, async (tx) => {
+      if (!userId) {
+        throw new Error("User ID required");
+      }
 
-    return await tx.query.notifications.findMany({
-      where: and(
-        eq(notifications.user_id, userId),
-        eq(notifications.organization_id, organizationId),
-        eq(notifications.read, false),
-      ),
-      orderBy: [desc(notifications.created_at)],
-      limit,
-      columns: {
-        id: true,
-        message: true,
-        created_at: true,
-        type: true,
-        entity_type: true,
-        entity_id: true,
-        action_url: true,
-      },
+      return await tx.query.notifications.findMany({
+        where: and(
+          eq(notifications.user_id, userId),
+          eq(notifications.organization_id, organizationId),
+          eq(notifications.read, false),
+        ),
+        orderBy: [desc(notifications.created_at)],
+        limit,
+        columns: {
+          id: true,
+          message: true,
+          created_at: true,
+          type: true,
+          entity_type: true,
+          entity_id: true,
+          action_url: true,
+        },
+      });
     });
-  });
-});
+  },
+);
 
 /**
  * Get notifications by type for specific filtering
@@ -122,9 +131,9 @@ export const getNotificationsByType = cache(
       | "ISSUE_COMMENTED"
       | "MACHINE_ASSIGNED"
       | "SYSTEM_ANNOUNCEMENT",
-    limit = 10
+    limit = 10,
   ) => {
-    return withOrgRLS(db, organizationId, async tx => {
+    return withOrgRLS(db, organizationId, async (tx) => {
       if (!userId) {
         throw new Error("User ID required");
       }
@@ -156,98 +165,104 @@ export const getNotificationsByType = cache(
  * Get notification by ID with access control
  * Ensures user can only access their own notifications
  */
-export const getNotificationById = cache(async (userId: string, organizationId: string, notificationId: string) => {
-  return withOrgRLS(db, organizationId, async tx => {
-    if (!userId) {
-      throw new Error("User ID required");
-    }
+export const getNotificationById = cache(
+  async (userId: string, organizationId: string, notificationId: string) => {
+    return withOrgRLS(db, organizationId, async (tx) => {
+      if (!userId) {
+        throw new Error("User ID required");
+      }
 
-    return await tx.query.notifications.findFirst({
-      where: and(
-        eq(notifications.id, notificationId),
-        eq(notifications.user_id, userId),
-        eq(notifications.organization_id, organizationId),
-      ),
-      columns: {
-        id: true,
-        message: true,
-        read: true,
-        created_at: true,
-        type: true,
-        entity_type: true,
-        entity_id: true,
-        action_url: true,
-      },
+      return await tx.query.notifications.findFirst({
+        where: and(
+          eq(notifications.id, notificationId),
+          eq(notifications.user_id, userId),
+          eq(notifications.organization_id, organizationId),
+        ),
+        columns: {
+          id: true,
+          message: true,
+          read: true,
+          created_at: true,
+          type: true,
+          entity_type: true,
+          entity_id: true,
+          action_url: true,
+        },
+      });
     });
-  });
-});
+  },
+);
 
 /**
  * Check if user has any unread notifications
  * Quick boolean check for UI state management
  */
-export const hasUnreadNotifications = cache(async (userId: string, organizationId: string) => {
-  const count = await getUnreadNotificationCount(userId, organizationId);
-  return count > 0;
-});
+export const hasUnreadNotifications = cache(
+  async (userId: string, organizationId: string) => {
+    const count = await getUnreadNotificationCount(userId, organizationId);
+    return count > 0;
+  },
+);
 
 /**
  * Get notification statistics for dashboard/analytics
  * Shows breakdown by type and read status
  */
-export const getNotificationStats = cache(async (userId: string, organizationId: string) => {
-  return withOrgRLS(db, organizationId, async tx => {
-    if (!userId) {
-      throw new Error("User ID required");
-    }
+export const getNotificationStats = cache(
+  async (userId: string, organizationId: string) => {
+    return withOrgRLS(db, organizationId, async (tx) => {
+      if (!userId) {
+        throw new Error("User ID required");
+      }
 
-    const [totalResult, unreadResult, todayResult]: [
-      CountResult[],
-      CountResult[],
-      CountResult[]
-    ] = await Promise.all([
-      tx
-        .select({ count: sql<number>`count(*)` })
-        .from(notifications)
-        .where(
-          and(
-            eq(notifications.user_id, userId),
-            eq(notifications.organization_id, organizationId),
+      const [totalResult, unreadResult, todayResult]: [
+        CountResult[],
+        CountResult[],
+        CountResult[],
+      ] = await Promise.all([
+        tx
+          .select({ count: sql<number>`count(*)` })
+          .from(notifications)
+          .where(
+            and(
+              eq(notifications.user_id, userId),
+              eq(notifications.organization_id, organizationId),
+            ),
           ),
-        ),
-      tx
-        .select({ count: sql<number>`count(*)` })
-        .from(notifications)
-        .where(
-          and(
-            eq(notifications.user_id, userId),
-            eq(notifications.organization_id, organizationId),
-            eq(notifications.read, false),
+        tx
+          .select({ count: sql<number>`count(*)` })
+          .from(notifications)
+          .where(
+            and(
+              eq(notifications.user_id, userId),
+              eq(notifications.organization_id, organizationId),
+              eq(notifications.read, false),
+            ),
           ),
-        ),
-      tx
-        .select({ count: sql<number>`count(*)` })
-        .from(notifications)
-        .where(
-          and(
-            eq(notifications.user_id, userId),
-            eq(notifications.organization_id, organizationId),
-            sql`DATE(created_at) = CURRENT_DATE`,
+        tx
+          .select({ count: sql<number>`count(*)` })
+          .from(notifications)
+          .where(
+            and(
+              eq(notifications.user_id, userId),
+              eq(notifications.organization_id, organizationId),
+              sql`DATE(created_at) = CURRENT_DATE`,
+            ),
           ),
-        )
-    ]);
+      ]);
 
-    const total = safeCount(totalResult);
-    const unread = safeCount(unreadResult);
+      const total = safeCount(totalResult);
+      const unread = safeCount(unreadResult);
 
-    return {
-      total,
-      unread,
-      read: total - unread,
-      today: safeCount(todayResult),
-    };
-  });
-});
+      return {
+        total,
+        unread,
+        read: total - unread,
+        today: safeCount(todayResult),
+      };
+    });
+  },
+);
 
 /**
  * Helper function to create notification URLs
