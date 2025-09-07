@@ -110,6 +110,15 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     supabaseResponse.headers.set("x-auth-error", authError);
   }
 
+  // Mirror subdomain headers to response for debugging and client-side access
+  const subdomainValue = requestHeaders.get("x-subdomain");
+  const verifiedValue = requestHeaders.get(SUBDOMAIN_VERIFIED_HEADER);
+  if (subdomainValue && verifiedValue) {
+    supabaseResponse.headers.set("x-subdomain", subdomainValue);
+    supabaseResponse.headers.set(SUBDOMAIN_VERIFIED_HEADER, verifiedValue);
+    console.log(`[MIDDLEWARE] Also setting response headers: x-subdomain=${subdomainValue}, verified=${verifiedValue}`);
+  }
+
   // Ensure any Supabase SSR cookies are applied to this final response
   bufferedCookies.forEach(({ name, value, options }) => {
     if (options) {
