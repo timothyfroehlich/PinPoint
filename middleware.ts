@@ -138,12 +138,25 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 }
 
 function getSubdomain(host: string): string | null {
-  // Centralized resolution with alias support
-  const result = resolveOrgSubdomainFromHost(host);
+  // Direct inline alias mapping to eliminate import issues
+  const hostWithoutPort = host.split(":")[0] ?? "";
+  console.log(`[MIDDLEWARE] Processing host: "${hostWithoutPort}"`);
+
+  // Check direct alias mapping
+  if (
+    hostWithoutPort.toLowerCase() === "pinpoint.austinpinballcollective.org"
+  ) {
+    console.log(`[MIDDLEWARE] FOUND APC alias match! Returning 'apc'`);
+    return "apc";
+  }
+
+  // Also try the imported function for comparison
+  const importedResult = resolveOrgSubdomainFromHost(host);
   console.log(
-    `[MIDDLEWARE] Host resolution: "${host}" -> subdomain: "${result ?? "null"}"`,
+    `[MIDDLEWARE] Direct check: null, Imported function: "${importedResult ?? "null"}"`,
   );
-  return result;
+
+  return importedResult;
 }
 
 export const config = {
