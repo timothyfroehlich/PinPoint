@@ -52,22 +52,20 @@ jobs:
           # Verify auth functions are available
           psql "postgresql://postgres:postgres@localhost:54322/postgres" -c "SELECT auth.uid() IS NOT NULL as auth_function_available;" || echo "Auth function check failed (expected if no session)"
 
-      - name: Install pgTAP and setup roles
+      - name: Ensure pgTAP available and setup roles
         run: |
           set -e
-          echo "📦 Installing pgTAP and preparing database for tests..."
-          sudo apt-get update
-          sudo apt-get install -y wget ca-certificates make build-essential postgresql-client-17 libtap-parser-sourcehandler-pgtap-perl
-          wget https://github.com/theory/pgtap/archive/refs/tags/v1.3.3.tar.gz
-          tar -xzf v1.3.3.tar.gz
-          cd pgtap-1.3.3
-          make
-          cd ..
+          echo "📦 Ensuring pgTAP is available and preparing database for tests..."
           export DATABASE_URL="postgresql://postgres:postgres@localhost:54322/postgres"
-          psql "$DATABASE_URL" -f pgtap-1.3.3/sql/pgtap.sql
+          # Try to enable pgTAP as extension (preferred)
+          if psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS pgtap;"; then
+            echo "✅ pgTAP extension available"
+          else
+            echo "⚠️ Could not enable pgTAP extension; the test runner will fallback to SQL functions if present"
+          fi
+          # Apply roles/setup
           psql "$DATABASE_URL" -f supabase/tests/setup/01-test-roles.sql
-          
-          echo "✅ Database connection verified"
+          echo "✅ Database prepared"
       
       - name: Run pgTAP RLS Tests
         run: |
