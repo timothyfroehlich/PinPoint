@@ -44,15 +44,19 @@ jobs:
 
           # Map to Next.js client/server env expectations
           # Reconstruct DATABASE_URL to avoid GitHub secret masking issues
-          DB_PORT=$(echo "$DB_URL" | grep -o '[0-9]*' | head -1)
+          # Extract port number more reliably (should be 5 digits starting with 5)
+          DB_PORT=$(echo "$DB_URL" | grep -o '5[0-9][0-9][0-9][0-9]' | head -1)
           DB_HOST="127.0.0.1"
           DB_NAME="postgres"
           RECONSTRUCTED_DB_URL="postgresql://postgres:postgres@${DB_HOST}:${DB_PORT}/${DB_NAME}"
           
+          # Clean API_URL to remove trailing slash if present
+          CLEAN_API_URL="${API_URL%/}"
+          
           {
-            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_URL=$CLEAN_API_URL"
             echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$ANON_KEY"
-            echo "SUPABASE_URL=$API_URL"
+            echo "SUPABASE_URL=$CLEAN_API_URL"
             echo "SUPABASE_SECRET_KEY=$SERVICE_ROLE_KEY"
             echo "DATABASE_URL=$RECONSTRUCTED_DB_URL"
             echo "DIRECT_URL=$RECONSTRUCTED_DB_URL"
@@ -61,6 +65,7 @@ jobs:
           # Helpful for logs/debugging
           echo "✅ Mapped env: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL, SUPABASE_SECRET_KEY"
           echo "✅ DATABASE_URL reconstructed: postgresql://postgres:postgres@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+          echo "✅ API_URL cleaned: $CLEAN_API_URL (original: $API_URL)"
           echo "✅ Original DB_URL for reference: $DB_URL"
 
 
