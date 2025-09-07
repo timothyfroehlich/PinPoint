@@ -42,7 +42,7 @@ jobs:
           ADDITIONAL_CONTEXT: '${{ inputs.additional_context }}'
         with:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
-          gemini_debug: '${{ vars.ACTIONS_STEP_DEBUG == ''true'' }}'
+          gemini_debug: '${{ fromJSON(vars.DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}'
           settings: |-
             {
               "maxSessionTurns": 25,
@@ -172,7 +172,7 @@ jobs:
             - **Schema Lock:** Code adapts to schema, NEVER modify schema. Flag any schema change proposals as CRITICAL violation
 
             ### Authentication & Session Management  
-            - **Supabase SSR:** Server-side auth MUST use `~/lib/supabase/server` createClient(), never direct `@supabase/supabase-js` imports
+            - **Supabase SSR:** Server-side auth MUST use `~/lib/supabase/server` createClient(), never direct supabase-js imports from node_modules
             - **Cookie Contract:** Must use getAll()/setAll() pattern, never individual cookie operations
             - **Middleware Required:** Next.js middleware for token refresh must be present
             - **Auth Callback:** `/auth/callback/route.ts` must exist for OAuth flows
@@ -271,7 +271,7 @@ jobs:
             **Infrastructure & Architecture:**
             - Per-test PGlite instances (memory safety violations)
             - New SQL migration files in `supabase/migrations/` (initial snapshot only)
-            - Deprecated imports: `@supabase/auth-helpers-nextjs`
+            - Deprecated imports: auth-helpers-nextjs (old Supabase library)
             - Missing/removed auth callback route for OAuth flows
             - Tailwind v4 projects adding v3 `tailwind.config.js`
             - Overuse of Client Components when Server Components suffice
