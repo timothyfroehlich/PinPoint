@@ -248,7 +248,7 @@ export function hasValidPinPointMetadata(
 ): user is PinPointSupabaseUser {
   return (
     typeof user.app_metadata === "object" &&
-    typeof user.app_metadata["organization_id"] === "string"
+    typeof user.app_metadata["organizationId"] === "string"
   );
 }
 
@@ -257,7 +257,7 @@ export function hasValidPinPointMetadata(
  */
 export function extractOrganizationId(user: User): string | null {
   if (!hasValidPinPointMetadata(user)) return null;
-  const orgId = user.app_metadata["organization_id"] as unknown;
+  const orgId = user.app_metadata["organizationId"] as unknown;
   return typeof orgId === "string" ? orgId : null;
 }
 

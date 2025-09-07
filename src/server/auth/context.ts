@@ -13,6 +13,7 @@ import { cache } from "react";
 import { headers } from "next/headers";
 import { createClient } from "~/lib/supabase/server";
 import { extractTrustedSubdomain } from "~/lib/subdomain-verification";
+import { resolveOrgSubdomainFromHost } from "~/lib/domain-org-mapping";
 import { getOrganizationBySubdomain } from "~/lib/dal/public-organizations";
 import { getUserMembershipPublic } from "~/lib/dal/public-organizations";
 
@@ -84,7 +85,10 @@ export const getRequestAuthContext = cache(async (): Promise<AuthContext> => {
     // 3. Org Context Layer: Resolve orgId (precedence order)
     // Priority: subdomain header > user.app_metadata.organizationId
     const headersList = await headers();
-    const subdomain = extractTrustedSubdomain(headersList);
+    const host = headersList.get("host") ?? "";
+    const subdomain =
+      extractTrustedSubdomain(headersList) ??
+      resolveOrgSubdomainFromHost(host);
     const metadataOrgId = user.app_metadata["organizationId"] as string;
 
     let orgId: string;

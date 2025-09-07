@@ -6,7 +6,7 @@ setup("authenticate as Tim dev user", async ({ page }) => {
   console.log("Setting up authentication for Tim dev user...");
 
   // Calculate BASE_URL using same logic as playwright.config.ts
-  const PORT = process.env.PORT ?? "3000";
+  const PORT = process.env.PLAYWRIGHT_PORT ?? process.env.PORT ?? "3000";
   const BASE_URL = process.env.BASE_URL ?? `http://localhost:${PORT}`;
 
   // Go directly to sign-in page on the correct subdomain

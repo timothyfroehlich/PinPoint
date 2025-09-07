@@ -21,7 +21,7 @@ export type {
  */
 export interface PinPointSupabaseUser extends SupabaseUser {
   app_metadata: {
-    organization_id?: string;
+    organizationId?: string;
     role?: string;
   } & Record<string, unknown>;
 }
@@ -47,7 +47,7 @@ export interface SupabaseJWTPayload {
   email?: string;
   phone?: string;
   app_metadata: {
-    organization_id?: string;
+    organizationId?: string;
     role?: string;
   } & Record<string, unknown>;
   user_metadata: Record<string, unknown>;
