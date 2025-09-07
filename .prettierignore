@@ -41,3 +41,22 @@ pnpm-lock.yaml
 # OS files
 .DS_Store
 Thumbs.db
+
+# Generated files (codegen output)
+# Supabase type generation
+src/lib/types/database.ts
+# Drizzle schema codegen
+supabase/migrations/relations.ts
+supabase/migrations/schema.ts
+# Dev user script (frequently regenerated)
+scripts/create-dev-users.ts
+
+# Archived test directories
+.archived-tests-*/**
+
+# Coverage reports
+coverage/**
+**/coverage/**
+
+# Claude agent files
+.claude/**
