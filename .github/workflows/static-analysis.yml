@@ -104,7 +104,7 @@ jobs:
           FILES=$(find scripts -type f -name "*.sh" 2>/dev/null || true)
           if [ -f "start-database.sh" ]; then FILES="$FILES start-database.sh"; fi
           if [ -n "$FILES" ]; then
-            shellcheck -f gcc $FILES | reviewdog -name="shellcheck" -f=shellcheck -reporter=github-pr-check -filter-mode=diff_context -level=warning -fail-on-error=false
+            shellcheck -f gcc $FILES | reviewdog -name="shellcheck" -f=gcc -reporter=github-pr-check -filter-mode=diff_context -level=warning -fail-on-error=false
           else
             echo "No shell scripts found"
           fi
