@@ -79,26 +79,17 @@ export function SignInForm(): React.JSX.Element {
 
   // Load organizations and apply host-based org locking
   useEffect(() => {
-    console.log(
-      `[SIGNIN_FORM] useEffect triggered - orgsLoading: ${String(orgsLoading)}, orgs.length: ${String(orgs.length)}`,
-    );
-
+    console.log(`[SIGNIN_FORM] useEffect triggered - orgsLoading: ${String(orgsLoading)}, orgs.length: ${String(orgs.length)}`);
+    
     setOrganizationsLoading(orgsLoading);
     if (orgsLoading || orgs.length === 0) return;
 
     // Determine if host locks this session to a specific org (e.g., APC domain alias)
     const lockedSubdomain = resolveOrgSubdomainFromLocation();
     console.log(`[SIGNIN_FORM] Client-side host resolution:`);
-    console.log(
-      `[SIGNIN_FORM] window.location.hostname: "${typeof window !== "undefined" ? window.location.hostname : "undefined"}"`,
-    );
-    console.log(
-      `[SIGNIN_FORM] lockedSubdomain: "${lockedSubdomain ?? "null"}"`,
-    );
-    console.log(
-      `[SIGNIN_FORM] Available orgs:`,
-      orgs.map((o) => ({ id: o.id, subdomain: o.subdomain, name: o.name })),
-    );
+    console.log(`[SIGNIN_FORM] window.location.hostname: "${typeof window !== 'undefined' ? window.location.hostname : 'undefined'}"`);
+    console.log(`[SIGNIN_FORM] lockedSubdomain: "${lockedSubdomain ?? 'null'}"`);
+    console.log(`[SIGNIN_FORM] Available orgs:`, orgs.map(o => ({ id: o.id, subdomain: o.subdomain, name: o.name })));
 
     if (lockedSubdomain) {
       const locked = orgs.find((o) => o.subdomain === lockedSubdomain);

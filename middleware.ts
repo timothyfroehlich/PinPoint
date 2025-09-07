@@ -125,9 +125,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 function getSubdomain(host: string): string | null {
   // Centralized resolution with alias support
   const result = resolveOrgSubdomainFromHost(host);
-  console.log(
-    `[MIDDLEWARE] Host resolution: "${host}" -> subdomain: "${result ?? "null"}"`,
-  );
+  console.log(`[MIDDLEWARE] Host resolution: "${host}" -> subdomain: "${result ?? 'null'}"`);
   return result;
 }
 
