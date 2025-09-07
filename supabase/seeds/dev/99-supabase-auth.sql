@@ -69,52 +69,52 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- =============================================================================
--- AUTH USERS: Create auth.users entries for test users
+-- AUTH USERS: Dev users now created via Supabase Admin API
 -- =============================================================================
--- Insert corresponding auth.users for the test users (Supabase-specific)
--- These must match the user IDs in 03-users.sql
+-- Dev auth users are now created via scripts/create-dev-users.ts using the
+-- Supabase Admin API, which properly handles password hashing and auth integration.
+-- This approach is compatible with Supabase's authentication system.
 
-INSERT INTO auth.users (id, instance_id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_user_meta_data, is_super_admin, role)
-VALUES 
-  (
-    '10000000-0000-4000-8000-000000000001', 
-    '00000000-0000-0000-0000-000000000000',
-    'tim.froehlich@example.com', 
-    crypt('password123', gen_salt('bf')), 
-    now(), 
-    now(), 
-    now(),
-    '{"name": "Tim Froehlich", "organizationId": "test-org-pinpoint"}'::jsonb,
-    false,
-    'authenticated'
-  ),
-  (
-    '10000000-0000-4000-8000-000000000002', 
-    '00000000-0000-0000-0000-000000000000',
-    'harry.williams@example.com', 
-    crypt('password123', gen_salt('bf')), 
-    now(), 
-    now(), 
-    now(),
-    '{"name": "Harry Williams", "organizationId": "test-org-pinpoint"}'::jsonb,
-    false,
-    'authenticated'
-  ),
-  (
-    '10000000-0000-4000-8000-000000000003', 
-    '00000000-0000-0000-0000-000000000000',
-    'escher.lefkoff@example.com', 
-    crypt('password123', gen_salt('bf')), 
-    now(), 
-    now(), 
-    now(),
-    '{"name": "Escher Lefkoff", "organizationId": "test-org-pinpoint"}'::jsonb,
-    false,
-    'authenticated'
-  )
-ON CONFLICT (id) DO UPDATE SET
-  email = EXCLUDED.email,
-  encrypted_password = EXCLUDED.encrypted_password,
-  email_confirmed_at = EXCLUDED.email_confirmed_at,
-  updated_at = now(),
-  raw_user_meta_data = EXCLUDED.raw_user_meta_data;
+-- =============================================================================
+-- ADMIN HELPERS (DEV/PREVIEW ONLY): Bypass RLS for membership upserts
+-- =============================================================================
+-- SECURITY NOTE: These helpers are included only in DEV/PREVIEW seed file and
+-- are not part of base production seeds. They use SECURITY DEFINER to safely
+-- bypass RLS when invoked with appropriate privileges (e.g., service role).
+
+-- Upsert a membership for a user/org/role, updating role if row exists
+CREATE OR REPLACE FUNCTION public.fn_upsert_membership_admin(
+  p_user_id text,
+  p_org_id text,
+  p_role_id text
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_exists boolean;
+  v_id text;
+BEGIN
+  IF p_user_id IS NULL OR p_org_id IS NULL OR p_role_id IS NULL THEN
+    RAISE EXCEPTION 'fn_upsert_membership_admin: all parameters are required';
+  END IF;
+
+  -- Deterministic ID for idempotency across runs
+  v_id := 'membership-' || left(replace(p_org_id, ' ', ''), 16) || '-' || left(p_user_id, 8);
+
+  SELECT EXISTS (
+    SELECT 1 FROM memberships m
+    WHERE m.user_id = p_user_id AND m.organization_id = p_org_id
+  ) INTO v_exists;
+
+  IF v_exists THEN
+    UPDATE memberships
+    SET role_id = p_role_id
+    WHERE user_id = p_user_id AND organization_id = p_org_id;
+  ELSE
+    INSERT INTO memberships (id, user_id, organization_id, role_id)
+    VALUES (v_id, p_user_id, p_org_id, p_role_id);
+  END IF;
+END;
+$$;

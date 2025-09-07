@@ -3,17 +3,8 @@
  * Extracted from IssueList component for proper unit testing
  */
 
-export interface IssueFilters {
-  locationId?: string | undefined;
-  machineId?: string | undefined;
-  statusIds?: string[] | undefined;
-  search?: string | undefined;
-  assigneeId?: string | undefined;
-  reporterId?: string | undefined;
-  ownerId?: string | undefined;
-  sortBy: "created" | "updated" | "status" | "severity" | "game";
-  sortOrder: "asc" | "desc";
-}
+import type { IssueFilters } from "~/lib/types";
+import { ISSUE_SORT_OPTIONS } from "~/lib/types/filters";
 
 /**
  * Default filter values for new filter objects
@@ -74,22 +65,31 @@ export function mergeFilters(
 export function validateFilters(filters: Partial<IssueFilters>): IssueFilters {
   const defaults = getDefaultFilters();
 
+  const trimmedSearch =
+    typeof filters.search === "string" ? filters.search.trim() : undefined;
+
+  const validatedSortBy: IssueFilters["sortBy"] = isValidSortField(
+    filters.sortBy,
+  )
+    ? filters.sortBy
+    : defaults.sortBy;
+  const validatedSortOrder: IssueFilters["sortOrder"] = isValidSortOrder(
+    filters.sortOrder,
+  )
+    ? filters.sortOrder
+    : defaults.sortOrder;
+
   return {
-    locationId: filters.locationId ?? undefined,
-    machineId: filters.machineId ?? undefined,
-    statusIds: Array.isArray(filters.statusIds) ? filters.statusIds : undefined,
-    search:
-      typeof filters.search === "string"
-        ? // Convert empty strings to undefined for API consistency
-          filters.search.trim() || undefined
-        : undefined,
-    assigneeId: filters.assigneeId ?? undefined,
-    reporterId: filters.reporterId ?? undefined,
-    ownerId: filters.ownerId ?? undefined,
-    sortBy: isValidSortField(filters.sortBy) ? filters.sortBy : defaults.sortBy,
-    sortOrder: isValidSortOrder(filters.sortOrder)
-      ? filters.sortOrder
-      : defaults.sortOrder,
+    ...(filters.locationId && { locationId: filters.locationId }),
+    ...(filters.machineId && { machineId: filters.machineId }),
+    ...(Array.isArray(filters.statusIds) &&
+      filters.statusIds.length > 0 && { statusIds: filters.statusIds }),
+    ...(trimmedSearch && { search: trimmedSearch }),
+    ...(filters.assigneeId && { assigneeId: filters.assigneeId }),
+    ...(filters.reporterId && { reporterId: filters.reporterId }),
+    ...(filters.ownerId && { ownerId: filters.ownerId }),
+    ...(validatedSortBy && { sortBy: validatedSortBy }),
+    ...(validatedSortOrder && { sortOrder: validatedSortOrder }),
   };
 }
 
@@ -121,7 +121,7 @@ export function clearAllFilters(): IssueFilters {
 function isValidSortField(value: unknown): value is IssueFilters["sortBy"] {
   return (
     typeof value === "string" &&
-    ["created", "updated", "status", "severity", "game"].includes(value)
+    ISSUE_SORT_OPTIONS.includes(value as (typeof ISSUE_SORT_OPTIONS)[number])
   );
 }
 

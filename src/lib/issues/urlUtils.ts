@@ -3,7 +3,8 @@
  * Extracted from IssueList component for proper unit testing
  */
 
-import type { IssueFilters } from "./filterUtils";
+import type { IssueFilters } from "~/lib/types";
+import { ISSUE_SORT_OPTIONS, type IssueSortBy } from "~/lib/types/filters";
 
 /**
  * Converts IssueFilters to URLSearchParams for shareable URLs
@@ -102,8 +103,10 @@ export function createFilteredUrl(
   if (filters.ownerId) params.set("ownerId", filters.ownerId);
 
   // Only include sort parameters if they differ from defaults
-  if (filters.sortBy !== "created") params.set("sortBy", filters.sortBy);
-  if (filters.sortOrder !== "desc") params.set("sortOrder", filters.sortOrder);
+  if (filters.sortBy && filters.sortBy !== "created")
+    params.set("sortBy", filters.sortBy);
+  if (filters.sortOrder && filters.sortOrder !== "desc")
+    params.set("sortOrder", filters.sortOrder);
 
   const queryString = params.toString();
   return queryString ? `${basePath}?${queryString}` : basePath;
@@ -164,12 +167,10 @@ export function sanitizeUrlParams(params: URLSearchParams): URLSearchParams {
 /**
  * Type guards for URL parameter validation
  */
-function isValidSortBy(
-  value: string | null,
-): value is "created" | "updated" | "status" | "severity" | "game" {
+function isValidSortBy(value: string | null): value is IssueSortBy {
   return (
     typeof value === "string" &&
-    ["created", "updated", "status", "severity", "game"].includes(value)
+    ISSUE_SORT_OPTIONS.includes(value as (typeof ISSUE_SORT_OPTIONS)[number])
   );
 }
 

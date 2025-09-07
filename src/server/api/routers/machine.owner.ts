@@ -24,7 +24,7 @@ type MachineWithRelations = InferSelectModel<typeof machines> & {
 type MachineWithRelationsResponse = DrizzleToCamelCase<MachineWithRelations>;
 
 export const machineOwnerRouter = createTRPCRouter({
-  // Assign or remove owner from a game instance
+  // Assign or remove owner from a machine
   assignOwner: machineEditProcedure
     .input(
       z.object({
@@ -33,7 +33,7 @@ export const machineOwnerRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }): Promise<MachineWithRelationsResponse> => {
-      // Verify the game instance exists and belongs to the user's organization
+      // Verify the machine exists and belongs to the user's organization
       const existingInstance = await ctx.db.query.machines.findFirst({
         where: and(
           eq(machines.id, input.machineId),

@@ -13,8 +13,17 @@
  */
 
 import { createClient } from "./server";
-import { getUserWithOrganization } from "./rls-helpers";
+import { getRequestAuthContext } from "~/server/auth/context";
 import type { SupabaseClient } from "@supabase/supabase-js";
+
+/**
+ * Base user type - matches the canonical auth context
+ */
+interface BaseUser {
+  id: string;
+  email: string;
+  name?: string;
+}
 
 /**
  * Organization-aware Supabase client with validated context
@@ -25,9 +34,7 @@ export interface OrganizationAwareClient {
   /** Organization ID extracted from user's app_metadata */
   organizationId: string;
   /** User object with guaranteed organization context */
-  user: NonNullable<
-    Awaited<ReturnType<SupabaseClient["auth"]["getUser"]>>["data"]["user"]
-  >;
+  user: BaseUser;
 }
 
 /**
@@ -62,12 +69,16 @@ export interface OrganizationAwareClient {
  */
 export async function createOrganizationAwareClient(): Promise<OrganizationAwareClient> {
   const supabase = await createClient();
-  const { user, organizationId } = await getUserWithOrganization(supabase);
+  const authContext = await getRequestAuthContext();
+
+  if (authContext.kind !== "authorized") {
+    throw new Error("Organization membership required");
+  }
 
   return {
     supabase,
-    organizationId,
-    user,
+    organizationId: authContext.org.id,
+    user: authContext.user,
   };
 }
 
@@ -95,20 +106,36 @@ export async function createOrganizationAwareClient(): Promise<OrganizationAware
 export async function createOptionalOrganizationClient(): Promise<{
   supabase: SupabaseClient;
   organizationId: string | null;
-  user: Awaited<ReturnType<SupabaseClient["auth"]["getUser"]>>["data"]["user"];
+  user: BaseUser | null;
 }> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const orgId = user?.app_metadata["organizationId"] as unknown;
+  if (!user) {
+    return {
+      supabase,
+      organizationId: null,
+      user: null,
+    };
+  }
+
+  const orgId = user.app_metadata["organizationId"] as unknown;
   const organizationId = typeof orgId === "string" ? orgId : null;
+
+  // Convert Supabase User to BaseUser (matching auth context pattern)
+  const userName = user.user_metadata["name"] as string | undefined;
+  const baseUser: BaseUser = {
+    id: user.id,
+    email: user.email ?? "",
+    ...(userName && { name: userName }),
+  };
 
   return {
     supabase,
     organizationId,
-    user,
+    user: baseUser,
   };
 }
 

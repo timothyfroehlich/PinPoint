@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useActionState, useEffect } from "react";
+import React, { useState, useActionState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { Switch } from "~/components/ui/switch";
@@ -24,19 +24,26 @@ interface SystemNotificationSettingsProps {
   };
 }
 
-export function SystemNotificationSettings({ settings }: SystemNotificationSettingsProps) {
+export function SystemNotificationSettings({
+  settings,
+}: SystemNotificationSettingsProps): JSX.Element {
   const [formData, setFormData] = useState(settings);
-  const [state, formAction, isPending] = useActionState(updateSystemSettingsAction, null);
+  const [state, formAction, isPending] = useActionState(
+    updateSystemSettingsAction,
+    null,
+  );
 
-  const handleToggle = (key: keyof typeof formData, value: boolean) => {
-    setFormData(prev => ({ ...prev, [key]: value }));
+  const handleToggle = (key: keyof typeof formData, value: boolean): void => {
+    setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
   // Handle successful save
   useEffect(() => {
     if (state?.success) {
-      toast.success(state.message || "Notification settings saved successfully!");
-    } else if (state && !state.success) {
+      toast.success(
+        state.message ?? "Notification settings saved successfully!",
+      );
+    } else if (state) {
       if (state.error) {
         toast.error(state.error);
       }
@@ -58,7 +65,9 @@ export function SystemNotificationSettings({ settings }: SystemNotificationSetti
           </div>
           <Switch
             checked={formData.emailNotifications}
-            onCheckedChange={(checked) => { handleToggle("emailNotifications", checked); }}
+            onCheckedChange={(checked) => {
+              handleToggle("emailNotifications", checked);
+            }}
             disabled={isPending}
           />
         </div>
@@ -74,7 +83,9 @@ export function SystemNotificationSettings({ settings }: SystemNotificationSetti
           </div>
           <Switch
             checked={formData.pushNotifications}
-            onCheckedChange={(checked) => { handleToggle("pushNotifications", checked); }}
+            onCheckedChange={(checked) => {
+              handleToggle("pushNotifications", checked);
+            }}
             disabled={isPending}
           />
         </div>
@@ -85,7 +96,7 @@ export function SystemNotificationSettings({ settings }: SystemNotificationSetti
       {/* Specific Notification Types */}
       <div className="space-y-4">
         <h4 className="text-sm font-medium">Notification Types</h4>
-        
+
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label>Issue Updates</Label>
@@ -95,7 +106,9 @@ export function SystemNotificationSettings({ settings }: SystemNotificationSetti
           </div>
           <Switch
             checked={formData.issueUpdates}
-            onCheckedChange={(checked) => { handleToggle("issueUpdates", checked); }}
+            onCheckedChange={(checked) => {
+              handleToggle("issueUpdates", checked);
+            }}
             disabled={isPending || !formData.emailNotifications}
           />
         </div>
@@ -109,7 +122,9 @@ export function SystemNotificationSettings({ settings }: SystemNotificationSetti
           </div>
           <Switch
             checked={formData.weeklyDigest}
-            onCheckedChange={(checked) => { handleToggle("weeklyDigest", checked); }}
+            onCheckedChange={(checked) => {
+              handleToggle("weeklyDigest", checked);
+            }}
             disabled={isPending || !formData.emailNotifications}
           />
         </div>
@@ -123,7 +138,9 @@ export function SystemNotificationSettings({ settings }: SystemNotificationSetti
           </div>
           <Switch
             checked={formData.maintenanceAlerts}
-            onCheckedChange={(checked) => { handleToggle("maintenanceAlerts", checked); }}
+            onCheckedChange={(checked) => {
+              handleToggle("maintenanceAlerts", checked);
+            }}
             disabled={isPending || !formData.emailNotifications}
           />
         </div>
@@ -131,12 +148,12 @@ export function SystemNotificationSettings({ settings }: SystemNotificationSetti
 
       {/* Save Button */}
       <form action={formAction} className="pt-4">
-        <input 
-          type="hidden" 
-          name="settings" 
+        <input
+          type="hidden"
+          name="settings"
           value={JSON.stringify({ notifications: formData })}
         />
-        <Button 
+        <Button
           type="submit"
           disabled={isPending || !hasChanges}
           className="w-full"

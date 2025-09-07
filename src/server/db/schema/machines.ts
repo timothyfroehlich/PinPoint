@@ -39,7 +39,7 @@ export const locations = pgTable(
     region_id: text(), // PinballMap region ("austin", "portland", etc.)
     last_sync_at: timestamp(), // When was last sync performed
     sync_enabled: boolean().default(false).notNull(), // Enable/disable sync for this location
-    
+
     // Public access control (nullable = inherit)
     is_public: boolean(),
   },
@@ -47,7 +47,10 @@ export const locations = pgTable(
     // Multi-tenancy: organization_id filtering
     index("locations_organization_id_idx").on(table.organization_id),
     // Public access index
-    index("locations_public_org_idx").on(table.organization_id, table.is_public),
+    index("locations_public_org_idx").on(
+      table.organization_id,
+      table.is_public,
+    ),
   ],
 );
 
@@ -105,7 +108,7 @@ export const machines = pgTable(
     qr_code_id: text().unique(),
     qr_code_url: text(),
     qr_code_generated_at: timestamp(),
-    
+
     // Public access control (nullable = inherit)
     is_public: boolean(),
 

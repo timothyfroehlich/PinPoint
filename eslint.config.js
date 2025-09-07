@@ -13,6 +13,12 @@ import {
   ESLINT_RULES,
   convertPatterns,
 } from "./tooling.config.js";
+// Custom ESLint rules
+import noLegacyAuthImports from "./eslint-rules/no-legacy-auth-imports.js";
+import noDuplicateAuthResolution from "./eslint-rules/no-duplicate-auth-resolution.js";
+import noMissingCacheWrapper from "./eslint-rules/no-missing-cache-wrapper.js";
+import noDirectSupabaseClient from "./eslint-rules/no-direct-supabase-client.js";
+import noDuplicateValidation from "./eslint-rules/no-duplicate-validation.js";
 
 export default tseslint.config(
   // TypeScript ESLint base configurations
@@ -36,6 +42,7 @@ export default tseslint.config(
       },
     },
   },
+
   {
     // Main configuration for all TS/TSX files
     files: convertPatterns.forESLint(INCLUDE_PATTERNS.production),
@@ -47,6 +54,32 @@ export default tseslint.config(
       vitest: vitestPlugin,
       security: securityPlugin,
       "@microsoft/sdl": sdlPlugin,
+      // Custom rules
+      legacyAuth: {
+        rules: {
+          "no-legacy-auth-imports": noLegacyAuthImports,
+        },
+      },
+      duplicateAuth: {
+        rules: {
+          "no-duplicate-auth-resolution": noDuplicateAuthResolution,
+        },
+      },
+      missingCache: {
+        rules: {
+          "no-missing-cache-wrapper": noMissingCacheWrapper,
+        },
+      },
+      directSupabase: {
+        rules: {
+          "no-direct-supabase-client": noDirectSupabaseClient,
+        },
+      },
+      validation: {
+        rules: {
+          "no-duplicate-validation": noDuplicateValidation,
+        },
+      },
     },
     rules: {
       // Existing Next.js rules
@@ -75,7 +108,7 @@ export default tseslint.config(
       "vitest/no-disabled-tests": "off", // Enable only in test files
       "vitest/no-focused-tests": "off", // Enable only in test files
 
-      // Custom Drizzle safety (replaces problematic plugin)
+      // Custom Drizzle safety and Lane B cache enforcement
       "no-restricted-syntax": [
         "error",
         {
@@ -88,6 +121,8 @@ export default tseslint.config(
             "CallExpression[callee.property.name='update']:not([arguments.0])",
           message: "UPDATE operations must include WHERE clause",
         },
+        // Lane B: Cache() rules for data fetching functions only (too broad - disabled for now)
+        // Use the custom missingCache/no-missing-cache-wrapper rule instead for more targeted detection
       ],
 
       // Rule to enforce use of validated env object
@@ -97,7 +132,7 @@ export default tseslint.config(
           object: "process",
           property: "env",
           message:
-            "Use the 'env' object from '~/env.js' instead of 'process.env'. It is validated and type-safe. See src/env.js for available variables and T3 Env documentation: https://env.t3.gg/docs/introduction",
+            "Use the 'env' object from '~/env' (server context) or utilities from '~/lib/environment-client' (client context) instead of 'process.env'. For server: import { env } from '~/env'. For client: import { isDevelopment } from '~/lib/environment-client'. See T3 Env documentation: https://env.t3.gg/docs/introduction",
         },
       ],
 
@@ -118,11 +153,29 @@ export default tseslint.config(
       "no-restricted-imports": [
         "error",
         {
+          paths: [
+            {
+              name: "~/server/auth/legacy-adapters",
+              message:
+                "Legacy auth adapters have been removed. Use getRequestAuthContext() from ~/server/auth/context instead.",
+            },
+          ],
           patterns: [
             {
               group: ["../../*", "../../../*", "../../../../*"],
               message:
                 "Use the '~/' path alias instead of deep relative imports (../../). This improves maintainability and prevents broken imports when files are moved.",
+            },
+            // Lane B: DAL cross-import prevention
+            {
+              group: ["../lib/dal/*", "../../lib/dal/*"],
+              message:
+                "Use '~/lib/dal/*' alias instead of relative DAL imports",
+            },
+            {
+              group: ["**/organization-context", "../organization-context"],
+              message:
+                "Import getRequestAuthContext from '~/server/auth/context' instead",
             },
           ],
         },
@@ -144,16 +197,27 @@ export default tseslint.config(
       // Type-aware rules from shared config
       ...ESLINT_RULES.production,
 
-      // Additional strict rules for better type safety
+      // Additional strict rules for better type safety (upgraded from warn to error)
       "@typescript-eslint/explicit-function-return-type": [
-        "warn",
+        "error",
         {
           allowExpressions: true,
           allowTypedFunctionExpressions: true,
           allowHigherOrderFunctions: true,
           allowDirectConstAssertionInArrowFunctions: true,
+          // Lane B enhancement: Require return types for all async functions
+          allowConciseArrowFunctionExpressionsStartingWithVoid: false,
         },
       ],
+
+      // Custom rules for legacy auth prevention
+      "legacyAuth/no-legacy-auth-imports": "error",
+
+      // Lane B: Enhanced ESLint enforcement rules
+      "duplicateAuth/no-duplicate-auth-resolution": "error", // Critical safety
+      "missingCache/no-missing-cache-wrapper": "warn", // Start as warning, escalate later
+      "directSupabase/no-direct-supabase-client": "error", // SSR safety
+      "validation/no-duplicate-validation": "error", // Validation consistency
 
       // Ban problematic TypeScript comment directives
       "@typescript-eslint/ban-ts-comment": [
@@ -174,6 +238,172 @@ export default tseslint.config(
           allowIndexSignaturePropertyAccess: true,
         },
       ],
+    },
+  },
+  {
+    // Exclude auto-generated Supabase database types from all rules
+    files: ["src/lib/types/database.ts"],
+    rules: {
+      // Disable all typescript-eslint rules for auto-generated file
+      "@typescript-eslint/consistent-type-definitions": "off",
+      "@typescript-eslint/consistent-indexed-object-style": "off",
+      "@typescript-eslint/no-redundant-type-constituents": "off",
+    },
+  },
+  {
+    // Guardrails for app code (exclude server code)
+    // Target app code files but explicitly exclude directories where exported
+    // types/interfaces are allowed (negated globs are used for exclusions).
+    files: [
+      "src/**/*.{ts,tsx}",
+      "!src/lib/types/**",
+      "!src/components/**",
+      "!src/**/__tests__/**",
+      "!e2e/**",
+      "!src/server/db/**",
+      "!supabase/**",
+      "!RSC_MIGRATION/**",
+      "!docs/**",
+    ],
+    rules: {
+      // App code must not depend directly on DB schema/types or low-level server modules
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "~/server/db/schema",
+              message:
+                "Import DB model types via '~/lib/types' (Db.*) per CORE-TS-003. Do not import schema directly in app code.",
+            },
+            {
+              name: "~/server/db/types",
+              message:
+                "Import DB model types via '~/lib/types' (Db.*) per CORE-TS-003. Do not import server DB types directly in app code.",
+            },
+            {
+              name: "~/lib/dal/issues",
+              importNames: ["IssueFilters"],
+              message:
+                "Import IssueFilters from '~/lib/types' (filters) per CORE-TS-002. DAL does not export this type.",
+            },
+            {
+              name: "~/lib/dal/machines",
+              importNames: ["MachineFilters"],
+              message:
+                "Import MachineFilters from '~/lib/types' (filters) per CORE-TS-002. DAL does not export this type.",
+            },
+            {
+              name: "@supabase/supabase-js",
+              importNames: ["createClient"],
+              message:
+                "Use '~/lib/supabase/server' createClient() wrapper for SSR per CORE-SSR-001.",
+            },
+          ],
+          patterns: [
+            {
+              group: [
+                "~/server/db/**",
+                "../server/db/**",
+                "../../server/db/**",
+                "../../../server/db/**",
+              ],
+              message:
+                "Do not import server DB modules in app code. Use '~/lib/types' for types and service boundaries per CORE-TS-003.",
+            },
+            {
+              group: ["../../*", "../../../*", "../../../../*"],
+              message:
+                "Use the '~/' path alias instead of deep relative imports (../../).",
+            },
+          ],
+        },
+      ],
+      // Type declaration location enforcement removed - was too restrictive
+      // Component props, external API types, and module-specific interfaces
+      // should remain co-located with their code. Only truly reusable business
+      // domain types should be centralized via code review when duplication occurs.
+    },
+  },
+  {
+    // Allow type-only search param re-exports in the types barrel
+    files: ["src/lib/types/search.ts"],
+    rules: {
+      "no-restricted-syntax": "off",
+    },
+  },
+  {
+    // Allow server imports in lib/types for type definitions
+    files: ["src/lib/types/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "off",
+      "no-restricted-syntax": "off",
+    },
+  },
+  {
+    // Allow server imports in DAL layer for data access abstraction
+    files: ["src/lib/dal/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "off",
+      "no-restricted-syntax": "off",
+    },
+  },
+  {
+    // Allow server imports in server-side API routers
+    files: ["src/server/api/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "off",
+    },
+  },
+  {
+    // Allow server imports in server-side services
+    files: ["src/server/services/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "off",
+    },
+  },
+  {
+    // Allow server imports in server-side auth modules
+    files: ["src/server/auth/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "off",
+    },
+  },
+  {
+    // Allow server imports in test helpers
+    files: ["src/test/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "off",
+      "no-restricted-syntax": "off",
+    },
+  },
+  {
+    // Allow server imports in server DB layer (already excluded by main rule but explicitly adding)
+    files: ["src/server/db/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "off",
+    },
+  },
+  {
+    // Allow server imports in lib services layer
+    files: ["src/lib/services/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "off",
+    },
+  },
+  {
+    // Allow server-only imports and type exports in organization context module (moved to end)
+    files: ["src/lib/organization-context.ts"],
+    rules: {
+      "no-restricted-imports": "off",
+      "no-restricted-syntax": "off",
+    },
+  },
+  {
+    // Allow server imports in Server Actions (server-side execution)
+    files: ["src/lib/actions/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "off",
     },
   },
   {
@@ -380,6 +610,7 @@ export default tseslint.config(
       "playwright.config.ts",
       "tooling.config.js",
       "tooling.config.ts",
+      "supabase/migrations/**/*", // Generated migration files
     ],
   },
 );

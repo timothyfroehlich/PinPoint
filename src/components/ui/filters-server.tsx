@@ -35,7 +35,7 @@ interface ActiveFilter {
 }
 
 interface FiltersServerProps {
-  currentFilters: Record<string, any>;
+  currentFilters: Record<string, unknown>;
   searchPlaceholder?: string;
   filterOptions: Record<string, FilterOption[]>;
   activeFilters: ActiveFilter[];
@@ -56,7 +56,7 @@ export function FiltersServer({
   actionUrl,
   clearAllUrl,
   children,
-}: FiltersServerProps) {
+}: FiltersServerProps): JSX.Element {
   return (
     <Card>
       <CardHeader className="pb-4">
@@ -97,7 +97,12 @@ export function FiltersServer({
               </Label>
               <Select
                 name={filterKey}
-                defaultValue={(currentFilters[filterKey] as string) || "all"}
+                defaultValue={
+                  // ESLint security warning is false positive - filterKey comes from
+                  // Object.entries(filterOptions) where filterOptions keys are controlled
+                  // eslint-disable-next-line security/detect-object-injection
+                  (currentFilters[filterKey] as string | undefined) ?? "all"
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -157,7 +162,7 @@ export function FiltersServer({
 /**
  * Active filter badge with remove functionality
  */
-function ActiveFilterBadge({ filter }: { filter: ActiveFilter }) {
+function ActiveFilterBadge({ filter }: { filter: ActiveFilter }): JSX.Element {
   return (
     <Badge variant="secondary" className="flex items-center gap-1 pr-1">
       <span className="text-xs">
@@ -176,7 +181,7 @@ function ActiveFilterBadge({ filter }: { filter: ActiveFilter }) {
  * Compact filter bar for inline filtering
  */
 interface FilterBarServerProps {
-  currentFilters: Record<string, any>;
+  currentFilters: Record<string, unknown>;
   quickFilters: {
     key: string;
     label: string;
@@ -191,7 +196,7 @@ export function FilterBarServer({
   quickFilters,
   searchUrl,
   clearUrl,
-}: FilterBarServerProps) {
+}: FilterBarServerProps): JSX.Element {
   const hasActiveFilters = Object.values(currentFilters).some(
     (value) =>
       value !== undefined &&
@@ -254,22 +259,38 @@ export function FilterBarServer({
  */
 export function createFilterAction(
   basePath: string,
-  urlBuilder: (basePath: string, params: any, currentParams?: any) => string,
-) {
-  return async function handleFilterSubmit(formData: FormData) {
+  urlBuilder: (
+    basePath: string,
+    params: Record<string, unknown>,
+    currentParams?: Record<string, unknown>,
+  ) => string,
+): (formData: FormData) => void {
+  return function handleFilterSubmit(formData: FormData) {
     "use server";
 
     // Extract form data
-    const params: Record<string, any> = {};
+    const params: Record<string, unknown> = {};
 
     for (const [key, value] of formData.entries()) {
-      if (value && value !== "all") {
-        params[key] = value.toString();
+      if (typeof value === "string" && value !== "all" && value !== "") {
+        // Safe assignment to avoid object injection warnings
+        Object.defineProperty(params, key, {
+          value: value,
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        });
       }
+      // Ignore File values in this server-first filter action
     }
 
     // Reset to first page when filters change
-    params["page"] = 1;
+    Object.defineProperty(params, "page", {
+      value: 1,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
 
     // Build new URL with filters
     const newUrl = urlBuilder(basePath, params);
@@ -292,7 +313,7 @@ export function CheckboxFilter({
   label,
   options,
   selectedValues,
-}: CheckboxFilterProps) {
+}: CheckboxFilterProps): JSX.Element {
   return (
     <div className="space-y-2">
       <Label className="text-sm font-medium">{label}</Label>

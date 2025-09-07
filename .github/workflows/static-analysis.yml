@@ -1,0 +1,168 @@
+name: Static Analysis
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: static-analysis-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  eslint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      checks: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Node setup and deps
+        uses: ./.github/actions/node-setup
+
+      # Dedup: rely on SARIF step + reviewdog for annotations
+
+      - name: Generate ESLint SARIF (gates)
+        run: npm run lint:sarif
+        env:
+          NODE_ENV: test
+
+      - name: Upload ESLint SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@181d5eefc20863364f96762470ba6f862bdef56b # v3
+        with:
+          sarif_file: eslint-results.sarif
+          category: eslint
+
+      - name: Reviewdog (ESLint annotations)
+        if: always()
+        uses: reviewdog/action-eslint@556a3fdaf8b4201d4d74d406013386aa4f7dab96 # v1
+        with:
+          reporter: github-pr-check
+          filter_mode: diff_context
+          fail_level: none
+          level: warning
+
+  prettier:
+    name: Prettier
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Node setup and deps
+        uses: ./.github/actions/node-setup
+
+      - name: Prettier Check
+        run: npm run format
+
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      checks: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Node (no install)
+        uses: ./.github/actions/node-setup
+        with:
+          install: 'false'
+
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Setup reviewdog
+        uses: reviewdog/action-setup@d8edfce3dd5e1ec6978745e801f9c50b5ef80252 # v1
+        with:
+          reviewdog_version: latest
+        env:
+          REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Reviewdog annotations (ShellCheck)
+        if: github.event_name == 'pull_request'
+        uses: reviewdog/action-shellcheck@4c07458293ac342d477251099501a718ae5ef86e # v1
+        with:
+          reporter: github-pr-check
+          filter_mode: diff_context
+          fail_level: none
+          path: scripts
+          pattern: '**/*.sh'
+
+      - name: Generate ShellCheck SARIF
+        if: always()
+        run: |
+          # Create empty results file to start
+          echo "[]" > shellcheck-raw.json
+
+          # Collect results from scripts directory
+          if find scripts -name "*.sh" -type f | head -1 | grep -q .; then
+            find scripts -name "*.sh" -type f -exec shellcheck -f json {} + >> shellcheck-raw.json 2>/dev/null || true
+          fi
+
+          # Also check additional file if present
+          if [ -f "start-database.sh" ]; then
+            shellcheck -f json start-database.sh >> shellcheck-raw.json 2>/dev/null || true
+          fi
+
+          # Convert JSON to SARIF
+          node scripts/shellcheck-to-sarif.cjs shellcheck-raw.json shellcheck-results.sarif
+
+      - name: Upload ShellCheck SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@181d5eefc20863364f96762470ba6f862bdef56b # v3
+        with:
+          sarif_file: shellcheck-results.sarif
+          category: shellcheck
+
+      # Annotations handled above via reviewdog CLI
+
+  actionlint:
+    name: Validate Workflows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: actionlint (reviewdog)
+        uses: reviewdog/action-actionlint@95395aac8c053577d0bc67eb7b74936c660c6f66 # v1
+        with:
+          reporter: github-pr-check
+          filter_mode: diff_context
+          fail_level: error
+
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Node setup and deps
+        uses: ./.github/actions/node-setup
+
+      - name: Run npm audit (high+)
+        run: npm run deps:check

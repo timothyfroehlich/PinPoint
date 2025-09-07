@@ -7,11 +7,15 @@
 -- =============================================================================
 INSERT INTO permissions (id, name, description) VALUES
   ('perm-issue-view-001', 'issue:view', 'View issues in the organization'),
-  ('perm-issue-create-002', 'issue:create', 'Create new issues'),
+  -- Legacy create (pre-beta) kept for backward compatibility; treated as FULL
+  ('perm-issue-create-002', 'issue:create', '(Legacy) Create new issues (treated as full access)'),
+  -- New split create permissions
+  ('perm-issue-create-basic-002a', 'issue:create_basic', 'Create new issues (basic fields only)'),
+  ('perm-issue-create-full-002b', 'issue:create_full', 'Create new issues with priority and assignee control'),
   ('perm-issue-edit-003', 'issue:edit', 'Edit existing issues'),
   ('perm-issue-delete-004', 'issue:delete', 'Delete issues'),
-  ('perm-issue-assign-005', 'issue:assign', 'Assign issues to users'),
-  ('perm-issue-bulk-manage-006', 'issue:bulk_manage', 'Bulk manage issues'),
+  ('perm-issue-assign-005', 'issue:assign', '(Deprecated) Assign issues to users'),
+  ('perm-issue-bulk-manage-006', 'issue:bulk_manage', '(Deprecated) Bulk manage issues'),
   ('perm-machine-view-007', 'machine:view', 'View machines in the organization'),
   ('perm-machine-create-008', 'machine:create', 'Create new machines'),
   ('perm-machine-edit-009', 'machine:edit', 'Edit existing machines'),
@@ -131,14 +135,15 @@ FROM (VALUES
   ('role-admin-competitor-001', 'perm-comment-moderate-022'),
   -- Member roles get standard permissions
   ('role-member-primary-001', 'perm-issue-view-001'),
-  ('role-member-primary-001', 'perm-issue-create-002'),
+  -- Member roles get full create (implicitly includes basic)
+  ('role-member-primary-001', 'perm-issue-create-full-002b'),
   ('role-member-primary-001', 'perm-issue-edit-003'),
   ('role-member-primary-001', 'perm-machine-view-007'),
   ('role-member-primary-001', 'perm-location-view-011'),
   ('role-member-primary-001', 'perm-attachment-view-015'),
   ('role-member-primary-001', 'perm-attachment-create-016'),
   ('role-member-competitor-001', 'perm-issue-view-001'),
-  ('role-member-competitor-001', 'perm-issue-create-002'),
+  ('role-member-competitor-001', 'perm-issue-create-full-002b'),
   ('role-member-competitor-001', 'perm-issue-edit-003'),
   ('role-member-competitor-001', 'perm-machine-view-007'),
   ('role-member-competitor-001', 'perm-location-view-011'),
@@ -146,9 +151,12 @@ FROM (VALUES
   ('role-member-competitor-001', 'perm-attachment-create-016'),
   -- Unauthenticated roles get view-only permissions
   ('role-unauth-primary-001', 'perm-issue-view-001'),
+  -- Allow basic create for unauth (public issue reporting)
+  ('role-unauth-primary-001', 'perm-issue-create-basic-002a'),
   ('role-unauth-primary-001', 'perm-machine-view-007'),
   ('role-unauth-primary-001', 'perm-location-view-011'),
   ('role-unauth-competitor-001', 'perm-issue-view-001'),
+  ('role-unauth-competitor-001', 'perm-issue-create-basic-002a'),
   ('role-unauth-competitor-001', 'perm-machine-view-007'),
   ('role-unauth-competitor-001', 'perm-location-view-011')
 ) AS v(role_id, permission_id)

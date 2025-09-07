@@ -43,8 +43,8 @@ export function IssueAssignmentClient({
   currentAssigneeId,
   currentAssigneeName,
   availableUsers,
-}: IssueAssignmentClientProps) {
-  const userOptions = availableUsers || DEFAULT_USER_OPTIONS;
+}: IssueAssignmentClientProps): JSX.Element {
+  const userOptions = availableUsers ?? DEFAULT_USER_OPTIONS;
 
   const [state, formAction, isPending] = useActionState(
     updateIssueAssignmentAction.bind(null, issueId),
@@ -55,18 +55,15 @@ export function IssueAssignmentClient({
     <form action={formAction} className="space-y-3">
       <Select
         name="assigneeId"
-        defaultValue={currentAssigneeId || "unassigned"}
+        defaultValue={currentAssigneeId ?? "unassigned"}
         disabled={isPending}
       >
         <SelectTrigger>
-          <SelectValue placeholder={currentAssigneeName || "Unassigned"} />
+          <SelectValue placeholder={currentAssigneeName ?? "Unassigned"} />
         </SelectTrigger>
         <SelectContent>
           {userOptions.map((user) => (
-            <SelectItem 
-              key={user.id} 
-              value={user.id === "unassigned" ? "" : user.id}
-            >
+            <SelectItem key={user.id} value={user.id}>
               {user.name}
               {user.email && (
                 <span className="text-xs text-muted-foreground ml-1">
@@ -79,13 +76,13 @@ export function IssueAssignmentClient({
       </Select>
 
       {state && !state.success && (
-        <p className="text-error text-sm">
-          {state.error || "Failed to update assignment"}
-        </p>
+        <p className="text-error text-sm">{state.error}</p>
       )}
 
       {state && state.success && (
-        <p className="text-tertiary text-sm">✅ Assignment updated successfully</p>
+        <p className="text-tertiary text-sm">
+          ✅ Assignment updated successfully
+        </p>
       )}
 
       <Button type="submit" disabled={isPending} size="sm" className="w-full">
