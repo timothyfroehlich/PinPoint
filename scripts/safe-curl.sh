@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Safe curl wrapper script
-# Ensures curl can only connect to localhost with safety guardrails
-# Prevents accidental external network requests during development/testing
+# Agent-focused curl wrapper script
+# Restricts curl to localhost to reduce risk for automated agents.
+# Human contributors should use plain `curl` directly as needed.
 
 set -euo pipefail
 
