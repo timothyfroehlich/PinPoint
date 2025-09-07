@@ -1,31 +1,40 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
-import { AlertTriangleIcon, PlusIcon, ArrowRightIcon, WrenchIcon, BarChart3Icon } from "lucide-react";
-import { requireMemberAccess } from "~/lib/organization-context";
-import { getIssuesForOrg } from "~/lib/dal/issues";
 import {
-  getOrganizationById,
-  getOrganizationStats,
-} from "~/lib/dal/organizations";
+  AlertTriangleIcon,
+  PlusIcon,
+  ArrowRightIcon,
+  WrenchIcon,
+  BarChart3Icon,
+} from "lucide-react";
+import { AuthGuard } from "~/components/auth/auth-guard";
+import { getRequestAuthContext } from "~/server/auth/context";
+import { getIssuesForOrg } from "~/lib/dal/issues";
+import { getOrganizationStatsById } from "~/lib/dal/organizations";
 import { IssuesListServer } from "~/components/issues/issues-list-server";
 import { DashboardStats } from "~/components/dashboard/dashboard-stats";
 
-export async function generateMetadata() {
-  const { organization } = await requireMemberAccess();
-  const org = await getOrganizationById(organization.id);
-
+export function generateMetadata(): Metadata {
+  // Generic metadata to avoid auth race conditions - org-specific title set at page level
   return {
-    title: `Dashboard - ${org.name}`,
-    description: `Issue management dashboard for ${org.name}`,
+    title: "Dashboard - PinPoint",
+    description:
+      "Issue management dashboard for monitoring and tracking maintenance issues",
   };
 }
 
-export default async function DashboardPage() {
-  // Authentication validation with automatic redirect
-  const { user, organization } = await requireMemberAccess();
-  const organizationId = organization.id;
+function DashboardContent({
+  authContext,
+}: {
+  authContext: Extract<
+    Awaited<ReturnType<typeof getRequestAuthContext>>,
+    { kind: "authorized" }
+  >;
+}): React.JSX.Element {
+  const { user } = authContext;
 
   return (
     <div className="space-y-8">
@@ -33,14 +42,13 @@ export default async function DashboardPage() {
       <div>
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground mt-1">
-          Welcome back,{" "}
-          {user.name ?? user.email?.split("@")[0] ?? "User"}
+          Welcome back, {user.name ?? user.email.split("@")[0] ?? "User"}
         </p>
       </div>
 
       {/* Organization Statistics */}
       <Suspense fallback={<StatsLoadingSkeleton />}>
-        <DashboardStatsWithData organizationId={organizationId} />
+        <DashboardStatsWithData organizationId={authContext.org.id} />
       </Suspense>
 
       {/* Dashboard Actions */}
@@ -59,15 +67,37 @@ export default async function DashboardPage() {
         </div>
 
         <Suspense fallback={<RecentIssuesLoadingSkeleton />}>
-          <RecentIssuesWithData organizationId={organizationId} />
+          <RecentIssuesWithData organizationId={authContext.org.id} />
         </Suspense>
       </div>
     </div>
   );
 }
 
+export default async function DashboardPage(): Promise<React.JSX.Element> {
+  // Single authentication resolution for entire request (Phase 1 invariant)
+  const authContext = await getRequestAuthContext();
+
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Dashboard Access Required"
+      fallbackMessage="You need to be signed in as a member to view your dashboard."
+    >
+      <DashboardContent
+        authContext={
+          authContext as Extract<
+            Awaited<ReturnType<typeof getRequestAuthContext>>,
+            { kind: "authorized" }
+          >
+        }
+      />
+    </AuthGuard>
+  );
+}
+
 // Dashboard-specific Quick Actions (focused on task creation and management)
-function DashboardQuickActions() {
+function DashboardQuickActions(): React.JSX.Element {
   return (
     <Card>
       <CardHeader>
@@ -124,13 +154,13 @@ function DashboardQuickActions() {
   );
 }
 
-// Server Component for dashboard statistics
+// Server Component for dashboard statistics (receives pre-resolved organizationId)
 async function DashboardStatsWithData({
-  organizationId: _organizationId,
+  organizationId,
 }: {
   organizationId: string;
-}) {
-  const stats = await getOrganizationStats();
+}): Promise<React.JSX.Element> {
+  const stats = await getOrganizationStatsById(organizationId);
 
   // Transform to match DashboardStats component interface
   const dashboardStats = {
@@ -144,13 +174,13 @@ async function DashboardStatsWithData({
   return <DashboardStats stats={dashboardStats} />;
 }
 
-// Server Component for recent issues
+// Server Component for recent issues (receives pre-resolved organizationId)
 async function RecentIssuesWithData({
-  organizationId: _organizationId,
+  organizationId,
 }: {
   organizationId: string;
-}) {
-  const issues = await getIssuesForOrg();
+}): Promise<React.JSX.Element> {
+  const issues = await getIssuesForOrg(organizationId);
   const recentIssues = issues.slice(0, 5);
 
   if (recentIssues.length === 0) {
@@ -175,7 +205,11 @@ async function RecentIssuesWithData({
 
   return (
     <div className="space-y-4">
-      <IssuesListServer issues={recentIssues} limit={5} />
+      <IssuesListServer
+        issues={recentIssues}
+        limit={5}
+        organizationId={organizationId}
+      />
 
       {issues.length > 5 && (
         <div className="text-center pt-4">
@@ -190,7 +224,7 @@ async function RecentIssuesWithData({
 
 // Loading Skeletons
 
-function StatsLoadingSkeleton() {
+function StatsLoadingSkeleton(): React.JSX.Element {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       {Array.from({ length: 4 }).map((_, i) => (
@@ -207,7 +241,7 @@ function StatsLoadingSkeleton() {
   );
 }
 
-function RecentIssuesLoadingSkeleton() {
+function RecentIssuesLoadingSkeleton(): React.JSX.Element {
   return (
     <div className="space-y-4">
       {Array.from({ length: 3 }).map((_, i) => (

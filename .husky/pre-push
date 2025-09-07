@@ -1,4 +1,32 @@
 #!/bin/sh
-echo "🚀 Pre-push validation temporarily disabled for development"
-echo "📋 Skipping all validation checks - remember to re-enable before production!"
-exit 0
+echo "🔍 Running pre-push validation checks..."
+
+# Run type check
+echo "📝 Type checking..."
+npm run typecheck:brief
+if [ $? -ne 0 ]; then
+  echo "❌ TypeScript errors found. Fix them before pushing."
+  echo "💡 If intentionally pushing incomplete work, you may use --no-verify"
+  exit 1
+fi
+
+# Run linting
+echo "🧹 Linting..."
+npm run lint:brief
+if [ $? -ne 0 ]; then
+  echo "❌ Linting errors found. Fix them before pushing."
+  echo "💡 If intentionally pushing incomplete work, you may use --no-verify"
+  exit 1
+fi
+
+# Run formatting check
+echo "✨ Checking formatting..."
+npm run format:brief
+if [ $? -ne 0 ]; then
+  echo "❌ Formatting errors found. Run 'npm run format:write' to fix."
+  echo "💡 If intentionally pushing incomplete work, you may use --no-verify"
+  exit 1
+fi
+
+echo "✅ All pre-push checks passed!"
+echo "💡 If intentionally pushing incomplete work, you may use --no-verify"

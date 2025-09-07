@@ -20,6 +20,16 @@ interface PaginationServerProps {
   showSummary?: boolean;
 }
 
+// Legacy compatibility interface for PaginationUniversal migration
+interface PaginationUniversalProps {
+  currentPage: number;
+  totalPages: number;
+  totalCount: number;
+  baseUrl: string;
+  searchParams?: Record<string, string | string[] | undefined>;
+  itemName?: string;
+}
+
 export function PaginationServer({
   currentPage,
   totalPages,
@@ -28,14 +38,14 @@ export function PaginationServer({
   searchParams,
   itemsPerPage = 20,
   showSummary = true,
-}: PaginationServerProps) {
+}: PaginationServerProps): JSX.Element | null {
   // Don't render pagination for single page or no results
   if (totalPages <= 1) return null;
 
   /**
    * Build page URL preserving all current search parameters
    */
-  const buildPageUrl = (page: number) => {
+  const buildPageUrl = (page: number): string => {
     const params = new URLSearchParams();
 
     // Preserve all current search parameters
@@ -61,7 +71,7 @@ export function PaginationServer({
   /**
    * Generate page numbers to display with ellipsis handling
    */
-  const generatePageNumbers = () => {
+  const generatePageNumbers = (): (number | "ellipsis")[] => {
     const pages: (number | "ellipsis")[] = [];
     const maxPagesToShow = 7;
 
@@ -137,7 +147,7 @@ export function PaginationServer({
           {pageNumbers.map((pageNum, index) => {
             if (pageNum === "ellipsis") {
               return (
-                <div key={`ellipsis-${index}`} className="px-2">
+                <div key={`ellipsis-${String(index)}`} className="px-2">
                   <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
                 </div>
               );
@@ -190,10 +200,13 @@ export function PaginationServerCompact({
   totalPages,
   basePath,
   searchParams,
-}: Omit<PaginationServerProps, "totalItems" | "itemsPerPage" | "showSummary">) {
+}: Omit<
+  PaginationServerProps,
+  "totalItems" | "itemsPerPage" | "showSummary"
+>): JSX.Element | null {
   if (totalPages <= 1) return null;
 
-  const buildPageUrl = (page: number) => {
+  const buildPageUrl = (page: number): string => {
     const params = new URLSearchParams();
 
     Object.entries(searchParams).forEach(([key, value]) => {
@@ -246,5 +259,34 @@ export function PaginationServerCompact({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Legacy compatibility component for PaginationUniversal migration
+ * Maps PaginationUniversal API to PaginationServer implementation
+ */
+export function PaginationUniversal({
+  currentPage,
+  totalPages,
+  totalCount,
+  baseUrl,
+  searchParams = {},
+  itemName: _itemName = "items",
+}: PaginationUniversalProps): JSX.Element | null {
+  // Calculate items per page (estimate from totalCount and totalPages)
+  const itemsPerPage =
+    totalPages > 1 ? Math.ceil(totalCount / totalPages) : totalCount;
+
+  return (
+    <PaginationServer
+      currentPage={currentPage}
+      totalPages={totalPages}
+      totalItems={totalCount}
+      basePath={baseUrl}
+      searchParams={searchParams}
+      itemsPerPage={itemsPerPage}
+      showSummary={true}
+    />
   );
 }

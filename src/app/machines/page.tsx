@@ -1,26 +1,28 @@
 import { Suspense } from "react";
+import { type Metadata } from "next";
 import Link from "next/link";
 import { Button } from "~/components/ui/button";
 import { PlusIcon } from "lucide-react";
+import { AuthGuard } from "~/components/auth/auth-guard";
 import { MachineInventoryServer } from "~/components/machines/machine-inventory-server";
 import { MachineStatsServer } from "~/components/machines/machine-stats-server";
-import { AdvancedSearchForm, MACHINES_FILTER_FIELDS } from "~/components/search";
-import { requireMemberAccess } from "~/lib/organization-context";
+import {
+  AdvancedSearchForm,
+  MACHINES_FILTER_FIELDS,
+} from "~/components/search";
+import { getRequestAuthContext } from "~/server/auth/context";
 import {
   getMachinesWithFilters,
   getMachineStats,
   getLocationsForOrg,
-  type MachineFilters,
-  type MachinePagination,
   type MachineSorting,
 } from "~/lib/dal/machines";
+import type { MachineFilters } from "~/lib/types";
 import {
   parseMachineSearchParams,
   getMachineFilterDescription,
   getMachineCanonicalUrl,
-  buildMachineUrl,
 } from "~/lib/search-params/machine-search-params";
-import { buildMetadataDescription } from "~/lib/search-params/shared";
 
 // Force dynamic rendering for auth-dependent content
 export const dynamic = "force-dynamic";
@@ -29,51 +31,38 @@ interface MachinesPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export async function generateMetadata({ searchParams }: MachinesPageProps) {
-  await requireMemberAccess();
+export async function generateMetadata({
+  searchParams,
+}: MachinesPageProps): Promise<Metadata> {
+  // Note: Authentication happens at page component level to avoid race conditions
 
   // Parse search params using centralized utility
   const rawParams = await searchParams;
   const parsedParams = parseMachineSearchParams(rawParams);
 
-  // Convert to legacy DAL format for now
-  const filters: MachineFilters = {
-    locationIds: parsedParams.location,
-    modelIds: parsedParams.model,
-    ownerIds: parsedParams.owner,
-    search: parsedParams.search,
-    hasQR: parsedParams.hasQR,
-  };
+  // Convert to legacy DAL format for now (avoid undefined assignment for exactOptionalPropertyTypes)
+  const filters: MachineFilters = {};
+  if (parsedParams.location) filters.locationIds = parsedParams.location;
+  if (parsedParams.model) filters.modelIds = parsedParams.model;
+  if (parsedParams.owner) filters.ownerIds = parsedParams.owner;
+  if (parsedParams.search) filters.search = parsedParams.search;
+  if (parsedParams.hasQR !== undefined) filters.hasQR = parsedParams.hasQR;
 
-  const pagination: MachinePagination = {
-    page: parsedParams.page,
-    limit: parsedParams.view === "grid" ? 12 : parsedParams.limit,
-  };
-
-  const sorting: MachineSorting = {
-    field: parsedParams.sort as MachineSorting["field"],
-    order: parsedParams.order,
-  };
-
-  // Get machine count for metadata
-  const { totalCount } = await getMachinesWithFilters(
-    filters,
-    pagination,
-    sorting,
-  );
-
-  // Generate filter descriptions using centralized utility
+  // Generate filter descriptions using centralized utility (without org-specific data)
   const filterDescriptions = getMachineFilterDescription(parsedParams);
-  const description = buildMetadataDescription(
-    "Manage your pinball machine fleet and track maintenance",
-    filterDescriptions,
-    totalCount,
-  );
+  const description =
+    filterDescriptions.length > 0
+      ? `Manage your pinball machine fleet and track maintenance. Current filters: ${filterDescriptions.join(", ")}`
+      : "Manage your pinball machine fleet and track maintenance";
 
   // Generate canonical URL for SEO
   const canonicalUrl = getMachineCanonicalUrl("/machines", parsedParams);
 
-  const title = `Machine Inventory (${totalCount} machines) - PinPoint`;
+  // Generic title without organization-specific count to avoid auth race conditions
+  const title =
+    filterDescriptions.length > 0
+      ? `Machine Inventory (${filterDescriptions.join(", ")}) - PinPoint`
+      : `Machine Inventory - PinPoint`;
 
   return {
     title,
@@ -91,39 +80,69 @@ export async function generateMetadata({ searchParams }: MachinesPageProps) {
 
 export default async function MachinesPage({
   searchParams,
-}: MachinesPageProps) {
-  await requireMemberAccess();
+}: MachinesPageProps): Promise<React.JSX.Element> {
+  // Single authentication resolution for entire request
+  const authContext = await getRequestAuthContext();
 
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Machine Access Required"
+      fallbackMessage="You need to be signed in as a member to view the machine inventory."
+    >
+      <MachinesPageContent
+        authContext={
+          authContext as Extract<
+            Awaited<ReturnType<typeof getRequestAuthContext>>,
+            { kind: "authorized" }
+          >
+        }
+        searchParams={searchParams}
+      />
+    </AuthGuard>
+  );
+}
+
+async function MachinesPageContent({
+  authContext,
+  searchParams,
+}: {
+  authContext: Extract<
+    Awaited<ReturnType<typeof getRequestAuthContext>>,
+    { kind: "authorized" }
+  >;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}): Promise<React.JSX.Element> {
   // Parse URL parameters using centralized utility
   const rawParams = await searchParams;
   const parsedParams = parseMachineSearchParams(rawParams);
 
-  // Convert to legacy DAL format for now
-  const filters: MachineFilters = {
-    locationIds: parsedParams.location,
-    modelIds: parsedParams.model,
-    ownerIds: parsedParams.owner,
-    search: parsedParams.search,
-    hasQR: parsedParams.hasQR,
-  };
-
-  const pagination: MachinePagination = {
-    page: parsedParams.page,
-    limit: parsedParams.view === "grid" ? 12 : parsedParams.limit,
-  };
-
-  const sorting: MachineSorting = {
-    field: parsedParams.sort as MachineSorting["field"],
-    order: parsedParams.order,
-  };
+  // Convert to legacy DAL format for now (avoid undefined assignment for exactOptionalPropertyTypes)
+  const filters: MachineFilters = {};
+  if (parsedParams.location) filters.locationIds = parsedParams.location;
+  if (parsedParams.model) filters.modelIds = parsedParams.model;
+  if (parsedParams.owner) filters.ownerIds = parsedParams.owner;
+  if (parsedParams.search) filters.search = parsedParams.search;
+  if (parsedParams.hasQR !== undefined) filters.hasQR = parsedParams.hasQR;
 
   const viewMode = parsedParams.view;
 
   // Parallel data fetching for optimal performance
   const [machines, machineStats, locations] = await Promise.all([
-    getMachinesWithFilters(filters, pagination, sorting),
-    getMachineStats(),
-    getLocationsForOrg(),
+    getMachinesWithFilters(
+      filters,
+      {
+        page: parsedParams.page,
+        limit: parsedParams.view === "grid" ? 12 : parsedParams.limit,
+      },
+      {
+        field: parsedParams.sort as MachineSorting["field"],
+        order: parsedParams.order,
+      },
+      authContext.org.id,
+    ),
+    getMachineStats(authContext.org.id),
+    getLocationsForOrg(authContext.org.id),
   ]);
 
   return (
@@ -185,7 +204,7 @@ export default async function MachinesPage({
           entityType="machines"
           fields={MACHINES_FILTER_FIELDS}
           currentParams={rawParams}
-          buildUrl={(params) => buildMachineUrl("/machines", params, rawParams)}
+          basePath="/machines"
           title="Filter Machine Inventory"
           description="Search and filter machines by location, manufacturer, model, year, and more"
           collapsible={true}
@@ -223,8 +242,14 @@ export default async function MachinesPage({
           locations={locations}
           viewMode={viewMode}
           filters={filters}
-          pagination={pagination}
-          sorting={sorting}
+          pagination={{
+            page: parsedParams.page,
+            limit: parsedParams.view === "grid" ? 12 : parsedParams.limit,
+          }}
+          sorting={{
+            field: parsedParams.sort as MachineSorting["field"],
+            order: parsedParams.order,
+          }}
           searchParams={rawParams}
         />
       </Suspense>

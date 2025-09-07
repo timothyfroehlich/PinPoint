@@ -1,7 +1,7 @@
 /**
  * Filter Configuration for Advanced Search Forms
  * Phase 3C: Centralized filter definitions for Issues and Machines
- * 
+ *
  * Defines the available filter fields and their configurations
  * for use with AdvancedSearchForm component
  */
@@ -9,7 +9,11 @@
 import { type FilterField } from "./advanced-search-form";
 
 // Issue status options with typical counts (these would be dynamic in real implementation)
-export const ISSUE_STATUS_OPTIONS: { value: string; label: string; count?: number }[] = [
+export const ISSUE_STATUS_OPTIONS: {
+  value: string;
+  label: string;
+  count?: number;
+}[] = [
   { value: "open", label: "Open", count: 12 },
   { value: "in_progress", label: "In Progress", count: 8 },
   { value: "resolved", label: "Resolved", count: 45 },
@@ -17,7 +21,11 @@ export const ISSUE_STATUS_OPTIONS: { value: string; label: string; count?: numbe
 ];
 
 // Issue priority options
-export const ISSUE_PRIORITY_OPTIONS: { value: string; label: string; count?: number }[] = [
+export const ISSUE_PRIORITY_OPTIONS: {
+  value: string;
+  label: string;
+  count?: number;
+}[] = [
   { value: "low", label: "Low", count: 15 },
   { value: "medium", label: "Medium", count: 28 },
   { value: "high", label: "High", count: 12 },
@@ -25,14 +33,22 @@ export const ISSUE_PRIORITY_OPTIONS: { value: string; label: string; count?: num
 ];
 
 // Machine status options
-export const MACHINE_STATUS_OPTIONS: { value: string; label: string; count?: number }[] = [
+export const MACHINE_STATUS_OPTIONS: {
+  value: string;
+  label: string;
+  count?: number;
+}[] = [
   { value: "active", label: "Active", count: 45 },
   { value: "maintenance", label: "Under Maintenance", count: 5 },
   { value: "retired", label: "Retired", count: 8 },
 ];
 
 // Common location options (these would come from database in real implementation)
-export const LOCATION_OPTIONS: { value: string; label: string; count?: number }[] = [
+export const LOCATION_OPTIONS: {
+  value: string;
+  label: string;
+  count?: number;
+}[] = [
   { value: "location-1", label: "Main Floor", count: 25 },
   { value: "location-2", label: "Upper Level", count: 18 },
   { value: "location-3", label: "Basement", count: 10 },
@@ -40,7 +56,11 @@ export const LOCATION_OPTIONS: { value: string; label: string; count?: number }[
 ];
 
 // Machine manufacturer options
-export const MACHINE_MANUFACTURER_OPTIONS: { value: string; label: string; count?: number }[] = [
+export const MACHINE_MANUFACTURER_OPTIONS: {
+  value: string;
+  label: string;
+  count?: number;
+}[] = [
   { value: "stern", label: "Stern", count: 22 },
   { value: "bally", label: "Bally", count: 15 },
   { value: "williams", label: "Williams", count: 12 },
@@ -49,7 +69,11 @@ export const MACHINE_MANUFACTURER_OPTIONS: { value: string; label: string; count
 ];
 
 // Machine model options (subset for demo)
-export const MACHINE_MODEL_OPTIONS: { value: string; label: string; count?: number }[] = [
+export const MACHINE_MODEL_OPTIONS: {
+  value: string;
+  label: string;
+  count?: number;
+}[] = [
   { value: "medieval_madness", label: "Medieval Madness", count: 2 },
   { value: "attack_from_mars", label: "Attack from Mars", count: 1 },
   { value: "twilight_zone", label: "Twilight Zone", count: 1 },
@@ -69,21 +93,21 @@ export const ISSUES_FILTER_FIELDS: FilterField[] = [
     placeholder: "Search issue titles and descriptions...",
   },
   {
-    id: "status", 
+    id: "status",
     label: "Status",
     type: "multi-select",
     options: ISSUE_STATUS_OPTIONS,
   },
   {
     id: "priority",
-    label: "Priority", 
+    label: "Priority",
     type: "multi-select",
     options: ISSUE_PRIORITY_OPTIONS,
   },
   {
     id: "location",
     label: "Location",
-    type: "multi-select", 
+    type: "multi-select",
     options: LOCATION_OPTIONS,
   },
   {
@@ -99,7 +123,7 @@ export const ISSUES_FILTER_FIELDS: FilterField[] = [
     ],
   },
   {
-    id: "reporter", 
+    id: "reporter",
     label: "Reporter",
     type: "select",
     placeholder: "Select reporter...",
@@ -111,24 +135,24 @@ export const ISSUES_FILTER_FIELDS: FilterField[] = [
   },
   {
     id: "created_at",
-    label: "Created Date Range", 
+    label: "Created Date Range",
     type: "date-range",
   },
   {
     id: "updated_at",
     label: "Last Updated Range",
-    type: "date-range", 
+    type: "date-range",
   },
 ];
 
 /**
- * Machines Filter Configuration  
+ * Machines Filter Configuration
  * Defines all available filters for machine searching
  */
 export const MACHINES_FILTER_FIELDS: FilterField[] = [
   {
     id: "search",
-    label: "Search Text", 
+    label: "Search Text",
     type: "text",
     placeholder: "Search machine names and models...",
   },
@@ -139,7 +163,7 @@ export const MACHINES_FILTER_FIELDS: FilterField[] = [
     options: LOCATION_OPTIONS,
   },
   {
-    id: "manufacturer", 
+    id: "manufacturer",
     label: "Manufacturer",
     type: "multi-select",
     options: MACHINE_MANUFACTURER_OPTIONS,
@@ -147,7 +171,7 @@ export const MACHINES_FILTER_FIELDS: FilterField[] = [
   {
     id: "model",
     label: "Model",
-    type: "multi-select", 
+    type: "multi-select",
     options: MACHINE_MODEL_OPTIONS,
   },
   {
@@ -170,7 +194,7 @@ export const MACHINES_FILTER_FIELDS: FilterField[] = [
   {
     id: "year",
     label: "Year Range",
-    type: "number-range", 
+    type: "number-range",
     min: 1931,
     max: new Date().getFullYear(),
   },
@@ -189,7 +213,7 @@ export const UNIVERSAL_FILTER_FIELDS: FilterField[] = [
   {
     id: "search",
     label: "Search Text",
-    type: "text", 
+    type: "text",
     placeholder: "Search across all entities...",
   },
   {
@@ -219,11 +243,13 @@ export const UNIVERSAL_FILTER_FIELDS: FilterField[] = [
 /**
  * Get filter fields configuration for specific entity type
  */
-export function getFilterFieldsForEntity(entityType: "issues" | "machines" | "universal"): FilterField[] {
+export function getFilterFieldsForEntity(
+  entityType: "issues" | "machines" | "universal",
+): FilterField[] {
   switch (entityType) {
     case "issues":
       return ISSUES_FILTER_FIELDS;
-    case "machines": 
+    case "machines":
       return MACHINES_FILTER_FIELDS;
     case "universal":
       return UNIVERSAL_FILTER_FIELDS;
@@ -235,40 +261,48 @@ export function getFilterFieldsForEntity(entityType: "issues" | "machines" | "un
 /**
  * Get filter field by ID for specific entity type
  */
-export function getFilterField(entityType: "issues" | "machines" | "universal", fieldId: string): FilterField | undefined {
+export function getFilterField(
+  entityType: "issues" | "machines" | "universal",
+  fieldId: string,
+): FilterField | undefined {
   const fields = getFilterFieldsForEntity(entityType);
-  return fields.find(field => field.id === fieldId);
+  return fields.find((field) => field.id === fieldId);
 }
 
 /**
  * Validate filter values against field configuration
  */
-export function validateFilterValue(field: FilterField, value: any): boolean {
+export function validateFilterValue(
+  field: FilterField,
+  value: unknown,
+): boolean {
   switch (field.type) {
     case "text":
       return typeof value === "string" && value.length <= 100;
-      
+
     case "select":
-      return field.options?.some(option => option.value === value) ?? false;
-      
+      return field.options?.some((option) => option.value === value) ?? false;
+
     case "multi-select":
       if (!Array.isArray(value)) return false;
-      return value.every(v => field.options?.some(option => option.value === v));
-      
+      return value.every((v) =>
+        field.options?.some((option) => option.value === v),
+      );
+
     case "date-range":
       // For date range, we check start/end separately
       return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
-      
+
     case "number-range":
       const num = Number(value);
       if (isNaN(num)) return false;
       if (field.min !== undefined && num < field.min) return false;
       if (field.max !== undefined && num > field.max) return false;
       return true;
-      
+
     case "boolean":
       return typeof value === "boolean";
-      
+
     default:
       return false;
   }

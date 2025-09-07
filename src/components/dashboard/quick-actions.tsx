@@ -10,7 +10,7 @@ import {
   SettingsIcon,
 } from "lucide-react";
 
-export function QuickActions() {
+export function QuickActions(): JSX.Element {
   return (
     <Card>
       <CardHeader>

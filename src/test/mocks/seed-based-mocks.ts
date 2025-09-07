@@ -71,75 +71,89 @@ export interface MockPriority {
 /**
  * Mock data factory based on seed data patterns
  */
-export class SeedBasedMockFactory {
-  private static getTimestamp(): string {
-    return new Date().toISOString();
-  }
 
+// Internal helpers for SeedBasedMockFactory
+function getTimestamp(): string {
+  return new Date().toISOString();
+}
+
+function getRandomIssueTitle(): string {
+  const titles = [
+    "Machine Display Not Working",
+    "Flipper Sticking",
+    "Ball Getting Stuck",
+    "Audio System Malfunction",
+    "Coin Acceptor Jammed",
+    "Scoring System Error",
+  ];
+  return titles[Math.floor(Math.random() * titles.length)];
+}
+
+export const SeedBasedMockFactory = {
   /**
    * Generate mock organizations based on seed patterns
    */
-  static createMockOrganization(
+  createMockOrganization: (
     overrides: Partial<MockOrganization> = {},
-  ): MockOrganization {
+  ): MockOrganization => {
     const defaults = {
       id: SEED_TEST_IDS.ORGANIZATIONS.primary,
       name: "PinPoint Test Arcade",
       slug: "pinpoint-test",
-      created_at: this.getTimestamp(),
-      updated_at: this.getTimestamp(),
+      created_at: getTimestamp(),
+      updated_at: getTimestamp(),
     };
 
     return { ...defaults, ...overrides };
-  }
+  },
 
-  static createMockCompetitorOrganization(
+  createMockCompetitorOrganization: (
     overrides: Partial<MockOrganization> = {},
-  ): MockOrganization {
+  ): MockOrganization => {
     const defaults = {
       id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
       name: "Competitor Arcade",
       slug: "competitor-arcade",
-      created_at: this.getTimestamp(),
-      updated_at: this.getTimestamp(),
+      created_at: getTimestamp(),
+      updated_at: getTimestamp(),
     };
 
     return { ...defaults, ...overrides };
-  }
+  },
 
   /**
    * Generate mock users based on seed patterns
    */
-  static createMockUser(overrides: Partial<MockUser> = {}): MockUser {
+  createMockUser: (overrides: Partial<MockUser> = {}): MockUser => {
     const defaults = {
       id: SEED_TEST_IDS.USERS.ADMIN,
       name: "Tim Froehlich",
       email: "tim@pinpoint.dev",
       organization_id: SEED_TEST_IDS.ORGANIZATIONS.primary,
-      created_at: this.getTimestamp(),
-      updated_at: this.getTimestamp(),
+      created_at: getTimestamp(),
+      updated_at: getTimestamp(),
     };
 
     return { ...defaults, ...overrides };
-  }
+  },
 
-  static createMockCompetitorUser(overrides: Partial<MockUser> = {}): MockUser {
+  createMockCompetitorUser: (overrides: Partial<MockUser> = {}): MockUser => {
     const defaults = {
       id: SEED_TEST_IDS.USERS.COMPETITOR_ADMIN,
       name: "Competitor Admin",
       email: "admin@competitor.dev",
       organization_id: SEED_TEST_IDS.ORGANIZATIONS.competitor,
-      created_at: this.getTimestamp(),
-      updated_at: this.getTimestamp(),
+      created_at: getTimestamp(),
+      updated_at: getTimestamp(),
     };
 
     return { ...defaults, ...overrides };
-  }
+  },
 
   /**
    * Generate mock machines based on seed patterns
    */
-  static createMockMachine(overrides: Partial<MockMachine> = {}): MockMachine {
+  createMockMachine: (overrides: Partial<MockMachine> = {}): MockMachine => {
     const defaults = {
       id: SEED_TEST_IDS.MOCK_PATTERNS.MACHINE,
       name: "Test Pinball Machine",
@@ -147,103 +161,101 @@ export class SeedBasedMockFactory {
       location_id: "location-test-123",
       organization_id: SEED_TEST_IDS.ORGANIZATIONS.primary,
       status: "active" as const,
-      created_at: this.getTimestamp(),
-      updated_at: this.getTimestamp(),
+      created_at: getTimestamp(),
+      updated_at: getTimestamp(),
     };
 
     return { ...defaults, ...overrides };
-  }
+  },
 
   /**
    * Generate mock issue statuses based on seed patterns
    */
-  static createMockIssueStatus(
+  createMockIssueStatus: (
     overrides: Partial<MockIssueStatus> = {},
-  ): MockIssueStatus {
+  ): MockIssueStatus => {
     const defaults = {
       id: "status-open",
       name: "Open",
       organization_id: SEED_TEST_IDS.ORGANIZATIONS.primary,
       is_default: true,
       sort_order: 1,
-      created_at: this.getTimestamp(),
-      updated_at: this.getTimestamp(),
+      created_at: getTimestamp(),
+      updated_at: getTimestamp(),
     };
 
     return { ...defaults, ...overrides };
-  }
+  },
 
-  static createMockIssueStatuses(): MockIssueStatus[] {
+  createMockIssueStatuses: (): MockIssueStatus[] => {
     return [
-      this.createMockIssueStatus(),
-      this.createMockIssueStatus({
+      SeedBasedMockFactory.createMockIssueStatus(),
+      SeedBasedMockFactory.createMockIssueStatus({
         id: "status-in-progress",
         name: "In Progress",
         is_default: false,
         sort_order: 2,
       }),
-      this.createMockIssueStatus({
+      SeedBasedMockFactory.createMockIssueStatus({
         id: "status-resolved",
         name: "Resolved",
         is_default: false,
         sort_order: 3,
       }),
-      this.createMockIssueStatus({
+      SeedBasedMockFactory.createMockIssueStatus({
         id: "status-closed",
         name: "Closed",
         is_default: false,
         sort_order: 4,
       }),
     ];
-  }
+  },
 
   /**
    * Generate mock priorities based on seed patterns
    */
-  static createMockPriority(
-    overrides: Partial<MockPriority> = {},
-  ): MockPriority {
+  createMockPriority: (overrides: Partial<MockPriority> = {}): MockPriority => {
     const defaults = {
       id: "priority-medium",
       name: "Medium",
       organization_id: SEED_TEST_IDS.ORGANIZATIONS.primary,
       is_default: true,
       sort_order: 2,
-      created_at: this.getTimestamp(),
-      updated_at: this.getTimestamp(),
+      created_at: getTimestamp(),
+      updated_at: getTimestamp(),
     };
 
     return { ...defaults, ...overrides };
-  }
+  },
 
-  static createMockPriorities(): MockPriority[] {
+  createMockPriorities: (): MockPriority[] => {
     return [
-      this.createMockPriority({
+      SeedBasedMockFactory.createMockPriority({
         id: "priority-low",
         name: "Low",
         is_default: false,
         sort_order: 1,
       }),
-      this.createMockPriority(), // Medium (default)
-      this.createMockPriority({
+      SeedBasedMockFactory.createMockPriority(), // Medium (default)
+      SeedBasedMockFactory.createMockPriority({
         id: "priority-high",
         name: "High",
         is_default: false,
         sort_order: 3,
       }),
-      this.createMockPriority({
+      SeedBasedMockFactory.createMockPriority({
         id: "priority-urgent",
         name: "Urgent",
         is_default: false,
         sort_order: 4,
       }),
     ];
-  }
+  },
 
   /**
    * Generate mock issues based on seed patterns
    */
-  static createMockIssue(overrides: Partial<MockIssue> = {}): MockIssue {
+  createMockIssue: (overrides: Partial<MockIssue> = {}): MockIssue => {
     const defaults = {
       id: "issue-test-123",
       title: "Test Issue: Machine Not Working",
@@ -255,26 +267,26 @@ export class SeedBasedMockFactory {
       priority_id: "priority-medium",
       assigned_to_id: SEED_TEST_IDS.USERS.ADMIN,
       created_by_id: SEED_TEST_IDS.USERS.ADMIN,
-      created_at: this.getTimestamp(),
-      updated_at: this.getTimestamp(),
+      created_at: getTimestamp(),
+      updated_at: getTimestamp(),
     };
 
     return { ...defaults, ...overrides };
-  }
+  },
 
   /**
    * Generate multiple mock issues for testing lists
    */
-  static createMockIssues(count = 3): MockIssue[] {
+  createMockIssues: (count = 3): MockIssue[] => {
     const issues: MockIssue[] = [];
     const statuses = ["status-open", "status-in-progress", "status-resolved"];
     const priorities = ["priority-low", "priority-medium", "priority-high"];
 
     for (let i = 0; i < count; i++) {
       issues.push(
-        this.createMockIssue({
+        SeedBasedMockFactory.createMockIssue({
           id: `issue-test-${i + 1}`,
-          title: `Test Issue ${i + 1}: ${this.getRandomIssueTitle()}`,
+          title: `Test Issue ${i + 1}: ${getRandomIssueTitle()}`,
           status_id: statuses[i % statuses.length],
           priority_id: priorities[i % priorities.length],
           assigned_to_id: i % 2 === 0 ? SEED_TEST_IDS.USERS.ADMIN : null,
@@ -283,55 +295,43 @@ export class SeedBasedMockFactory {
     }
 
     return issues;
-  }
-
-  private static getRandomIssueTitle(): string {
-    const titles = [
-      "Machine Display Not Working",
-      "Flipper Sticking",
-      "Ball Getting Stuck",
-      "Audio System Malfunction",
-      "Coin Acceptor Jammed",
-      "Scoring System Error",
-    ];
-    return titles[Math.floor(Math.random() * titles.length)];
-  }
-}
+  },
+};
 
 /**
  * Auth context mocks for testing Server Components and Server Actions
  */
-export class MockAuthContextFactory {
-  static createPrimaryOrgContext() {
+export const MockAuthContextFactory = {
+  createPrimaryOrgContext: () => {
     return {
       user: SeedBasedMockFactory.createMockUser(),
       organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
     };
-  }
+  },
 
-  static createCompetitorOrgContext() {
+  createCompetitorOrgContext: () => {
     return {
       user: SeedBasedMockFactory.createMockCompetitorUser(),
       organizationId: SEED_TEST_IDS.ORGANIZATIONS.competitor,
     };
-  }
+  },
 
-  static createUnauthenticatedContext() {
+  createUnauthenticatedContext: () => {
     return {
       user: null,
       organizationId: null,
     };
-  }
-}
+  },
+};
 
 /**
  * Database mock helpers that return seed-based data
  */
-export class MockDatabaseFactory {
+export const MockDatabaseFactory = {
   /**
    * Create mock database responses for DAL functions
    */
-  static createMockDbClient() {
+  createMockDbClient: () => {
     const mockIssues = SeedBasedMockFactory.createMockIssues(5);
     const mockStatuses = SeedBasedMockFactory.createMockIssueStatuses();
     const mockPriorities = SeedBasedMockFactory.createMockPriorities();
@@ -383,16 +383,16 @@ export class MockDatabaseFactory {
         })),
       })),
     };
-  }
-}
+  },
+};
 
 /**
  * FormData helpers for Server Action testing
  */
-export class MockFormDataFactory {
-  static createValidIssueFormData(
+export const MockFormDataFactory = {
+  createValidIssueFormData: (
     overrides: Record<string, string> = {},
-  ): FormData {
+  ): FormData => {
     const formData = new FormData();
 
     const defaults = {
@@ -412,19 +412,19 @@ export class MockFormDataFactory {
     });
 
     return formData;
-  }
+  },
 
-  static createValidStatusUpdateFormData(
+  createValidStatusUpdateFormData: (
     statusId = "status-in-progress",
-  ): FormData {
+  ): FormData => {
     const formData = new FormData();
     formData.append("statusId", statusId);
     return formData;
-  }
+  },
 
-  static createInvalidFormData(
+  createInvalidFormData: (
     invalidFields: Record<string, string> = {},
-  ): FormData {
+  ): FormData => {
     const formData = new FormData();
 
     const invalidDefaults = {
@@ -441,17 +441,17 @@ export class MockFormDataFactory {
     });
 
     return formData;
-  }
-}
+  },
+};
 
 /**
  * Test scenario builders that combine multiple mocks
  */
-export class MockScenarioFactory {
+export const MockScenarioFactory = {
   /**
    * Create a complete test scenario with organization, users, machines, and issues
    */
-  static createPrimaryOrgScenario() {
+  createPrimaryOrgScenario: () => {
     return {
       organization: SeedBasedMockFactory.createMockOrganization(),
       users: [SeedBasedMockFactory.createMockUser()],
@@ -462,13 +462,13 @@ export class MockScenarioFactory {
       authContext: MockAuthContextFactory.createPrimaryOrgContext(),
       dbClient: MockDatabaseFactory.createMockDbClient(),
     };
-  }
+  },
 
   /**
    * Create a cross-organization test scenario for security testing
    */
-  static createCrossOrgSecurityScenario() {
-    const primaryScenario = this.createPrimaryOrgScenario();
+  createCrossOrgSecurityScenario: () => {
+    const primaryScenario = MockScenarioFactory.createPrimaryOrgScenario();
 
     return {
       primaryOrg: primaryScenario,
@@ -492,32 +492,32 @@ export class MockScenarioFactory {
         authContext: MockAuthContextFactory.createCompetitorOrgContext(),
       },
     };
-  }
+  },
 
   /**
    * Create edge case scenarios for robust testing
    */
-  static createEdgeCaseScenarios() {
+  createEdgeCaseScenarios: () => {
     return {
       emptyOrganization: {
-        ...this.createPrimaryOrgScenario(),
+        ...MockScenarioFactory.createPrimaryOrgScenario(),
         issues: [], // No issues
         machines: [], // No machines
       },
       unassignedIssues: {
-        ...this.createPrimaryOrgScenario(),
+        ...MockScenarioFactory.createPrimaryOrgScenario(),
         issues: SeedBasedMockFactory.createMockIssues(3).map((issue) => ({
           ...issue,
           assigned_to_id: null, // All unassigned
         })),
       },
       highVolumeScenario: {
-        ...this.createPrimaryOrgScenario(),
+        ...MockScenarioFactory.createPrimaryOrgScenario(),
         issues: SeedBasedMockFactory.createMockIssues(50), // Large dataset
       },
     };
-  }
-}
+  },
+};
 
 // Re-export for convenience
 export { SEED_TEST_IDS };

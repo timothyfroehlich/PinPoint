@@ -7,28 +7,42 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { createIssueAction, updateIssueStatusAction } from "./issue-actions";
 
-// Simple mock for auth failures - this is the main testable boundary
-vi.mock("./shared", async () => {
-  const actual = await vi.importActual("./shared");
-  return {
-    ...actual,
-    requireAuthContextWithRole: vi.fn(),
-  };
-});
+// Mock the canonical auth resolver used by Server Actions
+vi.mock("~/server/auth/context", () => ({
+  getRequestAuthContext: vi.fn(),
+  requireAuthorized: vi.fn(),
+}));
 
-const { requireAuthContextWithRole } = await import("./shared");
-const mockRequireAuthContextWithRole = vi.mocked(requireAuthContextWithRole);
+const { getRequestAuthContext } = await import("~/server/auth/context");
+const mockGetRequestAuthContext = vi.mocked(getRequestAuthContext);
 
 describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRequireAuthContextWithRole.mockResolvedValue({
-      user: { id: "user-test", email: "user@test.com", user_metadata: { name: "Tester" } } as any,
-      organizationId: "org-test",
-      membership: { roleId: "role-test" } as any,
-      role: { id: "role-test", name: "Member" } as any,
-      permissions: [],
-    } as any);
+    // Set up default authorized state using canonical discriminated union
+    mockGetRequestAuthContext.mockResolvedValue({
+      kind: "authorized",
+      user: {
+        id: SEED_TEST_IDS.USERS.ADMIN,
+        email: "tim@pinpoint.dev",
+        name: "Tim Froehlich",
+      },
+      org: {
+        id: SEED_TEST_IDS.ORGANIZATIONS.primary,
+        name: "Test Organization",
+        subdomain: "test-org",
+      },
+      membership: {
+        id: "membership-test",
+        role: {
+          id: "role-admin",
+          name: "Admin",
+          permissions: [],
+        },
+        userId: SEED_TEST_IDS.USERS.ADMIN,
+        organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
+      },
+    });
   });
 
   describe("FormData validation patterns", () => {
@@ -58,7 +72,7 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.fieldErrors?.title).toBeDefined();
-        expect(result.fieldErrors?.title?.[0]).toContain("required");
+        expect(result.fieldErrors?.title?.[0]).toContain("expected string");
       }
     });
 
@@ -72,7 +86,7 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.fieldErrors?.machineId).toContain(
-          "Invalid machine selected",
+          "Invalid machine selection",
         );
       }
     });
@@ -98,14 +112,16 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
       // description and assigneeId omitted - should be fine
 
       // This test will fail auth, but validation should pass
-      mockRequireAuthContextWithRole.mockRejectedValue(new Error("Auth required"));
+      mockGetRequestAuthContext.mockResolvedValue({
+        kind: "unauthenticated",
+      });
 
       const result = await createIssueAction(null, formData);
 
       // Should fail on auth, not validation
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error).toBe("Auth required");
+        expect(result.error).toBe("Member access required");
         expect(result.fieldErrors).toBeUndefined(); // No validation errors
       }
     });
@@ -116,14 +132,16 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
       formData.append("description", ""); // Empty string should become undefined
       formData.append("machineId", SEED_TEST_IDS.MOCK_PATTERNS.MACHINE);
 
-      mockRequireAuthContextWithRole.mockRejectedValue(new Error("Auth required"));
+      mockGetRequestAuthContext.mockResolvedValue({
+        kind: "unauthenticated",
+      });
 
       const result = await createIssueAction(null, formData);
 
       // Should fail on auth, not validation (empty description is fine)
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error).toBe("Auth required");
+        expect(result.error).toBe("Member access required");
         expect(result.fieldErrors).toBeUndefined();
       }
     });
@@ -133,14 +151,16 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
       formData.append("title", "  Test Issue  "); // Whitespace should be trimmed
       formData.append("machineId", SEED_TEST_IDS.MOCK_PATTERNS.MACHINE);
 
-      mockRequireAuthContextWithRole.mockRejectedValue(new Error("Auth required"));
+      mockGetRequestAuthContext.mockResolvedValue({
+        kind: "unauthenticated",
+      });
 
       const result = await createIssueAction(null, formData);
 
       // Should fail on auth, not validation (trimmed title should pass)
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error).toBe("Auth required");
+        expect(result.error).toBe("Member access required");
         expect(result.fieldErrors).toBeUndefined();
       }
     });
@@ -170,9 +190,7 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.fieldErrors?.statusId).toContain(
-          "Invalid status selected",
-        );
+        expect(result.fieldErrors?.statusId?.[0]).toContain("valid UUID");
       }
     });
 
@@ -181,14 +199,16 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
       formData.append("statusId", "550e8400-e29b-41d4-a716-446655440000");
 
       // Should fail on auth, not validation
-      mockGetActionAuthContext.mockRejectedValue(new Error("Auth required"));
+      mockGetRequestAuthContext.mockResolvedValue({
+        kind: "unauthenticated",
+      });
 
       const result = await updateIssueStatusAction(testIssueId, null, formData);
 
       // Should fail on auth, not validation
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error).toBe("Auth required");
+        expect(result.error).toBe("Member access required");
         expect(result.fieldErrors).toBeUndefined();
       }
     });
@@ -196,9 +216,9 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
 
   describe("Authentication boundary testing", () => {
     it("requires authentication for createIssueAction", async () => {
-      mockRequireAuthContextWithRole.mockRejectedValue(
-        new Error("Authentication required"),
-      );
+      mockGetRequestAuthContext.mockResolvedValue({
+        kind: "unauthenticated",
+      });
 
       const formData = new FormData();
       formData.append("title", "Test Issue");
@@ -208,13 +228,15 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error).toBe("Authentication required");
+        expect(result.error).toBe("Member access required");
       }
-      expect(mockRequireAuthContextWithRole).toHaveBeenCalledOnce();
+      expect(mockGetRequestAuthContext).toHaveBeenCalledOnce();
     });
 
     it("requires authentication for updateIssueStatusAction", async () => {
-      mockRequireAuthContextWithRole.mockRejectedValue(new Error("No session"));
+      mockGetRequestAuthContext.mockResolvedValue({
+        kind: "unauthenticated",
+      });
 
       const formData = new FormData();
       formData.append("statusId", "550e8400-e29b-41d4-a716-446655440000");
@@ -227,9 +249,9 @@ describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error).toBe("No session");
+        expect(result.error).toBe("Member access required");
       }
-      expect(mockRequireAuthContextWithRole).toHaveBeenCalledOnce();
+      expect(mockGetRequestAuthContext).toHaveBeenCalledOnce();
     });
   });
 
