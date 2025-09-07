@@ -33,11 +33,6 @@ jobs:
         with:
           exclude: studio,realtime,storage-api,edge-runtime,logflare,vector,imgproxy,supavisor,postgres-meta,mailpit
 
-      - name: Install PostgreSQL Client
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client-17
-
       - name: Map Supabase env for Next.js
         run: |
           set -e
