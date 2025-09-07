@@ -7,7 +7,7 @@
 
 import React from "react";
 import { useActionState } from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "~/trpc/react";
 
@@ -41,6 +41,7 @@ import { getCurrentDomain } from "~/lib/utils/domain";
 import { resolveOrgSubdomainFromLocation } from "~/lib/domain-org-mapping";
 
 export function SignInForm(): React.JSX.Element {
+  console.log(`[SIGNIN_FORM] Component mounting/rendering`);
   const router = useRouter();
 
   const [magicLinkState, magicLinkAction, magicLinkPending] = useActionState(
@@ -67,23 +68,35 @@ export function SignInForm(): React.JSX.Element {
   // Development auth integration (preserving existing dev auth system)
   const shouldShowDevLogin = isDevAuthAvailable();
 
-  // Load organizations from tRPC when ready and apply host-based org locking
-  useEffect(() => {
-    setOrganizationsLoading(orgsLoading);
-    if (orgsLoading) return;
-
-    const orgs: OrganizationOption[] = (publicOrganizations ?? []).map((o) => ({
+  // Memoize organizations array to prevent unnecessary re-renders
+  const orgs = useMemo(() => {
+    if (!publicOrganizations) return [];
+    return publicOrganizations.map((o) => ({
       id: o.id,
       name: o.name,
       subdomain: o.subdomain,
     }));
+  }, [publicOrganizations]);
+
+  // Load organizations and apply host-based org locking
+  useEffect(() => {
+    console.log(`[SIGNIN_FORM] useEffect triggered - orgsLoading: ${orgsLoading}, orgs.length: ${orgs.length}`);
+    
+    setOrganizationsLoading(orgsLoading);
+    if (orgsLoading || orgs.length === 0) return;
 
     // Determine if host locks this session to a specific org (e.g., APC domain alias)
     const lockedSubdomain = resolveOrgSubdomainFromLocation();
+    console.log(`[SIGNIN_FORM] Client-side host resolution:`);
+    console.log(`[SIGNIN_FORM] window.location.hostname: "${typeof window !== 'undefined' ? window.location.hostname : 'undefined'}"`);
+    console.log(`[SIGNIN_FORM] lockedSubdomain: "${lockedSubdomain}"`);
+    console.log(`[SIGNIN_FORM] Available orgs:`, orgs.map(o => ({ id: o.id, subdomain: o.subdomain, name: o.name })));
 
     if (lockedSubdomain) {
       const locked = orgs.find((o) => o.subdomain === lockedSubdomain);
+      console.log(`[SIGNIN_FORM] Found locked org:`, locked);
       if (locked) {
+        console.log(`[SIGNIN_FORM] Setting org locked by host: ${locked.name}`);
         setIsOrgLockedByHost(true);
         setLockedOrgLabel(locked.name);
         setOrganizations([locked]);
@@ -100,7 +113,7 @@ export function SignInForm(): React.JSX.Element {
 
     setOrganizations(orgs);
     setSelectedOrganizationId(defaultId);
-  }, [publicOrganizations, orgsLoading]);
+  }, [orgs, orgsLoading]);
 
   const handleOAuthSignIn = async (provider: "google"): Promise<void> => {
     if (!selectedOrganizationId) {
@@ -137,49 +150,7 @@ export function SignInForm(): React.JSX.Element {
       if (result.success) {
         console.log("Dev login successful:", result.method);
 
-        // CRITICAL: Wait for session to sync between client and server
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        // Use the selected organization from the dropdown to redirect to proper subdomain
-        const selectedOrg = organizations.find(
-          (org) => org.id === selectedOrganizationId,
-        );
-        if (selectedOrg?.subdomain) {
-          const currentSubdomain = window.location.hostname.split(".")[0];
-          const isLocalhost = window.location.hostname.includes("localhost");
-
-          // In preview and local dev, avoid cross-domain redirect (wildcard subdomains may not exist)
-          if (isPreview() || isLocalhost) {
-            router.refresh();
-            await new Promise((resolve) => setTimeout(resolve, 200));
-            router.push("/dashboard");
-            return;
-          }
-
-          // If org is locked by host alias (e.g., APC custom domain), stay on current host
-          if (isOrgLockedByHost) {
-            router.refresh();
-            await new Promise((resolve) => setTimeout(resolve, 200));
-            router.push("/dashboard");
-            return;
-          }
-
-          if (currentSubdomain !== selectedOrg.subdomain) {
-            const rootDomain = getCurrentDomain();
-            window.location.href = `${window.location.protocol}//${selectedOrg.subdomain}.${rootDomain}/dashboard`;
-            return;
-          }
-
-          // Already on correct subdomain (production)
-          router.refresh();
-          await new Promise((resolve) => setTimeout(resolve, 200));
-          router.push("/dashboard");
-          return;
-        }
-
-        // Fallback: regular navigation if no organization selected
-        router.refresh();
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        // Simple navigation to dashboard - let the application handle routing
         router.push("/dashboard");
       } else {
         console.error("Login failed:", result.error);

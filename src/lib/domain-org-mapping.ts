@@ -28,6 +28,9 @@ export function resolveOrgSubdomainFromHost(host: string): string | null {
 
   // 1) Explicit alias mapping (highest priority)
   const alias = ORG_ALIAS_HOSTS[hostWithoutPort.toLowerCase()];
+  console.log(`[HOST_RESOLUTION] Checking alias for "${hostWithoutPort.toLowerCase()}":`);
+  console.log(`[HOST_RESOLUTION] Available aliases:`, Object.keys(ORG_ALIAS_HOSTS));
+  console.log(`[HOST_RESOLUTION] Found alias: "${alias}"`);
   if (alias) return alias;
 
   // 2) Localhost subdomain format: org.localhost[:port]
