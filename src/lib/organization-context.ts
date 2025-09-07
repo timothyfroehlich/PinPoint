@@ -42,7 +42,7 @@ export async function ensureOrgContextAndBindRLS<T>(
   fn: (tx: DrizzleClient, context: OrganizationContext) => Promise<T>,
 ): Promise<T> {
   const authContext = await requireAuthorized();
-  
+
   // Map to legacy OrganizationContext shape for compatibility
   const context: OrganizationContext = {
     user: authContext.user,
@@ -52,8 +52,8 @@ export async function ensureOrgContextAndBindRLS<T>(
       subdomain: authContext.org.subdomain,
     },
     membership: authContext.membership,
-    accessLevel: 'member' as const,
+    accessLevel: "member" as const,
   };
-  
+
   return withOrgRLS(db, context.organization.id, async (tx) => fn(tx, context));
 }

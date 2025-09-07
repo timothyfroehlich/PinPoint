@@ -76,7 +76,9 @@ export function StatusTogglePills({
     if (!statusesByCategory) return;
 
     // eslint-disable-next-line security/detect-object-injection -- category is type-constrained to union type
-    const categoryStatusIds = statusesByCategory[category].map((s): string => s.id);
+    const categoryStatusIds = statusesByCategory[category].map(
+      (s): string => s.id,
+    );
 
     // Check if all statuses in this category are selected
     const allSelected = categoryStatusIds.every((id) => value.includes(id));
@@ -97,7 +99,9 @@ export function StatusTogglePills({
   ): boolean => {
     if (!statusesByCategory) return false;
     // eslint-disable-next-line security/detect-object-injection -- category is type-constrained to union type
-    const categoryStatusIds = statusesByCategory[category].map((s): string => s.id);
+    const categoryStatusIds = statusesByCategory[category].map(
+      (s): string => s.id,
+    );
     return categoryStatusIds.some((id) => value.includes(id));
   };
 
@@ -107,7 +111,9 @@ export function StatusTogglePills({
   ): boolean => {
     if (!statusesByCategory) return false;
     // eslint-disable-next-line security/detect-object-injection -- category is type-constrained to union type
-    const categoryStatusIds = statusesByCategory[category].map((s): string => s.id);
+    const categoryStatusIds = statusesByCategory[category].map(
+      (s): string => s.id,
+    );
     return (
       categoryStatusIds.length > 0 &&
       categoryStatusIds.every((id) => value.includes(id))

@@ -26,6 +26,7 @@ import {
   FilterIcon,
 } from "lucide-react";
 import { getRequestAuthContext } from "~/server/auth/context";
+import { AuthGuard } from "~/components/auth/auth-guard";
 import { getActivityLog, getActivityStats } from "~/lib/dal/activity-log";
 import { ActivityLogFilter } from "./components/ActivityLogFilter";
 import { format } from "date-fns";
@@ -35,11 +36,29 @@ export default async function ActivityLogPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }): Promise<React.JSX.Element> {
-  const auth = await getRequestAuthContext();
-  if (auth.kind !== 'authorized') {
-    throw new Error('Member access required');
+  const authContext = await getRequestAuthContext();
+
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Activity Log Access Required"
+      fallbackMessage="You need to be signed in as a member to view activity logs."
+    >
+      <ActivityLogPageContent searchParams={searchParams} />
+    </AuthGuard>
+  );
+}
+
+async function ActivityLogPageContent({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}): Promise<React.JSX.Element> {
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Unauthorized access"); // This should never happen due to AuthGuard
   }
-  const organizationId = auth.org.id;
+  const organizationId = authContext.org.id;
 
   // Await searchParams as required by Next.js 15
   const resolvedSearchParams = await searchParams;
@@ -71,7 +90,9 @@ export default async function ActivityLogPage({
     totalPages,
   } = activityResult;
 
-  const getActionIcon = (action: string): React.ComponentType<{ className?: string }> => {
+  const getActionIcon = (
+    action: string,
+  ): React.ComponentType<{ className?: string }> => {
     switch (action) {
       case "USER_LOGIN":
       case "USER_LOGOUT":

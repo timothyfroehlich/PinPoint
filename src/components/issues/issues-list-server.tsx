@@ -135,8 +135,7 @@ function IssueCard({ issue }: { issue: Issue }): JSX.Element {
               <WrenchIcon className="h-4 w-4" />
               <span>
                 {issue.machine?.name ?? "Unknown Machine"}
-                {issue.machine?.model?.name &&
-                  ` (${issue.machine.model.name})`}
+                {issue.machine?.model?.name && ` (${issue.machine.model.name})`}
               </span>
             </div>
 
@@ -173,7 +172,13 @@ function IssueCard({ issue }: { issue: Issue }): JSX.Element {
 }
 
 // Direct data fetching version for pages
-export async function IssuesListWithData({ limit, organizationId }: { limit?: number; organizationId: string }): Promise<JSX.Element> {
+export async function IssuesListWithData({
+  limit,
+  organizationId,
+}: {
+  limit?: number;
+  organizationId: string;
+}): Promise<JSX.Element> {
   const issues = await getIssuesForOrg(organizationId);
   const displayIssues = limit ? issues.slice(0, limit) : issues;
 
@@ -194,9 +199,11 @@ export async function IssuesListWithData({ limit, organizationId }: { limit?: nu
 
   return (
     <div className="space-y-4" data-testid="issues-list">
-      {displayIssues.map((issue): JSX.Element => (
-        <IssueCard key={issue.id} issue={issue} />
-      ))}
+      {displayIssues.map(
+        (issue): JSX.Element => (
+          <IssueCard key={issue.id} issue={issue} />
+        ),
+      )}
     </div>
   );
 }
@@ -282,11 +289,16 @@ export function IssuesListServer({
 }: IssuesListServerProps & { organizationId?: string }): React.JSX.Element {
   if (!issues) {
     if (!organizationId) {
-      throw new Error("organizationId required when issues are not pre-fetched");
+      throw new Error(
+        "organizationId required when issues are not pre-fetched",
+      );
     }
     return (
       <Suspense fallback={<IssuesListSkeleton />}>
-        <IssuesListWithData limit={limit ?? 20} organizationId={organizationId} />
+        <IssuesListWithData
+          limit={limit ?? 20}
+          organizationId={organizationId}
+        />
       </Suspense>
     );
   }
@@ -314,9 +326,11 @@ export function IssuesListServer({
 
   return (
     <div className="space-y-4" data-testid="issues-list">
-      {displayIssues.map((issue): React.JSX.Element => (
-        <IssueCard key={issue.id} issue={issue} />
-      ))}
+      {displayIssues.map(
+        (issue): React.JSX.Element => (
+          <IssueCard key={issue.id} issue={issue} />
+        ),
+      )}
 
       {/* Pagination controls */}
       {pagination && filters && sorting && (
@@ -333,22 +347,24 @@ export function IssuesListServer({
 function IssuesListSkeleton(): React.JSX.Element {
   return (
     <div className="space-y-4">
-      {Array.from({ length: 3 }).map((_, i): React.JSX.Element => (
-        <Card key={i}>
-          <CardHeader className="pb-3">
-            <div className="space-y-2">
-              <Skeleton className="h-6 w-3/4" />
-              <Skeleton className="h-4 w-1/2" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="flex justify-between items-center">
-              <Skeleton className="h-4 w-1/3" />
-              <Skeleton className="h-4 w-1/4" />
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+      {Array.from({ length: 3 }).map(
+        (_, i): React.JSX.Element => (
+          <Card key={i}>
+            <CardHeader className="pb-3">
+              <div className="space-y-2">
+                <Skeleton className="h-6 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex justify-between items-center">
+                <Skeleton className="h-4 w-1/3" />
+                <Skeleton className="h-4 w-1/4" />
+              </div>
+            </CardContent>
+          </Card>
+        ),
+      )}
     </div>
   );
 }

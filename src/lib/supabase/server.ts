@@ -152,7 +152,10 @@ export async function getCurrentUser(): Promise<
   } = await supabase.auth.getUser();
 
   if (error) {
-    console.warn("Auth error in getCurrentUser:", isError(error) ? error.message : String(error));
+    console.warn(
+      "Auth error in getCurrentUser:",
+      isError(error) ? error.message : String(error),
+    );
     return null;
   }
 

@@ -62,8 +62,8 @@ export const getPublicMachineById = cache(
       id: machineRecord.id,
       name: machineRecord.name,
       model: {
-        id: machineRecord.model_id ?? machineRecord.model.id ?? "model",
-        name: machineRecord.model.name ?? "Model",
+        id: machineRecord.model_id,
+        name: machineRecord.model.name,
         manufacturer: machineRecord.model.manufacturer ?? null,
         year: machineRecord.model.year ?? null,
       },

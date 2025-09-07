@@ -6,6 +6,7 @@ import {
   UniversalSearchResultsSkeleton,
 } from "~/components/search/universal-search-results";
 import { UniversalSearch } from "~/components/search/universal-search";
+import { AuthGuard } from "~/components/auth/auth-guard";
 import { getRequestAuthContext } from "~/server/auth/context";
 
 // Force dynamic rendering for search pages
@@ -15,7 +16,9 @@ interface SearchPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export async function generateMetadata({ searchParams }: SearchPageProps): Promise<Metadata> {
+export async function generateMetadata({
+  searchParams,
+}: SearchPageProps): Promise<Metadata> {
   const params = await searchParams;
   const query = typeof params["q"] === "string" ? params["q"] : "";
 
@@ -38,13 +41,9 @@ export async function generateMetadata({ searchParams }: SearchPageProps): Promi
   };
 }
 
-export default async function SearchPage({ searchParams }: SearchPageProps): Promise<React.JSX.Element> {
-  // Authentication validation with automatic redirect
-  const authContext = await getRequestAuthContext();
-  if (authContext.kind !== "authorized") {
-    throw new Error("Member access required");
-  }
-
+async function SearchContent({
+  searchParams,
+}: SearchPageProps): Promise<React.JSX.Element> {
   const params = await searchParams;
   const query = typeof params["q"] === "string" ? params["q"].trim() : "";
   const entitiesParam =
@@ -133,6 +132,23 @@ export default async function SearchPage({ searchParams }: SearchPageProps): Pro
         </Suspense>
       )}
     </div>
+  );
+}
+
+export default async function SearchPage({
+  searchParams,
+}: SearchPageProps): Promise<React.JSX.Element> {
+  // Authentication validation with automatic redirect
+  const authContext = await getRequestAuthContext();
+
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Search Access Required"
+      fallbackMessage="You need to be signed in as a member to search across your organization's data."
+    >
+      <SearchContent searchParams={searchParams} />
+    </AuthGuard>
   );
 }
 

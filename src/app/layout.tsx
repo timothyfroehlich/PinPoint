@@ -18,16 +18,17 @@ export default async function RootLayout({
   children: React.ReactNode;
 }): Promise<React.JSX.Element> {
   const authContext = await getRequestAuthContext();
-  
+
   // Convert to legacy format if authorized, otherwise null
-  const organizationContext = authContext.kind === "authorized" 
-    ? {
-        organization: authContext.org,
-        user: authContext.user,
-        accessLevel: "member" as const,
-        membership: authContext.membership,
-      }
-    : null;
+  const organizationContext =
+    authContext.kind === "authorized"
+      ? {
+          organization: authContext.org,
+          user: authContext.user,
+          accessLevel: "member" as const,
+          membership: authContext.membership,
+        }
+      : null;
 
   return (
     <html lang="en">

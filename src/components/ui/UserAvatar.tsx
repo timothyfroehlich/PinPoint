@@ -37,11 +37,16 @@ export function UserAvatar({
 }: UserAvatarProps): React.JSX.Element {
   const [imageError, setImageError] = useState(false);
 
+  // ESLint security warning is false positive - `size` is strictly typed
+  // as "small" | "medium" | "large" union type, making object access safe
+  // eslint-disable-next-line security/detect-object-injection
+  const sizeClass = SIZE_CLASSES[size];
+
   if (!user) {
     const avatarElement = (
       <Avatar
         className={cn(
-          SIZE_CLASSES[size],
+          sizeClass,
           clickable && "cursor-pointer hover:opacity-80",
         )}
         onClick={onClick}
@@ -76,10 +81,7 @@ export function UserAvatar({
 
   const avatarElement = (
     <Avatar
-      className={cn(
-        SIZE_CLASSES[size],
-        clickable && "cursor-pointer hover:opacity-80",
-      )}
+      className={cn(sizeClass, clickable && "cursor-pointer hover:opacity-80")}
       onClick={onClick}
     >
       {avatarSrc && (

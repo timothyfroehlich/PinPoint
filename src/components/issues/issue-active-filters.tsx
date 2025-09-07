@@ -124,25 +124,27 @@ export function IssueActiveFilters({
 
   return (
     <>
-      {activeFilters.map((filter): JSX.Element => (
-        <Badge
-          key={filter.key}
-          variant="secondary"
-          className="flex items-center gap-1"
-        >
-          {filter.label}: {filter.value}
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="h-4 w-4 p-0 ml-1"
+      {activeFilters.map(
+        (filter): JSX.Element => (
+          <Badge
+            key={filter.key}
+            variant="secondary"
+            className="flex items-center gap-1"
           >
-            <Link href={filter.removeUrl} className="hover:text-error">
-              <X className="h-3 w-3" />
-            </Link>
-          </Button>
-        </Badge>
-      ))}
+            {filter.label}: {filter.value}
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="h-4 w-4 p-0 ml-1"
+            >
+              <Link href={filter.removeUrl} className="hover:text-error">
+                <X className="h-3 w-3" />
+              </Link>
+            </Button>
+          </Badge>
+        ),
+      )}
 
       {/* Clear all filters button */}
       <Button variant="ghost" size="sm" asChild>

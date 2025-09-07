@@ -213,6 +213,9 @@ export function getErrorConfig(
   type: keyof typeof errorConfigs,
   reset: () => void,
 ): ErrorBoundaryConfig {
+  // ESLint security warning is false positive - type parameter is strictly
+  // typed as keyof typeof errorConfigs, making object access safe
+  // eslint-disable-next-line security/detect-object-injection
   const configFactory = errorConfigs[type];
   return configFactory(reset);
 }

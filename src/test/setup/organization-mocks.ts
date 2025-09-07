@@ -80,11 +80,14 @@ export function mockUnauthenticatedContext() {
 /**
  * Helper to create no-membership auth context mock
  */
-export function mockNoMembershipContext(userId = SEED_TEST_IDS.USERS.ADMIN, orgId = SEED_TEST_IDS.ORGANIZATIONS.primary) {
+export function mockNoMembershipContext(
+  userId = SEED_TEST_IDS.USERS.ADMIN,
+  orgId = SEED_TEST_IDS.ORGANIZATIONS.primary,
+) {
   const { getRequestAuthContext } = vi.hoisted(() => {
     return { getRequestAuthContext: vi.fn() };
   });
-  
+
   vi.mock("~/server/auth/context", () => ({
     getRequestAuthContext,
     requireAuthorized: vi.fn(async () => {

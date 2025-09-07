@@ -11,6 +11,7 @@ import type {
   IssueWithRelationsResponse,
 } from "~/lib/types";
 import { transformKeysToCamelCase } from "~/lib/utils/case-transformers";
+import { cache } from "react";
 
 // Issue stats and dashboard types
 interface IssueStats {
@@ -19,8 +20,6 @@ interface IssueStats {
   closedCount: number;
   urgentCount: number;
 }
-
-
 
 // =================================
 // ORGANIZATIONS - Stats & Management
@@ -84,7 +83,10 @@ export {
  * Combines organization, user, and issue data for dashboard pages
  * Uses parallel queries for optimal performance
  */
-export async function getDashboardData(userId: string, organizationId: string): Promise<{
+export const getDashboardData = cache(async function getDashboardData(
+  userId: string,
+  organizationId: string,
+): Promise<{
   organization: OrganizationResponse;
   user: UserProfileResponse;
   issueStats: IssueStats;
@@ -109,46 +111,46 @@ export async function getDashboardData(userId: string, organizationId: string): 
       recentIssues,
     ) as IssueWithRelationsResponse[],
   };
-}
-
-
+});
 
 /**
  * Common organization overview data
  * Combines organization info with key statistics
  * Useful for admin pages and organization management
  */
-export async function getOrganizationOverviewData(organizationId: string): Promise<{
-  organization: OrganizationResponse;
-  stats: IssueStats;
-  memberCount: number;
-  recentIssues: IssueWithRelationsResponse[];
-}> {
-  const {
-    getCurrentOrganization,
-    getOrganizationStats,
-    getOrganizationMemberCount,
-  } = await import("./organizations");
-  const { getRecentIssues } = await import("./issues");
+export const getOrganizationOverviewData = cache(
+  async function getOrganizationOverviewData(organizationId: string): Promise<{
+    organization: OrganizationResponse;
+    stats: IssueStats;
+    memberCount: number;
+    recentIssues: IssueWithRelationsResponse[];
+  }> {
+    const {
+      getCurrentOrganization,
+      getOrganizationStats,
+      getOrganizationMemberCount,
+    } = await import("./organizations");
+    const { getRecentIssues } = await import("./issues");
 
-  const [organization, stats, memberCount, recentIssues] = await Promise.all([
-    getCurrentOrganization(organizationId),
-    getOrganizationStats(organizationId),
-    getOrganizationMemberCount(organizationId),
-    getRecentIssues(organizationId, 10),
-  ]);
+    const [organization, stats, memberCount, recentIssues] = await Promise.all([
+      getCurrentOrganization(organizationId),
+      getOrganizationStats(organizationId),
+      getOrganizationMemberCount(organizationId),
+      getRecentIssues(organizationId, 10),
+    ]);
 
-  return {
-    organization: transformKeysToCamelCase(
-      organization,
-    ) as OrganizationResponse,
-    stats: transformKeysToCamelCase(stats) as IssueStats,
-    memberCount,
-    recentIssues: transformKeysToCamelCase(
-      recentIssues,
-    ) as IssueWithRelationsResponse[],
-  };
-}
+    return {
+      organization: transformKeysToCamelCase(
+        organization,
+      ) as OrganizationResponse,
+      stats: transformKeysToCamelCase(stats) as IssueStats,
+      memberCount,
+      recentIssues: transformKeysToCamelCase(
+        recentIssues,
+      ) as IssueWithRelationsResponse[],
+    };
+  },
+);
 
 // Utility type for DAL function return types
 export type DALFunction<T extends (...args: unknown[]) => unknown> = T extends (

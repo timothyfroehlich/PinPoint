@@ -19,14 +19,23 @@ import {
   optionalNameSchema,
   descriptionSchema,
   searchQuerySchema,
+  requiredSearchQuerySchema,
   titleSchema as issueTitleSchema,
   optionalTitleSchema as optionalIssueTitleSchema,
-  nameSchema as submitterNameSchema,
+  submitterNameSchema,
+  emailSchema,
+  optionalEmailSchema,
+  createCommentSchema as commentCreationSchema,
 } from "~/lib/validation/schemas";
 
 // ============================================================================
 // BASIC ID VALIDATION SCHEMAS
 // ============================================================================
+
+/**
+ * Core ID schema - re-exported from centralized validation
+ */
+export { idSchema };
 
 /**
  * Standard entity ID validation
@@ -77,31 +86,31 @@ export const issueIdSchema = z.object({
  * Standard name validation for entities
  * Pattern: Used in location.ts, machine.core.ts, role creation
  */
-// nameSchema re-exported from centralized validation
+export { nameSchema, optionalNameSchema };
 
 /**
  * Issue title validation
  * Pattern: Specific to issue.core.ts create/update operations
  */
-// issueTitleSchema re-exported from centralized validation
+export { issueTitleSchema, optionalIssueTitleSchema };
 
 /**
  * Description validation (longer text fields)
  * Pattern: Used in issue.core.ts, comment creation
  */
-// descriptionSchema re-exported from centralized validation
+export { descriptionSchema };
 
 /**
  * Search query validation
  * Pattern: Used in filtering operations across multiple routers
  */
-// searchQuerySchema re-exported from centralized validation
+export { searchQuerySchema };
 
 /**
  * Submitter name validation for anonymous issue reporting
  * Pattern: Used in public issue creation endpoints
  */
-// submitterNameSchema re-exported from centralized validation
+export { submitterNameSchema };
 
 // ============================================================================
 // NUMERIC VALIDATION SCHEMAS
@@ -238,7 +247,7 @@ export const issueFilteringSchema = z.object({
  * Pattern: Used in model router for game search
  */
 export const opdbSearchSchema = z.object({
-  query: searchQuerySchema,
+  query: requiredSearchQuerySchema,
 });
 
 /**
@@ -246,7 +255,7 @@ export const opdbSearchSchema = z.object({
  * Pattern: Used in model router for specific model lookup
  */
 export const opdbModelSchema = z.object({
-  opdbId: idSchema,
+  opdbId: z.string().min(1, "OPDB ID is required"),
 });
 
 // ============================================================================
@@ -258,7 +267,7 @@ export const opdbModelSchema = z.object({
  * Pattern: Used in issue assignment, role assignment operations
  */
 export const userAssignmentSchema = z.object({
-  userId: idSchema,
+  userId: z.string().min(1, "User ID is required"),
 });
 
 /**
@@ -283,8 +292,8 @@ export const machineOwnerAssignmentSchema = z.object({
  * Pattern: Used in issue.core.ts for assigning users to issues
  */
 export const issueAssignmentSchema = z.object({
-  issueId: idSchema,
-  userId: idSchema,
+  issueId: z.string().min(1, "Issue ID is required"),
+  userId: z.string().min(1, "User ID is required"),
 });
 
 // ============================================================================
@@ -296,7 +305,7 @@ export const issueAssignmentSchema = z.object({
  * Pattern: Used in notification.ts operations
  */
 export const notificationIdSchema = z.object({
-  notificationId: idSchema,
+  notificationId: z.string().min(1, "Notification ID is required"),
 });
 
 // ============================================================================
@@ -308,14 +317,14 @@ export const notificationIdSchema = z.object({
  * Pattern: Used in comment.ts operations
  */
 export const commentIdSchema = z.object({
-  commentId: idSchema,
+  commentId: z.string().min(1, "Comment ID is required"),
 });
 
 /**
  * Comment creation schema
  * Pattern: Used in comment.ts create operations
  */
-// commentCreationSchema re-exported from centralized validation
+export { commentCreationSchema };
 
 // ============================================================================
 // VALIDATION HELPERS
@@ -325,7 +334,7 @@ export const commentIdSchema = z.object({
  * Email validation schema
  * Pattern: Used in user management operations
  */
-// emailSchema and optionalEmailSchema re-exported from centralized validation
+export { emailSchema, optionalEmailSchema };
 
 /**
  * Boolean flag validation
@@ -350,8 +359,10 @@ export function createEntityIdSchema(
   entityName: string,
 ): z.ZodObject<Record<string, z.ZodString>> {
   const fieldName = `${entityName}Id`;
+  const capitalizedName =
+    entityName.charAt(0).toUpperCase() + entityName.slice(1);
   return z.object({
-    [fieldName]: z.string().min(1, "ID is required"),
+    [fieldName]: z.string().min(1, `${capitalizedName} ID is required`),
   });
 }
 
@@ -402,6 +413,12 @@ export function validateNonEmptyStringArray(
   const arr: unknown[] = array as unknown[];
   const result: string[] = [];
   for (let index = 0; index < arr.length; index++) {
+    if (!Object.prototype.hasOwnProperty.call(arr, index)) {
+      continue; // Skip holes in sparse arrays
+    }
+    // ESLint security warning is false positive - index is controlled loop variable
+    // within array bounds, making array access safe
+    // eslint-disable-next-line security/detect-object-injection
     const raw: unknown = arr[index];
     if (typeof raw !== "string") {
       throw new Error(`${fieldName}[${String(index)}] must be a string`);
