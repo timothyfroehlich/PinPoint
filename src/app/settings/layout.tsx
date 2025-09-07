@@ -14,19 +14,34 @@ import {
   ActivityIcon,
   ShieldIcon,
 } from "lucide-react";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
+import { AuthGuard } from "~/components/auth/auth-guard";
 
 interface SettingsLayoutProps {
   children: React.ReactNode;
 }
 
-export default async function SettingsLayout({ children }: SettingsLayoutProps) {
-  // Ensure user is authenticated and has organization access
-  await requireMemberAccess();
-  
-  // requireMemberAccess already ensures user is authenticated and has membership
-  // No additional checks needed
+export default async function SettingsLayout({
+  children,
+}: SettingsLayoutProps): Promise<React.JSX.Element> {
+  const authContext = await getRequestAuthContext();
 
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Settings Access Required"
+      fallbackMessage="You need to be signed in as a member to access settings."
+    >
+      <SettingsLayoutContent children={children} />
+    </AuthGuard>
+  );
+}
+
+function SettingsLayoutContent({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.JSX.Element {
   const navigationItems = [
     {
       title: "Organization",
@@ -36,14 +51,14 @@ export default async function SettingsLayout({ children }: SettingsLayoutProps) 
     },
     {
       title: "Users",
-      href: "/settings/users", 
+      href: "/settings/users",
       icon: UsersIcon,
       description: "Manage team members and permissions",
     },
     {
       title: "Roles",
       href: "/settings/roles",
-      icon: ShieldIcon, 
+      icon: ShieldIcon,
       description: "Configure roles and permissions",
     },
     {
@@ -72,9 +87,9 @@ export default async function SettingsLayout({ children }: SettingsLayoutProps) 
                 Manage your organization and application settings
               </p>
             </div>
-            
+
             <Separator />
-            
+
             <nav className="space-y-2">
               {navigationItems.map((item) => {
                 const Icon = item.icon;
@@ -96,12 +111,10 @@ export default async function SettingsLayout({ children }: SettingsLayoutProps) 
             </nav>
           </div>
         </aside>
-        
+
         {/* Settings Content */}
         <div className="flex-1 lg:max-w-4xl">
-          <div className="space-y-6">
-            {children}
-          </div>
+          <div className="space-y-6">{children}</div>
         </div>
       </div>
     </div>

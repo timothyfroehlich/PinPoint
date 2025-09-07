@@ -10,8 +10,6 @@
  *   or treat the subdomain as unknown and handle accordingly.
  */
 
-import { isDevelopment } from "~/lib/environment";
-
 export const SUBDOMAIN_VERIFIED_HEADER = "x-subdomain-verified" as const;
 export const SUBDOMAIN_HEADER = "x-subdomain" as const;
 
@@ -32,29 +30,11 @@ export function isSubdomainHeaderTrusted(headers: Headers): boolean {
 export function extractTrustedSubdomain(headers: Headers): string | null {
   if (!isSubdomainHeaderTrusted(headers)) return null;
   const value = headers.get(SUBDOMAIN_HEADER);
-  return value ? value : null;
+  return value ?? null;
 }
 
 /**
  * Parse subdomain directly from a Host header value.
- * Mirrors middleware and organization-context parsing behavior.
+ * @deprecated Use resolveOrgSubdomainFromHost from ~/lib/domain-org-mapping instead,
+ * which handles both subdomains and alias mappings correctly.
  */
-export function parseSubdomainFromHost(host: string): string | null {
-  const hostWithoutPort = host.split(":")[0] ?? "";
-  if (!hostWithoutPort) return null;
-
-  if (isDevelopment()) {
-    if (hostWithoutPort === "localhost") return null;
-    const parts = hostWithoutPort.split(".");
-    if (parts.length >= 2 && parts[parts.length - 1] === "localhost") {
-      return parts[0] ?? null;
-    }
-    return null;
-  } else {
-    const parts = hostWithoutPort.split(".");
-    if (parts.length >= 3) {
-      return parts[0] ?? null;
-    }
-    return null;
-  }
-}

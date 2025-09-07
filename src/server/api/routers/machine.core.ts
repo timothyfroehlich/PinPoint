@@ -3,8 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { asc, eq, sql } from "drizzle-orm";
 
 // Internal types (alphabetical)
-import { type MachineResponse } from "~/lib/types/api";
-import { type MachineForIssues } from "~/lib/utils/machine-response-transformers";
+import { type MachineResponse, type MachineForIssues } from "~/lib/types/api";
 
 // Internal utilities (alphabetical)
 import { generatePrefixedId } from "~/lib/utils/id-generation";
@@ -13,12 +12,13 @@ import {
   transformMachinesForIssuesResponse,
   transformMachinesResponse,
 } from "~/lib/utils/machine-response-transformers";
+import { getErrorMessage } from "~/lib/utils/type-guards";
 
 // Server modules (alphabetical)
 import {
   machineCreateSchema,
   machineFilterSchema,
-  machineIdSchema,
+  machineIdParamSchema,
   machineUpdateSchema,
 } from "~/server/api/schemas/machine.schema";
 import {
@@ -52,7 +52,7 @@ export const machineCoreRouter = createTRPCRouter({
       if (!model || !location) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Invalid game title or location",
+          message: "Invalid model or location",
         });
       }
 
@@ -159,7 +159,7 @@ export const machineCoreRouter = createTRPCRouter({
             operation: "qr_code_generation",
           },
           error: {
-            message: error instanceof Error ? error.message : String(error),
+            message: getErrorMessage(error),
           },
         });
       }
@@ -247,7 +247,7 @@ export const machineCoreRouter = createTRPCRouter({
   ),
 
   getById: orgScopedProcedure
-    .input(machineIdSchema)
+    .input(machineIdParamSchema)
     .query(async ({ ctx, input }): Promise<MachineResponse> => {
       const [machineWithRelations] = await ctx.db
         .select({
@@ -308,7 +308,7 @@ export const machineCoreRouter = createTRPCRouter({
       if (!machineWithRelations) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Game instance not found",
+          message: "Machine not found",
         });
       }
 
@@ -318,7 +318,7 @@ export const machineCoreRouter = createTRPCRouter({
   update: machineEditProcedure
     .input(machineUpdateSchema)
     .mutation(async ({ ctx, input }): Promise<MachineResponse> => {
-      // First verify the game instance exists (RLS handles org scoping)
+      // First verify the machine exists (RLS handles org scoping)
       const [existingMachine] = await ctx.db
         .select()
         .from(machines)
@@ -343,7 +343,7 @@ export const machineCoreRouter = createTRPCRouter({
         if (!model) {
           throw new TRPCError({
             code: "NOT_FOUND",
-            message: "Game title not found",
+            message: "Model not found",
           });
         }
       }
@@ -455,9 +455,9 @@ export const machineCoreRouter = createTRPCRouter({
     }),
 
   delete: machineDeleteProcedure
-    .input(machineIdSchema)
+    .input(machineIdParamSchema)
     .mutation(async ({ ctx, input }): Promise<MachineResponse> => {
-      // Verify the game instance exists (RLS handles org scoping)
+      // Verify the machine exists (RLS handles org scoping)
       const [existingMachine] = await ctx.db
         .select()
         .from(machines)
@@ -467,7 +467,7 @@ export const machineCoreRouter = createTRPCRouter({
       if (!existingMachine) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Game instance not found",
+          message: "Machine not found",
         });
       }
 

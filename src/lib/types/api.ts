@@ -216,16 +216,6 @@ export interface ModelResponse
   };
 }
 
-/** OPDB search result */
-export interface OPDBSearchResult {
-  id: string;
-  name: string;
-  manufacturer?: string;
-  year?: number;
-  type?: string;
-  playfield_image?: string;
-}
-
 /** Attachment response */
 export type AttachmentResponse = DrizzleToCamelCase<
   InferSelectModel<typeof attachments>
@@ -351,35 +341,6 @@ export type MachineModel = NonNullable<MachineResponse>["model"];
 export type MachineOwner = NonNullable<MachineResponse>["owner"];
 
 // ============================================================================
-// Input Types - For Forms and Filters
-// ============================================================================
-
-/** Issue filtering parameters */
-export interface IssueFilters {
-  machineId?: string;
-  statusIds?: string[];
-  statusId?: string;
-  statusCategory?: string;
-  assigneeId?: string;
-  reporterId?: string;
-  locationId?: string;
-  modelId?: string;
-  ownerId?: string;
-  search?: string;
-  sortBy?: "created" | "updated" | "status" | "severity" | "game";
-  sortOrder?: "asc" | "desc";
-  limit?: number;
-}
-
-/** Machine filtering parameters */
-export interface MachineFilters {
-  locationId?: string;
-  modelId?: string;
-  ownerId?: string;
-  organizationId?: string;
-}
-
-// ============================================================================
 // Utility Types - Common Patterns
 // ============================================================================
 
@@ -400,51 +361,6 @@ export type IssueSortBy = "created" | "updated" | "priority" | "status";
 
 /** Sort order options */
 export type SortOrder = "asc" | "desc";
-
-// ============================================================================
-// Component-Specific Types - For Props and State
-// ============================================================================
-
-/** Props for components displaying a single issue */
-export interface IssueComponentProps {
-  issue: IssueResponse;
-  onUpdate?: (issue: IssueResponse) => void;
-  onDelete?: (issueId: string) => void;
-}
-
-/** Props for components displaying issue lists */
-export interface IssueListComponentProps {
-  issues: IssueList;
-  onSelectIssue?: (issue: IssueResponse) => void;
-  onSelectAll?: (selected: boolean) => void;
-  selectedIssues?: string[];
-}
-
-/** Props for components displaying a single machine */
-export interface MachineComponentProps {
-  machine: MachineResponse;
-  onUpdate?: (machine: MachineResponse) => void;
-  onDelete?: (machineId: string) => void;
-}
-
-/** Props for components displaying machine lists */
-export interface MachineListComponentProps {
-  machines: MachineList;
-  onSelectMachine?: (machine: MachineResponse) => void;
-}
-
-/** Props for components displaying a single location */
-export interface LocationComponentProps {
-  location: LocationResponse;
-  onUpdate?: (location: LocationResponse) => void;
-  onDelete?: (locationId: string) => void;
-}
-
-/** Props for components displaying location lists */
-export interface LocationListComponentProps {
-  locations: LocationList;
-  onSelectLocation?: (location: LocationResponse) => void;
-}
 
 // ============================================================================
 // Re-exports for Convenience
@@ -477,3 +393,59 @@ export type {
   UserMembership as UserMembershipDatabase,
   MachineWithRelations as MachineWithRelationsDatabase,
 };
+
+// ============================================================================
+// Service Layer Types (migrated from server/services/types.ts)
+// ============================================================================
+
+// Service infrastructure types
+export type { DrizzleClient } from "~/server/db/drizzle";
+
+// Database utility types
+export type DatabaseResult<T> = T;
+
+// Service layer enum re-exports
+export {
+  notificationTypeEnum,
+  notificationEntityEnum,
+} from "~/server/db/schema/collections";
+export { activityTypeEnum } from "~/server/db/schema/issues";
+
+// Type guard for database results
+export function isDatabaseResult(obj: unknown): obj is DatabaseResult<object> {
+  if (typeof obj !== "object" || obj === null) return false;
+  return Object.keys(obj).some((key) => key.includes("_"));
+}
+
+// ============================================================================
+// System & Infrastructure Types
+// ============================================================================
+
+// System health check result
+export interface HealthStatus {
+  status: "healthy" | "unhealthy";
+  timestamp: string;
+  database: "connected" | "disconnected";
+  version: string;
+  error?: string;
+}
+
+// QR Code resolution types
+export interface QRCodeResolution {
+  success: true;
+  reportUrl: string;
+  machine: {
+    id: string;
+    name: string;
+    organizationId: string;
+    locationId: string;
+  };
+}
+
+export interface QRCodeResolutionError {
+  success: false;
+  error: "not_found" | "invalid_id" | "server_error";
+  message: string;
+}
+
+export type QRCodeResolutionResult = QRCodeResolution | QRCodeResolutionError;

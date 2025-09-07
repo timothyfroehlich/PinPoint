@@ -29,25 +29,16 @@ import {
   transformKeysToCamelCase,
   transformKeysToSnakeCase,
 } from "./case-transformers";
-import type { MachineResponse } from "~/lib/types/api";
+import type {
+  MachineResponse,
+  LocationResponse,
+  MachineForIssues,
+} from "~/lib/types/api";
 
 /**
- * NOTE: MachineResponse type is now defined in ~/lib/types/api.ts
+ * NOTE: MachineResponse, LocationResponse, MachineForIssues types are now defined in ~/lib/types/api.ts
  * Import from there for consistent type definitions across the codebase.
  */
-
-export interface LocationResponse {
-  id: string;
-  name: string;
-  organizationId: string;
-  pinballMapId?: number;
-  createdAt?: Date;
-  updatedAt?: Date;
-  _count?: {
-    machines: number;
-  };
-  machines?: MachineResponse[];
-}
 
 export interface MachineWithRelations extends MachineResponse {
   model: NonNullable<MachineResponse["model"]>;
@@ -56,14 +47,6 @@ export interface MachineWithRelations extends MachineResponse {
 
 export interface LocationWithMachines extends LocationResponse {
   machines: MachineResponse[];
-}
-
-export interface MachineForIssues {
-  id: string;
-  name: string;
-  model: {
-    name: string;
-  };
 }
 
 /**
@@ -152,7 +135,10 @@ export function transformLocationResponse(location: unknown): LocationResponse {
 
   // Handle nested machines array if present
   if ("machines" in transformed) {
-    const locationWithMachines = transformed as unknown as LocationResponse;
+    interface LocationWithMachines {
+      machines?: unknown[];
+    }
+    const locationWithMachines = transformed as LocationWithMachines;
     if (Array.isArray(locationWithMachines.machines)) {
       locationWithMachines.machines = transformMachinesResponse(
         locationWithMachines.machines,

@@ -6,66 +6,53 @@
  */
 
 import { z } from "zod";
+import {
+  paginationLimitSchema,
+  paginationOffsetSchema,
+  sortOrderSchema,
+  searchQuerySchema,
+  arrayParamTransformer,
+  booleanParamTransformer,
+  dateRangeSchema,
+} from "~/lib/validation/schemas";
 
 /**
  * Common pagination schema used across all entities
  */
 export const PaginationSchema = z.object({
-  page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(5).max(100).default(20),
+  page: paginationOffsetSchema,
+  limit: paginationLimitSchema,
 });
 
 /**
  * Common sorting schema used across all entities
  */
 export const SortingSchema = z.object({
-  order: z.enum(["asc", "desc"]).default("desc"),
+  order: sortOrderSchema,
 });
 
 /**
  * Base search schema with common search functionality
  */
 export const BaseSearchSchema = z.object({
-  search: z.string().max(100).optional(),
+  search: searchQuerySchema,
 });
 
-/**
- * Generic array parameter transformer
- * Handles both single strings and arrays, splitting on commas
- */
-export const arrayParamTransformer = z
-  .union([z.string(), z.array(z.string())])
-  .optional()
-  .transform((val) => {
-    if (!val) return undefined;
-    return Array.isArray(val) ? val : val.split(",").filter(Boolean);
-  });
+// Re-export centralized transformers for backwards compatibility
+export { arrayParamTransformer };
 
-/**
- * Generic boolean parameter transformer
- * Handles string boolean values from URL parameters
- */
-export const booleanParamTransformer = z
-  .union([
-    z.boolean(),
-    z.enum(["true", "false"]).transform((val) => val === "true"),
-  ])
-  .optional();
+// Re-export centralized transformers for backwards compatibility
+export { booleanParamTransformer };
 
 /**
  * Date range schema for filtering
  */
-export const DateRangeSchema = z.object({
-  created_after: z.string().datetime().optional(),
-  created_before: z.string().datetime().optional(),
-  updated_after: z.string().datetime().optional(),
-  updated_before: z.string().datetime().optional(),
-});
+export const DateRangeSchema = dateRangeSchema;
 
 /**
  * Generate SEO-friendly URL by removing default parameters
  */
-export function cleanUrlParameters<T extends Record<string, any>>(
+export function cleanUrlParameters<T extends Record<string, unknown>>(
   url: string,
   parser: (params: Record<string, string | string[] | undefined>) => T,
   builder: (basePath: string, params: Partial<T>) => string,
@@ -86,16 +73,16 @@ export function buildMetadataDescription(
   totalCount: number,
 ): string {
   if (filterDescriptions.length === 0) {
-    return `${baseDescription} - ${totalCount} total`;
+    return `${baseDescription} - ${String(totalCount)} total`;
   }
 
-  return `${baseDescription} (${filterDescriptions.join(", ")}) - ${totalCount} found`;
+  return `${baseDescription} (${filterDescriptions.join(", ")}) - ${String(totalCount)} found`;
 }
 
 /**
  * Generate canonical URL without pagination
  */
-export function generateCanonicalUrl<T extends Record<string, any>>(
+export function generateCanonicalUrl<T extends Record<string, unknown>>(
   basePath: string,
   params: T,
   builder: (basePath: string, params: Partial<T>) => string,
@@ -103,12 +90,12 @@ export function generateCanonicalUrl<T extends Record<string, any>>(
   const canonicalParams = { ...params };
 
   // Remove pagination from canonical URLs
-  const cleanedParams = { ...canonicalParams };
-  if ("page" in cleanedParams) {
-    delete (cleanedParams as any).page;
+  if ("page" in canonicalParams) {
+    const { page: _page, ...cleanedParams } = canonicalParams;
+    return builder(basePath, cleanedParams as Partial<T>);
   }
 
-  return builder(basePath, cleanedParams);
+  return builder(basePath, canonicalParams);
 }
 
 /**
@@ -126,7 +113,7 @@ export interface SearchParamError {
 export function extractSearchParamErrors(
   error: z.ZodError,
 ): SearchParamError[] {
-  return error.issues.map((err: z.ZodIssue) => ({
+  return error.issues.map((err) => ({
     field: err.path.join("."),
     message: err.message,
     code: err.code,
@@ -138,7 +125,7 @@ export function extractSearchParamErrors(
  */
 export function safeParseSearchParams<T>(
   searchParams: Record<string, string | string[] | undefined>,
-  schema: z.ZodSchema<T>,
+  schema: z.ZodType<T>,
   entityName: string,
 ): T {
   const parsed = schema.safeParse(searchParams);
@@ -169,13 +156,13 @@ export interface UrlBuilderOptions {
 /**
  * Advanced URL builder with options
  */
-export function buildUrlWithOptions<T extends Record<string, any>>(
+export function buildUrlWithOptions<T extends Record<string, unknown>>(
   basePath: string,
   params: Partial<T>,
   currentSearchParams:
     | Record<string, string | string[] | undefined>
     | undefined,
-  defaultParser: (params: any) => T,
+  defaultParser: (params: unknown) => T,
   options: UrlBuilderOptions = {},
 ): string {
   const { preserveUnrelated = true, includeDefaults = false } = options;
@@ -196,7 +183,15 @@ export function buildUrlWithOptions<T extends Record<string, any>>(
   }
 
   // Get defaults for comparison
-  const defaults = includeDefaults ? {} : defaultParser({});
+  const defaults: Record<string, unknown> = includeDefaults
+    ? {}
+    : (defaultParser({}) as unknown as Record<string, unknown>);
+
+  // Safe setter to avoid object injection warnings on dynamic keys
+  const setParam = (k: string, v: string): void => {
+    if (!/^[a-zA-Z0-9_\-]+$/.test(k)) return;
+    url.searchParams.set(k, v);
+  };
 
   // Add new parameters
   Object.entries(params).forEach(([key, value]) => {
@@ -207,27 +202,41 @@ export function buildUrlWithOptions<T extends Record<string, any>>(
 
     if (Array.isArray(value)) {
       if (value.length > 0) {
-        url.searchParams.set(key, value.join(","));
+        setParam(key, value.join(","));
       } else {
         url.searchParams.delete(key);
       }
     } else {
-      const stringValue = value.toString();
+      let stringValue: string | null = null;
+      if (typeof value === "string") {
+        stringValue = value;
+      } else if (typeof value === "number" || typeof value === "boolean") {
+        stringValue = String(value);
+      }
+
+      if (stringValue === null) {
+        // Unsupported value type for URLSearchParams; skip
+        return;
+      }
 
       // Skip default values unless explicitly requested
-      if (!includeDefaults && defaults && typeof defaults === "object") {
-        const defaultValue = (defaults as any)[key];
+      if (!includeDefaults) {
+        // ESLint security warning is false positive - key comes from Object.entries(params)
+        // where params is a controlled object with known property names
+        // eslint-disable-next-line security/detect-object-injection
+        const defaultValue = defaults[key];
         if (
-          defaultValue !== undefined &&
+          (typeof defaultValue === "string" ||
+            typeof defaultValue === "number" ||
+            typeof defaultValue === "boolean") &&
           stringValue === String(defaultValue)
         ) {
           url.searchParams.delete(key);
-        } else {
-          url.searchParams.set(key, stringValue);
+          return;
         }
-      } else {
-        url.searchParams.set(key, stringValue);
       }
+
+      setParam(key, stringValue);
     }
   });
 

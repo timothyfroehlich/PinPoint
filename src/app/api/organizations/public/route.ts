@@ -1,19 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { sql } from "drizzle-orm";
-
-import { getGlobalDatabaseProvider } from "~/server/db/provider";
-
-type PublicOrgRow = { id: string; name: string; subdomain: string; logo_url: string | null };
+import { getAllOrganizationsForLogin } from "~/lib/dal/public-organizations";
 
 export async function GET(_request: NextRequest): Promise<NextResponse> {
   try {
-    const db = getGlobalDatabaseProvider().getClient();
-    const result = await db.execute(
-      sql`SELECT id, name, subdomain, logo_url FROM public_organizations_minimal ORDER BY name`,
-    );
-
-    const rows = (result as unknown as { rows: PublicOrgRow[] }).rows ?? [];
-    const organizations = rows.map((r) => ({ id: r.id, name: r.name, subdomain: r.subdomain }));
+    const organizations = await getAllOrganizationsForLogin();
 
     // Prefer APC/test org as default if present, else first
     const apc = organizations.find(
@@ -30,4 +20,3 @@ export async function GET(_request: NextRequest): Promise<NextResponse> {
     );
   }
 }
-

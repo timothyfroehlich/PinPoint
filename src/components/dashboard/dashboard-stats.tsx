@@ -16,7 +16,7 @@ interface DashboardStatsProps {
   };
 }
 
-export function DashboardStats({ stats }: DashboardStatsProps) {
+export function DashboardStats({ stats }: DashboardStatsProps): JSX.Element {
   const resolutionRate =
     stats.totalIssues > 0
       ? Math.round((stats.closedIssues / stats.totalIssues) * 100)
@@ -46,7 +46,7 @@ export function DashboardStats({ stats }: DashboardStatsProps) {
 
       <StatCard
         title="Resolution Rate"
-        value={`${resolutionRate}%`}
+        value={`${String(resolutionRate)}%`}
         icon={<CheckCircleIcon className="h-4 w-4" />}
         description="Issues resolved"
         trend={
@@ -77,25 +77,38 @@ interface StatCardProps {
   trend: "good" | "neutral" | "needs-attention";
 }
 
-function StatCard({ title, value, icon, description, trend }: StatCardProps) {
+function StatCard({
+  title,
+  value,
+  icon,
+  description,
+  trend,
+}: StatCardProps): JSX.Element {
   const trendColors = {
     good: "text-tertiary",
     neutral: "text-secondary",
     "needs-attention": "text-error",
-  };
+  } as const;
 
   const bgColors = {
     good: "bg-tertiary-container",
     neutral: "bg-secondary-container",
     "needs-attention": "bg-error-container",
-  };
+  } as const;
+
+  // ESLint security warning is false positive here - `trend` is strictly typed
+  // as "good" | "neutral" | "needs-attention" union type, making object access safe
+  // eslint-disable-next-line security/detect-object-injection
+  const trendColor = trendColors[trend];
+  // eslint-disable-next-line security/detect-object-injection
+  const bgColor = bgColors[trend];
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <div className={`p-2 rounded-full ${bgColors[trend]}`}>
-          <div className={trendColors[trend]}>{icon}</div>
+        <div className={`p-2 rounded-full ${bgColor}`}>
+          <div className={trendColor}>{icon}</div>
         </div>
       </CardHeader>
       <CardContent>

@@ -7,17 +7,17 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { SignInForm } from "./components/SignInForm";
-import { getOrganizationContext } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
 
 export const metadata = {
   title: "Sign In - PinPoint",
   description: "Sign in to your PinPoint account",
 };
 
-export default async function SignInPage() {
+export default async function SignInPage(): Promise<React.JSX.Element> {
   // Check if user is already authenticated
-  const orgContext = await getOrganizationContext();
-  if (orgContext?.user && orgContext?.accessLevel === "member") {
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind === "authorized") {
     redirect("/dashboard");
   }
 
@@ -39,7 +39,7 @@ export default async function SignInPage() {
   );
 }
 
-function SignInFormSkeleton() {
+function SignInFormSkeleton(): React.JSX.Element {
   return (
     <div className="space-y-6">
       <div className="space-y-4">

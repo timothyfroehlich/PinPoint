@@ -4,7 +4,7 @@
 
 /**
  * Extracts the root domain from a host header for cookie domain setting
- * 
+ *
  * Examples:
  * - "org1.mysite.com" -> ".mysite.com"
  * - "org2.mysite.com:3000" -> ".mysite.com"
@@ -14,24 +14,25 @@
  */
 export function getCookieDomain(host: string): string {
   // Remove port if present
-  const hostname = host.split(':')[0];
-  
+  const hostParts = host.split(":");
+  const hostname = hostParts[0] ?? host;
+
   // Handle localhost (development)
-  if (hostname === 'localhost') {
-    return '.localhost';
+  if (hostname === "localhost") {
+    return ".localhost";
   }
-  
+
   // For production domains, we want the root domain with leading dot
-  // This handles both subdomains (org1.mysite.com -> .mysite.com) 
+  // This handles both subdomains (org1.mysite.com -> .mysite.com)
   // and apex domains (mysite.com -> .mysite.com)
-  const parts = hostname.split('.');
-  
+  const parts = hostname.split(".");
+
   if (parts.length >= 2) {
     // Take the last two parts (domain.tld)
-    const rootDomain = parts.slice(-2).join('.');
+    const rootDomain = parts.slice(-2).join(".");
     return `.${rootDomain}`;
   }
-  
+
   // Fallback: use the hostname as-is with leading dot
   return `.${hostname}`;
 }
@@ -41,13 +42,14 @@ export function getCookieDomain(host: string): string {
  * Used for client-side redirects and absolute URLs
  */
 export function getProductionUrl(host: string): string {
-  const hostname = host.split(':')[0];
-  
-  if (hostname === 'localhost') {
-    return `http://${host}`;
+  const hostParts = host.split(":");
+  const hostname = hostParts.length > 0 ? hostParts[0] : host;
+
+  if (hostname === "localhost") {
+    return `https://${host}`;
   }
-  
-  return `https://${hostname}`;
+
+  return `https://${String(hostname)}`;
 }
 
 /**
@@ -55,22 +57,22 @@ export function getProductionUrl(host: string): string {
  * Uses window.location when available (client-side)
  */
 export function getCurrentDomain(): string {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     // Server-side fallback - should not be used for redirects
-    return 'localhost';
+    return "localhost";
   }
-  
+
   const hostname = window.location.hostname;
-  
-  if (hostname === 'localhost') {
-    return 'localhost';
+
+  if (hostname === "localhost") {
+    return "localhost";
   }
-  
+
   // Extract root domain (e.g., org1.mysite.com -> mysite.com)
-  const parts = hostname.split('.');
+  const parts = hostname.split(".");
   if (parts.length >= 2) {
-    return parts.slice(-2).join('.');
+    return parts.slice(-2).join(".");
   }
-  
+
   return hostname;
 }

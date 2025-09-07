@@ -3,12 +3,20 @@ import { TRPCError } from "@trpc/server";
 import { count, eq } from "drizzle-orm";
 import { z } from "zod";
 
+// Validation schemas
+import {
+  idSchema,
+  roleNameSchema,
+  optionalRoleNameSchema,
+} from "~/lib/validation/schemas";
+
 // Internal types (alphabetical)
 import type { RLSOrganizationTRPCContext } from "~/server/api/trpc.base";
 import type {
   RoleAssignmentInput,
   RoleManagementContext,
 } from "~/lib/users/roleManagementValidation";
+import type { RoleResponseWithDetails, PermissionResponse } from "~/lib/types";
 
 // Internal utilities (alphabetical)
 import { generatePrefixedId } from "~/lib/utils/id-generation";
@@ -27,30 +35,13 @@ import type { RoleService } from "~/server/services/roleService";
 import { memberships, roles } from "~/server/db/schema";
 import { type Membership, type Role } from "~/server/db/types";
 
-// Interface definitions for role-related responses
-export interface RoleResponse {
-  id: string;
-  name: string;
-  organizationId: string;
-  isSystem: boolean;
-  isDefault: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-  memberCount: number;
-  permissions: PermissionResponse[];
-}
-
-export interface PermissionResponse {
-  id: string;
-  name: string;
-  description: string | null;
-}
+// Use canonical API types from ~/lib/types
 
 /**
  * Create role service using factory pattern
  */
 function createRoleService(ctx: RLSOrganizationTRPCContext): RoleService {
-  return ctx.services.createRoleService();
+  return ctx.services.createRoleService(ctx.organizationId);
 }
 
 export const roleRouter = createTRPCRouter({
@@ -58,7 +49,7 @@ export const roleRouter = createTRPCRouter({
    * List all roles in the organization
    */
   list: organizationManageProcedure.query(
-    async ({ ctx }): Promise<RoleResponse[]> => {
+    async ({ ctx }): Promise<RoleResponseWithDetails[]> => {
       const roleService = createRoleService(ctx);
       const roles = await roleService.getRoles();
 
@@ -87,8 +78,8 @@ export const roleRouter = createTRPCRouter({
   create: roleManageProcedure
     .input(
       z.object({
-        name: z.string().min(1).max(50),
-        permissionIds: z.array(z.string()).optional(),
+        name: roleNameSchema,
+        permissionIds: z.array(idSchema).optional(),
         template: z
           .enum(Object.keys(ROLE_TEMPLATES) as [string, ...string[]])
           .optional(),
@@ -150,9 +141,9 @@ export const roleRouter = createTRPCRouter({
   update: roleManageProcedure
     .input(
       z.object({
-        roleId: z.string(),
-        name: z.string().min(1).max(50).optional(),
-        permissionIds: z.array(z.string()).optional(),
+        roleId: idSchema,
+        name: optionalRoleNameSchema,
+        permissionIds: z.array(idSchema).optional(),
         isDefault: z.boolean().optional(),
       }),
     )
@@ -179,7 +170,7 @@ export const roleRouter = createTRPCRouter({
   delete: roleManageProcedure
     .input(
       z.object({
-        roleId: z.string(),
+        roleId: idSchema,
       }),
     )
     .mutation(async ({ ctx, input }): Promise<{ success: boolean }> => {
@@ -199,10 +190,10 @@ export const roleRouter = createTRPCRouter({
   get: organizationManageProcedure
     .input(
       z.object({
-        roleId: z.string(),
+        roleId: idSchema,
       }),
     )
-    .query(async ({ ctx, input }): Promise<RoleResponse> => {
+    .query(async ({ ctx, input }): Promise<RoleResponseWithDetails> => {
       // Get role details
       const role = await ctx.db.query.roles.findFirst({
         where: eq(roles.id, input.roleId),
@@ -296,8 +287,8 @@ export const roleRouter = createTRPCRouter({
   assignToUser: roleManageProcedure
     .input(
       z.object({
-        userId: z.string(),
-        roleId: z.string(),
+        userId: idSchema,
+        roleId: idSchema,
       }),
     )
     .mutation(async ({ ctx, input }): Promise<Membership> => {
@@ -465,34 +456,25 @@ export const roleRouter = createTRPCRouter({
    * Get all roles for the organization
    */
   getAll: organizationManageProcedure.query(
-    async ({ ctx }): Promise<RoleResponse[]> => {
-      const rolesWithMemberCount = await ctx.db
-        .select({
-          id: roles.id,
-          name: roles.name,
-          organizationId: roles.organization_id,
-          isSystem: roles.is_system,
-          isDefault: roles.is_default,
-          createdAt: roles.created_at,
-          updatedAt: roles.updated_at,
-          memberCount: count(memberships.id),
-        })
-        .from(roles)
-        .leftJoin(memberships, eq(roles.id, memberships.role_id))
-        .where(eq(roles.organization_id, ctx.organizationId))
-        .groupBy(roles.id)
-        .orderBy(roles.name);
+    async ({ ctx }): Promise<RoleResponseWithDetails[]> => {
+      const roleService = createRoleService(ctx);
+      const roles = await roleService.getRoles();
 
-      return rolesWithMemberCount.map((role) => ({
+      // Map snake_case fields from service to camelCase API response
+      return roles.map((role) => ({
         id: role.id,
         name: role.name,
-        organizationId: role.organizationId,
-        isSystem: role.isSystem,
-        isDefault: role.isDefault,
-        createdAt: role.createdAt,
-        updatedAt: role.updatedAt,
-        memberCount: role.memberCount,
-        permissions: [], // TODO: Add permissions when permission system is implemented
+        organizationId: role.organization_id,
+        isSystem: role.is_system,
+        isDefault: role.is_default,
+        createdAt: role.created_at,
+        updatedAt: role.updated_at,
+        memberCount: role._count.memberships,
+        permissions: role.permissions.map((p) => ({
+          id: p.id,
+          name: p.name,
+          description: null,
+        })),
       }));
     },
   ),

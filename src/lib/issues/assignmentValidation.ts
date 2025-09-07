@@ -9,15 +9,15 @@
  * - Zero side effects for reliable testing
  */
 
+import type { ValidationUser } from "~/lib/types/validation";
+import { titleSchema, emailSchema } from "~/lib/validation/schemas";
+
 // =============================================================================
 // TYPE DEFINITIONS - Based on actual Drizzle types from issue.core.ts
 // =============================================================================
 
-export interface User {
-  readonly id: string;
-  readonly name: string | null;
-  readonly email: string;
-}
+// Compatibility alias for existing imports
+export type User = ValidationUser;
 
 export interface Membership {
   readonly id: string;
@@ -406,20 +406,24 @@ export function validateIssueCreationRules(
     };
   }
 
-  if (input.title.length > 255) {
+  // Validate title via centralized schema
+  const titleResult = titleSchema.safeParse(input.title);
+  if (!titleResult.success) {
     return {
       valid: false,
-      error: "Issue title cannot exceed 255 characters",
+      error: titleResult.error.issues[0]?.message ?? "Invalid title",
     };
   }
 
-  // Validate email format if provided
+  // Validate email format if provided using centralized schema
   if (input.reporterEmail) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(input.reporterEmail)) {
+    const emailResult = emailSchema.safeParse(input.reporterEmail);
+    if (!emailResult.success) {
       return {
         valid: false,
-        error: "Invalid reporter email format",
+        error:
+          emailResult.error.issues[0]?.message ??
+          "Invalid reporter email format",
       };
     }
   }

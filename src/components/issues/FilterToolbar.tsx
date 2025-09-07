@@ -19,10 +19,11 @@ import {
   TooltipTrigger,
 } from "~/components/ui/tooltip";
 import { cn } from "~/lib/utils";
+import { ISSUE_SORT_OPTIONS } from "~/lib/types/filters";
 
 import { AdvancedFiltersDropdown } from "./AdvancedFiltersDropdown";
-import { GameFilterDropdown } from "./GameFilterDropdown";
-import { SearchTextField } from "./SearchTextField";
+import { MachineFilterDropdown } from "./MachineFilterDropdown";
+import { FilteredSearch } from "~/components/ui/filtered-search";
 import { StatusTogglePills } from "./StatusTogglePills";
 import { FilterPresets } from "./FilterPresets";
 
@@ -36,7 +37,7 @@ interface IssueFilters {
   assigneeId?: string | undefined;
   reporterId?: string | undefined;
   ownerId?: string | undefined;
-  sortBy: "created" | "updated" | "status" | "severity" | "game";
+  sortBy: (typeof ISSUE_SORT_OPTIONS)[number];
   sortOrder: "asc" | "desc";
 }
 
@@ -50,14 +51,14 @@ export function FilterToolbar({
   filters,
   onFiltersChange,
   isLoading = false,
-}: FilterToolbarProps) {
+}: FilterToolbarProps): JSX.Element {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [activePresetId, setActivePresetId] = useState<string>();
 
   // Fetch locations for filter dropdown
   const { data: locations } = api.location.getAll.useQuery();
-  
-  // Get current user for "My Issues" preset  
+
+  // Get current user for "My Issues" preset
   const { data: currentUser } = api.user.getProfile.useQuery();
 
   const handleSortOrderToggle = (): void => {
@@ -66,7 +67,10 @@ export function FilterToolbar({
     });
   };
 
-  const handlePresetClick = (presetFilters: any, presetId?: string) => {
+  const handlePresetClick = (
+    presetFilters: Partial<IssueFilters>,
+    presetId?: string,
+  ): void => {
     // Apply preset filters and mark which preset is active
     onFiltersChange({
       ...filters,
@@ -87,20 +91,23 @@ export function FilterToolbar({
       <div className="mb-4">
         <FilterPresets
           currentUserId={currentUser?.id}
-          onPresetClick={(presetFilters) => handlePresetClick(presetFilters)}
+          onPresetClick={(presetFilters) => {
+            handlePresetClick(presetFilters);
+          }}
           activePresetId={activePresetId}
         />
       </div>
-      
+
       {/* Primary Filter Row */}
       <div className="flex items-center gap-4 flex-wrap">
         {/* Search - Most prominent */}
         <div className="flex-grow min-w-[250px]">
-          <SearchTextField
+          <FilteredSearch
             value={filters.search ?? ""}
             onChange={(search) => {
               onFiltersChange({ search: search === "" ? undefined : search });
             }}
+            placeholder="Search issues..."
           />
         </div>
 
@@ -119,7 +126,7 @@ export function FilterToolbar({
         </div>
 
         {/* Machine Filter - Primary */}
-        <GameFilterDropdown
+        <MachineFilterDropdown
           value={filters.machineId ?? ""}
           onChange={(machineId) => {
             onFiltersChange({
@@ -162,13 +169,13 @@ export function FilterToolbar({
             }
             className={cn(
               "h-8 w-8 p-0 transition-all duration-200",
-              showAdvanced && "text-primary"
+              showAdvanced && "text-primary",
             )}
           >
-            <ChevronDown 
+            <ChevronDown
               className={cn(
                 "h-4 w-4 transition-transform duration-200",
-                showAdvanced && "rotate-180"
+                showAdvanced && "rotate-180",
               )}
             />
           </Button>
@@ -217,11 +224,24 @@ export function FilterToolbar({
                   <SelectValue placeholder="Sort By" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="created">Created Date</SelectItem>
-                  <SelectItem value="updated">Updated Date</SelectItem>
-                  <SelectItem value="status">Status</SelectItem>
-                  <SelectItem value="severity">Priority</SelectItem>
-                  <SelectItem value="game">Game</SelectItem>
+                  {ISSUE_SORT_OPTIONS.map((option) => {
+                    const labels = {
+                      created: "Created Date",
+                      updated: "Updated Date",
+                      status: "Status",
+                      severity: "Priority",
+                      machine: "Machine",
+                    } as const;
+                    // ESLint security warning is false positive - `option` comes from
+                    // ISSUE_SORT_OPTIONS const array with known values, making object access safe
+                    // eslint-disable-next-line security/detect-object-injection
+                    const label = labels[option];
+                    return (
+                      <SelectItem key={option} value={option}>
+                        {label}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -235,19 +255,22 @@ export function FilterToolbar({
                     onClick={handleSortOrderToggle}
                     className={cn(
                       "h-8 w-8 p-0 transition-all duration-200",
-                      filters.sortOrder === "desc" && "text-primary"
+                      filters.sortOrder === "desc" && "text-primary",
                     )}
                   >
-                    <ArrowUpDown 
+                    <ArrowUpDown
                       className={cn(
                         "h-4 w-4 transition-transform duration-200",
-                        filters.sortOrder === "desc" && "rotate-180"
+                        filters.sortOrder === "desc" && "rotate-180",
                       )}
                     />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Sort {filters.sortOrder === "asc" ? "Ascending" : "Descending"}</p>
+                  <p>
+                    Sort{" "}
+                    {filters.sortOrder === "asc" ? "Ascending" : "Descending"}
+                  </p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>

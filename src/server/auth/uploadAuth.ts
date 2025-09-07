@@ -6,11 +6,12 @@ import { getSupabaseUser } from "./supabase";
 import { isValidOrganization, isValidMembership } from "./types";
 import { transformKeysToCamelCase } from "~/lib/utils/case-transformers";
 
-import type { PinPointSupabaseUser } from "~/lib/supabase/types";
+import type { PinPointSupabaseUser } from "~/lib/types";
 import type { DrizzleClient } from "~/server/db/drizzle";
 
 import { organizations, memberships } from "~/server/db/schema";
-import { extractTrustedSubdomain, parseSubdomainFromHost } from "~/lib/subdomain-verification";
+import { extractTrustedSubdomain } from "~/lib/subdomain-verification";
+import { resolveOrgSubdomainFromHost } from "~/lib/domain-org-mapping";
 
 export interface UploadAuthContext {
   user: PinPointSupabaseUser;
@@ -64,7 +65,7 @@ export async function getUploadAuthContext(
   const host = req.headers.get("host") ?? "";
   const subdomain =
     extractTrustedSubdomain(req.headers as unknown as Headers) ??
-    parseSubdomainFromHost(host);
+    resolveOrgSubdomainFromHost(host);
   if (!subdomain) {
     throw new TRPCError({
       code: "BAD_REQUEST",

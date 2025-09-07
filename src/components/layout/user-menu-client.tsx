@@ -26,7 +26,7 @@ interface UserMenuClientProps {
   };
 }
 
-export function UserMenuClient({ user }: UserMenuClientProps) {
+export function UserMenuClient({ user }: UserMenuClientProps): JSX.Element {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -35,7 +35,7 @@ export function UserMenuClient({ user }: UserMenuClientProps) {
             <AvatarImage src={user.profile_picture} />
             <AvatarFallback>
               {user.name
-                ?.split(" ")
+                .split(" ")
                 .map((n) => n[0])
                 .join("") || "?"}
             </AvatarFallback>
