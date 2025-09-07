@@ -33,5 +33,31 @@ export default async function HomePage(): Promise<React.JSX.Element> {
   }
 
   console.log(`[PAGE_HOMEPAGE] Showing homepage`);
-  return <PinPointHomepage />;
+  
+  // Temporary debug display for production testing
+  const debugInfo = {
+    host,
+    subdomain: sub,
+    verified,
+    shouldRedirect: Boolean(sub && verified)
+  };
+  
+  return (
+    <div>
+      <div style={{
+        position: 'fixed', 
+        top: '10px', 
+        right: '10px', 
+        background: 'red', 
+        color: 'white', 
+        padding: '10px', 
+        fontSize: '12px',
+        zIndex: 9999,
+        fontFamily: 'monospace'
+      }}>
+        DEBUG: {JSON.stringify(debugInfo, null, 2)}
+      </div>
+      <PinPointHomepage />
+    </div>
+  );
 }
