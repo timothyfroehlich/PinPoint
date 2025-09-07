@@ -101,10 +101,11 @@ jobs:
         run: |
           set -e
           echo "Running shellcheck for PR annotations..."
-          FILES=$(find scripts -type f -name "*.sh" 2>/dev/null || true)
-          if [ -f "start-database.sh" ]; then FILES="$FILES start-database.sh"; fi
-          if [ -n "$FILES" ]; then
-            shellcheck -f gcc $FILES | reviewdog -name="shellcheck" -f=gcc -reporter=github-pr-check -filter-mode=diff_context -level=warning -fail-on-error=false
+          shopt -s globstar nullglob
+          files=(scripts/**/*.sh)
+          if [ -f "start-database.sh" ]; then files+=("start-database.sh"); fi
+          if [ ${#files[@]} -gt 0 ]; then
+            shellcheck -f gcc "${files[@]}" | reviewdog -name="shellcheck" -f=gcc -reporter=github-pr-check -filter-mode=diff_context -level=warning -fail-on-error=false
           else
             echo "No shell scripts found"
           fi
