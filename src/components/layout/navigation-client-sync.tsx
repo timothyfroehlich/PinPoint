@@ -26,7 +26,7 @@ export function NavigationClientSync({
     // If client-side auth detects a user but server context is null,
     // refresh to get proper server-side context
     if (user) {
-      const organizationId = user.app_metadata?.organizationId as string | undefined;
+      const organizationId = user.app_metadata?.organizationId;
       if (organizationId) {
         console.log("🔄 Auth state changed, refreshing to sync server context");
         router.refresh();
