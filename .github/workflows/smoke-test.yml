@@ -53,8 +53,6 @@ jobs:
       - name: Setup Node, Deps, and Supabase
         uses: ./.github/actions/supabase-local
         with:
-          node-version: "24"
-          cli-version: latest
           exclude: studio,realtime,storage-api,edge-runtime,logflare,vector,imgproxy,supavisor,postgres-meta,mailpit
 
 
