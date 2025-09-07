@@ -76,7 +76,8 @@ jobs:
           echo "🗃️ Setting up database schema and seed data with local Supabase..."
 
           # Use unified reset script for schema + seeds (local Supabase)
-          npm run db:reset:local
+          # Pass --allow-non-local because .env.local points to preview/prod in CI
+          npm run db:reset:local -- --allow-non-local
 
           echo "✅ Database setup complete - ready for smoke test"
 
