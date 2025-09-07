@@ -116,7 +116,9 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   if (subdomainValue && verifiedValue) {
     supabaseResponse.headers.set("x-subdomain", subdomainValue);
     supabaseResponse.headers.set(SUBDOMAIN_VERIFIED_HEADER, verifiedValue);
-    console.log(`[MIDDLEWARE] Also setting response headers: x-subdomain=${subdomainValue}, verified=${verifiedValue}`);
+    console.log(
+      `[MIDDLEWARE] Also setting response headers: x-subdomain=${subdomainValue}, verified=${verifiedValue}`,
+    );
   }
 
   // Ensure any Supabase SSR cookies are applied to this final response
@@ -134,7 +136,9 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 function getSubdomain(host: string): string | null {
   // Centralized resolution with alias support
   const result = resolveOrgSubdomainFromHost(host);
-  console.log(`[MIDDLEWARE] Host resolution: "${host}" -> subdomain: "${result ?? 'null'}"`);
+  console.log(
+    `[MIDDLEWARE] Host resolution: "${host}" -> subdomain: "${result ?? "null"}"`,
+  );
   return result;
 }
 
