@@ -145,7 +145,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
+      - name: Detect workflow file changes (PRs only)
+        id: changed
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          filters: |
+            workflows:
+              - '.github/workflows/**'
+
       - name: actionlint (reviewdog)
+        if: github.event_name != 'pull_request' || steps.changed.outputs.workflows == 'true'
         uses: reviewdog/action-actionlint@95395aac8c053577d0bc67eb7b74936c660c6f66 # v1
         with:
           reporter: github-pr-check
