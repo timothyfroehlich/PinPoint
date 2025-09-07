@@ -39,33 +39,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       
-      - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - name: Setup Node, Deps, and Supabase
+        uses: ./.github/actions/supabase-local
         with:
           node-version: "24"
-          cache: "npm"
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
-      
-      - name: Start Supabase
-        run: |
-          echo "🚀 Starting Supabase for pgTAP RLS testing..."
-          # Initialize if no config exists
-          if [ ! -f "supabase/config.toml" ]; then
-            echo "No Supabase config found, initializing..."
-            supabase init
-          fi
-          
-          # Start Supabase with minimal services for faster startup
-          supabase start
-          
-          echo "✅ Supabase started successfully"
+          cli-version: latest
+          exclude: ''
           
       - name: Verify Supabase Connection
         run: |
@@ -73,7 +52,7 @@ jobs:
           
           # Test basic connectivity
           npm run db:push:local
-          
+
           # Verify auth functions are available
           psql "postgresql://postgres:postgres@localhost:54322/postgres" -c "SELECT auth.uid() IS NOT NULL as auth_function_available;" || echo "Auth function check failed (expected if no session)"
           
