@@ -5,8 +5,9 @@
 
 "use client";
 
+import React from "react";
 import { useActionState } from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "~/trpc/react";
 
@@ -29,26 +30,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import {
-  sendMagicLink,
-  signInWithOAuth,
-  type ActionResult,
-} from "~/lib/actions/auth-actions";
+import { sendMagicLink, signInWithOAuth } from "~/lib/actions/auth-actions";
 import { type OrganizationOption } from "~/lib/dal/public-organizations";
 
 // Development auth integration
 import { authenticateDevUser, getAuthResultMessage } from "~/lib/auth/dev-auth";
 import { isDevAuthAvailable } from "~/lib/environment-client";
 import { createClient } from "~/utils/supabase/client";
-import { getCurrentDomain } from "~/lib/utils/domain";
+import { resolveOrgSubdomainFromLocation } from "~/lib/domain-org-mapping";
 
-export function SignInForm() {
+export function SignInForm(): React.JSX.Element {
+  console.log(`[SIGNIN_FORM] Component mounting/rendering`);
   const router = useRouter();
-  
-  const [magicLinkState, magicLinkAction, magicLinkPending] = useActionState<
-    ActionResult<{ message: string }> | null,
-    FormData
-  >(sendMagicLink, null);
+
+  const [magicLinkState, magicLinkAction, magicLinkPending] = useActionState(
+    sendMagicLink,
+    null,
+  );
 
   const [isOAuthLoading, setIsOAuthLoading] = useState(false);
   const [devAuthLoading, setDevAuthLoading] = useState(false);
@@ -56,8 +54,11 @@ export function SignInForm() {
 
   // Organization selection state
   const [organizations, setOrganizations] = useState<OrganizationOption[]>([]);
-  const [selectedOrganizationId, setSelectedOrganizationId] = useState<string>("");
+  const [selectedOrganizationId, setSelectedOrganizationId] =
+    useState<string>("");
   const [organizationsLoading, setOrganizationsLoading] = useState(true);
+  const [isOrgLockedByHost, setIsOrgLockedByHost] = useState(false);
+  const [lockedOrgLabel, setLockedOrgLabel] = useState<string | null>(null);
 
   // tRPC: fetch public organizations (anon-safe)
   const { data: publicOrganizations, isLoading: orgsLoading } =
@@ -66,18 +67,53 @@ export function SignInForm() {
   // Development auth integration (preserving existing dev auth system)
   const shouldShowDevLogin = isDevAuthAvailable();
 
-  // Load organizations from tRPC when ready
-  useEffect(() => {
-    setOrganizationsLoading(orgsLoading);
-    if (orgsLoading) return;
-
-    const orgs: OrganizationOption[] = (publicOrganizations ?? []).map((o) => ({
+  // Memoize organizations array to prevent unnecessary re-renders
+  const orgs = useMemo(() => {
+    if (!publicOrganizations) return [];
+    return publicOrganizations.map((o) => ({
       id: o.id,
       name: o.name,
       subdomain: o.subdomain,
     }));
+  }, [publicOrganizations]);
 
-    // Prefer APC/test org as default if present, else first
+  // Load organizations and apply host-based org locking
+  useEffect(() => {
+    console.log(
+      `[SIGNIN_FORM] useEffect triggered - orgsLoading: ${String(orgsLoading)}, orgs.length: ${String(orgs.length)}`,
+    );
+
+    setOrganizationsLoading(orgsLoading);
+    if (orgsLoading || orgs.length === 0) return;
+
+    // Determine if host locks this session to a specific org (e.g., APC domain alias)
+    const lockedSubdomain = resolveOrgSubdomainFromLocation();
+    console.log(`[SIGNIN_FORM] Client-side host resolution:`);
+    console.log(
+      `[SIGNIN_FORM] window.location.hostname: "${typeof window !== "undefined" ? window.location.hostname : "undefined"}"`,
+    );
+    console.log(
+      `[SIGNIN_FORM] lockedSubdomain: "${lockedSubdomain ?? "null"}"`,
+    );
+    console.log(
+      `[SIGNIN_FORM] Available orgs:`,
+      orgs.map((o) => ({ id: o.id, subdomain: o.subdomain, name: o.name })),
+    );
+
+    if (lockedSubdomain) {
+      const locked = orgs.find((o) => o.subdomain === lockedSubdomain);
+      console.log(`[SIGNIN_FORM] Found locked org:`, locked);
+      if (locked) {
+        console.log(`[SIGNIN_FORM] Setting org locked by host: ${locked.name}`);
+        setIsOrgLockedByHost(true);
+        setLockedOrgLabel(locked.name);
+        setOrganizations([locked]);
+        setSelectedOrganizationId(locked.id);
+        return;
+      }
+    }
+
+    // Fallback default: prefer APC/test org as default if present, else first
     const apc = orgs.find(
       (o) => o.subdomain === "apc" || o.id === "test-org-pinpoint",
     );
@@ -85,14 +121,14 @@ export function SignInForm() {
 
     setOrganizations(orgs);
     setSelectedOrganizationId(defaultId);
-  }, [publicOrganizations, orgsLoading]);
+  }, [orgs, orgsLoading]);
 
-  const handleOAuthSignIn = async (provider: "google") => {
+  const handleOAuthSignIn = async (provider: "google"): Promise<void> => {
     if (!selectedOrganizationId) {
       alert("Please select an organization");
       return;
     }
-    
+
     setIsOAuthLoading(true);
     try {
       await signInWithOAuth(provider, selectedOrganizationId);
@@ -102,12 +138,12 @@ export function SignInForm() {
     }
   };
 
-  const handleDevAuth = async (email: string, role: string) => {
+  const handleDevAuth = async (email: string, role: string): Promise<void> => {
     if (!selectedOrganizationId) {
       alert("Please select an organization");
       return;
     }
-    
+
     setDevAuthLoading(true);
     try {
       const supabase = createClient();
@@ -117,32 +153,13 @@ export function SignInForm() {
         role,
         organizationId: selectedOrganizationId,
       };
-      const result = await authenticateDevUser(supabase as any, userData);
+      const result = await authenticateDevUser(supabase, userData);
 
       if (result.success) {
         console.log("Dev login successful:", result.method);
-        
-        // CRITICAL: Wait for session to sync between client and server
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Use the selected organization from the dropdown to redirect to proper subdomain
-        const selectedOrg = organizations.find(org => org.id === selectedOrganizationId);
-        if (selectedOrg?.subdomain) {
-          const isDev = typeof window !== 'undefined' && window.location.hostname === 'localhost';
-          if (isDev) {
-            window.location.href = `http://${selectedOrg.subdomain}.localhost:3000/dashboard`;
-            return;
-          }
-          // In production, use dynamic domain
-          const currentDomain = getCurrentDomain();
-          window.location.href = `https://${selectedOrg.subdomain}.${currentDomain}/dashboard`;
-          return;
-        }
-        
-        // Fallback: regular navigation if no organization selected
-        router.refresh();
-        await new Promise(resolve => setTimeout(resolve, 200));
-        router.push('/dashboard');
+
+        // Simple navigation to dashboard - let the application handle routing
+        router.push("/dashboard");
       } else {
         console.error("Login failed:", result.error);
         setDevAuthError(getAuthResultMessage(result));
@@ -162,44 +179,62 @@ export function SignInForm() {
         <CardDescription>Choose your preferred sign-in method</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Organization Selector */}
-        <div className="space-y-2">
-          <Label htmlFor="organization">Organization</Label>
-          {organizationsLoading ? (
-            <div className="flex items-center space-x-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
-              <span className="text-sm text-muted-foreground">Loading organizations...</span>
+        {/* Organization Selector (hidden when host locks to a specific org) */}
+        {!isOrgLockedByHost ? (
+          <div className="space-y-2">
+            <Label htmlFor="organization">Organization</Label>
+            {organizationsLoading ? (
+              <div className="flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
+                <span className="text-sm text-muted-foreground">
+                  Loading organizations...
+                </span>
+              </div>
+            ) : (
+              <Select
+                value={selectedOrganizationId}
+                onValueChange={setSelectedOrganizationId}
+                disabled={isOAuthLoading || magicLinkPending || devAuthLoading}
+              >
+                <SelectTrigger data-testid="org-select-trigger">
+                  <SelectValue
+                    placeholder="Select your organization"
+                    data-testid="org-select-value"
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {organizations.map((org) => (
+                    <SelectItem
+                      key={org.id}
+                      value={org.id}
+                      data-testid={`org-option-${org.subdomain}`}
+                    >
+                      {org.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {organizations.length === 0 && !organizationsLoading && (
+              <p className="text-sm text-error">
+                No organizations available. Please contact support.
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <Label>Organization</Label>
+            <div className="text-sm text-on-surface-variant">
+              {lockedOrgLabel ?? "Organization locked by site"}
             </div>
-          ) : (
-            <Select
-              value={selectedOrganizationId}
-              onValueChange={setSelectedOrganizationId}
-              disabled={isOAuthLoading || magicLinkPending || devAuthLoading}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select your organization" />
-              </SelectTrigger>
-              <SelectContent>
-                {organizations.map((org) => (
-                  <SelectItem key={org.id} value={org.id}>
-                    {org.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          {organizations.length === 0 && !organizationsLoading && (
-            <p className="text-sm text-error">
-              No organizations available. Please contact support.
-            </p>
-          )}
-        </div>
+          </div>
+        )}
 
         <Separator />
 
         {/* Google OAuth */}
         <Button
-          onClick={() => handleOAuthSignIn("google")}
+          onClick={() => void handleOAuthSignIn("google")}
           disabled={isOAuthLoading || magicLinkPending || devAuthLoading}
           className="w-full"
           variant="outline"
@@ -255,10 +290,11 @@ export function SignInForm() {
               required
               disabled={magicLinkPending || isOAuthLoading || devAuthLoading}
             />
-            {magicLinkState?.success === false &&
+            {magicLinkState &&
+              !magicLinkState.success &&
               magicLinkState.fieldErrors?.["email"] && (
                 <p className="text-sm text-error">
-                  {magicLinkState.fieldErrors["email"]}
+                  {magicLinkState.fieldErrors["email"][0]}
                 </p>
               )}
           </div>
@@ -287,7 +323,7 @@ export function SignInForm() {
         </form>
 
         {/* Action Results */}
-        {magicLinkState?.success === true && (
+        {magicLinkState && magicLinkState.success && (
           <Alert className="border-tertiary bg-tertiary-container">
             <div className="text-on-tertiary-container">
               <p className="font-medium">Magic link sent!</p>
@@ -296,14 +332,16 @@ export function SignInForm() {
           </Alert>
         )}
 
-        {magicLinkState?.success === false && !magicLinkState.fieldErrors && (
-          <Alert className="border-error bg-error-container">
-            <div className="text-on-error-container">
-              <p className="font-medium">Sign-in failed</p>
-              <p className="text-sm mt-1">{magicLinkState.error}</p>
-            </div>
-          </Alert>
-        )}
+        {magicLinkState &&
+          !magicLinkState.success &&
+          !magicLinkState.fieldErrors && (
+            <Alert className="border-error bg-error-container">
+              <div className="text-on-error-container">
+                <p className="font-medium">Sign-in failed</p>
+                <p className="text-sm mt-1">{magicLinkState.error}</p>
+              </div>
+            </Alert>
+          )}
 
         {/* Development Auth (preserved from existing system) */}
         {shouldShowDevLogin && (
@@ -328,7 +366,7 @@ export function SignInForm() {
               <div className="space-y-2">
                 <Button
                   onClick={() =>
-                    handleDevAuth("tim.froehlich@example.com", "Admin")
+                    void handleDevAuth("tim.froehlich@example.com", "Admin")
                   }
                   disabled={
                     devAuthLoading || magicLinkPending || isOAuthLoading
@@ -336,13 +374,14 @@ export function SignInForm() {
                   variant="outline"
                   size="sm"
                   className="w-full text-xs"
+                  data-testid="dev-login-tim"
                 >
                   {devAuthLoading ? "Logging in..." : "Dev Login: Tim (Admin)"}
                 </Button>
 
                 <Button
                   onClick={() =>
-                    handleDevAuth("harry.williams@example.com", "Member")
+                    void handleDevAuth("harry.williams@example.com", "Member")
                   }
                   disabled={
                     devAuthLoading || magicLinkPending || isOAuthLoading
@@ -350,6 +389,7 @@ export function SignInForm() {
                   variant="outline"
                   size="sm"
                   className="w-full text-xs"
+                  data-testid="dev-login-harry"
                 >
                   {devAuthLoading
                     ? "Logging in..."

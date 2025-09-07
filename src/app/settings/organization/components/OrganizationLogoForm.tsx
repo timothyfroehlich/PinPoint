@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useActionState } from "react";
+import React, { useActionState } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -14,12 +14,15 @@ import { LoaderIcon, UploadIcon, ImageIcon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { updateOrganizationLogoAction } from "~/lib/actions/organization-actions";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 
 interface OrganizationLogoFormProps {
   currentLogoUrl: string;
 }
 
-export function OrganizationLogoForm({ currentLogoUrl }: OrganizationLogoFormProps) {
+export function OrganizationLogoForm({
+  currentLogoUrl,
+}: OrganizationLogoFormProps): JSX.Element {
   const [state, formAction, isPending] = useActionState(
     updateOrganizationLogoAction,
     null,
@@ -36,11 +39,11 @@ export function OrganizationLogoForm({ currentLogoUrl }: OrganizationLogoFormPro
     }
   }, [state]);
 
-  const handleUrlChange = (url: string) => {
+  const handleUrlChange = (url: string): void => {
     setPreviewUrl(url);
   };
 
-  const clearLogo = () => {
+  const clearLogo = (): void => {
     setPreviewUrl("");
     setHasImageError(false);
   };
@@ -61,9 +64,11 @@ export function OrganizationLogoForm({ currentLogoUrl }: OrganizationLogoFormPro
             <div className="flex items-center space-x-3">
               <div className="h-12 w-12 rounded border flex items-center justify-center overflow-hidden bg-muted">
                 {previewUrl && !hasImageError ? (
-                  <img
+                  <Image
                     src={previewUrl}
                     alt="Organization logo"
+                    width={48}
+                    height={48}
                     className="h-full w-full object-contain"
                     onError={() => {
                       setHasImageError(true);
@@ -102,12 +107,16 @@ export function OrganizationLogoForm({ currentLogoUrl }: OrganizationLogoFormPro
             name="logoUrl"
             type="url"
             value={previewUrl}
-            onChange={(e) => { handleUrlChange(e.target.value); }}
+            onChange={(e) => {
+              handleUrlChange(e.target.value);
+            }}
             placeholder="https://example.com/logo.png"
             disabled={isPending}
           />
           {state && !state.success && state.fieldErrors?.["logoUrl"] && (
-            <p className="text-sm text-destructive">{state.fieldErrors["logoUrl"][0]}</p>
+            <p className="text-sm text-destructive">
+              {state.fieldErrors["logoUrl"][0]}
+            </p>
           )}
           <p className="text-xs text-muted-foreground">
             Enter a URL to an image file (PNG, JPG, or SVG recommended)

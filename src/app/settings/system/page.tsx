@@ -4,28 +4,52 @@
  * Phase 4B.3: Basic System Settings
  */
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Separator } from "~/components/ui/separator";
-import { 
-  SettingsIcon, 
-  BellIcon, 
+import {
+  SettingsIcon,
+  BellIcon,
   ShieldCheckIcon,
   DatabaseIcon,
   PaletteIcon,
   ClockIcon,
   GlobeIcon,
-  ZapIcon
+  ZapIcon,
 } from "lucide-react";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { getRequestAuthContext } from "~/server/auth/context";
+import { AuthGuard } from "~/components/auth/auth-guard";
 import { getSystemSettings } from "~/lib/dal/system-settings";
 import { SystemNotificationSettings } from "./components/SystemNotificationSettings";
 import { SystemSecuritySettings } from "./components/SystemSecuritySettings";
 import { SystemPreferences } from "./components/SystemPreferences";
 
-export default async function SystemSettingsPage() {
-  const { organization } = await requireMemberAccess();
-  const organizationId = organization.id;
+export default async function SystemSettingsPage(): Promise<React.JSX.Element> {
+  const authContext = await getRequestAuthContext();
+
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="System Settings Access Required"
+      fallbackMessage="You need to be signed in as a member to manage system settings."
+    >
+      <SystemSettingsPageContent />
+    </AuthGuard>
+  );
+}
+
+async function SystemSettingsPageContent(): Promise<React.JSX.Element> {
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Unauthorized access"); // This should never happen due to AuthGuard
+  }
+  const organizationId = authContext.org.id;
 
   // Fetch system settings from database
   const systemSettings = await getSystemSettings(organizationId);
@@ -104,7 +128,7 @@ export default async function SystemSettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <SystemNotificationSettings 
+            <SystemNotificationSettings
               settings={systemSettings.notifications}
             />
           </CardContent>
@@ -122,9 +146,7 @@ export default async function SystemSettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <SystemSecuritySettings 
-              settings={systemSettings.security}
-            />
+            <SystemSecuritySettings settings={systemSettings.security} />
           </CardContent>
         </Card>
       </div>
@@ -141,9 +163,7 @@ export default async function SystemSettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <SystemPreferences 
-            settings={systemSettings.preferences}
-          />
+          <SystemPreferences settings={systemSettings.preferences} />
         </CardContent>
       </Card>
 
@@ -165,27 +185,28 @@ export default async function SystemSettingsPage() {
                 name: "Real-time Updates",
                 description: "Enable live updates for issues and comments",
                 enabled: systemSettings.features.realTimeUpdates,
-                key: "realTimeUpdates"
+                key: "realTimeUpdates",
               },
               {
                 name: "Analytics Tracking",
                 description: "Collect usage analytics for system improvement",
                 enabled: systemSettings.features.analyticsTracking,
-                key: "analyticsTracking"
+                key: "analyticsTracking",
               },
               {
                 name: "Beta Features",
                 description: "Enable experimental features and early access",
                 enabled: systemSettings.features.betaFeatures,
-                key: "betaFeatures"
+                key: "betaFeatures",
               },
               {
                 name: "Maintenance Mode",
-                description: "Temporarily disable system access for maintenance",
+                description:
+                  "Temporarily disable system access for maintenance",
                 enabled: systemSettings.features.maintenanceMode,
                 key: "maintenanceMode",
-                warning: true
-              }
+                warning: true,
+              },
             ].map((feature, index) => (
               <div key={feature.key}>
                 <div className="flex items-center justify-between">
@@ -244,7 +265,9 @@ export default async function SystemSettingsPage() {
               </div>
               <div>
                 <p className="text-sm font-medium">Deployment</p>
-                <p className="text-sm text-muted-foreground">Local Development</p>
+                <p className="text-sm text-muted-foreground">
+                  Local Development
+                </p>
               </div>
               <div>
                 <p className="text-sm font-medium">Last Deployment</p>

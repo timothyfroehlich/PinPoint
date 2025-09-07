@@ -12,6 +12,7 @@ import type {
 import type {
   IssueWithRelationsResponse,
   IssueResponse,
+  IssueStatus,
 } from "~/lib/types/api";
 
 // Internal utilities (alphabetical)
@@ -760,7 +761,7 @@ export const issueCoreRouter = createTRPCRouter({
             aValue = a.priority.order;
             bValue = b.priority.order;
             break;
-          case "game":
+          case "machine":
             aValue = a.machine.model.name;
             bValue = b.machine.model.name;
             break;
@@ -1160,11 +1161,13 @@ export const issueCoreRouter = createTRPCRouter({
       const userPermissions = ["issue:edit"] as const;
       const validationResult = validateStatusTransition(
         {
-          currentStatus: transformKeysToCamelCase(existingIssue.status) as any, // IssueStatus type conversion
+          currentStatus: transformKeysToCamelCase(
+            existingIssue.status,
+          ) as IssueStatus,
           newStatusId: input.statusId,
           organizationId: ctx.organizationId,
         },
-        transformKeysToCamelCase(newStatus) as any, // IssueStatus type conversion
+        transformKeysToCamelCase(newStatus) as IssueStatus,
         {
           userPermissions,
           organizationId: ctx.organizationId,
@@ -1180,8 +1183,8 @@ export const issueCoreRouter = createTRPCRouter({
 
       // Get status change effects using extracted function
       const effects = getStatusChangeEffects(
-        transformKeysToCamelCase(existingIssue.status) as any, // IssueStatus type conversion
-        transformKeysToCamelCase(newStatus) as any, // IssueStatus type conversion
+        transformKeysToCamelCase(existingIssue.status) as IssueStatus,
+        transformKeysToCamelCase(newStatus) as IssueStatus,
       );
 
       // Update the issue
@@ -1365,7 +1368,7 @@ export const issueCoreRouter = createTRPCRouter({
             aValue = a.priority.order;
             bValue = b.priority.order;
             break;
-          case "game":
+          case "machine":
             aValue = a.machine.model.name;
             bValue = b.machine.model.name;
             break;

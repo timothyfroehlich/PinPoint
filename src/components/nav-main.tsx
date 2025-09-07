@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { IconCirclePlusFilled, IconMail, type Icon } from "@tabler/icons-react";
 
 import { Button } from "src/components/ui/button";
@@ -19,7 +20,7 @@ export function NavMain({
     url: string;
     icon?: Icon;
   }[];
-}) {
+}): JSX.Element {
   return (
     <SidebarGroup>
       <SidebarGroupContent className="flex flex-col gap-2">

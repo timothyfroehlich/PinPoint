@@ -1,22 +1,25 @@
 "use client";
 
-import { type InferSelectModel } from "drizzle-orm";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import { Separator } from "~/components/ui/separator";
-import { Chrome, Loader2 } from "lucide-react";
+import { Globe, Loader2 } from "lucide-react";
 
 import { useAuth } from "~/app/auth-provider";
 import { authenticateDevUser, getAuthResultMessage } from "~/lib/auth/dev-auth";
 import { isDevAuthAvailable } from "~/lib/environment-client";
 import { createClient } from "~/utils/supabase/client";
-import type { users, roles } from "~/server/db/schema";
-
-type User = InferSelectModel<typeof users>;
-type Role = InferSelectModel<typeof roles>;
+import { getErrorMessage } from "~/lib/utils/type-guards";
+import type { User, Role } from "~/lib/types/db";
 type UserWithRole = User & { role: Role | null };
 
 // Check if dev features are available
@@ -55,7 +58,7 @@ export default function SignInPage(): React.ReactElement | null {
           const { users } = (await res.json()) as { users: UserWithRole[] };
           setUsers(users);
         } catch (error) {
-          console.error("Error fetching dev users:", error);
+          console.error("Error fetching dev users:", getErrorMessage(error));
         } finally {
           setIsLoadingUsers(false);
         }
@@ -79,7 +82,7 @@ export default function SignInPage(): React.ReactElement | null {
         console.error("Google sign in failed:", error.message);
       }
     } catch (error) {
-      console.error("Google sign in failed:", error);
+      console.error("Google sign in failed:", getErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
@@ -100,7 +103,7 @@ export default function SignInPage(): React.ReactElement | null {
       if (testUser?.name) userData.name = testUser.name;
       if (testUser?.role?.name) userData.role = testUser.role.name;
 
-      const result = await authenticateDevUser(supabase as any, userData);
+      const result = await authenticateDevUser(supabase, userData);
 
       const message = getAuthResultMessage(result);
 
@@ -123,7 +126,9 @@ export default function SignInPage(): React.ReactElement | null {
     }
   }
 
-  function getRoleBadgeVariant(role: Role | null): "default" | "secondary" | "destructive" | "outline" {
+  function getRoleBadgeVariant(
+    role: Role | null,
+  ): "default" | "secondary" | "destructive" | "outline" {
     if (!role) return "default";
     switch (role.name.toLowerCase()) {
       case "admin":
@@ -150,7 +155,7 @@ export default function SignInPage(): React.ReactElement | null {
             Welcome back! Please sign in to continue.
           </CardDescription>
         </CardHeader>
-        
+
         <CardContent className="space-y-6">
           <Button
             className="w-full h-12"
@@ -160,7 +165,7 @@ export default function SignInPage(): React.ReactElement | null {
             {isLoading ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
-              <Chrome className="mr-2 h-4 w-4" />
+              <Globe className="mr-2 h-4 w-4" />
             )}
             Sign in with Google
           </Button>
@@ -178,7 +183,9 @@ export default function SignInPage(): React.ReactElement | null {
 
               <div className="space-y-4">
                 <div>
-                  <h3 className="text-base font-medium">Quick Login (Dev Only)</h3>
+                  <h3 className="text-base font-medium">
+                    Quick Login (Dev Only)
+                  </h3>
                   <p className="text-sm text-muted-foreground mt-1">
                     Skip authentication and login as a test user
                   </p>
@@ -199,13 +206,15 @@ export default function SignInPage(): React.ReactElement | null {
                           variant="outline"
                           size="sm"
                           disabled={isLoading}
-                          onClick={() => void handleDevLogin(testUser.email ?? "")}
+                          onClick={() =>
+                            void handleDevLogin(testUser.email ?? "")
+                          }
                           className="flex-1 justify-start text-xs h-8"
                         >
                           {testUser.name}
                         </Button>
                         {testUser.role && (
-                          <Badge 
+                          <Badge
                             variant={getRoleBadgeVariant(testUser.role)}
                             className="text-xs h-5"
                           >

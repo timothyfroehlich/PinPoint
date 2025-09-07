@@ -14,29 +14,15 @@ import { mockDeep } from "vitest-mock-extended";
 import type { TRPCContext } from "~/server/api/trpc.base";
 import type { DrizzleClient } from "~/server/db/drizzle";
 import type { SupabaseServerClient } from "~/lib/supabase/server";
+import type { AnonymousTestContext } from "~/lib/types";
 import { SEED_TEST_IDS } from "../constants/seed-test-ids";
 import { createMockDatabase } from "./service-test-helpers";
-import { SUBDOMAIN_VERIFIED_HEADER, SUBDOMAIN_HEADER } from "~/lib/subdomain-verification";
+import {
+  SUBDOMAIN_VERIFIED_HEADER,
+  SUBDOMAIN_HEADER,
+} from "~/lib/subdomain-verification";
 
-/**
- * Anonymous user test context with organization scoping
- */
-export interface AnonymousTestContext {
-  /** Mocked tRPC context for anonymous user */
-  mockContext: Partial<TRPCContext>;
-  /** Mocked Drizzle database client */
-  mockDb: MockProxy<DrizzleClient>;
-  /** Mocked Supabase client */
-  mockSupabase: MockProxy<SupabaseServerClient>;
-  /** Current organization context */
-  organization: {
-    id: string;
-    name: string;
-    subdomain: string;
-  };
-  /** Request headers with subdomain */
-  headers: Headers;
-}
+// AnonymousTestContext has been moved to ~/lib/types/test.ts for centralization
 
 /**
  * Creates a mock tRPC context for anonymous user testing

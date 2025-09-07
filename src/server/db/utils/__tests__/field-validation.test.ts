@@ -103,7 +103,7 @@ describe("Field Validation Utilities", () => {
     });
 
     it("should provide automatic conversion for unknown camelCase fields", () => {
-      const result = validateFieldExists("users", "someNewField");
+      const result = validateFieldExists("users", "singleword");
       expect(result.valid).toBe(true); // single word, not camelCase
 
       const camelResult = validateFieldExists("users", "someNewCamelField");

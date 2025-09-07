@@ -313,13 +313,13 @@ Example Implementation:
 
 ### **/games (All Games Page)**
 
-- **Purpose:** Organization-wide view of all game titles.
+- **Purpose:** Organization-wide view of all models.
 - **Public View:**
-  - Searchable list of all game titles in the organization
+  - Searchable list of all models in the organization
   - Filter by manufacturer, era, location
   - Count of instances per title
 - **Authenticated View (Additional Components):**
-  - Add custom game title (permission-based)
+  - Add custom model (permission-based)
   - Edit game metadata
   - Bulk operations
 

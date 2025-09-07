@@ -27,7 +27,7 @@ import {
   ListIcon,
   XIcon,
 } from "lucide-react";
-import type { MachineFilters } from "~/lib/dal/machines";
+import type { MachineFilters } from "~/lib/types";
 
 interface MachineFiltersClientProps {
   locations: {
@@ -44,13 +44,13 @@ export function MachineFiltersClient({
   locations,
   initialFilters,
   viewMode,
-}: MachineFiltersClientProps) {
+}: MachineFiltersClientProps): JSX.Element {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
   const [selectedLocations, setSelectedLocations] = useState<string[]>(
-    initialFilters.locationIds || [],
+    initialFilters.locationIds ?? [],
   );
 
   const updateFilters = (
@@ -59,7 +59,7 @@ export function MachineFiltersClient({
       hasQR: boolean | undefined;
       view: "table" | "grid";
     }>,
-  ) => {
+  ): void => {
     const params = new URLSearchParams(searchParams);
 
     if (updates.locations !== undefined) {
@@ -72,11 +72,7 @@ export function MachineFiltersClient({
     }
 
     if (updates.hasQR !== undefined) {
-      if (updates.hasQR !== null) {
-        params.set("hasQR", String(updates.hasQR));
-      } else {
-        params.delete("hasQR");
-      }
+      params.set("hasQR", String(updates.hasQR));
     }
 
     if (updates.view) {
@@ -95,7 +91,7 @@ export function MachineFiltersClient({
     });
   };
 
-  const toggleLocation = (locationId: string) => {
+  const toggleLocation = (locationId: string): void => {
     const newSelection = selectedLocations.includes(locationId)
       ? selectedLocations.filter((id) => id !== locationId)
       : [...selectedLocations, locationId];
@@ -103,7 +99,7 @@ export function MachineFiltersClient({
     updateFilters({ locations: newSelection });
   };
 
-  const clearAllFilters = () => {
+  const clearAllFilters = (): void => {
     const params = new URLSearchParams(searchParams);
     params.delete("location");
     params.delete("model");
@@ -119,9 +115,9 @@ export function MachineFiltersClient({
   };
 
   const activeFilterCount =
-    (initialFilters.locationIds?.length || 0) +
-    (initialFilters.modelIds?.length || 0) +
-    (initialFilters.ownerIds?.length || 0) +
+    (initialFilters.locationIds?.length ?? 0) +
+    (initialFilters.modelIds?.length ?? 0) +
+    (initialFilters.ownerIds?.length ?? 0) +
     (initialFilters.hasQR !== undefined ? 1 : 0);
 
   return (

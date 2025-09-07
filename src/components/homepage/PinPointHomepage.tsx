@@ -21,7 +21,7 @@ import {
   ClipboardListIcon,
 } from "lucide-react";
 
-export function PinPointHomepage() {
+export function PinPointHomepage(): JSX.Element {
   return (
     <div className="min-h-screen bg-gradient-to-b from-surface to-surface-variant">
       {/* Hero Section */}

@@ -1,19 +1,26 @@
 import { z } from "zod";
+import {
+  titleSchema,
+  emailSchema,
+  idSchema,
+  issueIdSchema,
+  descriptionSchema,
+  apiPaginationSchema,
+  sortOrderSchema,
+} from "~/lib/validation/schemas";
+import { ISSUE_SORT_OPTIONS } from "~/lib/types/filters";
 
 /**
  * Issue Creation Schema
  * Core schema for creating issues with additional validation
  */
 export const issueCreateSchema = z.object({
-  title: z
-    .string()
-    .min(1, "Title is required")
-    .max(200, "Title must be 200 characters or less"),
+  title: titleSchema,
   description: z.string().optional(),
-  machineId: z.string().min(1, "Machine ID is required"),
+  machineId: idSchema,
   submitterName: z.string().optional(),
-  reporterEmail: z.email().optional(),
-  organizationId: z.string().min(1, "Organization ID is required").optional(),
+  reporterEmail: emailSchema.optional(),
+  organizationId: idSchema.optional(),
 });
 
 /**
@@ -21,13 +28,9 @@ export const issueCreateSchema = z.object({
  * Schema for updating existing issues
  */
 export const issueUpdateSchema = z.object({
-  id: z.string().min(1, "Issue ID is required"),
-  title: z
-    .string()
-    .min(1, "Title is required")
-    .max(200, "Title must be 200 characters or less")
-    .optional(),
-  description: z.string().min(1).nullable().optional(),
+  id: issueIdSchema,
+  title: titleSchema.optional(),
+  description: descriptionSchema.nullable().optional(),
   statusId: z.string().optional(),
   assignedToId: z.string().optional(),
   priorityId: z.string().optional(),
@@ -38,22 +41,19 @@ export const issueUpdateSchema = z.object({
  * Enhanced validation for complex filtering operations
  */
 export const issueFilterSchema = z.object({
-  locationId: z.string().optional(),
-  machineId: z.string().optional(),
-  statusIds: z.array(z.string()).optional(),
+  locationId: idSchema.optional(),
+  machineId: idSchema.optional(),
+  statusIds: z.array(idSchema).optional(),
   search: z.string().optional(),
-  assigneeId: z.string().optional(),
-  reporterId: z.string().optional(),
-  ownerId: z.string().optional(),
-  modelId: z.string().optional(),
-  statusId: z.string().optional(),
-  priorityIds: z.array(z.string()).optional(),
-  limit: z.number().min(1).max(1000).optional(),
-  offset: z.number().min(0).optional(),
-  sortBy: z
-    .enum(["created", "updated", "status", "severity", "game"])
-    .optional(),
-  sortOrder: z.enum(["asc", "desc"]).optional(),
+  assigneeId: idSchema.optional(),
+  reporterId: idSchema.optional(),
+  ownerId: idSchema.optional(),
+  modelId: idSchema.optional(),
+  statusId: idSchema.optional(),
+  priorityIds: z.array(idSchema).optional(),
+  ...apiPaginationSchema.shape,
+  sortBy: z.enum(ISSUE_SORT_OPTIONS).optional(),
+  sortOrder: sortOrderSchema.optional(),
   statusCategory: z.string().optional(),
 });
 
@@ -62,8 +62,8 @@ export const issueFilterSchema = z.object({
  * For assigning issues to users
  */
 export const issueAssignSchema = z.object({
-  issueId: z.string().min(1, "Issue ID is required"),
-  userId: z.string().min(1, "User ID is required"),
+  issueId: issueIdSchema,
+  userId: idSchema,
 });
 
 /**
@@ -71,8 +71,8 @@ export const issueAssignSchema = z.object({
  * For updating issue status
  */
 export const issueStatusUpdateSchema = z.object({
-  id: z.string().min(1, "Issue ID is required"),
-  statusId: z.string().min(1, "Status ID is required"),
+  id: issueIdSchema,
+  statusId: idSchema,
 });
 
 /**
@@ -80,29 +80,26 @@ export const issueStatusUpdateSchema = z.object({
  * For public-facing issue creation with additional validation
  */
 export const publicIssueCreateSchema = z.object({
-  title: z
-    .string()
-    .min(1, "Title is required")
-    .max(200, "Title must be 200 characters or less"),
+  title: titleSchema,
   description: z.string().optional(),
-  machineId: z.string().min(1, "Machine ID is required"),
+  machineId: idSchema,
   submitterName: z.string().optional(),
-  reporterEmail: z.email(),
+  reporterEmail: emailSchema,
 });
 
 /**
  * Output validation schemas corresponding to API response transformers
  */
 export const issueResponseSchema = z.object({
-  id: z.string(),
+  id: issueIdSchema,
   title: z.string(),
   description: z.string().nullable(),
-  machineId: z.string(),
-  organizationId: z.string(),
-  statusId: z.string(),
-  priorityId: z.string(),
-  assignedToId: z.string().nullable(),
-  createdById: z.string(),
+  machineId: idSchema,
+  organizationId: idSchema,
+  statusId: idSchema,
+  priorityId: idSchema,
+  assignedToId: idSchema.nullable(),
+  createdById: idSchema,
   resolvedAt: z.date().nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
