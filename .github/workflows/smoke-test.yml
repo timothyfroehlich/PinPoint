@@ -43,15 +43,25 @@ jobs:
           [[ -n "$DB_URL" ]] || { echo "❌ DB_URL not set by Supabase CLI"; exit 1; }
 
           # Map to Next.js client/server env expectations
-          echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
-          echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$ANON_KEY" >> "$GITHUB_ENV"
-          echo "SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
-          echo "SUPABASE_SECRET_KEY=$SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
-          echo "DATABASE_URL=$DB_URL" >> "$GITHUB_ENV"
-          echo "DIRECT_URL=$DB_URL" >> "$GITHUB_ENV"
+          # Reconstruct DATABASE_URL to avoid GitHub secret masking issues
+          DB_PORT=$(echo "$DB_URL" | grep -o '[0-9]*' | head -1)
+          DB_HOST="127.0.0.1"
+          DB_NAME="postgres"
+          RECONSTRUCTED_DB_URL="postgresql://postgres:postgres@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+          
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$ANON_KEY"
+            echo "SUPABASE_URL=$API_URL"
+            echo "SUPABASE_SECRET_KEY=$SERVICE_ROLE_KEY"
+            echo "DATABASE_URL=$RECONSTRUCTED_DB_URL"
+            echo "DIRECT_URL=$RECONSTRUCTED_DB_URL"
+          } >> "$GITHUB_ENV"
 
           # Helpful for logs/debugging
-          echo "✅ Mapped env: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL, SUPABASE_SECRET_KEY, DATABASE_URL, DIRECT_URL"
+          echo "✅ Mapped env: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL, SUPABASE_SECRET_KEY"
+          echo "✅ DATABASE_URL reconstructed: postgresql://postgres:postgres@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+          echo "✅ Original DB_URL for reference: $DB_URL"
 
 
       - name: Cache Playwright Browsers
