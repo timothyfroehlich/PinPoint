@@ -57,7 +57,10 @@ function safeHost(urlString: string | undefined): string | null {
   }
 }
 
-function redactKey(value: string | undefined, tailLen = 6): {
+function redactKey(
+  value: string | undefined,
+  tailLen = 6,
+): {
   present: boolean;
   tail: string | null;
 } {
@@ -69,9 +72,13 @@ function redactKey(value: string | undefined, tailLen = 6): {
 function parseProjectRef(urlString: string | undefined): string | null {
   if (!urlString) return null;
   try {
-    const u = new URL(urlString.includes("://") ? urlString : `https://${urlString}`);
+    const u = new URL(
+      urlString.includes("://") ? urlString : `https://${urlString}`,
+    );
     const parts = u.hostname.split(".");
-    const supabaseIdx = parts.findIndex((p) => p.toLowerCase().includes("supabase"));
+    const supabaseIdx = parts.findIndex((p) =>
+      p.toLowerCase().includes("supabase"),
+    );
     if (supabaseIdx > 0) return parts[supabaseIdx - 1] ?? null;
     return null;
   } catch {
@@ -86,8 +93,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   const url = new URL(req.url);
-  const deep = url.searchParams.get("deep") === "1" || url.searchParams.get("deep") === "true";
-  const probeAuth = deep || url.searchParams.get("auth") === "1" || url.searchParams.get("auth") === "true";
+  const deep =
+    url.searchParams.get("deep") === "1" ||
+    url.searchParams.get("deep") === "true";
+  const probeAuth =
+    deep ||
+    url.searchParams.get("auth") === "1" ||
+    url.searchParams.get("auth") === "true";
 
   // Gather environment basics
   const publicUrl = env.NEXT_PUBLIC_SUPABASE_URL;
@@ -122,7 +134,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     })(),
   };
 
-  const matches = derived.publicRef && derived.serverRef ? derived.publicRef === derived.serverRef : null;
+  const matches =
+    derived.publicRef && derived.serverRef
+      ? derived.publicRef === derived.serverRef
+      : null;
 
   logger.info({
     msg: "[DEV-DIAG] Environment summary",
@@ -162,7 +177,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   let adminErr: string | undefined;
   try {
     const admin = await createAdminClient();
-    const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1 });
+    const { data, error } = await admin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1,
+    });
     if (error) throw error as unknown as Error;
     adminOk = true;
     adminTotalHint = Array.isArray(data.users) ? data.users.length : 0;
@@ -207,9 +225,15 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
   }
 
-  const adminListUsers: DiagnosticsResponse["checks"]["adminListUsers"] = adminOk
-    ? { ok: true, ...(typeof adminTotalHint === "number" ? { totalUsersHint: adminTotalHint } : {}) }
-    : { ok: false, ...(adminErr ? { error: adminErr } : {}) };
+  const adminListUsers: DiagnosticsResponse["checks"]["adminListUsers"] =
+    adminOk
+      ? {
+          ok: true,
+          ...(typeof adminTotalHint === "number"
+            ? { totalUsersHint: adminTotalHint }
+            : {}),
+        }
+      : { ok: false, ...(adminErr ? { error: adminErr } : {}) };
 
   const checks: DiagnosticsResponse["checks"] = {
     adminListUsers,
