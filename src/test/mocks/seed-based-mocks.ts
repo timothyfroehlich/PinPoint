@@ -90,7 +90,6 @@ function getRandomIssueTitle(): string {
 }
 
 export const SeedBasedMockFactory = {
-
   /**
    * Generate mock organizations based on seed patterns
    */
@@ -215,9 +214,7 @@ export const SeedBasedMockFactory = {
   /**
    * Generate mock priorities based on seed patterns
    */
-  createMockPriority: (
-    overrides: Partial<MockPriority> = {},
-  ): MockPriority => {
+  createMockPriority: (overrides: Partial<MockPriority> = {}): MockPriority => {
     const defaults = {
       id: "priority-medium",
       name: "Medium",
@@ -298,7 +295,7 @@ export const SeedBasedMockFactory = {
     }
 
     return issues;
-  }
+  },
 };
 
 /**
@@ -324,7 +321,7 @@ export const MockAuthContextFactory = {
       user: null,
       organizationId: null,
     };
-  }
+  },
 };
 
 /**
@@ -386,7 +383,7 @@ export const MockDatabaseFactory = {
         })),
       })),
     };
-  }
+  },
 };
 
 /**
@@ -444,7 +441,7 @@ export const MockFormDataFactory = {
     });
 
     return formData;
-  }
+  },
 };
 
 /**
@@ -519,7 +516,7 @@ export const MockScenarioFactory = {
         issues: SeedBasedMockFactory.createMockIssues(50), // Large dataset
       },
     };
-  }
+  },
 };
 
 // Re-export for convenience

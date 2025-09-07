@@ -93,7 +93,7 @@ export function AdvancedSearchForm({
     if (externalBuildUrl) {
       return externalBuildUrl(params);
     }
-    
+
     if (entityType === "issues") {
       return buildIssueUrl(basePath, params, currentParams);
     } else if (entityType === "machines") {

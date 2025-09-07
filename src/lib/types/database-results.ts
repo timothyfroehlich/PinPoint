@@ -30,8 +30,8 @@ export type AggregateResult<T extends Record<string, unknown>> = {
 export type SafeQueryResult<T> = T extends (infer U)[]
   ? U[]
   : T extends Record<string, unknown>
-  ? T
-  : T;
+    ? T
+    : T;
 
 /**
  * Common aggregation result for statistics queries

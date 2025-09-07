@@ -47,27 +47,40 @@ export default defineConfig({
     // 3. Authenticated browsers (depend on auth-setup)
     {
       name: "chromium-auth",
-      use: { ...devices["Desktop Chrome"], storageState: "e2e/.auth/user.json" },
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: "e2e/.auth/user.json",
+      },
       dependencies: ["auth-setup"],
     },
     {
       name: "firefox-auth",
-      use: { ...devices["Desktop Firefox"], storageState: "e2e/.auth/user.json" },
+      use: {
+        ...devices["Desktop Firefox"],
+        storageState: "e2e/.auth/user.json",
+      },
       dependencies: ["auth-setup"],
     },
     {
       name: "webkit-auth",
-      use: { ...devices["Desktop Safari"], storageState: "e2e/.auth/user.json" },
+      use: {
+        ...devices["Desktop Safari"],
+        storageState: "e2e/.auth/user.json",
+      },
       dependencies: ["auth-setup"],
     },
   ],
   ...(SHOULD_START
     ? {
         webServer: {
-          command: `NEXT_PUBLIC_ENABLE_DEV_FEATURES=true PORT=${PORT} npm run dev`,
+          command: `npm run dev`,
           url: BASE_URL,
           reuseExistingServer: true, // don't kill an already running dev server
           timeout: 120_000,
+          env: {
+            NEXT_PUBLIC_ENABLE_DEV_FEATURES: "true",
+            PORT: PORT,
+          },
         },
       }
     : {

@@ -5,6 +5,7 @@
  */
 
 "use client";
+import Image from "next/image";
 
 import { useState, useTransition } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -108,19 +109,19 @@ export function MachineQRCodeClient({
       const printWindow = window.open("", "_blank");
       if (printWindow) {
         const doc = printWindow.document;
-        
+
         // Create document structure using safe DOM APIs
-        const html = doc.createElement('html');
-        const head = doc.createElement('head');
-        const body = doc.createElement('body');
-        
+        const html = doc.createElement("html");
+        const head = doc.createElement("head");
+        const body = doc.createElement("body");
+
         // Set title safely
-        const title = doc.createElement('title');
+        const title = doc.createElement("title");
         title.textContent = `QR Code - ${machineName}`;
         head.appendChild(title);
-        
+
         // Add styles
-        const style = doc.createElement('style');
+        const style = doc.createElement("style");
         style.textContent = `
           body { 
             font-family: Arial, sans-serif; 
@@ -153,33 +154,33 @@ export function MachineQRCodeClient({
           }
         `;
         head.appendChild(style);
-        
+
         // Create body content safely
-        const container = doc.createElement('div');
-        container.className = 'qr-container';
-        
-        const nameDiv = doc.createElement('div');
-        nameDiv.className = 'machine-name';
+        const container = doc.createElement("div");
+        container.className = "qr-container";
+
+        const nameDiv = doc.createElement("div");
+        nameDiv.className = "machine-name";
         nameDiv.textContent = machineName; // Safe: uses textContent instead of innerHTML
         container.appendChild(nameDiv);
-        
-        const img = doc.createElement('img');
+
+        const img = doc.createElement("img");
         img.src = currentQRCode;
         img.alt = `QR Code for ${machineName}`; // This is safe in attributes
-        img.className = 'qr-code';
+        img.className = "qr-code";
         container.appendChild(img);
-        
+
         if (generatedAt) {
-          const dateDiv = doc.createElement('div');
-          dateDiv.className = 'generated-date';
+          const dateDiv = doc.createElement("div");
+          dateDiv.className = "generated-date";
           dateDiv.textContent = `Generated: ${generatedAt.toLocaleDateString()}`;
           container.appendChild(dateDiv);
         }
-        
+
         body.appendChild(container);
         html.appendChild(head);
         html.appendChild(body);
-        
+
         // Replace the document content safely
         doc.open();
         doc.close();
@@ -263,9 +264,11 @@ export function MachineQRCodeClient({
             {/* QR Code Display */}
             <div className="flex justify-center">
               <div className="p-4 border rounded-lg bg-surface">
-                <img
+                <Image
                   src={currentQRCode}
                   alt={`QR Code for ${machineName}`}
+                  width={128}
+                  height={128}
                   className="w-32 h-32 object-contain"
                 />
               </div>

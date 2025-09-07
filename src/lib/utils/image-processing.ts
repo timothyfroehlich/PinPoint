@@ -94,10 +94,7 @@ export async function processImageFile(
   } catch (error) {
     return {
       success: false,
-      error:
-        isError(error)
-          ? error.message
-          : "Unknown error processing image",
+      error: isError(error) ? error.message : "Unknown error processing image",
     };
   }
 }
@@ -212,10 +209,7 @@ export async function processIssueImageFile(
   } catch (error) {
     return {
       success: false,
-      error:
-        isError(error)
-          ? error.message
-          : "Unknown error processing image",
+      error: isError(error) ? error.message : "Unknown error processing image",
     };
   }
 }

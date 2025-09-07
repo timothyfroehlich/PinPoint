@@ -122,7 +122,8 @@ export function UniversalSearch({
 
         const response = await fetch(`/api/search/suggestions?${params}`);
         if (response.ok) {
-          const data: SearchSuggestionsResponse = await response.json() as SearchSuggestionsResponse;
+          const data: SearchSuggestionsResponse =
+            (await response.json()) as SearchSuggestionsResponse;
           setSuggestions(data.suggestions);
         } else {
           console.error("Failed to fetch suggestions:", response.statusText);
@@ -177,7 +178,7 @@ export function UniversalSearch({
         document.removeEventListener("keydown", handleKeyDown);
       };
     }
-    
+
     // Explicit return for consistency when showDropdown is false
     return undefined;
   }, [mounted, showDropdown]);

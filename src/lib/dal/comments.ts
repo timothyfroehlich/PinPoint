@@ -16,102 +16,108 @@ import { db } from "./shared";
  * Includes proper organization scoping and excludes soft-deleted comments
  * Uses React 19 cache() for request-level memoization
  */
-export const getCommentsForIssue = cache(async (issueId: string, organizationId: string) => {
-  return withOrgRLS(db, organizationId, async tx => {
-    return await tx.query.comments.findMany({
-      where: and(
-        eq(comments.issue_id, issueId),
-        eq(comments.organization_id, organizationId),
-        isNull(comments.deleted_at), // Exclude soft-deleted comments
-      ),
-      with: {
-        author: {
-          columns: {
-            id: true,
-            name: true,
-            email: true,
-            profile_picture: true,
+export const getCommentsForIssue = cache(
+  async (issueId: string, organizationId: string) => {
+    return withOrgRLS(db, organizationId, async (tx) => {
+      return await tx.query.comments.findMany({
+        where: and(
+          eq(comments.issue_id, issueId),
+          eq(comments.organization_id, organizationId),
+          isNull(comments.deleted_at), // Exclude soft-deleted comments
+        ),
+        with: {
+          author: {
+            columns: {
+              id: true,
+              name: true,
+              email: true,
+              profile_picture: true,
+            },
           },
         },
-      },
-      orderBy: [desc(comments.created_at)],
+        orderBy: [desc(comments.created_at)],
+      });
     });
-  });
-});
+  },
+);
 
 /**
  * Get a single comment by ID with organization scoping
  * Returns null if comment doesn't exist or user doesn't have access
  */
-export const getCommentById = cache(async (commentId: string, organizationId: string) => {
-  return withOrgRLS(db, organizationId, async tx => {
-    return await tx.query.comments.findFirst({
-      where: and(
-        eq(comments.id, commentId),
-        eq(comments.organization_id, organizationId),
-        isNull(comments.deleted_at), // Exclude soft-deleted comments
-      ),
-      with: {
-        author: {
-          columns: {
-            id: true,
-            name: true,
-            email: true,
-            profile_picture: true,
+export const getCommentById = cache(
+  async (commentId: string, organizationId: string) => {
+    return withOrgRLS(db, organizationId, async (tx) => {
+      return await tx.query.comments.findFirst({
+        where: and(
+          eq(comments.id, commentId),
+          eq(comments.organization_id, organizationId),
+          isNull(comments.deleted_at), // Exclude soft-deleted comments
+        ),
+        with: {
+          author: {
+            columns: {
+              id: true,
+              name: true,
+              email: true,
+              profile_picture: true,
+            },
+          },
+          issue: {
+            columns: {
+              id: true,
+              title: true,
+              organization_id: true,
+            },
           },
         },
-        issue: {
-          columns: {
-            id: true,
-            title: true,
-            organization_id: true,
-          },
-        },
-      },
+      });
     });
-  });
-});
+  },
+);
 
 /**
  * Get recent comments for the organization (for activity feeds)
  * Limited to prevent performance issues
  */
-export const getRecentCommentsForOrg = cache(async (limit = 10, organizationId: string) => {
-  return withOrgRLS(db, organizationId, async tx => {
-    return await tx.query.comments.findMany({
-      where: and(
-        eq(comments.organization_id, organizationId),
-        isNull(comments.deleted_at),
-      ),
-      with: {
-        author: {
-          columns: {
-            id: true,
-            name: true,
-            email: true,
-            profile_picture: true,
+export const getRecentCommentsForOrg = cache(
+  async (limit = 10, organizationId: string) => {
+    return withOrgRLS(db, organizationId, async (tx) => {
+      return await tx.query.comments.findMany({
+        where: and(
+          eq(comments.organization_id, organizationId),
+          isNull(comments.deleted_at),
+        ),
+        with: {
+          author: {
+            columns: {
+              id: true,
+              name: true,
+              email: true,
+              profile_picture: true,
+            },
           },
-        },
-        issue: {
-          columns: {
-            id: true,
-            title: true,
-          },
-          with: {
-            machine: {
-              columns: {
-                id: true,
-                name: true,
+          issue: {
+            columns: {
+              id: true,
+              title: true,
+            },
+            with: {
+              machine: {
+                columns: {
+                  id: true,
+                  name: true,
+                },
               },
             },
           },
         },
-      },
-      orderBy: [desc(comments.created_at)],
-      limit,
+        orderBy: [desc(comments.created_at)],
+        limit,
+      });
     });
-  });
-});
+  },
+);
 
 /**
  * Check if user can access a comment (for permissions)
@@ -119,7 +125,7 @@ export const getRecentCommentsForOrg = cache(async (limit = 10, organizationId: 
  */
 export const canUserAccessComment = cache(
   async (commentId: string, userId: string, organizationId: string) => {
-    return withOrgRLS(db, organizationId, async tx => {
+    return withOrgRLS(db, organizationId, async (tx) => {
       const comment = await tx.query.comments.findFirst({
         where: and(
           eq(comments.id, commentId),
@@ -139,21 +145,23 @@ export const canUserAccessComment = cache(
 /**
  * Get comment count for an issue (for display purposes)
  */
-export const getCommentCountForIssue = cache(async (issueId: string, organizationId: string) => {
-  return withOrgRLS(db, organizationId, async tx => {
-    const result: CountResult[] = await tx
-      .select({ count: sql<number>`count(*)` })
-      .from(comments)
-      .where(
-        and(
-          eq(comments.issue_id, issueId),
-          eq(comments.organization_id, organizationId),
-          isNull(comments.deleted_at),
-        ),
-      );
-    return safeCount(result);
-  });
-});
+export const getCommentCountForIssue = cache(
+  async (issueId: string, organizationId: string) => {
+    return withOrgRLS(db, organizationId, async (tx) => {
+      const result: CountResult[] = await tx
+        .select({ count: sql<number>`count(*)` })
+        .from(comments)
+        .where(
+          and(
+            eq(comments.issue_id, issueId),
+            eq(comments.organization_id, organizationId),
+            isNull(comments.deleted_at),
+          ),
+        );
+      return safeCount(result);
+    });
+  },
+);
 
 /**
  * Type definitions for comment data

@@ -7,38 +7,28 @@
  */
 
 import { z } from "zod";
+import {
+  paginationLimitSchema,
+  paginationOffsetSchema,
+  sortOrderSchema,
+  searchQuerySchema,
+  arrayParamTransformer,
+  booleanParamTransformer,
+} from "~/lib/validation/schemas";
 
 // Comprehensive schema for machine filtering
 const MachineSearchParamsSchema = z.object({
   // Text search
-  search: z.string().max(100).optional(),
+  search: searchQuerySchema,
 
   // Location filtering - supports multiple values
-  location: z
-    .union([z.string(), z.array(z.string())])
-    .optional()
-    .transform((val) => {
-      if (!val) return undefined;
-      return Array.isArray(val) ? val : val.split(",").filter(Boolean);
-    }),
+  location: arrayParamTransformer,
 
   // Model filtering - supports multiple values
-  model: z
-    .union([z.string(), z.array(z.string())])
-    .optional()
-    .transform((val) => {
-      if (!val) return undefined;
-      return Array.isArray(val) ? val : val.split(",").filter(Boolean);
-    }),
+  model: arrayParamTransformer,
 
   // Owner filtering - supports multiple values
-  owner: z
-    .union([z.string(), z.array(z.string())])
-    .optional()
-    .transform((val) => {
-      if (!val) return undefined;
-      return Array.isArray(val) ? val : val.split(",").filter(Boolean);
-    }),
+  owner: arrayParamTransformer,
 
   // Manufacturer filtering
   manufacturer: z.string().optional(),
@@ -56,31 +46,20 @@ const MachineSearchParamsSchema = z.object({
     .optional(),
 
   // QR Code filtering
-  hasQR: z
-    .union([
-      z.boolean(),
-      z.enum(["true", "false"]).transform((val) => val === "true"),
-    ])
-    .optional(),
+  hasQR: booleanParamTransformer,
 
   // Status filtering (active, maintenance, retired)
-  status: z
-    .union([z.string(), z.array(z.string())])
-    .optional()
-    .transform((val) => {
-      if (!val) return undefined;
-      return Array.isArray(val) ? val : val.split(",").filter(Boolean);
-    }),
+  status: arrayParamTransformer,
 
   // Sorting
   sort: z
     .enum(["created_at", "updated_at", "name", "model", "location", "year"])
     .default("created_at"),
-  order: z.enum(["asc", "desc"]).default("desc"),
+  order: sortOrderSchema,
 
   // Pagination
-  page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(5).max(100).default(20),
+  page: paginationOffsetSchema,
+  limit: paginationLimitSchema,
 
   // View mode
   view: z.enum(["table", "grid"]).default("table"),
@@ -152,7 +131,7 @@ export function buildMachineUrl(
       const defaults = MachineSearchParamsSchema.parse({});
 
       // Don't include default values in URL for cleaner URLs
-      const defaultValue = (defaults)[key as keyof MachineSearchParams];
+      const defaultValue = defaults[key as keyof MachineSearchParams];
       if (defaultValue !== undefined && stringValue === String(defaultValue)) {
         url.searchParams.delete(key);
       } else {
@@ -228,7 +207,7 @@ export function getMachineCanonicalUrl(
   const canonicalParams = { ...params };
 
   // Remove pagination from canonical URLs
-  const { page, ...cleanedParams } = canonicalParams;
+  const { page: _page, ...cleanedParams } = canonicalParams;
 
   // Use cleaned URL for consistent canonical URLs
   return cleanMachineUrl(buildMachineUrl(basePath, cleanedParams));

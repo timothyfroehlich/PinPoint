@@ -5,7 +5,7 @@
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { z } from "zod";
-import { uuidSchema } from "~/lib/validation/schemas";
+import { uuidSchema, optionalPrioritySchema, titleSchema } from "~/lib/validation/schemas";
 import {
   SeedBasedMockFactory,
   MockAuthContextFactory,
@@ -29,9 +29,9 @@ describe("Archetype Integration: RSC Test System Working Together", () => {
       const validFormData = MockFormDataFactory.createValidIssueFormData();
 
       const schema = z.object({
-        title: z.string().min(1),
+        title: titleSchema,
         machineId: uuidSchema,
-        priority: z.enum(["low", "medium", "high"]).default("medium"),
+        priority: optionalPrioritySchema.default("medium"),
       });
 
       const result = validateFormData(validFormData, schema);
@@ -48,7 +48,7 @@ describe("Archetype Integration: RSC Test System Working Together", () => {
       const invalidFormData = MockFormDataFactory.createInvalidFormData();
 
       const schema = z.object({
-        title: z.string().min(1, "Title required"),
+        title: titleSchema,
         machineId: uuidSchema,
       });
 
@@ -167,7 +167,7 @@ describe("Archetype Integration: RSC Test System Working Together", () => {
 
           // Validate FormData
           const schema = z.object({
-            title: z.string().min(1),
+            title: titleSchema,
             machineId: uuidSchema,
           });
 
@@ -216,7 +216,7 @@ describe("Archetype Integration: RSC Test System Working Together", () => {
           await mockGetAuthContext();
 
           const schema = z.object({
-            title: z.string().min(1, "Title is required"),
+            title: titleSchema,
             machineId: uuidSchema,
           });
 
@@ -253,9 +253,9 @@ describe("Archetype Integration: RSC Test System Working Together", () => {
 
       // 2. Validate FormData (Archetype 1: Pure function)
       const schema = z.object({
-        title: z.string().min(1),
+        title: titleSchema,
         machineId: uuidSchema,
-        priority: z.enum(["low", "medium", "high"]).default("medium"),
+        priority: optionalPrioritySchema.default("medium"),
       });
 
       const validation = validateFormData(formData, schema);

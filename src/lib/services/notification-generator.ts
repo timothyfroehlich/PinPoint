@@ -90,12 +90,14 @@ async function createNotificationForUser(
 async function getIssueStakeholders(
   issueId: string,
   organizationId: string,
-): Promise<{
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-}[]> {
+): Promise<
+  {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  }[]
+> {
   const issue = await db.query.issues.findFirst({
     where: and(
       eq(issues.id, issueId),
@@ -229,7 +231,7 @@ export async function generateCommentNotifications(
     }
 
     console.log(
-      `Generated ${notificationIds.length} comment notifications for issue ${issueId}`,
+      `Generated ${String(notificationIds.length)} comment notifications for issue ${issueId}`,
     );
     return notificationIds;
   } catch (error) {
@@ -288,7 +290,7 @@ export async function generateAssignmentNotifications(
     }
 
     console.log(
-      `Generated ${notificationIds.length} assignment notifications for issue ${issueId}`,
+      `Generated ${String(notificationIds.length)} assignment notifications for issue ${issueId}`,
     );
     return notificationIds;
   } catch (error) {
@@ -353,7 +355,7 @@ export async function generateStatusChangeNotifications(
     }
 
     console.log(
-      `Generated ${notificationIds.length} status change notifications for issue ${issueId}`,
+      `Generated ${String(notificationIds.length)} status change notifications for issue ${issueId}`,
     );
     return notificationIds;
   } catch (error) {
@@ -415,7 +417,7 @@ export async function generateIssueCreationNotifications(
     }
 
     console.log(
-      `Generated ${notificationIds.length} issue creation notifications for issue ${issueId}`,
+      `Generated ${String(notificationIds.length)} issue creation notifications for issue ${issueId}`,
     );
     return notificationIds;
   } catch (error) {

@@ -14,22 +14,37 @@
 import { test, expect } from "@playwright/test";
 
 // Helper: detect if we landed on sign-in page
-async function isOnSignIn(page: import('@playwright/test').Page): Promise<boolean> {
-  return !!(await page.locator('h1:has-text("Sign In to PinPoint")').first().elementHandle());
+async function isOnSignIn(
+  page: import("@playwright/test").Page,
+): Promise<boolean> {
+  return !!(await page
+    .locator('h1:has-text("Sign In to PinPoint")')
+    .first()
+    .elementHandle());
 }
 
 // Helper: detect generic error boundary card (auth or access failure)
-async function isShowingErrorBoundary(page: import('@playwright/test').Page): Promise<boolean> {
-  return await page.locator('[data-testid="error-boundary-card"], text=/Authentication Error|Issues Unavailable|Access Denied/i').first().isVisible().catch(() => false);
+async function isShowingErrorBoundary(
+  page: import("@playwright/test").Page,
+): Promise<boolean> {
+  return await page
+    .locator(
+      '[data-testid="error-boundary-card"], text=/Authentication Error|Issues Unavailable|Access Denied/i',
+    )
+    .first()
+    .isVisible()
+    .catch(() => false);
 }
 
-test.describe('Anonymous Access', () => {
-  test('unauthenticated visit to /issues shows auth barrier (redirect or error boundary)', async ({ page }) => {
-    await page.goto('/issues');
+test.describe("Anonymous Access", () => {
+  test("unauthenticated visit to /issues shows auth barrier (redirect or error boundary)", async ({
+    page,
+  }) => {
+    await page.goto("/issues");
 
     // Allow a brief window for potential client redirect to /sign-in
     for (let i = 0; i < 6; i++) {
-      if (page.url().includes('/sign-in')) break;
+      if (page.url().includes("/sign-in")) break;
       await page.waitForTimeout(250);
     }
 
@@ -40,13 +55,16 @@ test.describe('Anonymous Access', () => {
     if (!onSignIn && !errorBoundaryVisible) {
       // Capture diagnostics before failing
       const bodyHtml = await page.content();
-      console.log('Anonymous /issues access diagnostics:', { url, snippet: bodyHtml.slice(0, 1200) });
+      console.log("Anonymous /issues access diagnostics:", {
+        url,
+        snippet: bodyHtml.slice(0, 1200),
+      });
     }
 
     expect(onSignIn || errorBoundaryVisible).toBeTruthy();
   });
 
-  test.skip('anonymous user can create an issue via public reporting flow (CUJ 1.1)', async () => {
+  test.skip("anonymous user can create an issue via public reporting flow (CUJ 1.1)", async () => {
     /*
       CURRENT STATUS:
       The public anonymous issue creation endpoint is not yet implemented.
