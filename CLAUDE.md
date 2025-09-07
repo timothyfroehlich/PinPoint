@@ -91,6 +91,7 @@
 | Direct `psql` | `./scripts/safe-psql.sh` | Database safety |
 | Direct `curl` | `./scripts/safe-curl.sh` | Localhost-only HTTP |
 | Parameterized SET | `sql.raw()` with escaping | PostgreSQL DDL limitation |
+| **`require()` statements** | Use ES module `import` syntax | Project is type: "module" (ESM) |
 
 ### Safe Command Alternatives
 - **Search**: `rg --files \| rg "pattern"`, `rg -l "content" --type js`
