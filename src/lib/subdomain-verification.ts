@@ -37,24 +37,6 @@ export function extractTrustedSubdomain(headers: Headers): string | null {
 
 /**
  * Parse subdomain directly from a Host header value.
- * Mirrors middleware and organization-context parsing behavior.
+ * @deprecated Use resolveOrgSubdomainFromHost from ~/lib/domain-org-mapping instead,
+ * which handles both subdomains and alias mappings correctly.
  */
-export function parseSubdomainFromHost(host: string): string | null {
-  const hostWithoutPort = host.split(":")[0] ?? "";
-  if (!hostWithoutPort) return null;
-
-  if (isDevelopment()) {
-    if (hostWithoutPort === "localhost") return null;
-    const parts = hostWithoutPort.split(".");
-    if (parts.length >= 2 && parts[parts.length - 1] === "localhost") {
-      return parts[0] ?? null;
-    }
-    return null;
-  } else {
-    const parts = hostWithoutPort.split(".");
-    if (parts.length >= 3) {
-      return parts[0] ?? null;
-    }
-    return null;
-  }
-}

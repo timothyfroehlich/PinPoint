@@ -10,9 +10,19 @@ export default async function HomePage(): Promise<React.JSX.Element> {
   const h = await headers();
   const sub = h.get(SUBDOMAIN_HEADER);
   const verified = h.get(SUBDOMAIN_VERIFIED_HEADER);
+  const host = h.get("host");
+  
+  // Debug logging for production troubleshooting
+  console.log(`[PAGE_HOMEPAGE] Host: "${host}"`);
+  console.log(`[PAGE_HOMEPAGE] Subdomain header (${SUBDOMAIN_HEADER}): "${sub}"`);
+  console.log(`[PAGE_HOMEPAGE] Verified header (${SUBDOMAIN_VERIFIED_HEADER}): "${verified}"`);
+  console.log(`[PAGE_HOMEPAGE] Should redirect: ${Boolean(sub && verified)}`);
+  
   if (sub && verified) {
+    console.log(`[PAGE_HOMEPAGE] Redirecting to /auth/sign-in`);
     redirect("/auth/sign-in");
   }
 
+  console.log(`[PAGE_HOMEPAGE] Showing homepage`);
   return <PinPointHomepage />;
 }
