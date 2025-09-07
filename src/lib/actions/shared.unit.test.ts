@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+import { titleSchema, optionalPrioritySchema } from "~/lib/validation/schemas";
 import {
   actionSuccess,
   actionError,
@@ -69,9 +70,9 @@ describe("Server Action Utilities (Unit Tests - Archetype 1)", () => {
 
   describe("validateFormData", () => {
     const testSchema = z.object({
-      title: z.string().min(1, "Title is required"),
+      title: titleSchema,
       description: z.string().optional(),
-      priority: z.enum(["low", "medium", "high"]).default("medium"),
+      priority: optionalPrioritySchema.default("medium"),
     });
 
     it("validates valid form data successfully", () => {
@@ -235,7 +236,9 @@ describe("Server Action Utilities (Unit Tests - Archetype 1)", () => {
     });
 
     it("handles non-Error exceptions", async () => {
+      // Intentionally throw a non-Error to verify normalization
       const failingAction = async () => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error
         throw "String error";
       };
 

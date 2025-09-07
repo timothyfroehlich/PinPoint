@@ -30,18 +30,7 @@ import {
 } from "~/components/ui/select";
 import { signInWithOAuth, sendMagicLink } from "~/lib/actions/auth-actions";
 import { type OrganizationOption } from "~/lib/dal/public-organizations";
-
-// API Response validation schema for security
-const organizationSelectOptionsSchema = z.object({
-  organizations: z.array(
-    z.object({
-      id: z.string().min(1),
-      name: z.string().min(1),
-      subdomain: z.string().min(1),
-    }),
-  ),
-  defaultOrganizationId: z.string().nullable(),
-});
+import { organizationSelectOptionsSchema } from "~/lib/validation/schemas";
 
 // Type guard for safe organization access
 function isValidOrganizationArray(data: unknown): data is OrganizationOption[] {
@@ -232,7 +221,9 @@ export function SignUpForm(): React.JSX.Element {
               required
               disabled={magicLinkPending || isOAuthLoading}
             />
-            {magicLinkState && !magicLinkState.success && magicLinkState.fieldErrors?.["email"] && (
+            {magicLinkState &&
+              !magicLinkState.success &&
+              magicLinkState.fieldErrors?.["email"] && (
                 <p className="text-sm text-error">
                   {magicLinkState.fieldErrors["email"][0]}
                 </p>
@@ -272,14 +263,16 @@ export function SignUpForm(): React.JSX.Element {
           </Alert>
         )}
 
-        {magicLinkState && !magicLinkState.success && !magicLinkState.fieldErrors && (
-          <Alert className="border-error bg-error-container">
-            <div className="text-on-error-container">
-              <p className="font-medium">Account creation failed</p>
-              <p className="text-sm mt-1">{magicLinkState.error}</p>
-            </div>
-          </Alert>
-        )}
+        {magicLinkState &&
+          !magicLinkState.success &&
+          !magicLinkState.fieldErrors && (
+            <Alert className="border-error bg-error-container">
+              <div className="text-on-error-container">
+                <p className="font-medium">Account creation failed</p>
+                <p className="text-sm mt-1">{magicLinkState.error}</p>
+              </div>
+            </Alert>
+          )}
 
         <div className="text-xs text-center text-muted-foreground space-y-2">
           <p>

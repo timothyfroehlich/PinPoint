@@ -3,6 +3,9 @@ import { TRPCError } from "@trpc/server";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
+// Validation schemas
+import { nameSchema } from "~/lib/validation/schemas";
+
 // Internal types (alphabetical)
 import type {
   OrganizationResponse,
@@ -35,7 +38,7 @@ export const organizationRouter = createTRPCRouter({
   update: organizationManageProcedure
     .input(
       z.object({
-        name: z.string().min(1),
+        name: nameSchema,
         logoUrl: z.url().optional(),
       }),
     )

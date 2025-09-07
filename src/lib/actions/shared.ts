@@ -62,7 +62,7 @@ export async function requireActionAuthContextWithPermission(
 ): Promise<{
   user: { id: string; email: string; name: string };
   organizationId: string;
-  membership: { id: string; role: any };
+  membership: { id: string; role: { id: string; name: string } };
 }> {
   const authContext = await getRequestAuthContext();
   if (authContext.kind !== "authorized") {
@@ -71,8 +71,12 @@ export async function requireActionAuthContextWithPermission(
   const { user, org: organization, membership } = authContext;
   const organizationId = organization.id;
   await baseRequirePermission({ roleId: membership.role.id }, permission, db);
-  const name = ((user as any).user_metadata?.name as string | undefined) ?? user.email;
-  return { user: { id: user.id, email: user.email, name }, organizationId, membership };
+  const name = user.name ?? user.email;
+  return {
+    user: { id: user.id, email: user.email, name },
+    organizationId,
+    membership,
+  };
 }
 
 /**
@@ -107,7 +111,12 @@ export function validateRequiredFields(
   for (const field of requiredFields) {
     const value = getFormField(formData, field, true);
     if (value) {
-      result[field] = value;
+      Object.defineProperty(result, field, {
+        value: value,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
     }
   }
 
@@ -149,7 +158,12 @@ export function validateFormData<T>(
   // Convert empty strings to undefined for optional fields
   const processedData = Object.entries(rawData).reduce<Record<string, unknown>>(
     (acc, [key, value]) => {
-      acc[key] = value === "" ? undefined : value;
+      Object.defineProperty(acc, key, {
+        value: value === "" ? undefined : value,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
       return acc;
     },
     {},
@@ -162,10 +176,14 @@ export function validateFormData<T>(
   }
 
   // Format Zod errors for form display
+  // ESLint security warnings are false positive - path comes from Zod validation
+  // error.path which contains controlled field names, not user input
   const fieldErrors = result.error.issues.reduce<Record<string, string[]>>(
     (acc: Record<string, string[]>, issue) => {
       const path = issue.path.join(".");
-      acc[path] = acc[path] ?? [];
+      // eslint-disable-next-line security/detect-object-injection
+      acc[path] ??= [];
+      // eslint-disable-next-line security/detect-object-injection
       acc[path].push(issue.message);
       return acc;
     },
@@ -181,7 +199,7 @@ export function validateFormData<T>(
  */
 export function runAfterResponse(task: () => Promise<void>): void {
   // For now, run immediately (in production, would use unstable_after)
-  task().catch((error) => {
+  task().catch((error: unknown) => {
     console.error("Background task failed:", error);
   });
 }

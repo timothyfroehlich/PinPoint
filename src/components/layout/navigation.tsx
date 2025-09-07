@@ -17,7 +17,9 @@ interface NavigationProps {
   organizationContext: OrganizationContext | null;
 }
 
-export function Navigation({ organizationContext }: NavigationProps): JSX.Element {
+export function Navigation({
+  organizationContext,
+}: NavigationProps): JSX.Element {
   if (!organizationContext?.user) {
     // Unauthenticated navigation - using Material 3 surface colors
     return (
@@ -123,7 +125,10 @@ export function Navigation({ organizationContext }: NavigationProps): JSX.Elemen
 
           {/* Right Section - User Context */}
           <div className="flex items-center gap-3">
-            <NotificationBellWrapper userId={organizationContext.user.id} organizationId={organizationContext.organization.id} />
+            <NotificationBellWrapper
+              userId={organizationContext.user.id}
+              organizationId={organizationContext.organization.id}
+            />
 
             <UserContextDisplay
               user={organizationContext.user}

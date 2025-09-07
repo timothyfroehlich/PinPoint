@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { idSchema, machineIdSchema } from "~/lib/validation/schemas";
+import {
+  idSchema,
+  machineIdSchema,
+  apiPaginationSchema,
+} from "~/lib/validation/schemas";
 
 /**
  * Machine Creation Schema
@@ -48,8 +52,7 @@ export const machineFilterSchema = z.object({
   modelId: z.string().optional(),
   ownerId: z.string().optional(),
   search: z.string().optional(),
-  limit: z.number().min(1).max(1000).optional(),
-  offset: z.number().min(0).optional(),
+  ...apiPaginationSchema.shape,
 });
 
 /**
@@ -73,9 +76,9 @@ export const machineResponseSchema = z.object({
   updatedAt: z.date().optional(),
   model: z
     .object({
-  id: idSchema,
-  name: z.string(),
-  manufacturer: z.string(),
+      id: idSchema,
+      name: z.string(),
+      manufacturer: z.string(),
       year: z.number().nullable(),
       machineType: z.string(),
       ipdbUrl: z.string().nullable(),
@@ -84,7 +87,7 @@ export const machineResponseSchema = z.object({
     .optional(),
   location: z
     .object({
-  id: idSchema,
+      id: idSchema,
       name: z.string(),
       address: z.string().nullable(),
       city: z.string().nullable(),
@@ -95,9 +98,9 @@ export const machineResponseSchema = z.object({
     .optional(),
   owner: z
     .object({
-  id: idSchema,
-  name: z.string(),
-  email: z.string(),
+      id: idSchema,
+      name: z.string(),
+      email: z.string(),
       profilePicture: z.string().nullable(),
     })
     .nullable()

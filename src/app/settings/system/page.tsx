@@ -24,17 +24,32 @@ import {
   ZapIcon,
 } from "lucide-react";
 import { getRequestAuthContext } from "~/server/auth/context";
+import { AuthGuard } from "~/components/auth/auth-guard";
 import { getSystemSettings } from "~/lib/dal/system-settings";
 import { SystemNotificationSettings } from "./components/SystemNotificationSettings";
 import { SystemSecuritySettings } from "./components/SystemSecuritySettings";
 import { SystemPreferences } from "./components/SystemPreferences";
 
 export default async function SystemSettingsPage(): Promise<React.JSX.Element> {
-  const auth = await getRequestAuthContext();
-  if (auth.kind !== 'authorized') {
-    throw new Error('Member access required');
+  const authContext = await getRequestAuthContext();
+
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="System Settings Access Required"
+      fallbackMessage="You need to be signed in as a member to manage system settings."
+    >
+      <SystemSettingsPageContent />
+    </AuthGuard>
+  );
+}
+
+async function SystemSettingsPageContent(): Promise<React.JSX.Element> {
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Unauthorized access"); // This should never happen due to AuthGuard
   }
-  const organizationId = auth.org.id;
+  const organizationId = authContext.org.id;
 
   // Fetch system settings from database
   const systemSettings = await getSystemSettings(organizationId);

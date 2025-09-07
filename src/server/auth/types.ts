@@ -1,16 +1,16 @@
 /**
  * @fileoverview DEPRECATED: Auth-related Drizzle ORM model types
- * 
+ *
  * **THIS FILE IS DEPRECATED**
  * Auth-related types have been moved to `~/lib/types/auth.ts` for centralization.
  * All auth types are now available via `~/lib/types`.
- * 
+ *
  * Migration:
  * ```typescript
  * // OLD: import type { DbUser, User } from "~/server/auth/types";
  * // NEW: import type { DbUser, AuthUser } from "~/lib/types";
  * ```
- * 
+ *
  * @deprecated Use `~/lib/types` instead
  * @see ~/lib/types/auth.ts - New location for auth types
  * @see ~/lib/types/db.ts - Database model types via Db namespace

@@ -19,8 +19,10 @@ export async function bindRLSContext(
       ),
     );
   } catch (error) {
-    console.error('Failed to set RLS organization context:', error);
-    throw new Error(`Failed query: SET LOCAL app.current_organization_id = '${organizationId}'`);
+    console.error("Failed to set RLS organization context:", error);
+    throw new Error(
+      `Failed query: SET LOCAL app.current_organization_id = '${organizationId}'`,
+    );
   }
 }
 

@@ -67,9 +67,9 @@ export const getMachinesWithFilters = cache(
     filters: MachineFilters = {},
     pagination: MachinePagination = { page: 1, limit: 20 },
     sorting: MachineSorting = { field: "created_at", order: "desc" },
-    organizationId: string
+    organizationId: string,
   ) => {
-    return withOrgRLS(db, organizationId, async tx => {
+    return withOrgRLS(db, organizationId, async (tx) => {
       const offset = (pagination.page - 1) * pagination.limit;
 
       // Build where conditions
@@ -202,7 +202,12 @@ export const getMachinesWithFilters = cache(
  * Uses React 19 cache() for request-level memoization
  */
 export const getMachinesForOrg = cache(async (organizationId: string) => {
-  return await getMachinesWithFilters({}, { page: 1, limit: 20 }, { field: "created_at", order: "desc" }, organizationId);
+  return await getMachinesWithFilters(
+    {},
+    { page: 1, limit: 20 },
+    { field: "created_at", order: "desc" },
+    organizationId,
+  );
 });
 
 /**
@@ -210,122 +215,126 @@ export const getMachinesForOrg = cache(async (organizationId: string) => {
  * Enforces organization scoping
  * Uses React 19 cache() for request-level memoization per machineId
  */
-export const getMachineById = cache(async (machineId: string, organizationId: string) => {
-  return withOrgRLS(db, organizationId, async tx => {
-    const machine = await tx.query.machines.findFirst({
-      where: and(
-        eq(machines.id, machineId),
-        eq(machines.organization_id, organizationId),
-        isNull(machines.deleted_at), // Exclude soft-deleted machines per §9.3
-      ),
-      with: {
-        location: {
-          columns: {
-            id: true,
-            name: true,
-            city: true,
-            state: true,
-            street: true,
+export const getMachineById = cache(
+  async (machineId: string, organizationId: string) => {
+    return withOrgRLS(db, organizationId, async (tx) => {
+      const machine = await tx.query.machines.findFirst({
+        where: and(
+          eq(machines.id, machineId),
+          eq(machines.organization_id, organizationId),
+          isNull(machines.deleted_at), // Exclude soft-deleted machines per §9.3
+        ),
+        with: {
+          location: {
+            columns: {
+              id: true,
+              name: true,
+              city: true,
+              state: true,
+              street: true,
+            },
+          },
+          model: {
+            columns: {
+              id: true,
+              name: true,
+              manufacturer: true,
+              year: true,
+              machine_type: true,
+              machine_display: true,
+            },
           },
         },
-        model: {
-          columns: {
-            id: true,
-            name: true,
-            manufacturer: true,
-            year: true,
-            machine_type: true,
-            machine_display: true,
-          },
-        },
-      },
+      });
+
+      if (!machine) {
+        throw new Error("Machine not found or access denied");
+      }
+
+      return machine;
     });
-
-    if (!machine) {
-      throw new Error("Machine not found or access denied");
-    }
-
-    return machine;
-  });
-});
+  },
+);
 
 /**
  * Get machine statistics for organization dashboard
  * Includes counts by location, model, and QR code status
  * Uses React 19 cache() for request-level memoization
  */
-export const getMachineStats = cache(async (organizationId: string): Promise<MachineStats> => {
-  return withOrgRLS(db, organizationId, async tx => {
-    // Get basic counts
-    const [totalMachines, machinesWithQR, byLocation, byModel] =
-      await Promise.all([
-        // Total machine count
-        tx
-          .select({ count: count() })
-          .from(machines)
-          .where(eq(machines.organization_id, organizationId))
-          .then((result: CountResult[]) => safeCount(result)),
+export const getMachineStats = cache(
+  async (organizationId: string): Promise<MachineStats> => {
+    return withOrgRLS(db, organizationId, async (tx) => {
+      // Get basic counts
+      const [totalMachines, machinesWithQR, byLocation, byModel] =
+        await Promise.all([
+          // Total machine count
+          tx
+            .select({ count: count() })
+            .from(machines)
+            .where(eq(machines.organization_id, organizationId))
+            .then((result: CountResult[]) => safeCount(result)),
 
-        // Machines with QR codes
-        tx
-          .select({ count: count() })
-          .from(machines)
-          .where(
-            and(
-              eq(machines.organization_id, organizationId),
-              sql`${machines.qr_code_url} IS NOT NULL`,
-            ),
-          )
-          .then((result: CountResult[]) => safeCount(result)),
+          // Machines with QR codes
+          tx
+            .select({ count: count() })
+            .from(machines)
+            .where(
+              and(
+                eq(machines.organization_id, organizationId),
+                sql`${machines.qr_code_url} IS NOT NULL`,
+              ),
+            )
+            .then((result: CountResult[]) => safeCount(result)),
 
-        // Machines by location
-        tx
-          .select({
-            locationId: machines.location_id,
-            locationName: locations.name,
-            count: count(),
-          })
-          .from(machines)
-          .leftJoin(locations, eq(machines.location_id, locations.id))
-          .where(eq(machines.organization_id, organizationId))
-          .groupBy(machines.location_id, locations.name),
+          // Machines by location
+          tx
+            .select({
+              locationId: machines.location_id,
+              locationName: locations.name,
+              count: count(),
+            })
+            .from(machines)
+            .leftJoin(locations, eq(machines.location_id, locations.id))
+            .where(eq(machines.organization_id, organizationId))
+            .groupBy(machines.location_id, locations.name),
 
-        // Machines by model
-        tx
-          .select({
-            modelId: machines.model_id,
-            modelName: models.name,
-            count: count(),
-          })
-          .from(machines)
-          .leftJoin(models, eq(machines.model_id, models.id))
-          .where(eq(machines.organization_id, organizationId))
-          .groupBy(machines.model_id, models.name),
-      ]);
+          // Machines by model
+          tx
+            .select({
+              modelId: machines.model_id,
+              modelName: models.name,
+              count: count(),
+            })
+            .from(machines)
+            .leftJoin(models, eq(machines.model_id, models.id))
+            .where(eq(machines.organization_id, organizationId))
+            .groupBy(machines.model_id, models.name),
+        ]);
 
-    return {
-      total: totalMachines,
-      withQR: machinesWithQR,
-      byLocation: byLocation.map((item) => ({
-        locationId: item.locationId,
-        locationName: item.locationName ?? "Unknown Location",
-        count: item.count,
-      })),
-      byModel: byModel.map((item) => ({
-        modelId: item.modelId,
-        modelName: item.modelName ?? "Unknown Model",
-        count: item.count,
-      })),
-    };
-  });
-});
+      return {
+        total: totalMachines,
+        withQR: machinesWithQR,
+        byLocation: byLocation.map((item) => ({
+          locationId: item.locationId,
+          locationName: item.locationName ?? "Unknown Location",
+          count: item.count,
+        })),
+        byModel: byModel.map((item) => ({
+          modelId: item.modelId,
+          modelName: item.modelName ?? "Unknown Model",
+          count: item.count,
+        })),
+      };
+    });
+  },
+);
 
 /**
  * Get locations for the current organization (for filters)
  * Uses React 19 cache() for request-level memoization
  */
 export const getLocationsForOrg = cache(async (organizationId: string) => {
-  return withOrgRLS(db, organizationId, async tx => {
+  return withOrgRLS(db, organizationId, async (tx) => {
     return await tx.query.locations.findMany({
       where: eq(locations.organization_id, organizationId),
       columns: { id: true, name: true, city: true, state: true },
@@ -340,7 +349,7 @@ export const getLocationsForOrg = cache(async (organizationId: string) => {
  * Uses React 19 cache() for request-level memoization
  */
 export const getModelsForOrg = cache(async (organizationId: string) => {
-  return withOrgRLS(db, organizationId, async tx => {
+  return withOrgRLS(db, organizationId, async (tx) => {
     return await tx.query.models.findMany({
       where: or(
         sql`${models.organization_id} IS NULL`, // Global commercial models
@@ -363,9 +372,11 @@ export const getModelsForOrg = cache(async (organizationId: string) => {
  * Useful for machine management dashboard
  * Benefits from getMachinesForOrg() React 19 cache()
  */
-export async function getMachinesWithIssueCounts(organizationId: string): Promise<
-  Awaited<ReturnType<typeof getMachinesForOrg>>
-> {
-  // For now, return basic machines - can enhance with issue counts later
-  return await getMachinesForOrg(organizationId);
-}
+export const getMachinesWithIssueCounts = cache(
+  async (
+    organizationId: string,
+  ): Promise<Awaited<ReturnType<typeof getMachinesForOrg>>> => {
+    // For now, return basic machines - can enhance with issue counts later
+    return await getMachinesForOrg(organizationId);
+  },
+);

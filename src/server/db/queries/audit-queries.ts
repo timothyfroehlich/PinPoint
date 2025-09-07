@@ -18,6 +18,7 @@ import {
 } from "~/server/db/schema";
 // Types are used for documentation purposes in this reference file
 import { eq, and } from "drizzle-orm";
+import { cache } from "react";
 
 /**
  * Demonstrates a complex join with correct snake_case field selection.
@@ -26,45 +27,47 @@ import { eq, and } from "drizzle-orm";
  *
  * The result of this query should be transformed to camelCase at the API boundary.
  */
-export async function getMembershipsWithUserAndRole(
-  organizationId: string,
-): Promise<
-  {
-    membership_id: string;
-    user_id: string | null;
-    organization_id: string;
-    role_name: string | null;
-    user_name: string | null;
-    user_email: string | null;
-    profile_picture: string | null;
-  }[]
-> {
-  const dbProvider = getGlobalDatabaseProvider();
-  const db = dbProvider.getClient();
+export const getMembershipsWithUserAndRole = cache(
+  async function getMembershipsWithUserAndRole(organizationId: string): Promise<
+    {
+      membership_id: string;
+      user_id: string | null;
+      organization_id: string;
+      role_name: string | null;
+      user_name: string | null;
+      user_email: string | null;
+      profile_picture: string | null;
+    }[]
+  > {
+    const dbProvider = getGlobalDatabaseProvider();
+    const db = dbProvider.getClient();
 
-  const selectObject = {
-    membership_id: memberships.id,
-    user_id: memberships.user_id,
-    organization_id: memberships.organization_id,
-    role_name: roles.name,
-    user_name: users.name,
-    user_email: users.email,
-    profile_picture: users.profile_picture,
-  } as const;
+    const selectObject = {
+      membership_id: memberships.id,
+      user_id: memberships.user_id,
+      organization_id: memberships.organization_id,
+      role_name: roles.name,
+      user_name: users.name,
+      user_email: users.email,
+      profile_picture: users.profile_picture,
+    } as const;
 
-  return db
-    .select(selectObject)
-    .from(memberships)
-    .leftJoin(users, eq(memberships.user_id, users.id))
-    .leftJoin(roles, eq(memberships.role_id, roles.id))
-    .where(eq(memberships.organization_id, organizationId));
-}
+    return db
+      .select(selectObject)
+      .from(memberships)
+      .leftJoin(users, eq(memberships.user_id, users.id))
+      .leftJoin(roles, eq(memberships.role_id, roles.id))
+      .where(eq(memberships.organization_id, organizationId));
+  },
+);
 
 /**
  * Demonstrates a simple query with a `where` clause using a snake_case field.
  * The `where` condition correctly uses `machines.qr_code_id`.
  */
-export async function getMachineByQrCode(qrCodeId: string): Promise<
+export const getMachineByQrCode = cache(async function getMachineByQrCode(
+  qrCodeId: string,
+): Promise<
   {
     id: string;
     name: string;
@@ -89,13 +92,13 @@ export async function getMachineByQrCode(qrCodeId: string): Promise<
     .from(machines)
     .where(eq(machines.qr_code_id, qrCodeId))
     .limit(1);
-}
+});
 
 /**
  * Demonstrates a query with a compound `where` clause, filtering by `status` and `organization_id`.
  * Both fields in the `and()` condition are snake_case.
  */
-export async function getIssuesByStatus(
+export const getIssuesByStatus = cache(async function getIssuesByStatus(
   organizationId: string,
   statusName: string,
 ): Promise<
@@ -129,7 +132,7 @@ export async function getIssuesByStatus(
         eq(issueStatuses.name, statusName),
       ),
     );
-}
+});
 
 /**
  * This is an anti-pattern example and should not be followed.
