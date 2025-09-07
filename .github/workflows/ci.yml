@@ -120,20 +120,12 @@ jobs:
       - name: Prettier Check
         run: npm run format
 
-  # Job 4: Tests (Parallel Shards)
-  # Uses matrix strategy to run test shards in parallel
+  # Job 4: Tests (Simplified during test system reboot)
   test:
-    name: Tests (${{ matrix.shard }})
+    name: Tests
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        shard:
-          - "unit-node"
-          - "unit-jsdom" 
-          - "integration"
     env:
       NODE_ENV: test
       CI: true
@@ -144,26 +136,8 @@ jobs:
           node-version: "24"
           cache: "npm"
       - run: npm ci
-      - name: Run Tests (${{ matrix.shard }}) with Coverage
-        run: |
-          case "${{ matrix.shard }}" in
-            "unit-node")
-              npx vitest run --coverage --project=node --coverage.thresholds=false
-              ;;
-            "unit-jsdom")
-              npx vitest run --coverage --project=jsdom --coverage.thresholds=false
-              ;;
-            "integration")
-              npx vitest run --coverage --project=integration --coverage.thresholds=false
-              ;;
-          esac
-      - name: Upload Coverage (${{ matrix.shard }})
-        uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24 # v5
-        with:
-          files: ./coverage/lcov.info
-          flags: ${{ matrix.shard }}
-          name: codecov-${{ matrix.shard }}
-          fail_ci_if_error: true
+      - name: Run Tests
+        run: npm test
 
   # Job 5: RLS Policy Tests
   # Database-level security validation with pgTAP
