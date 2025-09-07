@@ -7,9 +7,9 @@ on:
   pull_request_review:
     types:
       - 'submitted'
-  issue_comment:
-    types:
-      - 'created'
+  push:
+    branches:
+      - 'gemini-reviews'  # Temporary: for testing Gemini review functionality
   workflow_dispatch:
 
 defaults:
@@ -38,7 +38,7 @@ jobs:
 
   dispatch:
     # For comments: only if user types @gemini-cli and is OWNER/MEMBER/COLLABORATOR
-    # For manual dispatch: always run
+    # For push/manual dispatch: always run
     if: |-
       (
         github.event.sender.type == 'User' &&
@@ -46,6 +46,8 @@ jobs:
         contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association || github.event.review.author_association)
       ) || (
         github.event_name == 'workflow_dispatch'
+      ) || (
+        github.event_name == 'push'
       )
     runs-on: 'ubuntu-latest'
     permissions:
@@ -81,6 +83,9 @@ jobs:
             } else if (eventType.includes('workflow_dispatch')) {
               core.setOutput('command', 'review'); // Default to review for manual dispatch
               core.setOutput('additional_context', 'Manual workflow dispatch for testing');
+            } else if (eventType.includes('push')) {
+              core.setOutput('command', 'review'); // Default to review for push events
+              core.setOutput('additional_context', 'Push event triggered review for testing');
             } else {
               core.setOutput('command', 'fallthrough');
             }
