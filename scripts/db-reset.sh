@@ -369,8 +369,14 @@ execute_sql_seeds() {
                 # Use direct cloud database connection for preview
                 execute_cloud_sql "$seed_path" ""
             else
-                # Use safe-psql.sh wrapper for local environments
-                "$PROJECT_ROOT/scripts/safe-psql.sh" -f "$seed_path"
+                # Local environment: execute via psql directly
+                PGPASSWORD="${PGPASSWORD:-postgres}" psql \
+                  --host=localhost \
+                  --port=54322 \
+                  --username=postgres \
+                  --dbname=postgres \
+                  -v ON_ERROR_STOP=1 \
+                  -f "$seed_path"
             fi
         else
             log_warning "Seed file not found: $seed_file"
@@ -392,8 +398,14 @@ execute_sql_seeds() {
             # Use cloud database connection for verification
             execute_cloud_sql "" "$verification_query" || true
         else
-            # Use safe-psql.sh for local verification
-            "$PROJECT_ROOT/scripts/safe-psql.sh" -c "$verification_query" || true
+            # Local verification via direct psql
+            PGPASSWORD="${PGPASSWORD:-postgres}" psql \
+              --host=localhost \
+              --port=54322 \
+              --username=postgres \
+              --dbname=postgres \
+              -v ON_ERROR_STOP=1 \
+              -c "$verification_query" || true
         fi
     } | sed 's/^/    /'
 }
@@ -431,8 +443,10 @@ reset_supabase_database() {
                     fi
                 fi
             else
-                # Local DB readiness check via safe-psql
-                if "$PROJECT_ROOT/scripts/safe-psql.sh" -c "SELECT 1;" >/dev/null 2>&1; then
+                # Local DB readiness check via direct psql
+                if PGPASSWORD="${PGPASSWORD:-postgres}" psql \
+                  --host=localhost --port=54322 --username=postgres --dbname=postgres \
+                  -v ON_ERROR_STOP=1 -c "SELECT 1;" >/dev/null 2>&1; then
                     log_success "Database is ready"
                     return 0
                 fi
