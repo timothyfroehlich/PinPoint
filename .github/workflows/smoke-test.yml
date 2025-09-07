@@ -75,11 +75,8 @@ jobs:
           set -e  # Exit on any error
           echo "🗃️ Setting up database schema and seed data with local Supabase..."
 
-          # Push schema to local Supabase database
-          npm run db:push:local
-
-          # Seed database with full auth + database users (like local dev)
-          npm run db:seed:local:sb
+          # Use unified reset script for schema + seeds (local Supabase)
+          npm run db:reset:local
 
           echo "✅ Database setup complete - ready for smoke test"
 
