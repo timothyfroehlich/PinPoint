@@ -5,6 +5,7 @@ import type { CookieOptions } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { env } from "~/env";
+import { isError } from "~/lib/utils/type-guards";
 
 /**
  * Creates a Supabase client for use in server components and API routes.
@@ -20,16 +21,17 @@ import { env } from "~/env";
  *
  * @returns Promise resolving to Supabase server client instance
  */
-export async function createClient() {
+export async function createClient(): Promise<SupabaseClient> {
   // These environment variables are required in non-test environments
   // In test environment, Supabase client creation is mocked at the module level
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
     const missingVars = [];
     if (!supabaseUrl) missingVars.push("NEXT_PUBLIC_SUPABASE_URL");
-    if (!supabaseAnonKey) missingVars.push("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+    if (!supabaseAnonKey)
+      missingVars.push("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
     throw new Error(
       `Missing required Supabase environment variables: ${missingVars.join(", ")}`,
     );
@@ -80,7 +82,7 @@ export async function createClient() {
  *
  * @returns Promise resolving to Supabase admin client instance
  */
-export async function createAdminClient() {
+export async function createAdminClient(): Promise<SupabaseClient> {
   // These environment variables are required in non-test environments
   // In test environment, Supabase client creation is mocked at the module level
   const supabaseUrl = env.SUPABASE_URL;
@@ -150,7 +152,10 @@ export async function getCurrentUser(): Promise<
   } = await supabase.auth.getUser();
 
   if (error) {
-    console.warn("Auth error in getCurrentUser:", error.message);
+    console.warn(
+      "Auth error in getCurrentUser:",
+      isError(error) ? error.message : String(error),
+    );
     return null;
   }
 
@@ -186,11 +191,11 @@ export async function getCurrentUserOrganizationId(): Promise<string | null> {
  *
  * @example
  * ```typescript
- * const { user, organizationId } = await requireOrganizationContext();
- * // Safe to proceed with organization-scoped operations
+ * const { user, organizationId } = await requireSupabaseUserContext();
+ * // Safe to proceed with user-scoped operations using app_metadata
  * ```
  */
-export async function requireOrganizationContext(): Promise<{
+export async function requireSupabaseUserContext(): Promise<{
   user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
   organizationId: string;
 }> {

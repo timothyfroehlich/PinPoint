@@ -131,7 +131,7 @@ Notes:
 - Organization data is accessed only within its subdomain context.
 - Public listing (root, no subdomain) returns only: `id`, `name`, `subdomain` (optional lightweight logo) for rows with `organizations.is_public = TRUE`.
 - Members may view their own memberships; org admins may list their members.
-  
+
 Note: Organization visibility toggling is governed by general organization update authority (admin role / `organization:update`), not a separate permission.
 
 Implementation note: Anon listing is exposed via a dedicated minimal view/function pair (`public_organizations_minimal` / `fn_public_organizations_minimal`) that returns only public organizations with minimal fields. The base `organizations` table remains unavailable to anonymous users.

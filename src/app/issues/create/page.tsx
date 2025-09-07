@@ -3,29 +3,61 @@ import Link from "next/link";
 import { Home, Wrench } from "lucide-react";
 
 import { CreateIssueFormServer } from "~/components/forms/CreateIssueFormServer";
-import { requireMemberAccess } from "~/lib/organization-context";
+import { AuthGuard } from "~/components/auth/auth-guard";
+import { getRequestAuthContext } from "~/server/auth/context";
 import { createIssueAction } from "~/lib/actions/issue-actions";
 import { getMachinesForOrg } from "~/lib/dal/machines";
 import { getAssignableUsers } from "~/lib/dal/users";
+import { computeIssueCreationGating } from "~/lib/permissions/issueCreationGating";
 
 // Transform DAL data for CreateIssueFormServer component
-function transformMachinesForForm(machinesResult: Awaited<ReturnType<typeof getMachinesForOrg>>) {
-  return machinesResult.items.map(machine => ({
+function transformMachinesForForm(
+  machinesResult: Awaited<ReturnType<typeof getMachinesForOrg>>,
+): {
+  id: string;
+  name: string;
+  model: {
+    id: string;
+    name: string;
+    manufacturer: string | null;
+    year: number | null;
+  };
+  location: {
+    id: string;
+    name: string;
+  };
+}[] {
+  return machinesResult.items.map((machine) => ({
     id: machine.id,
     name: machine.name,
-    ...(machine.model?.name && { model: machine.model.name }),
+    model: {
+      id: machine.model.id,
+      name: machine.model.name,
+      manufacturer: machine.model.manufacturer,
+      year: machine.model.year,
+    },
+    location: {
+      id: machine.location.id,
+      name: machine.location.name,
+    },
   }));
 }
 
 // Transform DAL data for CreateIssueFormServer component
-function transformUsersForForm(assignableUsers: Awaited<ReturnType<typeof getAssignableUsers>>) {
+function transformUsersForForm(
+  assignableUsers: Awaited<ReturnType<typeof getAssignableUsers>>,
+): {
+  id: string;
+  name: string;
+  email: string;
+}[] {
   return assignableUsers
-    .map(user => ({
+    .map((user) => ({
       id: user.id,
-      name: user.name || 'Unknown User',
-      email: user.email || '',
+      name: user.name ?? "Unknown User",
+      email: user.email ?? "",
     }))
-    .filter(user => user.email); // Filter out users without email
+    .filter((user) => user.email); // Filter out users without email
 }
 
 // Force dynamic rendering for auth-dependent content
@@ -47,21 +79,33 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function CreateIssuePage({
+async function CreateIssueContent({
   searchParams,
-}: CreateIssuePageProps): Promise<React.JSX.Element> {
-  await requireMemberAccess(); // Ensure authenticated user with organization membership
+  authContext,
+}: {
+  searchParams: CreateIssuePageProps["searchParams"];
+  authContext: Extract<
+    Awaited<ReturnType<typeof getRequestAuthContext>>,
+    { kind: "authorized" }
+  >;
+}): Promise<React.JSX.Element> {
   const resolvedSearchParams = await searchParams;
 
   // Parallel data fetching using real DAL functions with React 19 cache()
   const [machinesRaw, assignableUsersRaw] = await Promise.all([
-    getMachinesForOrg(),
-    getAssignableUsers(),
+    getMachinesForOrg(authContext.org.id),
+    getAssignableUsers(authContext.org.id),
   ]);
 
   // Transform data to match component expectations
   const machines = transformMachinesForForm(machinesRaw);
   const users = transformUsersForForm(assignableUsersRaw);
+
+  // For now, give all authenticated members full creation permissions
+  // TODO: Implement proper permission checking via DAL function
+  const gating = computeIssueCreationGating({
+    permissions: ["ISSUE_CREATE_FULL"],
+  });
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -72,7 +116,10 @@ export default async function CreateIssuePage({
           Home
         </Link>
         <span>/</span>
-        <Link href="/issues" className="flex items-center hover:text-foreground">
+        <Link
+          href="/issues"
+          className="flex items-center hover:text-foreground"
+        >
           <Wrench className="w-4 h-4 mr-1" />
           Issues
         </Link>
@@ -84,17 +131,46 @@ export default async function CreateIssuePage({
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Create New Issue</h1>
         <p className="text-muted-foreground">
-          Report a problem with a pinball machine to help keep the games running smoothly.
+          Report a problem with a pinball machine to help keep the games running
+          smoothly.
         </p>
       </div>
 
       {/* Server Component Form with Server Actions */}
-      <CreateIssueFormServer 
+      <CreateIssueFormServer
         machines={machines}
         users={users}
         action={createIssueAction}
-        {...(resolvedSearchParams.machineId && { initialMachineId: resolvedSearchParams.machineId })}
+        {...(resolvedSearchParams.machineId && {
+          initialMachineId: resolvedSearchParams.machineId,
+        })}
+        showPriority={gating.showPriority}
+        showAssignee={gating.showAssignee}
       />
     </div>
+  );
+}
+
+export default async function CreateIssuePage({
+  searchParams,
+}: CreateIssuePageProps): Promise<React.JSX.Element> {
+  const authContext = await getRequestAuthContext();
+
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Create Issue Access Required"
+      fallbackMessage="You need to be signed in as a member to create new issues."
+    >
+      <CreateIssueContent
+        searchParams={searchParams}
+        authContext={
+          authContext as Extract<
+            Awaited<ReturnType<typeof getRequestAuthContext>>,
+            { kind: "authorized" }
+          >
+        }
+      />
+    </AuthGuard>
   );
 }

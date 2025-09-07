@@ -10,10 +10,8 @@ import Link from "next/link";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { X } from "lucide-react";
-import {
-  buildIssueUrl,
-  type IssueSearchParams,
-} from "~/lib/search-params/issue-search-params";
+import { buildIssueUrl } from "~/lib/search-params/issue-search-params";
+import type { IssueSearchParams } from "~/lib/types";
 
 interface IssueActiveFiltersProps {
   filters: IssueSearchParams;
@@ -23,7 +21,7 @@ interface IssueActiveFiltersProps {
 export function IssueActiveFilters({
   filters,
   searchParams,
-}: IssueActiveFiltersProps) {
+}: IssueActiveFiltersProps): JSX.Element | null {
   const activeFilters = [];
 
   // Status filters
@@ -126,25 +124,27 @@ export function IssueActiveFilters({
 
   return (
     <>
-      {activeFilters.map((filter) => (
-        <Badge
-          key={filter.key}
-          variant="secondary"
-          className="flex items-center gap-1"
-        >
-          {filter.label}: {filter.value}
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="h-4 w-4 p-0 ml-1"
+      {activeFilters.map(
+        (filter): JSX.Element => (
+          <Badge
+            key={filter.key}
+            variant="secondary"
+            className="flex items-center gap-1"
           >
-            <Link href={filter.removeUrl} className="hover:text-error">
-              <X className="h-3 w-3" />
-            </Link>
-          </Button>
-        </Badge>
-      ))}
+            {filter.label}: {filter.value}
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="h-4 w-4 p-0 ml-1"
+            >
+              <Link href={filter.removeUrl} className="hover:text-error">
+                <X className="h-3 w-3" />
+              </Link>
+            </Button>
+          </Badge>
+        ),
+      )}
 
       {/* Clear all filters button */}
       <Button variant="ghost" size="sm" asChild>

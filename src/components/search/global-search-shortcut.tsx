@@ -7,27 +7,34 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
-import { UniversalSearchInput } from "./universal-search-input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
+import { UniversalSearch } from "./universal-search";
 import { type SearchResult } from "~/lib/services/search-service";
 
 interface GlobalSearchShortcutProps {
   children?: React.ReactNode;
 }
 
-export function GlobalSearchShortcut({ children }: GlobalSearchShortcutProps) {
+export function GlobalSearchShortcut({
+  children,
+}: GlobalSearchShortcutProps): JSX.Element {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
 
   // Handle keyboard shortcut
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
       // Cmd+K or Ctrl+K to open search
       if ((event.metaKey || event.ctrlKey) && event.key === "k") {
         event.preventDefault();
         setIsOpen(true);
       }
-      
+
       // Escape to close
       if (event.key === "Escape" && isOpen) {
         setIsOpen(false);
@@ -35,32 +42,38 @@ export function GlobalSearchShortcut({ children }: GlobalSearchShortcutProps) {
     };
 
     document.addEventListener("keydown", handleKeyDown);
-    return () => { document.removeEventListener("keydown", handleKeyDown); };
+    return (): void => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, [isOpen]);
 
   // Focus input when dialog opens
   useEffect(() => {
     if (isOpen) {
       // Small delay to ensure dialog is fully rendered
-      const timer = setTimeout(() => {
-        const input = document.querySelector('[data-search-input]') as HTMLInputElement;
+      const timer = setTimeout((): void => {
+        const input = document.querySelector<HTMLElement>(
+          "[data-search-input]",
+        );
         if (input) {
           input.focus();
         }
       }, 100);
-      
-      return () => { clearTimeout(timer); };
+
+      return (): void => {
+        clearTimeout(timer);
+      };
     }
-    
+
     return undefined;
   }, [isOpen]);
 
-  const handleResultSelect = (result: SearchResult) => {
+  const handleResultSelect = (result: SearchResult): void => {
     setIsOpen(false);
     router.push(result.url);
   };
 
-  const handleOpenChange = (open: boolean) => {
+  const handleOpenChange = (open: boolean): void => {
     setIsOpen(open);
   };
 
@@ -68,7 +81,12 @@ export function GlobalSearchShortcut({ children }: GlobalSearchShortcutProps) {
     <>
       {/* Trigger element (optional) */}
       {children && (
-        <div onClick={() => { setIsOpen(true); }} className="cursor-pointer">
+        <div
+          onClick={() => {
+            setIsOpen(true);
+          }}
+          className="cursor-pointer"
+        >
           {children}
         </div>
       )}
@@ -79,9 +97,9 @@ export function GlobalSearchShortcut({ children }: GlobalSearchShortcutProps) {
           <DialogHeader className="sr-only">
             <DialogTitle>Global Search</DialogTitle>
           </DialogHeader>
-          
+
           <div className="p-4">
-            <UniversalSearchInput
+            <UniversalSearch
               placeholder="Search issues, machines, users, locations..."
               showSuggestions={true}
               showRecentSearches={true}
@@ -90,7 +108,7 @@ export function GlobalSearchShortcut({ children }: GlobalSearchShortcutProps) {
               onResultSelect={handleResultSelect}
               className="w-full"
             />
-            
+
             <div className="flex items-center justify-between text-xs text-muted-foreground mt-3 px-3">
               <div className="flex items-center gap-4">
                 <span>🔍 Search across everything</span>
@@ -122,12 +140,12 @@ interface SearchButtonTriggerProps {
   className?: string;
 }
 
-export function SearchButtonTrigger({ 
+export function SearchButtonTrigger({
   variant = "outline",
   size = "sm",
   showShortcut = true,
-  className = "" 
-}: SearchButtonTriggerProps) {
+  className = "",
+}: SearchButtonTriggerProps): JSX.Element {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -135,16 +153,24 @@ export function SearchButtonTrigger({
   }, []);
 
   // Get the appropriate shortcut key based on platform
-  const shortcutKey = mounted 
-    ? (navigator.platform.includes('Mac') ? '⌘' : 'Ctrl')
-    : 'Ctrl';
+  const shortcutKey = mounted
+    ? navigator.userAgent.includes("Mac")
+      ? "⌘"
+      : "Ctrl"
+    : "Ctrl";
 
   // Variant styles matching shadcn/ui button patterns
   const variantStyles = {
     default: "bg-primary text-primary-foreground hover:bg-primary/90",
-    outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground", 
-    ghost: "hover:bg-accent hover:text-accent-foreground"
-  };
+    outline:
+      "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+    ghost: "hover:bg-accent hover:text-accent-foreground",
+  } as const;
+
+  // ESLint security warning is false positive - `variant` is strictly typed
+  // as "default" | "outline" | "ghost" union type, making object access safe
+  // eslint-disable-next-line security/detect-object-injection
+  const variantClass = variantStyles[variant];
 
   return (
     <GlobalSearchShortcut>
@@ -152,8 +178,8 @@ export function SearchButtonTrigger({
         className={`
           inline-flex items-center justify-start gap-2 px-3 py-2 text-sm font-medium rounded-md
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
-          ${variantStyles[variant]}
-          ${size === 'sm' ? 'h-8 text-xs' : size === 'lg' ? 'h-12 text-base' : 'h-10 text-sm'}
+          ${variantClass}
+          ${size === "sm" ? "h-8 text-xs" : size === "lg" ? "h-12 text-base" : "h-10 text-sm"}
           ${className}
         `}
         type="button"
@@ -173,7 +199,7 @@ export function SearchButtonTrigger({
             Search anything...
           </span>
         </div>
-        
+
         {showShortcut && (
           <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100 sm:flex">
             {shortcutKey}K
@@ -188,11 +214,15 @@ export function SearchButtonTrigger({
  * Hook for global search shortcut functionality
  * Can be used in other components to implement search shortcuts
  */
-export function useGlobalSearchShortcut() {
+export function useGlobalSearchShortcut(): {
+  isSearchOpen: boolean;
+  openSearch: () => void;
+  closeSearch: () => void;
+} {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
       if ((event.metaKey || event.ctrlKey) && event.key === "k") {
         event.preventDefault();
         setIsSearchOpen(true);
@@ -200,12 +230,18 @@ export function useGlobalSearchShortcut() {
     };
 
     document.addEventListener("keydown", handleKeyDown);
-    return () => { document.removeEventListener("keydown", handleKeyDown); };
+    return (): void => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, []);
 
   return {
     isSearchOpen,
-    openSearch: () => { setIsSearchOpen(true); },
-    closeSearch: () => { setIsSearchOpen(false); },
+    openSearch: (): void => {
+      setIsSearchOpen(true);
+    },
+    closeSearch: (): void => {
+      setIsSearchOpen(false);
+    },
   };
 }

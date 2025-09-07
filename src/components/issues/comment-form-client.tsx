@@ -10,7 +10,9 @@ interface CommentFormClientProps {
   issueId: string;
 }
 
-export function CommentFormClient({ issueId }: CommentFormClientProps) {
+export function CommentFormClient({
+  issueId,
+}: CommentFormClientProps): JSX.Element {
   const [state, formAction, isPending] = useActionState(
     addCommentAction.bind(null, issueId),
     null,
@@ -41,7 +43,9 @@ export function CommentFormClient({ issueId }: CommentFormClientProps) {
           )}
 
           {state && state.success && (
-            <p className="text-tertiary text-sm">✅ Comment added successfully</p>
+            <p className="text-tertiary text-sm">
+              ✅ Comment added successfully
+            </p>
           )}
 
           <div className="flex justify-end">

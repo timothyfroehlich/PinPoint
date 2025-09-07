@@ -6,6 +6,7 @@
  */
 
 import { generateCacheKey, isValidOPDBId } from "./utils";
+import { isError, getErrorMessage } from "~/lib/utils/type-guards";
 
 import type {
   OPDBSearchResult,
@@ -107,11 +108,11 @@ export class OPDBClient {
         success: true,
       };
     } catch (error) {
-      console.error("OPDB API request failed:", error);
+      console.error("OPDB API request failed:", getErrorMessage(error));
       return {
         data: null as T,
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: isError(error) ? error.message : "Unknown error",
       };
     }
   }
@@ -284,7 +285,10 @@ export class OPDBClient {
       const result = await this.request<{ status: string }>("/health");
       return result.success;
     } catch (error) {
-      console.error("OPDB connection validation failed:", error);
+      console.error(
+        "OPDB connection validation failed:",
+        getErrorMessage(error),
+      );
       return false;
     }
   }

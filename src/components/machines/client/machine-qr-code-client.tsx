@@ -5,6 +5,7 @@
  */
 
 "use client";
+import Image from "next/image";
 
 import { useState, useTransition } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -41,7 +42,7 @@ export function MachineQRCodeClient({
   qrCodeGeneratedAt,
   machineName,
   showBulkActions: _showBulkActions = false,
-}: MachineQRCodeClientProps) {
+}: MachineQRCodeClientProps): JSX.Element {
   const [currentQRCode, setCurrentQRCode] = useState(qrCodeUrl);
   const [generatedAt, setGeneratedAt] = useState(qrCodeGeneratedAt);
   const [isPending, startTransition] = useTransition();
@@ -50,7 +51,7 @@ export function MachineQRCodeClient({
     text: string;
   } | null>(null);
 
-  const handleRegenerate = () => {
+  const handleRegenerate = (): void => {
     startTransition(async () => {
       try {
         const result = await regenerateQRCodeAction(machineId);
@@ -73,13 +74,13 @@ export function MachineQRCodeClient({
             text: result.error || "Failed to regenerate QR code",
           });
         }
-      } catch (error) {
+      } catch {
         setMessage({ type: "error", text: "An unexpected error occurred" });
       }
     });
   };
 
-  const handleDownload = () => {
+  const handleDownload = (): void => {
     if (!currentQRCode) return;
 
     try {
@@ -95,64 +96,96 @@ export function MachineQRCodeClient({
       setTimeout(() => {
         setMessage(null);
       }, 2000);
-    } catch (error) {
+    } catch {
       setMessage({ type: "error", text: "Failed to download QR code" });
     }
   };
 
-  const handlePrint = () => {
+  const handlePrint = (): void => {
     if (!currentQRCode) return;
 
     try {
       // Create a new window for printing
       const printWindow = window.open("", "_blank");
       if (printWindow) {
-        printWindow.document.write(`
-          <html>
-            <head>
-              <title>QR Code - ${machineName}</title>
-              <style>
-                body { 
-                  font-family: Arial, sans-serif; 
-                  text-align: center; 
-                  padding: 20px; 
-                }
-                .qr-container { 
-                  margin: 20px auto; 
-                  max-width: 400px; 
-                }
-                .qr-code { 
-                  max-width: 100%; 
-                  height: auto; 
-                  border: 1px solid #ddd; 
-                  padding: 20px;
-                  background: white;
-                }
-                .machine-name { 
-                  font-size: 18px; 
-                  font-weight: bold; 
-                  margin-bottom: 10px; 
-                }
-                .generated-date { 
-                  font-size: 12px; 
-                  color: #666; 
-                  margin-top: 10px; 
-                }
-                @media print {
-                  body { margin: 0; }
-                }
-              </style>
-            </head>
-            <body>
-              <div class="qr-container">
-                <div class="machine-name">${machineName}</div>
-                <img src="${currentQRCode}" alt="QR Code for ${machineName}" class="qr-code" />
-                ${generatedAt ? `<div class="generated-date">Generated: ${generatedAt.toLocaleDateString()}</div>` : ""}
-              </div>
-            </body>
-          </html>
-        `);
-        printWindow.document.close();
+        const doc = printWindow.document;
+
+        // Create document structure using safe DOM APIs
+        const html = doc.createElement("html");
+        const head = doc.createElement("head");
+        const body = doc.createElement("body");
+
+        // Set title safely
+        const title = doc.createElement("title");
+        title.textContent = `QR Code - ${machineName}`;
+        head.appendChild(title);
+
+        // Add styles
+        const style = doc.createElement("style");
+        style.textContent = `
+          body { 
+            font-family: Arial, sans-serif; 
+            text-align: center; 
+            padding: 20px; 
+          }
+          .qr-container { 
+            margin: 20px auto; 
+            max-width: 400px; 
+          }
+          .qr-code { 
+            max-width: 100%; 
+            height: auto; 
+            border: 1px solid #ddd; 
+            padding: 20px;
+            background: white;
+          }
+          .machine-name { 
+            font-size: 18px; 
+            font-weight: bold; 
+            margin-bottom: 10px; 
+          }
+          .generated-date { 
+            font-size: 12px; 
+            color: #666; 
+            margin-top: 10px; 
+          }
+          @media print {
+            body { margin: 0; }
+          }
+        `;
+        head.appendChild(style);
+
+        // Create body content safely
+        const container = doc.createElement("div");
+        container.className = "qr-container";
+
+        const nameDiv = doc.createElement("div");
+        nameDiv.className = "machine-name";
+        nameDiv.textContent = machineName; // Safe: uses textContent instead of innerHTML
+        container.appendChild(nameDiv);
+
+        const img = doc.createElement("img");
+        img.src = currentQRCode;
+        img.alt = `QR Code for ${machineName}`; // This is safe in attributes
+        img.className = "qr-code";
+        container.appendChild(img);
+
+        if (generatedAt) {
+          const dateDiv = doc.createElement("div");
+          dateDiv.className = "generated-date";
+          dateDiv.textContent = `Generated: ${generatedAt.toLocaleDateString()}`;
+          container.appendChild(dateDiv);
+        }
+
+        body.appendChild(container);
+        html.appendChild(head);
+        html.appendChild(body);
+
+        // Replace the document content safely
+        doc.open();
+        doc.close();
+        doc.documentElement.replaceWith(html);
+        // Remove document.close() as it's not needed with innerHTML
         printWindow.print();
         printWindow.close();
 
@@ -161,7 +194,7 @@ export function MachineQRCodeClient({
           setMessage(null);
         }, 2000);
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: "error", text: "Failed to print QR code" });
     }
   };
@@ -231,9 +264,11 @@ export function MachineQRCodeClient({
             {/* QR Code Display */}
             <div className="flex justify-center">
               <div className="p-4 border rounded-lg bg-surface">
-                <img
+                <Image
                   src={currentQRCode}
                   alt={`QR Code for ${machineName}`}
+                  width={128}
+                  height={128}
                   className="w-32 h-32 object-contain"
                 />
               </div>

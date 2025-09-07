@@ -11,7 +11,7 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -21,13 +21,9 @@ import {
 import { Alert, AlertDescription } from "~/components/ui/alert";
 import { Loader2, Plus } from "lucide-react";
 import type { ActionResult } from "~/lib/actions/shared";
+import type { LocationResponse } from "~/lib/types";
 
-interface Location {
-  id: string;
-  name: string;
-  city?: string | null;
-  state?: string | null;
-}
+type Location = Pick<LocationResponse, "id" | "name">;
 
 interface Model {
   id: string;
@@ -47,21 +43,21 @@ export function CreateMachineFormClient({
   locations,
   models,
   action,
-}: CreateMachineFormClientProps) {
+}: CreateMachineFormClientProps): JSX.Element {
   const router = useRouter();
-  
+
   // Wrapper to adapt Server Action for useActionState
   const actionWrapper = async (
     _prevState: ActionResult<{ machineId: string }> | null,
-    formData: FormData
-  ) => {
+    formData: FormData,
+  ): Promise<ActionResult<{ machineId: string }>> => {
     return await action(formData);
   };
 
   const [state, formAction, isPending] = useActionState(actionWrapper, null);
 
   // Redirect on success
-  if (state?.success && state.data?.machineId) {
+  if (state?.success && state.data.machineId) {
     router.push(`/machines/${state.data.machineId}`);
   }
 
@@ -95,8 +91,10 @@ export function CreateMachineFormClient({
                 disabled={isPending}
                 required
               />
-              {!state?.success && state?.fieldErrors?.['name'] && (
-                <p className="text-sm text-destructive">{state.fieldErrors['name'][0]}</p>
+              {!state?.success && state?.fieldErrors?.["name"] && (
+                <p className="text-sm text-destructive">
+                  {state.fieldErrors["name"][0]}
+                </p>
               )}
             </div>
 
@@ -111,17 +109,14 @@ export function CreateMachineFormClient({
                   {locations.map((location) => (
                     <SelectItem key={location.id} value={location.id}>
                       {location.name}
-                      {location.city && location.state && (
-                        <span className="text-muted-foreground">
-                          {" "}- {location.city}, {location.state}
-                        </span>
-                      )}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {!state?.success && state?.fieldErrors?.['locationId'] && (
-                <p className="text-sm text-destructive">{state.fieldErrors['locationId'][0]}</p>
+              {!state?.success && state?.fieldErrors?.["locationId"] && (
+                <p className="text-sm text-destructive">
+                  {state.fieldErrors["locationId"][0]}
+                </p>
               )}
             </div>
 
@@ -137,22 +132,30 @@ export function CreateMachineFormClient({
                     <SelectItem key={model.id} value={model.id}>
                       <div className="flex items-center gap-2">
                         {model.manufacturer && (
-                          <span className="font-medium">{model.manufacturer}</span>
+                          <span className="font-medium">
+                            {model.manufacturer}
+                          </span>
                         )}
                         <span>{model.name}</span>
                         {model.year && (
-                          <span className="text-muted-foreground">({model.year})</span>
+                          <span className="text-muted-foreground">
+                            ({model.year})
+                          </span>
                         )}
                         {model.is_custom && (
-                          <span className="text-xs bg-muted px-1 rounded">Custom</span>
+                          <span className="text-xs bg-muted px-1 rounded">
+                            Custom
+                          </span>
                         )}
                       </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {!state?.success && state?.fieldErrors?.['modelId'] && (
-                <p className="text-sm text-destructive">{state.fieldErrors['modelId'][0]}</p>
+              {!state?.success && state?.fieldErrors?.["modelId"] && (
+                <p className="text-sm text-destructive">
+                  {state.fieldErrors["modelId"][0]}
+                </p>
               )}
             </div>
 
@@ -165,27 +168,27 @@ export function CreateMachineFormClient({
                 placeholder="Enter owner information"
                 disabled={isPending}
               />
-              {!state?.success && state?.fieldErrors?.['ownerId'] && (
-                <p className="text-sm text-destructive">{state.fieldErrors['ownerId'][0]}</p>
+              {!state?.success && state?.fieldErrors?.["ownerId"] && (
+                <p className="text-sm text-destructive">
+                  {state.fieldErrors["ownerId"][0]}
+                </p>
               )}
             </div>
           </div>
 
           {/* Submit Button */}
           <div className="flex gap-4 pt-4">
-            <Button
-              type="submit"
-              disabled={isPending}
-              className="flex-1"
-            >
+            <Button type="submit" disabled={isPending} className="flex-1">
               {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isPending ? "Creating Machine..." : "Create Machine"}
             </Button>
-            
+
             <Button
               type="button"
               variant="outline"
-              onClick={() => { router.push("/machines"); }}
+              onClick={() => {
+                router.push("/machines");
+              }}
               disabled={isPending}
             >
               Cancel

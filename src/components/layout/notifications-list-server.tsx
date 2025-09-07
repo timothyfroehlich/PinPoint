@@ -3,6 +3,7 @@
  * Server-rendered notification dropdown content
  */
 
+import React from "react";
 import { formatDistanceToNow } from "date-fns";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
@@ -14,17 +15,22 @@ import {
   MegaphoneIcon,
   ExternalLinkIcon,
 } from "lucide-react";
-import { getUserNotifications, getNotificationStats } from "~/lib/dal/notifications";
+import {
+  getUserNotifications,
+  getNotificationStats,
+} from "~/lib/dal/notifications";
 import Link from "next/link";
 
 interface NotificationListServerProps {
+  userId: string;
+  organizationId: string;
   limit?: number;
 }
 
 /**
  * Get appropriate icon based on notification type
  */
-function getNotificationIcon(type: string) {
+function getNotificationIcon(type: string): JSX.Element {
   switch (type) {
     case "ISSUE_CREATED":
     case "ISSUE_UPDATED":
@@ -44,7 +50,7 @@ function getNotificationIcon(type: string) {
 /**
  * Get appropriate color scheme based on notification type using Material 3 colors
  */
-function getNotificationColor(type: string) {
+function getNotificationColor(type: string): string {
   switch (type) {
     case "ISSUE_CREATED":
       return "bg-error-container border-outline-variant text-on-error-container";
@@ -63,13 +69,15 @@ function getNotificationColor(type: string) {
   }
 }
 
-export async function NotificationsListServer({ 
-  limit = 10 
-}: NotificationListServerProps) {
+export async function NotificationsListServer({
+  userId,
+  organizationId,
+  limit = 10,
+}: NotificationListServerProps): Promise<JSX.Element> {
   // Parallel data fetching for optimal performance
   const [notifications, stats] = await Promise.all([
-    getUserNotifications(limit),
-    getNotificationStats(),
+    getUserNotifications(userId, organizationId, limit),
+    getNotificationStats(userId, organizationId),
   ]);
 
   if (notifications.length === 0) {
@@ -93,7 +101,7 @@ export async function NotificationsListServer({
         <div className="p-3 bg-primary-container border-b">
           <div className="flex items-center justify-between text-sm">
             <span className="text-on-primary-container font-medium">
-              {stats.unread} unread notification{stats.unread !== 1 ? 's' : ''}
+              {stats.unread} unread notification{stats.unread !== 1 ? "s" : ""}
             </span>
             <Badge variant="secondary" className="text-xs">
               {stats.today} today
@@ -138,7 +146,7 @@ export async function NotificationsListServer({
                   {/* Action Button */}
                   {notification.action_url && (
                     <Button variant="ghost" size="sm" asChild>
-                      <Link 
+                      <Link
                         href={notification.action_url}
                         className="flex items-center gap-1 text-xs"
                       >
@@ -157,9 +165,7 @@ export async function NotificationsListServer({
       {/* View All Link */}
       <div className="p-3 border-t bg-muted/20">
         <Button variant="ghost" size="sm" className="w-full" asChild>
-          <Link href="/notifications">
-            View all notifications
-          </Link>
+          <Link href="/notifications">View all notifications</Link>
         </Button>
       </div>
     </div>

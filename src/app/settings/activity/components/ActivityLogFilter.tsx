@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -28,50 +28,61 @@ import { CalendarIcon, FilterIcon, XIcon, SearchIcon } from "lucide-react";
 import { format, subDays } from "date-fns";
 import { cn } from "~/lib/utils";
 
-export function ActivityLogFilter() {
+export function ActivityLogFilter(): JSX.Element {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   // Get current filter values from URL
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(
-    searchParams.get("dateFrom") ? new Date(searchParams.get("dateFrom")!) : undefined
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(() => {
+    const dateFromParam = searchParams.get("dateFrom");
+    return dateFromParam ? new Date(dateFromParam) : undefined;
+  });
+  const [dateTo, setDateeTo] = useState<Date | undefined>(() => {
+    const dateToParam = searchParams.get("dateTo");
+    return dateToParam ? new Date(dateToParam) : undefined;
+  });
+  const [selectedUser, setSelectedUser] = useState(
+    searchParams.get("userId") ?? "",
   );
-  const [dateTo, setDateeTo] = useState<Date | undefined>(
-    searchParams.get("dateTo") ? new Date(searchParams.get("dateTo")!) : undefined
+  const [selectedAction, setSelectedAction] = useState(
+    searchParams.get("action") ?? "",
   );
-  const [selectedUser, setSelectedUser] = useState(searchParams.get("userId") || "");
-  const [selectedAction, setSelectedAction] = useState(searchParams.get("action") || "");
-  const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
+  const [searchTerm, setSearchTerm] = useState(
+    searchParams.get("search") ?? "",
+  );
 
   // Create query string from current filters
-  const createQueryString = useCallback((params: Record<string, string | undefined>) => {
-    const newSearchParams = new URLSearchParams(searchParams.toString());
-    
-    Object.entries(params).forEach(([key, value]) => {
-      if (value) {
-        newSearchParams.set(key, value);
-      } else {
-        newSearchParams.delete(key);
-      }
-    });
+  const createQueryString = useCallback(
+    (params: Record<string, string | undefined>) => {
+      const newSearchParams = new URLSearchParams(searchParams.toString());
 
-    return newSearchParams.toString();
-  }, [searchParams]);
+      Object.entries(params).forEach(([key, value]) => {
+        if (value) {
+          newSearchParams.set(key, value);
+        } else {
+          newSearchParams.delete(key);
+        }
+      });
 
-  const applyFilters = () => {
+      return newSearchParams.toString();
+    },
+    [searchParams],
+  );
+
+  const applyFilters = (): void => {
     const queryString = createQueryString({
-      dateFrom: dateFrom?.toISOString().split('T')[0],
-      dateTo: dateTo?.toISOString().split('T')[0],
+      dateFrom: dateFrom?.toISOString().split("T")[0],
+      dateTo: dateTo?.toISOString().split("T")[0],
       userId: selectedUser,
       action: selectedAction,
       search: searchTerm,
-      page: "1" // Reset to first page when filtering
+      page: "1", // Reset to first page when filtering
     });
 
     router.push(`?${queryString}`);
   };
 
-  const clearFilters = () => {
+  const clearFilters = (): void => {
     setDateFrom(undefined);
     setDateeTo(undefined);
     setSelectedUser("");
@@ -80,14 +91,19 @@ export function ActivityLogFilter() {
     router.push(window.location.pathname);
   };
 
-  const setQuickDateRange = (days: number) => {
+  const setQuickDateRange = (days: number): void => {
     const to = new Date();
     const from = subDays(to, days);
     setDateFrom(from);
     setDateeTo(to);
   };
 
-  const hasActiveFilters = dateFrom || dateTo || selectedUser || selectedAction || searchTerm;
+  const hasActiveFilters =
+    Boolean(dateFrom) ||
+    Boolean(dateTo) ||
+    Boolean(selectedUser) ||
+    Boolean(selectedAction) ||
+    Boolean(searchTerm);
 
   return (
     <div className="space-y-4">
@@ -96,28 +112,36 @@ export function ActivityLogFilter() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => { setQuickDateRange(1); }}
+          onClick={() => {
+            setQuickDateRange(1);
+          }}
         >
           Last 24h
         </Button>
         <Button
           variant="outline"
           size="sm"
-          onClick={() => { setQuickDateRange(7); }}
+          onClick={() => {
+            setQuickDateRange(7);
+          }}
         >
           Last 7 days
         </Button>
         <Button
           variant="outline"
           size="sm"
-          onClick={() => { setQuickDateRange(30); }}
+          onClick={() => {
+            setQuickDateRange(30);
+          }}
         >
           Last 30 days
         </Button>
         <Button
           variant="outline"
           size="sm"
-          onClick={() => { setQuickDateRange(90); }}
+          onClick={() => {
+            setQuickDateRange(90);
+          }}
         >
           Last 90 days
         </Button>
@@ -135,7 +159,7 @@ export function ActivityLogFilter() {
                 variant="outline"
                 className={cn(
                   "w-full justify-start text-left font-normal",
-                  !dateFrom && "text-muted-foreground"
+                  !dateFrom && "text-muted-foreground",
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
@@ -147,7 +171,7 @@ export function ActivityLogFilter() {
                 mode="single"
                 selected={dateFrom}
                 onSelect={setDateFrom}
-                initialFocus
+                autoFocus
               />
             </PopoverContent>
           </Popover>
@@ -162,7 +186,7 @@ export function ActivityLogFilter() {
                 variant="outline"
                 className={cn(
                   "w-full justify-start text-left font-normal",
-                  !dateTo && "text-muted-foreground"
+                  !dateTo && "text-muted-foreground",
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
@@ -174,8 +198,8 @@ export function ActivityLogFilter() {
                 mode="single"
                 selected={dateTo}
                 onSelect={setDateeTo}
-                initialFocus
-                disabled={(date) => dateFrom ? date < dateFrom : false}
+                autoFocus
+                disabled={(date) => (dateFrom ? date < dateFrom : false)}
               />
             </PopoverContent>
           </Popover>
@@ -226,7 +250,9 @@ export function ActivityLogFilter() {
           <Input
             placeholder="Search in activity details, IP addresses, or user agents..."
             value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); }}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+            }}
             className="pl-10"
           />
         </div>
@@ -246,22 +272,29 @@ export function ActivityLogFilter() {
             </Button>
           )}
         </div>
-        
+
         {hasActiveFilters && (
           <div className="text-sm text-muted-foreground">
+            {
+              [
+                dateFrom && `From: ${format(dateFrom, "MMM d")}`,
+                dateTo && `To: ${format(dateTo, "MMM d")}`,
+                selectedUser && `User filtered`,
+                selectedAction && `Action filtered`,
+                searchTerm && `Search active`,
+              ].filter(Boolean).length
+            }{" "}
+            filter
             {[
               dateFrom && `From: ${format(dateFrom, "MMM d")}`,
               dateTo && `To: ${format(dateTo, "MMM d")}`,
               selectedUser && `User filtered`,
               selectedAction && `Action filtered`,
-              searchTerm && `Search active`
-            ].filter(Boolean).length} filter{[
-              dateFrom && `From: ${format(dateFrom, "MMM d")}`,
-              dateTo && `To: ${format(dateTo, "MMM d")}`,
-              selectedUser && `User filtered`,
-              selectedAction && `Action filtered`,
-              searchTerm && `Search active`
-            ].filter(Boolean).length !== 1 ? 's' : ''} active
+              searchTerm && `Search active`,
+            ].filter(Boolean).length !== 1
+              ? "s"
+              : ""}{" "}
+            active
           </div>
         )}
       </div>
