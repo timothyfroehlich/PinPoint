@@ -1,0 +1,23 @@
+HTTP/2 403 
+date: Sat, 06 Sep 2025 13:42:52 GMT
+content-type: application/json; charset=utf-8
+x-github-media-type: github.v3; format=json
+x-github-api-version-selected: 2022-11-28
+access-control-expose-headers: ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset
+access-control-allow-origin: *
+strict-transport-security: max-age=31536000; includeSubdomains; preload
+x-frame-options: deny
+x-content-type-options: nosniff
+x-xss-protection: 0
+referrer-policy: origin-when-cross-origin, strict-origin-when-cross-origin
+content-security-policy: default-src 'none'
+vary: Accept-Encoding, Accept, X-Requested-With
+server: github.com
+x-ratelimit-limit: 60
+x-ratelimit-remaining: 57
+x-ratelimit-reset: 1757166878
+x-ratelimit-resource: core
+x-ratelimit-used: 3
+content-length: 180
+x-github-request-id: 855C:23D75C:2945441:9654068:68BC3A5C
+
