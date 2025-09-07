@@ -71,7 +71,8 @@ jobs:
           echo "🗃️ Setting up database schema and seed data with local Supabase..."
 
           # Use unified reset script for schema + seeds (local Supabase)
-          npm run db:reset:local
+          # Capture logs for artifact upload on failure
+          npm run db:reset:local 2>&1 | tee db-reset.log
 
           echo "✅ Database setup complete - ready for smoke test"
 
@@ -94,4 +95,11 @@ jobs:
         with:
           name: playwright-report-smoke
           path: playwright-report/
+          retention-days: 7
+      - name: Upload DB Reset Log
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: failure()
+        with:
+          name: db-reset-log
+          path: db-reset.log
           retention-days: 7
