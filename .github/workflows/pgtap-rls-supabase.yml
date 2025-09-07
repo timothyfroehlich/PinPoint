@@ -89,9 +89,17 @@ jobs:
           
           # Run RLS tests with proper DATABASE_URL for Supabase
           export DATABASE_URL="postgresql://postgres:postgres@localhost:54322/postgres"
-          npm run test:rls
+          npm run test:rls 2>&1 | tee pgtap-run.log
           
           echo "✅ pgTAP RLS tests completed"
+      
+      - name: Upload pgTAP logs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pgtap-run-log
+          path: pgtap-run.log
+          retention-days: 7
       
       - name: Cleanup
         if: always()
