@@ -49,7 +49,7 @@ jobs:
         with:
           reporter: github-pr-check
           filter_mode: diff_context
-          fail_on_error: 'false'
+          fail_level: none
           level: warning
 
   prettier:
@@ -102,7 +102,7 @@ jobs:
         with:
           reporter: github-pr-check
           filter_mode: diff_context
-          fail_on_error: 'false'
+          fail_level: none
           path: scripts
           pattern: '**/*.sh'
 
@@ -150,7 +150,7 @@ jobs:
         with:
           reporter: github-pr-check
           filter_mode: diff_context
-          fail_on_error: 'true'
+          fail_level: error
 
   security-audit:
     name: Security Audit
