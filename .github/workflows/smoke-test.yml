@@ -33,6 +33,23 @@ jobs:
         with:
           exclude: studio,realtime,storage-api,edge-runtime,logflare,vector,imgproxy,supavisor,postgres-meta,mailpit
 
+      - name: Map Supabase env for Next.js
+        run: |
+          set -e
+          echo "🔧 Mapping Supabase CLI env to Next.js expected variables"
+          [[ -n "$API_URL" ]] || { echo "❌ API_URL not set by Supabase CLI"; exit 1; }
+          [[ -n "$ANON_KEY" ]] || { echo "❌ ANON_KEY not set by Supabase CLI"; exit 1; }
+          [[ -n "$SERVICE_ROLE_KEY" ]] || { echo "❌ SERVICE_ROLE_KEY not set by Supabase CLI"; exit 1; }
+
+          # Map to Next.js client/server env expectations
+          echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$ANON_KEY" >> "$GITHUB_ENV"
+          echo "SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
+          echo "SUPABASE_SECRET_KEY=$SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
+
+          # Helpful for logs/debugging
+          echo "✅ Mapped env: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL, SUPABASE_SECRET_KEY"
+
 
       - name: Cache Playwright Browsers
         uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
@@ -64,6 +81,8 @@ jobs:
           # Validate critical environment variables are set by Supabase CLI
           [[ -n "$API_URL" ]] || { echo "❌ API_URL not set by Supabase CLI"; exit 1; }
           [[ -n "$ANON_KEY" ]] || { echo "❌ ANON_KEY not set by Supabase CLI"; exit 1; }
+          [[ -n "$NEXT_PUBLIC_SUPABASE_URL" ]] || { echo "❌ NEXT_PUBLIC_SUPABASE_URL not exported"; exit 1; }
+          [[ -n "$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" ]] || { echo "❌ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY not exported"; exit 1; }
 
           # Run smoke test - must pass completely for CI success
           echo "🧪 Running smoke test with local Supabase stack"
