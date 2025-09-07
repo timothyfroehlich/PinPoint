@@ -17,6 +17,7 @@
   },
   "include": [
     "*.config.{ts,js}",
+    "playwright.prod.config.ts",
     "drizzle.config.*.ts",
     "vitest.setup.*.ts",
     "scripts/**/*.{ts,js}",
