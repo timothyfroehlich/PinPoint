@@ -113,23 +113,21 @@ validate_local_env_safety() {
 
     log_step "Validating .env.local safety for $env"
 
+    # If .env.local is missing, that's OK in CI because Supabase CLI exports env via GITHUB_ENV
     if [[ ! -f ".env.local" ]]; then
-        if [[ "$allow_non_local" != "true" ]]; then
-            log_error ".env.local not found. Create it (copy from .env.example) or pass --allow-non-local to proceed."
-            exit 1
-        else
-            log_warning ".env.local not found; proceeding due to --allow-non-local"
-            return 0
-        fi
+        log_warning ".env.local not found; assuming CI with Supabase CLI-provided env (API_URL, SERVICE_ROLE_KEY, etc.)"
+        return 0
     fi
 
     # Detect obvious cloud DB/URL patterns (supabase.co) to prevent accidental prod/preview targeting
     if grep -E "SUPABASE_URL|NEXT_PUBLIC_SUPABASE_URL|POSTGRES_URL|POSTGRES_URL_NON_POOLING|DATABASE_URL|SUPABASE_DB_URL" .env.local | grep -E "supabase\\.co|aws-" >/dev/null 2>&1; then
         if [[ "$allow_non_local" != "true" ]]; then
-            log_error "Detected non-local Supabase/DB settings in .env.local (contains supabase.co/aws)."
-            log_error "Run with --allow-non-local to proceed anyway."
+            log_error ".env.local contains cloud endpoints (supabase.co/aws). To prevent accidental data loss, script will not run."
+            log_error "If you intend to target a non-local database, run with --allow-non-local (DANGEROUS)."
+            log_error "Otherwise, update .env.local to point to your local Supabase instance."
             exit 1
         else
+            log_warning ".env.local appears to contain non-local settings (supabase.co/aws)"
             log_warning "Proceeding with non-local settings due to --allow-non-local"
         fi
     else

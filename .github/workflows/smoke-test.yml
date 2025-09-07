@@ -28,28 +28,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
-      - name: Install Vercel CLI
-        run: npm install --global vercel@latest
-
-      - name: Pull Vercel Environment Variables
-        run: |
-          set -e  # Exit on any error
-          # Validate required secrets are present
-          [[ -n "${{ secrets.VERCEL_TOKEN }}" ]] || { echo "❌ VERCEL_TOKEN secret not set"; exit 1; }
-          [[ -n "${{ secrets.VERCEL_ORG_ID }}" ]] || { echo "❌ VERCEL_ORG_ID secret not set"; exit 1; }
-          [[ -n "${{ secrets.VERCEL_PROJECT_ID }}" ]] || { echo "❌ VERCEL_PROJECT_ID secret not set"; exit 1; }
-
-          # Pull environment variables
-          vercel env pull .env.local --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-
-          # Verify the .env.local file was created
-          [[ -f .env.local ]] || { echo "❌ .env.local file not created"; exit 1; }
-          echo "✅ Environment variables successfully pulled from Vercel"
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
-
       - name: Setup Node, Deps, and Supabase
         uses: ./.github/actions/supabase-local
         with:
@@ -76,8 +54,7 @@ jobs:
           echo "🗃️ Setting up database schema and seed data with local Supabase..."
 
           # Use unified reset script for schema + seeds (local Supabase)
-          # Pass --allow-non-local because .env.local points to preview/prod in CI
-          npm run db:reset:local -- --allow-non-local
+          npm run db:reset:local
 
           echo "✅ Database setup complete - ready for smoke test"
 
