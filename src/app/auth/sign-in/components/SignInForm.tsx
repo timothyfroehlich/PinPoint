@@ -35,9 +35,8 @@ import { type OrganizationOption } from "~/lib/dal/public-organizations";
 
 // Development auth integration
 import { authenticateDevUser, getAuthResultMessage } from "~/lib/auth/dev-auth";
-import { isDevAuthAvailable, isPreview } from "~/lib/environment-client";
+import { isDevAuthAvailable } from "~/lib/environment-client";
 import { createClient } from "~/utils/supabase/client";
-import { getCurrentDomain } from "~/lib/utils/domain";
 import { resolveOrgSubdomainFromLocation } from "~/lib/domain-org-mapping";
 
 export function SignInForm(): React.JSX.Element {
@@ -80,7 +79,7 @@ export function SignInForm(): React.JSX.Element {
 
   // Load organizations and apply host-based org locking
   useEffect(() => {
-    console.log(`[SIGNIN_FORM] useEffect triggered - orgsLoading: ${orgsLoading}, orgs.length: ${orgs.length}`);
+    console.log(`[SIGNIN_FORM] useEffect triggered - orgsLoading: ${String(orgsLoading)}, orgs.length: ${String(orgs.length)}`);
     
     setOrganizationsLoading(orgsLoading);
     if (orgsLoading || orgs.length === 0) return;
@@ -89,7 +88,7 @@ export function SignInForm(): React.JSX.Element {
     const lockedSubdomain = resolveOrgSubdomainFromLocation();
     console.log(`[SIGNIN_FORM] Client-side host resolution:`);
     console.log(`[SIGNIN_FORM] window.location.hostname: "${typeof window !== 'undefined' ? window.location.hostname : 'undefined'}"`);
-    console.log(`[SIGNIN_FORM] lockedSubdomain: "${lockedSubdomain}"`);
+    console.log(`[SIGNIN_FORM] lockedSubdomain: "${lockedSubdomain ?? 'null'}"`);
     console.log(`[SIGNIN_FORM] Available orgs:`, orgs.map(o => ({ id: o.id, subdomain: o.subdomain, name: o.name })));
 
     if (lockedSubdomain) {
