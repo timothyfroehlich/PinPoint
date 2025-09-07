@@ -69,13 +69,16 @@ const DEV_PASSWORD = "dev-login-123";
 async function createDevUsers() {
   // Required environment
   const rawSupabaseUrl = (
-    process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
+    process.env.SUPABASE_URL ??
+    process.env.NEXT_PUBLIC_SUPABASE_URL ??
+    ""
   ).trim();
   const supabaseSecretKey = (process.env.SUPABASE_SECRET_KEY ?? "").trim();
 
   if (!rawSupabaseUrl || !supabaseSecretKey) {
     console.error("❌ Missing required environment variables:");
-    if (!rawSupabaseUrl) console.error("  - SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL)");
+    if (!rawSupabaseUrl)
+      console.error("  - SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL)");
     if (!supabaseSecretKey) console.error("  - SUPABASE_SECRET_KEY");
     process.exit(1);
   }
@@ -116,7 +119,9 @@ async function createDevUsers() {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  console.log("🔧 Creating dev users and memberships via Supabase Admin API...");
+  console.log(
+    "🔧 Creating dev users and memberships via Supabase Admin API...",
+  );
 
   // Helper function creation skipped in CI to avoid direct DB connection
 
@@ -149,20 +154,20 @@ async function createDevUsers() {
 
       // Upsert membership via SECURITY DEFINER helper through Supabase RPC
       console.log(`    - Upserting membership for ${user.email}`);
-      const roleId = user.email.includes("tim") ? ROLE_IDS.ADMIN : ROLE_IDS.MEMBER;
+      const roleId = user.email.includes("tim")
+        ? ROLE_IDS.ADMIN
+        : ROLE_IDS.MEMBER;
       // Upsert membership via service-role REST (RLS bypassed)
       const stableId = `membership-${user.id}-${user.organizationId}`;
-      const { error: upsertErr } = await supabase
-        .from("memberships")
-        .upsert(
-          {
-            id: stableId,
-            user_id: user.id,
-            organization_id: user.organizationId,
-            role_id: roleId,
-          },
-          { onConflict: "id" },
-        );
+      const { error: upsertErr } = await supabase.from("memberships").upsert(
+        {
+          id: stableId,
+          user_id: user.id,
+          organization_id: user.organizationId,
+          role_id: roleId,
+        },
+        { onConflict: "id" },
+      );
       if (upsertErr) {
         throw new Error(`Membership upsert failed: ${upsertErr.message}`);
       }
