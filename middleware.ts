@@ -11,6 +11,10 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   const host = request.headers.get("host") ?? "";
 
   console.log(`[MIDDLEWARE] Request to: ${host}${url.pathname}`);
+  console.log(
+    `[MIDDLEWARE] Full host from headers:`,
+    request.headers.get("host"),
+  );
 
   // Track auth error state to forward to the app
   let hasAuthError: boolean | undefined = undefined;
