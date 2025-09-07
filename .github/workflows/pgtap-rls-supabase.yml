@@ -41,10 +41,6 @@ jobs:
       
       - name: Setup Node, Deps, and Supabase
         uses: ./.github/actions/supabase-local
-        with:
-          node-version: "24"
-          cli-version: latest
-          exclude: ''
           
       - name: Verify Supabase Connection
         run: |
