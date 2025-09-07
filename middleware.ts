@@ -11,6 +11,10 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   const host = request.headers.get("host") ?? "";
 
   console.log(`[MIDDLEWARE] Request to: ${host}${url.pathname}`);
+  console.log(
+    `[MIDDLEWARE] Full host from headers:`,
+    request.headers.get("host"),
+  );
 
   // Track auth error state to forward to the app
   let hasAuthError: boolean | undefined = undefined;
@@ -110,6 +114,17 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     supabaseResponse.headers.set("x-auth-error", authError);
   }
 
+  // Mirror subdomain headers to response for debugging and client-side access
+  const subdomainValue = requestHeaders.get("x-subdomain");
+  const verifiedValue = requestHeaders.get(SUBDOMAIN_VERIFIED_HEADER);
+  if (subdomainValue && verifiedValue) {
+    supabaseResponse.headers.set("x-subdomain", subdomainValue);
+    supabaseResponse.headers.set(SUBDOMAIN_VERIFIED_HEADER, verifiedValue);
+    console.log(
+      `[MIDDLEWARE] Also setting response headers: x-subdomain=${subdomainValue}, verified=${verifiedValue}`,
+    );
+  }
+
   // Ensure any Supabase SSR cookies are applied to this final response
   bufferedCookies.forEach(({ name, value, options }) => {
     if (options) {
@@ -123,10 +138,25 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 }
 
 function getSubdomain(host: string): string | null {
-  // Centralized resolution with alias support
-  const result = resolveOrgSubdomainFromHost(host);
-  console.log(`[MIDDLEWARE] Host resolution: "${host}" -> subdomain: "${result ?? 'null'}"`);
-  return result;
+  // Direct inline alias mapping to eliminate import issues
+  const hostWithoutPort = host.split(":")[0] ?? "";
+  console.log(`[MIDDLEWARE] Processing host: "${hostWithoutPort}"`);
+
+  // Check direct alias mapping
+  if (
+    hostWithoutPort.toLowerCase() === "pinpoint.austinpinballcollective.org"
+  ) {
+    console.log(`[MIDDLEWARE] FOUND APC alias match! Returning 'apc'`);
+    return "apc";
+  }
+
+  // Also try the imported function for comparison
+  const importedResult = resolveOrgSubdomainFromHost(host);
+  console.log(
+    `[MIDDLEWARE] Direct check: null, Imported function: "${importedResult ?? "null"}"`,
+  );
+
+  return importedResult;
 }
 
 export const config = {
