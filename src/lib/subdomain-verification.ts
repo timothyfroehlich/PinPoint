@@ -10,8 +10,6 @@
  *   or treat the subdomain as unknown and handle accordingly.
  */
 
-import { isDevelopment } from "~/lib/environment";
-
 export const SUBDOMAIN_VERIFIED_HEADER = "x-subdomain-verified" as const;
 export const SUBDOMAIN_HEADER = "x-subdomain" as const;
 
