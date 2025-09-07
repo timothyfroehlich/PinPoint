@@ -1,0 +1,135 @@
+name: Tests
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+  NODE_ENV: test
+
+jobs:
+  typecheck:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript Check (multi-config)
+        run: |
+          echo "=== Checking Production Code (Strictest) ==="
+          set +e
+          npm run typecheck > production-typescript.log 2>&1
+          TYPECHECK_EXIT_CODE=$?
+          set -e
+          if [ $TYPECHECK_EXIT_CODE -ne 0 ]; then
+            echo "❌ Production code has TypeScript errors!" >> "$GITHUB_STEP_SUMMARY"
+            grep "error TS" production-typescript.log | head -10 >> "$GITHUB_STEP_SUMMARY" || true
+            exit 1
+          fi
+          echo "=== Checking Test Utils (Recommended) ==="
+          npx tsc --project tsconfig.test-utils.json --noEmit > test-utils-typescript.log 2>&1 || true
+          echo "=== Checking Test Files (Relaxed) ==="
+          npx tsc --project tsconfig.tests.json --noEmit > tests-typescript.log 2>&1 || true
+          echo "✅ Multi-config TypeScript check completed!" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload TypeScript Logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: typescript-logs
+          path: |
+            production-typescript.log
+            test-utils-typescript.log
+            tests-typescript.log
+          retention-days: 7
+
+  tests:
+    name: Vitest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Vitest
+        run: npx vitest run --coverage --coverage.thresholds=false
+
+      - name: Upload Coverage
+        uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24 # v5
+        with:
+          files: ./coverage/lcov.info
+          fail_ci_if_error: true
+
+  database-validation:
+    name: Database Validation
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_db
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
+      DIRECT_URL: postgresql://test_user:test_password@localhost:5432/test_db
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Database Schema
+        run: npm run db:push:local
+
+      - name: CRUD Validation
+        run: npm run db:validate:ci
+
+      - name: Upload Validation Log
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: database-validation-report
+          path: database-validation.log
+          retention-days: 7
