@@ -36,6 +36,7 @@ logs/
 # https://create.t3.gg/en/usage/env-variables#using-environment-variables
 .env.local
 .env.*.local
+.env.preview
 !.env
 !.env.development
 !.env.example
