@@ -57,14 +57,30 @@ jobs:
           set -e
           echo "📦 Ensuring pgTAP is available and preparing database for tests..."
           export DATABASE_URL="postgresql://postgres:postgres@localhost:54322/postgres"
-          # Try to enable pgTAP as extension (preferred)
-          if psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS pgtap;"; then
-            echo "✅ pgTAP extension available"
+
+          echo "🔎 Trying pgTAP extension..."
+          if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS pgtap;"; then
+            echo "✅ pgTAP extension created or already present"
           else
-            echo "⚠️ Could not enable pgTAP extension; the test runner will fallback to SQL functions if present"
+            echo "⚠️ CREATE EXTENSION pgtap failed; will attempt to load SQL functions"
           fi
-          # Apply roles/setup
-          psql "$DATABASE_URL" -f supabase/tests/setup/01-test-roles.sql
+
+          echo "🔎 Verifying pgTAP functions (plan)..."
+          if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SELECT plan(1); SELECT pass('pgTAP available'); SELECT finish();" >/dev/null 2>&1; then
+            echo "✅ pgTAP functions are available"
+          else
+            echo "⬇️ Downloading pgTAP SQL (v1.3.3)"
+            wget -q https://github.com/theory/pgtap/archive/refs/tags/v1.3.3.tar.gz
+            tar -xzf v1.3.3.tar.gz
+            echo "🧪 Loading pgTAP SQL into database..."
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f pgtap-1.3.3/sql/pgtap.sql
+            echo "🔁 Re-checking pgTAP availability..."
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SELECT plan(1); SELECT pass('pgTAP SQL loaded'); SELECT finish();"
+            echo "✅ pgTAP SQL loaded successfully"
+          fi
+
+          echo "🛠️ Applying test roles/setup"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/setup/01-test-roles.sql
           echo "✅ Database prepared"
       
       - name: Run pgTAP RLS Tests
