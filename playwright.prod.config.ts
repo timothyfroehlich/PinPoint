@@ -4,11 +4,10 @@ import { defineConfig, devices } from "@playwright/test";
 // Env vars (override as needed when running locally):
 // - PROD_GENERIC_URL: e.g. https://pinpoint-tracker.vercel.app
 // - PROD_APC_URL:     e.g. https://pinpoint.austinpinballcollective.org
-// - PROD_GENERIC_ORG_SUBDOMAIN: default 'apc'
+// Note: Vercel .vercel.app domains don't support subdomains (apc.pinpoint-tracker.vercel.app is invalid)
 
 const GENERIC_URL = process.env.PROD_GENERIC_URL || "https://pinpoint-tracker.vercel.app";
 const APC_URL = process.env.PROD_APC_URL || "https://pinpoint.austinpinballcollective.org";
-const ORG_SUB = process.env.PROD_GENERIC_ORG_SUBDOMAIN || "apc";
 
 export default defineConfig({
   testDir: "./e2e/prod",
@@ -27,16 +26,6 @@ export default defineConfig({
         baseURL: GENERIC_URL,
         extraHTTPHeaders: {
           "x-test-target": "prod-generic",
-        },
-      },
-    },
-    {
-      name: "prod-generic-apc-subdomain",
-      use: {
-        ...devices["Desktop Chrome"],
-        baseURL: `https://${ORG_SUB}.${new URL(GENERIC_URL).host}`,
-        extraHTTPHeaders: {
-          "x-test-target": "prod-generic-apc",
         },
       },
     },
