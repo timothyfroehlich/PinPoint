@@ -6,10 +6,8 @@ import { defineConfig, devices } from "@playwright/test";
 // - PROD_APC_URL:     e.g. https://pinpoint.austinpinballcollective.org
 // Note: Vercel .vercel.app domains don't support subdomains (apc.pinpoint-tracker.vercel.app is invalid)
 
-const GENERIC_URL =
-  process.env.PROD_GENERIC_URL || "https://pinpoint-tracker.vercel.app";
-const APC_URL =
-  process.env.PROD_APC_URL || "https://pinpoint.austinpinballcollective.org";
+const GENERIC_URL = process.env.PROD_GENERIC_URL || "https://pinpoint-tracker.vercel.app";
+const APC_URL = process.env.PROD_APC_URL || "https://pinpoint.austinpinballcollective.org";
 
 export default defineConfig({
   testDir: "./e2e/prod",
@@ -43,3 +41,4 @@ export default defineConfig({
     },
   ],
 });
+
