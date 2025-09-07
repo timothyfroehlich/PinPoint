@@ -5,6 +5,7 @@ import type { NextRequest } from "next/server";
 import { env } from "~/env";
 import { SUBDOMAIN_VERIFIED_HEADER } from "~/lib/subdomain-verification";
 import { getCookieDomain } from "~/lib/utils/domain";
+import { resolveOrgSubdomainFromHost } from "~/lib/domain-org-mapping";
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const url = request.nextUrl.clone();
   const host = request.headers.get("host") ?? "";
@@ -122,28 +123,10 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 }
 
 function getSubdomain(host: string): string | null {
-  // Remove port from host for parsing
-  const hostParts = host.split(":");
-  const hostWithoutPort = hostParts[0];
-
-  if (!hostWithoutPort) return null;
-
-  if (env.NODE_ENV === "development") {
-    // In development, expect format: subdomain.localhost
-    if (hostWithoutPort === "localhost") return null;
-    const parts = hostWithoutPort.split(".");
-    if (parts.length >= 2 && parts[parts.length - 1] === "localhost") {
-      return parts[0] ?? null;
-    }
-    return null;
-  } else {
-    // In production, expect format: subdomain.domain.com
-    const parts = hostWithoutPort.split(".");
-    if (parts.length >= 3) {
-      return parts[0] ?? null;
-    }
-    return null;
-  }
+  // Centralized resolution with alias support
+  const result = resolveOrgSubdomainFromHost(host);
+  console.log(`[MIDDLEWARE] Host resolution: "${host}" -> subdomain: "${result ?? 'null'}"`);
+  return result;
 }
 
 export const config = {
