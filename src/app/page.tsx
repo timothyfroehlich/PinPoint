@@ -6,6 +6,7 @@ import {
   SUBDOMAIN_HEADER,
   SUBDOMAIN_VERIFIED_HEADER,
 } from "~/lib/subdomain-verification";
+import { ORG_ALIAS_HOSTS } from "~/lib/domain-org-mapping";
 
 export default async function HomePage(): Promise<React.JSX.Element> {
   // If request is already scoped to an organization (via subdomain or alias),
@@ -15,6 +16,9 @@ export default async function HomePage(): Promise<React.JSX.Element> {
   const verified = h.get(SUBDOMAIN_VERIFIED_HEADER);
   const host = h.get("host");
 
+  // Fallback: Check for alias hosts directly (when middleware fails to execute)
+  const aliasSubdomain = host ? ORG_ALIAS_HOSTS[host] : null;
+
   // Debug logging for production troubleshooting
   console.log(`[PAGE_HOMEPAGE] Host: "${host ?? "null"}"`);
   console.log(
@@ -23,12 +27,19 @@ export default async function HomePage(): Promise<React.JSX.Element> {
   console.log(
     `[PAGE_HOMEPAGE] Verified header (${SUBDOMAIN_VERIFIED_HEADER}): "${verified ?? "null"}"`,
   );
-  console.log(
-    `[PAGE_HOMEPAGE] Should redirect: ${String(Boolean(sub && verified))}`,
-  );
+  console.log(`[PAGE_HOMEPAGE] Alias subdomain: "${aliasSubdomain ?? "null"}"`);
+  // Check redirect conditions
+  const middlewareRedirect = Boolean(sub && verified);
+  const aliasRedirect = Boolean(aliasSubdomain);
+  const shouldRedirect = middlewareRedirect || aliasRedirect;
 
-  if (sub && verified) {
-    console.log(`[PAGE_HOMEPAGE] Redirecting to /auth/sign-in`);
+  console.log(`[PAGE_HOMEPAGE] Should redirect: ${String(shouldRedirect)}`);
+
+  // Redirect if middleware set org headers OR if we detect alias host directly
+  if (shouldRedirect) {
+    const reason =
+      sub && verified ? "middleware headers" : "alias host fallback";
+    console.log(`[PAGE_HOMEPAGE] Redirecting to /auth/sign-in (${reason})`);
     redirect("/auth/sign-in");
   }
 
@@ -39,7 +50,10 @@ export default async function HomePage(): Promise<React.JSX.Element> {
     host,
     subdomain: sub,
     verified,
-    shouldRedirect: Boolean(sub && verified),
+    aliasSubdomain,
+    middlewareRedirect,
+    aliasRedirect,
+    shouldRedirect,
   };
 
   return (
