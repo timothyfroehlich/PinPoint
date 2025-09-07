@@ -113,23 +113,21 @@ validate_local_env_safety() {
 
     log_step "Validating .env.local safety for $env"
 
+    # If .env.local is missing, that's OK in CI because Supabase CLI exports env via GITHUB_ENV
     if [[ ! -f ".env.local" ]]; then
-        if [[ "$allow_non_local" != "true" ]]; then
-            log_error ".env.local not found. Create it (copy from .env.example) or pass --allow-non-local to proceed."
-            exit 1
-        else
-            log_warning ".env.local not found; proceeding due to --allow-non-local"
-            return 0
-        fi
+        log_warning ".env.local not found; assuming CI with Supabase CLI-provided env (API_URL, SERVICE_ROLE_KEY, etc.)"
+        return 0
     fi
 
     # Detect obvious cloud DB/URL patterns (supabase.co) to prevent accidental prod/preview targeting
     if grep -E "SUPABASE_URL|NEXT_PUBLIC_SUPABASE_URL|POSTGRES_URL|POSTGRES_URL_NON_POOLING|DATABASE_URL|SUPABASE_DB_URL" .env.local | grep -E "supabase\\.co|aws-" >/dev/null 2>&1; then
         if [[ "$allow_non_local" != "true" ]]; then
-            log_error "Detected non-local Supabase/DB settings in .env.local (contains supabase.co/aws)."
-            log_error "Run with --allow-non-local to proceed anyway."
+            log_error ".env.local contains cloud endpoints (supabase.co/aws). To prevent accidental data loss, script will not run."
+            log_error "If you intend to target a non-local database, run with --allow-non-local (DANGEROUS)."
+            log_error "Otherwise, update .env.local to point to your local Supabase instance."
             exit 1
         else
+            log_warning ".env.local appears to contain non-local settings (supabase.co/aws)"
             log_warning "Proceeding with non-local settings due to --allow-non-local"
         fi
     else
@@ -371,8 +369,14 @@ execute_sql_seeds() {
                 # Use direct cloud database connection for preview
                 execute_cloud_sql "$seed_path" ""
             else
-                # Use safe-psql.sh wrapper for local environments
-                "$PROJECT_ROOT/scripts/safe-psql.sh" -f "$seed_path"
+                # Local environment: execute via psql directly
+                PGPASSWORD="${PGPASSWORD:-postgres}" psql \
+                  --host=localhost \
+                  --port=54322 \
+                  --username=postgres \
+                  --dbname=postgres \
+                  -v ON_ERROR_STOP=1 \
+                  -f "$seed_path"
             fi
         else
             log_warning "Seed file not found: $seed_file"
@@ -394,8 +398,14 @@ execute_sql_seeds() {
             # Use cloud database connection for verification
             execute_cloud_sql "" "$verification_query" || true
         else
-            # Use safe-psql.sh for local verification
-            "$PROJECT_ROOT/scripts/safe-psql.sh" -c "$verification_query" || true
+            # Local verification via direct psql
+            PGPASSWORD="${PGPASSWORD:-postgres}" psql \
+              --host=localhost \
+              --port=54322 \
+              --username=postgres \
+              --dbname=postgres \
+              -v ON_ERROR_STOP=1 \
+              -c "$verification_query" || true
         fi
     } | sed 's/^/    /'
 }
@@ -433,8 +443,10 @@ reset_supabase_database() {
                     fi
                 fi
             else
-                # Local DB readiness check via safe-psql
-                if "$PROJECT_ROOT/scripts/safe-psql.sh" -c "SELECT 1;" >/dev/null 2>&1; then
+                # Local DB readiness check via direct psql
+                if PGPASSWORD="${PGPASSWORD:-postgres}" psql \
+                  --host=localhost --port=54322 --username=postgres --dbname=postgres \
+                  -v ON_ERROR_STOP=1 -c "SELECT 1;" >/dev/null 2>&1; then
                     log_success "Database is ready"
                     return 0
                 fi
@@ -461,7 +473,7 @@ reset_supabase_database() {
     execute_sql_seeds "$env"
 
     # Create dev users via Supabase Admin API (only for dev environments)
-    if [[ "$env" == "local" || "$env" == "preview" ]]; then
+    if [[ "$env" == "local" ]]; then
         log_info "Creating dev users via Supabase Admin API..."
         if command -v tsx >/dev/null 2>&1; then
             if tsx scripts/create-dev-users.ts; then
@@ -472,6 +484,10 @@ reset_supabase_database() {
         else
             log_warning "tsx not found, skipping dev user creation"
         fi
+    elif [[ "$env" == "preview" ]]; then
+        log_info "Preview environment: Dev users should be created via GitHub Actions"
+        log_warning "For security, the SUPABASE_SECRET_KEY is only available in GitHub Actions"
+        log_info "Run 'npm run preview:seed' to trigger secure seeding via GitHub Actions"
     fi
 
     # Sync schema definitions back to Drizzle
@@ -519,19 +535,25 @@ main() {
     echo -e "${NC}"
 
     # Validate arguments
-    if [[ $# -lt 1 || $# -gt 2 ]]; then
-        log_error "Usage: $0 <local|preview> [--allow-non-local]"
+    if [[ $# -lt 1 ]]; then
+        log_error "Usage: $0 <local|preview> [--allow-non-local] [--only-seed]"
         log_error "  local   - Reset local Supabase database"
         log_error "  preview - Reset preview environment database (with safety checks)"
         log_error "  --allow-non-local  Proceed even if .env.local looks non-local (DANGEROUS)"
+        log_error "  --only-seed       Only run SQL seeds and dev user creation (no reset/push) [local]"
         exit 1
     fi
 
-    local environment="$1"
+    local environment="$1"; shift || true
     local allow_non_local="false"
-    if [[ "${2:-}" == "--allow-non-local" ]]; then
-        allow_non_local="true"
-    fi
+    local only_seed="false"
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --allow-non-local) allow_non_local="true"; shift ;;
+            --only-seed) only_seed="true"; shift ;;
+            *) log_error "Unknown option: $1"; exit 1 ;;
+        esac
+    done
 
     # Change to project root
     cd "$PROJECT_ROOT"
@@ -562,9 +584,45 @@ main() {
         validate_local_env_safety "$environment" "$allow_non_local"
     fi
 
-    # Execution steps
+    # If only running seeds (no reset/push)
+    if [[ "$only_seed" == "true" ]]; then
+        if [[ "$environment" != "local" ]]; then
+            log_error "--only-seed is currently supported for local environment only"
+            exit 1
+        fi
+
+        log_step "Seed-only mode: applying SQL seeds and creating dev users (local)"
+        execute_sql_seeds "$environment"
+
+        # Create dev users via Supabase Admin API (local only)
+        log_info "Creating dev users via Supabase Admin API..."
+        if command -v tsx >/dev/null 2>&1; then
+            if tsx scripts/create-dev-users.ts; then
+                log_success "Dev users created successfully"
+            else
+                log_warning "Dev user creation failed, but continuing..."
+            fi
+        else
+            log_warning "tsx not found, skipping dev user creation"
+        fi
+
+        generate_typescript_types "$environment"
+
+        trap - ERR
+        echo -e "\n${GREEN}"
+        echo "======================================================================"
+        echo "✅ Seed-only completed successfully!"
+        echo "======================================================================"
+        echo -e "${NC}"
+        return 0
+    fi
+
+    # Full reset + seeds
     reset_supabase_database "$environment"
     generate_typescript_types "$environment"
+
+    # Disable ERR trap after successful completion to avoid spurious messages
+    trap - ERR
 
     echo -e "\n${GREEN}"
     echo "======================================================================"
@@ -577,6 +635,7 @@ main() {
         log_info "• Run 'npm run dev' to start development server"
         log_info "• Check 'npm run db:studio' to browse database"
     else
+        log_info "• Run 'npm run preview:seed' to create development users securely"
         log_info "• Deploy changes: 'vercel --prod'"
         log_info "• Check 'npm run db:studio:preview' to browse database"
     fi
