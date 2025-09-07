@@ -42,7 +42,7 @@ jobs:
           ADDITIONAL_CONTEXT: '${{ inputs.additional_context }}'
         with:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
-          gemini_debug: '${{ vars.ACTIONS_STEP_DEBUG == 'true' }}'
+          gemini_debug: '${{ vars.ACTIONS_STEP_DEBUG == ''true'' }}'
           settings: |-
             {
               "maxSessionTurns": 25,
