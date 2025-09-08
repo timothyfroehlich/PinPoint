@@ -37,6 +37,9 @@ export function middleware(request: NextRequest): NextResponse {
 }
 
 export const config = {
+  // Explicitly run middleware on the Node.js runtime to avoid
+  // Turbopack + Edge runtime incompatibilities in Next.js 15.5.x
+  runtime: "nodejs",
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
