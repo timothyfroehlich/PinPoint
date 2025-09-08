@@ -37,9 +37,7 @@ export default defineConfig({
     },
     {
       name: "prod-apc-alias",
-      testMatch: [
-        "**/apc-alias-host-behavior.e2e.test.ts",
-      ],
+      testMatch: ["**/apc-alias-host-behavior.e2e.test.ts"],
       use: {
         ...devices["Desktop Chrome"],
         baseURL: APC_URL,
