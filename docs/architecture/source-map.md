@@ -90,7 +90,7 @@ These files are referenced across multiple subsystems and should be understood f
 ### Database Models
 
 - `Machine` model in src/server/db/schema/
-- `Model` model in src/server/db/schema/ (OPDB machine types)
+- `Model` model in src/server/db/schema/ (commercial machine types)
 
 ### Tests
 

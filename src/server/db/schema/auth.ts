@@ -4,7 +4,7 @@ import { pgTable, text, timestamp, boolean, pgEnum } from "drizzle-orm/pg-core";
 // ENUMS
 // =================================
 
-export const notificationFrequencyEnum = pgEnum("NotificationFrequency", [
+export const notificationFrequencyEnum = pgEnum("notification_frequency", [
   "IMMEDIATE",
   "DAILY",
   "WEEKLY",
@@ -15,55 +15,51 @@ export const notificationFrequencyEnum = pgEnum("NotificationFrequency", [
 // AUTH & USER TABLES
 // =================================
 
-export const users = pgTable("User", {
-  id: text("id").primaryKey(),
-  name: text("name"),
-  email: text("email").unique(),
-  emailVerified: timestamp("emailVerified"),
-  image: text("image"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+export const users = pgTable("users", {
+  id: text().primaryKey(),
+  name: text(),
+  email: text().unique(),
+  email_verified: timestamp(),
+  image: text(),
+  created_at: timestamp().defaultNow().notNull(),
+  updated_at: timestamp().defaultNow().notNull(),
 
   // PinPoint Specific Profile
-  bio: text("bio"),
-  profilePicture: text("profilePicture"),
+  bio: text(),
+  profile_picture: text(),
 
   // Global notification preferences
-  emailNotificationsEnabled: boolean("emailNotificationsEnabled")
-    .default(true)
-    .notNull(),
-  pushNotificationsEnabled: boolean("pushNotificationsEnabled")
-    .default(false)
-    .notNull(),
-  notificationFrequency: notificationFrequencyEnum("notificationFrequency")
+  email_notifications_enabled: boolean().default(true).notNull(),
+  push_notifications_enabled: boolean().default(false).notNull(),
+  notification_frequency: notificationFrequencyEnum()
     .default("IMMEDIATE")
     .notNull(),
 });
 
-export const accounts = pgTable("Account", {
-  id: text("id").primaryKey(),
-  userId: text("userId").notNull(),
-  type: text("type").notNull(),
-  provider: text("provider").notNull(),
-  providerAccountId: text("providerAccountId").notNull(),
-  refresh_token: text("refresh_token"),
-  access_token: text("access_token"),
-  expires_at: timestamp("expires_at"),
-  token_type: text("token_type"),
-  scope: text("scope"),
-  id_token: text("id_token"),
-  session_state: text("session_state"),
+export const accounts = pgTable("accounts", {
+  id: text().primaryKey(),
+  user_id: text().notNull(),
+  type: text().notNull(),
+  provider: text().notNull(),
+  provider_account_id: text().notNull(),
+  refresh_token: text(),
+  access_token: text(),
+  expires_at: timestamp(),
+  token_type: text(),
+  scope: text(),
+  id_token: text(),
+  session_state: text(),
 });
 
-export const sessions = pgTable("Session", {
-  id: text("id").primaryKey(),
-  sessionToken: text("sessionToken").unique().notNull(),
-  userId: text("userId").notNull(),
-  expires: timestamp("expires").notNull(),
+export const sessions = pgTable("sessions", {
+  id: text().primaryKey(),
+  session_token: text().unique().notNull(),
+  user_id: text().notNull(),
+  expires: timestamp().notNull(),
 });
 
-export const verificationTokens = pgTable("VerificationToken", {
-  identifier: text("identifier").notNull(),
-  token: text("token").unique().notNull(),
-  expires: timestamp("expires").notNull(),
+export const verificationTokens = pgTable("verification_tokens", {
+  identifier: text().notNull(),
+  token: text().unique().notNull(),
+  expires: timestamp().notNull(),
 });

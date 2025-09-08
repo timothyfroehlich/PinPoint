@@ -4,12 +4,14 @@ import { type NextRequest } from "next/server";
 
 import { getSupabaseUser } from "./supabase";
 import { isValidOrganization, isValidMembership } from "./types";
+import { transformKeysToCamelCase } from "~/lib/utils/case-transformers";
 
-import type { PinPointSupabaseUser } from "~/lib/supabase/types";
+import type { PinPointSupabaseUser } from "~/lib/types";
 import type { DrizzleClient } from "~/server/db/drizzle";
 
-import { env } from "~/env";
 import { organizations, memberships } from "~/server/db/schema";
+import { extractTrustedSubdomain } from "~/lib/subdomain-verification";
+import { resolveOrgSubdomainFromHost } from "~/lib/domain-org-mapping";
 
 export interface UploadAuthContext {
   user: PinPointSupabaseUser;
@@ -20,9 +22,9 @@ export interface UploadAuthContext {
   };
   membership: {
     id: string;
-    userId: string;
-    organizationId: string;
-    roleId: string;
+    user_id: string;
+    organization_id: string;
+    role_id: string;
     role: {
       id: string;
       name: string;
@@ -32,6 +34,20 @@ export interface UploadAuthContext {
   userPermissions: string[];
 }
 
+/**
+ * Transforms upload auth context from database snake_case to API camelCase
+ * @param ctx Raw database context with snake_case fields
+ * @returns Transformed context with camelCase fields for API consumption
+ */
+function transformUploadAuthContext(ctx: unknown): unknown {
+  return transformKeysToCamelCase(ctx) as UploadAuthContext;
+}
+
+/**
+ * Gets upload authentication context with camelCase data for API consumption.
+ * Database operations use snake_case, but results are transformed to camelCase
+ * for TypeScript interface compatibility.
+ */
 export async function getUploadAuthContext(
   req: NextRequest,
   drizzle: DrizzleClient,
@@ -45,9 +61,17 @@ export async function getUploadAuthContext(
     });
   }
 
-  // 2. Resolve organization from subdomain
-  let subdomain = req.headers.get("x-subdomain");
-  subdomain ??= env.DEFAULT_ORG_SUBDOMAIN;
+  // 2. Resolve organization from subdomain: verified header, else fallback to Host parsing
+  const host = req.headers.get("host") ?? "";
+  const subdomain =
+    extractTrustedSubdomain(req.headers as unknown as Headers) ??
+    resolveOrgSubdomainFromHost(host);
+  if (!subdomain) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Invalid subdomain - organization context required",
+    });
+  }
 
   const organizationResult = await drizzle.query.organizations.findFirst({
     where: eq(organizations.subdomain, subdomain),
@@ -63,8 +87,8 @@ export async function getUploadAuthContext(
   // 3. Get user's membership and permissions
   const membershipResult = await drizzle.query.memberships.findFirst({
     where: and(
-      eq(memberships.organizationId, organizationResult.id),
-      eq(memberships.userId, user.id),
+      eq(memberships.organization_id, organizationResult.id),
+      eq(memberships.user_id, user.id),
     ),
     with: {
       role: {
@@ -86,14 +110,20 @@ export async function getUploadAuthContext(
     });
   }
 
-  return {
+  // Transform database results to camelCase for API compatibility
+  const transformedOrganization = transformKeysToCamelCase(
+    organizationResult,
+  ) as UploadAuthContext["organization"];
+  const transformedMembership = transformKeysToCamelCase(
+    membershipResult,
+  ) as UploadAuthContext["membership"];
+
+  return transformUploadAuthContext({
     user,
-    organization: organizationResult,
-    membership: membershipResult,
-    userPermissions: membershipResult.role.rolePermissions.map(
-      (rp) => rp.permission.name,
-    ),
-  };
+    organization: transformedOrganization,
+    membership: transformedMembership,
+    userPermissions: membershipResult.role.permissions.map((p) => p.name),
+  }) as UploadAuthContext;
 }
 
 export function requireUploadPermission(

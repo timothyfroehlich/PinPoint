@@ -11,6 +11,18 @@
           }
         ]
       }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/pattern-reminder.cjs",
+            "timeout": 2000
+          }
+        ]
+      }
     ]
   },
   "permissions": {
@@ -29,8 +41,11 @@
       "Bash(npm run smoke:*)",
       "Bash(npx eslint:*)",
       "Bash(npx prettier:*)",
+            "Bash(npx next:*)",
+      "Bash(npx shadcn:*)",
+      "WebFetch(domain:ui.shadcn.com)",
+      "Bash(./scripts/safe-curl.sh:*)",
       "Bash(npx tsc:*)",
-      "Bash(npx prisma db seed:*)",
       "Bash(ls:*)",
       "Bash(grep:*)",
       "Bash(gitleaks detect:*)",
@@ -55,12 +70,13 @@
       "Bash(supabase start:*)",
       "Bash(vercel env pull:*)",
       "Bash(./scripts/create-and-setup-worktree.sh:*)",
+      "Bash(./scripts/safe-psql.sh:*)",
       "WebFetch(domain:docs.anthropic.com)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:supabase.com)",
       "mcp__context7__resolve-library-id",
       "mcp__context7__get-library-docs"
     ],
-    "deny": ["Bash(find:*)"]
+    "deny": ["Bash(find:*)", "Bash(psql:*)"]
   }
 }

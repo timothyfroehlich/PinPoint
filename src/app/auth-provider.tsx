@@ -6,12 +6,11 @@ import {
   useEffect,
   useState,
   type ReactNode,
-  type JSX,
 } from "react";
 
-import type { PinPointSupabaseUser } from "~/lib/supabase/types";
+import type { PinPointSupabaseUser } from "~/lib/types";
 
-import { createClient } from "~/lib/supabase/client";
+import { createClient } from "~/utils/supabase/client";
 
 interface AuthContextType {
   user: PinPointSupabaseUser | null;
@@ -25,7 +24,7 @@ export function AuthProvider({
   children,
 }: {
   children: ReactNode;
-}): JSX.Element {
+}): React.JSX.Element {
   const [user, setUser] = useState<PinPointSupabaseUser | null>(null);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();

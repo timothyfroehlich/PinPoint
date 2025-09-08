@@ -1,11 +1,15 @@
 /**
  * Common query utilities used across Drizzle router implementations.
  * Provides consistent patterns for organization scoping, single record queries, etc.
+ *
+ * Note: All utilities in this file use snake_case field names to match the database schema.
+ * Field validation utilities are available to ensure consistency during development.
  */
 
 import { eq, and, isNull, type SQL } from "drizzle-orm";
-
 import type { PgColumn, PgSelect } from "drizzle-orm/pg-core";
+import { devValidateFields } from "./field-validation";
+import { env } from "~/env.js";
 
 /**
  * Organization scoping condition for multi-tenant queries.
@@ -81,4 +85,36 @@ export const COMMON_ERRORS = {
   NOT_FOUND: "Record not found",
   NOT_IN_ORGANIZATION: "Record not found in organization",
   ORGANIZATION_MISMATCH: "Record does not belong to organization",
+  INVALID_FIELD_NAME: "Invalid field name - use snake_case",
 } as const;
+
+/**
+ * Development helper for validating field names in queries
+ * Only active in development environment to catch field naming errors early
+ * @param tableName - The table being queried
+ * @param fields - Array of field names being accessed
+ * @example
+ * ```typescript
+ * // Validate before query construction
+ * validateQueryFields('users', ['email', 'created_at']); // OK
+ * validateQueryFields('users', ['emailAddress']); // Throws in development
+ * ```
+ */
+export function validateQueryFields(
+  tableName: Parameters<typeof devValidateFields>[0],
+  fields: string[],
+): void {
+  try {
+    devValidateFields(tableName, fields);
+  } catch (error) {
+    // In development/test, rethrow validation errors for stricter checks
+    if (env.NODE_ENV === "development" || env.NODE_ENV === "test") {
+      throw error;
+    }
+    // In production, just log the warning
+    console.warn(
+      `⚠️  Field validation warning for table '${tableName}':`,
+      error,
+    );
+  }
+}

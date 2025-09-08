@@ -1,4 +1,7 @@
 {
+  // Main TypeScript configuration for production code
+  // Extends @tsconfig/strictest for maximum type safety
+  // Used by: ESLint type-aware rules, IDE, tsc compilation
   "extends": ["./tsconfig.base.json", "@tsconfig/strictest/tsconfig.json"],
   "compilerOptions": {
     /* Strictness - inherited from @tsconfig/strictest */
@@ -7,10 +10,13 @@
     "strictNullChecks": true,
     "exactOptionalPropertyTypes": true,
     "noUncheckedIndexedAccess": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedSideEffectImports": true,
     /* Ensure path aliases work for middleware */
     "baseUrl": ".",
     "paths": {
-      "~/*": ["./src/*"]
+      "~/*": ["./src/*"],
+      "@/*": ["./src/*"]
     }
   },
   "include": [
@@ -19,8 +25,9 @@
     "lib/**/*.ts",
     "lib/**/*.tsx",
     ".next/types/**/*.ts",
+    "types/**/*.d.ts",
     "middleware.ts",
-    "prisma/**/*.ts"
+    "playwright.prod.config.ts"
   ],
   "exclude": [
     "src/_archived_frontend/**/*",

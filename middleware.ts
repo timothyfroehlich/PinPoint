@@ -1,115 +1,39 @@
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-import { env } from "~/env";
-import { isDevelopment } from "~/lib/environment";
+export function middleware(request: NextRequest): NextResponse {
+  // MINIMAL TEST: Check if middleware runs at all
+  console.log(`[MIDDLEWARE_TEST] ===== MIDDLEWARE IS RUNNING! =====`);
+  console.log(`[MIDDLEWARE_TEST] Path: ${request.nextUrl.pathname}`);
+  console.log(
+    `[MIDDLEWARE_TEST] Host: ${request.headers.get("host") ?? "null"}`,
+  );
 
-export async function middleware(request: NextRequest): Promise<NextResponse> {
-  const url = request.nextUrl.clone();
+  // Test direct APC alias check
   const host = request.headers.get("host") ?? "";
+  console.log(`[MIDDLEWARE_TEST] Processing host: "${host}"`);
 
-  console.log(`[MIDDLEWARE] Request to: ${host}${url.pathname}`);
+  if (host === "pinpoint.austinpinballcollective.org") {
+    console.log(`[MIDDLEWARE_TEST] FOUND APC ALIAS! Setting headers...`);
 
-  // Create Supabase response for session management
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-subdomain", "apc");
+    requestHeaders.set("x-subdomain-verified", "1");
 
-  // Handle Supabase session refresh
-  try {
-    const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabasePublishableKey = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    const response = NextResponse.next({
+      request: { headers: requestHeaders },
+    });
 
-    if (supabaseUrl && supabasePublishableKey) {
-      const supabase = createServerClient(supabaseUrl, supabasePublishableKey, {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll();
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value }) =>
-              request.cookies.set(name, value),
-            );
-            supabaseResponse = NextResponse.next({ request });
-            cookiesToSet.forEach(({ name, value, options }) =>
-              supabaseResponse.cookies.set(name, value, options),
-            );
-          },
-        },
-      });
+    response.headers.set("x-subdomain", "apc");
+    response.headers.set("x-subdomain-verified", "1");
 
-      // CRITICAL: Always call getUser() to refresh session
-      await supabase.auth.getUser();
-    }
-  } catch (error) {
-    console.warn("[MIDDLEWARE] Supabase session refresh failed:", error);
-    // Continue with subdomain handling even if auth refresh fails
+    console.log(`[MIDDLEWARE_TEST] Headers set! Returning response.`);
+    return response;
   }
 
-  // Extract subdomain
-  const subdomain = getSubdomain(host);
-  console.log(`[MIDDLEWARE] Detected subdomain: ${subdomain ?? "none"}`);
+  console.log(`[MIDDLEWARE_TEST] No special handling needed for host: ${host}`);
 
-  // If no subdomain, redirect to apc subdomain (default organization)
-  if (!subdomain) {
-    const redirectHost = isDevelopment()
-      ? `apc.localhost:3000`
-      : `apc.${getBaseDomain(host)}`;
-
-    console.log(`[MIDDLEWARE] Redirecting to: ${redirectHost}`);
-    url.host = redirectHost;
-    return NextResponse.redirect(url);
-  }
-
-  // Add subdomain to headers for organization resolution
-  supabaseResponse.headers.set("x-subdomain", subdomain);
-
-  console.log(`[MIDDLEWARE] Setting x-subdomain header: ${subdomain}`);
-  return supabaseResponse;
-}
-
-function getSubdomain(host: string): string | null {
-  // Remove port from host for parsing
-  const hostParts = host.split(":");
-  const hostWithoutPort = hostParts[0];
-
-  if (!hostWithoutPort) return null;
-
-  if (isDevelopment()) {
-    // In development, expect format: subdomain.localhost
-    if (hostWithoutPort === "localhost") return null;
-    const parts = hostWithoutPort.split(".");
-    if (parts.length >= 2 && parts[parts.length - 1] === "localhost") {
-      return parts[0] ?? null;
-    }
-    return null;
-  } else {
-    // In production, expect format: subdomain.domain.com
-    const parts = hostWithoutPort.split(".");
-    if (parts.length >= 3) {
-      return parts[0] ?? null;
-    }
-    return null;
-  }
-}
-
-function getBaseDomain(host: string): string {
-  const hostParts = host.split(":");
-  const hostWithoutPort = hostParts[0];
-
-  if (!hostWithoutPort) return host;
-
-  if (isDevelopment()) {
-    return "localhost:3000";
-  } else {
-    // Extract base domain (e.g., "example.com" from "sub.example.com")
-    const parts = hostWithoutPort.split(".");
-    if (parts.length >= 2) {
-      return parts.slice(-2).join(".");
-    }
-    return hostWithoutPort;
-  }
+  return NextResponse.next();
 }
 
 export const config = {
