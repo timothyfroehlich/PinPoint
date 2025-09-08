@@ -1,22 +1,17 @@
-# Deployment Documentation
-
-Deployment guides and environment management for PinPoint.
+# Deployment
 
 ## Current Stack
 
-- Vercel hosting with automatic preview deployments
-- PostgreSQL via Vercel Postgres
-- Environment variables via Vercel dashboard
+- **Hosting**: Vercel
+- **Database**: Supabase PostgreSQL  
+- **Auth**: Supabase SSR
+- **Storage**: Supabase Storage
+- **Environment**: Vercel dashboard
 
-## Migration Impact
+## Guides
 
-- Supabase will provide database hosting
-- Auth environment variables will change
-- File storage moves from local/Vercel Blob to Supabase Storage
-
-## Contents
-
-- **[development-deployment-guide.md](./development-deployment-guide.md)** - Local dev and preview setup
-- **[production-deployment-guide.md](./production-deployment-guide.md)** - Production deployment process
-- **[environment-management.md](./environment-management.md)** - Environment-specific strategies
-- **[vercel-environment-configuration.md](./vercel-environment-configuration.md)** - Vercel Dashboard environment variable setup
+- **[development-deployment-guide.md](./development-deployment-guide.md)** - Local setup
+- **[production-deployment-guide.md](./production-deployment-guide.md)** - Production process
+- **[environment-management.md](./environment-management.md)** - Environment variables
+- **[vercel-environment-configuration.md](./vercel-environment-configuration.md)** - Vercel setup
+- **[github-actions-vercel-supabase-integration.md](./github-actions-vercel-supabase-integration.md)** - CI/CD setup

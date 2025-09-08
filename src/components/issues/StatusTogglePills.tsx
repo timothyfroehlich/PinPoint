@@ -1,7 +1,10 @@
 "use client";
 
-import { Chip, Box, CircularProgress } from "@mui/material";
 import { useMemo } from "react";
+import { Button } from "~/components/ui/button";
+import { Badge } from "~/components/ui/badge";
+import { cn } from "~/lib/utils";
+import { Loader2 } from "lucide-react";
 
 import { api } from "~/trpc/react";
 
@@ -12,34 +15,13 @@ interface StatusTogglePillsProps {
   parentLoading?: boolean;
 }
 
-interface StatusCounts {
-  NEW: number;
-  IN_PROGRESS: number;
-  RESOLVED: number;
-}
-
 interface StatusInfo {
   id: string;
   name: string;
   category: "NEW" | "IN_PROGRESS" | "RESOLVED";
 }
 
-// Helper function to get status color based on category
-const getStatusColor = (
-  category: "NEW" | "IN_PROGRESS" | "RESOLVED",
-): {
-  backgroundColor: string;
-  color: string;
-} => {
-  switch (category) {
-    case "NEW":
-      return { backgroundColor: "#f44336", color: "white" }; // Red
-    case "IN_PROGRESS":
-      return { backgroundColor: "#ff9800", color: "white" }; // Orange
-    case "RESOLVED":
-      return { backgroundColor: "#4caf50", color: "white" }; // Green
-  }
-};
+// Status color mapping is now handled inline with Tailwind classes
 
 // Helper function to get readable category labels
 const getCategoryLabel = (
@@ -60,59 +42,42 @@ export function StatusTogglePills({
   onChange,
   showCounts = true,
   parentLoading = false,
-}: StatusTogglePillsProps): React.JSX.Element {
+}: StatusTogglePillsProps): JSX.Element {
+  // Use optimized endpoint that returns category-based counts directly
+  const { data: statusCounts, isLoading: countsLoading } =
+    api.issueStatus.getStatusCounts.useQuery();
   const { data: statuses, isLoading: statusesLoading } =
     api.issueStatus.getAll.useQuery();
-  const { data: allIssues, isLoading: issuesLoading } =
-    api.issue.core.getAll.useQuery();
 
-  // Group statuses by category and calculate counts
-  const statusData = useMemo(() => {
-    if (!statuses || !allIssues) return null;
+  // Group statuses by category for toggle functionality
+  const statusesByCategory = useMemo(() => {
+    if (!statuses) return null;
 
-    // Group statuses by category
-    const statusesByCategory: Record<
-      "NEW" | "IN_PROGRESS" | "RESOLVED",
-      StatusInfo[]
-    > = {
+    const grouped: Record<"NEW" | "IN_PROGRESS" | "RESOLVED", StatusInfo[]> = {
       NEW: [],
       IN_PROGRESS: [],
       RESOLVED: [],
     };
 
-    statuses.forEach((status) => {
+    statuses.forEach((status: StatusInfo): void => {
       // Only process statuses with valid categories
-      if (status.category in statusesByCategory) {
-        statusesByCategory[status.category].push(status);
+      if (status.category in grouped) {
+        grouped[status.category].push(status);
       }
     });
 
-    // Calculate counts by category
-    const counts: StatusCounts = {
-      NEW: 0,
-      IN_PROGRESS: 0,
-      RESOLVED: 0,
-    };
-
-    allIssues.forEach((issue) => {
-      const category = issue.status.category;
-      // Only count issues with valid status categories
-      if (category in counts) {
-        counts[category]++;
-      }
-    });
-
-    return { statusesByCategory, counts };
-  }, [statuses, allIssues]);
+    return grouped;
+  }, [statuses]);
 
   // Handle category toggle
   const handleCategoryToggle = (
     category: "NEW" | "IN_PROGRESS" | "RESOLVED",
   ): void => {
-    if (!statusData) return;
+    if (!statusesByCategory) return;
 
-    const categoryStatusIds = statusData.statusesByCategory[category].map(
-      (s) => s.id,
+    // eslint-disable-next-line security/detect-object-injection -- category is type-constrained to union type
+    const categoryStatusIds = statusesByCategory[category].map(
+      (s): string => s.id,
     );
 
     // Check if all statuses in this category are selected
@@ -132,9 +97,10 @@ export function StatusTogglePills({
   const isCategoryActive = (
     category: "NEW" | "IN_PROGRESS" | "RESOLVED",
   ): boolean => {
-    if (!statusData) return false;
-    const categoryStatusIds = statusData.statusesByCategory[category].map(
-      (s) => s.id,
+    if (!statusesByCategory) return false;
+    // eslint-disable-next-line security/detect-object-injection -- category is type-constrained to union type
+    const categoryStatusIds = statusesByCategory[category].map(
+      (s): string => s.id,
     );
     return categoryStatusIds.some((id) => value.includes(id));
   };
@@ -143,9 +109,10 @@ export function StatusTogglePills({
   const isCategoryFullySelected = (
     category: "NEW" | "IN_PROGRESS" | "RESOLVED",
   ): boolean => {
-    if (!statusData) return false;
-    const categoryStatusIds = statusData.statusesByCategory[category].map(
-      (s) => s.id,
+    if (!statusesByCategory) return false;
+    // eslint-disable-next-line security/detect-object-injection -- category is type-constrained to union type
+    const categoryStatusIds = statusesByCategory[category].map(
+      (s): string => s.id,
     );
     return (
       categoryStatusIds.length > 0 &&
@@ -153,11 +120,17 @@ export function StatusTogglePills({
     );
   };
 
-  if (parentLoading || statusesLoading || issuesLoading || !statusData) {
+  if (
+    parentLoading ||
+    statusesLoading ||
+    countsLoading ||
+    !statusesByCategory ||
+    !statusCounts
+  ) {
     return (
-      <Box display="flex" alignItems="center" gap={1}>
-        <CircularProgress size={16} />
-      </Box>
+      <div className="flex items-center gap-2">
+        <Loader2 className="h-4 w-4 animate-spin" />
+      </div>
     );
   }
 
@@ -168,44 +141,79 @@ export function StatusTogglePills({
   ];
 
   return (
-    <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
-      {categories.map((category) => {
+    <div className="flex items-center gap-2 flex-wrap">
+      {categories.map((category): JSX.Element => {
         const isActive = isCategoryActive(category);
         const isFullySelected = isCategoryFullySelected(category);
-        const count = statusData.counts[category];
-        const colors = getStatusColor(category);
+        // eslint-disable-next-line security/detect-object-injection -- category is type-constrained to union type
+        const count = statusCounts[category];
         const label = getCategoryLabel(category);
 
+        // Get status color classes using Material 3 semantic colors
+        const getStatusClasses = (
+          category: "NEW" | "IN_PROGRESS" | "RESOLVED",
+          isActive: boolean,
+        ): string => {
+          const baseClasses = "text-sm font-normal transition-all duration-200";
+
+          switch (category) {
+            case "NEW":
+              return cn(
+                baseClasses,
+                isActive
+                  ? "bg-error text-on-error border-error hover:bg-error/90"
+                  : "text-error border-error bg-transparent hover:bg-error/10",
+              );
+            case "IN_PROGRESS":
+              return cn(
+                baseClasses,
+                isActive
+                  ? "bg-secondary text-on-secondary border-secondary hover:bg-secondary/90"
+                  : "text-secondary border-secondary bg-transparent hover:bg-secondary/10",
+              );
+            case "RESOLVED":
+              return cn(
+                baseClasses,
+                isActive
+                  ? "bg-tertiary text-on-tertiary border-tertiary hover:bg-tertiary/90"
+                  : "text-tertiary border-tertiary bg-transparent hover:bg-tertiary/10",
+              );
+          }
+        };
+
         return (
-          <Chip
+          <Button
             key={category}
-            label={showCounts ? `${label} (${count.toString()})` : label}
-            onClick={() => {
+            variant="outline"
+            size="sm"
+            onClick={(): void => {
               handleCategoryToggle(category);
             }}
-            variant={isActive ? "filled" : "outlined"}
-            sx={{
-              backgroundColor: isActive
-                ? colors.backgroundColor
-                : "transparent",
-              color: isActive ? colors.color : colors.backgroundColor,
-              borderColor: colors.backgroundColor,
-              fontWeight: isFullySelected ? "bold" : "normal",
-              opacity: count === 0 ? 0.5 : 1,
-              cursor: count === 0 ? "not-allowed" : "pointer",
-              "&:hover": {
-                backgroundColor: isActive
-                  ? colors.backgroundColor
-                  : `${colors.backgroundColor}10`,
-              },
-              "& .MuiChip-label": {
-                fontSize: "0.875rem",
-              },
-            }}
             disabled={count === 0}
-          />
+            className={cn(
+              getStatusClasses(category, isActive),
+              isFullySelected && "font-semibold",
+              count === 0 && "opacity-50 cursor-not-allowed",
+              "h-8 px-3",
+            )}
+          >
+            <span>{label}</span>
+            {showCounts && (
+              <Badge
+                variant="secondary"
+                className={cn(
+                  "ml-1 h-5 px-1.5 text-xs",
+                  isActive
+                    ? "bg-surface-variant/20 text-on-surface"
+                    : "bg-current/10 text-current",
+                )}
+              >
+                {count}
+              </Badge>
+            )}
+          </Button>
         );
       })}
-    </Box>
+    </div>
   );
 }

@@ -1,31 +1,15 @@
-"use client";
+/**
+ * Placeholder LocationDetailView Component
+ * TODO: Implement full location detail functionality
+ */
 
-import {
-  Edit as EditIcon,
-  LocationOn as LocationIcon,
-} from "@mui/icons-material";
-import {
-  Container,
-  Card,
-  CardContent,
-  Typography,
-  Box,
-  Button,
-  Grid,
-} from "@mui/material";
+import type { PinPointSupabaseUser, LocationResponse } from "~/lib/types";
 
-import { MachineGrid } from "./MachineGrid";
-
-import type { PinPointSupabaseUser } from "~/lib/supabase/types";
-import type { RouterOutputs } from "~/trpc/react";
-
-import { PermissionGate } from "~/components/permissions";
-import { usePermissions } from "~/hooks/usePermissions";
-
-type LocationWithDetails = RouterOutputs["location"]["getById"];
+// Use canonical Location type to avoid drift
+type Location = Pick<LocationResponse, "id" | "name">;
 
 interface LocationDetailViewProps {
-  location: LocationWithDetails;
+  location: Location;
   user: PinPointSupabaseUser | null;
   locationId: string;
 }
@@ -33,118 +17,27 @@ interface LocationDetailViewProps {
 export function LocationDetailView({
   location,
   user: _user,
-  locationId,
-}: LocationDetailViewProps): React.ReactElement {
-  const { hasPermission } = usePermissions();
-
+  locationId: _locationId,
+}: LocationDetailViewProps): JSX.Element {
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      {/* Header Section */}
-      <Box
-        display="flex"
-        justifyContent="space-between"
-        alignItems="center"
-        mb={4}
-      >
-        <Box>
-          <Box display="flex" alignItems="center" gap={1} mb={1}>
-            <LocationIcon sx={{ fontSize: 28, color: "text.secondary" }} />
-            <Typography variant="h4" component="h1">
-              {location.name}
-            </Typography>
-          </Box>
-          <Typography variant="h6" color="text.secondary">
-            {location.machines.length} machine
-            {location.machines.length !== 1 ? "s" : ""}
-          </Typography>
-        </Box>
+    <div className="container mx-auto px-4 py-8">
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold">{location.name}</h1>
+        </div>
 
-        {/* Action Buttons */}
-        <Box display="flex" gap={2}>
-          <PermissionGate
-            permission="location:edit"
-            hasPermission={hasPermission}
-          >
-            <Button
-              variant="outlined"
-              startIcon={<EditIcon />}
-              onClick={() => {
-                // TODO: Navigate to edit page or open edit dialog
-                console.log("Edit location:", locationId);
-              }}
-            >
-              Edit Location
-            </Button>
-          </PermissionGate>
-
-          <PermissionGate
-            permission="organization:manage"
-            hasPermission={hasPermission}
-          >
-            <Button
-              variant="outlined"
-              onClick={() => {
-                // TODO: Show PinballMap sync dialog
-                console.log("Sync with PinballMap:", locationId);
-              }}
-            >
-              Sync PinballMap
-            </Button>
-          </PermissionGate>
-        </Box>
-      </Box>
-
-      <Grid container spacing={4}>
-        {/* Location Information Card */}
-        <Grid size={{ xs: 12, md: 4 }}>
-          <Card>
-            <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Location Information
-              </Typography>
-
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Name
-                </Typography>
-                <Typography variant="body1" fontWeight="medium">
-                  {location.name}
-                </Typography>
-              </Box>
-
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Total Machines
-                </Typography>
-                <Typography variant="body1" fontWeight="medium">
-                  {location.machines.length}
-                </Typography>
-              </Box>
-
-              {/* TODO: Add additional location details when available */}
-              {/* Address, contact info, hours, etc. */}
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Machine Grid Section */}
-        <Grid size={{ xs: 12, md: 8 }}>
-          <Card>
-            <CardContent sx={{ p: 3 }}>
-              <Box
-                display="flex"
-                justifyContent="space-between"
-                alignItems="center"
-                mb={3}
-              >
-                <Typography variant="h6">Machines</Typography>
-              </Box>
-
-              <MachineGrid machines={location.machines} />
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-    </Container>
+        <div className="text-center py-12">
+          <h2 className="text-xl font-semibold text-on-surface mb-2">
+            Location Details Coming Soon
+          </h2>
+          <p className="text-on-surface-variant mb-4">
+            This feature is currently under development.
+          </p>
+          <p className="text-sm text-on-surface-variant">
+            Location ID: {location.id}
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }

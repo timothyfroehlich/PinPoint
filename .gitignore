@@ -9,9 +9,7 @@
 /coverage
 
 # database
-/prisma/db.sqlite
-/prisma/db.sqlite-journal
-db.sqlite
+# (using Drizzle + Supabase)
 
 # next.js
 /.next/
@@ -38,6 +36,7 @@ logs/
 # https://create.t3.gg/en/usage/env-variables#using-environment-variables
 .env.local
 .env.*.local
+.env.preview
 !.env
 !.env.development
 !.env.example
@@ -96,6 +95,9 @@ betterer-output.log
 agent_workspace/
 cleanup_analysis/
 
+# Project index files (auto-generated)
+PROJECT_INDEX.json
+
 # Claude hooks cache files
 .claude/hooks/.quality-check.js.swp
 .claude/hooks/.quality-check.json.swp
@@ -104,3 +106,5 @@ cleanup_analysis/
 .worktree-ports
 .env*.local
 .eslintcache
+.claude/recycle_bin/
+.playwright-mcp/

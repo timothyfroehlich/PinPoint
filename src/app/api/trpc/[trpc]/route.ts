@@ -6,6 +6,7 @@ import type { TRPCContext } from "~/server/api/trpc.base";
 import { isDevelopment } from "~/lib/environment";
 import { appRouter } from "~/server/api/root";
 import { createTRPCContext } from "~/server/api/trpc";
+import { getErrorMessage } from "~/lib/utils/type-guards";
 
 /**
  * This wraps the `createTRPCContext` helper and provides the required context for the tRPC API when
@@ -30,7 +31,7 @@ const handler = (req: NextRequest): Promise<Response> => {
       ...baseConfig,
       onError: ({ path, error }): void => {
         console.error(
-          `❌ tRPC failed on ${path ?? "<no-path>"}: ${error.message}`,
+          `❌ tRPC failed on ${path ?? "<no-path>"}: ${getErrorMessage(error)}`,
         );
       },
     });

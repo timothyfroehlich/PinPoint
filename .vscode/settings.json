@@ -1,0 +1,112 @@
+{
+  // TypeScript Configuration - Optimized for @tsconfig/strictest
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.preferences.includePackageJsonAutoImports": "on",
+  "typescript.preferences.strictMode": true,
+  "typescript.suggest.autoImports": true,
+  "typescript.suggest.enabled": true,
+  "typescript.workspaceSymbols.scope": "allOpenProjects",
+  "typescript.tsserver.maxTsServerMemory": 8192,
+  "typescript.preferences.includeProjectReferencesInNavigation": true,
+  "typescript.suggest.includeCompletionsWithSnippetText": true,
+  "typescript.suggest.strictMode": true,
+
+  // ESLint Flat Config Integration (Required for ESLint v9 + Security Plugins)
+  "eslint.experimental.useFlatConfig": true,
+  "eslint.validate": [
+    "javascript",
+    "typescript",
+    "javascriptreact",
+    "typescriptreact"
+  ],
+  "eslint.format.enable": true,
+  "eslint.run": "onType",
+  "eslint.packageManager": "npm",
+  "eslint.problems.shortenToSingleLine": true,
+
+  // Language-Specific Auto-Fix Settings
+  "[typescript]": {
+    "editor.formatOnSave": true,
+    "editor.formatOnPaste": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit",
+      "source.addMissingImports": "explicit"
+    },
+    "editor.maxTokenizationLineLength": 2500
+  },
+  "[typescriptreact]": {
+    "editor.formatOnSave": true,
+    "editor.formatOnPaste": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+  "[javascript]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+  "[javascriptreact]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    }
+  },
+
+  // Next.js and React Development
+  "files.associations": {
+    "*.mdx": "markdown"
+  },
+  "emmet.includeLanguages": {
+    "typescript": "typescriptreact"
+  },
+
+  // Performance Optimization - File Exclusions
+  "files.exclude": {
+    "**/.next": true,
+    "**/node_modules": true,
+    "**/.git": true,
+    "**/dist": true,
+    "**/.turbo": true,
+    "**/.claude/recycle_bin": true
+  },
+  "search.exclude": {
+    "**/.next": true,
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/.turbo": true,
+    "**/.claude/recycle_bin": true
+  },
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true,
+    "**/.next/**": true,
+    "**/dist/**": true,
+    "**/.turbo/**": true
+  },
+
+  // Problem Panel Optimization for @tsconfig/strictest
+  "problems.decorations.enabled": true,
+  "problems.showCurrentInStatus": true,
+
+  // Search Performance
+  "search.useGlobalIgnoreFiles": true,
+  "search.useParentIgnoreFiles": true,
+
+  // Editor Quality of Life
+  "editor.suggestSelection": "first",
+  "editor.acceptSuggestionOnCommitCharacter": false,
+  "editor.acceptSuggestionOnEnter": "on",
+  "editor.wordBasedSuggestions": "off",
+
+  // Git Integration
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "git.enableSmartCommit": true,
+
+  // Extension Performance Management
+  "extensions.autoUpdate": false,
+  "extensions.autoCheckUpdates": false
+}

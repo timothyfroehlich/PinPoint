@@ -1,132 +1,265 @@
-"use client";
-
+import { Suspense } from "react";
+import Link from "next/link";
+import type { Metadata } from "next";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Button } from "~/components/ui/button";
 import {
-  Box,
-  Typography,
-  Card,
-  Chip,
-  CircularProgress,
-  Alert,
-} from "@mui/material";
-import Grid from "@mui/material/Grid";
+  AlertTriangleIcon,
+  PlusIcon,
+  ArrowRightIcon,
+  WrenchIcon,
+  BarChart3Icon,
+} from "lucide-react";
+import { AuthGuard } from "~/components/auth/auth-guard";
+import { getRequestAuthContext } from "~/server/auth/context";
+import { getIssuesForOrg } from "~/lib/dal/issues";
+import { getOrganizationStatsById } from "~/lib/dal/organizations";
+import { IssuesListServer } from "~/components/issues/issues-list-server";
+import { DashboardStats } from "~/components/dashboard/dashboard-stats";
 
-import DetailedIssueCard from "./_components/DetailedIssueCard";
+export function generateMetadata(): Metadata {
+  // Generic metadata to avoid auth race conditions - org-specific title set at page level
+  return {
+    title: "Dashboard - PinPoint",
+    description:
+      "Issue management dashboard for monitoring and tracking maintenance issues",
+  };
+}
 
-import type { JSX } from "react";
-
-import { api } from "~/trpc/react";
-
-type IssueStatus = "new" | "in progress" | "acknowledged" | "resolved";
-type IssuePriority = "high" | "medium" | "low";
-
-const newlyReported = [{ location: "Pinballz Arcade", count: 2 }];
-
-export default function DashboardPage(): JSX.Element {
-  const { data: issues, isLoading, error } = api.issue.core.getAll.useQuery({});
-
-  if (isLoading) {
-    return <CircularProgress />;
-  }
-
-  if (error) {
-    return <Alert severity="error">{error.message}</Alert>;
-  }
-
-  const openIssues =
-    issues
-      ?.filter((issue) => issue.status.category !== "RESOLVED")
-      .map((issue) => ({
-        id: issue.id,
-        title: issue.title,
-        machineName: issue.machine.model.name,
-        status: issue.status.name.toLowerCase() as IssueStatus,
-        priority: issue.priority.name.toLowerCase() as IssuePriority,
-      })) ?? [];
-
-  const resolvedIssues =
-    issues
-      ?.filter((issue) => issue.status.category === "RESOLVED")
-      .map((issue) => ({
-        id: issue.id,
-        title: issue.title,
-        machineName: issue.machine.model.name,
-        status: issue.status.name.toLowerCase() as IssueStatus,
-        priority: issue.priority.name.toLowerCase() as IssuePriority,
-      })) ?? [];
+function DashboardContent({
+  authContext,
+}: {
+  authContext: Extract<
+    Awaited<ReturnType<typeof getRequestAuthContext>>,
+    { kind: "authorized" }
+  >;
+}): React.JSX.Element {
+  const { user } = authContext;
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: "auto" }}>
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-        Here's what's happening for your selected collections.
-      </Typography>
+    <div className="space-y-8">
+      {/* Welcome Section */}
+      <div>
+        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <p className="text-muted-foreground mt-1">
+          Welcome back, {user.name ?? user.email.split("@")[0] ?? "User"}
+        </p>
+      </div>
 
-      <Grid container spacing={4}>
-        <Grid size={{ xs: 12, lg: 8 }}>
-          <Box sx={{ mb: 4 }}>
-            <Typography variant="h5" fontWeight="medium" sx={{ mb: 3 }}>
-              My Open Issues
-            </Typography>
-            {openIssues.length > 0 ? (
-              openIssues.map((issue) => (
-                <DetailedIssueCard key={issue.id} {...issue} />
-              ))
-            ) : (
-              <Typography color="text.secondary">
-                No open issues assigned to you.
-              </Typography>
-            )}
-          </Box>
+      {/* Organization Statistics */}
+      <Suspense fallback={<StatsLoadingSkeleton />}>
+        <DashboardStatsWithData organizationId={authContext.org.id} />
+      </Suspense>
 
-          <Box>
-            <Typography variant="h5" fontWeight="medium" sx={{ mb: 3 }}>
-              Recently Resolved
-            </Typography>
-            {resolvedIssues.length > 0 ? (
-              resolvedIssues.map((issue) => (
-                <DetailedIssueCard key={issue.id} {...issue} />
-              ))
-            ) : (
-              <Typography color="text.secondary">
-                No recently resolved issues.
-              </Typography>
-            )}
-          </Box>
-        </Grid>
+      {/* Dashboard Actions */}
+      <DashboardQuickActions />
 
-        <Grid size={{ xs: 12, lg: 4 }}>
-          <Box>
-            <Typography variant="h5" fontWeight="medium" sx={{ mb: 3 }}>
-              Newly Reported
-            </Typography>
-            <Card sx={{ p: 3 }}>
-              {newlyReported.map((item, index) => (
-                <Box
-                  key={index}
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    py: 2,
-                  }}
-                >
-                  <Typography variant="body1" fontWeight="medium">
-                    {item.location}
-                  </Typography>
-                  <Chip
-                    label={item.count}
-                    sx={{
-                      bgcolor: "primary.main",
-                      color: "white",
-                      fontWeight: "bold",
-                      minWidth: 32,
-                    }}
-                  />
-                </Box>
-              ))}
-            </Card>
-          </Box>
-        </Grid>
-      </Grid>
-    </Box>
+      {/* Recent Issues */}
+      <div>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-semibold">Recent Issues</h2>
+          <Button variant="outline" asChild>
+            <Link href="/issues">
+              View All Issues
+              <ArrowRightIcon className="h-4 w-4 ml-2" />
+            </Link>
+          </Button>
+        </div>
+
+        <Suspense fallback={<RecentIssuesLoadingSkeleton />}>
+          <RecentIssuesWithData organizationId={authContext.org.id} />
+        </Suspense>
+      </div>
+    </div>
+  );
+}
+
+export default async function DashboardPage(): Promise<React.JSX.Element> {
+  // Single authentication resolution for entire request (Phase 1 invariant)
+  const authContext = await getRequestAuthContext();
+
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Dashboard Access Required"
+      fallbackMessage="You need to be signed in as a member to view your dashboard."
+    >
+      <DashboardContent
+        authContext={
+          authContext as Extract<
+            Awaited<ReturnType<typeof getRequestAuthContext>>,
+            { kind: "authorized" }
+          >
+        }
+      />
+    </AuthGuard>
+  );
+}
+
+// Dashboard-specific Quick Actions (focused on task creation and management)
+function DashboardQuickActions(): React.JSX.Element {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Quick Actions</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Button
+            variant="default"
+            asChild
+            className="h-auto p-4 flex-col gap-2"
+          >
+            <Link href="/issues/create">
+              <PlusIcon className="h-5 w-5" />
+              <span className="text-xs">Report Issue</span>
+            </Link>
+          </Button>
+
+          <Button
+            variant="outline"
+            asChild
+            className="h-auto p-4 flex-col gap-2"
+          >
+            <Link href="/issues?status=open">
+              <AlertTriangleIcon className="h-5 w-5" />
+              <span className="text-xs">View Open Issues</span>
+            </Link>
+          </Button>
+
+          <Button
+            variant="outline"
+            asChild
+            className="h-auto p-4 flex-col gap-2"
+          >
+            <Link href="/machines?status=needs-attention">
+              <WrenchIcon className="h-5 w-5" />
+              <span className="text-xs">Maintenance Alerts</span>
+            </Link>
+          </Button>
+
+          <Button
+            variant="outline"
+            asChild
+            className="h-auto p-4 flex-col gap-2"
+          >
+            <Link href="/analytics">
+              <BarChart3Icon className="h-5 w-5" />
+              <span className="text-xs">View Analytics</span>
+            </Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Server Component for dashboard statistics (receives pre-resolved organizationId)
+async function DashboardStatsWithData({
+  organizationId,
+}: {
+  organizationId: string;
+}): Promise<React.JSX.Element> {
+  const stats = await getOrganizationStatsById(organizationId);
+
+  // Transform to match DashboardStats component interface
+  const dashboardStats = {
+    totalIssues: stats.issues.total,
+    openIssues: stats.issues.new,
+    closedIssues: stats.issues.resolved,
+    totalMachines: stats.machines.total,
+    inProgressIssues: stats.issues.inProgress,
+  };
+
+  return <DashboardStats stats={dashboardStats} />;
+}
+
+// Server Component for recent issues (receives pre-resolved organizationId)
+async function RecentIssuesWithData({
+  organizationId,
+}: {
+  organizationId: string;
+}): Promise<React.JSX.Element> {
+  const issues = await getIssuesForOrg(organizationId);
+  const recentIssues = issues.slice(0, 5);
+
+  if (recentIssues.length === 0) {
+    return (
+      <Card>
+        <CardContent className="text-center py-12">
+          <AlertTriangleIcon className="mx-auto h-12 w-12 text-muted-foreground" />
+          <h3 className="mt-4 text-lg font-medium">No issues yet</h3>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Get started by creating your first issue report.
+          </p>
+          <Button asChild className="mt-4">
+            <Link href="/issues/create">
+              <PlusIcon className="h-4 w-4 mr-2" />
+              Create Issue
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <IssuesListServer
+        issues={recentIssues}
+        limit={5}
+        organizationId={organizationId}
+      />
+
+      {issues.length > 5 && (
+        <div className="text-center pt-4">
+          <p className="text-sm text-muted-foreground">
+            Showing 5 of {issues.length} total issues
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Loading Skeletons
+
+function StatsLoadingSkeleton(): React.JSX.Element {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <Card key={i}>
+          <CardHeader className="pb-2">
+            <div className="h-4 bg-muted rounded w-20 animate-pulse" />
+          </CardHeader>
+          <CardContent>
+            <div className="h-8 bg-muted rounded w-12 animate-pulse" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function RecentIssuesLoadingSkeleton(): React.JSX.Element {
+  return (
+    <div className="space-y-4">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <Card key={i}>
+          <CardHeader className="pb-3">
+            <div className="space-y-2">
+              <div className="h-6 bg-muted rounded w-3/4 animate-pulse" />
+              <div className="h-4 bg-muted rounded w-1/2 animate-pulse" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex justify-between items-center">
+              <div className="h-4 bg-muted rounded w-1/3 animate-pulse" />
+              <div className="h-4 bg-muted rounded w-1/4 animate-pulse" />
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
   );
 }

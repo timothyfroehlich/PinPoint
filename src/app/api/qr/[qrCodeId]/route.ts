@@ -1,54 +1,58 @@
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
-import { getGlobalDatabaseProvider } from "~/server/db/provider";
-import { ServiceFactory } from "~/server/services/factory";
-import { constructReportUrl } from "~/server/utils/qrCodeUtils";
+import {
+  resolveQRCodeToReportUrl,
+  checkQRCodeExists,
+} from "~/lib/dal/qr-codes";
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ qrCodeId: string }> },
 ): Promise<NextResponse> {
-  const dbProvider = getGlobalDatabaseProvider();
-  const db = dbProvider.getClient();
-  const drizzle = dbProvider.getDrizzleClient();
   try {
     const { qrCodeId } = await params;
 
-    if (!qrCodeId) {
+    // Validate QR code ID parameter
+    if (!qrCodeId || qrCodeId.trim().length === 0) {
       return NextResponse.json(
         { error: "QR code ID is required" },
         { status: 400 },
       );
     }
 
-    // Initialize services
-    const services = new ServiceFactory(db, drizzle);
-    const qrCodeService = services.createQRCodeService();
+    // Resolve QR code
+    const qrResult = await resolveQRCodeToReportUrl(qrCodeId);
 
-    // Resolve machine information from QR code
-    const machine = await qrCodeService.resolveMachineFromQR(qrCodeId);
-
-    if (!machine) {
-      return NextResponse.json({ error: "Invalid QR code" }, { status: 404 });
+    if (!qrResult.success) {
+      switch (qrResult.error) {
+        case "not_found":
+          return NextResponse.json(
+            { error: `QR code '${qrCodeId}' not found` },
+            { status: 404 },
+          );
+        case "invalid_id":
+          return NextResponse.json(
+            { error: qrResult.message },
+            { status: 400 },
+          );
+        default:
+          console.error("QR code resolution failed:", qrResult.message);
+          return NextResponse.json(
+            { error: "Internal server error" },
+            { status: 500 },
+          );
+      }
     }
 
-    // Construct the report issue URL
-    const reportUrl = constructReportUrl(machine);
-
     // Redirect to the machine's report issue page
-    return NextResponse.redirect(reportUrl);
+    return NextResponse.redirect(qrResult.reportUrl);
   } catch (error) {
-    console.error("QR code resolution failed:", error);
-
+    console.error("QR code API error:", error);
     return NextResponse.json(
-      {
-        error: "Failed to resolve QR code",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
+      { error: "Internal server error" },
       { status: 500 },
     );
-  } finally {
-    await dbProvider.disconnect();
   }
 }
 
@@ -57,29 +61,24 @@ export async function HEAD(
   _request: NextRequest,
   { params }: { params: Promise<{ qrCodeId: string }> },
 ): Promise<NextResponse> {
-  const dbProvider = getGlobalDatabaseProvider();
-  const db = dbProvider.getClient();
-  const drizzle = dbProvider.getDrizzleClient();
   try {
     const { qrCodeId } = await params;
 
-    if (!qrCodeId) {
+    // Validate QR code ID parameter
+    if (!qrCodeId || qrCodeId.trim().length === 0) {
       return new NextResponse(null, { status: 400 });
     }
 
-    const services = new ServiceFactory(db, drizzle);
-    const qrCodeService = services.createQRCodeService();
-    const machine = await qrCodeService.resolveMachineFromQR(qrCodeId);
+    // Check if QR code exists
+    const exists = await checkQRCodeExists(qrCodeId);
 
-    if (!machine) {
+    if (!exists) {
       return new NextResponse(null, { status: 404 });
     }
 
     return new NextResponse(null, { status: 200 });
   } catch (error) {
-    console.error("QR code HEAD check failed:", error);
+    console.error("QR code HEAD check error:", error);
     return new NextResponse(null, { status: 500 });
-  } finally {
-    await dbProvider.disconnect();
   }
 }
