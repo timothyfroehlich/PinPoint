@@ -1,27 +1,23 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, orgScopedProcedure } from "~/server/api/trpc";
 import { issues } from "~/server/db/schema";
 
 export const issueTimelineRouter = createTRPCRouter({
   // Get issue timeline (comments + activities)
-  getTimeline: organizationProcedure
+  getTimeline: orgScopedProcedure
     .input(z.object({ issueId: z.string() }))
     .query(async ({ ctx, input }) => {
-      // Verify the issue belongs to this organization
-      const issue = await ctx.drizzle.query.issues.findFirst({
-        where: and(
-          eq(issues.id, input.issueId),
-          eq(issues.organizationId, ctx.organization.id),
-        ),
-        columns: {
-          id: true,
-        },
-      });
+      // Verify the issue exists (RLS handles org scoping)
+      const issue = await ctx.db
+        .select({ id: issues.id })
+        .from(issues)
+        .where(eq(issues.id, input.issueId))
+        .limit(1);
 
-      if (!issue) {
+      if (issue.length === 0) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Issue not found or access denied",
@@ -29,9 +25,6 @@ export const issueTimelineRouter = createTRPCRouter({
       }
 
       const activityService = ctx.services.createIssueActivityService();
-      return activityService.getIssueTimeline(
-        input.issueId,
-        ctx.organization.id,
-      );
+      return activityService.getIssueTimeline(input.issueId);
     }),
 });

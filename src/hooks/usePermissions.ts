@@ -94,11 +94,7 @@ export function usePermissions(): UsePermissionsReturn {
   const isAuthenticated = !loading && !!user;
 
   // Get current membership and permissions (only if authenticated)
-  const {
-    data: membership,
-    isLoading,
-    isError,
-  } = membershipQuery(undefined, {
+  const { data: membership, isError } = membershipQuery(undefined, {
     enabled: isAuthenticated,
   });
 
@@ -127,7 +123,7 @@ export function usePermissions(): UsePermissionsReturn {
     hasPermission,
     permissions,
     isAuthenticated,
-    isLoading: loading || isLoading,
+    isLoading: loading,
     isError,
     isAdmin,
   };

@@ -1,8 +1,31 @@
-import { ActivityType } from "./types";
-import { type IssueStatus, type ExtendedPrismaClient } from "./types";
+import { eq, and, isNull } from "drizzle-orm";
 
-export interface ActivityData {
-  type: ActivityType; // Use enum instead of string
+import { type DrizzleClient } from "../db/drizzle";
+import type { activityTypeEnum } from "../db/schema";
+import { issues, issueHistory, comments } from "../db/schema";
+
+import { generatePrefixedId } from "~/lib/utils/id-generation";
+
+// Import ActivityType from schema enum
+type ActivityType = (typeof activityTypeEnum.enumValues)[number];
+
+// Constants for ActivityType enum values
+const ActivityType = {
+  CREATED: "CREATED" as const,
+  STATUS_CHANGED: "STATUS_CHANGED" as const,
+  ASSIGNED: "ASSIGNED" as const,
+  PRIORITY_CHANGED: "PRIORITY_CHANGED" as const,
+  COMMENTED: "COMMENTED" as const,
+  COMMENT_DELETED: "COMMENT_DELETED" as const,
+  ATTACHMENT_ADDED: "ATTACHMENT_ADDED" as const,
+  MERGED: "MERGED" as const,
+  RESOLVED: "RESOLVED" as const,
+  REOPENED: "REOPENED" as const,
+  SYSTEM: "SYSTEM" as const,
+} as const;
+
+interface ActivityData {
+  type: ActivityType;
   actorId?: string;
   fieldName?: string;
   oldValue?: string;
@@ -10,50 +33,78 @@ export interface ActivityData {
   description?: string;
 }
 
-export class IssueActivityService {
-  constructor(private prisma: ExtendedPrismaClient) {}
+// IssueStatus interface for backward compatibility
+interface IssueStatus {
+  name: string;
+}
 
+/**
+ * Service for recording and retrieving issue activity.
+ *
+ * RLS Context: All database operations are automatically scoped to the user's
+ * organization via RLS policies. Issue activities inherit organizational scope
+ * through their associated issues.
+ */
+export class IssueActivityService {
+  constructor(private db: DrizzleClient) {}
+
+  /**
+   * Records a general activity for an issue.
+   * RLS handles organizational scoping in queries. For inserts, organizationId
+   * is derived from the associated issue via database query.
+   */
   async recordActivity(
     issueId: string,
-    organizationId: string,
     activityData: ActivityData,
   ): Promise<void> {
+    // Get the issue to obtain organizationId (RLS ensures we only get issues from our org)
+    const issue = await this.db.query.issues.findFirst({
+      where: eq(issues.id, issueId),
+      columns: { organization_id: true },
+    });
+
+    if (!issue) {
+      throw new Error("Issue not found or access denied");
+    }
+
     // Build data object with conditional assignment for exactOptionalPropertyTypes compatibility
     const data: {
-      issueId: string;
-      organizationId: string;
+      id: string;
+      issue_id: string;
+      organization_id: string;
       type: ActivityType;
       field: string;
-      actorId?: string;
-      oldValue?: string;
-      newValue?: string;
+      actor_id?: string;
+      old_value?: string;
+      new_value?: string;
     } = {
-      issueId,
-      organizationId, // Now properly supported
+      id: generatePrefixedId("history"),
+      issue_id: issueId,
+      organization_id: issue.organization_id,
       type: activityData.type,
       field: activityData.fieldName ?? "",
     };
 
     // Use conditional assignment for optional properties to avoid undefined assignments
     if (activityData.actorId) {
-      data.actorId = activityData.actorId;
+      data.actor_id = activityData.actorId;
     }
     if (activityData.oldValue) {
-      data.oldValue = activityData.oldValue;
+      data.old_value = activityData.oldValue;
     }
     if (activityData.newValue) {
-      data.newValue = activityData.newValue;
+      data.new_value = activityData.newValue;
     }
 
-    await this.prisma.issueHistory.create({ data });
+    await this.db.insert(issueHistory).values(data);
   }
 
-  async recordIssueCreated(
-    issueId: string,
-    organizationId: string,
-    actorId: string,
-  ): Promise<void> {
-    await this.recordActivity(issueId, organizationId, {
+  /**
+   * Records an issue creation activity.
+   * RLS automatically handles organizational scoping.
+   */
+  async recordIssueCreated(issueId: string, actorId: string): Promise<void> {
+    await this.recordActivity(issueId, {
       type: ActivityType.CREATED,
       actorId,
       fieldName: "status",
@@ -61,14 +112,17 @@ export class IssueActivityService {
     });
   }
 
+  /**
+   * Records a status change activity.
+   * RLS automatically handles organizational scoping.
+   */
   async recordStatusChange(
     issueId: string,
-    organizationId: string,
     actorId: string,
     oldStatus: IssueStatus,
     newStatus: IssueStatus,
   ): Promise<void> {
-    await this.recordActivity(issueId, organizationId, {
+    await this.recordActivity(issueId, {
       type: ActivityType.STATUS_CHANGED,
       actorId,
       fieldName: "status",
@@ -77,9 +131,12 @@ export class IssueActivityService {
     });
   }
 
+  /**
+   * Records an assignment change activity.
+   * RLS automatically handles organizational scoping.
+   */
   async recordAssignmentChange(
     issueId: string,
-    organizationId: string,
     actorId: string,
     oldAssignee: { name?: string | null } | null,
     newAssignee: { name?: string | null } | null,
@@ -98,18 +155,21 @@ export class IssueActivityService {
       activityData.newValue = newAssignee.name;
     }
 
-    await this.recordActivity(issueId, organizationId, activityData);
+    await this.recordActivity(issueId, activityData);
   }
 
+  /**
+   * Records a general field update activity.
+   * RLS automatically handles organizational scoping.
+   */
   async recordFieldUpdate(
     issueId: string,
-    organizationId: string,
     actorId: string,
     fieldName: string,
     oldValue: string,
     newValue: string,
   ): Promise<void> {
-    await this.recordActivity(issueId, organizationId, {
+    await this.recordActivity(issueId, {
       type: ActivityType.SYSTEM,
       actorId,
       fieldName,
@@ -118,12 +178,12 @@ export class IssueActivityService {
     });
   }
 
-  async recordIssueResolved(
-    issueId: string,
-    organizationId: string,
-    actorId: string,
-  ): Promise<void> {
-    await this.recordActivity(issueId, organizationId, {
+  /**
+   * Records an issue resolution activity.
+   * RLS automatically handles organizational scoping.
+   */
+  async recordIssueResolved(issueId: string, actorId: string): Promise<void> {
+    await this.recordActivity(issueId, {
       type: ActivityType.RESOLVED,
       actorId,
       fieldName: "status",
@@ -131,13 +191,16 @@ export class IssueActivityService {
     });
   }
 
+  /**
+   * Records an issue assignment activity.
+   * RLS automatically handles organizational scoping.
+   */
   async recordIssueAssigned(
     issueId: string,
-    organizationId: string,
     actorId: string,
     assigneeId: string,
   ): Promise<void> {
-    await this.recordActivity(issueId, organizationId, {
+    await this.recordActivity(issueId, {
       type: ActivityType.ASSIGNED,
       actorId,
       fieldName: "assignee",
@@ -145,13 +208,16 @@ export class IssueActivityService {
     });
   }
 
+  /**
+   * Records a comment deletion activity.
+   * RLS automatically handles organizational scoping.
+   */
   async recordCommentDeleted(
     issueId: string,
-    organizationId: string,
     actorId: string,
     commentId: string,
   ): Promise<void> {
-    await this.recordActivity(issueId, organizationId, {
+    await this.recordActivity(issueId, {
       type: ActivityType.COMMENT_DELETED,
       actorId,
       fieldName: "comment",
@@ -160,10 +226,32 @@ export class IssueActivityService {
     });
   }
 
-  async getIssueTimeline(
+  /**
+   * Records a comment restoration activity.
+   * RLS automatically handles organizational scoping.
+   */
+  async recordCommentRestored(
     issueId: string,
-    organizationId: string,
-  ): Promise<
+    actorId: string,
+    commentId: string,
+  ): Promise<void> {
+    await this.recordActivity(issueId, {
+      type: ActivityType.SYSTEM,
+      actorId,
+      fieldName: "comment",
+      newValue: commentId,
+      description: "Comment restored",
+    });
+  }
+
+  /**
+   * Gets the complete timeline (activities + comments) for an issue.
+   * RLS automatically scopes results to the user's organization.
+   *
+   * @param issueId - The issue ID to get timeline for
+   * @returns Merged timeline of activities and comments, sorted chronologically
+   */
+  async getIssueTimeline(issueId: string): Promise<
     (
       | {
           itemType: "comment";
@@ -197,71 +285,113 @@ export class IssueActivityService {
     interface CommentResult {
       id: string;
       content: string;
-      createdAt: Date;
+      created_at: Date;
       author: {
         id: string;
         name: string | null;
-        profilePicture: string | null;
-      };
+        profile_picture: string | null;
+      } | null;
     }
 
     interface ActivityResult {
       id: string;
       type: ActivityType;
       field: string;
-      oldValue: string | null;
-      newValue: string | null;
-      changedAt: Date;
+      old_value: string | null;
+      new_value: string | null;
+      changed_at: Date;
       actor: {
         id: string;
         name: string | null;
-        profilePicture: string | null;
+        profile_picture: string | null;
       } | null;
     }
 
-    const [comments, activities] = await Promise.all([
-      this.prisma.comment.findMany({
-        where: {
-          issueId,
-          deletedAt: null, // Exclude soft-deleted comments
+    // Use Drizzle relational queries to fetch comments and activities
+    const [commentsData, activitiesData] = await Promise.all([
+      // Fetch comments with author relations (exclude soft-deleted)
+      this.db.query.comments.findMany({
+        where: and(eq(comments.issue_id, issueId), isNull(comments.deleted_at)),
+        columns: {
+          id: true,
+          content: true,
+          created_at: true,
         },
-        include: {
+        with: {
           author: {
-            select: {
+            columns: {
               id: true,
               name: true,
-              profilePicture: true,
+              profile_picture: true,
             },
           },
         },
-        orderBy: { createdAt: "asc" },
-      }) as Promise<CommentResult[]>,
-      this.prisma.issueHistory.findMany({
-        where: { issueId, organizationId },
-        include: {
+        orderBy: [comments.created_at],
+      }),
+      // Fetch issue history with actor relations (RLS scoped)
+      this.db.query.issueHistory.findMany({
+        where: eq(issueHistory.issue_id, issueId),
+        columns: {
+          id: true,
+          type: true,
+          field: true,
+          old_value: true,
+          new_value: true,
+          changed_at: true,
+        },
+        with: {
           actor: {
-            select: {
+            columns: {
               id: true,
               name: true,
-              profilePicture: true,
+              profile_picture: true,
             },
           },
         },
-        orderBy: { changedAt: "asc" },
-      }) as Promise<ActivityResult[]>,
+        orderBy: [issueHistory.changed_at],
+      }),
     ]);
+
+    // Type-safe assignment based on the schema structure
+    const commentsResults: CommentResult[] = commentsData;
+    const activitiesResults: ActivityResult[] = activitiesData;
 
     // Merge comments and activities into a single timeline
     const timeline = [
-      ...comments.map((comment) => ({
-        ...comment,
+      ...commentsResults.map((comment) => ({
         itemType: "comment" as const,
-        timestamp: comment.createdAt,
+        timestamp: comment.created_at,
+        id: comment.id,
+        content: comment.content,
+        createdAt: comment.created_at,
+        author: comment.author
+          ? {
+              id: comment.author.id,
+              name: comment.author.name,
+              profilePicture: comment.author.profile_picture,
+            }
+          : {
+              id: "anonymous",
+              name: "Anonymous",
+              profilePicture: null,
+            },
       })),
-      ...activities.map((activity) => ({
-        ...activity,
+      ...activitiesResults.map((activity) => ({
         itemType: "activity" as const,
-        timestamp: activity.changedAt,
+        timestamp: activity.changed_at,
+        id: activity.id,
+        type: activity.type,
+        field: activity.field,
+        oldValue: activity.old_value,
+        newValue: activity.new_value,
+        changedAt: activity.changed_at,
+        actor: activity.actor
+          ? {
+              id: activity.actor.id,
+              name: activity.actor.name,
+              profilePicture: activity.actor.profile_picture,
+            }
+          : null,
       })),
     ].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 

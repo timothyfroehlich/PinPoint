@@ -47,18 +47,24 @@ max_client_conn = 100
 
 [db.migrations]
 # If disabled, migrations will be skipped during a db push or reset.
-# Disabled for now during development phase - will re-enable for beta
-enabled = false
+# Enabled for CLI-based deployment approach
+enabled = true
 # Specifies an ordered list of schema files that describe your database.
 # Supports glob patterns relative to supabase directory: "./schemas/*.sql"
 schema_paths = []
 
 [db.seed]
-# If enabled, seeds the database after migrations during a db reset.
-enabled = true
+# Disable automatic seeding during `supabase start`/reset.
+# We seed via scripts/db-reset.sh after Drizzle push to avoid ordering issues.
+enabled = false
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
-sql_paths = ["./seed.sql"]
+# Note: We intentionally disable CLI seeding; all seeds (base + dev) are
+# applied by scripts/db-reset.sh in the right order after schema push.
+sql_paths = [
+  "./seeds/base/01-rls-policies.sql",
+  "./seeds/base/02-permissions.sql",
+]
 
 [db.network_restrictions]
 # Enable management of network restrictions.
@@ -263,6 +269,17 @@ max_frequency = "5s"
 # Use an external OAuth provider. The full list of providers are: `apple`, `azure`, `bitbucket`,
 # `discord`, `facebook`, `github`, `gitlab`, `google`, `keycloak`, `linkedin_oidc`, `notion`, `twitch`,
 # `twitter`, `slack`, `spotify`, `workos`, `zoom`.
+
+[auth.external.google]
+enabled = true
+client_id = "env(GOOGLE_CLIENT_ID)"
+# DO NOT commit your OAuth provider secret to git. Use environment variable substitution instead:
+secret = "env(GOOGLE_CLIENT_SECRET)"
+# Overrides the default auth redirectUrl.
+redirect_uri = ""
+# If enabled, the nonce check will be skipped. Required for local sign in with Google auth.
+skip_nonce_check = false
+
 [auth.external.apple]
 enabled = false
 client_id = ""

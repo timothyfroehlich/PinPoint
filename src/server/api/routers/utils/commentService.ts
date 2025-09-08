@@ -1,15 +1,37 @@
 import { eq, desc } from "drizzle-orm";
+import type { InferSelectModel } from "drizzle-orm";
 
 import type { DrizzleClient } from "~/server/db/drizzle";
 
 import { comments, issues, users } from "~/server/db/schema";
+import {
+  transformKeysToCamelCase,
+  type DrizzleToCamelCase,
+} from "~/lib/utils/case-transformers";
+
+// Type definitions for service responses
+type CommentDbModel = InferSelectModel<typeof comments>;
+type CommentResponse = DrizzleToCamelCase<CommentDbModel>;
+
+type CommentWithRelations = InferSelectModel<typeof comments> & {
+  author: Pick<
+    InferSelectModel<typeof users>,
+    "id" | "name" | "email" | "image"
+  >;
+  deleter: Pick<
+    InferSelectModel<typeof users>,
+    "id" | "name" | "email" | "image"
+  > | null;
+  issue: Pick<InferSelectModel<typeof issues>, "id" | "title">;
+};
+type CommentWithRelationsResponse = DrizzleToCamelCase<CommentWithRelations>;
 
 /**
- * Comment service utilities for Drizzle operations.
- * This provides reusable comment business logic with Drizzle ORM.
+ * Comment service utilities.
+ * This provides reusable comment business logic.
  * TODO: Consolidate with CommentCleanupService for unified comment management.
  */
-export class DrizzleCommentService {
+export class CommentService {
   constructor(private drizzle: DrizzleClient) {}
 
   /**
@@ -26,28 +48,31 @@ export class DrizzleCommentService {
     deletedAt: Date | null;
     deletedBy: string | null;
     issueId: string;
-    authorId: string;
+    authorId: string | null;
   }> {
     const [deletedComment] = await this.drizzle
       .update(comments)
       .set({
-        deletedAt: new Date(),
-        deletedBy: deletedById,
+        deleted_at: new Date(),
+        deleted_by: deletedById,
       })
       .where(eq(comments.id, commentId))
       .returning({
         id: comments.id,
         content: comments.content,
-        createdAt: comments.createdAt,
-        updatedAt: comments.updatedAt,
-        deletedAt: comments.deletedAt,
-        deletedBy: comments.deletedBy,
-        issueId: comments.issueId,
-        authorId: comments.authorId,
+        created_at: comments.created_at,
+        updated_at: comments.updated_at,
+        deleted_at: comments.deleted_at,
+        deleted_by: comments.deleted_by,
+        issue_id: comments.issue_id,
+        author_id: comments.author_id,
       });
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Drizzle update with returning throws on no rows
-    return deletedComment!; // Safe because update with returning will throw if no rows affected
+    if (!deletedComment) {
+      throw new Error(`Comment with id ${commentId} not found`);
+    }
+
+    return transformKeysToCamelCase(deletedComment) as CommentResponse;
   }
 
   /**
@@ -61,28 +86,31 @@ export class DrizzleCommentService {
     deletedAt: Date | null;
     deletedBy: string | null;
     issueId: string;
-    authorId: string;
+    authorId: string | null;
   }> {
     const [restoredComment] = await this.drizzle
       .update(comments)
       .set({
-        deletedAt: null,
-        deletedBy: null,
+        deleted_at: null,
+        deleted_by: null,
       })
       .where(eq(comments.id, commentId))
       .returning({
         id: comments.id,
         content: comments.content,
-        createdAt: comments.createdAt,
-        updatedAt: comments.updatedAt,
-        deletedAt: comments.deletedAt,
-        deletedBy: comments.deletedBy,
-        issueId: comments.issueId,
-        authorId: comments.authorId,
+        created_at: comments.created_at,
+        updated_at: comments.updated_at,
+        deleted_at: comments.deleted_at,
+        deleted_by: comments.deleted_by,
+        issue_id: comments.issue_id,
+        author_id: comments.author_id,
       });
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Drizzle update with returning throws on no rows
-    return restoredComment!; // Safe because update with returning will throw if no rows affected
+    if (!restoredComment) {
+      throw new Error(`Comment with id ${commentId} not found`);
+    }
+
+    return transformKeysToCamelCase(restoredComment) as CommentResponse;
   }
 
   /**
@@ -97,13 +125,13 @@ export class DrizzleCommentService {
       deletedAt: Date | null;
       deletedBy: string | null;
       issueId: string;
-      authorId: string;
+      authorId: string | null;
       author: {
         id: string;
         name: string | null;
         email: string | null;
         image: string | null;
-      };
+      } | null;
       deleter: {
         id: string;
         name: string | null;
@@ -121,12 +149,12 @@ export class DrizzleCommentService {
       .select({
         id: comments.id,
         content: comments.content,
-        createdAt: comments.createdAt,
-        updatedAt: comments.updatedAt,
-        deletedAt: comments.deletedAt,
-        deletedBy: comments.deletedBy,
-        issueId: comments.issueId,
-        authorId: comments.authorId,
+        created_at: comments.created_at,
+        updated_at: comments.updated_at,
+        deleted_at: comments.deleted_at,
+        deleted_by: comments.deleted_by,
+        issue_id: comments.issue_id,
+        author_id: comments.author_id,
         author: {
           id: users.id,
           name: users.name,
@@ -139,16 +167,16 @@ export class DrizzleCommentService {
         },
       })
       .from(comments)
-      .innerJoin(users, eq(comments.authorId, users.id))
-      .innerJoin(issues, eq(comments.issueId, issues.id))
-      .where(eq(issues.organizationId, organizationId))
-      .orderBy(desc(comments.deletedAt));
+      .leftJoin(users, eq(comments.author_id, users.id))
+      .innerJoin(issues, eq(comments.issue_id, issues.id))
+      .where(eq(issues.organization_id, organizationId))
+      .orderBy(desc(comments.deleted_at));
 
     // For each comment, if it has a deleter, fetch deleter info
     const commentsWithDeleters = await Promise.all(
       result.map(async (comment) => {
         let deleter = null;
-        if (comment.deletedBy) {
+        if (comment.deleted_by) {
           const [deleterUser] = await this.drizzle
             .select({
               id: users.id,
@@ -157,7 +185,7 @@ export class DrizzleCommentService {
               image: users.image,
             })
             .from(users)
-            .where(eq(users.id, comment.deletedBy))
+            .where(eq(users.id, comment.deleted_by))
             .limit(1);
           deleter = deleterUser ?? null;
         }
@@ -168,7 +196,12 @@ export class DrizzleCommentService {
       }),
     );
 
-    // Filter to only deleted comments
-    return commentsWithDeleters.filter((comment) => comment.deletedAt !== null);
+    // Filter to only deleted comments and transform to camelCase
+    const deletedComments = commentsWithDeleters.filter(
+      (comment) => comment.deleted_at !== null,
+    );
+    return deletedComments.map((comment) =>
+      transformKeysToCamelCase(comment),
+    ) as CommentWithRelationsResponse[];
   }
 }

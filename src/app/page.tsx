@@ -1,45 +1,33 @@
-"use client";
+import React from "react";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { PinPointHomepage } from "~/components/homepage/PinPointHomepage";
+import {
+  SUBDOMAIN_HEADER,
+  SUBDOMAIN_VERIFIED_HEADER,
+} from "~/lib/subdomain-verification";
+import { ORG_ALIAS_HOSTS } from "~/lib/domain-org-mapping";
 
-import { Box } from "@mui/material";
-import dynamic from "next/dynamic";
+export default async function HomePage(): Promise<React.JSX.Element> {
+  // If request is already scoped to an organization (via subdomain or alias),
+  // do not show the generic landing page; send users to sign-in.
+  const h = await headers();
+  const sub = h.get(SUBDOMAIN_HEADER);
+  const verified = h.get(SUBDOMAIN_VERIFIED_HEADER);
+  const host = h.get("host");
 
-import { AuthenticatedDashboard } from "./_components/AuthenticatedDashboard";
-import { PublicDashboard } from "./_components/PublicDashboard";
+  // Fallback: Check for alias hosts directly (when middleware fails to execute)
+  const aliasSubdomain = host ? ORG_ALIAS_HOSTS[host] : null;
 
-import { useAuth } from "~/app/auth-provider";
+  // Check redirect conditions
+  const middlewareRedirect = Boolean(sub && verified);
+  const aliasRedirect = Boolean(aliasSubdomain);
+  const shouldRedirect = middlewareRedirect || aliasRedirect;
 
-// Dynamic import with SSR disabled for dev login component
-// This prevents browser-only code from running during SSR/build
-const DevLoginCompact = dynamic(
-  () =>
-    import("./_components/DevLoginCompact").then((mod) => ({
-      default: mod.DevLoginCompact,
-    })),
-  {
-    ssr: false,
-    loading: () => null, // No loading state needed for dev helper
-  },
-);
+  // Redirect if middleware set org headers OR if we detect alias host directly
+  if (shouldRedirect) {
+    redirect("/auth/sign-in");
+  }
 
-export default function HomePage(): React.ReactNode {
-  const { user } = useAuth();
-
-  // Always show public content
-  const publicContent = <PublicDashboard />;
-
-  // Show additional authenticated content if logged in
-  const authenticatedContent = user ? <AuthenticatedDashboard /> : null;
-
-  return (
-    <Box>
-      {/* Public content - visible to everyone */}
-      {publicContent}
-
-      {/* Authenticated content - only visible when logged in */}
-      {authenticatedContent}
-
-      {/* Dev login helper - only in development */}
-      <DevLoginCompact />
-    </Box>
-  );
+  return <PinPointHomepage />;
 }

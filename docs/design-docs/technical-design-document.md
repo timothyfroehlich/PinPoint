@@ -15,11 +15,11 @@ The system will be architected as a multi-tenant web application utilizing a sha
 
 PinPoint integrates with the Open Pinball Database (OPDB) and [PinballMap.com](http://pinballmap.com/) to provide authoritative game data and streamline game management:
 
-- **Hybrid Data Model:** Models are sourced from OPDB but cached locally for performance and offline capability
+- **Hybrid Data Model:** Commercial models are sourced from OPDB but cached locally for performance and offline capability
 - **API Integration:** Server-side integration with OPDB's REST API for searching, fetching, and syncing game data
 - **Data Synchronization:** Periodic sync processes to keep local game data up-to-date with OPDB
-- **Fallback Strategy:** Support for custom game titles when OPDB data is unavailable or incomplete
-- **PinballMap Sync:** Game lists can be synced with [PinballMap.com](http://pinballmap.com/) to automate adding and removing game instances.
+- **Fallback Strategy:** Support for custom models when OPDB data is unavailable or incomplete
+- **PinballMap Sync:** Game lists can be synced with [PinballMap.com](http://pinballmap.com/) to automate adding and removing machines.
 
 ### Technology Stack
 
@@ -129,7 +129,7 @@ The system will integrate with the Open Pinball Database (OPDB) and [PinballMap.
 - **Search Integration:** Real-time search of OPDB games during Machine creation
 - **Data Synchronization:** Periodic sync processes to update local game data
 - **Caching Strategy:** Local caching of OPDB data for performance and offline capability
-- **PinballMap Sync:** Sync game lists with [PinballMap.com](http://pinballmap.com/) to automate adding and removing game instances. The sync is performed by a tRPC mutation that is only available to admin users. The sync process will add and remove `Machine` records based on the real-world machine list at a venue.
+- **PinballMap Sync:** Sync game lists with [PinballMap.com](http://pinballmap.com/) to automate adding and removing machines. The sync is performed by a tRPC mutation that is only available to admin users. The sync process will add and remove `Machine` records based on the real-world machine list at a venue.
 
 ### Core CRUD Procedures
 
@@ -253,7 +253,7 @@ During the pre-production phase, the following practices apply:
 The API is organized into logical routers based on the data model:
 
 - `issue.router.ts` - Issue management operations
-- `machine.router.ts` - Machine/game instance operations
+- `machine.router.ts` - Machine operations
 - `organization.router.ts` - Organization settings
 - `user.router.ts` - User profile management
 - `location.router.ts` - Location management

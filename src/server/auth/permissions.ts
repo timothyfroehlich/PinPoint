@@ -1,4 +1,14 @@
 import { TRPCError } from "@trpc/server";
+import { eq } from "drizzle-orm";
+
+import { PermissionService } from "../services/permissionService";
+
+import { SYSTEM_ROLES } from "./permissions.constants";
+
+import type { PinPointSupabaseUser } from "~/lib/types";
+
+import { type DrizzleClient } from "~/server/db/drizzle";
+import { roles } from "~/server/db/schema";
 
 // Legacy session type for backward compatibility
 type Session = {
@@ -8,33 +18,35 @@ type Session = {
   };
 } | null;
 
-import { type ExtendedPrismaClient } from "../db";
-import { PermissionService } from "../services/permissionService";
-
-import { SYSTEM_ROLES } from "./permissions.constants";
-
-import type { PinPointSupabaseUser } from "~/lib/supabase/types";
-
 /**
  * Checks if a given membership has a specific permission.
  *
  * @param membership - The membership object, containing the roleId.
  * @param permission - The permission string to check for.
- * @param prisma - The Prisma client instance.
+ * @param db - The Drizzle client instance.
  * @returns A boolean indicating whether the permission is granted.
  */
 export async function hasPermission(
   membership: { roleId: string | null },
   permission: string,
-  prisma: ExtendedPrismaClient,
+  db: DrizzleClient,
 ): Promise<boolean> {
   if (!membership.roleId) {
     return false;
   }
 
-  const role = await prisma.role.findUnique({
-    where: { id: membership.roleId },
-    select: { name: true, permissions: { select: { name: true } } },
+  const role = await db.query.roles.findFirst({
+    where: eq(roles.id, membership.roleId),
+    columns: { name: true },
+    with: {
+      rolePermissions: {
+        with: {
+          permission: {
+            columns: { name: true },
+          },
+        },
+      },
+    },
   });
 
   if (!role) {
@@ -45,8 +57,8 @@ export async function hasPermission(
     return true;
   }
 
-  const permissionService = new PermissionService(prisma);
-  const rolePermissions = role.permissions.map((p) => p.name);
+  const permissionService = new PermissionService(db);
+  const rolePermissions = role.rolePermissions.map((rp) => rp.permission.name);
   const expandedPermissions =
     permissionService.expandPermissionsWithDependencies(rolePermissions);
 
@@ -59,14 +71,14 @@ export async function hasPermission(
  *
  * @param membership - The membership object, containing the roleId.
  * @param permission - The permission string to require.
- * @param prisma - The Prisma client instance.
+ * @param db - The Drizzle client instance.
  */
 export async function requirePermission(
   membership: { roleId: string | null },
   permission: string,
-  prisma: ExtendedPrismaClient,
+  db: DrizzleClient,
 ): Promise<void> {
-  if (!(await hasPermission(membership, permission, prisma))) {
+  if (!(await hasPermission(membership, permission, db))) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: `Permission required: ${permission}`,
@@ -78,19 +90,28 @@ export async function requirePermission(
  * Retrieves all permissions for a given membership.
  *
  * @param membership - The membership object, containing the roleId.
- * @param prisma - The Prisma client instance.
+ * @param db - The Drizzle client instance.
  * @returns A string array of all granted permissions.
  */
 export async function getUserPermissions(
   membership: { roleId: string | null },
-  prisma: ExtendedPrismaClient,
+  db: DrizzleClient,
 ): Promise<string[]> {
   if (!membership.roleId) {
     return [];
   }
-  const role = await prisma.role.findUnique({
-    where: { id: membership.roleId },
-    select: { name: true, permissions: { select: { name: true } } },
+  const role = await db.query.roles.findFirst({
+    where: eq(roles.id, membership.roleId),
+    columns: { name: true },
+    with: {
+      rolePermissions: {
+        with: {
+          permission: {
+            columns: { name: true },
+          },
+        },
+      },
+    },
   });
 
   if (!role) {
@@ -98,92 +119,85 @@ export async function getUserPermissions(
   }
 
   if (role.name === SYSTEM_ROLES.ADMIN) {
-    const allPermissions = await prisma.permission.findMany({
-      select: { name: true },
+    const allPermissions = await db.query.permissions.findMany({
+      columns: { name: true },
     });
     return allPermissions.map((p) => p.name);
   }
 
-  const permissionService = new PermissionService(prisma);
-  const rolePermissions = role.permissions.map((p) => p.name);
+  const permissionService = new PermissionService(db);
+  const rolePermissions = role.rolePermissions.map((rp) => rp.permission.name);
   return permissionService.expandPermissionsWithDependencies(rolePermissions);
 }
 
 /**
- * Checks if a user session has a specific permission within an organization.
+ * Checks if a user session has a specific permission.
+ *
+ * Post-RLS Migration: Organization context is automatically handled by RLS policies.
  *
  * @param session - The NextAuth session object.
  * @param permission - The permission string to check for.
- * @param prisma - The Prisma client instance.
- * @param organizationId - The ID of the organization to check against.
+ * @param db - The Drizzle client instance.
  * @returns A boolean indicating whether the permission is granted.
  */
 export async function hasPermissionForSession(
   session: Session | null,
   permission: string,
-  prisma: ExtendedPrismaClient,
-  organizationId: string,
+  db: DrizzleClient,
 ): Promise<boolean> {
-  const permissionService = new PermissionService(prisma);
-  return permissionService.hasPermission(session, permission, organizationId);
+  const permissionService = new PermissionService(db);
+  return permissionService.hasPermission(session, permission);
 }
 
 /**
  * Enforces that a user session has a specific permission.
  * Throws a TRPCError if the permission is not granted.
  *
+ * Post-RLS Migration: Organization context is automatically handled by RLS policies.
+ *
  * @param session - The NextAuth session object.
  * @param permission - The permission string to require.
- * @param prisma - The Prisma client instance.
- * @param organizationId - The ID of the organization to check against.
+ * @param db - The Drizzle client instance.
  */
 export async function requirePermissionForSession(
   session: Session | null,
   permission: string,
-  prisma: ExtendedPrismaClient,
-  organizationId: string,
+  db: DrizzleClient,
 ): Promise<void> {
-  const permissionService = new PermissionService(prisma);
-  await permissionService.requirePermission(
-    session,
-    permission,
-    organizationId,
-  );
+  const permissionService = new PermissionService(db);
+  await permissionService.requirePermission(session, permission);
 }
 
 /**
- * Retrieves all permissions for a user session in a given organization.
+ * Retrieves all permissions for a user session.
+ *
+ * Post-RLS Migration: Organization context is automatically handled by RLS policies.
  *
  * @param session - The NextAuth session object.
- * @param prisma - The Prisma client instance.
- * @param organizationId - The ID of the organization.
+ * @param db - The Drizzle client instance.
  * @returns A string array of all granted permissions.
  */
 export async function getUserPermissionsForSession(
   session: Session | null,
-  prisma: ExtendedPrismaClient,
-  organizationId: string,
+  db: DrizzleClient,
 ): Promise<string[]> {
-  const permissionService = new PermissionService(prisma);
-  return permissionService.getUserPermissions(session, organizationId);
+  const permissionService = new PermissionService(db);
+  return permissionService.getUserPermissions(session);
 }
 
 /**
  * Get all permissions for a Supabase user
  *
+ * Post-RLS Migration: Organization context is automatically handled by RLS policies.
+ *
  * @param user - The Supabase user
- * @param prisma - The Prisma client instance
- * @param organizationId - The ID of the organization.
+ * @param db - The Drizzle client instance
  * @returns A string array of all granted permissions.
  */
 export async function getUserPermissionsForSupabaseUser(
   user: PinPointSupabaseUser | null,
-  prisma: ExtendedPrismaClient,
-  organizationId?: string,
+  db: DrizzleClient,
 ): Promise<string[]> {
-  const permissionService = new PermissionService(prisma);
-  return permissionService.getUserPermissionsForSupabaseUser(
-    user,
-    organizationId,
-  );
+  const permissionService = new PermissionService(db);
+  return permissionService.getUserPermissionsForSupabaseUser(user);
 }
