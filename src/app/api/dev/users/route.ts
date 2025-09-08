@@ -1,11 +1,10 @@
-import { eq, or, like } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { env } from "~/env";
 import { shouldEnableDevFeatures } from "~/lib/environment";
+import { transformKeysToCamelCase } from "~/lib/utils/case-transformers";
 import { getSupabaseUser } from "~/server/auth/supabase";
-import { getGlobalDatabaseProvider } from "~/server/db/provider";
-import { users, memberships, roles, organizations } from "~/server/db/schema";
+import { getDevUsers, getDevOrganization } from "~/lib/dal/dev-users";
 
 export async function GET(): Promise<NextResponse> {
   console.log("[DEV-API] Dev features enabled:", shouldEnableDevFeatures());
@@ -21,15 +20,11 @@ export async function GET(): Promise<NextResponse> {
     return new NextResponse(null, { status: 404 });
   }
 
-  const dbProvider = getGlobalDatabaseProvider();
-  const db = dbProvider.getDrizzleClient(); // ← Use Drizzle instead of Prisma
   try {
     const user = await getSupabaseUser();
 
     // Get the organization to fetch memberships
-    const organizationResults = await db.select().from(organizations).limit(1);
-
-    const organization = organizationResults[0];
+    const organization = await getDevOrganization();
     console.log("[DEV-API] Found organization:", organization?.name ?? "none");
 
     if (!organization) {
@@ -39,35 +34,9 @@ export async function GET(): Promise<NextResponse> {
       );
     }
 
-    // Query dev users using Drizzle
+    // Query dev users using DAL
     console.log("[DEV-API] Querying for dev users...");
-    const devUsers = await db
-      .select({
-        id: users.id,
-        name: users.name,
-        email: users.email,
-        emailVerified: users.emailVerified,
-        image: users.image,
-        bio: users.bio,
-        notificationFrequency: users.notificationFrequency,
-        emailNotificationsEnabled: users.emailNotificationsEnabled,
-        pushNotificationsEnabled: users.pushNotificationsEnabled,
-        createdAt: users.createdAt,
-        updatedAt: users.updatedAt,
-        // Join membership and role data
-        membershipId: memberships.id,
-        roleId: roles.id,
-        roleName: roles.name,
-      })
-      .from(users)
-      .leftJoin(memberships, eq(memberships.userId, users.id))
-      .leftJoin(roles, eq(roles.id, memberships.roleId))
-      .where(
-        or(
-          like(users.email, "%@dev.local"),
-          like(users.email, "%@pinpoint.dev"),
-        ),
-      );
+    const devUsers = await getDevUsers();
 
     console.log("[DEV-API] Found", devUsers.length, "dev user records");
     console.log(
@@ -75,38 +44,14 @@ export async function GET(): Promise<NextResponse> {
       devUsers.map((u) => u.email),
     );
 
-    // Transform results to group by user and include role information
-    const userMap = new Map();
-    for (const row of devUsers) {
-      const userId = row.id;
-      if (!userMap.has(userId)) {
-        userMap.set(userId, {
-          id: row.id,
-          name: row.name,
-          email: row.email,
-          emailVerified: row.emailVerified,
-          image: row.image,
-          bio: row.bio,
-          notificationFrequency: row.notificationFrequency,
-          emailNotificationsEnabled: row.emailNotificationsEnabled,
-          pushNotificationsEnabled: row.pushNotificationsEnabled,
-          createdAt: row.createdAt,
-          updatedAt: row.updatedAt,
-          role: row.roleName,
-        });
-      }
-    }
+    // Transform current user for consistency
+    const transformedUser = transformKeysToCamelCase(user);
 
-    const usersWithRoles = Array.from(userMap.values());
-    console.log(
-      "[DEV-API] Returning",
-      usersWithRoles.length,
-      "users with roles",
-    );
+    console.log("[DEV-API] Returning", devUsers.length, "users with roles");
 
     return NextResponse.json({
-      users: usersWithRoles,
-      currentUser: user,
+      users: devUsers,
+      currentUser: transformedUser,
     });
   } catch (error) {
     console.error("Error fetching dev users:", error);
@@ -114,7 +59,5 @@ export async function GET(): Promise<NextResponse> {
       { error: "Internal server error" },
       { status: 500 },
     );
-  } finally {
-    await dbProvider.disconnect();
   }
 }

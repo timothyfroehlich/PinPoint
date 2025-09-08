@@ -8,10 +8,15 @@
 export const PERMISSIONS = {
   // Issues
   ISSUE_VIEW: "issue:view",
-  ISSUE_CREATE: "issue:create",
+  // Legacy alias kept pre-beta; prefer ISSUE_CREATE_FULL or ISSUE_CREATE_BASIC
+  ISSUE_CREATE: "issue:create", // legacy alias kept pre-beta
+  ISSUE_CREATE_BASIC: "issue:create_basic",
+  ISSUE_CREATE_FULL: "issue:create_full",
   ISSUE_EDIT: "issue:edit",
   ISSUE_DELETE: "issue:delete",
+  // Deprecated: Will be merged into ISSUE_EDIT (tracking TODO)
   ISSUE_ASSIGN: "issue:assign",
+  // Deprecated: Will be merged into ISSUE_EDIT (tracking TODO)
   ISSUE_BULK_MANAGE: "issue:bulk_manage",
 
   // Machines
@@ -52,6 +57,16 @@ export const PERMISSION_DEPENDENCIES: Record<string, string[]> = {
     PERMISSIONS.ISSUE_VIEW,
     PERMISSIONS.ISSUE_EDIT,
   ],
+  // Full creation grants basic automatically
+  [PERMISSIONS.ISSUE_CREATE_FULL]: [
+    PERMISSIONS.ISSUE_VIEW,
+    PERMISSIONS.ISSUE_CREATE_BASIC,
+  ],
+  // Legacy create treated as full for transition
+  [PERMISSIONS.ISSUE_CREATE]: [
+    PERMISSIONS.ISSUE_VIEW,
+    PERMISSIONS.ISSUE_CREATE_BASIC,
+  ],
   [PERMISSIONS.MACHINE_EDIT]: [PERMISSIONS.MACHINE_VIEW],
   [PERMISSIONS.MACHINE_DELETE]: [PERMISSIONS.MACHINE_VIEW],
   [PERMISSIONS.LOCATION_EDIT]: [PERMISSIONS.LOCATION_VIEW],
@@ -80,7 +95,7 @@ export const ROLE_TEMPLATES = {
     description: "Standard organization member with basic permissions",
     permissions: [
       PERMISSIONS.ISSUE_VIEW,
-      PERMISSIONS.ISSUE_CREATE,
+      PERMISSIONS.ISSUE_CREATE_FULL,
       PERMISSIONS.ISSUE_EDIT,
       PERMISSIONS.ISSUE_DELETE,
       PERMISSIONS.ISSUE_ASSIGN,
@@ -102,7 +117,10 @@ export const ROLE_TEMPLATES = {
  */
 export const PERMISSION_DESCRIPTIONS: Record<string, string> = {
   [PERMISSIONS.ISSUE_VIEW]: "View issues and their details",
-  [PERMISSIONS.ISSUE_CREATE]: "Create new issues",
+  [PERMISSIONS.ISSUE_CREATE_BASIC]: "Create new issues (basic fields only)",
+  [PERMISSIONS.ISSUE_CREATE_FULL]:
+    "Create new issues with priority and assignee control",
+  [PERMISSIONS.ISSUE_CREATE]: "(Legacy) Create new issues (treated as full)",
   [PERMISSIONS.ISSUE_EDIT]: "Edit existing issues",
   [PERMISSIONS.ISSUE_DELETE]: "Delete issues",
   [PERMISSIONS.ISSUE_ASSIGN]: "Assign issues to users",
@@ -140,7 +158,7 @@ export const ALL_PERMISSIONS = Object.values(PERMISSIONS);
  */
 export const UNAUTHENTICATED_PERMISSIONS = [
   PERMISSIONS.ISSUE_VIEW,
-  PERMISSIONS.ISSUE_CREATE,
+  PERMISSIONS.ISSUE_CREATE_BASIC,
   PERMISSIONS.MACHINE_VIEW,
   PERMISSIONS.LOCATION_VIEW,
   PERMISSIONS.ATTACHMENT_VIEW,

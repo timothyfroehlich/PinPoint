@@ -1,35 +1,44 @@
-import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
-import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
-
-import { AuthenticatedLayout } from "./_components/AuthenticatedLayout";
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import { Navigation } from "~/components/layout/navigation";
+import { getRequestAuthContext } from "~/server/auth/context";
 import Providers from "./providers";
+import "./globals.css";
 
-import type { JSX } from "react";
+const inter = Inter({ subsets: ["latin"] });
 
-export default function RootLayout({
+export const metadata: Metadata = {
+  title: "PinPoint - Pinball Machine Issue Tracking",
+  description: "Professional pinball machine maintenance and issue tracking",
+};
+
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
-}): JSX.Element {
+}): Promise<React.JSX.Element> {
+  const authContext = await getRequestAuthContext();
+
+  // Convert to legacy format if authorized, otherwise null
+  const organizationContext =
+    authContext.kind === "authorized"
+      ? {
+          organization: authContext.org,
+          user: authContext.user,
+          accessLevel: "member" as const,
+          membership: authContext.membership,
+        }
+      : null;
+
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <title>PinPoint</title>
-      </head>
-      <body>
-        <InitColorSchemeScript attribute="data" />
-        <AppRouterCacheProvider
-          options={{
-            key: "mui-app",
-            enableCssLayer: true,
-            prepend: true,
-            speedy: false,
-          }}
-        >
-          <Providers>
-            <AuthenticatedLayout>{children}</AuthenticatedLayout>
-          </Providers>
-        </AppRouterCacheProvider>
+    <html lang="en">
+      <body className={inter.className}>
+        <Providers>
+          <div className="min-h-screen bg-background">
+            <Navigation organizationContext={organizationContext} />
+            <main className="container mx-auto px-4 py-8">{children}</main>
+          </div>
+        </Providers>
       </body>
     </html>
   );

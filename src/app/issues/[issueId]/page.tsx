@@ -2,9 +2,9 @@ import { type Metadata } from "next";
 import { notFound } from "next/navigation";
 import * as React from "react";
 
-import { IssueDetailView } from "~/components/issues/IssueDetailView";
-import { getSupabaseUser } from "~/server/auth/supabase";
-import { api } from "~/trpc/server";
+import { IssueDetailServer } from "~/components/issues/issue-detail-server";
+import { AuthGuard } from "~/components/auth/auth-guard";
+import { getRequestAuthContext } from "~/server/auth/context";
 
 interface IssuePageProps {
   params: Promise<{
@@ -15,46 +15,34 @@ interface IssuePageProps {
 export async function generateMetadata({
   params,
 }: IssuePageProps): Promise<Metadata> {
-  try {
-    const resolvedParams = await params;
-    const issue = await api.issue.core.getById({ id: resolvedParams.issueId });
-
-    return {
-      title: `${issue.title} - PinPoint`,
-      description: issue.description?.slice(0, 160) ?? "Issue details",
-      openGraph: {
-        title: issue.title,
-        description: issue.description ?? "Issue details",
-        type: "article",
-      },
-    };
-  } catch {
-    return {
-      title: "Issue Not Found - PinPoint",
-      description: "The requested issue could not be found.",
-    };
-  }
+  // Generic metadata to avoid auth race conditions - specific details set at page level
+  const resolvedParams = await params;
+  return {
+    title: `Issue ${resolvedParams.issueId} - PinPoint`,
+    description: "Issue details and management",
+  };
 }
 
-export default async function IssuePage({
+async function IssueContent({
   params,
-}: IssuePageProps): Promise<React.JSX.Element> {
-  const user = await getSupabaseUser();
-
+  authContext,
+}: {
+  params: IssuePageProps["params"];
+  authContext: Extract<
+    Awaited<ReturnType<typeof getRequestAuthContext>>,
+    { kind: "authorized" }
+  >;
+}): Promise<React.JSX.Element> {
   try {
-    // Fetch issue data on the server
+    // Resolve params for issue ID
     const resolvedParams = await params;
-    const issue = await api.issue.core.getById({ id: resolvedParams.issueId });
-
-    // Check if user has permission to view this issue
-    // For now, we'll allow public access and let the component handle permissions
 
     return (
-      <main aria-label="Issue details">
-        <IssueDetailView
-          issue={issue}
-          user={user}
+      <main aria-label="Issue details" className="container mx-auto px-4 py-6">
+        <IssueDetailServer
           issueId={resolvedParams.issueId}
+          organizationId={authContext.org.id}
+          userId={authContext.user.id}
         />
       </main>
     );
@@ -62,4 +50,29 @@ export default async function IssuePage({
     // If issue doesn't exist or user doesn't have access, show 404
     notFound();
   }
+}
+
+export default async function IssuePage({
+  params,
+}: IssuePageProps): Promise<React.JSX.Element> {
+  // Single authentication resolution for entire request
+  const authContext = await getRequestAuthContext();
+
+  return (
+    <AuthGuard
+      authContext={authContext}
+      fallbackTitle="Issue Access Required"
+      fallbackMessage="You need to be signed in as a member to view issue details."
+    >
+      <IssueContent
+        params={params}
+        authContext={
+          authContext as Extract<
+            Awaited<ReturnType<typeof getRequestAuthContext>>,
+            { kind: "authorized" }
+          >
+        }
+      />
+    </AuthGuard>
+  );
 }

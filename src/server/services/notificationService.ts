@@ -2,13 +2,11 @@ import { eq, and, count, desc } from "drizzle-orm";
 
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { type DrizzleClient } from "~/server/db/drizzle";
-import {
-  notifications,
-  machines,
-  issues,
+import type {
   notificationTypeEnum,
   notificationEntityEnum,
 } from "~/server/db/schema";
+import { notifications, machines, issues } from "~/server/db/schema";
 
 // Define types from Drizzle schema
 type Notification = typeof notifications.$inferSelect;
@@ -32,8 +30,9 @@ export const NotificationEntity = {
   ORGANIZATION: "ORGANIZATION" as const,
 } as const;
 
-export interface NotificationData {
+interface NotificationData {
   userId: string;
+  organizationId: string;
   type: NotificationType;
   message: string;
   entityType?: NotificationEntity;
@@ -46,16 +45,20 @@ export class NotificationService {
 
   /**
    * Create a new notification
+   *
+   * RLS automatically scopes notifications to the user's organization
+   * via database trigger that sets organizationId from auth.jwt()
    */
   async createNotification(data: NotificationData): Promise<void> {
     const notificationData: typeof notifications.$inferInsert = {
       id: generatePrefixedId("notification"),
-      userId: data.userId,
+      user_id: data.userId,
+      organization_id: data.organizationId,
       type: data.type,
       message: data.message,
-      entityType: data.entityType ?? null,
-      entityId: data.entityId ?? null,
-      actionUrl: data.actionUrl ?? null,
+      entity_type: data.entityType ?? null,
+      entity_id: data.entityId ?? null,
+      action_url: data.actionUrl ?? null,
     };
 
     await this.db.insert(notifications).values(notificationData);
@@ -63,6 +66,9 @@ export class NotificationService {
 
   /**
    * Notify machine owner of new issue
+   *
+   * RLS automatically ensures only machines and issues from the same
+   * organization are accessible via database-level policies
    */
   async notifyMachineOwnerOfIssue(
     issueId: string,
@@ -78,21 +84,22 @@ export class NotificationService {
 
     if (
       !machine?.owner ||
-      !machine.ownerNotificationsEnabled ||
-      !machine.notifyOnNewIssues
+      !machine.owner_notifications_enabled ||
+      !machine.notify_on_new_issues
     ) {
       return; // No owner, notifications disabled, or new issue notifications disabled
     }
 
     const issue = await this.db.query.issues.findFirst({
       where: eq(issues.id, issueId),
-      columns: { title: true },
+      columns: { title: true, organization_id: true },
     });
 
     if (!issue) return;
 
     await this.createNotification({
       userId: machine.owner.id,
+      organizationId: issue.organization_id,
       type: NotificationType.ISSUE_CREATED,
       message: `New issue reported on your ${machine.model.name}: "${issue.title}"`,
       entityType: NotificationEntity.ISSUE,
@@ -103,6 +110,9 @@ export class NotificationService {
 
   /**
    * Notify machine owner of issue status change
+   *
+   * RLS automatically ensures only issues from the same organization
+   * are accessible, providing cross-organizational security
    */
   async notifyMachineOwnerOfStatusChange(
     issueId: string,
@@ -111,6 +121,10 @@ export class NotificationService {
   ): Promise<void> {
     const issue = await this.db.query.issues.findFirst({
       where: eq(issues.id, issueId),
+      columns: {
+        organization_id: true,
+        title: true,
+      },
       with: {
         machine: {
           with: {
@@ -123,14 +137,15 @@ export class NotificationService {
 
     if (
       !issue?.machine.owner ||
-      !issue.machine.ownerNotificationsEnabled ||
-      !issue.machine.notifyOnStatusChanges
+      !issue.machine.owner_notifications_enabled ||
+      !issue.machine.notify_on_status_changes
     ) {
       return;
     }
 
     await this.createNotification({
       userId: issue.machine.owner.id,
+      organizationId: issue.organization_id,
       type: NotificationType.ISSUE_UPDATED,
       message: `Issue status changed on your ${issue.machine.model.name}: ${oldStatus} → ${newStatus}`,
       entityType: NotificationEntity.ISSUE,
@@ -141,6 +156,9 @@ export class NotificationService {
 
   /**
    * Notify user of issue assignment
+   *
+   * RLS automatically ensures only issues from the same organization
+   * are accessible, and notifications are scoped appropriately
    */
   async notifyUserOfAssignment(
     issueId: string,
@@ -148,6 +166,10 @@ export class NotificationService {
   ): Promise<void> {
     const issue = await this.db.query.issues.findFirst({
       where: eq(issues.id, issueId),
+      columns: {
+        organization_id: true,
+        title: true,
+      },
       with: {
         machine: {
           with: {
@@ -161,6 +183,7 @@ export class NotificationService {
 
     await this.createNotification({
       userId: assignedUserId,
+      organizationId: issue.organization_id,
       type: NotificationType.ISSUE_ASSIGNED,
       message: `You were assigned to issue: "${issue.title}" on ${issue.machine.model.name}`,
       entityType: NotificationEntity.ISSUE,
@@ -171,6 +194,9 @@ export class NotificationService {
 
   /**
    * Get user's notifications
+   *
+   * RLS automatically filters notifications to only those belonging
+   * to the user's organization via database-level policies
    */
   async getUserNotifications(
     userId: string,
@@ -181,12 +207,12 @@ export class NotificationService {
     } = {},
   ): Promise<Notification[]> {
     const whereConditions = options.unreadOnly
-      ? and(eq(notifications.userId, userId), eq(notifications.read, false))
-      : eq(notifications.userId, userId);
+      ? and(eq(notifications.user_id, userId), eq(notifications.read, false))
+      : eq(notifications.user_id, userId);
 
     const result = await this.db.query.notifications.findMany({
       where: whereConditions,
-      orderBy: desc(notifications.createdAt),
+      orderBy: desc(notifications.created_at),
       limit: options.limit ?? 50,
       offset: options.offset ?? 0,
     });
@@ -196,6 +222,9 @@ export class NotificationService {
 
   /**
    * Mark notification as read
+   *
+   * RLS ensures the notification belongs to the user's organization.
+   * User ownership validation prevents cross-user notification access.
    */
   async markAsRead(notificationId: string, userId: string): Promise<void> {
     await this.db
@@ -204,32 +233,38 @@ export class NotificationService {
       .where(
         and(
           eq(notifications.id, notificationId),
-          eq(notifications.userId, userId), // Ensure user owns the notification
+          eq(notifications.user_id, userId), // Ensure user owns the notification
         ),
       );
   }
 
   /**
    * Mark all notifications as read for user
+   *
+   * RLS automatically scopes to the user's organization,
+   * ensuring only their notifications are updated
    */
   async markAllAsRead(userId: string): Promise<void> {
     await this.db
       .update(notifications)
       .set({ read: true })
       .where(
-        and(eq(notifications.userId, userId), eq(notifications.read, false)),
+        and(eq(notifications.user_id, userId), eq(notifications.read, false)),
       );
   }
 
   /**
    * Get unread notification count
+   *
+   * RLS automatically filters to notifications within the user's
+   * organization, providing accurate organizational counts
    */
   async getUnreadCount(userId: string): Promise<number> {
     const [countResult] = await this.db
       .select({ count: count() })
       .from(notifications)
       .where(
-        and(eq(notifications.userId, userId), eq(notifications.read, false)),
+        and(eq(notifications.user_id, userId), eq(notifications.read, false)),
       );
 
     return countResult?.count ?? 0;

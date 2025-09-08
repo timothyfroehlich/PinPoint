@@ -1,13 +1,27 @@
-import { count, eq, asc, and } from "drizzle-orm";
+import { count, eq, asc } from "drizzle-orm";
+import type { InferSelectModel } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 
+// Validation schemas
 import {
-  createTRPCRouter,
-  organizationProcedure,
-  organizationManageProcedure,
-} from "~/server/api/trpc";
+  idSchema,
+  statusNameSchema,
+  optionalStatusNameSchema,
+  statusCategorySchema,
+  optionalStatusCategorySchema,
+} from "~/lib/validation/schemas";
+
+import {
+  transformKeysToCamelCase,
+  type DrizzleToCamelCase,
+} from "~/lib/utils/case-transformers";
+import { createTRPCRouter, orgScopedProcedure } from "~/server/api/trpc";
 import { issues, issueStatuses } from "~/server/db/schema/issues";
+
+// Type definitions for API responses
+type IssueStatusDbModel = InferSelectModel<typeof issueStatuses>;
+type IssueStatusResponse = DrizzleToCamelCase<IssueStatusDbModel>;
 
 /**
  * Generate UUID with environment fallback support.
@@ -28,43 +42,45 @@ function generateId(): string {
 
 export const issueStatusRouter = createTRPCRouter({
   // CRUD Operations
-  getAll: organizationProcedure.query(async ({ ctx }) => {
-    return ctx.drizzle
-      .select()
-      .from(issueStatuses)
-      .where(eq(issueStatuses.organizationId, ctx.organization.id))
-      .orderBy(asc(issueStatuses.name));
-  }),
+  getAll: orgScopedProcedure.query(
+    async ({ ctx }): Promise<IssueStatusResponse[]> => {
+      const statuses = await ctx.db
+        .select()
+        .from(issueStatuses)
+        .orderBy(asc(issueStatuses.name));
+      return transformKeysToCamelCase(statuses) as IssueStatusResponse[];
+    },
+  ),
 
-  create: organizationManageProcedure
+  create: orgScopedProcedure
     .input(
       z.object({
-        name: z.string().min(1).max(50),
-        category: z.enum(["NEW", "IN_PROGRESS", "RESOLVED"]),
+        name: statusNameSchema,
+        category: statusCategorySchema,
       }),
     )
-    .mutation(async ({ ctx, input }) => {
-      const [result] = await ctx.drizzle
+    .mutation(async ({ ctx, input }): Promise<IssueStatusResponse> => {
+      const [result] = await ctx.db
         .insert(issueStatuses)
         .values({
           id: generateId(),
           name: input.name,
           category: input.category,
-          organizationId: ctx.organization.id,
+          organization_id: ctx.organizationId,
         })
         .returning();
-      return result;
+      return transformKeysToCamelCase(result) as IssueStatusResponse;
     }),
 
-  update: organizationManageProcedure
+  update: orgScopedProcedure
     .input(
       z.object({
-        id: z.string(),
-        name: z.string().min(1).max(50).optional(),
-        category: z.enum(["NEW", "IN_PROGRESS", "RESOLVED"]).optional(),
+        id: idSchema,
+        name: optionalStatusNameSchema,
+        category: optionalStatusCategorySchema,
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<IssueStatusResponse> => {
       // Build the update object dynamically
       const updateData: Partial<{
         name: string;
@@ -74,33 +90,23 @@ export const issueStatusRouter = createTRPCRouter({
       if (input.name) updateData.name = input.name;
       if (input.category) updateData.category = input.category;
 
-      const [result] = await ctx.drizzle
+      const [result] = await ctx.db
         .update(issueStatuses)
         .set(updateData)
-        .where(
-          and(
-            eq(issueStatuses.id, input.id),
-            eq(issueStatuses.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(issueStatuses.id, input.id))
         .returning();
 
-      return result;
+      return transformKeysToCamelCase(result) as IssueStatusResponse;
     }),
 
-  delete: organizationManageProcedure
-    .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      // Check if any issues are using this status
-      const [issueCountResult] = await ctx.drizzle
+  delete: orgScopedProcedure
+    .input(z.object({ id: idSchema }))
+    .mutation(async ({ ctx, input }): Promise<IssueStatusResponse> => {
+      // Check if any issues are using this status (RLS handles org scoping)
+      const [issueCountResult] = await ctx.db
         .select({ count: count() })
         .from(issues)
-        .where(
-          and(
-            eq(issues.statusId, input.id),
-            eq(issues.organizationId, ctx.organization.id),
-          ),
-        );
+        .where(eq(issues.status_id, input.id));
 
       if (issueCountResult?.count && issueCountResult.count > 0) {
         throw new Error(
@@ -108,39 +114,32 @@ export const issueStatusRouter = createTRPCRouter({
         );
       }
 
-      const [result] = await ctx.drizzle
+      const [result] = await ctx.db
         .delete(issueStatuses)
-        .where(
-          and(
-            eq(issueStatuses.id, input.id),
-            eq(issueStatuses.organizationId, ctx.organization.id),
-          ),
-        )
+        .where(eq(issueStatuses.id, input.id))
         .returning();
 
-      return result;
+      return transformKeysToCamelCase(result) as IssueStatusResponse;
     }),
 
   // Status Counts / Analytics
-  getStatusCounts: organizationProcedure.query(async ({ ctx }) => {
-    // Get issue counts grouped by statusId using Drizzle aggregation
-    const counts = await ctx.drizzle
+  getStatusCounts: orgScopedProcedure.query(async ({ ctx }) => {
+    // Get issue counts grouped by statusId using Drizzle aggregation (RLS handles org scoping)
+    const counts = await ctx.db
       .select({
-        statusId: issues.statusId,
+        status_id: issues.status_id,
         count: count(),
       })
       .from(issues)
-      .where(eq(issues.organizationId, ctx.organization.id))
-      .groupBy(issues.statusId);
+      .groupBy(issues.status_id);
 
-    // Get all statuses for the organization
-    const statuses = await ctx.drizzle
+    // Get all statuses (RLS handles org scoping)
+    const statuses = await ctx.db
       .select({
         id: issueStatuses.id,
         category: issueStatuses.category,
       })
-      .from(issueStatuses)
-      .where(eq(issueStatuses.organizationId, ctx.organization.id));
+      .from(issueStatuses);
 
     // Create status ID to category mapping
     const statusMap = new Map(statuses.map((s) => [s.id, s.category]));
@@ -161,9 +160,15 @@ export const issueStatusRouter = createTRPCRouter({
 
     // Aggregate counts by category
     for (const group of counts) {
-      const category = statusMap.get(group.statusId);
-      if (category && isValidCategory(category)) {
-        categoryCounts[category] = categoryCounts[category] + group.count;
+      // Type assertion needed due to Drizzle query result typing
+      const statusId = group.status_id;
+      const category = statusMap.get(statusId);
+      if (category !== undefined && isValidCategory(category)) {
+        // Use type-safe property access instead of bracket notation
+        // eslint-disable-next-line security/detect-object-injection -- category is validated by isValidCategory and type-constrained
+        const currentCount = categoryCounts[category];
+        // eslint-disable-next-line security/detect-object-injection -- category is validated by isValidCategory and type-constrained
+        categoryCounts[category] = currentCount + group.count;
       }
     }
 

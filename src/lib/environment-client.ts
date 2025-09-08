@@ -128,3 +128,11 @@ export function shouldEnableDevFeatures(): boolean {
 export function isDevAuthAvailable(): boolean {
   return shouldEnableDevFeatures();
 }
+
+/**
+ * Get the app URL for client-side usage (QR codes, external links, etc.)
+ * Client-safe wrapper around the validated env variable
+ */
+export function getAppUrl(): string {
+  return env.NEXT_PUBLIC_APP_URL;
+}

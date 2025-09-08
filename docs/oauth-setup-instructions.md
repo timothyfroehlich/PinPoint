@@ -46,8 +46,8 @@ vercel env add GOOGLE_CLIENT_SECRET production
 2. **Test Development Environment**:
 
    ```bash
-   npm run dev:bg:status
-   npm run dev:bg || npm run dev
+   supabase start
+   npm run dev
    ```
 
    Check console output for OAuth validation messages.
@@ -96,8 +96,8 @@ npm run dev
 # Check console output for validation messages
 
 # Test authentication
-npm run dev:bg:status
-# Navigate to http://localhost:3000/sign-in
+npm run dev
+# Navigate to http://localhost:49200/sign-in
 ```
 
 ## 6. Security Notes

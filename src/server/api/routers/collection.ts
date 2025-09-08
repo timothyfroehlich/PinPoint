@@ -1,36 +1,40 @@
 import { z } from "zod";
 
+// Validation schemas
+import {
+  idSchema,
+  descriptionSchema,
+  collectionNameSchema,
+} from "~/lib/validation/schemas";
+
 import {
   createTRPCRouter,
   publicProcedure,
-  organizationProcedure,
+  orgScopedProcedure,
   organizationManageProcedure,
   locationEditProcedure,
 } from "~/server/api/trpc";
 
 export const collectionRouter = createTRPCRouter({
-  // Public: Get collections for location filtering
+  // Public: Get collections for location filtering (RLS scoped)
   getForLocation: publicProcedure
     .input(
       z.object({
-        locationId: z.string(),
-        organizationId: z.string(),
+        locationId: idSchema,
+        organizationId: idSchema, // Still needed for public API compatibility
       }),
     )
     .query(async ({ ctx, input }) => {
       const service = ctx.services.createCollectionService();
-      return service.getLocationCollections(
-        input.locationId,
-        input.organizationId,
-      );
+      return service.getLocationCollections(input.locationId);
     }),
 
   // Get machines in a collection
   getMachines: publicProcedure
     .input(
       z.object({
-        collectionId: z.string(),
-        locationId: z.string(),
+        collectionId: idSchema,
+        locationId: idSchema,
       }),
     )
     .query(async ({ ctx, input }) => {
@@ -45,10 +49,10 @@ export const collectionRouter = createTRPCRouter({
   createManual: locationEditProcedure
     .input(
       z.object({
-        name: z.string().min(1).max(50),
-        typeId: z.string(),
-        locationId: z.string().optional(),
-        description: z.string().optional(),
+        name: collectionNameSchema,
+        typeId: idSchema,
+        locationId: z.string().optional(), // Keep as string since it may come from client
+        description: descriptionSchema,
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -72,15 +76,15 @@ export const collectionRouter = createTRPCRouter({
         data.description = input.description;
       }
 
-      return service.createManualCollection(ctx.organization.id, data);
+      return service.createManualCollection(data);
     }),
 
   // Add machines to collection
   addMachines: locationEditProcedure
     .input(
       z.object({
-        collectionId: z.string(),
-        machineIds: z.array(z.string()),
+        collectionId: idSchema,
+        machineIds: z.array(idSchema),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -92,23 +96,23 @@ export const collectionRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  // Generate auto-collections
+  // Generate auto-collections (RLS scoped)
   generateAuto: organizationManageProcedure.mutation(async ({ ctx }) => {
     const service = ctx.services.createCollectionService();
-    return service.generateAutoCollections(ctx.organization.id);
+    return service.generateAutoCollections();
   }),
 
-  // Get organization collection types for admin
-  getTypes: organizationProcedure.query(async ({ ctx }) => {
+  // Get organization collection types for admin (RLS scoped)
+  getTypes: orgScopedProcedure.query(async ({ ctx }) => {
     const service = ctx.services.createCollectionService();
-    return service.getOrganizationCollectionTypes(ctx.organization.id);
+    return service.getOrganizationCollectionTypes();
   }),
 
   // Toggle collection type
   toggleType: organizationManageProcedure
     .input(
       z.object({
-        collectionTypeId: z.string(),
+        collectionTypeId: idSchema,
         enabled: z.boolean(),
       }),
     )

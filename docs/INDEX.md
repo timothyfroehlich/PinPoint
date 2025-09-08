@@ -1,13 +1,10 @@
 # PinPoint Documentation
 
-## 🚨 Active Migration
+## Project Status
 
-PinPoint is completing a direct conversion migration from Prisma to Drizzle optimized for solo development velocity.
-
-**Migration Status**: Phase 2B-E (Router Conversions)  
-**Progress**: Phase 2A Drizzle Foundation Complete, 3 routers converted  
-**Timeline**: 2-3 weeks total direct conversion approach  
-**Details**: [`migration/supabase-drizzle/`](./migration/supabase-drizzle/)
+**Architecture**: 100% Drizzle-only (Prisma removal complete)  
+**Current Phase**: RSC Migration + Test System Reboot  
+**Focus**: Server-first architecture with shadcn/ui
 
 ## Quick Start
 
@@ -15,51 +12,48 @@ PinPoint is completing a direct conversion migration from Prisma to Drizzle opti
 
 1. Read [`CLAUDE.md`](../CLAUDE.md) - Essential project instructions
 2. Review [`architecture/current-state.md`](./architecture/current-state.md) - System overview
-3. Check [`migration/supabase-drizzle/developer-guide.md`](./migration/supabase-drizzle/developer-guide.md) - Current patterns
+3. Check [`developer-guides/`](./developer-guides/) - Current implementation patterns
 
-### For Migration Participants
+### For Current Development
 
-- **🚨 CRITICAL**: [`latest-updates/`](./latest-updates/) - Post-training breaking changes and new patterns
-- **Migration Hub**: [`migration/supabase-drizzle/`](./migration/supabase-drizzle/)
-- **Quick References**: [`migration/supabase-drizzle/quick-reference/`](./migration/supabase-drizzle/quick-reference/)
-- **New Stack Guides**: [`developer-guides/`](./developer-guides/) (Supabase, Drizzle, RLS)
+- **Patterns**: [`developer-guides/`](./developer-guides/) - Current implementation guides
+- **Types**: [`CORE/TYPE_INVENTORY.md`](./CORE/TYPE_INVENTORY.md) - Type system reference and import patterns
+- **Security**: [`quick-reference/api-security-patterns.md`](./quick-reference/api-security-patterns.md) - Essential patterns
+- **Testing**: [`testing/TEST_SYSTEM_REBOOT_PLAN.md`](./testing/TEST_SYSTEM_REBOOT_PLAN.md) - Archetype system
 
 ## Documentation Structure
 
-### Core Documentation
+### Essential
 
-- [`latest-updates/`](./latest-updates/) - **CRITICAL**: Post-training tech stack updates (August 2025)
-- [`architecture/`](./architecture/) - System design, patterns, and current state
-- [`developer-guides/`](./developer-guides/) - Technology-specific implementation guides
-- [`testing/`](./testing/) - Testing philosophy and patterns (now integration-first)
-- [`security/`](./security/) - Security patterns and audit findings
-
-### Planning & Process
-
-- [`planning/`](./planning/) - Roadmap, future features, and archived ideas
-- [`migration/`](./migration/) - Active and completed migrations
-- [`orchestrator-system/`](./orchestrator-system/) - Multi-agent development workflow
+- [`CORE/`](./CORE/) - **Most critical documentation** (NON_NEGOTIABLES, TARGET_ARCHITECTURE, etc.)
+- [`developer-guides/`](./developer-guides/) - Implementation guides
+- [`testing/`](./testing/) - Test system reboot plan
+- [`quick-reference/`](./quick-reference/) - Auto-loaded tactical patterns
 
 ### Reference
 
-- [`design-docs/`](./design-docs/) - Feature designs and architectural decisions
-- [`lessons-learned/`](./lessons-learned/) - Counter-intuitive discoveries and insights
-- [`deployment/`](./deployment/) - Environment and deployment guides
-- [`research/`](./research/) - Technical research and experimental patterns
+- [`architecture/`](./architecture/) - System design and current state
+- [`security/`](./security/) - Security patterns and audit findings
+- [`deployment/`](./deployment/) - Environment setup guides
+- [`design-docs/`](./design-docs/) - Feature specifications
+- [`planning/`](./planning/) - Roadmap and future features
 
-## Key Resources
+### Archive
 
-### Quick References (Auto-Loaded)
+- [`deprecated/`](./deprecated/) - Legacy documentation (don't use)
 
-- **Tactical Patterns**: [`quick-reference/`](./quick-reference/) - Auto-loaded guides for immediate action
-- **Essential Commands**: [`CLAUDE.md`](../CLAUDE.md) - Command reference and project context
-- **Latest Updates**: [`latest-updates/quick-reference.md`](./latest-updates/quick-reference.md) - Post-training breaking changes
+## Quick Commands
 
-## Contributing
+- `npm test` - Unit tests (205 tests)
+- `npm run test:rls` - RLS policy tests  
+- `npm run smoke` - Playwright automation
+- `npm run dev` - Development server
+- `npm run build` - Production build
+- `npm run lint` - ESLint validation
 
-1. **Before coding**: Check migration status and use current patterns
-2. **Validation**: Run `npm run validate` before commits
-3. **Documentation**: Update relevant docs with any pattern changes
-4. **Testing**: Write integration tests with transaction cleanup
+## Usage
 
-For detailed contribution guidelines, see the migration developer guide.
+1. Check [`CLAUDE.md`](../CLAUDE.md) for project context
+2. Start with [`CORE/`](./CORE/) for foundational documentation
+3. Use [`quick-reference/`](./quick-reference/) for immediate patterns
+4. Run tests before commits
