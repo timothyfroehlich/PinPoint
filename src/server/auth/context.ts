@@ -87,8 +87,7 @@ export const getRequestAuthContext = cache(async (): Promise<AuthContext> => {
     const headersList = await headers();
     const host = headersList.get("host") ?? "";
     const subdomain =
-      extractTrustedSubdomain(headersList) ??
-      resolveOrgSubdomainFromHost(host);
+      extractTrustedSubdomain(headersList) ?? resolveOrgSubdomainFromHost(host);
     const metadataOrgId = user.app_metadata["organizationId"] as string;
 
     let orgId: string;

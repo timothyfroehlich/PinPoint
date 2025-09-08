@@ -28,9 +28,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         let resolvedOrgId: string | null = queryOrgId;
         if (!resolvedOrgId) {
           // Derive from subdomain (trusted header or host alias fallback)
-          const trustedSubdomain = extractTrustedSubdomain(request.headers as unknown as Headers);
+          const trustedSubdomain = extractTrustedSubdomain(
+            request.headers as unknown as Headers,
+          );
           const host = request.headers.get("host") ?? "";
-          const subdomain = trustedSubdomain ?? resolveOrgSubdomainFromHost(host);
+          const subdomain =
+            trustedSubdomain ?? resolveOrgSubdomainFromHost(host);
           if (subdomain) {
             const org = await getOrganizationBySubdomain(subdomain);
             resolvedOrgId = org?.id ?? null;
