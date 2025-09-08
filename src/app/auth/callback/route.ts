@@ -41,7 +41,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         }
 
         if (user && resolvedOrgId) {
-          const current = user.app_metadata?.["organizationId"] as unknown;
+          const current = user.app_metadata["organizationId"] as unknown;
           if (current !== resolvedOrgId) {
             await updateUserOrganization(user.id, resolvedOrgId);
           }
