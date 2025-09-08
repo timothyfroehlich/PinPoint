@@ -69,6 +69,8 @@ export const env = createEnv({
       getEnvironmentType() === "test"
         ? z.string().url().optional()
         : z.string().url("Supabase URL must be a valid URL"),
+    // Secret key (new Supabase API key)
+    // Required in all non-test environments
     SUPABASE_SECRET_KEY:
       getEnvironmentType() === "test"
         ? z.string().optional()

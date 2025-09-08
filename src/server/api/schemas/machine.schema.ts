@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { idSchema, machineIdSchema, apiPaginationSchema } from "~/lib/validation/schemas";
+import {
+  idSchema,
+  machineIdSchema,
+  apiPaginationSchema,
+} from "~/lib/validation/schemas";
 
 /**
  * Machine Creation Schema
