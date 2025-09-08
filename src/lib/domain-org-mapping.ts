@@ -38,9 +38,12 @@ export function resolveOrgSubdomainFromHost(host: string): string | null {
   console.log(`[HOST_RESOLUTION] Found alias: "${alias ?? "undefined"}"`);
   if (alias) return alias;
 
-  // 2) Localhost subdomain format: org.localhost[:port]
+  // 2) Localhost subdomain format: org.localhost[:port] (case-insensitive)
   const parts = hostWithoutPort.split(".");
-  if (parts.length >= 2 && parts[parts.length - 1] === "localhost") {
+  if (
+    parts.length >= 2 &&
+    parts[parts.length - 1]?.toLowerCase() === "localhost"
+  ) {
     return parts[0] ?? null;
   }
 
