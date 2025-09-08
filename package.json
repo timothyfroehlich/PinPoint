@@ -197,7 +197,7 @@
     "@types/pg": "^8.15.5",
     "@types/qrcode": "^1.5.5",
     "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
+    "@types/react-dom": "^19.1.9",
     "@types/uuid": "^10.0.0",
     "@typescript-eslint/rule-tester": "^8.42.0",
     "@vitejs/plugin-react": "^5.0.0",
