@@ -3,7 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { and, eq, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 
-// Validation schemas  
+// Validation schemas
 import { idSchema, requiredSearchQuerySchema } from "~/lib/validation/schemas";
 
 // Internal types (alphabetical)

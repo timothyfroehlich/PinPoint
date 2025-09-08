@@ -1,0 +1,122 @@
+name: pgTAP RLS Tests (Supabase)
+
+# Dedicated workflow to evaluate Supabase CLI performance for RLS testing
+# Separate from main CI to avoid blocking other tests if Supabase is slow
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/tests/**'
+      - 'src/server/db/schema/**'
+      - 'supabase/migrations/**'
+      - '.github/workflows/pgtap-rls-supabase.yml'
+  pull_request:
+    paths:
+      - 'supabase/tests/**'
+      - 'src/server/db/schema/**'
+      - 'supabase/migrations/**' 
+      - '.github/workflows/pgtap-rls-supabase.yml'
+
+env:
+  CI: true
+  NODE_ENV: test
+
+# Cancel in-progress runs for the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rls-tests:
+    name: pgTAP RLS Validation (Supabase)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15  # Generous timeout to handle Supabase startup
+    permissions:
+      contents: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      
+      - name: Setup Node, Deps, and Supabase
+        uses: ./.github/actions/supabase-local
+          
+      - name: Verify Supabase Connection
+        run: |
+          echo "🔍 Verifying Supabase database connection..."
+          
+          # Test basic connectivity
+          npm run db:push:local
+
+          # Verify auth functions are available
+          psql "postgresql://postgres:postgres@localhost:54322/postgres" -c "SELECT auth.uid() IS NOT NULL as auth_function_available;" || echo "Auth function check failed (expected if no session)"
+
+      - name: Ensure pgTAP available and setup roles
+        run: |
+          set -e
+          echo "📦 Ensuring pgTAP is available and preparing database for tests..."
+          export DATABASE_URL="postgresql://postgres:postgres@localhost:54322/postgres"
+
+          echo "🔎 Trying pgTAP extension..."
+          if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS pgtap;"; then
+            echo "✅ pgTAP extension created or already present"
+          else
+            echo "⚠️ CREATE EXTENSION pgtap failed; will attempt to load SQL functions"
+          fi
+
+          echo "🔎 Verifying pgTAP functions (plan)..."
+          if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SELECT plan(1); SELECT pass('pgTAP available'); SELECT finish();" >/dev/null 2>&1; then
+            echo "✅ pgTAP functions are available"
+          else
+            echo "⬇️ Downloading pgTAP SQL (v1.3.3)"
+            wget -q https://github.com/theory/pgtap/archive/refs/tags/v1.3.3.tar.gz
+            tar -xzf v1.3.3.tar.gz
+            echo "🧪 Loading pgTAP SQL into database..."
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f pgtap-1.3.3/sql/pgtap.sql
+            echo "🔁 Re-checking pgTAP availability..."
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "SELECT plan(1); SELECT pass('pgTAP SQL loaded'); SELECT finish();"
+            echo "✅ pgTAP SQL loaded successfully"
+          fi
+
+          echo "🛠️ Applying test roles/setup"
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/setup/01-test-roles.sql
+          echo "✅ Database prepared"
+      
+      - name: Run pgTAP RLS Tests
+        run: |
+          echo "🧪 Running pgTAP RLS tests against Supabase..."
+          
+          # Run RLS tests with proper DATABASE_URL for Supabase
+          export DATABASE_URL="postgresql://postgres:postgres@localhost:54322/postgres"
+          npm run test:rls 2>&1 | tee pgtap-run.log
+          
+          echo "✅ pgTAP RLS tests completed"
+      
+      - name: Upload pgTAP logs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pgtap-run-log
+          path: pgtap-run.log
+          retention-days: 7
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "🧹 Cleaning up Supabase..."
+          supabase stop || true
+          echo "✅ Cleanup completed"
+      
+      - name: Performance Summary
+        if: always()
+        run: |
+          {
+            echo "## 📊 Workflow Performance Summary"
+            echo "- **Workflow Duration**: Check job timeline above"
+            echo "- **Supabase Startup**: Monitor 'Start Supabase' step duration"
+            echo "- **Test Execution**: Monitor 'Run pgTAP RLS Tests' step duration"
+            echo ""
+            echo "**Goal**: Evaluate if Supabase CLI is viable for CI RLS testing"
+            echo "**Alternative**: Use preview database if this workflow is too slow"
+          } >> "$GITHUB_STEP_SUMMARY"

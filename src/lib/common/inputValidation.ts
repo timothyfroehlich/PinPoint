@@ -359,7 +359,8 @@ export function createEntityIdSchema(
   entityName: string,
 ): z.ZodObject<Record<string, z.ZodString>> {
   const fieldName = `${entityName}Id`;
-  const capitalizedName = entityName.charAt(0).toUpperCase() + entityName.slice(1);
+  const capitalizedName =
+    entityName.charAt(0).toUpperCase() + entityName.slice(1);
   return z.object({
     [fieldName]: z.string().min(1, `${capitalizedName} ID is required`),
   });
