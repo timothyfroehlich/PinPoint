@@ -68,12 +68,12 @@ export interface AuthUserProfile {
  * const apiUser = transformUserResponse(dbUser);
  * // Result: { emailVerified: Date, notificationFrequency: 'daily' }
  */
-export function transformUserResponse(user: unknown): UserResponse {
+export function transformUserResponse(user: unknown): UserResponse | null {
   // Handle null/undefined inputs gracefully
   if (user == null) {
-    return user as UserResponse;
+    return null;
   }
-  
+
   return transformKeysToCamelCase(user) as UserResponse;
 }
 
@@ -91,12 +91,12 @@ export function transformUserResponse(user: unknown): UserResponse {
  */
 export function transformOrganizationResponse(
   org: unknown,
-): OrganizationResponse {
+): OrganizationResponse | null {
   // Handle null/undefined inputs gracefully
   if (org == null) {
-    return org as OrganizationResponse;
+    return null;
   }
-  
+
   return transformKeysToCamelCase(org) as OrganizationResponse;
 }
 
@@ -119,10 +119,10 @@ export function transformOrganizationResponse(
  */
 export function transformMembershipResponse(
   membership: unknown,
-): MembershipResponse {
+): MembershipResponse | null {
   // Handle null/undefined inputs gracefully
   if (membership == null) {
-    return membership as MembershipResponse;
+    return null;
   }
 
   const transformed = transformKeysToCamelCase(
@@ -131,7 +131,10 @@ export function transformMembershipResponse(
 
   // Handle nested user transformation if present
   if (transformed.user && typeof transformed.user === "object") {
-    transformed.user = transformUserResponse(transformed.user);
+    const transformedUser = transformUserResponse(transformed.user);
+    if (transformedUser) {
+      transformed.user = transformedUser;
+    }
   }
 
   // Handle nested role transformation if present
@@ -197,16 +200,22 @@ export function transformUploadAuthContextResponse(
 
   // Transform nested organization if present
   if (typeof transformed.organization === "object") {
-    transformed.organization = transformOrganizationResponse(
+    const transformedOrg = transformOrganizationResponse(
       transformed.organization,
     );
+    if (transformedOrg) {
+      transformed.organization = transformedOrg;
+    }
   }
 
   // Transform nested membership if present
   if (typeof transformed.membership === "object") {
-    transformed.membership = transformMembershipResponse(
+    const transformedMembership = transformMembershipResponse(
       transformed.membership,
     );
+    if (transformedMembership) {
+      transformed.membership = transformedMembership;
+    }
   }
 
   // Ensure userPermissions is an array of strings
@@ -248,13 +257,13 @@ export function transformAuthUserProfile(profile: unknown): AuthUserProfile {
  */
 export function transformAuthArray<T>(
   items: unknown[],
-  transformer: (item: unknown) => T,
+  transformer: (item: unknown) => T | null,
 ): T[] {
   if (!Array.isArray(items)) {
     return [];
   }
 
-  return items.map(transformer);
+  return items.map(transformer).filter((item): item is T => item !== null);
 }
 
 /**

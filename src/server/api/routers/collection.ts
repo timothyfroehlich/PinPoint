@@ -1,7 +1,11 @@
 import { z } from "zod";
 
 // Validation schemas
-import { idSchema, descriptionSchema, collectionNameSchema } from "~/lib/validation/schemas";
+import {
+  idSchema,
+  descriptionSchema,
+  collectionNameSchema,
+} from "~/lib/validation/schemas";
 
 import {
   createTRPCRouter,

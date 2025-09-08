@@ -4,7 +4,11 @@ import { asc, count, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 // Validation schemas
-import { idSchema, bioSchema, optionalUserNameSchema } from "~/lib/validation/schemas";
+import {
+  idSchema,
+  bioSchema,
+  optionalUserNameSchema,
+} from "~/lib/validation/schemas";
 
 // Internal types (alphabetical)
 import type {
