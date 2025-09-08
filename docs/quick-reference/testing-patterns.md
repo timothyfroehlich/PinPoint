@@ -1,207 +1,153 @@
-# Testing Patterns: Modern Vitest & Direct Conversion
+# Testing Patterns Quick Reference
 
-Testing strategies optimized for fast feedback and direct conversion.
+_Minimal testing patterns for current simplified test system_
 
-## 🎯 Testing Philosophy for Direct Conversion
+## Current Test System (Post-Archive)
 
-**Core Principles:**
+**Status**: Simplified baseline system with single test file and essential validation
 
-- Fast feedback loops over extensive test suites
-- Integration testing with PGlite for database logic
-- Mock at the right level (module > individual functions)
-- TypeScript compilation as primary safety net
-- Manual testing for complex business logic
-
----
-
-## 🧪 Modern Vitest Patterns
-
-### Modern Mock Patterns
-
-**Partial mocking**: `vi.importActual` with type safety → @docs/testing/vitest-guide.md#partial-mocking  
-**Hoisted variables**: `vi.hoisted()` for shared mock state → @docs/testing/vitest-guide.md#hoisted-mocks
-
-### Configuration Migration
-
-```typescript
-// vitest.config.ts - Updated for v4.0
-export default defineConfig({
-  test: {
-    // OLD: workspace (deprecated)
-    // NEW: projects
-    projects: [
-      {
-        name: "unit",
-        testMatch: ["**/*.test.ts"],
-      },
-      {
-        name: "integration",
-        testMatch: ["**/*.integration.test.ts"],
-      },
-    ],
-  },
-});
-```
-
----
-
-## 🗄️ Database Testing with PGlite
-
-### Database Testing Setup
-
-**PGlite setup**: In-memory PostgreSQL with migrations → @docs/testing/vitest-guide.md#pglite-setup  
-**Integration tests**: Router testing with real database calls → @docs/testing/integration-guide.md#router-patterns
-
----
-
-## 🔐 Authentication Testing
-
-### Supabase Server Component Mocks
-
-```typescript
-// Mock next/headers for Server Components
-vi.mock("next/headers", () => ({
-  cookies: () => ({
-    get: vi.fn().mockReturnValue({ value: "fake-session" }),
-    set: vi.fn(),
-    remove: vi.fn(),
-  }),
-}));
-
-// Mock Supabase server client
-vi.mock("@/utils/supabase/server", () => ({
-  createClient: () => ({
-    auth: {
-      getUser: vi.fn().mockResolvedValue({
-        data: { user: { id: "123", email: "test@example.com" } },
-        error: null,
-      }),
-    },
-  }),
-}));
-```
-
-### Server Action Testing
-
-```typescript
-import * as actions from "@/app/actions";
-
-vi.mock("@/app/actions");
-
-test("form submission calls server action", async () => {
-  const mockCreatePost = vi.mocked(actions.createPost);
-  mockCreatePost.mockResolvedValue({ id: 1 });
-
-  // Simulate form submission
-  const formData = new FormData();
-  formData.set("title", "Test Post");
-
-  await actions.createPost(formData);
-
-  expect(mockCreatePost).toHaveBeenCalledWith(formData);
-});
-```
-
----
-
-## 🛡️ Security & Permission Testing
-
-### Multi-Tenant Scoping Tests
-
-```typescript
-test("enforces organizational boundaries", async () => {
-  const caller = appRouter.createCaller({
-    user: { organizationId: "org-1" },
-  });
-
-  // Should only return posts from user's organization
-  const posts = await caller.post.getAll();
-
-  posts.forEach((post) => {
-    expect(post.organizationId).toBe("org-1");
-  });
-});
-```
-
-### Permission Matrix Testing
-
-```typescript
-const permissionCases = [
-  { role: "admin", action: "delete", allowed: true },
-  { role: "user", action: "delete", allowed: false },
-  { role: "user", action: "read", allowed: true },
-];
-
-permissionCases.forEach(({ role, action, allowed }) => {
-  test(`${role} can ${allowed ? "" : "not "}${action}`, async () => {
-    const caller = appRouter.createCaller({
-      user: { role, organizationId: "test-org" },
-    });
-
-    if (allowed) {
-      await expect(caller.post[action]({ id: "1" })).resolves.toBeDefined();
-    } else {
-      await expect(caller.post[action]({ id: "1" })).rejects.toThrow();
-    }
-  });
-});
-```
-
----
-
-## 📋 Testing Decision Tree
-
-```
-Testing Need:
-├── Mock setup? → @docs/testing/vitest-guide.md#mock-patterns
-├── Database testing? → @docs/testing/vitest-guide.md#pglite-setup
-├── Router tests? → @docs/testing/integration-guide.md#router-patterns
-└── Complete strategy? → @docs/testing/INDEX.md
-```
-
----
-
-## ⚠️ Common Testing Pitfalls
-
-**Mock Setup Issues:**
-
-- ❌ Accessing variables in `vi.mock` factories directly
-- ✅ Use `vi.hoisted` for shared mock state
-- ❌ Mocking individual methods instead of modules
-- ✅ Mock at module level with partial mocking
-
-**Database Testing:**
-
-- ❌ Using external Docker containers for tests
-- ✅ PGlite in-memory for fast, isolated tests
-- ❌ Sharing database state between tests
-- ✅ Fresh database for each test case
-
-**Authentication Mocks:**
-
-- ❌ Forgetting to mock `next/headers` for Server Components
-- ✅ Mock both server and client Supabase utilities
-- ❌ Complex auth state setup in every test
-- ✅ Use factory functions for common auth states
-
----
-
-## 🚦 Test Commands
+### Available Commands
 
 ```bash
-# Test by project type
-npm run test -- --project=unit         # Unit tests (mocked DB)
-npm run test -- --project=integration  # Integration tests (PGlite DB)
-
-# All tests
-npm run test            # Full test suite
-npm run test:brief      # Fast, minimal output
-
-# Debugging
-npm run test:ui         # Interactive UI
-npm run test -- --reporter=verbose  # Detailed output
+npm test                    # Run unit tests (1 file, 205 tests, ~214ms)
+npm run test:watch         # Watch mode for unit tests
+npm run test:rls           # pgTAP RLS policy tests
+npm run smoke              # Essential Playwright smoke tests
 ```
+
+### Active Test Infrastructure
+
+**Core Test File**: `src/lib/common/__tests__/inputValidation.test.ts`
+
+- **Pattern**: Pure function unit tests
+- **Dependencies**: Vitest only
+- **Coverage**: Input validation functions
+- **Speed**: Ultra-fast execution
+
+## Current Testing Patterns
+
+### Pure Function Unit Tests
+
+```typescript
+// Pattern: Direct function testing with describe blocks
+import { describe, it, expect } from "vitest";
+import { validateEmail, validatePhoneNumber } from "../inputValidation";
+
+describe("Input Validation", () => {
+  describe("validateEmail", () => {
+    it("should accept valid email formats", () => {
+      expect(validateEmail("user@domain.com")).toBe(true);
+      expect(validateEmail("test+tag@example.org")).toBe(true);
+    });
+
+    it("should reject invalid email formats", () => {
+      expect(validateEmail("invalid-email")).toBe(false);
+      expect(validateEmail("@domain.com")).toBe(false);
+    });
+  });
+});
+```
+
+### RLS Policy Testing (pgTAP)
+
+```bash
+# Run database policy tests
+npm run test:rls
+
+# Individual test files
+npm run test:rls -- organizations.test.sql
+npm run test:rls -- multi-tenant-isolation.test.sql
+```
+
+### Smoke Testing (Playwright)
+
+```bash
+# Essential UI validation
+npm run smoke
+
+# Tests basic authentication and navigation flows
+# Located in: e2e/smoke-test-workflow.spec.ts
+```
+
+## Archived Infrastructure (Reference Only)
+
+**Location**: `.archived-tests-2025-08-23/`
+
+- ~130 test files with complex integration patterns
+- PGlite worker-scoped testing infrastructure
+- Multi-config vitest setup
+- Comprehensive E2E test suite
+
+**Why Archived**: Test system was over-engineered for pre-beta phase. Focus shifted to velocity and rapid prototyping.
+
+## Future Test System (Planned)
+
+**Reference**: `docs/testing/TEST_SYSTEM_REBOOT_PLAN.md`
+
+**9 Planned Archetypes**:
+
+1. Unit Tests (✅ **Current baseline**)
+2. Component Tests
+3. Service Tests
+4. Repository Tests
+5. Router Tests
+6. Auth Tests
+7. RLS Policy Tests (✅ **Currently active**)
+8. Schema Tests
+9. Smoke Tests (✅ **Currently active**)
+
+## Testing Philosophy (Pre-Beta)
+
+**Current Approach**:
+
+- **Minimal viable testing** - Catch obvious regressions
+- **Focus on velocity** - Don't over-test rapidly changing features
+- **Strategic testing** - RLS policies (security-critical) + input validation (data integrity) + smoke tests (basic functionality)
+
+**When to Expand**:
+
+- Core features stabilize and UI/UX decisions finalize
+- User feedback indicates specific reliability requirements
+- Performance optimization needs detailed metrics
+
+## Anti-Patterns (Current Context)
+
+```typescript
+// ❌ Don't create complex test infrastructure yet
+describe("Complex Integration Test", () => {
+  // Avoid until core features stabilize
+});
+
+// ❌ Don't over-mock rapidly changing components
+const mockComplexComponent = vi.mock("./Component");
+// UI/UX still in flux - mocking adds maintenance burden
+
+// ❌ Don't create comprehensive E2E suites yet
+test("Full user journey with 20 steps", () => {
+  // Save for post-beta when workflows are stable
+});
+```
+
+## Quick Decision Guide
+
+**Add a Test If**:
+
+- Pure function with clear input/output contract
+- Security-critical database policy (RLS)
+- Core data validation logic
+- Critical authentication/authorization flow
+
+**Skip Testing If**:
+
+- UI component that changes frequently
+- Feature still being designed/prototyped
+- Complex integration during architecture shifts
+- Non-critical convenience features
 
 ---
 
-**Complete strategies**: @docs/testing/vitest-guide.md
+**Cross-References:**
+
+- Test system status: `docs/testing/INDEX.md`
+- Security patterns: `docs/quick-reference/api-security-patterns.md`
+- TypeScript patterns: `docs/quick-reference/typescript-strictest-patterns.md`

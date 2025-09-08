@@ -1,25 +1,24 @@
 # Architecture Documentation
 
-System design patterns and architectural decisions for PinPoint.
+## Current Stack
 
-## Current Stack (Being Replaced)
+- **Database**: PostgreSQL + Drizzle ORM (100% Drizzle-only)
+- **Auth**: Supabase SSR
+- **API**: tRPC with organization scoping
+- **UI**: Material UI v7 + shadcn/ui (transition)
+- **Framework**: Next.js 14 App Router
 
-- Prisma ORM with manual organization filtering
-- NextAuth.js for authentication
-- Service factory pattern for dependency injection
+## Current Phase
 
-## Migration Target
-
-- Drizzle ORM with database-level RLS
-- Supabase for auth, storage, and database hosting
-- Direct service instantiation
+- **RSC Migration**: Server-first architecture with shadcn/ui
+- **Multi-tenant**: Organization-scoped queries with RLS policies
+- **Testing**: Archetype system reboot
 
 ## Contents
 
-- **[current-state.md](./current-state.md)** - Current system architecture and components
-- **[api-routes.md](./api-routes.md)** - tRPC-exclusive API strategy and exceptions
-- **[dependency-injection.md](./dependency-injection.md)** - DI patterns and service organization
-- **[permissions-roles-implementation.md](./permissions-roles-implementation.md)** - RBAC implementation
-- **[terminology.md](./terminology.md)** - Glossary of architectural terms
-- **[source-map.md](./source-map.md)** - Codebase structure overview
-- **[test-map.md](./test-map.md)** - Testing architecture alignment
+- **[current-state.md](./current-state.md)** - Detailed system architecture
+- **[api-routes.md](./api-routes.md)** - tRPC patterns and routing
+- **[dependency-injection.md](./dependency-injection.md)** - Service patterns
+- **[permissions-roles-implementation.md](./permissions-roles-implementation.md)** - RBAC system
+- **[terminology.md](./terminology.md)** - Project glossary
+- **[source-map.md](./source-map.md)** - Codebase structure

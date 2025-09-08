@@ -15,21 +15,13 @@
  * when the user upgrades their Supabase plan.
  */
 
-import { createDevUserAction, type DevUserData } from "./dev-auth-server";
-
-import type { SupabaseClient } from "@supabase/supabase-js";
-
 import { shouldEnableDevFeatures } from "~/lib/environment-client";
-
-/**
- * Result of a dev authentication attempt
- */
-export interface DevAuthResult {
-  success: boolean;
-  error?: string;
-  method?: "created" | "existing" | "signed_in";
-  requiresEmailConfirmation?: boolean;
-}
+import type {
+  DevUserData,
+  DevAuthResult,
+  TypedSupabaseClient,
+} from "~/lib/types";
+import { isError, isErrorWithStatus } from "~/lib/utils/type-guards";
 
 /**
  * Fixed password for all dev users
@@ -41,7 +33,12 @@ const DEV_PASSWORD = "dev-login-123";
  * Allowed email domains for dev users
  * Restricts dev user creation to development-specific domains
  */
-const ALLOWED_DEV_DOMAINS = ["dev.local", "localhost", "pinpoint.dev"];
+const ALLOWED_DEV_DOMAINS = [
+  "dev.local",
+  "localhost",
+  "pinpoint.dev",
+  "example.com",
+];
 
 /**
  * Validates that an email is allowed for dev user creation
@@ -56,32 +53,59 @@ function isValidDevEmail(email: string): boolean {
  * No OTP or email confirmation required
  */
 async function signInDevUser(
-  clientSupabase: SupabaseClient,
+  clientSupabase: TypedSupabaseClient,
   email: string,
 ): Promise<DevAuthResult> {
   try {
-    const { error } = await clientSupabase.auth.signInWithPassword({
+    console.log(
+      `Attempting sign-in with password for: ${email.replace(/\n|\r/g, "")}`,
+    );
+
+    const { data, error } = await clientSupabase.auth.signInWithPassword({
       email,
       password: DEV_PASSWORD,
     });
 
     if (error) {
-      console.error("Dev sign-in failed:", error.message);
+      // Log detailed error information for debugging
+      console.error(`Dev sign-in failed for ${email.replace(/\n|\r/g, "")}:`, {
+        code: isErrorWithStatus(error) ? error.status : undefined,
+        message: isError(error) ? error.message : String(error),
+        possibleCauses: [
+          isError(error) && error.message.includes("Invalid login credentials")
+            ? "User doesn't exist or wrong password"
+            : null,
+          isError(error) && error.message.includes("Email not confirmed")
+            ? "Email needs confirmation"
+            : null,
+          isError(error) && error.message.includes("Too many requests")
+            ? "Rate limited"
+            : null,
+        ].filter(Boolean),
+      });
+
       return {
         success: false,
-        error: `Sign-in failed: ${error.message}`,
+        error: `Sign-in failed: ${isError(error) ? error.message : String(error)}`,
       };
     }
 
-    console.log(`Dev user signed in: ${email.replace(/\n|\r/g, "")}`);
+    // On successful sign-in, Supabase should return a user
+
+    console.log(
+      `Dev user signed in successfully: ${email.replace(/\n|\r/g, "")} (ID: ${data.user.id})`,
+    );
     return {
       success: true,
       method: "signed_in",
       requiresEmailConfirmation: false,
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error("Dev sign-in error:", errorMessage);
+    const errorMessage = isError(error) ? error.message : String(error);
+    console.error(
+      `Dev sign-in exception for ${email.replace(/\n|\r/g, "")}:`,
+      errorMessage,
+    );
     return {
       success: false,
       error: `Sign-in failed: ${errorMessage}`,
@@ -90,11 +114,11 @@ async function signInDevUser(
 }
 
 /**
- * Main function for dev authentication - creates user if needed, then signs them in
- * This provides the "click button, immediately logged in" experience
+ * Main function for dev authentication - signs in existing seeded users
+ * This provides the "click button, immediately logged in" experience for seeded users only
  */
 export async function authenticateDevUser(
-  clientSupabase: SupabaseClient,
+  clientSupabase: TypedSupabaseClient,
   userData: DevUserData,
 ): Promise<DevAuthResult> {
   // Environment safety check
@@ -115,47 +139,43 @@ export async function authenticateDevUser(
   }
 
   try {
-    // Try to sign in first (user might already exist)
+    console.log(
+      `Attempting to sign in seeded user: ${userData.email.replace(/\n|\r/g, "")}`,
+    );
+
+    // Only try to sign in - assume user exists from seeding
     const signInResult = await signInDevUser(clientSupabase, userData.email);
 
     if (signInResult.success) {
+      console.log(
+        `Successfully signed in seeded user: ${userData.email.replace(/\n|\r/g, "")}`,
+      );
       return {
         ...signInResult,
         method: "existing",
       };
     }
 
-    // User doesn't exist or sign-in failed, create the user
-    console.log(
-      `User ${userData.email.replace(/\n|\r/g, "")} doesn't exist, creating...`,
+    // Sign-in failed - provide detailed error information for debugging
+    console.error(
+      `Dev sign-in failed for ${userData.email.replace(/\n|\r/g, "")}: ${signInResult.error ?? ""}`,
     );
 
-    const createResult = await createDevUserAction(userData);
-
-    if (!createResult.success) {
-      return {
-        success: false,
-        error: createResult.error ?? "Failed to create user",
-      };
-    }
-
-    // Now sign in the newly created user
-    const newSignInResult = await signInDevUser(clientSupabase, userData.email);
-
-    if (newSignInResult.success) {
-      return {
-        ...newSignInResult,
-        method: "created",
-      };
-    }
-
-    return newSignInResult;
+    return {
+      success: false,
+      error:
+        `Sign-in failed for seeded user. This usually means:\n` +
+        `1. Database wasn't properly seeded (run 'npm run db:reset')\n` +
+        `2. User exists but password doesn't match expected dev password\n` +
+        `3. Email confirmation issues\n` +
+        `Specific error: ${signInResult.error ?? ""}`,
+    };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage = isError(error) ? error.message : String(error);
     console.error("Dev authentication error:", errorMessage);
     return {
       success: false,
-      error: `Authentication failed: ${errorMessage}`,
+      error: `Authentication failed: ${errorMessage}. Ensure database is seeded with 'npm run db:reset'`,
     };
   }
 }
@@ -166,10 +186,8 @@ export async function authenticateDevUser(
 export function getAuthResultMessage(result: DevAuthResult): string {
   if (result.success) {
     switch (result.method) {
-      case "created":
-        return "✅ Dev user created and logged in successfully!";
       case "existing":
-        return "✅ Logged in successfully!";
+        return "✅ Logged in with seeded user successfully!";
       case "signed_in":
         return "✅ Signed in successfully!";
       default:

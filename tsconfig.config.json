@@ -1,4 +1,7 @@
 {
+  // TypeScript configuration for build tools and config files
+  // Flexible standards allowing dynamic configurations while maintaining basic safety
+  // Used by: ESLint config, Vitest config, build scripts, tooling configs
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     /* Configuration files - relaxed standards for build/config tools */
@@ -14,6 +17,7 @@
   },
   "include": [
     "*.config.{ts,js}",
+    "playwright.prod.config.ts",
     "drizzle.config.*.ts",
     "vitest.setup.*.ts",
     "scripts/**/*.{ts,js}",

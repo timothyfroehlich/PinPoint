@@ -1,19 +1,21 @@
-import { eq, and, isNull, count } from "drizzle-orm";
+import { eq, isNull, count } from "drizzle-orm";
 import * as QRCode from "qrcode";
 
 import { imageStorage } from "~/lib/image-storage/local-storage";
 import { logger } from "~/lib/logger";
-import { type DrizzleClient } from "~/server/db/drizzle";
-import { machines } from "~/server/db/schema";
-import { constructReportUrl } from "~/server/utils/qrCodeUtils";
+import { type DrizzleClient } from "../db/drizzle";
+import { machines } from "../db/schema";
+import { constructReportUrl } from "../utils/qrCodeUtils";
+import { getErrorMessage } from "~/lib/utils/type-guards";
+import { safeCount, type CountResult } from "~/lib/types/database-results";
 
-export interface QRCodeInfo {
+interface QRCodeInfo {
   id: string;
   url: string | null;
   generatedAt: Date | null;
 }
 
-export interface MachineFromQRCode {
+interface MachineFromQRCode {
   id: string;
   name: string;
   organizationId: string;
@@ -31,7 +33,7 @@ export interface MachineFromQRCode {
   };
 }
 
-export interface BulkGenerationResult {
+interface BulkGenerationResult {
   generated: number;
   failed: number;
   total: number;
@@ -82,14 +84,14 @@ export class QRCodeService {
     const [updatedMachine] = await this.db
       .update(machines)
       .set({
-        qrCodeUrl,
-        qrCodeGeneratedAt: new Date(),
+        qr_code_url: qrCodeUrl,
+        qr_code_generated_at: new Date(),
       })
       .where(eq(machines.id, machineId))
       .returning({
-        qrCodeId: machines.qrCodeId,
-        qrCodeUrl: machines.qrCodeUrl,
-        qrCodeGeneratedAt: machines.qrCodeGeneratedAt,
+        qrCodeId: machines.qr_code_id,
+        qrCodeUrl: machines.qr_code_url,
+        qrCodeGeneratedAt: machines.qr_code_generated_at,
       });
 
     if (!updatedMachine) {
@@ -97,7 +99,7 @@ export class QRCodeService {
     }
 
     return {
-      id: updatedMachine.qrCodeId,
+      id: updatedMachine.qrCodeId ?? "",
       url: updatedMachine.qrCodeUrl,
       generatedAt: updatedMachine.qrCodeGeneratedAt,
     };
@@ -110,9 +112,9 @@ export class QRCodeService {
     const machine = await this.db.query.machines.findFirst({
       where: eq(machines.id, machineId),
       columns: {
-        qrCodeId: true,
-        qrCodeUrl: true,
-        qrCodeGeneratedAt: true,
+        qr_code_id: true,
+        qr_code_url: true,
+        qr_code_generated_at: true,
       },
     });
 
@@ -120,14 +122,19 @@ export class QRCodeService {
       throw new Error("Machine not found");
     }
 
-    if (!machine.qrCodeUrl || !machine.qrCodeGeneratedAt || !machine.qrCodeId) {
+    // Use || to check for falsy values - QR code validation requires non-empty strings and valid dates
+    if (
+      !machine.qr_code_url ||
+      !machine.qr_code_generated_at ||
+      !machine.qr_code_id
+    ) {
       return null;
     }
 
     return {
-      id: machine.qrCodeId,
-      url: machine.qrCodeUrl,
-      generatedAt: machine.qrCodeGeneratedAt,
+      id: machine.qr_code_id,
+      url: machine.qr_code_url,
+      generatedAt: machine.qr_code_generated_at,
     };
   }
 
@@ -137,7 +144,7 @@ export class QRCodeService {
   async regenerateQRCode(machineId: string): Promise<QRCodeInfo> {
     const machine = await this.db.query.machines.findFirst({
       where: eq(machines.id, machineId),
-      columns: { qrCodeUrl: true },
+      columns: { qr_code_url: true },
     });
 
     if (!machine) {
@@ -145,9 +152,9 @@ export class QRCodeService {
     }
 
     // Delete old QR code image if it exists
-    if (machine.qrCodeUrl) {
+    if (machine.qr_code_url) {
       try {
-        await imageStorage.deleteImage(machine.qrCodeUrl);
+        await imageStorage.deleteImage(machine.qr_code_url);
       } catch (error) {
         // Log error but don't fail regeneration
         logger.warn({
@@ -155,11 +162,11 @@ export class QRCodeService {
           component: "qrCodeService.regenerateQRCode",
           context: {
             machineId,
-            qrCodeUrl: machine.qrCodeUrl,
+            qrCodeUrl: machine.qr_code_url,
             operation: "delete_old_qr_image",
           },
           error: {
-            message: error instanceof Error ? error.message : String(error),
+            message: getErrorMessage(error),
           },
         });
       }
@@ -176,12 +183,12 @@ export class QRCodeService {
     qrCodeId: string,
   ): Promise<MachineFromQRCode | null> {
     const machine = await this.db.query.machines.findFirst({
-      where: eq(machines.qrCodeId, qrCodeId),
+      where: eq(machines.qr_code_id, qrCodeId),
       columns: {
         id: true,
         name: true,
-        organizationId: true,
-        locationId: true,
+        organization_id: true,
+        location_id: true,
       },
       with: {
         model: {
@@ -211,8 +218,8 @@ export class QRCodeService {
     return {
       id: machine.id,
       name: machine.name,
-      organizationId: machine.organizationId,
-      locationId: machine.locationId,
+      organizationId: machine.organization_id,
+      locationId: machine.location_id,
       model: machine.model,
       location: machine.location,
       organization: machine.organization,
@@ -220,16 +227,11 @@ export class QRCodeService {
   }
 
   /**
-   * Generate QR codes for all machines in an organization
+   * Generate QR codes for all machines in organization (RLS scoped)
    */
-  async generateQRCodesForOrganization(
-    organizationId: string,
-  ): Promise<BulkGenerationResult> {
+  async generateQRCodesForOrganization(): Promise<BulkGenerationResult> {
     const machineList = await this.db.query.machines.findMany({
-      where: and(
-        eq(machines.organizationId, organizationId),
-        isNull(machines.qrCodeUrl), // Only generate for machines without QR codes
-      ),
+      where: isNull(machines.qr_code_url), // Only generate for machines without QR codes
       columns: { id: true },
     });
 
@@ -246,13 +248,12 @@ export class QRCodeService {
           msg: "Failed to generate QR code for machine",
           component: "qrCodeService.generateQRCodesForOrganization",
           context: {
-            organizationId,
             machineId: machine.id,
             operation: "bulk_generate",
             stats: { generated, failed, total },
           },
           error: {
-            message: error instanceof Error ? error.message : String(error),
+            message: getErrorMessage(error),
           },
         });
         failed++;
@@ -263,13 +264,10 @@ export class QRCodeService {
   }
 
   /**
-   * Generate QR codes for all machines in an organization (including regeneration)
+   * Generate QR codes for all machines in organization (including regeneration, RLS scoped)
    */
-  async regenerateQRCodesForOrganization(
-    organizationId: string,
-  ): Promise<BulkGenerationResult> {
+  async regenerateQRCodesForOrganization(): Promise<BulkGenerationResult> {
     const machineList = await this.db.query.machines.findMany({
-      where: eq(machines.organizationId, organizationId),
       columns: { id: true },
     });
 
@@ -286,13 +284,12 @@ export class QRCodeService {
           msg: "Failed to regenerate QR code for machine",
           component: "qrCodeService.regenerateQRCodesForOrganization",
           context: {
-            organizationId,
             machineId: machine.id,
             operation: "bulk_regenerate",
             stats: { generated, failed, total },
           },
           error: {
-            message: error instanceof Error ? error.message : String(error),
+            message: getErrorMessage(error),
           },
         });
         failed++;
@@ -313,31 +310,24 @@ export class QRCodeService {
   }
 
   /**
-   * Get QR code statistics for an organization
+   * Get QR code statistics for organization (RLS scoped)
    */
-  async getOrganizationQRCodeStats(organizationId: string): Promise<{
+  async getOrganizationQRCodeStats(): Promise<{
     total: number;
     withQRCodes: number;
     withoutQRCodes: number;
   }> {
-    const [totalResult, withoutQRCodesResult] = await Promise.all([
-      this.db
-        .select({ count: count() })
-        .from(machines)
-        .where(eq(machines.organizationId, organizationId)),
-      this.db
-        .select({ count: count() })
-        .from(machines)
-        .where(
-          and(
-            eq(machines.organizationId, organizationId),
-            isNull(machines.qrCodeUrl),
-          ),
-        ),
-    ]);
+    const [totalResult, withoutQRCodesResult]: [CountResult[], CountResult[]] =
+      await Promise.all([
+        this.db.select({ count: count() }).from(machines),
+        this.db
+          .select({ count: count() })
+          .from(machines)
+          .where(isNull(machines.qr_code_url)),
+      ]);
 
-    const total = totalResult[0]?.count ?? 0;
-    const withoutQRCodes = withoutQRCodesResult[0]?.count ?? 0;
+    const total = safeCount(totalResult);
+    const withoutQRCodes = safeCount(withoutQRCodesResult);
     const withQRCodes = total - withoutQRCodes;
 
     return {
