@@ -38,6 +38,7 @@ logs/
 .env*
 !.env
 !.env.example
+!.env.test
 *.key
 *.p12
 *.pfx
