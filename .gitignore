@@ -41,8 +41,8 @@ logs/
 *.key
 *.p12
 *.pfx
-**/.env -> *
-**/secrets -> *
+**/.env*
+**/secrets*
 
 # vercel
 .vercel
@@ -98,7 +98,6 @@ PROJECT_INDEX.json
 .claude/hooks/tsconfig-cache.json
 .betterer.results.backup
 .worktree-ports
-.env*.local
 .eslintcache
 .claude/recycle_bin/
 .playwright-mcp/
