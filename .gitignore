@@ -44,6 +44,12 @@ logs/
 # Secret leak prevention (bulletproof patterns)
 .env.production.local
 .env.development.local
+*.env.backup
+.env.backup
+*.env.*.backup
+*.env.bak
+*.backup.env
+backup.env
 *.key
 *.p12
 *.pfx
