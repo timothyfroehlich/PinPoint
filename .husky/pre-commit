@@ -25,4 +25,15 @@ if [ -d "supabase/migrations" ]; then
 fi
 echo "✅ Using base migration for Supabase seeding, no new migrations found"
 
+# Check for staged .env* files (except explicitly allowed ones)
+STAGED_ENV_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^\.env' | grep -v '^\.env$' | grep -v '^\.env\.example$' || true)
+if [ -n "$STAGED_ENV_FILES" ]; then
+  echo "❌ BLOCKED: Staging .env* files is not allowed for security!"
+  echo "Found staged files: $STAGED_ENV_FILES"
+  echo "💡 Only .env and .env.example are allowed to be committed"
+  echo "🔧 Unstage with: git reset HEAD <file>"
+  exit 1
+fi
+echo "✅ No restricted .env* files staged"
+
 npm run pre-commit:all
