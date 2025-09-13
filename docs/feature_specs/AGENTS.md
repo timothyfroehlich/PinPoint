@@ -6,17 +6,18 @@ Purpose: Provide a consistent, reviewable spec for each user‑visible feature. 
 
 ## Required Structure (in order)
 
-1) Feature overview (one paragraph)
-2) Last reviewed / Last updated (ISO date)
-3) Key source files (paths + brief purpose)
-4) Detailed feature spec (capabilities & behavior)
-5) Security / RLS spec (link to CORE docs; summarize effective rules)
-6) Test spec (pyramid: unit → integration → E2E; include acceptance criteria)
-7) Associated test files (current + planned paths)
+1. Feature overview (one paragraph)
+2. Last reviewed / Last updated (ISO date)
+3. Key source files (paths + brief purpose)
+4. Detailed feature spec (capabilities & behavior)
+5. Security / RLS spec (link to CORE docs; summarize effective rules)
+6. Test spec (pyramid: unit → integration → E2E; include acceptance criteria)
+7. Associated test files (current + planned paths)
 
 Each section is mandatory unless explicitly marked optional in that file.
 
 Optional but Recommended:
+
 - UI Spec (concise)
   - Screens & Routes: URLs, breadcrumbs, redirects
   - States: loading/empty/error/auth-gated/validation
@@ -45,7 +46,7 @@ Optional but Recommended:
 
 - Follow the testing pyramid: many unit tests for pure logic; fewer integration tests for DAL/tRPC; E2E for full journeys.
 - Follow `docs/CORE/TESTING_GUIDE.md` for test type selection, naming, placement, and templates. Use shared seed constants and helpers; avoid ad‑hoc patterns.
-- List “Associated test files” that exist today and “Planned test files” with suggested paths.
+- List "Associated test files" that exist today and "Planned test files" with suggested paths.
 
 ## PR & Review Policy
 

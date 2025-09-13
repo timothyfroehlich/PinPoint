@@ -20,6 +20,14 @@
 
 **CRITICAL**: Any document in `docs/CORE/` that hasn't been reviewed within 5 days must be verified for consistency with the current codebase state before use.
 
+### Feature Specs (docs/feature_specs)
+
+- Location: `docs/feature_specs/` contains a living spec for each feature.
+- Required sections, in order: Feature overview (~1 page), Last reviewed/updated (ISO dates), Key source files, Detailed feature spec, Security/RLS spec, Test spec (unit/integration/E2E with acceptance criteria), Associated test files.
+- Policy: When a PR changes feature behavior, update the corresponding spec and bump the dates. Reviewers should block behavior changes without spec updates.
+- Testing: Create new tests via the `/create-test` workflow and list them under "Associated test files". Follow the testing pyramid described in NON_NEGOTIABLES.
+- Authoring guide: See `docs/feature_specs/AGENTS.md` for format and expectations.
+
 ## 🛠️ CLAUDE CODE COMMAND GUIDANCE
 
 ### Safe Command Alternatives for Agents
