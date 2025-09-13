@@ -6,17 +6,7 @@ name: pgTAP RLS Tests (Supabase)
 on:
   push:
     branches: [main]
-    paths:
-      - 'supabase/tests/**'
-      - 'src/server/db/schema/**'
-      - 'supabase/migrations/**'
-      - '.github/workflows/pgtap-rls-supabase.yml'
   pull_request:
-    paths:
-      - 'supabase/tests/**'
-      - 'src/server/db/schema/**'
-      - 'supabase/migrations/**' 
-      - '.github/workflows/pgtap-rls-supabase.yml'
 
 env:
   CI: true
