@@ -17,7 +17,11 @@ export default async function HomePage(): Promise<React.JSX.Element> {
   const host = h.get("host");
 
   // Fallback: Check for alias hosts directly (when middleware fails to execute)
-  const aliasSubdomain = host ? ORG_ALIAS_HOSTS[host] : null;
+  const aliasSubdomain =
+    host && Object.prototype.hasOwnProperty.call(ORG_ALIAS_HOSTS, host)
+      ? // eslint-disable-next-line security/detect-object-injection -- Safe: host is validated against controlled ORG_ALIAS_HOSTS keys
+        (ORG_ALIAS_HOSTS[host] ?? null)
+      : null;
 
   // Check redirect conditions
   const middlewareRedirect = Boolean(sub && verified);

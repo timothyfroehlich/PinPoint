@@ -12,6 +12,7 @@ import type { OrganizationContext } from "~/lib/types";
 import { UserMenuClient } from "./user-menu-client";
 import { UniversalSearch } from "~/components/search/universal-search";
 import { NotificationBellWrapper } from "./notification-bell-wrapper";
+import { NavigationClientSync } from "./navigation-client-sync";
 
 interface NavigationProps {
   organizationContext: OrganizationContext | null;
@@ -20,6 +21,18 @@ interface NavigationProps {
 export function Navigation({
   organizationContext,
 }: NavigationProps): JSX.Element {
+  return (
+    <NavigationClientSync initialOrganizationContext={organizationContext}>
+      <NavigationInner organizationContext={organizationContext} />
+    </NavigationClientSync>
+  );
+}
+
+function NavigationInner({
+  organizationContext,
+}: {
+  organizationContext: OrganizationContext | null;
+}): JSX.Element {
   if (!organizationContext?.user) {
     // Unauthenticated navigation - using Material 3 surface colors
     return (

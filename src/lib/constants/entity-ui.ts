@@ -55,9 +55,21 @@ export const ENTITY_SINGULAR = {
 } as const;
 
 /**
+ * Metadata field keys used in Supabase user metadata
+ * Centralizes string constants to prevent typos and ensure consistency
+ */
+export const METADATA_KEYS = {
+  /** Organization ID field in user app_metadata */
+  ORGANIZATION_ID: "organizationId",
+  /** User role field in user app_metadata */
+  ROLE: "role",
+} as const;
+
+/**
  * Type definitions for entity types
  */
 export type EntityType = keyof typeof ENTITY_ICONS;
+export type MetadataKey = (typeof METADATA_KEYS)[keyof typeof METADATA_KEYS];
 
 /**
  * Utility function to get entity display information

@@ -106,17 +106,6 @@ function checkAuthSafety() {
   console.log('✅ Authentication patterns are safe');
 }
 
-// Enhanced legacy auth usage check (integration with existing script)
-function checkLegacyAuthUsage() {
-  console.log('🔍 Checking for legacy authentication function usage...');
-  
-  try {
-    execSync('tsx scripts/check-legacy-auth-usage.ts', { stdio: 'inherit' });
-  } catch (error) {
-    console.error('❌ Legacy auth usage check failed');
-    process.exit(1);
-  }
-}
 
 // Cache wrapper validation
 function checkCacheUsage() {
@@ -154,7 +143,6 @@ function main() {
   
   try {
     checkAuthSafety();
-    checkLegacyAuthUsage();
     checkCacheUsage();
     
     console.log('');

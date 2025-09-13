@@ -13,7 +13,9 @@ import { defineConfig, devices } from "@playwright/test";
 //   (those calls will use an absolute URL in the test itself; relative paths
 //   still resolve against http://localhost:3000)
 
-const PORT = process.env.PORT ?? "3000"; // single source of truth for port
+// Allow override via PLAYWRIGHT_PORT, fallback to PORT, then 3000
+// This helps when dev server is running on a different port due to conflicts
+const PORT = process.env.PLAYWRIGHT_PORT ?? process.env.PORT ?? "3000"; // single source of truth for port
 const BASE_URL = `http://localhost:${PORT}`; // fixed per requirement
 
 // Opt-in auto start (e.g. in CI) via PLAYWRIGHT_START=1 (explicit > implicit)
@@ -92,10 +94,12 @@ export default defineConfig({
 // Usage Notes:
 // 1. Start dev server yourself: `PORT=3000 npm run dev` (or just `npm run dev`).
 // 2. Run tests (reuse server): `npx playwright test`.
-// 3. To have Playwright start the server (e.g. CI/local one-off):
+// 3. If dev server runs on different port due to conflicts:
+//      PLAYWRIGHT_PORT=3001 npx playwright test
+// 4. To have Playwright start the server (e.g. CI/local one-off):
 //      PLAYWRIGHT_START=1 npx playwright test
-// 4. To navigate to a subdomain in a test, use an absolute URL, e.g.:
-//      await page.goto(`http://apc.localhost:${process.env.PORT||3000}/issues`)
+// 5. To navigate to a subdomain in a test, use an absolute URL, e.g.:
+//      await page.goto(`http://apc.localhost:${process.env.PLAYWRIGHT_PORT||process.env.PORT||3000}/issues`)
 //    (Subdomains of localhost resolve to 127.0.0.1 per spec; hosts file changes
 //     typically not required.)
 // ---------------------------------------------------------------------------

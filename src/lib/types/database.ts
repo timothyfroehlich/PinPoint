@@ -1167,6 +1167,10 @@ export type Database = {
           subdomain: string;
         }[];
       };
+      fn_upsert_membership_admin: {
+        Args: { p_org_id: string; p_role_id: string; p_user_id: string };
+        Returns: undefined;
+      };
     };
     Enums: {
       activity_type:

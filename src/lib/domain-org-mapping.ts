@@ -27,20 +27,18 @@ export function resolveOrgSubdomainFromHost(host: string): string | null {
   if (!hostWithoutPort) return null;
 
   // 1) Explicit alias mapping (highest priority)
-  const alias = ORG_ALIAS_HOSTS[hostWithoutPort.toLowerCase()];
-  console.log(
-    `[HOST_RESOLUTION] Checking alias for "${hostWithoutPort.toLowerCase()}":`,
-  );
-  console.log(
-    `[HOST_RESOLUTION] Available aliases:`,
-    Object.keys(ORG_ALIAS_HOSTS),
-  );
-  console.log(`[HOST_RESOLUTION] Found alias: "${alias ?? "undefined"}"`);
-  if (alias) return alias;
+  const normalizedHost = hostWithoutPort.toLowerCase();
+  if (Object.prototype.hasOwnProperty.call(ORG_ALIAS_HOSTS, normalizedHost)) {
+    // eslint-disable-next-line security/detect-object-injection -- Safe: normalizedHost is validated against controlled ORG_ALIAS_HOSTS keys
+    return ORG_ALIAS_HOSTS[normalizedHost] ?? null;
+  }
 
-  // 2) Localhost subdomain format: org.localhost[:port]
+  // 2) Localhost subdomain format: org.localhost[:port] (case-insensitive)
   const parts = hostWithoutPort.split(".");
-  if (parts.length >= 2 && parts[parts.length - 1] === "localhost") {
+  if (
+    parts.length >= 2 &&
+    parts[parts.length - 1]?.toLowerCase() === "localhost"
+  ) {
     return parts[0] ?? null;
   }
 
