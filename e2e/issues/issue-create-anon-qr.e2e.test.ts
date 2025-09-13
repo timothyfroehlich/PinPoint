@@ -4,6 +4,11 @@
  * Covers the QR flow: redirect from /api/qr/[qrCodeId] to report page, submit
  * minimal anonymous report, confirm success; verify anonymous cannot edit or
  * attach after creation.
+ *
+ * Use:
+ * - Stable data-testids from the UI Spec in docs/feature_specs/issue-creation.md
+ * - Known QR code → machine mapping via SEED_TEST_IDS (or a test QR fixture)
+ * - Enforce anonymous context (no logged-in session) during run
  */
 
 import { test, expect } from "@playwright/test";
@@ -25,4 +30,3 @@ test.describe("Issue Create – Anonymous via QR (E2E)", () => {
     expect("test implemented").toBe("true");
   });
 });
-

@@ -3,6 +3,12 @@
  *
  * Validates member issue creation: inserts with createdById, applies defaults,
  * records activity, notifies owner; rejects invalid inputs and permission issues.
+ *
+ * Use:
+ * - SEED_TEST_IDS for organizations, users, machines, statuses, priorities
+ * - setupOrganizationMocks() to shape { kind: "authorized" } auth context
+ * - SeedBasedMockFactory/MockDatabaseFactory to stub DB reads/writes deterministically
+ * - Consider MockFormDataFactory when exercising Server Actions adjacent to this flow
  */
 
 import { describe, it, expect } from "vitest";
@@ -28,4 +34,3 @@ describe("issue.core.create (integration)", () => {
     expect("test implemented").toBe("true");
   });
 });
-

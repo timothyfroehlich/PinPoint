@@ -4,6 +4,12 @@
  * Validates the anonymous issue creation endpoint: inserts with createdById=null,
  * applies default status/priority, skips activity recording, and calls notifications.
  * Includes negative cases for soft-deleted machines, missing defaults, and org scoping.
+ *
+ * Use:
+ * - SEED_TEST_IDS for org/machine/status/priority IDs (~/test/constants/seed-test-ids)
+ * - setupOrganizationMocks() for auth resolver mocking (~/test/setup/organization-mocks)
+ * - SeedBasedMockFactory/MockDatabaseFactory for deterministic data and DB client stubs
+ * - Follow worker-safe patterns; do not spin per-test PGlite instances
  */
 
 import { describe, it, expect } from "vitest";
@@ -29,4 +35,3 @@ describe("issue.core.publicCreate (integration)", () => {
     expect("test implemented").toBe("true");
   });
 });
-
