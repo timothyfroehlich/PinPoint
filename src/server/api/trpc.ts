@@ -23,7 +23,6 @@ export {
 export type {
   TRPCContext,
   ProtectedTRPCContext,
-  OrganizationTRPCContext,
   RLSOrganizationTRPCContext,
 } from "./trpc.base";
 
