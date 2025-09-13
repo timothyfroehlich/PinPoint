@@ -17,8 +17,6 @@ const PORT = process.env.PORT ?? "3000"; // single source of truth for port
 const BASE_URL = `http://localhost:${PORT}`; // fixed per requirement
 
 // Always auto-start server for reliable, self-contained tests
-const SHOULD_START = true;
-
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
