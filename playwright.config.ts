@@ -3,10 +3,10 @@ import { defineConfig, devices } from "@playwright/test";
 // ---------------------------------------------------------------------------
 // Playwright Configuration (clean + minimal)
 // ---------------------------------------------------------------------------
-// Requirements from user:
+// Requirements:
 // - Fixed base URL: http://localhost:3000
-// - Reuse an already running Next.js dev server (do NOT auto start by default)
-// - Still allow CI / explicit opt-in auto-start when desired
+// - Auto-start dev server for reliable, self-contained tests
+// - Reuse existing server if already running on port 3000
 // - Support both unauthenticated and authenticated (Tim dev user) flows
 // - Simple, easy to read projects definition
 // - Tests may sometimes navigate to subdomains like http://apc.localhost:3000
@@ -16,9 +16,8 @@ import { defineConfig, devices } from "@playwright/test";
 const PORT = process.env.PORT ?? "3000"; // single source of truth for port
 const BASE_URL = `http://localhost:${PORT}`; // fixed per requirement
 
-// Opt-in auto start (e.g. in CI) via PLAYWRIGHT_START=1 (explicit > implicit)
-// or fallback to CI detection for convenience.
-const SHOULD_START = process.env.PLAYWRIGHT_START === "1" || !!process.env.CI;
+// Always auto-start server for reliable, self-contained tests
+const SHOULD_START = true;
 
 export default defineConfig({
   testDir: "./e2e",
@@ -70,32 +69,25 @@ export default defineConfig({
       dependencies: ["auth-setup"],
     },
   ],
-  ...(SHOULD_START
-    ? {
-        webServer: {
-          command: `npm run dev`,
-          url: BASE_URL,
-          reuseExistingServer: true, // don't kill an already running dev server
-          timeout: 120_000,
-          env: {
-            NEXT_PUBLIC_ENABLE_DEV_FEATURES: "true",
-            PORT: PORT,
-          },
-        },
-      }
-    : {
-        // No webServer section -> Playwright will assume server already running.
-      }),
+  webServer: {
+    command: `npm run dev -- --hostname 127.0.0.1`,
+    url: BASE_URL,
+    reuseExistingServer: true, // don't kill an already running dev server
+    timeout: 120_000,
+    env: {
+      NEXT_PUBLIC_ENABLE_DEV_FEATURES: "true",
+      PORT: PORT,
+    },
+  },
 });
 
 // ---------------------------------------------------------------------------
 // Usage Notes:
-// 1. Start dev server yourself: `PORT=3000 npm run dev` (or just `npm run dev`).
-// 2. Run tests (reuse server): `npx playwright test`.
-// 3. To have Playwright start the server (e.g. CI/local one-off):
-//      PLAYWRIGHT_START=1 npx playwright test
-// 4. To navigate to a subdomain in a test, use an absolute URL, e.g.:
-//      await page.goto(`http://apc.localhost:${process.env.PORT||3000}/issues`)
+// 1. Run tests: `npx playwright test` or `npm run smoke`
+//    - Playwright automatically starts dev server on port 3000
+//    - If you already have a dev server running on 3000, it will reuse it
+// 2. To navigate to a subdomain in a test, use an absolute URL, e.g.:
+//      await page.goto(`http://apc.localhost:3000/issues`)
 //    (Subdomains of localhost resolve to 127.0.0.1 per spec; hosts file changes
 //     typically not required.)
 // ---------------------------------------------------------------------------
