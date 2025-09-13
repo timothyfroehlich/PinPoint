@@ -5,6 +5,11 @@
  * validateIssueCreation and related helpers. It enumerates happy paths and
  * edge cases (empty title, invalid email, cross-org machine, missing defaults).
  *
+ * Use:
+ * - SEED_TEST_IDS.MOCK_PATTERNS for stable unit-test IDs
+ * - SeedBasedMockFactory (~/test/mocks/seed-based-mocks) for consistent mock entities
+ * - Keep tests pure (no DB); prefer strict type checks per NON_NEGOTIABLES
+ *
  * Replace the placeholder assertions with real implementations.
  */
 
@@ -35,4 +40,3 @@ describe("validateIssueCreation (unit)", () => {
     expect("test implemented").toBe("true");
   });
 });
-
