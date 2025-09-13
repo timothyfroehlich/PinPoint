@@ -1,12 +1,12 @@
 /**
- * Domain-Org-Mapping Unit Tests - Archetype 1
+ * Domain-Org-Mapping Unit Tests
  * Pure function testing with no external dependencies
  *
- * ARCHETYPE BOUNDARIES:
+ * SCOPE BOUNDARIES:
  * - Test ONLY pure functions that take input and return output
  * - NO database connections, API calls, file system access, or external services
- * - NO React components (use Client Island or Server Component archetypes instead)
- * - NO mocking of dependencies (indicates business logic archetype needed)
+ * - NO React components; validate UI via Integration/E2E tests
+ * - NO mocking of dependencies (indicates Integration test is needed)
  *
  * WHAT BELONGS HERE:
  * - Hostname parsing and subdomain extraction logic
@@ -34,7 +34,7 @@ import {
   resolveOrgSubdomainFromLocation,
 } from "~/lib/domain-org-mapping";
 
-describe("Domain-Org-Mapping (Unit Tests - Archetype 1)", () => {
+describe("Domain-Org-Mapping (Unit Tests)", () => {
   // Suppress console.log output during tests
   beforeEach(() => {
     vi.spyOn(console, "log").mockImplementation(() => {

@@ -44,7 +44,7 @@ Optional but Recommended:
 ## Test Spec Expectations
 
 - Follow the testing pyramid: many unit tests for pure logic; fewer integration tests for DAL/tRPC; E2E for full journeys.
-- Use the project’s archetype and `/create-test` workflow (see root `CLAUDE.md`) to generate tests. Do not hand‑craft ad‑hoc tests.
+- Follow `docs/CORE/TESTING_GUIDE.md` for test type selection, naming, placement, and templates. Use shared seed constants and helpers; avoid ad‑hoc patterns.
 - List “Associated test files” that exist today and “Planned test files” with suggested paths.
 
 ## PR & Review Policy

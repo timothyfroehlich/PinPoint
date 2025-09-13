@@ -1,6 +1,6 @@
 /**
- * Archetype Integration Example
- * Demonstrates how all test archetypes work together in the RSC migration
+ * Comprehensive Testing Patterns Example
+ * Demonstrates how multiple test types work together in the RSC migration
  */
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
@@ -22,8 +22,8 @@ import {
   withActionErrorHandling,
 } from "~/lib/actions/shared";
 
-describe("Archetype Integration: RSC Test System Working Together", () => {
-  describe("Archetype 1: Pure Function Unit Tests", () => {
+describe("Comprehensive Testing: RSC Test System Working Together", () => {
+  describe("Unit Test Example", () => {
     it("validates form data using mock FormData", () => {
       // Use mock system to create realistic FormData
       const validFormData = MockFormDataFactory.createValidIssueFormData();
@@ -80,7 +80,7 @@ describe("Archetype Integration: RSC Test System Working Together", () => {
     });
   });
 
-  describe("Archetype 2: Service Business Logic Tests", () => {
+  describe("Integration Example: Service/DAL Business Logic", () => {
     let mockRequireAuth: ReturnType<typeof vi.fn>;
 
     beforeEach(() => {
@@ -149,7 +149,7 @@ describe("Archetype Integration: RSC Test System Working Together", () => {
     });
   });
 
-  describe("Archetype 3: Server Action Integration", () => {
+  describe("Integration Example: Server Actions", () => {
     it("demonstrates complete Server Action flow with mocks", async () => {
       // Create realistic scenario
       const scenario = MockScenarioFactory.createPrimaryOrgScenario();
@@ -241,7 +241,7 @@ describe("Archetype Integration: RSC Test System Working Together", () => {
     });
   });
 
-  describe("Cross-Archetype Integration", () => {
+  describe("Cross-Type Integration", () => {
     it("demonstrates data flow from FormData to DAL to database", async () => {
       // Complete scenario with all components
       const scenario = MockScenarioFactory.createPrimaryOrgScenario();
@@ -251,7 +251,7 @@ describe("Archetype Integration: RSC Test System Working Together", () => {
         title: "Integration Test Issue",
       });
 
-      // 2. Validate FormData (Archetype 1: Pure function)
+      // 2. Validate FormData (Unit: Pure function)
       const schema = z.object({
         title: titleSchema,
         machineId: uuidSchema,
@@ -263,13 +263,13 @@ describe("Archetype Integration: RSC Test System Working Together", () => {
 
       if (!validation.success) return;
 
-      // 3. Auth context check (Archetype 2: Business logic)
+      // 3. Auth context check (Integration: Business logic)
       const authContext = scenario.authContext;
       expect(authContext.organizationId).toBe(
         SEED_TEST_IDS.ORGANIZATIONS.primary,
       );
 
-      // 4. Database operation (would be Archetype 3: Integration in real app)
+      // 4. Database operation (Integration in real app)
       const issueData = {
         ...validation.data,
         id: `issue-integration-${Date.now()}`,
@@ -421,11 +421,11 @@ describe("Archetype Integration: RSC Test System Working Together", () => {
     });
 
     it("confirms test system is ready for RSC migration", () => {
-      // We have all the archetypes needed for RSC testing
+      // We have the essential test types needed for RSC testing
       const capabilities = {
-        unitTests: true, // Archetype 1: Pure functions
-        businessLogicTests: true, // Archetype 2: Service logic with mocks
-        serverActionTests: true, // Archetype 5: Server Actions with FormData
+        unitTests: true, // Unit: Pure functions
+        businessLogicTests: true, // Integration: Service logic with mocks
+        serverActionTests: true, // Integration: Server Actions with FormData
         mockSystem: true, // Auto-generated mocks from seed data
         seedDataIntegration: true, // SEED_TEST_IDS for predictable testing
         crossOrgSecurity: true, // Multi-tenant testing patterns

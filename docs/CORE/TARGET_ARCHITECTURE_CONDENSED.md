@@ -91,22 +91,22 @@ _Essential architectural patterns for PinPoint's server-first, multi-tenant plat
 
 ## Testing Architecture
 
-**Nine-Archetype System**
+**Test Types**
 - Unit Tests: Pure functions, zero dependencies
 - Data Access Layer Tests: Organization-scoped query validation  
 - Client Island Tests: RTL patterns for interactive components
 - Server Action Tests: FormData processing and auth context
 - Hybrid Component Tests: Server shell + Client island integration
-- Integration Tests: Cross-archetype workflow validation
+- Integration Tests: Boundary and workflow validation
 - End-to-End Tests: Playwright browser automation
 - RLS Tests: pgTAP database security validation
 - Schema Tests: Database constraint verification
 
 **Infrastructure**
 - PGlite worker-scoped instances for integration isolation
-- SEED_TEST_IDS for predictable debugging across archetypes
+- SEED_TEST_IDS for predictable debugging across tests
 - Auto-generated mocks derived from actual seed data
-- Progressive coverage with archetype balance enforcement
+- Progressive, balanced coverage across test types
 
 ## Key Architectural Principles
 
@@ -144,7 +144,7 @@ _Essential architectural patterns for PinPoint's server-first, multi-tenant plat
 
 **Modern Stack Integration**
 - Context7 for current library documentation and patterns
-- Automated archetype compliance through `/create-test` command
+- Testing standards via `docs/CORE/TESTING_GUIDE.md` (test types, naming, placement)
 - Background task processing with proper error isolation
 - Real-time features as focused client islands within server pages
 

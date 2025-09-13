@@ -16,11 +16,11 @@ The PinPoint test suite demonstrates **excellent architectural foundations** wit
 **⚠️ E2E ENVIRONMENT**: Still blocked (deliberately skipped per request)
 
 ### Critical Finding: High-Quality Architecture, Major Recovery Achieved ✅
-- ✅ **Architecture**: Sophisticated 9-archetype test system with comprehensive templates
+- ✅ **Architecture**: Solid testing infrastructure with clear test types and templates
 - ✅ **Security**: 100% RLS test success rate (18/18) - CRITICAL SECURITY RESTORED  
 - ✅ **Unit Tests**: 64% improvement (330→303 passing, 76→27 failing) - MAJOR RECOVERY  
 - ✅ **Validation**: Core input validation system fully operational
-- ⚠️ **Coverage**: 3 of 9 test archetypes actively implemented (unchanged)
+- ⚠️ **Coverage**: Coverage concentrated in a subset of test types (unchanged)
 - ⚠️ **Environment**: E2E tests remain blocked (not addressed in this session)
 
 ### Recent Critical Fixes Completed ✅
@@ -109,7 +109,7 @@ Status: Environment setup improved but not tested (deliberately skipped)
 
 | Category | Files | Status | Purpose |
 |----------|-------|--------|---------|
-| **Templates** | 11 files | ✅ Ready | Test archetype templates |
+| **Templates** | 11 files | ✅ Ready | Test templates by type |
 | **Helpers** | 5 files | ✅ Ready | Test utility functions |
 | **Setup** | 2 files | ✅ Ready | Test environment setup |
 | **Mocks** | Multiple | ✅ Ready | Seed-based mocking system |
@@ -122,10 +122,10 @@ Status: Environment setup improved but not tested (deliberately skipped)
 
 #### `shared.unit.test.ts` - **EXEMPLARY**
 - **Status**: ✅ All 18 tests passing
-- **Type**: Unit Test (Archetype 1) ✅
+- **Type**: Unit Test ✅
 - **Quality**: Perfect pure function testing
 - **Coverage**: Complete utility function coverage
-- **Architecture**: Flawless archetype compliance
+- **Architecture**: Flawless compliance with test-type patterns
 - **Maintainability**: Clean, readable, comprehensive
 - **Recommendation**: **KEEP AS-IS** - Use as template for other unit tests
 
@@ -141,7 +141,7 @@ describe('validateAndNormalizeSearchQuery', () => {
 
 #### `issue-actions.server.test.ts` - **HIGH QUALITY**
 - **Status**: ✅ All 15 tests passing  
-- **Type**: Server Action Test (Archetype 5) ✅
+- **Type**: Server Action Test ✅
 - **Quality**: Good FormData validation patterns
 - **Coverage**: Auth boundaries, validation, error handling
 - **Architecture**: Proper mocking with canonical auth resolver
@@ -202,9 +202,9 @@ Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3000/undefined
 
 ## 📈 Test Architecture Assessment
 
-### Archetype Implementation Status
+### Test Types Implementation Status
 
-| Archetype | Status | Files | Quality | Priority |
+| Test Type | Status | Files | Quality | Priority |
 |-----------|--------|-------|---------|----------|
 | 1. Unit Tests | ⚠️ Partial | 8 files (4 broken) | Mixed | Fix failing |
 | 2. Component Tests | ❌ Missing | 0 files | N/A | Implement |  
@@ -220,7 +220,7 @@ Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3000/undefined
 
 ### Architecture Strengths ⭐⭐⭐⭐⭐
 
-1. **Test Archetype System**: Sophisticated 9-category classification
+1. **Test Types**: Clear classification and guidance
 2. **Template Infrastructure**: Complete template system for consistency  
 3. **Mocking Strategy**: Seed-based mocking aligned with database
 4. **Helper Functions**: Comprehensive utility infrastructure
@@ -228,7 +228,7 @@ Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:3000/undefined
 
 ### Architecture Gaps
 
-1. **Missing Archetypes**: 6 out of 9 archetypes not implemented
+1. **Gaps**: Some test types underrepresented
 2. **Integration Testing**: No cross-layer validation
 3. **Component Testing**: No React component coverage
 4. **Service Testing**: No business logic validation
@@ -324,24 +324,24 @@ All existing tests have value and should be fixed rather than discarded.
 
 #### Week 1: Core Test Types
 5. **Component Tests** - Implement React component testing
-   - Use archetype 2 templates
+   - Use integration test templates
    - Focus on critical UI components (forms, navigation)
    - **Success Metric**: 10+ component tests implemented
 
 6. **Service Tests** - Implement business logic testing
-   - Use archetype 3 templates  
+   - Use integration test templates  
    - Test critical business operations
    - **Success Metric**: Key service functions tested
 
 #### Week 2: Data & API Layer  
 7. **DAL Tests** - Implement database access testing
-   - Use archetype 4 templates
+   - Use integration test templates
    - Test organization scoping patterns
    - Implement PGlite worker pattern
    - **Success Metric**: Core DAL functions tested
 
 8. **API Router Tests** - Implement tRPC endpoint testing  
-   - Use archetype 5 templates
+   - Use integration test templates
    - Focus on critical API endpoints
    - **Success Metric**: Core API routes tested
 
@@ -349,7 +349,7 @@ All existing tests have value and should be fixed rather than discarded.
 
 #### Integration & Performance
 9. **Integration Tests** - Cross-layer validation
-   - Use archetype 6 templates
+   - Use integration test templates
    - Test complete user workflows  
    - **Success Metric**: End-to-end data flow validated
 
@@ -381,13 +381,13 @@ All existing tests have value and should be fixed rather than discarded.
 - [x] **E2E Test Health**: ✅ E2E tests unblocked (was blocked) - **ENVIRONMENT FIXED**
 
 ### Medium-Term (1 month)  
-- [ ] **Archetype Implementation**: 6/9 archetypes implemented (currently 3/9)
+- [ ] **Standards Adoption**: Test types in use across the suite
 - [ ] **Test Coverage**: >70% code coverage (currently unmeasured)
 - [ ] **Test Performance**: <30s full test suite execution
-- [ ] **Quality Standards**: All new tests follow archetype patterns
+- [ ] **Quality Standards**: All new tests follow `docs/CORE/TESTING_GUIDE.md`
 
 ### Long-Term (3 months)
-- [ ] **Complete Implementation**: 9/9 archetypes implemented  
+- [ ] **Complete Implementation**: All core test types represented  
 - [ ] **Comprehensive Coverage**: >85% code coverage
 - [ ] **Performance Optimized**: <15s test suite execution
 - [ ] **CI/CD Integration**: Fully automated test quality gates
@@ -411,7 +411,7 @@ All existing tests have value and should be fixed rather than discarded.
 4. **OPTIMIZE TEST PERFORMANCE** - Fast feedback loops
 
 ### Quality Standards
-1. **ALL NEW TESTS** must use `/create-test` archetype system
+1. **ALL NEW TESTS** must follow `docs/CORE/TESTING_GUIDE.md` (test type, naming, placement)
 2. **ALL TESTS** must pass before merging code  
 3. **ALL SECURITY TESTS** must pass before deployment
 4. **ALL E2E TESTS** must validate critical user journeys
@@ -420,14 +420,14 @@ All existing tests have value and should be fixed rather than discarded.
 
 ## 🔚 Conclusion
 
-**The PinPoint test suite is architecturally excellent and execution has been dramatically restored.** The sophisticated 9-archetype system and comprehensive infrastructure demonstrate forward-thinking design. **Major achievements**: All security tests now passing, 64% improvement in unit test success rate, and core validation system fully operational.
+**The PinPoint test suite is architecturally excellent and execution has been dramatically restored.** The simplified test-type approach and comprehensive infrastructure demonstrate forward-thinking design. **Major achievements**: All security tests now passing, 64% improvement in unit test success rate, and core validation system fully operational.
 
 **Priority Order - UPDATED WITH MAJOR PROGRESS:**
 1. ✅ **COMPLETED**: Fixed schema import crisis (76→27 failures, 64% improvement)
 2. ✅ **COMPLETED**: Fixed all security tests (18/18 passing, 100% success rate)  
 3. ✅ **COMPLETED**: Fixed E2E environment setup (BASE_URL added)
 4. 🔄 **CURRENT**: Address remaining 27 unit test failures
-5. **MEDIUM**: Implement missing test archetypes
+5. **MEDIUM**: Expand underrepresented test types
 6. **LOW**: Performance optimization and coverage reporting
 
 **Major success has been achieved** - all critical security issues resolved and unit test health dramatically improved. The strong architectural foundation combined with the recent fixes means the test suite now provides excellent security coverage and substantially improved reliability.

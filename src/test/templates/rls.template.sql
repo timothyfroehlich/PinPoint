@@ -1,4 +1,4 @@
--- {{TABLE_NAME}} RLS Policy Tests - Archetype 8
+-- {{TABLE_NAME}} RLS Policy Tests
 -- Tests Row-Level Security policies for multi-tenant data isolation
 -- CRITICAL: Zero tolerance for cross-organizational data leakage
 -- 
@@ -6,7 +6,7 @@
 -- - Test PostgreSQL Row-Level Security policies using pgTAP framework
 -- - Focus exclusively on multi-tenant data isolation and security boundaries
 -- - Use real database with RLS policies enabled, not mocked environments
--- - NO application logic testing (those belong in other archetypes)
+-- - NO application logic testing (those belong in other test types)
 -- 
 -- WHAT BELONGS HERE:
 -- - RLS policy effectiveness across different user contexts
@@ -15,9 +15,9 @@
 -- - Anonymous access restriction and authentication requirements
 -- 
 -- WHAT DOESN'T BELONG:
--- - Database schema validation (use Schema archetype)
--- - Application business logic testing (use Service/DAL archetypes)
--- - UI workflow testing (use E2E archetype)
+-- - Database schema validation (use Schema tests)
+-- - Application business logic testing (use Integration tests)
+-- - UI workflow testing (use E2E tests)
 -- - Database query performance testing (not security focused)
 -- 
 -- TESTING APPROACH:

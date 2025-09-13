@@ -82,7 +82,7 @@ References: `docs/CORE/DATABASE_SECURITY_SPEC.md`, `docs/CORE/CUJS_LIST.md` (Ano
 - Current
   - `src/lib/actions/issue-actions.server.test.ts` (Server Action create flow)
 
-- Planned (create via `/create-test`)
+- Planned
   - `src/lib/issues/assignmentValidation.issueCreation.unit.test.ts`
   - `src/server/api/routers/issue.core.publicCreate.integration.test.ts`
   - `src/server/api/routers/issue.core.create.integration.test.ts`

@@ -1,6 +1,6 @@
 -- §6 Visibility Inheritance Edge Cases - Extended Coverage
 -- Extends coverage for untested visibility inheritance permutations and regression guards
--- Tests complex visibility inheritance scenarios specified in docs/security/rls-assertions.md
+-- Tests complex visibility inheritance scenarios specified in docs/CORE/DATABASE_SECURITY_SPEC.md
 
 \i ../constants.sql
 

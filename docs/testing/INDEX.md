@@ -2,9 +2,9 @@
 
 ## Current State
 
-**Active Tests**: 205 unit tests (1 file)  
+**Active Tests**: Unit, Integration, RLS, and E2E smoke in place  
 **Commands**: `npm test`, `npm run test:rls`, `npm run smoke`  
-**Status**: Minimal baseline operational
+**Status**: Operational baseline; see CORE Testing Guide for standards
 
 ## Test Types
 
@@ -12,12 +12,11 @@
 - **RLS**: pgTAP database policy validation
 - **Smoke**: Essential Playwright flows
 
-## Future System
+## Guidance
 
-- **[TEST_SYSTEM_REBOOT_PLAN.md](./TEST_SYSTEM_REBOOT_PLAN.md)** - 9 archetype system plan
-- **[RISK_ANALYSIS.md](./RISK_ANALYSIS.md)** - Current risk assessment
-- **[SERVICE_TESTS_ARCHETYPE.md](./SERVICE_TESTS_ARCHETYPE.md)** - Service testing patterns
+- **Authoritative Guide**: `docs/CORE/TESTING_GUIDE.md`
+- **Quick Reference**: `docs/CORE/TESTING_QUICK_REFERENCE.md`
 
 ## Archive
 
-~130 test files archived during system reboot. Legacy patterns in `docs/deprecated/testing/`.
+Legacy patterns were archived during a prior reboot. Use the CORE Testing Guide going forward.

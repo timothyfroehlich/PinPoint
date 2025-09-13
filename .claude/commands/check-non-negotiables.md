@@ -47,7 +47,7 @@ Analyze specified files for violations of PinPoint's critical non-negotiable pat
 
 ### 🧪 TESTING (Manual Review)
 
-- **Archetype Violations**: Wrong patterns for test purpose (pure functions using DB, integration tests using mocks, tRPC tests using real DB)
+- **Test Type Violations**: Wrong patterns for test purpose (pure functions using DB, integration tests using mocks, tRPC tests using real DB)
 
 ### 📋 CONVENTIONS (Manual Review)
 

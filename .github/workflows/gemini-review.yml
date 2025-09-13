@@ -242,10 +242,10 @@ jobs:
             - **Background Processing:** Use `runAfterResponse()` for non-critical operations
 
             ### Testing Architecture (CORE-TEST-001, CORE-TEST-002, CORE-TEST-003)
-            - **Test Archetypes:** Pure functions → unit; DB → workerDb; tRPC → mocks; E2E for full flows
-            - **Server Component Testing:** Use E2E testing for async Server Components, not unit tests
-            - **Test Creation:** Use `/create-test` workflow, not manual test file creation
-            - **Mock System:** Auto-generated mocks from seed data with SEED_TEST_IDS constants
+            - **Test Types:** Unit, Integration, E2E, RLS, Schema (see docs/CORE/TESTING_GUIDE.md)
+            - **Server Component Testing:** Validate via Integration/E2E, not unit tests
+            - **Test Creation:** Follow docs/CORE/TESTING_GUIDE.md for type, naming, placement
+            - **Mock System:** Use seed-based fixtures and SEED_TEST_IDS constants
 
             ## 🟢 LOW Style & Convention Issues
 

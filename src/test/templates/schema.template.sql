@@ -1,4 +1,4 @@
--- {{TABLE_NAME}} Schema Constraint Tests - Archetype 9
+-- {{TABLE_NAME}} Schema Constraint Tests
 -- Tests database schema integrity, constraints, and data validation
 -- Ensures referential integrity and business rules enforcement
 -- 
@@ -6,7 +6,7 @@
 -- - Test PostgreSQL database schema structure and constraints using pgTAP
 -- - Focus on table structure, foreign keys, indexes, and business rules
 -- - Verify data integrity constraints and validation at database level
--- - NO Row-Level Security testing (that belongs in RLS archetype)
+-- - NO Row-Level Security testing (that belongs in RLS tests)
 -- 
 -- WHAT BELONGS HERE:
 -- - Table existence and column structure validation
@@ -15,9 +15,9 @@
 -- - Index existence and performance constraint verification
 -- 
 -- WHAT DOESN'T BELONG:
--- - RLS policy testing (use RLS archetype)
--- - Application business logic validation (use Service/DAL archetypes)
--- - User authentication and authorization testing (use RLS archetype)
+-- - RLS policy testing (use RLS tests)
+-- - Application business logic validation (use Integration tests)
+-- - User authentication and authorization testing (use RLS tests)
 -- - Query performance optimization (focus on constraint validation)
 -- 
 -- TESTING APPROACH:

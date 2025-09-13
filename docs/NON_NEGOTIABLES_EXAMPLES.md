@@ -245,12 +245,12 @@ test("business logic", async ({ workerDb }) => {
 
 **RATIONALE:** Track 1 (pgTAP RLS) tests security policies with RLS enabled. Track 2 (PGlite) tests business logic with RLS bypassed for performance. Mixing patterns defeats the purpose of each track.
 
-## Wrong Test Archetypes
+## Wrong Test Types
 
 **Violation**: Pure functions don't use DB. Integration uses workerDb. tRPC uses mocks.
 
 ```typescript
-// ❌ NEVER - Wrong archetype for test purpose
+// ❌ NEVER - Wrong test type for purpose
 // Pure Function Tests: Should not use database or external dependencies
 test("pure function", async ({ workerDb }) => {
   // Wrong - DB in pure function test
@@ -270,27 +270,27 @@ test("tRPC router", async ({ workerDb }) => {
   const caller = createCaller({ db: workerDb });
 });
 
-// ✅ REQUIRED - Correct archetype patterns
-// Archetype 1: Pure Function - No external dependencies
+// ✅ REQUIRED - Correct patterns by test type
+// Unit: Pure Function - No external dependencies
 test("calculateTotal pure function", () => {
   expect(calculateTotal([1, 2, 3])).toBe(6); // Pure computation only
 });
 
-// Archetype 3: PGlite Integration - Use worker-scoped database
+// Integration: PGlite-backed - Use worker-scoped database
 test("issue creation integration", async ({ workerDb }) => {
   await withIsolatedTest(workerDb, async (db) => {
     // Proper worker-scoped pattern
   });
 });
 
-// Archetype 5: tRPC Router - Use mock contexts
+// Integration: tRPC Router - Use mock contexts
 test("tRPC issue router", () => {
   const mockCtx = createMockContext({ userId: "test-user" });
   const caller = createCaller(mockCtx); // Mock context, not real DB
 });
 ```
 
-**RATIONALE:** Each of the 8 test archetypes has specific patterns that ensure architectural correctness and prevent anti-patterns. Wrong archetype usage breaks quality gates and defeats testing purpose.
+**RATIONALE:** Each test type has specific patterns that ensure architectural correctness and prevent anti-patterns. Wrong test type usage breaks quality gates and defeats testing purpose.
 
 ## snake_case Variables
 

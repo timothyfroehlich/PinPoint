@@ -1,5 +1,5 @@
 /**
- * Service Tests Template (Archetype 3)
+ * Service Tests Template (Integration)
  *
  * Template for testing service layer business logic with:
  * - Business logic validation with mocked dependencies

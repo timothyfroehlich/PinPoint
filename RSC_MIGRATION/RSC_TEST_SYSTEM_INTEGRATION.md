@@ -8,13 +8,13 @@
 
 ---
 
-## RSC Impact on Test Archetype System
+## RSC Impact on Test Types
 
-### Current Archetype System (CLIENT-HEAVY ASSUMPTIONS)
+### Historic Client-Heavy Assumptions
 
 The existing test reboot plan was designed for client-heavy MUI architecture:
 
-- **Archetype 2 (Component Tests)**: Assumed all components are client-side React with RTL
+- **Component Tests**: Assumed all components are client-side React with RTL
 - **Heavy tRPC Router Testing**: Assumed client-server API boundary everywhere
 - **Limited DAL Testing**: Database access through API layer only
 - **No Server-Side Rendering Patterns**: Missing server execution context
@@ -31,9 +31,9 @@ RSC creates **fundamentally different component patterns** requiring new test ap
 
 ---
 
-## New RSC Test Archetypes
+## New RSC Test Types
 
-### **Server Component Tests** (Enhanced Archetype 2a)
+### **Server Component Tests** (Integration)
 
 **Purpose**: Test server-executed view functions with database integration
 
@@ -78,7 +78,7 @@ describe("IssueListServer", () => {
 });
 ```
 
-### **Server Action Tests** (New Archetype)
+### **Server Action Tests** (Integration)
 
 **Purpose**: Test FormData processing, validation, mutations, and revalidation
 
@@ -135,7 +135,7 @@ describe("createIssueAction", () => {
 });
 ```
 
-### **Client Island Tests** (Traditional Archetype 2b)
+### **Client Island Tests** (Integration)
 
 **Purpose**: Test minimal interactive components with RTL (much smaller surface area)
 
@@ -171,7 +171,7 @@ describe("CommentForm (Client Island)", () => {
 });
 ```
 
-### **Hybrid Component Tests** (New Archetype 2c)
+### **Hybrid Component Tests** (Integration)
 
 **Purpose**: Test server shell + client island integration
 
@@ -223,7 +223,7 @@ describe("IssueDetailHybrid", () => {
 });
 ```
 
-### **Enhanced DAL Tests** (Expanded Archetype 4)
+### **Enhanced DAL Tests** (Integration)
 
 **Purpose**: Test direct database functions called by Server Components
 
@@ -385,11 +385,11 @@ export async function expectHydration(
 - ✅ Build DAL patterns and database query functions
 
 **Test Infrastructure Work**:
-- ✅ Create RSC-aware archetype templates targeting final architecture
-- ✅ Build `/create-test` command with RSC archetype analysis
+- ✅ Create RSC-aware templates targeting final architecture (where useful)
+- ✅ Adopt `docs/CORE/TESTING_GUIDE.md` for test types and standards
 - ✅ Set up Server Component rendering helpers
 - ✅ Create Server Action test utilities
-- ✅ Focus: Unit tests (Archetype 1) + DAL tests (Enhanced Archetype 4)
+- ✅ Focus: Unit tests + DAL tests
 
 **Coverage Target**: 5-10% with ultra-low thresholds, focus on foundation functions
 
@@ -405,14 +405,14 @@ export async function expectHydration(
 - ✅ Implement server-side user preferences and organization context
 
 **Test Pattern Development**:
-- ✅ Develop Server Component testing patterns (New Archetype 2a)
-- ✅ Develop Client Island testing patterns (Traditional Archetype 2b)
+- ✅ Develop Server Component testing patterns (Integration)
+- ✅ Develop Client Island testing patterns (Integration)
 - ✅ Build component test templates for both RSC patterns
 - ✅ Create hybrid component test infrastructure
 
 **Coverage Target**: 15-25% with basic Server Component and client island coverage
 
-**Integration Benefits**: Real Server Components and client islands drive archetype refinement
+**Integration Benefits**: Real Server Components and client islands drive pattern refinement
 
 ---
 
@@ -424,8 +424,8 @@ export async function expectHydration(
 - ✅ Create comprehensive issue Server Actions (create, update, delete, comment)
 
 **Advanced Test Patterns**:
-- ✅ Develop Server Action testing patterns (New Archetype)
-- ✅ Develop Hybrid Component testing patterns (New Archetype 2c)
+- ✅ Develop Server Action testing patterns (Integration)
+- ✅ Develop Hybrid Component testing patterns (Integration)
 - ✅ Build comprehensive DAL testing for complex issue queries with joins
 - ✅ Test server/client boundary data flow
 
@@ -479,7 +479,7 @@ export async function expectHydration(
 ### **Efficiency Gains**
 
 1. **No Wasted Testing**: Skip building test infrastructure for obsolete MUI client patterns
-2. **Real Pattern Discovery**: Test archetypes emerge from actual RSC conversion challenges
+2. **Real Pattern Discovery**: Test types emerge from actual RSC conversion challenges
 3. **Single Disruption**: One unified migration instead of two sequential changes
 4. **Architecture Alignment**: Tests built for final RSC architecture from day one
 
@@ -493,7 +493,7 @@ export async function expectHydration(
 ### **Risk Mitigation**
 
 1. **Incremental Validation**: Each RSC conversion phase immediately validated by corresponding tests
-2. **Pattern Confidence**: Test archetypes refined based on real RSC implementation challenges
+2. **Pattern Confidence**: Test types refined based on real RSC implementation challenges
 3. **Coverage Growth**: Test coverage builds alongside RSC functionality, not before or after
 4. **Rollback Safety**: Any RSC pattern issues caught immediately by targeted tests
 

@@ -1,5 +1,5 @@
 /**
- * Server Action Utilities Unit Tests - Archetype 1
+ * Server Action Utilities Unit Tests
  * Pure function testing with no external dependencies
  */
 
@@ -15,7 +15,7 @@ import {
   withActionErrorHandling,
 } from "./shared";
 
-describe("Server Action Utilities (Unit Tests - Archetype 1)", () => {
+describe("Server Action Utilities (Unit Tests)", () => {
   describe("actionSuccess", () => {
     it("creates successful result with data", () => {
       const data = { id: "123", name: "Test" };

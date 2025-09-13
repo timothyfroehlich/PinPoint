@@ -1,6 +1,6 @@
 /**
  * Server Action Test Helpers - RSC Integration
- * New Archetype: Server Action Tests with canonical resolver mocks
+ * Pattern: Server Action Integration tests with canonical resolver mocks
  * Updated to use getRequestAuthContext discriminated union pattern
  */
 

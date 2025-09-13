@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-**Strategic Integration**: Complete test system reboot designed for server-first RSC architecture. Eliminates obsolete client-heavy testing patterns while preserving systematic archetype approach, auto-generated mocks, and comprehensive coverage management from original reboot plan.
+**Strategic Integration**: Complete test system reboot designed for server-first RSC architecture. Eliminates obsolete client-heavy testing patterns while adopting simplified test types, auto-generated mocks, and comprehensive coverage management.
 
 **Core Principle**: Build test patterns for server-first architecture, not legacy client-heavy patterns.
 
@@ -28,9 +28,9 @@
 
 ---
 
-## RSC Test Archetype System
+## RSC Test Types
 
-### **Archetype 1: Unit Tests** (`*.unit.test.ts`)
+### Unit Tests (`*.unit.test.ts`)
 - **Pure functions with no external dependencies**
 - **No database, no mocks, no async**
 - **RSC Focus**: Server Action utilities, validation functions, formatters
@@ -40,7 +40,7 @@
 // Template: unit.template.ts
 import { describe, expect, it } from "vitest";
 
-describe("{{FUNCTION_NAME}} (Unit Tests - Archetype 1)", () => {
+describe("{{FUNCTION_NAME}} (Unit Tests)", () => {
   it("{{TEST_DESCRIPTION}}", () => {
     // Pure function testing with no dependencies
     const result = {{FUNCTION_NAME}}({{INPUT}});
@@ -49,7 +49,7 @@ describe("{{FUNCTION_NAME}} (Unit Tests - Archetype 1)", () => {
 });
 ```
 
-### **Archetype 2: Server Component Tests** (`*.server-component.test.ts`)
+### Server Component Tests (Integration) (`*.server-component.test.ts`)
 - **Server-executed view functions with database integration**
 - **Database state scenarios and query integration**
 - **Organization scoping validation**
@@ -60,7 +60,7 @@ describe("{{FUNCTION_NAME}} (Unit Tests - Archetype 1)", () => {
 import { renderServerComponent, expectServerQueries } from "~/test/rsc-helpers";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
-describe("{{COMPONENT_NAME}} (Server Component Tests - Archetype 2)", () => {
+describe("{{COMPONENT_NAME}} (Server Component Tests - Integration)", () => {
   it("renders with organization-scoped data", async () => {
     const rendered = await renderServerComponent(
       <{{COMPONENT_NAME}} orgId={SEED_TEST_IDS.ORGANIZATIONS.primary} />
@@ -77,7 +77,7 @@ describe("{{COMPONENT_NAME}} (Server Component Tests - Archetype 2)", () => {
 });
 ```
 
-### **Archetype 3: Client Island Tests** (`*.client-island.test.tsx`)
+### Client Island Tests (Integration) (`*.client-island.test.tsx`)
 - **Minimal interactive components with RTL**
 - **Server-passed props validation**
 - **User interaction testing**
@@ -88,7 +88,7 @@ describe("{{COMPONENT_NAME}} (Server Component Tests - Archetype 2)", () => {
 import { render, screen, fireEvent } from "@testing-library/react";
 import { GENERATED_MOCKS } from "~/test/generated/mocks";
 
-describe("{{COMPONENT_NAME}} (Client Island Tests - Archetype 3)", () => {
+describe("{{COMPONENT_NAME}} (Client Island Tests - Integration)", () => {
   it("handles user interaction with server props", async () => {
     const mockOnAction = vi.fn();
     const serverProps = GENERATED_MOCKS.{{ENTITY}};
@@ -101,7 +101,7 @@ describe("{{COMPONENT_NAME}} (Client Island Tests - Archetype 3)", () => {
 });
 ```
 
-### **Archetype 4: Server Action Tests** (`*.server-action.test.ts`)
+### Server Action Tests (Integration) (`*.server-action.test.ts`)
 - **FormData processing, validation, mutations, and revalidation**
 - **Authentication context propagation**
 - **Database mutation verification**
@@ -112,7 +112,7 @@ describe("{{COMPONENT_NAME}} (Client Island Tests - Archetype 3)", () => {
 import { testFormData, expectDatabaseChanges } from "~/test/server-action-helpers";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
-describe("{{ACTION_NAME}} (Server Action Tests - Archetype 4)", () => {
+describe("{{ACTION_NAME}} (Server Action Tests - Integration)", () => {
   it("processes valid FormData with auth context", async () => {
     const formData = testFormData({
       title: "New Issue",
@@ -131,7 +131,7 @@ describe("{{ACTION_NAME}} (Server Action Tests - Archetype 4)", () => {
 });
 ```
 
-### **Archetype 5: Hybrid Component Tests** (`*.hybrid-component.test.tsx`)
+### Hybrid Component Tests (Integration) (`*.hybrid-component.test.tsx`)
 - **Server shell + client island integration**
 - **Server/client boundary data flow**
 - **Hydration state matching**
@@ -142,7 +142,7 @@ describe("{{ACTION_NAME}} (Server Action Tests - Archetype 4)", () => {
 import { renderHybridComponent, expectHydration } from "~/test/hybrid-helpers";
 import { GENERATED_MOCKS } from "~/test/generated/mocks";
 
-describe("{{COMPONENT_NAME}} (Hybrid Component Tests - Archetype 5)", () => {
+describe("{{COMPONENT_NAME}} (Hybrid Component Tests - Integration)", () => {
   it("renders server data with client islands", async () => {
     const serverData = GENERATED_MOCKS.{{ENTITY}};
     
@@ -161,7 +161,7 @@ describe("{{COMPONENT_NAME}} (Hybrid Component Tests - Archetype 5)", () => {
 });
 ```
 
-### **Archetype 6: DAL Integration Tests** (`*.dal.test.ts`)
+### DAL Integration Tests (`*.dal.test.ts`)
 - **Direct database functions called by Server Components**
 - **Worker-scoped PGlite with real database operations**
 - **Multi-tenant boundary enforcement**
@@ -172,7 +172,7 @@ describe("{{COMPONENT_NAME}} (Hybrid Component Tests - Archetype 5)", () => {
 import { workerDb } from "~/test/worker-db";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
-describe("{{DAL_FUNCTION}} (DAL Integration Tests - Archetype 6)", () => {
+describe("{{DAL_FUNCTION}} (DAL Integration Tests)", () => {
   it("fetches organization-scoped data with optimized queries", async () => {
     const result = await {{DAL_FUNCTION}}(SEED_TEST_IDS.ORGANIZATIONS.primary);
     
@@ -187,7 +187,7 @@ describe("{{DAL_FUNCTION}} (DAL Integration Tests - Archetype 6)", () => {
 });
 ```
 
-### **Archetype 7: E2E Tests** (`*.e2e.test.ts`)
+### E2E Tests (`*.e2e.test.ts`)
 - **Playwright browser automation**
 - **Full RSC application workflow testing**
 - **Progressive enhancement validation**
@@ -197,7 +197,7 @@ describe("{{DAL_FUNCTION}} (DAL Integration Tests - Archetype 6)", () => {
 // Template: e2e.template.ts
 import { test, expect } from "@playwright/test";
 
-test("{{WORKFLOW_NAME}} (E2E Tests - Archetype 7)", async ({ page }) => {
+test("{{WORKFLOW_NAME}} (E2E Tests)", async ({ page }) => {
   await page.goto("/{{ROUTE}}");
   
   // Server Component rendered content
@@ -213,7 +213,7 @@ test("{{WORKFLOW_NAME}} (E2E Tests - Archetype 7)", async ({ page }) => {
 });
 ```
 
-### **Archetype 8: RLS Tests** (`*.rls.test.sql`)
+### RLS Tests (`*.rls.test.sql`)
 - **pgTAP tests for Row-Level Security policies**
 - **Multi-tenant security boundary validation**
 - **Server Component security context testing**
@@ -246,7 +246,7 @@ SELECT finish();
 ROLLBACK;
 ```
 
-### **Archetype 9: Schema Tests** (`*.schema.test.sql`)
+### Schema Tests (`*.schema.test.sql`)
 - **pgTAP tests for database constraints**
 - **Foreign keys, unique constraints, triggers**
 - **Data integrity validation**
@@ -504,36 +504,38 @@ export async function clearTables() {
 
 ---
 
-## /create-test Slash Command (Enhanced from Original Plan)
+## Test Creation Flow (Historic)
 
-### Command Flow with RSC Archetype Analysis
+Note: This section reflects a previous archetype-oriented approach and is retained for historical context. For current standards, see `docs/CORE/TESTING_GUIDE.md`.
+
+### Historic Flow (for reference)
 
 1. **File Analysis**: Analyze source file to determine RSC patterns
-2. **Archetype Suggestion**: Suggest appropriate archetype based on file type:
-   - Server Components → Archetype 2
-   - Client Components → Archetype 3  
-   - Server Actions → Archetype 4
-   - Hybrid Components → Archetype 5
-   - DAL functions → Archetype 6
-   - Pure functions → Archetype 1
+2. **Test Type Suggestion**: Suggest appropriate test type based on file:
+   - Server Components → Integration (Server Component)
+   - Client Components → Integration (Client Island)  
+   - Server Actions → Integration (Server Action)
+   - Hybrid Components → Integration (Hybrid)
+   - DAL functions → Integration (DAL)
+   - Pure functions → Unit
 3. **Template Selection**: Copy appropriate RSC-aware template
 4. **Customization**: Auto-fill imports and basic structure
 5. **Validation**: Run template test to verify setup
-6. **Save**: Create test file with correct archetype naming
+6. **Save**: Create test file with correct naming
 
 ### Template System Structure
 
 ```
 src/test/templates/
-├── unit.template.ts                    # Archetype 1
-├── server-component.template.ts        # Archetype 2 (RSC-specific)
-├── client-island.template.tsx          # Archetype 3 (RSC-specific)
-├── server-action.template.ts           # Archetype 4 (RSC-specific)
-├── hybrid-component.template.tsx       # Archetype 5 (RSC-specific)
-├── dal.template.ts                     # Archetype 6 (Enhanced)
-├── e2e.template.ts                     # Archetype 7
-├── rls.template.sql                    # Archetype 8
-└── schema.template.sql                 # Archetype 9
+├── unit.template.ts
+├── server-component.template.ts
+├── client-island.template.tsx
+├── server-action.template.ts
+├── hybrid-component.template.tsx
+├── dal.template.ts
+├── e2e.template.ts
+├── rls.template.sql
+└── schema.template.sql
 ```
 
 ---
@@ -547,41 +549,41 @@ src/
 ├── app/
 │   ├── issues/
 │   │   ├── page.tsx                           # Server Component
-│   │   ├── page.server-component.test.ts      # Archetype 2
+│   │   ├── page.server-component.test.ts
 │   │   └── components/
 │   │       ├── IssueFormClient.tsx           # Client Island
-│   │       └── IssueFormClient.client-island.test.tsx # Archetype 3
+│   │       └── IssueFormClient.client-island.test.tsx
 ├── lib/
 │   ├── actions/
 │   │   ├── issue-actions.ts                  # Server Actions
-│   │   ├── issue-actions.server-action.test.ts # Archetype 4
-│   │   └── shared.unit.test.ts               # Archetype 1
+│   │   ├── issue-actions.server-action.test.ts
+│   │   └── shared.unit.test.ts
 │   └── dal/
 │       ├── issues.ts                         # DAL functions
-│       └── issues.dal.test.ts                # Archetype 6
+│       └── issues.dal.test.ts
 └── components/
     ├── hybrid/
     │   ├── IssueDetailHybrid.tsx             # Hybrid Component
-    │   └── IssueDetailHybrid.hybrid-component.test.tsx # Archetype 5
+    │   └── IssueDetailHybrid.hybrid-component.test.tsx
 
 e2e/
-└── issue-workflow.e2e.test.ts               # Archetype 7
+└── issue-workflow.e2e.test.ts
 
 supabase/tests/
 ├── rls/
-│   └── issues.rls.test.sql                  # Archetype 8
+│   └── issues.rls.test.sql
 └── schema/
-    └── issues.schema.test.sql               # Archetype 9
+    └── issues.schema.test.sql
 ```
 
 ---
 
 ## Coverage Management Strategy (Enhanced from Original Plan)
 
-### Archetype-Based Coverage Tracking
+### Coverage Tracking by Test Type
 
 ```yaml
-# .codecov.yml with RSC archetype flags
+# .codecov.yml with test type flags
 flags:
   unit-tests:
     paths: ["src/**/*.unit.test.ts"]
@@ -606,27 +608,27 @@ flags:
 ### Weekly Coverage Targets (RSC-Adapted)
 
 **Week 1: Foundation (5-10%)**
-- Unit Tests (Archetype 1): Server Action utilities, validation
+- Unit Tests: Server Action utilities, validation
 - Coverage: Ultra-low thresholds for reboot
 
 **Week 2: Server Components + DAL (15-25%)**
-- Server Component Tests (Archetype 2): Direct DB access patterns  
-- DAL Integration Tests (Archetype 6): Enhanced due to Server Component usage
+- Server Component Tests: Direct DB access patterns  
+- DAL Integration Tests: Enhanced due to Server Component usage
 - Coverage: Focus on server-side patterns
 
 **Week 3: Actions + Interactions (30-45%)**
-- Server Action Tests (Archetype 4): FormData processing, mutations
-- Client Island Tests (Archetype 3): Minimal interactivity
+- Server Action Tests: FormData processing, mutations
+- Client Island Tests: Minimal interactivity
 - Coverage: Form handling and interactions
 
 **Week 4: Advanced Patterns (45-65%)**
-- Hybrid Component Tests (Archetype 5): Server/client boundaries
+- Hybrid Component Tests: Server/client boundaries
 - Enhanced DAL performance testing
 - Coverage: Complex integration patterns
 
 **Week 5+: Production Readiness (60%+)**
-- E2E Tests (Archetype 7): Full RSC workflows
-- Security testing (Archetypes 8 & 9): RLS and schema
+- E2E Tests: Full RSC workflows
+- Security testing: RLS and schema
 - Coverage: Production-ready comprehensive testing
 
 ---
@@ -634,10 +636,8 @@ flags:
 ## RSC Test Non-Negotiables
 
 ### Test Creation Policy
-- **🚨 MANDATORY: Any agent creating new tests MUST request the user to run the `/create-test` command**
-- **WHY**: Manual test creation bypasses archetype compliance validation, template-based consistency, proper file naming conventions, and mock system integration
-- **AGENT WORKFLOW**: When test creation is needed, respond: "I need to create a [archetype type] test for [module]. Please run `/create-test` to ensure archetype compliance."
-- **NO EXCEPTIONS**: This policy ensures 100% archetype adherence and prevents testing anti-patterns
+- **Follow `docs/CORE/TESTING_GUIDE.md`** for test type selection, naming, placement, and use of templates/helpers.
+- **Avoid deprecated archetype-era workflows**; standards are enforced via code review and CI.
 
 ### Server Component Testing
 - **NO direct unit testing of async Server Components** - Use integration or E2E
@@ -670,14 +670,14 @@ flags:
 - ✅ Auto-generated mock system from seed data
 - ✅ RSC-specific test helpers (server-component-renderer, server-action-helpers)
 - ✅ Worker-scoped PGlite infrastructure  
-- ✅ Template system for all 9 archetypes
-- ✅ /create-test command with RSC archetype analysis
+- ✅ Templates available where useful
+- ✅ Standards adopted per `docs/CORE/TESTING_GUIDE.md`
 
 ### Phase 2: Server-First Testing (Week 2)  
 - ✅ Server Component tests with database integration
 - ✅ DAL integration tests with performance monitoring
 - ✅ Unit tests for Server Action utilities
-- ✅ Coverage infrastructure with archetype tracking
+- ✅ Coverage infrastructure with test type tracking
 
 ### Phase 3: Action & Interaction Testing (Week 3)
 - ✅ Server Action tests with FormData processing
@@ -709,12 +709,12 @@ flags:
 
 ### Test System Quality
 - **Zero test flakiness** - Predictable SEED_TEST_IDS
-- **Archetype compliance** - All tests created via /create-test command
+- **Standards compliance** - All tests follow `docs/CORE/TESTING_GUIDE.md`
 - **Performance benchmarks** - Database queries optimized and monitored
 - **Security validation** - Organization scoping in all data access
 
 ### Coverage Excellence
-- **Balanced archetype coverage** - No single archetype dominance
+- **Balanced coverage across test types** - No single type dominance
 - **Quality over quantity** - Focused on critical paths and security boundaries
 - **RSC pattern coverage** - Server Components, Server Actions, client islands
 - **Production confidence** - Comprehensive E2E and security testing
@@ -722,7 +722,7 @@ flags:
 ---
 
 **Status**: COMPREHENSIVE PLAN - Ready for systematic implementation
-**Integration**: Merges TEST_SYSTEM_REBOOT_PLAN.md + RSC_TEST_SYSTEM_INTEGRATION.md  
+**Integration**: Historic merge reference (TEST_SYSTEM_REBOOT_PLAN.md + RSC_TEST_SYSTEM_INTEGRATION.md). For current guidance see `docs/CORE/TESTING_GUIDE.md`.
 **Adapted for**: Server-first RSC architecture with minimal client-side patterns
 **Author**: RSC Test System Comprehensive Initiative
 **Date**: 2025-08-26

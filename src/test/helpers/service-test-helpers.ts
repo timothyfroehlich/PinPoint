@@ -1,5 +1,5 @@
 /**
- * Service Test Helpers - Archetype 3 Infrastructure
+ * Service Test Helpers - Integration Infrastructure
  *
  * Provides utilities for testing service layer business logic with:
  * - TypeScript-safe mocking patterns
