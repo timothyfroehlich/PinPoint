@@ -29,6 +29,7 @@ export function resolveOrgSubdomainFromHost(host: string): string | null {
   // 1) Explicit alias mapping (highest priority)
   const normalizedHost = hostWithoutPort.toLowerCase();
   if (Object.prototype.hasOwnProperty.call(ORG_ALIAS_HOSTS, normalizedHost)) {
+    // eslint-disable-next-line security/detect-object-injection -- Safe: normalizedHost is validated against controlled ORG_ALIAS_HOSTS keys
     return ORG_ALIAS_HOSTS[normalizedHost] ?? null;
   }
 
