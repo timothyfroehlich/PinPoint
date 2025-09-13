@@ -1,6 +1,7 @@
 import { organizationProcedure } from "./trpc.base";
 
 import type { PinPointSupabaseUser } from "~/lib/types";
+import { METADATA_KEYS } from "~/lib/constants/entity-ui";
 
 // Legacy session type for backward compatibility
 type Session = {
@@ -42,7 +43,8 @@ function supabaseUserToSession(
       image: userMetadata["avatar_url"] as string | undefined,
       // Use organizationId from RLS context (preferred) or fallback to app_metadata
       organizationId:
-        organizationId ?? (appMetadata["organizationId"] as string | undefined),
+        organizationId ??
+        (appMetadata[METADATA_KEYS.ORGANIZATION_ID] as string | undefined),
     },
     expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
   };

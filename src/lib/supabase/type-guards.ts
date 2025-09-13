@@ -18,6 +18,7 @@ import type {
 
 import type { PinPointSupabaseUser, AuthErrorType } from "./types";
 import type { SupabaseValidationResult } from "~/lib/types/supabase-validation";
+import { METADATA_KEYS } from "~/lib/constants/entity-ui";
 
 // ============================================================================
 // Core Supabase Type Guards
@@ -248,7 +249,7 @@ export function hasValidPinPointMetadata(
 ): user is PinPointSupabaseUser {
   return (
     typeof user.app_metadata === "object" &&
-    typeof user.app_metadata["organization_id"] === "string"
+    typeof user.app_metadata[METADATA_KEYS.ORGANIZATION_ID] === "string"
   );
 }
 
@@ -257,7 +258,7 @@ export function hasValidPinPointMetadata(
  */
 export function extractOrganizationId(user: User): string | null {
   if (!hasValidPinPointMetadata(user)) return null;
-  const orgId = user.app_metadata["organization_id"] as unknown;
+  const orgId = user.app_metadata[METADATA_KEYS.ORGANIZATION_ID] as unknown;
   return typeof orgId === "string" ? orgId : null;
 }
 
@@ -266,7 +267,7 @@ export function extractOrganizationId(user: User): string | null {
  */
 export function extractUserRole(user: User): string | null {
   if (!hasValidPinPointMetadata(user)) return null;
-  const role = user.app_metadata["role"] as unknown;
+  const role = user.app_metadata[METADATA_KEYS.ROLE] as unknown;
   return typeof role === "string" ? role : null;
 }
 

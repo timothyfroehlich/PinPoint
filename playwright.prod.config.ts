@@ -23,6 +23,10 @@ export default defineConfig({
   projects: [
     {
       name: "prod-generic",
+      testMatch: [
+        "**/generic-host-behavior.e2e.test.ts",
+        "**/pre-beta-user-testing-auth.e2e.test.ts",
+      ],
       use: {
         ...devices["Desktop Chrome"],
         baseURL: GENERIC_URL,
@@ -33,6 +37,7 @@ export default defineConfig({
     },
     {
       name: "prod-apc-alias",
+      testMatch: ["**/apc-alias-host-behavior.e2e.test.ts"],
       use: {
         ...devices["Desktop Chrome"],
         baseURL: APC_URL,

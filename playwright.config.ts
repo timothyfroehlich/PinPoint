@@ -13,7 +13,9 @@ import { defineConfig, devices } from "@playwright/test";
 //   (those calls will use an absolute URL in the test itself; relative paths
 //   still resolve against http://localhost:3000)
 
-const PORT = process.env.PORT ?? "3000"; // single source of truth for port
+// Allow override via PLAYWRIGHT_PORT, fallback to PORT, then 3000
+// This helps when dev server is running on a different port due to conflicts
+const PORT = process.env.PLAYWRIGHT_PORT ?? process.env.PORT ?? "3000"; // single source of truth for port
 const BASE_URL = `http://localhost:${PORT}`; // fixed per requirement
 
 // Always auto-start server for reliable, self-contained tests
