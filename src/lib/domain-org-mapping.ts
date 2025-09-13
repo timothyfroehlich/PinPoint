@@ -27,8 +27,10 @@ export function resolveOrgSubdomainFromHost(host: string): string | null {
   if (!hostWithoutPort) return null;
 
   // 1) Explicit alias mapping (highest priority)
-  const alias = ORG_ALIAS_HOSTS[hostWithoutPort.toLowerCase()];
-  if (alias) return alias;
+  const normalizedHost = hostWithoutPort.toLowerCase();
+  if (Object.prototype.hasOwnProperty.call(ORG_ALIAS_HOSTS, normalizedHost)) {
+    return ORG_ALIAS_HOSTS[normalizedHost] ?? null;
+  }
 
   // 2) Localhost subdomain format: org.localhost[:port] (case-insensitive)
   const parts = hostWithoutPort.split(".");

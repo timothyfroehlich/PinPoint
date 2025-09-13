@@ -16,6 +16,7 @@ import { extractTrustedSubdomain } from "~/lib/subdomain-verification";
 import { resolveOrgSubdomainFromHost } from "~/lib/domain-org-mapping";
 import { getOrganizationBySubdomain } from "~/lib/dal/public-organizations";
 import { getUserMembershipPublic } from "~/lib/dal/public-organizations";
+import { METADATA_KEYS } from "~/lib/constants/entity-ui";
 
 /**
  * Base user type (identity layer)
@@ -88,7 +89,9 @@ export const getRequestAuthContext = cache(async (): Promise<AuthContext> => {
     const host = headersList.get("host") ?? "";
     const subdomain =
       extractTrustedSubdomain(headersList) ?? resolveOrgSubdomainFromHost(host);
-    const metadataOrgId = user.app_metadata["organizationId"] as string;
+    const metadataOrgId = user.app_metadata[
+      METADATA_KEYS.ORGANIZATION_ID
+    ] as string;
 
     let orgId: string;
     if (subdomain && subdomain !== "www" && subdomain !== "api") {

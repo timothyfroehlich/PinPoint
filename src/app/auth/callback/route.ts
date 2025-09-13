@@ -9,6 +9,7 @@ import {
   getUserMembershipPublic,
 } from "~/lib/dal/public-organizations";
 import { getInMemoryRateLimiter } from "~/lib/rate-limit/inMemory";
+import { METADATA_KEYS } from "~/lib/constants/entity-ui";
 import { env } from "~/env";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -86,7 +87,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             );
             // Don't update metadata for unauthorized organization - skip metadata update
           } else {
-            const current = user.app_metadata["organizationId"] as unknown;
+            const current = user.app_metadata[
+              METADATA_KEYS.ORGANIZATION_ID
+            ] as unknown;
             if (current !== resolvedOrgId) {
               await updateUserOrganization(user.id, resolvedOrgId);
             }
