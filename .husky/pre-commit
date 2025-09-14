@@ -9,7 +9,7 @@ if [ "$branch" = "main" ]; then
   exit 0
 fi
 
-echo "🔧 Running pre-commit checks in parallel..."
+echo "🔒 Running pre-commit security checks..."
 
 # Check for NEW migration files (allow initial base migration only)
 if [ -d "supabase/migrations" ]; then
@@ -23,6 +23,11 @@ if [ -d "supabase/migrations" ]; then
     exit 1
   fi
 fi
-echo "✅ Using base migration for Supabase seeding, no new migrations found"
 
-npm run pre-commit:all
+# Run security checks only (secrets, files, auth patterns)
+npm run security:check
+
+# Run database validation only if schema changed
+./scripts/check-db-schema.sh
+
+echo "✅ Pre-commit security checks passed!"

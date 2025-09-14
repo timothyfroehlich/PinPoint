@@ -1,32 +1,13 @@
 #!/bin/sh
-echo "🔍 Running pre-push validation checks..."
+echo "🔍 Running pre-push quality checks..."
 
-# Run type check
-echo "📝 Type checking..."
-npm run typecheck:brief
+# Run all quality checks in parallel (typecheck, lint, format, audit, test)
+npm run validate
+
 if [ $? -ne 0 ]; then
-  echo "❌ TypeScript errors found. Fix them before pushing."
+  echo "❌ Quality checks failed. Fix issues before pushing."
   echo "💡 If intentionally pushing incomplete work, you may use --no-verify"
   exit 1
 fi
 
-# Run linting
-echo "🧹 Linting..."
-npm run lint:brief
-if [ $? -ne 0 ]; then
-  echo "❌ Linting errors found. Fix them before pushing."
-  echo "💡 If intentionally pushing incomplete work, you may use --no-verify"
-  exit 1
-fi
-
-# Run formatting check
-echo "✨ Checking formatting..."
-npm run format:brief
-if [ $? -ne 0 ]; then
-  echo "❌ Formatting errors found. Run 'npm run format:write' to fix."
-  echo "💡 If intentionally pushing incomplete work, you may use --no-verify"
-  exit 1
-fi
-
-echo "✅ All pre-push checks passed!"
-echo "💡 If intentionally pushing incomplete work, you may use --no-verify"
+echo "✅ All pre-push quality checks passed!"
