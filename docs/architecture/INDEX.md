@@ -12,7 +12,7 @@
 
 - **RSC Migration**: Server-first architecture with shadcn/ui
 - **Multi-tenant**: Organization-scoped queries with RLS policies
-- **Testing**: Archetype system reboot
+- **Testing**: Simplified test types (Unit, Integration, E2E, RLS, Schema)
 
 ## Contents
 

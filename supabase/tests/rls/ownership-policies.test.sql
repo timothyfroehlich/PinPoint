@@ -1,6 +1,6 @@
 -- §§7–9 Ownership & Permission Enforcement
 -- Validates ownership-based allowances, denial paths for missing permissions, and anonymous immutability
--- Tests ownership and permission scenarios specified in docs/security/rls-assertions.md
+-- Tests ownership and permission scenarios specified in docs/CORE/DATABASE_SECURITY_SPEC.md
 -- Expectations follow the spec; failing tests indicate policy gaps to fix.
 
 \i ../constants.sql

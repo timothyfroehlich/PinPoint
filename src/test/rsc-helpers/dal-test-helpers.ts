@@ -1,6 +1,6 @@
 /**
  * DAL Test Helpers - RSC Integration
- * Enhanced Archetype 4: Repository/DAL Tests with canonical resolver mocks
+ * Integration (DAL): Repository/DAL tests with canonical resolver mocks
  * Updated to use getRequestAuthContext discriminated union pattern
  */
 

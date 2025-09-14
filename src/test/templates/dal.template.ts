@@ -1,12 +1,12 @@
 /**
- * {{MODULE_NAME}} DAL Tests - Archetype 2 (Enhanced)
+ * {{MODULE_NAME}} Integration Tests (DAL)
  * Service business logic testing with mocked auth context and database
  * 
- * ARCHETYPE BOUNDARIES:
+ * SCOPE BOUNDARIES:
  * - Test business logic functions that coordinate data access and processing
  * - Mock authentication context and external dependencies
  * - Focus on organization scoping and permission enforcement
- * - NO direct database operations (those belong in Repository archetype)
+ * - NO direct database policy testing (use RLS/Schema SQL tests)
  * 
  * WHAT BELONGS HERE:
  * - Service layer functions that call multiple data sources
@@ -15,10 +15,9 @@
  * - Cache behavior testing and invalidation patterns
  * 
  * WHAT DOESN'T BELONG:
- * - Pure functions without dependencies (use Unit archetype)
- * - Direct database queries (use Repository archetype for integration testing)
- * - React components (use Client Island or Server Component archetypes)
- * - Full API request/response cycles (use API Integration archetype)
+ * - Pure functions without dependencies (use Unit tests)
+ * - React components (validate via Integration/E2E tests)
+ * - Full API/browser workflows (use E2E tests)
  * 
  * MOCKING STRATEGY:
  * - Mock external API calls, database connections, and file system access
@@ -92,7 +91,7 @@ vi.mock("~/lib/dal/shared", async () => {
 const mockRequireAuthContext = vi.mocked(dalShared.requireAuthContext);
 const mockDb = vi.mocked(dalShared.db);
 
-describe("{{MODULE_NAME}} DAL (Business Logic Tests - Archetype 2)", () => {
+describe("{{MODULE_NAME}} (Integration Tests - DAL)", () => {
   // Test context setup with seed data
   const mockAuthContext = {
     user: { 

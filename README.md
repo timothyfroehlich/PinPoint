@@ -50,14 +50,14 @@ Technology stack:
 - Next: Data Access Layer (DAL) implementation
 - Approach: Complete rewrite from client-heavy MUI to server-first RSC
 
-**Test System Reboot:**
-- Status: Archive complete, ready for implementation
-- Next: 9 archetype-based test system with auto-generated mocks
-- Approach: Complete testing infrastructure rebuild
+**Test System:**
+- Status: Archive complete, standards consolidated
+- Next: Expand coverage across Unit, Integration, E2E, RLS, Schema
+- Approach: Follow CORE testing guide; use templates/helpers where useful
 
 **Project Context:** Pre-beta phase, solo development, high risk tolerance for breaking changes
 
-For detailed evolution plans, see [`RSC_MIGRATION/`](./RSC_MIGRATION/) and [`docs/testing/TEST_SYSTEM_REBOOT_PLAN.md`](./docs/testing/TEST_SYSTEM_REBOOT_PLAN.md).
+For detailed evolution plans, see [`RSC_MIGRATION/`](./RSC_MIGRATION/) and the CORE testing guide [`docs/CORE/TESTING_GUIDE.md`](./docs/CORE/TESTING_GUIDE.md).
 
 ### 🚨 Development User Reset Warning
 
@@ -190,4 +190,3 @@ PinPoint is designed to evolve. Key features planned for future releases include
 - **Parts & Inventory Tracking (v2.0):** A comprehensive module to manage spare parts and supplies. This will allow organizations to track stock levels, associate part consumption with specific repairs, and analyze the true maintenance cost of each game.
 
 This roadmap ensures that PinPoint will grow from a powerful issue tracker into a complete operational management tool for any arcade or collective.
-

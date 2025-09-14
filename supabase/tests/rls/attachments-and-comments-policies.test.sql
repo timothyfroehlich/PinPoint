@@ -1,6 +1,6 @@
 -- §§8–9 Attachments & Comment Moderation / Deletion
 -- Add attachment permission gating tests and full comment mutation matrix
--- Tests attachment and comment scenarios specified in docs/security/rls-assertions.md
+-- Tests attachment and comment scenarios specified in docs/CORE/DATABASE_SECURITY_SPEC.md
 -- Expectations follow the spec; failing tests indicate missing attachment policies or gaps.
 
 \i ../constants.sql

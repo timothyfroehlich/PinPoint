@@ -172,12 +172,12 @@
 
 ## Testing
 
-**CORE-TEST-001:** Use correct archetypes
+**CORE-TEST-001:** Use correct test types
 - **Severity:** Required (CORE‑TEST‑001)
 - **Why:** Ensures reliable, fast tests.
-- **Do:** Pure functions → unit; DB → workerDb; tRPC → mocks; E2E for full flows.
+- **Do:** Choose among Unit, Integration, E2E, RLS, Schema per `docs/CORE/TESTING_GUIDE.md`. Pure functions → unit; DB-backed integration uses worker-scoped DB; tRPC/server actions → integration; E2E for full flows.
 - **Don’t:** Spin per‑test PGlite; mix RLS tracks.
-- **Reference:** `src/test/**`, `e2e/**`, `supabase/tests/**`
+- **Reference:** `docs/CORE/TESTING_GUIDE.md`, `src/test/**`, `e2e/**`, `supabase/tests/**`
 
 **CORE-TEST-002:** Server components via E2E
 - **Severity:** Required (CORE‑TEST‑002)
@@ -186,12 +186,12 @@
 - **Don’t:** Unit test async Server Components directly.
 - **Reference:** Playwright config
 
-**CORE-TEST-003:** Non‑manual test creation
+**CORE-TEST-003:** Follow CORE Testing Guide
 - **Severity:** Required (CORE‑TEST‑003)
 - **Why:** Keeps structure consistent.
-- **Do:** Use the `/create-test` workflow.
-- **Don’t:** Add ad‑hoc test files.
-- **Reference:** Testing docs
+- **Do:** Follow `docs/CORE/TESTING_GUIDE.md` for type selection, naming, placement, and templates/helpers.
+- **Don’t:** Bypass seed constants, introduce per‑test DBs, or mix RLS and app tests.
+- **Reference:** `docs/CORE/TESTING_GUIDE.md`
 
 ---
 
@@ -239,7 +239,7 @@
   - CORE‑SSR‑004: Don't modify Supabase response
   - CORE‑SEC‑001..003: Org scoping, API protection, RLS track separation
   - CORE‑PERF‑001..002: cache(), fetch caching
-  - CORE‑TEST‑001..003: Archetypes, server components, non‑manual tests
+- CORE‑TEST‑001..003: Test types, server components, follow CORE Testing Guide
 
 - **Changelog:**
   - 2025‑09‑05: **Authentication cleanup success**: Eliminated ~500 lines of over-engineered infrastructure. Reduced ESLint errors from 87 to 41 (53% improvement) through parallel agent strategy. Added enterprise infrastructure anti-patterns. Confirmed authentication system was already well-architected with canonical `getRequestAuthContext()` resolver.

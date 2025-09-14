@@ -1,6 +1,6 @@
 -- §§5,9,10 Structural Guards, Soft Delete Visibility & Superadmin Bypass
 -- Cover structural deletion rules, soft-deleted visibility, intra-org movement success path, intake immutability, and superadmin bypass breadth
--- Tests structural and soft delete scenarios specified in docs/security/rls-assertions.md
+-- Tests structural and soft delete scenarios specified in docs/CORE/DATABASE_SECURITY_SPEC.md
 
 \i ../constants.sql
 

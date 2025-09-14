@@ -66,21 +66,15 @@
 
 - **Archive complete**: ~130 files removed, clean foundation established
 - **Current tests**: pgTAP RLS + smoke tests + 1 baseline unit test
-- **Ready for**: Systematic archetype implementation
+- **Ready for**: Expanded coverage using standardized test types
 - **Quality expectation**: All tests and lints must pass before commits
 
-### Test Archetype System
+### Testing Guidelines
 
-**9 Archetypes**: Unit, Component, Service, Repository, Router, API Integration, E2E, RLS, Schema
-**Mock System**: Auto-generated from seed data for consistency
-**Templates**: Pre-built for each archetype
-**Worker-scoped DB**: PGlite pattern for integration tests
-
-### Test Creation Policy
-
-**MANDATORY**: All new tests created via `/create-test` command
-**No exceptions**: Manual test creation bypasses archetype compliance
-**Agent response**: "I need to create a [type] test. Please run `/create-test` to ensure archetype compliance."
+- Authority: `docs/CORE/TESTING_GUIDE.md` (full) and `docs/CORE/TESTING_QUICK_REFERENCE.md` (compact).
+- Test Types: Unit, Integration, E2E, RLS, Schema.
+- Templates/Helpers: See `src/test/templates` and `src/test/helpers`.
+- Worker-scoped DB: Required pattern for DB-backed integration tests.
 
 ### Development Notes
 
@@ -116,7 +110,7 @@
 **Testing**: `npm test`, `npm run test:watch`, `npm run test:rls`, `npm run smoke`
 **Development**: `npm run dev`, `npm run build`, `npm run lint`, `npm run type-check`
 **Components**: `npx shadcn@latest add [component]`
-**Test Creation**: `/create-test` (slash command)
+**Docs**: `docs/CORE/TESTING_GUIDE.md`, `docs/CORE/TESTING_QUICK_REFERENCE.md`
 
 ### Seed Data Pattern
 
@@ -177,10 +171,18 @@
 
 **CRITICAL**: Any document in `docs/CORE/` that hasn't been reviewed within 5 days must be verified for consistency with the current codebase state before use.
 
+### Feature Specs (docs/feature_specs)
+
+- Location: `docs/feature_specs/` contains a living spec for each feature.
+- Required sections, in order: Feature overview (~1 page), Last reviewed/updated (ISO dates), Key source files, Detailed feature spec, Security/RLS spec, Test spec (unit/integration/E2E with acceptance criteria), Associated test files.
+- Policy: When a PR changes feature behavior, update the corresponding spec and bump the dates. Reviewers should block behavior changes without spec updates.
+- Testing: Follow `docs/CORE/TESTING_GUIDE.md` for test type selection, naming, and placement. Use templates/helpers and list files under “Associated test files”. Follow the testing pyramid described in NON_NEGOTIABLES.
+- Authoring guide: See `docs/feature_specs/AGENTS.md` for format and expectations.
+
 ### Current Priorities
 
 - **RSC Migration**: Phase 1A → Phase 1B (DAL implementation)
-- **Test System**: Ready for archetype implementation
+- **Test System**: Ready for standardized test types rollout
 - **Development**: Server-first with shadcn/ui for new features
 
 ### Documentation Philosophy

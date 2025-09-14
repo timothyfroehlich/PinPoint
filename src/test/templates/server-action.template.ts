@@ -1,12 +1,12 @@
 /**
- * {{MODULE_NAME}} Server Actions Tests - Archetype 4
+ * {{MODULE_NAME}} Server Actions Tests (Integration)
  * Server Action testing focusing on FormData validation, authentication boundaries, and progressive enhancement
  * 
- * ARCHETYPE BOUNDARIES:
+ * SCOPE BOUNDARIES:
  * - Test Next.js Server Actions that process FormData and handle redirects
  * - Focus on form validation, authentication checks, and error handling
  * - Mock Supabase auth and database operations for isolated testing
- * - NO React component rendering (those belong in other archetypes)
+ * - NO React component rendering (validate UI via Integration/E2E tests)
  * 
  * WHAT BELONGS HERE:
  * - Server Action functions that process form submissions
@@ -15,10 +15,10 @@
  * - Redirect behavior and revalidation path testing
  * 
  * WHAT DOESN'T BELONG:
- * - Pure validation functions (use Unit archetype)
- * - Database integration logic (use Repository archetype)
- * - React form components (use Client Island archetype)
- * - Full page rendering workflows (use E2E archetype)
+ * - Pure validation functions (use Unit tests)
+ * - Database policy or constraints (use RLS/Schema tests)
+ * - React form components (use Integration/E2E tests)
+ * - Full page workflows (use E2E tests)
  * 
  * TESTING APPROACH:
  * - Mock createClient from Supabase to control auth state
@@ -74,7 +74,7 @@ vi.mock("~/lib/actions/shared", async () => {
 const { requireAuthContextWithRole } = await import("~/lib/actions/shared");
 const mockGetActionAuthContext = vi.mocked(requireAuthContextWithRole);
 
-describe("{{MODULE_NAME}} Server Actions (Server Action Tests - Archetype 4)", () => {
+describe("{{MODULE_NAME}} Server Actions (Integration)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

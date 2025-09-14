@@ -1,5 +1,5 @@
 /**
- * Issue Server Actions Tests - Archetype 5
+ * Issue Server Actions Tests (Integration)
  * Server Action testing focusing on FormData validation and boundary conditions
  */
 
@@ -16,7 +16,7 @@ vi.mock("~/server/auth/context", () => ({
 const { getRequestAuthContext } = await import("~/server/auth/context");
 const mockGetRequestAuthContext = vi.mocked(getRequestAuthContext);
 
-describe("Issue Server Actions (Server Action Tests - Archetype 5)", () => {
+describe("Issue Server Actions (Integration)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Set up default authorized state using canonical discriminated union

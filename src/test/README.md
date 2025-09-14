@@ -17,9 +17,9 @@ src/test/
 └── README.md                  # This documentation
 ```
 
-## Testing Archetypes
+## Test Types
 
-PinPoint uses a structured approach to testing with different archetypes for different scenarios:
+PinPoint uses a structured approach with clear test types for different scenarios:
 
 ### 1. Service Layer Testing
 

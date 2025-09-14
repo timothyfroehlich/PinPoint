@@ -3,10 +3,10 @@
  * Integrated RSC + Test System Infrastructure
  */
 
-// DAL testing (Enhanced Archetype 4)
+// DAL testing (Integration helpers)
 export * from "./dal-test-helpers";
 
-// Server Action testing (New Archetype)
+// Server Action testing (Integration helpers)
 export * from "./server-action-test-helpers";
 
 // Re-export for convenience

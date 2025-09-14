@@ -42,7 +42,6 @@
     "src/test/**/*.ts"
   ],
   "exclude": [
-    "src/test/archived-templates/**/*",
     "src/test/templates/**/*",
     "src/**/*.template.ts"
   ]

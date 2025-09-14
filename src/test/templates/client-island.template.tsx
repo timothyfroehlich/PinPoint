@@ -1,12 +1,12 @@
 /**
- * {{COMPONENT_NAME}} Client Island Tests - Archetype 3
+ * {{COMPONENT_NAME}} Client Island Tests (Integration)
  * Minimal interactive components with server-passed props
  * 
- * ARCHETYPE BOUNDARIES:
+ * SCOPE BOUNDARIES:
  * - Test Client Components that provide specific interactivity within RSC architecture
  * - Focus on server prop integration, user interactions, and progressive enhancement
  * - Mock Server Actions and external dependencies for isolated component testing
- * - NO server-side data fetching (that belongs in Server Component archetype)
+ * - NO server-side data fetching here (test Server Components via Integration/E2E)
  * 
  * WHAT BELONGS HERE:
  * - Client Components marked with "use client" directive
@@ -15,10 +15,10 @@
  * - Progressive enhancement patterns that work without JavaScript
  * 
  * WHAT DOESN'T BELONG:
- * - Server Components that fetch data (use Server Component archetype)
- * - Pure utility functions (use Unit archetype)
- * - Server Actions (use Server Action archetype)
- * - Full page workflows (use E2E archetype)
+ * - Server Components that fetch data (use Integration/E2E tests)
+ * - Pure utility functions (use Unit tests)
+ * - Server Actions (use Integration tests)
+ * - Full page workflows (use E2E tests)
  * 
  * SERVER PROP INTEGRATION:
  * - Client Islands receive data from Server Components as props
@@ -46,7 +46,7 @@ import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { GENERATED_MOCKS } from "~/test/generated/mocks";
 import { {{COMPONENT_NAME}} } from "{{MODULE_PATH}}";
 
-describe("{{COMPONENT_NAME}} (Client Island Tests - Archetype 3)", () => {
+describe("{{COMPONENT_NAME}} (Client Island Tests - Integration)", () => {
   // Server-passed props from Server Components
   const mockServerProps = {
     {{SERVER_PROP_1}}: GENERATED_MOCKS.{{ENTITY_TYPE}}.{{MOCK_INSTANCE}},

@@ -1156,17 +1156,17 @@ export async function monitoredOrganizationResolution(
 
 ### Test System Architecture (src/test/)
 
-**Archetype-Based Testing Organization**
-- Nine test archetype templates with clear file naming conventions and execution patterns
+**Testing Organization (Note)**
+- Historic reference to an archetype-oriented approach. For current standards, use `docs/CORE/TESTING_GUIDE.md` (test types, naming, placement) and templates under `src/test/` where useful.
 - Auto-generated mock system derived from seed data for consistent test scenarios
 - Test helper utilities for Server Component, Server Action, and hybrid component testing
 - Integration test patterns with worker-scoped database instances for isolation
 
 **Mock and Data Management**
-- SEED_TEST_IDS constants for predictable test debugging and cross-archetype consistency
+- SEED_TEST_IDS constants for predictable test debugging across tests
 - Generated mock factories based on actual database schema and seed data patterns
 - Test database management with PGlite worker instances preventing test interference
-- Cross-archetype test data sharing ensuring realistic scenarios across all test types
+- Cross-type test data sharing ensuring realistic scenarios across multiple test types
 
 ### Migration-Specific Directory Organization
 
@@ -1187,14 +1187,14 @@ export async function monitoredOrganizationResolution(
 **File and Directory Naming Standards**
 - kebab-case for directories following Next.js App Router conventions
 - camelCase for TypeScript files with clear component and utility identification
-- Explicit archetype identification in test files (*.unit.test.ts, *.component.test.ts)
+- Historic note: explicit test-type identification in filenames (e.g., *.unit.test.ts)
 - Domain-driven naming aligned with business feature organization rather than technical implementation
 
 **Architectural Boundary Enforcement**
 - Clear separation between server-side (dal/, actions/) and client-side utilities
 - Explicit Client Component marking with "use client" directive and client/ subdirectory organization
 - Authentication context separation between server and client execution environments
-- Test archetype organization preventing architectural boundary violations during testing
+- Test organization standards preventing architectural boundary violations during testing
 
 **Import Path Organization**
 - TypeScript alias usage (~/lib/, ~/components/) eliminating deep relative imports
@@ -1988,7 +1988,7 @@ export function ErrorDisplay({
 
 ### Security Testing and Validation Architecture
 
-**Multi-Archetype Security Testing**
+**Multi-Type Security Testing**
 - RLS policy validation through pgTAP automated testing ensuring multi-tenant boundary enforcement
 - Integration testing with worker-scoped database instances preventing cross-test data contamination
 - Server Component security testing validating authentication context propagation and organization scoping
@@ -3298,71 +3298,71 @@ test.describe('Progressive Enhancement', () => {
 
 ## 11. RSC Testing & Quality Architecture
 
-### Comprehensive Nine-Archetype Testing Framework
+### Testing Framework (historic)
 
 **React Server Components Optimized Testing Strategy**
 - Complete testing framework designed specifically for server-first architecture with minimal client islands
-- Nine distinct test archetypes covering unit, integration, component, and end-to-end testing scenarios
-- Auto-generated mock system derived from seed data ensuring consistent test scenarios across all archetype levels
+- Historic reference to nine categories; current guidance consolidates into Unit, Integration, E2E, RLS, Schema.
+- Auto-generated mock system derived from seed data ensuring consistent test scenarios across all test types
 - Progressive coverage strategy with quality gates enforcing architectural compliance and security boundaries
 
-**Foundation Status**: Post-archive system with 205 passing unit tests, comprehensive templates for all nine archetypes, and operational pgTAP RLS validation
+**Foundation Status**: Post-archive system with 205 passing unit tests, templates for core test types, and operational pgTAP RLS validation
 
-### Nine RSC-Adapted Test Archetypes
+### Test Types (historic reference)
 
-**Archetype 1: Unit Tests (`*.unit.test.ts`)**
+**Unit Tests (`*.unit.test.ts`)**
 - Pure function testing with zero external dependencies for maximum isolation and execution speed
 - Server Action utilities, validation functions, formatters, and business logic components
 - Type-safe testing patterns with TypeScript strictest configuration compliance
 - Current example: `src/lib/actions/shared.unit.test.ts` with 205 comprehensive test assertions covering input validation, error handling, and edge cases
 
-**Archetype 2: Data Access Layer Tests (`*.dal.test.ts`)**
+**Data Access Layer Tests (`*.dal.test.ts`)**
 - Server Component data access patterns with organization scoping validation and authentication context mocking
 - Business logic testing for direct database queries through Drizzle ORM integration
 - Multi-tenant security boundary enforcement with cross-organization access denial verification
 - React 19 cache() API integration testing preventing duplicate database queries within request lifecycle
 - Current example: `src/lib/dal/issues.dal.test.ts` demonstrating organization-scoped query validation and security boundaries
 
-**Archetype 3: Client Island Tests (`*.client-island.test.tsx`)**
+**Client Island Tests (`*.client-island.test.tsx`)**
 - Traditional React Testing Library patterns optimized for minimal interactive components within server-rendered pages
 - Server-passed props validation ensuring proper data flow from Server Components to Client Components
 - User interaction testing with event handling, form submissions, and state management validation
 - Template ready: `src/test/templates/client-island.template.tsx` providing standardized testing patterns for client islands
 
-**Archetype 4: Server Action Tests (`*.server-action.test.ts`)**
+**Server Action Tests (`*.server-action.test.ts`)**
 - FormData processing validation with comprehensive field validation and structured error handling testing
 - Authentication context propagation ensuring proper user and organization scoping throughout mutation workflows
 - Database mutation verification with transaction rollback testing and cache revalidation pattern validation
 - Progressive enhancement scenarios ensuring form functionality without JavaScript execution
 - Active implementation: `src/lib/actions/issue-actions.server.test.ts` and comprehensive template with 400+ lines covering all Server Action patterns
 
-**Archetype 5: Hybrid Component Tests (`*.hybrid-component.test.ts`)**
+**Hybrid Component Tests (`*.hybrid-component.test.ts`)**
 - Server shell plus Client island integration testing ensuring proper hydration boundaries and data flow
 - Hydration state matching verification preventing client-server rendering mismatches
 - Selective hydration verification ensuring only necessary components receive client-side JavaScript
 - Server/client boundary data flow testing validating props passing and state synchronization patterns
 
-**Archetype 6: Integration Example Tests (`*.integration.test.ts`)**
-- Cross-archetype integration demonstration showing comprehensive testing approach across multiple component types
+**Integration Example Tests (`*.integration.test.ts`)**
+- Cross-type integration demonstration showing comprehensive testing approach across multiple component types
 - End-to-end workflow validation combining Server Components, Server Actions, and Client islands
 - Performance and memory management testing ensuring efficient resource utilization
-- Current example: `src/test/integration/archetype-integration-example.test.ts` with 410+ lines demonstrating all integration patterns
+- Current example: `src/test/integration/archetype-integration-example.test.ts` with 410+ lines demonstrating integration patterns (historic filename)
 
-**Archetype 7: End-to-End Tests (`*.e2e.test.ts`)**
+**End-to-End Tests (`*.e2e.test.ts`)**
 - Playwright browser automation for complete user journeys with RSC rendering validation
 - Multi-browser compatibility testing across Chromium, Firefox, and WebKit engines
 - Progressive enhancement testing ensuring core functionality works without JavaScript
 - Authentication flow testing with subdomain-based multi-tenancy and organization context validation
 - Active implementation: `e2e/smoke-test-workflow.spec.ts` with 491 lines covering 11-step comprehensive workflow
 
-**Archetype 8: Row-Level Security Tests (`*.rls.test.sql`)**
+**Row-Level Security Tests (`*.rls.test.sql`)**
 - pgTAP-based PostgreSQL testing for comprehensive multi-tenant boundary enforcement validation
 - Database-level security policy verification ensuring organizational data isolation
 - SQL-level security verification with zero-tolerance cross-organizational data access testing
 - Critical security boundary testing with 14 comprehensive tests covering all RLS policies
 - Active implementation: `supabase/tests/rls/issues-minimal.test.sql` providing essential security validation
 
-**Archetype 9: Schema Tests (`*.schema.test.sql`)**
+**Schema Tests (`*.schema.test.sql`)**
 - Database constraint validation and referential integrity testing
 - Foreign key relationship verification ensuring proper organizational scoping
 - Schema evolution testing with migration validation and rollback verification
@@ -3371,13 +3371,13 @@ test.describe('Progressive Enhancement', () => {
 ### Auto-Generated Mock System Architecture
 
 **Seed Data Foundation**
-- SEED_TEST_IDS constants providing predictable test data identifiers for consistent debugging and cross-archetype reliability
+- SEED_TEST_IDS constants providing predictable test data identifiers for consistent debugging across test types
 - Hardcoded organization, user, and machine identifiers eliminating random UUID unpredictability
 - Multi-tenant test scenarios with primary organization ("test-org-pinpoint") and competitor organization ("test-org-competitor") isolation
 - Cross-organization boundary validation ensuring security policy enforcement at application and database levels
 
 **Mock Factory System**
-- `SeedBasedMockFactory` generating consistent mock objects across all test archetypes based on actual seed data patterns
+- `SeedBasedMockFactory` generating consistent mock objects across all test types based on actual seed data patterns
 - Relationship-aware mock generation maintaining foreign key integrity and organizational scoping constraints
 - Type-safe mock factories derived from Drizzle schema definitions ensuring compile-time validation of test data
 - Realistic test scenarios based on actual seed patterns reflecting production data structures and relationships
@@ -3416,14 +3416,14 @@ test.describe('Progressive Enhancement', () => {
 - Organization-scoped test scenarios with primary and competitor organization contexts
 - User role hierarchy testing with admin, member, and technician permission levels
 - Machine and location hierarchies supporting geographic and collection-based testing scenarios
-- Cross-archetype consistency ensuring identical test data usage across unit, integration, and E2E test levels
+- Cross-type consistency ensuring identical test data usage across unit, integration, and E2E test levels
 
 ### Vitest Configuration for Server-First Architecture
 
 **Environment and Execution Configuration**
 - Node.js environment configuration optimized for Server Component testing execution
 - Global test utilities and assertion libraries with 30-second timeout for comprehensive test scenarios
-- Test file discovery patterns targeting all archetype filename conventions
+- Test file discovery patterns targeting expected filename conventions
 - Coverage provider configuration using V8 engine for accurate Server Component coverage measurement
 
 **Coverage Strategy and Thresholds**
@@ -3460,10 +3460,10 @@ test.describe('Progressive Enhancement', () => {
 
 ### Quality Gates and Progressive Coverage Strategy
 
-**Archetype Balance Enforcement**
-- Automated validation ensuring coverage distribution across all nine test archetypes
-- Prevention of over-concentration in single archetype types maintaining comprehensive testing approach
-- Quality gate enforcement requiring minimum coverage in each archetype before production deployment
+**Balanced Coverage Across Test Types**
+- Automated validation ensuring coverage distribution across test types
+- Prevention of over-concentration in a single test type maintaining a comprehensive approach
+- Quality gate enforcement promoting representation across test types before production deployment
 - Continuous integration validation preventing architectural degradation through inadequate testing
 
 **Progressive Coverage Targets with Weekly Milestones**
@@ -3474,7 +3474,7 @@ test.describe('Progressive Enhancement', () => {
 - **Week 5+ (60%+)**: End-to-End testing with complete user journeys and Production security validation
 
 **Security and Performance Gate Enforcement**
-- Multi-tenant scoping validation in every test archetype ensuring organizational boundary compliance
+- Multi-tenant scoping validation in every test type ensuring organizational boundary compliance
 - Server Component query performance monitoring with N+1 query detection and optimization recommendations
 - Server Action security testing with authentication context validation and authorization boundary verification
 - Progressive enhancement verification ensuring accessibility and functionality across different user agent capabilities
@@ -3487,16 +3487,16 @@ test.describe('Progressive Enhancement', () => {
 
 ### Test Creation and Development Workflow
 
-**Template-Based Test Generation**
-- Nine comprehensive archetype templates providing standardized testing patterns and boilerplate code
-- Automated test scaffolding through `/create-test` slash command integration (planned implementation)
-- Template customization supporting domain-specific testing requirements while maintaining architectural consistency
-- Cross-archetype template sharing enabling consistent testing approaches across different component types
+**Test Creation Standards**
+- Test types and naming/placement defined in `docs/CORE/TESTING_GUIDE.md`
+- Templates and helpers available under `src/test/` where useful
+- Customization allowed while maintaining architectural boundaries and consistency
+- Shared utilities encourage consistent approaches across different component types
 
 **Mock System Integration Workflow**
 - Seed data synchronization ensuring mock factory alignment with actual database seed patterns
 - Type-safe mock generation derived from Drizzle schema definitions with automatic TypeScript validation
-- Cross-archetype mock consistency preventing test scenario divergence and ensuring reliable debugging
+- Cross-type mock consistency preventing test scenario divergence and ensuring reliable debugging
 - Performance-optimized mock generation with caching and memory management for large test suites
 
 **Development Experience Optimization**
@@ -3508,7 +3508,7 @@ test.describe('Progressive Enhancement', () => {
 ### Integration with CI/CD and Production Deployment
 
 **Continuous Integration Validation**
-- Automated test execution across all nine archetypes in CI/CD pipeline with parallel execution optimization
+- Automated test execution across all test types in CI/CD pipeline with parallel execution optimization
 - Coverage reporting integration with pull request validation and coverage trend analysis
 - Security gate enforcement preventing deployment of code with multi-tenant boundary violations
 - Performance regression detection with automatic alerts for degraded test execution times

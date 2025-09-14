@@ -80,21 +80,15 @@ npm run smoke
 
 **Why Archived**: Test system was over-engineered for pre-beta phase. Focus shifted to velocity and rapid prototyping.
 
-## Future Test System (Planned)
+## Test Types
 
-**Reference**: `docs/testing/TEST_SYSTEM_REBOOT_PLAN.md`
+See `docs/CORE/TESTING_GUIDE.md` for authoritative standards. Summary:
 
-**9 Planned Archetypes**:
-
-1. Unit Tests (✅ **Current baseline**)
-2. Component Tests
-3. Service Tests
-4. Repository Tests
-5. Router Tests
-6. Auth Tests
-7. RLS Policy Tests (✅ **Currently active**)
-8. Schema Tests
-9. Smoke Tests (✅ **Currently active**)
+- Unit Tests (pure functions)
+- Integration Tests (services/DAL/tRPC/server actions)
+- E2E Tests (Playwright journeys)
+- RLS Tests (pgTAP policies)
+- Schema Tests (pgTAP constraints)
 
 ## Testing Philosophy (Pre-Beta)
 

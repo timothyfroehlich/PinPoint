@@ -14,7 +14,7 @@ Specialized tactical guides for immediate action. Auto-loaded by Claude Code for
 
 - **[Migration Patterns](migration-patterns.md)** - Supabase SSR + Drizzle patterns
 - **[API Security Patterns](api-security-patterns.md)** - Multi-tenant scoping, tRPC protection
-- **[Testing Patterns](testing-patterns.md)** - Current test archetype patterns
+- **[Testing Patterns](testing-patterns.md)** - Current test type patterns
 
 ### **Language & Framework**
 

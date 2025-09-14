@@ -1,12 +1,12 @@
 /**
- * Subdomain Verification Unit Tests - Archetype 1
+ * Subdomain Verification Unit Tests
  * Pure function testing with no external dependencies
  *
- * ARCHETYPE BOUNDARIES:
+ * SCOPE BOUNDARIES:
  * - Test ONLY pure functions that take input and return output
  * - NO database connections, API calls, file system access, or external services
- * - NO React components (use Client Island or Server Component archetypes instead)
- * - NO mocking of dependencies (indicates business logic archetype needed)
+ * - NO React components; validate UI via Integration/E2E tests
+ * - NO mocking of dependencies (indicates Integration test is needed)
  *
  * WHAT BELONGS HERE:
  * - Header validation and trusted subdomain checking
@@ -36,7 +36,7 @@ import {
   SUBDOMAIN_HEADER,
 } from "~/lib/subdomain-verification";
 
-describe("Subdomain Verification (Unit Tests - Archetype 1)", () => {
+describe("Subdomain Verification (Unit Tests)", () => {
   describe("isSubdomainHeaderTrusted", () => {
     describe("valid trust scenarios", () => {
       it("returns true when both subdomain and verification headers are present", () => {

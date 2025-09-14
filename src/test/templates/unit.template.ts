@@ -1,12 +1,12 @@
 /**
- * {{MODULE_NAME}} Unit Tests - Archetype 1
+ * {{MODULE_NAME}} Unit Tests
  * Pure function testing with no external dependencies
  * 
- * ARCHETYPE BOUNDARIES:
+ * SCOPE BOUNDARIES:
  * - Test ONLY pure functions that take input and return output
  * - NO database connections, API calls, file system access, or external services
- * - NO React components (use Client Island or Server Component archetypes instead)
- * - NO mocking of dependencies (indicates business logic archetype needed)
+ * - NO React components; validate UI via Integration/E2E tests
+ * - NO mocking of dependencies (if needed, you likely want Integration tests)
  * 
  * WHAT BELONGS HERE:
  * - Validation functions, formatters, calculators, type guards
@@ -34,7 +34,7 @@ import {
   {{IMPORTED_FUNCTIONS}}
 } from "{{MODULE_PATH}}";
 
-describe("{{MODULE_NAME}} (Unit Tests - Archetype 1)", () => {
+describe("{{MODULE_NAME}} (Unit Tests)", () => {
   
   describe("{{FUNCTION_NAME}}", () => {
     it("{{TEST_DESCRIPTION}}", () => {

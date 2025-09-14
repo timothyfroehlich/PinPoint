@@ -1,6 +1,6 @@
 /**
  * Mock System Usage Examples
- * Demonstrates how to use seed-based mocks across different test archetypes
+ * Demonstrates how to use seed-based mocks across different test types
  */
 
 import { describe, expect, it, beforeEach } from "vitest";
@@ -14,7 +14,7 @@ import {
 } from "./seed-based-mocks";
 
 describe("Mock System Usage Examples", () => {
-  describe("Archetype 1: Unit Tests - Using Individual Mocks", () => {
+  describe("Unit Tests - Using Individual Mocks", () => {
     it("demonstrates creating individual mock entities", () => {
       // Create individual mock entities with defaults
       const mockUser = SeedBasedMockFactory.createMockUser();
@@ -68,7 +68,7 @@ describe("Mock System Usage Examples", () => {
     });
   });
 
-  describe("Archetype 2: DAL Tests - Using Auth and Database Mocks", () => {
+  describe("Integration (DAL) - Using Auth and Database Mocks", () => {
     let mockDbClient: ReturnType<typeof MockDatabaseFactory.createMockDbClient>;
 
     beforeEach(() => {
@@ -120,7 +120,7 @@ describe("Mock System Usage Examples", () => {
     });
   });
 
-  describe("Archetype 3: Server Action Tests - Using FormData Mocks", () => {
+  describe("Integration (Server Action) - Using FormData Mocks", () => {
     it("demonstrates valid FormData creation", () => {
       const formData = MockFormDataFactory.createValidIssueFormData();
 
@@ -162,7 +162,7 @@ describe("Mock System Usage Examples", () => {
     });
   });
 
-  describe("Archetype 4: Integration Tests - Using Complete Scenarios", () => {
+  describe("Integration - Using Complete Scenarios", () => {
     it("demonstrates primary organization scenario", () => {
       const scenario = MockScenarioFactory.createPrimaryOrgScenario();
 

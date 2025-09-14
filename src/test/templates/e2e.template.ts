@@ -1,12 +1,12 @@
 /**
- * {{WORKFLOW_NAME}} E2E Tests - Archetype 7
+ * {{WORKFLOW_NAME}} E2E Tests
  * Full RSC application workflow testing with progressive enhancement
  * 
- * ARCHETYPE BOUNDARIES:
+ * SCOPE BOUNDARIES:
  * - Test complete user workflows across multiple pages and components
  * - Focus on RSC architecture patterns and progressive enhancement
  * - Use real browser automation with Playwright for authentic user interactions
- * - NO unit-level testing (those belong in other archetypes)
+ * - NO unit-level testing (cover those in Unit/Integration tests)
  * 
  * WHAT BELONGS HERE:
  * - Multi-step user workflows like signup, issue creation, machine setup
@@ -50,7 +50,7 @@ import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 // Test configuration
 test.describe.configure({ mode: 'parallel' });
 
-test.describe("{{WORKFLOW_NAME}} (E2E Tests - Archetype 7)", () => {
+test.describe("{{WORKFLOW_NAME}} (E2E Tests)", () => {
   
   // Setup and teardown
   test.beforeEach(async ({ page }) => {

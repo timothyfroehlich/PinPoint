@@ -595,7 +595,7 @@ export default tseslint.config(
       ".archived-tests-2025-08-23/**/*", // Archived test files
       "src/test/templates/**/*.ts", // Template files excluded from linting
       "src/test/templates/**/*.tsx", // Template files excluded from linting
-      "src/test/archived-templates/**/*.ts", // Archived template files excluded from linting
+      // Archived templates moved under .archived-tests-2025-08-23/
       "add-location-seed.ts", // Temporary script file
       "next-env.d.ts", // Next.js generated file
       "eslint.config.js",
