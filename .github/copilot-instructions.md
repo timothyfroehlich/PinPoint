@@ -16,7 +16,7 @@ PinPoint is a pre-beta multi-tenant React Server Components application for pinb
 When performing code review, apply ALL checks from the project's core documentation:
 - `/docs/CORE/NON_NEGOTIABLES.md` - Critical patterns and forbidden practices
 - `/docs/CORE/TYPESCRIPT_STRICTEST_PATTERNS.md` - Type safety requirements
-- `/CLAUDE.md` - Project-specific development constraints
+- `/AGENTS.md` - Project-specific development constraints
 
 ### 🔴 CRITICAL Architecture Violations (Block Merge)
 Focus heavily on these patterns that can cause production failures:
