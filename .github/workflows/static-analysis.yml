@@ -164,5 +164,5 @@ jobs:
       - name: Node setup and deps
         uses: ./.github/actions/node-setup
 
-      - name: Run npm audit (high+)
-        run: npm run deps:check
+      - name: Run security checks
+        run: npm run security:check

@@ -1,4 +1,4 @@
-name: Smoke Test
+name: E2E Tests
 permissions:
   contents: read
 
@@ -13,12 +13,12 @@ on:
     branches: [main]
 
 concurrency:
-  group: smoke-${{ github.ref }}
+  group: e2e-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  smoke-test:
-    name: End-to-End Smoke Test
+  e2e-test:
+    name: End-to-End Tests
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
@@ -111,15 +111,15 @@ jobs:
           [[ -n "$DATABASE_URL" ]] || { echo "❌ DATABASE_URL not exported"; exit 1; }
           [[ -n "$DIRECT_URL" ]] || { echo "❌ DIRECT_URL not exported"; exit 1; }
 
-          # Run smoke test - must pass completely for CI success
-          echo "🧪 Running smoke test with local Supabase stack"
-          npm run smoke
+          # Run E2E tests - must pass completely for CI success
+          echo "🧪 Running E2E tests with local Supabase stack"
+          npm run e2e
 
       - name: Upload Playwright Report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: failure()
         with:
-          name: playwright-report-smoke
+          name: playwright-report-e2e
           path: playwright-report/
           retention-days: 7
       - name: Upload DB Reset Log
