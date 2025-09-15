@@ -12,7 +12,7 @@ git diff --cached --name-only | while read -r file; do
     fi
     # Check if file is larger than 1MB (1048576 bytes)
     if [ "$size" -gt 1048576 ]; then
-      echo "❌ Large file detected: $file ($(($size / 1024))KB > 1MB)"
+      echo "❌ Large file detected: $file ($((size / 1024))KB > 1MB)"
       exit 1
     fi
   fi

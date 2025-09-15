@@ -64,7 +64,7 @@
     "security:secrets": "gitleaks protect --staged --verbose && trufflehog git file://. --since-commit HEAD~1 --fail --no-verification",
     "security:files": "./scripts/check-file-security.sh",
     "security:auth": "node scripts/check-auth-safety.cjs",
-    "security:audit": "npm audit --audit-level=high --json | jq -e '.vulnerabilities | to_entries | map(select(.value.severity == \"high\" or .value.severity == \"critical\")) | length == 0' || (echo '❌ High/critical vulnerabilities found!' && exit 1)",
+    "security:audit": "./scripts/check-npm-audit.sh",
     "_comment_testing": "========== Testing Commands ==========",
     "test:e2e:prod": "playwright test -c playwright.prod.config.ts --reporter=line",
     "lint:sarif": "next lint --format @microsoft/eslint-formatter-sarif --output-file eslint-results.sarif",
