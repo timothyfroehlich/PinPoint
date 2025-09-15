@@ -1,21 +1,34 @@
-@INDEX.md
+@AGENTS.md
 
-Last Reviewed: 2025-09-06
+## 🤖 CLAUDE CODE DOCUMENTATION FEATURES
 
-Environments & Domains (Brief)
-- Local: `org.localhost:3000` (org-scoped) and `localhost:3000` (global). Supabase CLI local.
-- Preview: `pin-point-git-<branch>-advacar.vercel.app` with `<org>.…` subdomains. Shares prod DB for now.
-- Production: `pinpoint-tracker.vercel.app`, `pin-point-advacar.vercel.app`, `pin-point-git-main-advacar.vercel.app` (no subdomains on .vercel.app).
-- APC Alias: `pinpoint.austinpinballcollective.org` → APC only. No generic landing. Login has no org dropdown.
+### Essential Reading Order for Claude Code
 
-Routing Rules
-- Generic hosts: root `/` shows landing; `<org>.host` scopes to that org (custom domains only).
-- APC alias: always APC; `/` redirects to `/auth/sign-in`.
+When working on PinPoint documentation, reference CORE documentation in this priority order using @ syntax for auto-loading:
 
-Code Pointers
-- Mapping: `src/lib/domain-org-mapping.ts` (host → org; APC alias → `apc`).
-- Middleware: `middleware.ts` sets trusted `x-subdomain` headers from mapping.
-- Login: `src/app/auth/sign-in/components/SignInForm.tsx` hides org selector when host locks org.
-- Home: `src/app/page.tsx` redirects to sign-in on org-scoped hosts.
+### 1. Critical Constraints (Auto-Load)
+- **@NON_NEGOTIABLES.md** - Forbidden patterns that MUST be enforced
+- **@DATABASE_SECURITY_SPEC.md** - RLS policies and multi-tenant security rules
 
-Note: Preview and prod share Supabase DB until open beta split.
+### 2. Architecture Authority (Manual Reference)
+- **TARGET_ARCHITECTURE.md** - Complete architectural blueprint (too large to auto-load)
+- **TARGET_ARCHITECTURE_CONDENSED.md** - Quick reference for common patterns
+
+### 3. Implementation Patterns (Auto-Load)
+- **@TYPESCRIPT_STRICTEST_PATTERNS.md** - Type safety patterns for @tsconfig/strictest
+- **@TYPE_INVENTORY.md** - Type Ownership Matrix and import reference for ~/lib/types
+
+### 4. Current Tech Stack (Manual Reference)
+- **latest-updates/** - Post-training library updates (September 2025)
+  - **quick-reference.md** - All breaking changes and new patterns
+  - Individual library guides for React 19, Next.js 15, Tailwind v4, etc.
+
+## 📋 CLAUDE CODE USAGE PATTERNS
+
+**Before any changes**: Read @NON_NEGOTIABLES.md for forbidden patterns
+**Architecture decisions**: Consult TARGET_ARCHITECTURE.md as authority
+**TypeScript errors**: Reference @TYPESCRIPT_STRICTEST_PATTERNS.md
+**Library usage**: Check latest-updates/ for current patterns (training cutoff January 2025)
+**User features**: Validate against CUJS_LIST.md requirements
+
+**USAGE**: This serves as the Claude Code specific documentation context. The @AGENTS.md file provides general documentation guidelines for any AI agent.
