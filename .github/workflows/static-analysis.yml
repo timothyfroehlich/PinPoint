@@ -164,5 +164,20 @@ jobs:
       - name: Node setup and deps
         uses: ./.github/actions/node-setup
 
+      - name: Install security tools
+        run: |
+          # Install gitleaks
+          curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/scripts/install.sh | sh -s -- -b /usr/local/bin
+
+          # Install trufflehog
+          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+
+          # Install ripgrep
+          sudo apt-get update
+          sudo apt-get install -y ripgrep
+
+          # Install jq (usually available but ensure it's there)
+          sudo apt-get install -y jq
+
       - name: Run security checks
         run: npm run security:check
