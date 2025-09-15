@@ -111,7 +111,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@electric-sql/pglite": "^0.3.7",
-    "@hookform/resolvers": "^5.2.1",
+    "@hookform/resolvers": "^5.2.2",
     "@material/material-color-utilities": "^0.3.0",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
