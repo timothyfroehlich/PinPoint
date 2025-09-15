@@ -57,19 +57,9 @@ Focus heavily on these patterns that can cause production failures:
 - **REQUIRED**: Use SEED_TEST_IDS constants for predictable test data
 - **FORBIDDEN**: Vitest redirection (`npm test 2>&1` breaks test execution)
 
-## Forbidden Patterns (One‑Page Reference)
-- Memory safety violations: per‑test PGlite instances
-- New SQL migration files in `supabase/migrations/` (initial snapshot only)
-- Schema modifications: Code adapts to schema, not vice versa
-- Deprecated imports: `@supabase/auth-helpers-nextjs`
-- Supabase SSR misuse: no wrapper, wrong cookie contract, logic before `getUser()`
-- TypeScript safety defeats: `any`, non‑null `!`, unsafe `as`
-- Deep relative imports; use `~/` aliases
-- SQL injection patterns: Raw string interpolation in SQL
-- Architectural SQL misuse: Using `sql.raw()` when `sql` templates provide safe parameterization
-- Over-abstraction: Functions with single call sites that add no architectural value
-- Enterprise infrastructure in pre-beta: Complex error hierarchies before operational scale demands
+## Forbidden Patterns
 
+> **All forbidden patterns are documented in [`/docs/CORE/NON_NEGOTIABLES.md`](../docs/CORE/NON_NEGOTIABLES.md). This is the single source of truth. Do not maintain duplicate lists—always refer to the canonical documentation.**
 ## Review Priority Guidelines
 - **🔴 CRITICAL**: Multi-tenant security, authentication patterns, forbidden SQL patterns
 - **🟠 HIGH**: Server Component usage, performance patterns, type safety
