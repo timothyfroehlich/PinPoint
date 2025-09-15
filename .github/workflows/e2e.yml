@@ -111,9 +111,14 @@ jobs:
           [[ -n "$DATABASE_URL" ]] || { echo "❌ DATABASE_URL not exported"; exit 1; }
           [[ -n "$DIRECT_URL" ]] || { echo "❌ DIRECT_URL not exported"; exit 1; }
 
-          # Run E2E tests - must pass completely for CI success
-          echo "🧪 Running E2E tests with local Supabase stack"
-          npm run e2e
+          # Run E2E tests - full suite on main, lighter on PRs
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "🧪 Running full E2E test suite (main branch)"
+            npx playwright test --grep-invert='e2e/prod/'
+          else
+            echo "🧪 Running E2E tests (PR - Chromium only)"
+            npx playwright test --grep-invert='e2e/prod/' --project=auth-setup --project=chromium --project=chromium-auth
+          fi
 
       - name: Upload Playwright Report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -127,5 +132,119 @@ jobs:
         if: failure()
         with:
           name: db-reset-log
+          path: db-reset.log
+          retention-days: 7
+
+  e2e-prod-test:
+    name: Production E2E Tests
+    runs-on: ubuntu-latest
+    needs: e2e-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    timeout-minutes: 25
+    env:
+      SKIP_ENV_VALIDATION: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Setup Node, Deps, and Supabase
+        uses: ./.github/actions/supabase-local
+        with:
+          exclude: studio,realtime,storage-api,edge-runtime,logflare,vector,imgproxy,supavisor,postgres-meta,mailpit
+
+      - name: Map Supabase env for Next.js
+        run: |
+          set -e
+          echo "🔧 Mapping Supabase CLI env to Next.js expected variables"
+          [[ -n "$API_URL" ]] || { echo "❌ API_URL not set by Supabase CLI"; exit 1; }
+          [[ -n "$ANON_KEY" ]] || { echo "❌ ANON_KEY not set by Supabase CLI"; exit 1; }
+          [[ -n "$SERVICE_ROLE_KEY" ]] || { echo "❌ SERVICE_ROLE_KEY not set by Supabase CLI"; exit 1; }
+          [[ -n "$DB_URL" ]] || { echo "❌ DB_URL not set by Supabase CLI"; exit 1; }
+
+          # Map to Next.js client/server env expectations
+          # Reconstruct DATABASE_URL to avoid GitHub secret masking issues
+          # Extract port number more reliably (should be 5 digits starting with 5)
+          DB_PORT=$(echo "$DB_URL" | grep -o '5[0-9][0-9][0-9][0-9]' | head -1)
+          # Fallback if port extraction fails
+          if [ -z "$DB_PORT" ]; then
+            DB_PORT="54322"  # Default Supabase local port
+          fi
+          DB_HOST="127.0.0.1"
+          DB_NAME="postgres"
+          RECONSTRUCTED_DB_URL="postgresql://postgres:postgres@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+
+          # Clean API_URL to remove quotes and trailing slash if present
+          CLEAN_API_URL="${API_URL%/}"
+          CLEAN_API_URL="${CLEAN_API_URL%\"}"
+          CLEAN_API_URL="${CLEAN_API_URL#\"}"
+
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$CLEAN_API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$ANON_KEY"
+            echo "SUPABASE_URL=$CLEAN_API_URL"
+            echo "SUPABASE_SECRET_KEY=$SERVICE_ROLE_KEY"
+            echo "DATABASE_URL=$RECONSTRUCTED_DB_URL"
+            echo "DIRECT_URL=$RECONSTRUCTED_DB_URL"
+          } >> "$GITHUB_ENV"
+
+          # Helpful for logs/debugging
+          echo "✅ Mapped env: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL, SUPABASE_SECRET_KEY"
+          echo "✅ DATABASE_URL reconstructed: postgresql://postgres:postgres@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+          echo "✅ API_URL cleaned: '$CLEAN_API_URL' (original: '$API_URL')"
+          echo "✅ DB_PORT extracted: '$DB_PORT' from DB_URL: '$DB_URL'"
+
+      - name: Cache Playwright Browsers
+        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+        id: playwright-cache
+        with:
+          path: "~/.cache/ms-playwright"
+          key: "${{ runner.os }}-playwright-chromium-${{ hashFiles('package-lock.json') }}"
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright Browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Setup Database Schema and Seed Data
+        run: |
+          set -e  # Exit on any error
+          echo "🗃️ Setting up database schema and seed data with local Supabase..."
+
+          # Use unified reset script for schema + seeds (local Supabase)
+          # Capture logs for artifact upload on failure
+          npm run db:reset:local 2>&1 | tee db-reset.log
+
+          echo "✅ Database setup complete - ready for production E2E tests"
+
+      - name: Run Production E2E Tests
+        run: |
+          set -e  # Exit on any error
+          # Validate critical environment variables are set by Supabase CLI
+          [[ -n "$API_URL" ]] || { echo "❌ API_URL not set by Supabase CLI"; exit 1; }
+          [[ -n "$ANON_KEY" ]] || { echo "❌ ANON_KEY not set by Supabase CLI"; exit 1; }
+          [[ -n "$NEXT_PUBLIC_SUPABASE_URL" ]] || { echo "❌ NEXT_PUBLIC_SUPABASE_URL not exported"; exit 1; }
+          [[ -n "$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" ]] || { echo "❌ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY not exported"; exit 1; }
+          [[ -n "$DATABASE_URL" ]] || { echo "❌ DATABASE_URL not exported"; exit 1; }
+          [[ -n "$DIRECT_URL" ]] || { echo "❌ DIRECT_URL not exported"; exit 1; }
+
+          # Run production E2E tests
+          echo "🧪 Running production E2E tests"
+          npm run e2e:prod
+
+      - name: Upload Playwright Report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: failure()
+        with:
+          name: playwright-report-e2e-prod
+          path: playwright-report/
+          retention-days: 7
+      - name: Upload DB Reset Log
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: failure()
+        with:
+          name: db-reset-log-prod
           path: db-reset.log
           retention-days: 7

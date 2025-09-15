@@ -14,7 +14,7 @@
     "audit": "npm audit --audit-level=high",
     "test": "vitest run --reporter=dot",
     "test:rls": "cd supabase/tests && ./run-tests.sh",
-    "e2e": "playwright test --grep-invert='e2e/prod/'",
+    "e2e": "playwright test --grep-invert='e2e/prod/' --project=auth-setup --project=chromium --project=chromium-auth",
     "e2e:prod": "playwright test e2e/prod/",
     "test:all": "npm-run-all --parallel test test:rls e2e",
     "fix": "npm-run-all --sequential lint:fix format:write",
