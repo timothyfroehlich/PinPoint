@@ -27,7 +27,17 @@
   },
   "permissions": {
     "allow": [
-      "Bash(npm run:*)",
+      
+      "WebSearch",
+      "WebFetch(domain:zod.dev)",
+      "WebFetch(domain:docs.codemod.com)",
+      "WebFetch(domain:docs.github.com)",
+      "WebFetch(domain:github.blog)",
+      "WebFetch(domain:playwright.dev)",
+      "WebFetch(domain:vitest.dev)",
+      "WebFetch(domain:eslint.org)",
+      "WebFetch(domain:prettier.io)",
+      "WebFetch(domain:docs.npmjs.com)",
       "Bash(npm test:*)",
       "Bash(npx jest:*)",
       "Bash(npm run typecheck:*)",
@@ -44,6 +54,9 @@
             "Bash(npx next:*)",
       "Bash(npx shadcn:*)",
       "WebFetch(domain:ui.shadcn.com)",
+      "Bash(npx playwright test:*)",
+      "Bash(npx playwright show-trace:*)",
+      "Bash(PLAYWRIGHT_PORT=3001 npm run smoke)",
       "Bash(./scripts/safe-curl.sh:*)",
       "Bash(npx tsc:*)",
       "Bash(ls:*)",
@@ -52,12 +65,10 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(git pull:*)",
       "Bash(git fetch:*)",
       "Bash(git rev-parse:*)",
       "Bash(git rev-list:*)",
       "Bash(git worktree:*)",
-      "Bash(gh pr:*)",
       "Bash(gh pr list:*)",
       "Bash(gh pr view:*)",
       "Bash(gh pr create:*)",
@@ -65,18 +76,33 @@
       "Bash(gh issue view:*)",
       "Bash(gh run list:*)",
       "Bash(gh run view:*)",
-      "Bash(gh api:*)",
       "Bash(supabase status:*)",
       "Bash(supabase start:*)",
-      "Bash(vercel env pull:*)",
-      "Bash(./scripts/create-and-setup-worktree.sh:*)",
+      
+      
+      "Bash(./scripts/check-security-deps.sh:*)",
+      "Bash(./scripts/check-file-security.sh:*)",
+      "Bash(./scripts/check-db-schema.sh:*)",
+      "Bash(./scripts/check-npm-audit.sh:*)",
       "Bash(./scripts/safe-psql.sh:*)",
       "WebFetch(domain:docs.anthropic.com)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:supabase.com)",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_type",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_evaluate",
+      "mcp__playwright__browser_console_messages",
+      "mcp__playwright__browser_wait_for",
       "mcp__context7__resolve-library-id",
       "mcp__context7__get-library-docs"
     ],
     "deny": ["Bash(find:*)", "Bash(psql:*)"]
   }
+,
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "playwright"
+  ]
 }
