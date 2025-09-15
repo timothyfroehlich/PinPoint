@@ -158,7 +158,6 @@
 ### Essential Documentation
 
 - **@docs/CORE/NON_NEGOTIABLES.md** - Static analysis patterns
-- **RSC_MIGRATION/** - Current migration plans and status
 - **docs/CORE/latest-updates/quick-reference.md** - Post-training tech updates
 - **@docs/CORE/TYPESCRIPT_STRICTEST_PATTERNS.md** - Type safety patterns
 - **@package.json** - Available scripts, dependencies, and project configuration

@@ -34,7 +34,7 @@ The system is architected as a multi-tenant SaaS platform, allowing multiple org
 Technology stack:
 
 - **Framework:** [Next.js 15](https://nextjs.org/) with React Server Components
-- **Language:** [TypeScript](https://www.typescriptlang.org/) (strictest configuration)  
+- **Language:** [TypeScript](https://www.typescriptlang.org/) (strictest configuration)
 - **Runtime:** [React 19](https://react.dev/)
 - **Components:** [shadcn/ui](https://ui.shadcn.com/) (primary), [Material UI](https://mui.com/) (transition)
 - **Styling:** [Tailwind CSS v4](https://tailwindcss.com/)
@@ -46,18 +46,20 @@ Technology stack:
 ### Current Development Phase
 
 **React Server Components Migration:**
+
 - Status: Phase 1A Foundation nearly complete
 - Next: Data Access Layer (DAL) implementation
 - Approach: Complete rewrite from client-heavy MUI to server-first RSC
 
 **Test System:**
+
 - Status: Archive complete, standards consolidated
 - Next: Expand coverage across Unit, Integration, E2E, RLS, Schema
 - Approach: Follow CORE testing guide; use templates/helpers where useful
 
 **Project Context:** Pre-beta phase, solo development, high risk tolerance for breaking changes
 
-For detailed evolution plans, see [`RSC_MIGRATION/`](./RSC_MIGRATION/) and the CORE testing guide [`docs/CORE/TESTING_GUIDE.md`](./docs/CORE/TESTING_GUIDE.md).
+For testing standards, see the CORE testing guide [`docs/CORE/TESTING_GUIDE.md`](./docs/CORE/TESTING_GUIDE.md).
 
 ### 🚨 Development User Reset Warning
 
@@ -80,6 +82,7 @@ For detailed evolution plans, see [`RSC_MIGRATION/`](./RSC_MIGRATION/) and the C
 **Target:** Server Components with shadcn/ui + Drizzle
 
 **Migration Strategy:**
+
 - Server Components by default, Client Components for interactivity only
 - MUI and shadcn/ui coexist during transition
 - Complete rewrite approach rather than incremental migration
