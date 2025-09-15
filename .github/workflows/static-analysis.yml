@@ -166,18 +166,21 @@ jobs:
 
       - name: Install security tools
         run: |
-          # Install gitleaks
-          curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/scripts/install.sh | sh -s -- -b /usr/local/bin
+          # Install gitleaks - use GitHub releases directly
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz | sudo tar -xzC /usr/local/bin gitleaks
 
           # Install trufflehog
           curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
 
-          # Install ripgrep
+          # Install ripgrep and jq
           sudo apt-get update
-          sudo apt-get install -y ripgrep
+          sudo apt-get install -y ripgrep jq
 
-          # Install jq (usually available but ensure it's there)
-          sudo apt-get install -y jq
+          # Verify installations
+          gitleaks version
+          trufflehog --version
+          rg --version
+          jq --version
 
       - name: Run security checks
         run: npm run security:check
