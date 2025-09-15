@@ -59,7 +59,7 @@
     "db:validate:pre-commit": "echo '💡 Database validation now runs automatically on schema changes'",
     "validate:consistency": "tsx ./scripts/validate-schema-consistency.ts",
     "_comment_security": "========== Security Commands ==========",
-    "security:check": "npm-run-all --parallel security:deps security:secrets security:files security:auth",
+    "security:check": "npm-run-all --parallel security:deps security:secrets security:files security:auth security:audit",
     "security:deps": "./scripts/check-security-deps.sh",
     "security:secrets": "gitleaks protect --staged --verbose && trufflehog git file://. --since-commit HEAD~1 --fail --no-verification",
     "security:files": "./scripts/check-file-security.sh",
