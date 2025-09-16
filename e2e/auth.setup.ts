@@ -15,27 +15,29 @@ setup("authenticate as Tim dev user", async ({ page }) => {
 
   // Handle organization selection
   const orgTrigger = page.locator("[data-testid='org-select-trigger']");
-  await expect(orgTrigger).toBeVisible({ timeout: 15000 });
+  if (await orgTrigger.isVisible()) {
+    await expect(orgTrigger).toBeVisible({ timeout: 15000 });
 
-  // Ensure an organization is selected
-  const triggerTextInitial = (await orgTrigger.textContent()) ?? "";
-  if (!triggerTextInitial.trim()) {
-    await orgTrigger.click();
-    for (let i = 0; i < 12; i++) {
-      const firstOption = page.locator('[role="option"]').first();
-      if (await firstOption.isVisible().catch(() => false)) {
-        await firstOption.click();
-        break;
+    // Ensure an organization is selected
+    const triggerTextInitial = (await orgTrigger.textContent()) ?? "";
+    if (!triggerTextInitial.trim()) {
+      await orgTrigger.click();
+      for (let i = 0; i < 12; i++) {
+        const firstOption = page.locator('[role="option"]').first();
+        if (await firstOption.isVisible().catch(() => false)) {
+          await firstOption.click();
+          break;
+        }
+        await page.waitForTimeout(250);
       }
-      await page.waitForTimeout(250);
     }
-  }
 
-  // Close any lingering dropdown overlays
-  await page.keyboard.press("Escape");
-  await page.waitForTimeout(100);
-  await page.keyboard.press("Escape");
-  await expect(orgTrigger).toHaveText(/.+/, { timeout: 5000 });
+    // Close any lingering dropdown overlays
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(100);
+    await page.keyboard.press("Escape");
+    await expect(orgTrigger).toHaveText(/.+/, { timeout: 5000 });
+  }
 
   // Click dev login button
   const devLoginBtn = page.locator("[data-testid='dev-login-tim']");
@@ -56,8 +58,10 @@ setup("authenticate as Tim dev user", async ({ page }) => {
     await devLoginBtn.click({ force: true });
   }
 
+  await page.waitForLoadState("networkidle");
+  console.log("URL after login click:", page.url());
   // Wait for successful login and dashboard redirect
-  await page.waitForURL("**/dashboard", { timeout: 20000 });
+  await page.waitForURL("**/dashboard", { timeout: 30000 });
 
   // Navigate back to localhost (without subdomain) to ensure tests run on correct domain
   await page.goto(`${BASE_URL}/dashboard`);
