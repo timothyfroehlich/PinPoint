@@ -113,6 +113,11 @@ export function SignInForm(): React.JSX.Element {
       }
     }
 
+    // Generic host - ensure dropdown is shown
+    console.log(`[SIGNIN_FORM] Generic host - showing organization dropdown`);
+    setIsOrgLockedByHost(false);
+    setLockedOrgLabel(null);
+
     // Fallback default: prefer APC/test org as default if present, else first
     const apc = orgs.find(
       (o) => o.subdomain === "apc" || o.id === "test-org-pinpoint",

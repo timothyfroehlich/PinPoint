@@ -68,6 +68,12 @@ const TEST_ORG = {
   name: "Test Organization",
 };
 
+const ALIAS_ORG = {
+  id: "alias-org-apc",
+  subdomain: "apc",
+  name: "Austin Pinball Collective",
+};
+
 const TEST_MEMBERSHIP = {
   id: "membership-789",
   user_id: TEST_USER.id,
@@ -331,6 +337,68 @@ describe("Auth Callback Route (Router Integration)", () => {
       // Assert
       expect(getUserMembershipPublic).not.toHaveBeenCalled();
       expect(updateUserOrganization).not.toHaveBeenCalled();
+    });
+
+    it("should update metadata when alias host resolves to organization", async () => {
+      // Arrange
+      const request = new NextRequest(
+        "https://pinpoint.austinpinballcollective.org/auth/callback?code=test123",
+      );
+      vi.mocked(resolveOrgSubdomainFromHost).mockReturnValue("apc");
+      vi.mocked(getOrganizationBySubdomain).mockResolvedValue(ALIAS_ORG);
+      vi.mocked(getUserMembershipPublic).mockResolvedValue({
+        id: "alias-membership",
+        user_id: TEST_USER.id,
+        organization_id: ALIAS_ORG.id,
+        role: "member",
+      });
+
+      // Act
+      const response = await GET(request);
+
+      // Assert
+      expect(updateUserOrganization).toHaveBeenCalledWith(
+        TEST_USER.id,
+        ALIAS_ORG.id,
+      );
+      expect(response.headers.get("location")).toBe(
+        "https://pinpoint.austinpinballcollective.org/dashboard",
+      );
+    });
+
+    it("should not overwrite metadata when host is apex and metadata exists", async () => {
+      // Arrange
+      const request = new NextRequest(
+        "https://pinpoint.app/auth/callback?code=test123",
+      );
+      // No query param, no host hint; metadata already on user
+      vi.mocked(getUserMembershipPublic).mockResolvedValue(TEST_MEMBERSHIP);
+
+      // Act
+      await GET(request);
+
+      // Assert
+      expect(getOrganizationBySubdomain).not.toHaveBeenCalled();
+      expect(updateUserOrganization).not.toHaveBeenCalled();
+    });
+
+    it("should not update metadata when user lacks membership for resolved org", async () => {
+      // Arrange
+      const request = new NextRequest(
+        "https://pinpoint.austinpinballcollective.org/auth/callback?code=test123",
+      );
+      vi.mocked(resolveOrgSubdomainFromHost).mockReturnValue("apc");
+      vi.mocked(getOrganizationBySubdomain).mockResolvedValue(ALIAS_ORG);
+      vi.mocked(getUserMembershipPublic).mockResolvedValue(null);
+
+      // Act
+      const response = await GET(request);
+
+      // Assert
+      expect(updateUserOrganization).not.toHaveBeenCalled();
+      expect(response.headers.get("location")).toBe(
+        "https://pinpoint.austinpinballcollective.org/dashboard",
+      );
     });
   });
 

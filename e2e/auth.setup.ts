@@ -63,7 +63,7 @@ setup("authenticate as Tim dev user", async ({ page }) => {
   await page.goto(`${BASE_URL}/dashboard`);
 
   // Verify we're logged in successfully
-  await expect(page.locator("h1")).toContainText(/Dashboard|Issues|Machines/i);
+  await expect(page.getByRole('heading', { name: /Dashboard|Issues|Machines/i, level: 1 })).toBeVisible();
 
   console.log("Authentication successful, saving state...");
 
