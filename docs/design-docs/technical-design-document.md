@@ -40,7 +40,7 @@ The technology stack outlined in the initial plan remains the ideal choice, offe
 
 ### Data Model & Database Schema
 
-The database schema is the foundation of the application. The following sections detail the tables required for the v1.0 release and a forward-looking proposal for the v2.0 inventory module. All tables that contain tenant-specific data must include a non-nullable organization_id foreign key.
+The database schema is the foundation of the application. During pre‑beta, we avoid migration files and prefer `db:push` with resets and updated seeds/tests. Schema changes are allowed sparingly when justified by product needs; do not change schema solely to satisfy TypeScript or short‑term convenience. The following sections detail the tables required for the v1.0 release and a forward-looking proposal for the v2.0 inventory module. All tables that contain tenant-specific data must include a non-nullable organization_id foreign key.
 
 ### Core Application Schema (v1.0)
 
@@ -240,7 +240,7 @@ The project uses ES modules (`"type": "module"` in package.json), which requires
 
 During the pre-production phase, the following practices apply:
 
-- **Database strategy** - Frequent schema changes, no migrations
+- **Database strategy** - Sparing schema changes (when justified), no migration files (use `db:push` + reset)
 - **Sessions** - Clear on `db:reset` (expected behavior)
 - **Schema evolution** - Use `npm run db:reset:local:sb` for clean state
 - **OPDB games** - Global (no organizationId)

@@ -57,10 +57,8 @@ export const env = createEnv({
         ? z.string()
         : z.string().optional(),
     OPDB_API_URL: z.string().url().default("https://opdb.org/api"),
-    // DEFAULT_ORG_SUBDOMAIN has been removed for security: organization context
-    // must be derived from the request subdomain (middleware-verified) rather
-    // than a silent global fallback. Handle any marketing or default routes at
-    // the application level explicitly.
+    // Organization context must be derived via Supabase app_metadata (canonical)
+    // with trusted host hints only during first login. No global fallback.
     // Additional environment variables that were accessed directly via process.env
     VERCEL_URL: z.string().optional(),
     PORT: z.string().optional(),

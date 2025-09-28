@@ -51,7 +51,7 @@ For each modified file, categorize as:
 #### Migration File Creation
 
 - [ ] **🔴 BLOCKING**: No migration files in pre-beta
-  - [ ] ❌ FORBIDDEN: Files in `supabase/migrations/`
+  - [ ] ❌ FORBIDDEN: Files in `supabase/migrations/` (project policy: no migration files; use `db:push` + reset)
   - [ ] ❌ FORBIDDEN: Commands like `drizzle-kit generate`, `npm run db:generate`
 
 #### Vitest Command Issues

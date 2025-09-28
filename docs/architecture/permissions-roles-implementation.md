@@ -582,11 +582,11 @@ export const issueRouter = createTRPCRouter({
 
 ### Organization Context Resolution
 
-The system automatically resolves organization context through a priority order:
+The system resolves organization context with a metadata‑first priority order:
 
-1. **User Session**: If authenticated, uses `session.user.organizationId`
-2. **Subdomain Header**: Falls back to `x-subdomain` header
-3. **Environment Default**: Uses `env.DEFAULT_ORG_SUBDOMAIN`
+1. **Supabase Metadata**: If authenticated, use `user.app_metadata.organizationId` (canonical source of truth).
+2. **Trusted Host Hint**: If metadata is absent (first login), use a trusted alias/subdomain hint to resolve an organization row.
+3. **No Default**: There is no environment default; marketing/selection flow is shown when no context is available.
 
 ### Procedure Hierarchy
 

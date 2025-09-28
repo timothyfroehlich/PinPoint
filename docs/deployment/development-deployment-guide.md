@@ -67,8 +67,6 @@ GOOGLE_CLIENT_SECRET="your-dev-google-client-secret"
 # OPDB Integration
 OPDB_API_TOKEN="your-opdb-token"
 
-# Application Config
-DEFAULT_ORG_SUBDOMAIN="apc"
 ```
 
 ### Database Setup
@@ -326,9 +324,8 @@ npm run validate  # Husky hooks
 
 ### Database Best Practices
 
-- Use `db:push` for rapid development
-- Create proper migrations before merging
-- Test migrations on preview deployments
+- Use `db:push` for schema changes (no migration files in this project)
+- Reset and reseed when making schema changes (`npm run db:reset:local:sb`)
 - Keep development data separate from production
 
 ### Environment Best Practices

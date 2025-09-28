@@ -1,6 +1,6 @@
-# Drizzle ORM: Latest Updates for Direct Migration
+# Drizzle ORM: Latest Updates (Project Policy Note)
 
-_Migration-focused updates for Prisma → Drizzle direct conversion_
+Project policy: We do not use migration files in this repository during pre‑beta. Prefer `drizzle-kit push` for schema sync, followed by DB resets and updated seeds/tests. The migration‑related sections below exist for general reference and do not apply to PinPoint’s workflow.
 
 ## Key Changes (2024-2025)
 
@@ -8,7 +8,7 @@ _Migration-focused updates for Prisma → Drizzle direct conversion_
 
 **Enhanced PGlite Integration**: Better memory management and query optimization  
 **Generated Columns Performance**: Improved database-level computation patterns  
-**Real-world Examples**: Production patterns for complex schema migrations
+**Real-world Examples**: Production patterns for complex schema management (reference only; PinPoint uses push)
 
 ### 🎯 **Critical for Direct Conversion**
 
@@ -41,11 +41,9 @@ _Migration-focused updates for Prisma → Drizzle direct conversion_
 - **Migration Benefit:** Fast, isolated integration tests
 - **Setup:** Replace node-postgres with `@electric-sql/pglite` in tests
 
-**Drizzle-Kit Migration Testing**
+**Drizzle-Kit Testing (Reference)**
 
-- **DO:** Test migrations with `drizzle-kit generate` → apply → verify
-- **DON'T:** Skip migration testing in direct conversion
-- **Migration Benefit:** Catch schema issues before production
+- PinPoint policy: use `drizzle-kit push` (no migration files). The following commands are provided for general Drizzle users and should not be used in this repo.
 
 ### ⚡ **Performance & Developer Experience**
 
@@ -88,8 +86,8 @@ prisma generate
 ### Phase 3: Testing Setup
 
 ```bash
-# Generate migrations for testing
-npx drizzle-kit generate
+# (Reference) Generate migrations for testing — not used in this project
+# npx drizzle-kit generate
 # Mock with PGlite in vitest.setup.ts
 ```
 
@@ -98,9 +96,8 @@ npx drizzle-kit generate
 | Task                     | Command                | Use Case                      |
 | ------------------------ | ---------------------- | ----------------------------- |
 | **Schema Introspection** | `drizzle-kit pull`     | Import existing DB schema     |
-| **Generate Migrations**  | `drizzle-kit generate` | Create migration files        |
-| **Apply Migrations**     | `drizzle-kit migrate`  | Update database schema        |
-| **Quick Push**           | `drizzle-kit push`     | Direct schema sync (dev only) |
+| **Quick Push**           | `drizzle-kit push`     | Direct schema sync            |
+| Generate/Apply Migrations| (reference only)       | Not used in this project      |
 | **Prisma Integration**   | `prisma generate`      | Generate from Prisma schema   |
 
 ## Common Conversion Patterns
@@ -143,7 +140,7 @@ export const users = pgTable("users", {
 **Vitest + PGlite Setup**
 
 - Replace database driver with in-memory PostgreSQL
-- Apply migrations automatically in test setup
+- (Reference) Apply migrations automatically in test setup — not used in this project
 - Isolate each test with clean schema
 - See full examples in [main research document](../tech-stack-research-catchup.md#testing-mocking-strategies)
 

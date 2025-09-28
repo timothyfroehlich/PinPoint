@@ -13,10 +13,10 @@ PinPoint operates as a **multi-tenant SaaS platform** where each arcade organiza
 - **Rationale**: Supports consultants, multi-venue managers, and users who switch organizations
 - **Implementation**: No "home organization" or "primary organization" concept in user identity
 
-### 2. Organization Context Is Request-Scoped
-- **Principle**: Organization context derives from the request (subdomain) not user identity
-- **Rationale**: Enables automatic context switching and anonymous access
-- **Implementation**: Subdomain resolution determines organizational data scope for every request
+### 2. Organization Context Is Metadata-Scoped (with Host Hints)
+- **Principle**: Organization context for authenticated sessions is stored in Supabase `app_metadata.organizationId`. Host hints (alias/subdomain) influence selection before metadata exists.
+- **Rationale**: Prevents race conditions and stale context; supports previews and apex domains that lack subdomains.
+- **Implementation**: Auth callback writes org ID to metadata after validating membership. Middleware may set trusted subdomain hints but never overrides metadata.
 
 ### 3. Access Level Is Contextual
 - **Principle**: User's access level depends on both authentication status AND organization context
@@ -96,11 +96,10 @@ PinPoint operates as a **multi-tenant SaaS platform** where each arcade organiza
 
 ### Request-Level Context Validation
 **Context Resolution Process**:
-1. Extract subdomain from request URL
-2. Resolve subdomain to organization entity
-3. Validate organization exists and is active
-4. Determine user's access level within that organization
-5. Set database session variables for RLS enforcement
+1. Read `user.app_metadata.organizationId` (canonical).
+2. If absent, use trusted alias/subdomain hint to resolve an organization entity for first login only.
+3. Validate organization exists and is active; enforce membership for member-level access.
+4. Set database session variables for RLS enforcement.
 
 ### Membership-Based Access Control
 **Dynamic Access Determination**:

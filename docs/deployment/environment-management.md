@@ -40,7 +40,6 @@ NEXTAUTH_URL="http://localhost:3000"
 GOOGLE_CLIENT_ID="dev-google-client-id"
 GOOGLE_CLIENT_SECRET="dev-google-client-secret"
 IMAGE_STORAGE_PROVIDER="local"
-DEFAULT_ORG_SUBDOMAIN="apc"
 
 # Preview Environment Variables (Vercel)
 DATABASE_URL="postgresql://preview-db-url"
@@ -51,7 +50,6 @@ GOOGLE_CLIENT_SECRET="preview-google-client-secret"
 IMAGE_STORAGE_PROVIDER="uploadthing"
 UPLOADTHING_SECRET="preview-uploadthing-secret"
 UPLOADTHING_APP_ID="preview-uploadthing-app-id"
-DEFAULT_ORG_SUBDOMAIN="demo"
 
 # Production Environment Variables (Vercel)
 DATABASE_URL="postgresql://prod-db-url"
@@ -62,7 +60,6 @@ GOOGLE_CLIENT_SECRET="prod-google-client-secret"
 IMAGE_STORAGE_PROVIDER="uploadthing"
 UPLOADTHING_SECRET="prod-uploadthing-secret"
 UPLOADTHING_APP_ID="prod-uploadthing-app-id"
-DEFAULT_ORG_SUBDOMAIN="apc"
 ```
 
 ### Environment Detection

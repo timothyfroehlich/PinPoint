@@ -153,8 +153,6 @@ GOOGLE_CLIENT_SECRET="your-google-client-secret"
 # OPDB Integration
 OPDB_API_TOKEN="your-opdb-token"
 
-# Application Config
-DEFAULT_ORG_SUBDOMAIN="apc"
 ```
 
 ### UploadThing Integration (Ready)
@@ -215,8 +213,8 @@ SENTRY_AUTH_TOKEN="your-sentry-auth-token"
    # Check database connectivity
    # Database schema is managed via Drizzle - no pull needed
 
-   # Verify migrations
-   npm run db:validate  # Validate database operations
+   # Validate schema operations (no migration files)
+   npm run db:validate
    ```
 
 2. **Environment Variables**:
@@ -278,7 +276,7 @@ SENTRY_AUTH_TOKEN="your-sentry-auth-token"
 ### Production Data Setup
 
 ```bash
-# 1. Run database migrations
+# 1. Push schema
 npm run db:push:prod
 
 # 2. Create admin user manually via Supabase Dashboard or CLI

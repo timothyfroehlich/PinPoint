@@ -198,8 +198,8 @@
 ## Forbidden Patterns (One‑Page Reference)
 
 - Memory safety violations: per‑test PGlite instances.
-- New SQL migration files in `supabase/migrations/` (initial snapshot only).
-- Schema is locked. Code adapts to schema, not vice versa. Do not propose or apply schema changes unless explicitly authorized; even then, do not add new migration files — use the approved workflow.
+- No migration files in `supabase/migrations/` (initial snapshot only). Use `db:push` for schema syncs.
+- Schema changes are allowed sparingly during pre‑beta when justified by product needs. Do not change schema solely to fix TypeScript errors. When changing schema: update seeds, adjust tests, and plan for DB resets.
 - Deprecated imports: `@supabase/auth-helpers-nextjs`.
 - Supabase SSR misuse: no wrapper, wrong cookie contract, logic before `getUser()`.
 - Missing/removed auth callback route for OAuth flows.

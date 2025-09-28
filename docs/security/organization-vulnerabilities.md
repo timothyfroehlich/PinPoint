@@ -155,10 +155,10 @@ Result: Undefined behavior, potential data leakage
 **Evidence**: `SET LOCAL app.current_organization_id` called but policies ignore it
 **Impact**: Performance overhead with no security benefit
 
-### 3. Subdomain Resolution Fallback Logic
-**Problem**: Complex fallback logic creates multiple code paths
-**Risk**: Edge cases in organization resolution could bypass security
-**Location**: `src/server/api/trpc.base.ts:154-185`
+### 3. Subdomain Resolution Model
+**Current Approach**: Metadata‑first resolution with trusted host hints only when metadata is absent (first login). No environment defaults.
+**Risk Reduction**: Eliminates multiple fallback paths and prevents unintended org switches due to host variance. Auth callback is the only place that writes organization context after membership validation.
+**Location**: `src/server/auth/context.ts`, `src/app/auth/callback/route.ts`
 
 ## Risk Assessment
 
