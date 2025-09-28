@@ -12,7 +12,7 @@
     "lint": "eslint . --max-warnings 220 --quiet",
     "format": "prettier --check \"**/*.{ts,tsx,js,jsx,mdx}\" --ignore-path .prettierignore --cache --log-level warn",
     "audit": "npm audit --audit-level=high",
-    "test": "vitest run --reporter=dot",
+    "test": "vitest run --reporter=dot --pool=threads --poolOptions.threads.maxThreads=1",
     "test:rls": "cd supabase/tests && ./run-tests.sh",
     "e2e": "playwright test --grep-invert='e2e/prod/' --project=auth-setup --project=chromium --project=chromium-auth",
     "e2e:prod": "playwright test e2e/prod/",

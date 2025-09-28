@@ -22,6 +22,13 @@ vi.mock("~/lib/dal/public-organizations", () => ({
   getPublicOrganizationById: vi.fn(),
 }));
 
+vi.doMock("~/server/auth/context", async () => {
+  const actual = await vi.importActual<typeof import("~/server/auth/context")>(
+    "~/server/auth/context",
+  );
+  return actual;
+});
+
 const { createClient } = await import("~/lib/supabase/server");
 const { headers } = await import("next/headers");
 const { extractTrustedSubdomain } = await import(
@@ -36,11 +43,9 @@ const {
   getPublicOrganizationById,
 } = await import("~/lib/dal/public-organizations");
 
-async function loadContext() {
-  vi.resetModules();
-  const mod = await import("./context");
-  return mod.getRequestAuthContext;
-}
+const { getRequestAuthContext, __resetAuthContextCache } = await import(
+  "./context"
+);
 
 describe("getRequestAuthContext host + metadata precedence", () => {
   const supabase = {
@@ -50,6 +55,7 @@ describe("getRequestAuthContext host + metadata precedence", () => {
   } as const;
 
   beforeEach(() => {
+    __resetAuthContextCache();
     vi.mocked(createClient).mockResolvedValue(supabase as any);
     vi.mocked(headers).mockResolvedValue(new Headers({ host: "pinpoint.app" }));
     vi.mocked(extractTrustedSubdomain).mockReturnValue(null);
@@ -83,11 +89,10 @@ describe("getRequestAuthContext host + metadata precedence", () => {
       organization_id: "org-123",
     });
 
-    const getRequestAuthContext = await loadContext();
     const ctx = await getRequestAuthContext();
 
     expect(getPublicOrganizationById).toHaveBeenCalledWith("org-123");
-    expect(resolveOrgSubdomainFromHost).not.toHaveBeenCalled();
+    expect(getOrganizationBySubdomain).not.toHaveBeenCalled();
     expect(ctx.kind).toBe("authorized");
     if (ctx.kind === "authorized") {
       expect(ctx.org.id).toBe("org-123");
@@ -107,6 +112,9 @@ describe("getRequestAuthContext host + metadata precedence", () => {
       error: null,
     });
 
+    vi.mocked(headers).mockResolvedValue(
+      new Headers({ host: "apc.pinpoint.app" }),
+    );
     vi.mocked(resolveOrgSubdomainFromHost).mockReturnValue("apc");
     vi.mocked(getOrganizationBySubdomain).mockResolvedValue({
       id: "org-apc",
@@ -120,7 +128,6 @@ describe("getRequestAuthContext host + metadata precedence", () => {
       organization_id: "org-apc",
     });
 
-    const getRequestAuthContext = await loadContext();
     const ctx = await getRequestAuthContext();
 
     expect(resolveOrgSubdomainFromHost).toHaveBeenCalled();
@@ -144,6 +151,9 @@ describe("getRequestAuthContext host + metadata precedence", () => {
       error: null,
     });
 
+    vi.mocked(headers).mockResolvedValue(
+      new Headers({ host: "apc.pinpoint.app" }),
+    );
     vi.mocked(resolveOrgSubdomainFromHost).mockReturnValue("apc");
     vi.mocked(getOrganizationBySubdomain).mockResolvedValue({
       id: "org-apc",
@@ -152,7 +162,6 @@ describe("getRequestAuthContext host + metadata precedence", () => {
     });
     vi.mocked(getUserMembershipPublic).mockResolvedValue(null);
 
-    const getRequestAuthContext = await loadContext();
     const ctx = await getRequestAuthContext();
 
     expect(ctx.kind).toBe("no-membership");
@@ -161,4 +170,3 @@ describe("getRequestAuthContext host + metadata precedence", () => {
     }
   });
 });
-

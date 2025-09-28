@@ -72,10 +72,10 @@ describe("host-context", () => {
           baseHost: "localhost",
           orgSubdomain: "apc",
           path: "/dashboard",
-          protocol: "http",
+          protocol: "https",
           port: 3000,
         }),
-      ).toBe("http://apc.localhost:3000/dashboard");
+      ).toBe("https://apc.localhost:3000/dashboard");
     });
 
     it("does not prepend org for non-subdomain-capable host", () => {
@@ -103,4 +103,3 @@ describe("host-context", () => {
     });
   });
 });
-

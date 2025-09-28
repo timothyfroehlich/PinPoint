@@ -17,7 +17,12 @@ import {
 } from "~/lib/dal/public-organizations";
 import { isDevelopment } from "~/lib/environment";
 import { extractFormFields } from "~/lib/utils/form-data";
-import { getCookieDomain } from "~/lib/utils/domain";
+import {
+  buildOrgUrl,
+  classifyHost,
+  extractOrgSubdomain,
+  splitHostAndPort,
+} from "~/lib/host-context";
 import { actionError } from "./shared";
 import { isError, getErrorMessage } from "~/lib/utils/type-guards";
 import { env } from "~/env";
@@ -36,21 +41,62 @@ const oauthProviderSchema = z.object({
   redirectTo: z.url().optional(),
 });
 
-/**
- * Get base domain for callback URLs using server-side headers
- * Handles both development (localhost) and production domains
- */
-async function getBaseDomain(): Promise<string> {
-  const headersList = await headers();
-  const host = headersList.get("host") ?? "localhost:3000";
+interface CallbackBuildOptions {
+  organizationId: string;
+  orgSubdomain: string;
+  searchParams?: URLSearchParams;
+}
 
-  if (isDevelopment()) {
-    return "localhost:3000";
+function normalizeQueryParams(
+  organizationId: string,
+  searchParams?: URLSearchParams,
+): string {
+  const params = searchParams ?? new URLSearchParams({ organizationId });
+  return params.toString();
+}
+
+async function buildCallbackUrl({
+  organizationId,
+  orgSubdomain,
+  searchParams,
+}: CallbackBuildOptions): Promise<string> {
+  const headersList = await headers();
+  const hostHeader = headersList.get("host") ?? "localhost:3000";
+  const { hostname, port } = splitHostAndPort(hostHeader);
+  const hostKind = classifyHost(hostname);
+  const forwardedProto = headersList.get("x-forwarded-proto");
+
+  const protocol: "http" | "https" = isDevelopment()
+    ? "https"
+    : forwardedProto === "http"
+      ? "http"
+      : "https";
+
+  const normalizedOrg = orgSubdomain.toLowerCase();
+  const existingOrg = extractOrgSubdomain(hostname)?.toLowerCase() ?? null;
+  const queryString = normalizeQueryParams(organizationId, searchParams);
+
+  if (hostKind === "alias" || hostKind === "non-subdomain-capable") {
+    const hostWithPort = port ? `${hostname}:${port}` : hostname;
+    return `${protocol}://${hostWithPort}/auth/callback?${queryString}`;
   }
 
-  // Use getCookieDomain to extract base domain, then remove leading dot
-  // e.g., "org1.mysite.com" -> ".mysite.com" -> "mysite.com"
-  return getCookieDomain(host).replace(/^\./, "");
+  if (existingOrg && existingOrg === normalizedOrg) {
+    const hostWithPort = port ? `${hostname}:${port}` : hostname;
+    return `${protocol}://${hostWithPort}/auth/callback?${queryString}`;
+  }
+
+  const rootHost = existingOrg ? hostname.slice(existingOrg.length + 1) : hostname;
+  const builtUrl = buildOrgUrl({
+    kind: "subdomain-capable",
+    baseHost: rootHost,
+    orgSubdomain: normalizedOrg,
+    protocol,
+    ...(port ? { port } : {}),
+    path: "/auth/callback",
+  });
+
+  return `${builtUrl}?${queryString}`;
 }
 
 /**
@@ -88,18 +134,17 @@ export async function sendMagicLink(
       return actionError("Organization configuration error");
     }
 
-    // Build callback URL with organization subdomain
-    const baseDomain = await getBaseDomain();
-    const callbackUrl = isDevelopment()
-      ? `https://${subdomain}.localhost:3000/auth/callback`
-      : `https://${subdomain}.${baseDomain}/auth/callback`;
+    const callbackUrl = await buildCallbackUrl({
+      organizationId,
+      orgSubdomain: subdomain,
+    });
 
     // Send magic link with organization metadata
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
         shouldCreateUser: true,
-        emailRedirectTo: `${callbackUrl}?organizationId=${organizationId}`,
+        emailRedirectTo: callbackUrl,
         data: {
           organizationId,
         },
@@ -156,23 +201,23 @@ export async function signInWithOAuth(
       redirect("/auth/auth-code-error?error=organization_config");
     }
 
-    // Build callback URL with organization subdomain
-    const baseDomain = await getBaseDomain();
-    const callbackUrl = isDevelopment()
-      ? `https://${subdomain}.localhost:3000/auth/callback`
-      : `https://${subdomain}.${baseDomain}/auth/callback`;
-
     // Build query params for callback
     const queryParams = new URLSearchParams({ organizationId });
     if (redirectTo) {
       queryParams.set("next", redirectTo);
     }
 
+    const callbackUrl = await buildCallbackUrl({
+      organizationId,
+      orgSubdomain: subdomain,
+      searchParams: queryParams,
+    });
+
     // Initiate OAuth flow
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${callbackUrl}?${queryParams.toString()}`,
+        redirectTo: callbackUrl,
       },
     });
 

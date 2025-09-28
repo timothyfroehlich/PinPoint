@@ -1,10 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { NextRequest } from "next/server";
+import { middleware } from "~/../middleware";
 
-import { middleware } from "../../middleware";
+function createRequest(url: string) {
+  const parsed = new URL(url);
+  return {
+    headers: new Headers({ host: parsed.host }),
+    nextUrl: parsed,
+  } as unknown as Parameters<typeof middleware>[0];
+}
 
 function runMiddleware(url: string): ReturnType<typeof middleware> {
-  const request = new NextRequest(url);
+  const request = createRequest(url);
   return middleware(request);
 }
 
@@ -49,4 +55,3 @@ describe("middleware host handling", () => {
     expect(response.headers.get("location")).toBeNull();
   });
 });
-

@@ -1,7 +1,5 @@
 import { describe, expect, beforeEach, afterEach, it, vi } from "vitest";
 
-import { sendMagicLink, signInWithOAuth } from "./auth-actions";
-
 vi.mock("~/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
@@ -19,6 +17,12 @@ vi.mock("next/headers", () => ({
   headers: vi.fn(),
 }));
 
+vi.mock("next/navigation", () => ({
+  redirect: vi.fn((url: string) => {
+    throw new Error(`redirect:${url}`);
+  }),
+}));
+
 const ALIAS_HOST = "pinpoint.austinpinballcollective.org";
 const APEX_HOST = "pinpoint.app";
 const PREVIEW_HOST = "pin-point-abc123.vercel.app";
@@ -31,6 +35,8 @@ const {
 } = await import("~/lib/dal/public-organizations");
 const { isDevelopment } = await import("~/lib/environment");
 const { headers } = await import("next/headers");
+const { redirect } = await import("next/navigation");
+const { sendMagicLink, signInWithOAuth } = await import("./auth-actions");
 
 describe("auth-actions host handling", () => {
   const mockSupabase = {
@@ -132,8 +138,13 @@ describe("auth-actions host handling", () => {
 
     async function trigger(host: string, redirectTo?: string): Promise<void> {
       vi.mocked(headers).mockResolvedValue(new Headers({ host }));
-
-      await signInWithOAuth("google", organizationId, redirectTo);
+      try {
+        await signInWithOAuth("google", organizationId, redirectTo);
+      } catch (error) {
+        if (!(error instanceof Error) || !error.message.startsWith("redirect:")) {
+          throw error;
+        }
+      }
     }
 
     it("keeps alias host in redirectTo", async () => {
@@ -147,16 +158,17 @@ describe("auth-actions host handling", () => {
           }),
         }),
       );
+      expect(redirect).toHaveBeenCalled();
     });
 
     it("builds subdomain redirect for apex host", async () => {
-      await trigger(APEX_HOST, "/dashboard");
+      await trigger(APEX_HOST);
 
       expect(mockSupabase.auth.signInWithOAuth).toHaveBeenCalledWith(
         expect.objectContaining({
           options: expect.objectContaining({
             redirectTo:
-              "https://apc.pinpoint.app/auth/callback?organizationId=org-apc&next=%2Fdashboard",
+              "https://apc.pinpoint.app/auth/callback?organizationId=org-apc",
           }),
         }),
       );
@@ -190,4 +202,3 @@ describe("auth-actions host handling", () => {
     });
   });
 });
-

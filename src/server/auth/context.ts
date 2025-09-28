@@ -14,8 +14,11 @@ import { headers } from "next/headers";
 import { createClient } from "~/lib/supabase/server";
 import { extractTrustedSubdomain } from "~/lib/subdomain-verification";
 import { resolveOrgSubdomainFromHost } from "~/lib/domain-org-mapping";
-import { getOrganizationBySubdomain } from "~/lib/dal/public-organizations";
-import { getUserMembershipPublic } from "~/lib/dal/public-organizations";
+import {
+  getOrganizationBySubdomain,
+  getUserMembershipPublic,
+  getPublicOrganizationById,
+} from "~/lib/dal/public-organizations";
 import { METADATA_KEYS } from "~/lib/constants/entity-ui";
 
 /**
@@ -58,11 +61,9 @@ export type AuthContext =
   | { kind: "authorized"; user: BaseUser; org: Org; membership: Membership };
 
 /**
- * Single canonical authentication resolver
- * Uses React 19 cache() for request-level memoization
- * Returns structured union (never throws)
+ * Core resolver (uncached) to allow cache resets in tests.
  */
-export const getRequestAuthContext = cache(async (): Promise<AuthContext> => {
+const resolveAuthContext = async (): Promise<AuthContext> => {
   try {
     // 1. Session Layer: Read cookies + Supabase session
     const supabase = await createClient();
@@ -84,7 +85,7 @@ export const getRequestAuthContext = cache(async (): Promise<AuthContext> => {
     };
 
     // 3. Org Context Layer: Resolve orgId (precedence order)
-    // Priority: subdomain header > user.app_metadata.organizationId
+    // Priority: user.app_metadata.organizationId > trusted subdomain/alias hint
     const headersList = await headers();
     const host = headersList.get("host") ?? "";
     const subdomain =
@@ -93,30 +94,23 @@ export const getRequestAuthContext = cache(async (): Promise<AuthContext> => {
       METADATA_KEYS.ORGANIZATION_ID
     ] as string;
 
-    let orgId: string;
-    if (subdomain && subdomain !== "www" && subdomain !== "api") {
-      orgId = subdomain;
-    } else if (metadataOrgId) {
-      orgId = metadataOrgId;
-    } else {
-      return { kind: "unauthenticated" }; // No valid org resolution
-    }
+    let orgId: string | null = null;
+    let org = null;
 
-    // Fetch organization (1 query) - handle both subdomain and organization ID
-    let org;
-    if (subdomain && subdomain !== "www" && subdomain !== "api") {
-      // Primary path: look up by subdomain
-      org = await getOrganizationBySubdomain(orgId);
-    } else {
-      // Fallback path: orgId is actually an organization ID, need to look up differently
-      const { getPublicOrganizationById } = await import(
-        "~/lib/dal/public-organizations"
-      );
+    if (metadataOrgId) {
+      orgId = metadataOrgId;
       try {
         org = await getPublicOrganizationById(orgId);
       } catch {
         org = null;
       }
+    } else if (subdomain && subdomain !== "www" && subdomain !== "api") {
+      orgId = subdomain;
+      org = await getOrganizationBySubdomain(subdomain);
+    }
+
+    if (!orgId) {
+      return { kind: "unauthenticated" };
     }
 
     if (!org) {
@@ -153,7 +147,21 @@ export const getRequestAuthContext = cache(async (): Promise<AuthContext> => {
     console.error("[AUTH-CONTEXT] Unexpected error during resolution:", error);
     return { kind: "unauthenticated" };
   }
-});
+};
+
+let cachedAuthContextResolver = cache(resolveAuthContext);
+
+/**
+ * Single canonical authentication resolver
+ * Uses React 19 cache() for request-level memoization
+ * Returns structured union (never throws)
+ */
+export const getRequestAuthContext = async (): Promise<AuthContext> =>
+  cachedAuthContextResolver();
+
+export function __resetAuthContextCache(): void {
+  cachedAuthContextResolver = cache(resolveAuthContext);
+}
 
 /**
  * Legacy enforcement helper (thin wrapper)
