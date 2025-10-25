@@ -1,6 +1,9 @@
 #!/bin/sh
 echo "🔍 Running pre-push quality checks..."
 
+# Run security checks with full git history scan
+npm run security:check:push
+
 # Run all quality checks in parallel (typecheck, lint, format, audit, test)
 npm run validate
 

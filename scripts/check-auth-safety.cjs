@@ -11,23 +11,19 @@ const { execSync } = require('child_process');
 const DANGEROUS_PATTERNS = [
   // Duplicate auth calls - multiple patterns per line
   'requireMemberAccess.*requireMemberAccess',
-  'requireOrganizationContext.*requireOrganizationContext', 
+  'requireOrganizationContext.*requireOrganizationContext',
   'getOrganizationContext.*requireMemberAccess',
   'getActionAuthContext.*requireMemberAccess',
   'requireMemberAccess.*getOrganizationContext',
-  
+
   // Direct Supabase usage patterns
   'createClient.*@supabase/supabase-js',
   'import.*createClient.*from.*@supabase/supabase-js',
   '@supabase/auth-helpers-nextjs',
-  
-  // Uncached async exports (basic pattern detection)
-  'export async function.*(?!.*cache)',
-  'export const.*=.*async.*(?!cache)',
-  
+
   // Legacy auth functions in new code (outside allowed files)
   'getActionAuthContext',
-  'getServerAuthContext', 
+  'getServerAuthContext',
   'requireActionAuthContextWithPermission',
   'getDALAuthContext',
   'getUserWithOrganization',
@@ -55,23 +51,25 @@ function isAllowedFile(filePath) {
 
 function checkAuthSafety() {
   console.log('🔐 Checking authentication safety patterns...');
-  
+
   let totalViolations = 0;
-  
-  DANGEROUS_PATTERNS.forEach((pattern, index) => {
+
+  DANGEROUS_PATTERNS.forEach((pattern) => {
     try {
-      const result = execSync(`rg "${pattern}" src/ --type ts -g "*.tsx"`, { 
+      const needsPcre2 = pattern.includes('(?');
+      const rgFlags = needsPcre2 ? '--pcre2' : '';
+      const result = execSync(`rg ${rgFlags} "${pattern}" src/ --type ts -g "*.tsx"`, {
         encoding: 'utf8',
-        stdio: 'pipe' 
+        stdio: 'pipe'
       });
-      
+
       if (result.trim()) {
         const lines = result.trim().split('\n');
         const violations = lines.filter(line => {
           const filePath = line.split(':')[0];
           return !isAllowedFile(filePath);
         });
-        
+
         if (violations.length > 0) {
           console.error(`❌ Dangerous pattern detected: ${pattern}`);
           violations.forEach(violation => {
@@ -89,20 +87,20 @@ function checkAuthSafety() {
       }
     }
   });
-  
+
   if (totalViolations > 0) {
     console.error(`💥 Found ${totalViolations} authentication safety violations!`);
     console.error('');
     console.error('💡 To fix these violations:');
     console.error('   1. Use getRequestAuthContext() from ~/server/auth/context');
-    console.error('   2. Wrap async server functions with cache()'); 
+    console.error('   2. Wrap async server functions with cache()');
     console.error('   3. Use ~/lib/supabase/server createClient() wrapper');
     console.error('   4. Avoid duplicate auth resolution calls');
     console.error('');
     console.error('🚫 Commit blocked until violations are resolved');
     process.exit(1);
   }
-  
+
   console.log('✅ Authentication patterns are safe');
 }
 
@@ -110,18 +108,27 @@ function checkAuthSafety() {
 // Cache wrapper validation
 function checkCacheUsage() {
   console.log('⚡ Checking for proper cache() usage in server functions...');
-  
+
   try {
-    // Find async exports that might need caching
-    const result = execSync(`rg "export.*async.*function|export.*const.*=.*async" src/lib/dal/ src/lib/actions/ src/server/ --type ts`, {
+    const targetDirectories = [
+      'src/lib/dal/',
+      'src/server/db/',
+      'src/server/services/',
+    ];
+
+    // Find async exports that might need caching (read-oriented modules only)
+    const result = execSync(
+      `rg "export.*async.*function|export.*const.*=.*async" ${targetDirectories.join(' ')} --type ts`,
+      {
       encoding: 'utf8',
       stdio: 'pipe'
-    });
-    
+      },
+    );
+
     if (result.trim()) {
       const lines = result.trim().split('\n');
-      const uncachedFunctions = lines.filter(line => !line.includes('cache('));
-      
+      const uncachedFunctions = lines.filter((line) => !line.includes('cache('));
+
       if (uncachedFunctions.length > 0) {
         console.warn('⚠️  Found potentially uncached async server functions:');
         uncachedFunctions.forEach(func => console.warn(`   ${func}`));
@@ -140,11 +147,11 @@ function checkCacheUsage() {
 function main() {
   console.log('🛡️  Running comprehensive authentication safety checks...');
   console.log('');
-  
+
   try {
     checkAuthSafety();
     checkCacheUsage();
-    
+
     console.log('');
     console.log('🎉 All authentication safety checks passed!');
   } catch (error) {

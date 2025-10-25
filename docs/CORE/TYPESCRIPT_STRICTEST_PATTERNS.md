@@ -1,9 +1,61 @@
 # TypeScript Strictest Patterns
 
-**Last Updated**: Unknown  
-**Last Reviewed**: Unknown  
+**Last Updated**: 2025-10-25
+**Last Reviewed**: 2025-10-25
 
 _Essential patterns for @tsconfig/strictest compliance and direct conversion approach_
+
+## ⚠️ When This Document Applies
+
+**IMPORTANT**: These strictest patterns apply **ONLY to production/application code**, not to test code, config files, or scripts.
+
+### Strictest Compliance (tsconfig.json)
+✅ **APPLIES TO**:
+- All application code: `src/**/*.ts`, `src/**/*.tsx`
+- Middleware: `middleware.ts`
+- Library code: `lib/**/*.ts`
+- Type definitions: `types/**/*.d.ts`
+
+Configuration:
+- Extends `@tsconfig/strictest`
+- `strict: true`
+- `strictNullChecks: true`
+- `exactOptionalPropertyTypes: true` ⚠️ (most restrictive)
+- `noUncheckedIndexedAccess: true`
+
+❌ **DOES NOT APPLY TO**:
+- Test files (`*.test.ts`, `*.spec.ts`, `__tests__/**`)
+- E2E tests (`e2e/**`)
+- Test utilities (`src/test/**`)
+- Config files (`*.config.ts`)
+- Build scripts (`scripts/**`)
+- Seed scripts (`scripts/seed/**`)
+
+### Relaxed Standards for Tests (tsconfig.tests.json)
+Test files use **relaxed TypeScript** to allow pragmatic testing patterns:
+- `strict: false`
+- `strictNullChecks: false`
+- `exactOptionalPropertyTypes: false`
+- `noUncheckedIndexedAccess: false`
+- `noImplicitAny: false`
+
+**Why?** Tests often require:
+- Mock objects with partial interfaces
+- Dynamic test data generation
+- Framework-specific patterns (Vitest globals)
+- `any` types for complex mock scenarios
+
+### Moderate Standards for Config (tsconfig.config.json)
+Build tools and configs use **moderate TypeScript**:
+- `strict: true` ✓
+- `strictNullChecks: true` ✓
+- `exactOptionalPropertyTypes: false` (relaxed for config flexibility)
+- `noUncheckedIndexedAccess: false` (relaxed for dynamic configs)
+- `noImplicitAny: false` (relaxed for build tools)
+
+**Summary**: If you're writing application code, follow these patterns strictly. If you're writing tests, configs, or scripts, these patterns are informative but not enforced.
+
+---
 
 ## Core Safety Patterns
 
