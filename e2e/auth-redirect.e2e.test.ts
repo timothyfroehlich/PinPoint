@@ -11,8 +11,8 @@ test.describe("Authentication Redirects", () => {
   }) => {
     console.log("Testing unauthenticated access to protected route...");
 
-    // Try to access the apc org's issues page without authentication
-    await page.goto("http://apc.localhost:3000/issues");
+    // Try to access the issues page without authentication
+    await page.goto("/issues");
 
     // Wait a moment for the page to load and process the authentication check
     await page.waitForTimeout(2000);
@@ -69,7 +69,7 @@ test.describe("Authentication Redirects", () => {
     console.log("Testing unauthenticated access to dashboard...");
 
     // Try to access the dashboard without authentication
-    await page.goto("http://apc.localhost:3000/dashboard");
+    await page.goto("/dashboard");
 
     // Wait for the page to process
     await page.waitForTimeout(2000);
@@ -98,7 +98,9 @@ test.describe("Authentication Redirects", () => {
     }
   });
 
-  test("unauthenticated access to localhost redirects to apc subdomain", async ({
+  // @multi-org-only - Skip in alpha single-org mode
+  // Alpha mode doesn't implement subdomain routing in middleware
+  test.skip("unauthenticated access to localhost redirects to apc subdomain", async ({
     page,
   }) => {
     console.log("Testing localhost redirect behavior...");

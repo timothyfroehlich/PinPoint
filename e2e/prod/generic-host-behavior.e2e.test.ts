@@ -14,7 +14,9 @@ test.describe("prod: generic host", () => {
     await expect(page).toHaveURL(/\/auth\/sign-in/);
   });
 
-  test("sign-in page shows organization dropdown", async ({
+  // @multi-org-only - Skip in alpha single-org mode
+  // Alpha mode removed org selection UI from sign-in form
+  test.skip("sign-in page shows organization dropdown", async ({
     page,
     baseURL,
   }) => {

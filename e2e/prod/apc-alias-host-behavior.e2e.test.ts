@@ -12,7 +12,9 @@ test.describe("prod: APC alias host", () => {
     expect(res?.status()).toBeLessThan(400);
   });
 
-  test("sign-in page hides organization dropdown (org locked by host)", async ({
+  // @multi-org-only - Skip in alpha single-org mode
+  // Alpha mode removed org selection UI entirely (no dropdown anywhere)
+  test.skip("sign-in page hides organization dropdown (org locked by host)", async ({
     page,
     baseURL,
   }) => {
