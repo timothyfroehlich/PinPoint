@@ -119,14 +119,13 @@ export async function signInWithOAuth(
         ? `${callbackUrl}?${queryParams.toString()}`
         : callbackUrl;
 
-    // Initiate OAuth flow with ALPHA_ORG_ID in metadata
+    // Initiate OAuth flow
+    // Note: OAuth doesn't support metadata in options
+    // Metadata will be set in auth callback based on ALPHA_ORG_ID
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
         redirectTo: finalCallbackUrl,
-        data: {
-          organizationId: env.ALPHA_ORG_ID,
-        },
       },
     });
 
