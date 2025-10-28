@@ -1,6 +1,8 @@
 /**
- * Canonical Authentication Context Resolver - Phase 1
+ * Canonical Authentication Context Resolver - Alpha Single-Org Mode
  * Single deterministic, cached request-scoped authentication resolution
+ *
+ * Alpha Simplification: No host hints, metadata-only org resolution
  *
  * Implements the 4-layer authentication stack:
  * 1. Session - Read cookies / Supabase session
@@ -10,13 +12,13 @@
  */
 
 import { cache } from "react";
-import { headers } from "next/headers";
 import { createClient } from "~/lib/supabase/server";
-import { extractTrustedSubdomain } from "~/lib/subdomain-verification";
-import { resolveOrgSubdomainFromHost } from "~/lib/domain-org-mapping";
-import { getOrganizationBySubdomain } from "~/lib/dal/public-organizations";
-import { getUserMembershipPublic } from "~/lib/dal/public-organizations";
+import {
+  getPublicOrganizationById,
+  getUserMembershipPublic,
+} from "~/lib/dal/public-organizations";
 import { METADATA_KEYS } from "~/lib/constants/entity-ui";
+import { env } from "~/env";
 
 /**
  * Base user type (identity layer)
@@ -58,11 +60,9 @@ export type AuthContext =
   | { kind: "authorized"; user: BaseUser; org: Org; membership: Membership };
 
 /**
- * Single canonical authentication resolver
- * Uses React 19 cache() for request-level memoization
- * Returns structured union (never throws)
+ * Core resolver (uncached) to allow cache resets in tests
  */
-export const getRequestAuthContext = cache(async (): Promise<AuthContext> => {
+const resolveAuthContext = async (): Promise<AuthContext> => {
   try {
     // 1. Session Layer: Read cookies + Supabase session
     const supabase = await createClient();
@@ -83,40 +83,20 @@ export const getRequestAuthContext = cache(async (): Promise<AuthContext> => {
       ...(userName && { name: userName }),
     };
 
-    // 3. Org Context Layer: Resolve orgId (precedence order)
-    // Priority: subdomain header > user.app_metadata.organizationId
-    const headersList = await headers();
-    const host = headersList.get("host") ?? "";
-    const subdomain =
-      extractTrustedSubdomain(headersList) ?? resolveOrgSubdomainFromHost(host);
+    // 3. Org Context Layer: Metadata-only (Alpha Single-Org)
+    // Priority: user.app_metadata.organizationId → ALPHA_ORG_ID
     const metadataOrgId = user.app_metadata[
       METADATA_KEYS.ORGANIZATION_ID
-    ] as string;
+    ] as string | undefined;
 
-    let orgId: string;
-    if (subdomain && subdomain !== "www" && subdomain !== "api") {
-      orgId = subdomain;
-    } else if (metadataOrgId) {
-      orgId = metadataOrgId;
-    } else {
-      return { kind: "unauthenticated" }; // No valid org resolution
-    }
+    // Alpha: If no metadata, use hardcoded org ID
+    const orgId = metadataOrgId ?? env.ALPHA_ORG_ID;
 
-    // Fetch organization (1 query) - handle both subdomain and organization ID
-    let org;
-    if (subdomain && subdomain !== "www" && subdomain !== "api") {
-      // Primary path: look up by subdomain
-      org = await getOrganizationBySubdomain(orgId);
-    } else {
-      // Fallback path: orgId is actually an organization ID, need to look up differently
-      const { getPublicOrganizationById } = await import(
-        "~/lib/dal/public-organizations"
-      );
-      try {
-        org = await getPublicOrganizationById(orgId);
-      } catch {
-        org = null;
-      }
+    let org = null;
+    try {
+      org = await getPublicOrganizationById(orgId);
+    } catch {
+      org = null;
     }
 
     if (!org) {
@@ -153,7 +133,25 @@ export const getRequestAuthContext = cache(async (): Promise<AuthContext> => {
     console.error("[AUTH-CONTEXT] Unexpected error during resolution:", error);
     return { kind: "unauthenticated" };
   }
-});
+};
+
+// Cache and export
+let cachedAuthContextResolver = cache(resolveAuthContext);
+
+/**
+ * Single canonical authentication resolver
+ * Uses React 19 cache() for request-level memoization
+ * Returns structured union (never throws)
+ */
+export const getRequestAuthContext = async (): Promise<AuthContext> =>
+  cachedAuthContextResolver();
+
+/**
+ * Test helper to reset cache between tests
+ */
+export function __resetAuthContextCache(): void {
+  cachedAuthContextResolver = cache(resolveAuthContext);
+}
 
 /**
  * Legacy enforcement helper (thin wrapper)
