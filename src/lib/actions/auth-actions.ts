@@ -1,23 +1,16 @@
 /**
- * Authentication Server Actions - Modern Supabase OAuth & Magic Link
- * Implements Google OAuth and Magic Link authentication with Server Actions
+ * Authentication Server Actions - Alpha Single-Org Mode
+ * Simplified magic link and OAuth authentication without org selection
  */
 
 "use server";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
 import { z } from "zod";
 import { createClient } from "~/lib/supabase/server";
-import { emailSchema, idSchema } from "~/lib/validation/schemas";
-import {
-  validateOrganizationExists,
-  getOrganizationSubdomainById,
-} from "~/lib/dal/public-organizations";
-import { isDevelopment } from "~/lib/environment";
+import { emailSchema } from "~/lib/validation/schemas";
 import { extractFormFields } from "~/lib/utils/form-data";
-import { getCookieDomain } from "~/lib/utils/domain";
 import { actionError } from "./shared";
 import { isError, getErrorMessage } from "~/lib/utils/type-guards";
 import { env } from "~/env";
@@ -27,42 +20,33 @@ import type { ActionResult } from "./shared";
 // Validation schemas
 const magicLinkSchema = z.object({
   email: emailSchema,
-  organizationId: idSchema,
 });
 
 const oauthProviderSchema = z.object({
   provider: z.enum(["google"]),
-  organizationId: idSchema,
   redirectTo: z.url().optional(),
 });
 
 /**
- * Get base domain for callback URLs using server-side headers
- * Handles both development (localhost) and production domains
+ * Get callback URL for authentication flows
+ * Alpha: Simple URL without subdomain routing
  */
-async function getBaseDomain(): Promise<string> {
-  const headersList = await headers();
-  const host = headersList.get("host") ?? "localhost:3000";
-
-  if (isDevelopment()) {
-    return "localhost:3000";
-  }
-
-  // Use getCookieDomain to extract base domain, then remove leading dot
-  // e.g., "org1.mysite.com" -> ".mysite.com" -> "mysite.com"
-  return getCookieDomain(host).replace(/^\./, "");
+function getCallbackUrl(): string {
+  const baseUrl = env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  return `${baseUrl}/auth/callback`;
 }
 
 /**
  * Send Magic Link for passwordless authentication
+ * Alpha: Always assigns user to ALPHA_ORG_ID
  */
 export async function sendMagicLink(
   _prevState: ActionResult<{ message: string }> | null,
   formData: FormData,
 ): Promise<ActionResult<{ message: string }>> {
   try {
-    // Validate form data with type safety
-    let data: { email: string; organizationId: string };
+    // Validate form data
+    let data: { email: string };
     try {
       data = extractFormFields(formData, magicLinkSchema);
     } catch (error) {
@@ -71,37 +55,17 @@ export async function sendMagicLink(
       );
     }
 
-    const { email, organizationId } = data;
-
-    // Validate organization exists
-    const organizationValid = await validateOrganizationExists(organizationId);
-    if (!organizationValid) {
-      return actionError("Invalid organization selected", {
-        organizationId: ["Selected organization is not valid"],
-      });
-    }
+    const { email } = data;
     const supabase = await createClient();
 
-    // Get organization subdomain for redirect URL
-    const subdomain = await getOrganizationSubdomainById(organizationId);
-    if (!subdomain) {
-      return actionError("Organization configuration error");
-    }
-
-    // Build callback URL with organization subdomain
-    const baseDomain = await getBaseDomain();
-    const callbackUrl = isDevelopment()
-      ? `https://${subdomain}.localhost:3000/auth/callback`
-      : `https://${subdomain}.${baseDomain}/auth/callback`;
-
-    // Send magic link with organization metadata
+    // Send magic link with ALPHA_ORG_ID in metadata
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
         shouldCreateUser: true,
-        emailRedirectTo: `${callbackUrl}?organizationId=${organizationId}`,
+        emailRedirectTo: getCallbackUrl(),
         data: {
-          organizationId,
+          organizationId: env.ALPHA_ORG_ID,
         },
       },
     });
@@ -125,54 +89,44 @@ export async function sendMagicLink(
 
 /**
  * Initiate OAuth authentication flow
+ * Alpha: Always assigns user to ALPHA_ORG_ID
  */
 export async function signInWithOAuth(
   provider: "google",
-  organizationId: string,
   redirectTo?: string,
 ): Promise<never> {
   try {
     // Validate inputs
     const validation = oauthProviderSchema.safeParse({
       provider,
-      organizationId,
       redirectTo,
     });
     if (!validation.success) {
       redirect("/auth/auth-code-error?error=invalid_input");
     }
 
-    // Validate organization exists
-    const organizationValid = await validateOrganizationExists(organizationId);
-    if (!organizationValid) {
-      redirect("/auth/auth-code-error?error=invalid_organization");
-    }
-
     const supabase = await createClient();
 
-    // Get organization subdomain for redirect URL
-    const subdomain = await getOrganizationSubdomainById(organizationId);
-    if (!subdomain) {
-      redirect("/auth/auth-code-error?error=organization_config");
-    }
-
-    // Build callback URL with organization subdomain
-    const baseDomain = await getBaseDomain();
-    const callbackUrl = isDevelopment()
-      ? `https://${subdomain}.localhost:3000/auth/callback`
-      : `https://${subdomain}.${baseDomain}/auth/callback`;
-
-    // Build query params for callback
-    const queryParams = new URLSearchParams({ organizationId });
+    // Build callback URL with optional redirect
+    const callbackUrl = getCallbackUrl();
+    const queryParams = new URLSearchParams();
     if (redirectTo) {
       queryParams.set("next", redirectTo);
     }
 
-    // Initiate OAuth flow
+    const finalCallbackUrl =
+      queryParams.toString() !== ""
+        ? `${callbackUrl}?${queryParams.toString()}`
+        : callbackUrl;
+
+    // Initiate OAuth flow with ALPHA_ORG_ID in metadata
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${callbackUrl}?${queryParams.toString()}`,
+        redirectTo: finalCallbackUrl,
+        data: {
+          organizationId: env.ALPHA_ORG_ID,
+        },
       },
     });
 
@@ -206,12 +160,14 @@ export async function devSignIn(
   try {
     const supabase = await createClient();
 
-    // Use Supabase's development-friendly authentication
-    // This would typically integrate with your existing dev auth system
+    // Dev auth with ALPHA_ORG_ID
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
         shouldCreateUser: true,
+        data: {
+          organizationId: env.ALPHA_ORG_ID,
+        },
       },
     });
 
