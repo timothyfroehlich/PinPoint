@@ -1,15 +1,14 @@
 /**
- * Sign-In Form Component - Client Island for Authentication
- * Modern form with Google OAuth and Magic Link using React 19 patterns
+ * Sign-In Form Component - Alpha Single-Org Mode
+ * Simplified authentication without organization selection
  */
 
 "use client";
 
 import React from "react";
 import { useActionState } from "react";
-import { useState, useEffect, useMemo } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "~/trpc/react";
 
 import { Button } from "~/components/ui/button";
 import {
@@ -23,24 +22,15 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Separator } from "~/components/ui/separator";
 import { Alert } from "~/components/ui/alert";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
 import { sendMagicLink, signInWithOAuth } from "~/lib/actions/auth-actions";
-import { type OrganizationOption } from "~/lib/dal/public-organizations";
 
 // Development auth integration
 import { authenticateDevUser, getAuthResultMessage } from "~/lib/auth/dev-auth";
 import { isDevAuthAvailable } from "~/lib/environment-client";
 import { createClient } from "~/utils/supabase/client";
-import { resolveOrgSubdomainFromLocation } from "~/lib/domain-org-mapping";
+import { env } from "~/env";
 
 export function SignInForm(): React.JSX.Element {
-  console.log(`[SIGNIN_FORM] Component mounting/rendering`);
   const router = useRouter();
 
   const [magicLinkState, magicLinkAction, magicLinkPending] = useActionState(
@@ -52,86 +42,13 @@ export function SignInForm(): React.JSX.Element {
   const [devAuthLoading, setDevAuthLoading] = useState(false);
   const [devAuthError, setDevAuthError] = useState<string | null>(null);
 
-  // Organization selection state
-  const [organizations, setOrganizations] = useState<OrganizationOption[]>([]);
-  const [selectedOrganizationId, setSelectedOrganizationId] =
-    useState<string>("");
-  const [organizationsLoading, setOrganizationsLoading] = useState(true);
-  const [isOrgLockedByHost, setIsOrgLockedByHost] = useState(false);
-  const [lockedOrgLabel, setLockedOrgLabel] = useState<string | null>(null);
-
-  // tRPC: fetch public organizations (anon-safe)
-  const { data: publicOrganizations, isLoading: orgsLoading } =
-    api.organization.listPublic.useQuery();
-
-  // Development auth integration (preserving existing dev auth system)
   const shouldShowDevLogin = isDevAuthAvailable();
 
-  // Memoize organizations array to prevent unnecessary re-renders
-  const orgs = useMemo(() => {
-    if (!publicOrganizations) return [];
-    return publicOrganizations.map((o) => ({
-      id: o.id,
-      name: o.name,
-      subdomain: o.subdomain,
-    }));
-  }, [publicOrganizations]);
-
-  // Load organizations and apply host-based org locking
-  useEffect(() => {
-    console.log(
-      `[SIGNIN_FORM] useEffect triggered - orgsLoading: ${String(orgsLoading)}, orgs.length: ${String(orgs.length)}`,
-    );
-
-    setOrganizationsLoading(orgsLoading);
-    if (orgsLoading || orgs.length === 0) return;
-
-    // Determine if host locks this session to a specific org (e.g., APC domain alias)
-    const lockedSubdomain = resolveOrgSubdomainFromLocation();
-    console.log(`[SIGNIN_FORM] Client-side host resolution:`);
-    console.log(
-      `[SIGNIN_FORM] window.location.hostname: "${typeof window !== "undefined" ? window.location.hostname : "undefined"}"`,
-    );
-    console.log(
-      `[SIGNIN_FORM] lockedSubdomain: "${lockedSubdomain ?? "null"}"`,
-    );
-    console.log(
-      `[SIGNIN_FORM] Available orgs:`,
-      orgs.map((o) => ({ id: o.id, subdomain: o.subdomain, name: o.name })),
-    );
-
-    if (lockedSubdomain) {
-      const locked = orgs.find((o) => o.subdomain === lockedSubdomain);
-      console.log(`[SIGNIN_FORM] Found locked org:`, locked);
-      if (locked) {
-        console.log(`[SIGNIN_FORM] Setting org locked by host: ${locked.name}`);
-        setIsOrgLockedByHost(true);
-        setLockedOrgLabel(locked.name);
-        setOrganizations([locked]);
-        setSelectedOrganizationId(locked.id);
-        return;
-      }
-    }
-
-    // Fallback default: prefer APC/test org as default if present, else first
-    const apc = orgs.find(
-      (o) => o.subdomain === "apc" || o.id === "test-org-pinpoint",
-    );
-    const defaultId = apc?.id ?? orgs[0]?.id ?? "";
-
-    setOrganizations(orgs);
-    setSelectedOrganizationId(defaultId);
-  }, [orgs, orgsLoading]);
-
   const handleOAuthSignIn = async (provider: "google"): Promise<void> => {
-    if (!selectedOrganizationId) {
-      alert("Please select an organization");
-      return;
-    }
-
     setIsOAuthLoading(true);
     try {
-      await signInWithOAuth(provider, selectedOrganizationId);
+      // Alpha: No org parameter needed
+      await signInWithOAuth(provider);
     } catch (error) {
       console.error("OAuth error:", error);
       setIsOAuthLoading(false);
@@ -139,11 +56,6 @@ export function SignInForm(): React.JSX.Element {
   };
 
   const handleDevAuth = async (email: string, role: string): Promise<void> => {
-    if (!selectedOrganizationId) {
-      alert("Please select an organization");
-      return;
-    }
-
     setDevAuthLoading(true);
     try {
       const supabase = createClient();
@@ -151,14 +63,12 @@ export function SignInForm(): React.JSX.Element {
         email,
         name: email.split("@").at(0) ?? "user",
         role,
-        organizationId: selectedOrganizationId,
+        organizationId: env.ALPHA_ORG_ID, // Alpha: Hardcoded org
       };
       const result = await authenticateDevUser(supabase, userData);
 
       if (result.success) {
         console.log("Dev login successful:", result.method);
-
-        // Simple navigation to dashboard - let the application handle routing
         router.push("/dashboard");
       } else {
         console.error("Login failed:", result.error);
@@ -176,62 +86,11 @@ export function SignInForm(): React.JSX.Element {
     <Card className="w-full">
       <CardHeader>
         <CardTitle>Sign In</CardTitle>
-        <CardDescription>Choose your preferred sign-in method</CardDescription>
+        <CardDescription>
+          Sign in to Austin Pinball Collective
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Organization Selector (hidden when host locks to a specific org) */}
-        {!isOrgLockedByHost ? (
-          <div className="space-y-2">
-            <Label htmlFor="organization">Organization</Label>
-            {organizationsLoading ? (
-              <div className="flex items-center space-x-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
-                <span className="text-sm text-muted-foreground">
-                  Loading organizations...
-                </span>
-              </div>
-            ) : (
-              <Select
-                value={selectedOrganizationId}
-                onValueChange={setSelectedOrganizationId}
-                disabled={isOAuthLoading || magicLinkPending || devAuthLoading}
-              >
-                <SelectTrigger data-testid="org-select-trigger">
-                  <SelectValue
-                    placeholder="Select your organization"
-                    data-testid="org-select-value"
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {organizations.map((org) => (
-                    <SelectItem
-                      key={org.id}
-                      value={org.id}
-                      data-testid={`org-option-${org.subdomain}`}
-                    >
-                      {org.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            {organizations.length === 0 && !organizationsLoading && (
-              <p className="text-sm text-error">
-                No organizations available. Please contact support.
-              </p>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-1">
-            <Label>Organization</Label>
-            <div className="text-sm text-on-surface-variant">
-              {lockedOrgLabel ?? "Organization locked by site"}
-            </div>
-          </div>
-        )}
-
-        <Separator />
-
         {/* Google OAuth */}
         <Button
           onClick={() => void handleOAuthSignIn("google")}
@@ -299,13 +158,6 @@ export function SignInForm(): React.JSX.Element {
               )}
           </div>
 
-          {/* Hidden organization ID field */}
-          <input
-            type="hidden"
-            name="organizationId"
-            value={selectedOrganizationId}
-          />
-
           <Button
             type="submit"
             disabled={magicLinkPending || isOAuthLoading || devAuthLoading}
@@ -343,7 +195,7 @@ export function SignInForm(): React.JSX.Element {
             </Alert>
           )}
 
-        {/* Development Auth (preserved from existing system) */}
+        {/* Development Auth */}
         {shouldShowDevLogin && (
           <>
             <Separator />
