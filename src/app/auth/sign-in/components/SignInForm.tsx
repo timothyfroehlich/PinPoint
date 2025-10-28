@@ -28,7 +28,6 @@ import { sendMagicLink, signInWithOAuth } from "~/lib/actions/auth-actions";
 import { authenticateDevUser, getAuthResultMessage } from "~/lib/auth/dev-auth";
 import { isDevAuthAvailable } from "~/lib/environment-client";
 import { createClient } from "~/utils/supabase/client";
-import { env } from "~/env";
 
 export function SignInForm(): React.JSX.Element {
   const router = useRouter();
@@ -63,7 +62,6 @@ export function SignInForm(): React.JSX.Element {
         email,
         name: email.split("@").at(0) ?? "user",
         role,
-        organizationId: env.ALPHA_ORG_ID, // Alpha: Hardcoded org
       };
       const result = await authenticateDevUser(supabase, userData);
 
