@@ -66,6 +66,8 @@
     "security:auth": "node scripts/check-auth-safety.cjs",
     "security:audit": "./scripts/check-npm-audit.sh",
     "_comment_testing": "========== Testing Commands ==========",
+    "e2e:snapshot:create": "./scripts/e2e-snapshot-create.sh",
+    "e2e:snapshot:restore": "./scripts/e2e-snapshot-restore.sh",
     "test:e2e:prod": "playwright test -c playwright.prod.config.ts --reporter=line",
     "lint:sarif": "next lint --format @microsoft/eslint-formatter-sarif --output-file eslint-results.sarif",
     "_comment_status": "========== Status Commands ==========",

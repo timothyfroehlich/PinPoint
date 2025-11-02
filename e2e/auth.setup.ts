@@ -14,7 +14,8 @@ setup("authenticate as Tim dev user", async ({ page }) => {
   const PORT = process.env.PLAYWRIGHT_PORT ?? process.env.PORT ?? "3000";
   const BASE_URL = process.env.BASE_URL ?? `http://localhost:${PORT}`;
 
-  // Go directly to sign-in page
+  // Note: Database health is verified in global-setup.ts
+  // This test focuses solely on authentication
   await page.goto(`${BASE_URL}/auth/sign-in`);
   await expect(page.locator("h1")).toContainText(/Welcome back|Sign In/i, {
     timeout: 10000,
