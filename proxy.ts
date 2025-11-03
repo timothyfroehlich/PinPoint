@@ -6,7 +6,7 @@ import { updateSession } from "~/utils/supabase/middleware";
  * Only handles Supabase session refresh
  * No subdomain routing or org resolution
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   return await updateSession(request);
 }
 
