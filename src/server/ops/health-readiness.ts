@@ -39,10 +39,13 @@ export function computeReadiness(
   counts: SeedCounts,
   minimums: Record<string, number>,
 ): ReadinessChecks {
-  return Object.entries(minimums).reduce<ReadinessChecks>((acc, [table, min]) => {
-    const actual = counts[table] ?? 0;
-    // CodeQL [js/prototype-pollution-utility]: table keys derive from constant 'minimums'
-    acc[table] = actual >= min;
-    return acc;
-  }, {});
+  return Object.entries(minimums).reduce<ReadinessChecks>(
+    (acc, [table, min]) => {
+      const actual = counts[table] ?? 0;
+      // CodeQL [js/prototype-pollution-utility]: table keys derive from constant 'minimums'
+      acc[table] = actual >= min;
+      return acc;
+    },
+    {},
+  );
 }
