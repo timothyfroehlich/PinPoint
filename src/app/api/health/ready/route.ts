@@ -76,6 +76,7 @@ export async function GET(): Promise<NextResponse> {
     // Convert results to lookup map
     const rows = Array.from(countResults);
     const counts = rows.reduce<Record<string, number>>((acc, row) => {
+      // CodeQL [js/prototype-pollution-utility]: False positive - row.table is from controlled SQL query results
       acc[row.table] = row.count;
       return acc;
     }, {});
@@ -86,6 +87,7 @@ export async function GET(): Promise<NextResponse> {
       Record<string, boolean>
     >((acc, [table, minCount]) => {
       const actualCount = counts[table] ?? 0;
+      // CodeQL [js/prototype-pollution-utility]: False positive - table is from compile-time constant MINIMUM_THRESHOLDS
       acc[table] = actualCount >= minCount;
       return acc;
     }, {});

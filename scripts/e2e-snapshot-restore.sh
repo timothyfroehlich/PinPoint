@@ -60,12 +60,12 @@ set -e
 
 echo "${RESTORE_OUTPUT}" | grep -v "NOTICE:" || true
 
-if [ ${RESTORE_STATUS} -ne 0 ]; then
+if [ "${RESTORE_STATUS}" -ne 0 ]; then
   if echo "${RESTORE_OUTPUT}" | grep -q "must be owner of event trigger pgrst_drop_watch"; then
     echo "⚠️  Ignoring known Supabase event trigger ownership warning (pgrst_drop_watch)."
   else
     echo "❌ pg_restore failed"
-    exit ${RESTORE_STATUS}
+    exit "${RESTORE_STATUS}"
   fi
 fi
 
