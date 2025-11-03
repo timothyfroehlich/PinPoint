@@ -81,14 +81,15 @@ async function createDevUsers() {
   ).trim();
 
   // Debug logging for environment variable availability (without exposing secrets)
+  // Note: We check boolean presence only to avoid CodeQL security warnings about logging sensitive data
   console.log("🔍 Environment variable check:");
   console.log(`  SUPABASE_URL: ${process.env.SUPABASE_URL ? "✓ set" : "✗ not set"}`);
   console.log(`  NEXT_PUBLIC_SUPABASE_URL: ${process.env.NEXT_PUBLIC_SUPABASE_URL ? "✓ set" : "✗ not set"}`);
   console.log(`  API_URL: ${process.env.API_URL ? "✓ set" : "✗ not set"}`);
-  console.log(`  SUPABASE_SECRET_KEY: ${process.env.SUPABASE_SECRET_KEY ? `✓ set (length: ${process.env.SUPABASE_SECRET_KEY.length})` : "✗ not set"}`);
-  console.log(`  SERVICE_ROLE_KEY: ${process.env.SERVICE_ROLE_KEY ? `✓ set (length: ${process.env.SERVICE_ROLE_KEY.length})` : "✗ not set"}`);
-  console.log(`  Selected URL: ${rawSupabaseUrl ? `✓ "${rawSupabaseUrl}"` : "✗ empty"}`);
-  console.log(`  Selected Secret Key: ${supabaseSecretKey ? `✓ present (length: ${supabaseSecretKey.length})` : "✗ empty"}`);
+  console.log(`  SUPABASE_SECRET_KEY: ${process.env.SUPABASE_SECRET_KEY ? "✓ set" : "✗ not set"}`);
+  console.log(`  SERVICE_ROLE_KEY: ${process.env.SERVICE_ROLE_KEY ? "✓ set" : "✗ not set"}`);
+  console.log(`  Selected URL: ${rawSupabaseUrl ? "✓ selected" : "✗ empty"}`);
+  console.log(`  Selected Secret Key: ${supabaseSecretKey ? "✓ present" : "✗ empty"}`);
 
   if (!rawSupabaseUrl || !supabaseSecretKey) {
     console.error("❌ Missing required environment variables:");
@@ -103,7 +104,7 @@ async function createDevUsers() {
   if (!jwtPattern.test(supabaseSecretKey)) {
     console.error("❌ SUPABASE_SECRET_KEY does not appear to be a valid JWT token");
     console.error("   Expected format: header.payload.signature (base64 encoded)");
-    console.error(`   Received format appears invalid (length: ${supabaseSecretKey.length})`);
+    console.error("   Received format appears invalid");
     console.error("   Token structure validation failed - check for:");
     console.error("   - Truncated/incomplete token");
     console.error("   - Extra whitespace or newlines");
