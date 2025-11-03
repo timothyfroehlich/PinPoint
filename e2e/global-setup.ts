@@ -10,8 +10,12 @@
 
 import { execSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 import type { FullConfig } from "@playwright/test";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 export default async function globalSetup(config: FullConfig) {
   console.log("🔧 Playwright Global Setup Starting...\n");

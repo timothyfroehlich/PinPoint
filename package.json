@@ -217,7 +217,7 @@
     "supabase": "^2.55.7",
     "tailwindcss": "^4.1.16",
     "tailwindcss-animate": "^1.0.7",
-    "ts-morph": "^26.0.0",
+    "ts-morph": "^27.0.2",
     "tsx": "^4.20.6",
     "typescript": "5.8.2",
     "typescript-eslint": "8.37.0",
