@@ -19,13 +19,10 @@
  * - 404 Not Found in production
  */
 
-import { sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { env } from "~/env";
-// Health check endpoint needs direct DB access for seeding verification (dev/test only)
-// eslint-disable-next-line no-restricted-imports
-import { getGlobalDatabaseProvider } from "~/server/db/provider";
+import { getSeedCounts, computeReadiness } from "~/server/ops/health-readiness";
 
 /**
  * Minimum row counts for critical tables
@@ -52,46 +49,8 @@ export async function GET(): Promise<NextResponse> {
   }
 
   try {
-    const db = getGlobalDatabaseProvider().getClient();
-
-    // Single optimized query: count rows in all critical tables
-    // Uses UNION ALL to combine results in one query
-    const countResults = await db.execute<{ table: string; count: number }>(sql`
-      SELECT 'organizations' AS table, COUNT(*)::int AS count FROM organizations
-      UNION ALL
-      SELECT 'users' AS table, COUNT(*)::int AS count FROM users
-      UNION ALL
-      SELECT 'memberships' AS table, COUNT(*)::int AS count FROM memberships
-      UNION ALL
-      SELECT 'roles' AS table, COUNT(*)::int AS count FROM roles
-      UNION ALL
-      SELECT 'priorities' AS table, COUNT(*)::int AS count FROM priorities
-      UNION ALL
-      SELECT 'issue_statuses' AS table, COUNT(*)::int AS count FROM issue_statuses
-      UNION ALL
-      SELECT 'machines' AS table, COUNT(*)::int AS count FROM machines
-      UNION ALL
-      SELECT 'issues' AS table, COUNT(*)::int AS count FROM issues
-    `);
-
-    // Convert results to lookup map
-    const rows = Array.from(countResults);
-    const counts = rows.reduce<Record<string, number>>((acc, row) => {
-      // CodeQL [js/prototype-pollution-utility]: False positive - row.table is from controlled SQL query results
-      acc[row.table] = row.count;
-      return acc;
-    }, {});
-
-    // Check each table against minimum threshold
-    // Return boolean only (not actual counts for security)
-    const checks = Object.entries(MINIMUM_THRESHOLDS).reduce<
-      Record<string, boolean>
-    >((acc, [table, minCount]) => {
-      const actualCount = counts[table] ?? 0;
-      // CodeQL [js/prototype-pollution-utility]: False positive - table is from compile-time constant MINIMUM_THRESHOLDS
-      acc[table] = actualCount >= minCount;
-      return acc;
-    }, {});
+    const counts = await getSeedCounts();
+    const checks = computeReadiness(counts, MINIMUM_THRESHOLDS);
 
     // Database is ready if ALL checks pass
     const ready = Object.values(checks).every((passed) => passed);
