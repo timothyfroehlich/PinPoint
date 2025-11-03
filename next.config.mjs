@@ -22,7 +22,7 @@ const config = {
   ],
 
   // React Compiler for automatic optimization (2025)
-  reactCompiler: true, // Enable React Compiler optimization
+  reactCompiler: true,
 
   experimental: {
     // optimizeCss: true, // Temporarily disabled while Tailwind v4 is stabilizing
