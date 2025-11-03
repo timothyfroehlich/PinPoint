@@ -1,6 +1,17 @@
 import { test, expect } from "@playwright/test";
 
+test.describe.configure({ tags: ["@prod"] });
+
 test.describe("prod: APC alias host", () => {
+  test.beforeEach(({}, testInfo) => {
+    const base = testInfo.project.use.baseURL ?? "";
+    if (base.includes("localhost")) {
+      testInfo.skip(
+        "Prod alias behavior disabled for single-tenant alpha / localhost",
+      );
+    }
+  });
+
   test("root redirects to /auth/sign-in (no landing page)", async ({
     page,
     baseURL,
@@ -12,7 +23,9 @@ test.describe("prod: APC alias host", () => {
     expect(res?.status()).toBeLessThan(400);
   });
 
-  test("sign-in page hides organization dropdown (org locked by host)", async ({
+  // @multi-org-only - Skip in alpha single-org mode
+  // Alpha mode removed org selection UI entirely (no dropdown anywhere)
+  test.skip("sign-in page hides organization dropdown (org locked by host)", async ({
     page,
     baseURL,
   }) => {
