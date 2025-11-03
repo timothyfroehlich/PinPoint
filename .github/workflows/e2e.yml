@@ -71,6 +71,8 @@ jobs:
           } >> "$GITHUB_ENV"
           
           # Debug: Log variable lengths (not values) to verify they're set
+          # Note: This validates source shell variables BEFORE they're exported to $GITHUB_ENV
+          # These are the raw values from Supabase CLI that will become env vars for subsequent steps
           echo "🔍 Environment variable validation:"
           echo "  NEXT_PUBLIC_SUPABASE_URL length: ${#CLEAN_API_URL}"
           echo "  ANON_KEY length: ${#ANON_KEY}"
@@ -110,7 +112,14 @@ jobs:
           [[ -n "$SUPABASE_URL" ]] || { echo "❌ SUPABASE_URL not set"; exit 1; }
           [[ -n "$SUPABASE_SECRET_KEY" ]] || { echo "❌ SUPABASE_SECRET_KEY not set"; exit 1; }
           [[ -n "$NEXT_PUBLIC_SUPABASE_URL" ]] || { echo "❌ NEXT_PUBLIC_SUPABASE_URL not set"; exit 1; }
-          echo "✅ Required environment variables are set"
+          
+          # Validate SUPABASE_SECRET_KEY is a JWT (three dot-separated segments)
+          if ! echo "$SUPABASE_SECRET_KEY" | grep -Eq '^[^.]+\.[^.]+\.[^.]+$'; then
+            echo "❌ SUPABASE_SECRET_KEY is not a valid JWT (expected three dot-separated segments)"
+            exit 1
+          fi
+          
+          echo "✅ Required environment variables are set and SUPABASE_SECRET_KEY is a valid JWT"
 
           # Use unified reset script for schema + seeds (local Supabase)
           # Capture logs for artifact upload on failure
