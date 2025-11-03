@@ -19,7 +19,9 @@ export default async function globalSetup(config: FullConfig) {
   // In CI, database is seeded fresh by the workflow before tests run
   // Skip snapshot operations to avoid filesystem dependencies
   if (process.env.CI === "true") {
-    console.log("⏭️  Skipping snapshot operations in CI (database already seeded by workflow)\n");
+    console.log(
+      "⏭️  Skipping snapshot operations in CI (database already seeded by workflow)\n",
+    );
     console.log("✅ Global Setup Complete\n");
     return;
   }
@@ -29,7 +31,9 @@ export default async function globalSetup(config: FullConfig) {
 
   if (!snapshotExists) {
     console.log("📸 Snapshot not found - creating fresh snapshot...");
-    console.log("   This is a one-time setup (subsequent runs will be faster)\n");
+    console.log(
+      "   This is a one-time setup (subsequent runs will be faster)\n",
+    );
 
     try {
       // Seed the database fresh
