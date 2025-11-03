@@ -1,3 +1,4 @@
+import { existsSync, promises as fs } from "node:fs";
 /**
  * Auth Setup for E2E Tests - Alpha Single-Org Mode
  * Simplified to work without org selection
@@ -9,6 +10,16 @@ const authFile = "e2e/.auth/user.json";
 
 setup("authenticate as Tim dev user", async ({ page }) => {
   console.log("Setting up authentication for Tim dev user...");
+
+  if (existsSync(authFile)) {
+    await fs.unlink(authFile);
+  }
+
+  page.on("console", (msg) => {
+    if (msg.type() === "error") {
+      console.warn(`[auth.setup] Browser console error: ${msg.text()}`);
+    }
+  });
 
   // Calculate BASE_URL using same logic as playwright.config.ts
   const PORT = process.env.PLAYWRIGHT_PORT ?? process.env.PORT ?? "3000";
@@ -49,6 +60,14 @@ setup("authenticate as Tim dev user", async ({ page }) => {
   });
 
   console.log("Authentication successful, saving state...");
+
+  const cookies = await page.context().cookies();
+  const hasSupabaseAuth = cookies.some(
+    (cookie) => cookie.name.startsWith("sb-") && cookie.name.endsWith("auth-token"),
+  );
+  if (!hasSupabaseAuth) {
+    throw new Error("Authentication succeeded but Supabase auth cookie missing.");
+  }
 
   // Save signed-in state to 'e2e/.auth/user.json'
   await page.context().storageState({ path: authFile });

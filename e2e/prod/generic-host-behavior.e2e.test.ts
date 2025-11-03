@@ -1,6 +1,15 @@
 import { test, expect } from "@playwright/test";
 
+test.describe.configure({ tags: ["@prod"] });
+
 test.describe("prod: generic host", () => {
+  test.beforeEach(({}, testInfo) => {
+    const base = testInfo.project.use.baseURL ?? "";
+    if (base.includes("localhost")) {
+      testInfo.skip("Prod generic host behavior disabled for single-tenant alpha / localhost");
+    }
+  });
+
   test("landing page is visible at root and CTA links to sign-in", async ({
     page,
     baseURL,

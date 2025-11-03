@@ -6,6 +6,12 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Authentication Redirects", () => {
+  test.beforeEach(({}, testInfo) => {
+    if (testInfo.project.name.includes("auth")) {
+      testInfo.skip("Authentication redirect tests require unauthenticated browser project");
+    }
+  });
+
   test("unauthenticated user accessing apc org issues page shows error boundary or redirects", async ({
     page,
   }) => {

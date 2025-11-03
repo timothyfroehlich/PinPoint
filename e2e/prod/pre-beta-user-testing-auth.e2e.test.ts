@@ -12,14 +12,23 @@ async function tryDevLoginIfAvailable(
   const hasTim = await timButton.count();
   const hasHarry = await harryButton.count();
   if (hasTim === 0 && hasHarry === 0) return false;
-  const button = hasHarry > 0 ? harryButton : timButton;
+  const button = hasHarry > 0 ? harryButton.first() : timButton.first();
   await button.click();
   await page.waitForURL(/\/dashboard/, { timeout: 15_000 });
   await expect(page).toHaveURL(/\/dashboard/);
   return true;
 }
 
+test.describe.configure({ tags: ["@prod"] });
+
 test.describe("prod: pre-beta-user-testing", () => {
+  test.beforeEach(({}, testInfo) => {
+    const base = testInfo.project.use.baseURL ?? "";
+    if (base.includes("localhost")) {
+      testInfo.skip("Prod pre-beta behaviours disabled for single-tenant alpha / localhost");
+    }
+  });
+
   test("APC alias: dev login (if available) lands on /dashboard", async ({
     page,
     baseURL,

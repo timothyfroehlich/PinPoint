@@ -6,6 +6,12 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Smoke Tests", () => {
+  test.beforeEach(({}, testInfo) => {
+    if (!testInfo.project.name.includes("auth")) {
+      testInfo.skip("Smoke tests require authenticated storage state project");
+    }
+  });
+
   test("dashboard access", async ({ page }) => {
     await page.goto("/dashboard");
     await expect(page.locator("h1")).toContainText(

@@ -41,24 +41,33 @@ echo "   Snapshot: ${SNAPSHOT_FILE}"
 # Export password for pg_restore
 export PGPASSWORD
 
-# Restore dump
-# --clean: Drop database objects before restoring (handled by dump's --clean)
-# --if-exists: Don't error if objects don't exist (handled by dump's --if-exists)
-# --no-owner: Don't set object ownership
-# --no-acl: Don't restore access privileges
-# -d: Database to restore into
-# --single-transaction: Restore as a single transaction (atomic, faster)
-pg_restore \
-  -h "${PGHOST}" \
-  -p "${PGPORT}" \
-  -U "${PGUSER}" \
-  -d "${PGDATABASE}" \
-  --no-owner \
-  --no-acl \
-  --single-transaction \
-  --clean \
-  --if-exists \
-  "${SNAPSHOT_FILE}" 2>&1 | grep -v "NOTICE:" || true
+set +e
+RESTORE_OUTPUT="$(
+  pg_restore \
+    -h "${PGHOST}" \
+    -p "${PGPORT}" \
+    -U "${PGUSER}" \
+    -d "${PGDATABASE}" \
+    --no-owner \
+    --no-acl \
+    --single-transaction \
+    --clean \
+    --if-exists \
+    "${SNAPSHOT_FILE}" 2>&1
+)"
+RESTORE_STATUS=$?
+set -e
+
+echo "${RESTORE_OUTPUT}" | grep -v "NOTICE:" || true
+
+if [ ${RESTORE_STATUS} -ne 0 ]; then
+  if echo "${RESTORE_OUTPUT}" | grep -q "must be owner of event trigger pgrst_drop_watch"; then
+    echo "⚠️  Ignoring known Supabase event trigger ownership warning (pgrst_drop_watch)."
+  else
+    echo "❌ pg_restore failed"
+    exit ${RESTORE_STATUS}
+  fi
+fi
 
 echo "✅ Database snapshot restored successfully"
 echo ""

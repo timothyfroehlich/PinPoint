@@ -1,6 +1,15 @@
 import { test, expect } from "@playwright/test";
 
+test.describe.configure({ tags: ["@prod"] });
+
 test.describe("prod: APC alias host", () => {
+  test.beforeEach(({}, testInfo) => {
+    const base = testInfo.project.use.baseURL ?? "";
+    if (base.includes("localhost")) {
+      testInfo.skip("Prod alias behavior disabled for single-tenant alpha / localhost");
+    }
+  });
+
   test("root redirects to /auth/sign-in (no landing page)", async ({
     page,
     baseURL,

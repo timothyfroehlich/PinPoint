@@ -39,7 +39,7 @@ const MINIMUM_THRESHOLDS = {
   issues: 10, // Sample issues for testing
 } as const;
 
-export async function GET() {
+export async function GET(): Promise<NextResponse> {
   // Only available in development/test environments
   if (process.env.NODE_ENV === "production") {
     return NextResponse.json(
