@@ -81,7 +81,6 @@ async function createDevUsers() {
   ).trim();
 
   // Debug logging for environment variable availability (without exposing secrets)
-  // Note: We check boolean presence only to avoid CodeQL security warnings about logging sensitive data
   console.log("🔍 Environment variable check:");
   console.log(`  SUPABASE_URL: ${process.env.SUPABASE_URL ? "✓ set" : "✗ not set"}`);
   console.log(`  NEXT_PUBLIC_SUPABASE_URL: ${process.env.NEXT_PUBLIC_SUPABASE_URL ? "✓ set" : "✗ not set"}`);
@@ -119,6 +118,11 @@ async function createDevUsers() {
     console.error("   - Missing environment variable in GitHub Actions secrets");
     process.exit(1);
   }
+
+  // Masked diagnostics for service role key (safe for logs)
+  const keyHead = supabaseSecretKey.substring(0, 4);
+  const keyTail = supabaseSecretKey.substring(supabaseSecretKey.length - 4);
+  console.log(`✅ Service role key validated: length=${supabaseSecretKey.length}, masked=${keyHead}...${keyTail}`);
 
   // Sanitize/build Supabase URL
   function buildSupabaseUrl(input: string): string {
