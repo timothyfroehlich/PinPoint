@@ -104,8 +104,10 @@ async function createDevUsers() {
     console.error("❌ SUPABASE_SECRET_KEY does not appear to be a valid JWT token");
     console.error("   Expected format: header.payload.signature (base64 encoded)");
     console.error(`   Received format appears invalid (length: ${supabaseSecretKey.length})`);
-    console.error("   First 20 chars:", supabaseSecretKey.substring(0, 20));
-    console.error("   Last 20 chars:", supabaseSecretKey.substring(supabaseSecretKey.length - 20));
+    console.error("   Token structure validation failed - check for:");
+    console.error("   - Truncated/incomplete token");
+    console.error("   - Extra whitespace or newlines");
+    console.error("   - Missing environment variable in GitHub Actions secrets");
     process.exit(1);
   }
 

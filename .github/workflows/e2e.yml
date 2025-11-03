@@ -104,6 +104,8 @@ jobs:
           echo "🗃️ Setting up database schema and seed data with local Supabase..."
 
           # Validate critical environment variables before running db:reset
+          # Note: This early validation helps catch missing variables before the db reset script runs
+          # The create-dev-users.ts script has its own validation for standalone usage
           echo "🔍 Validating environment variables for db:reset..."
           [[ -n "$SUPABASE_URL" ]] || { echo "❌ SUPABASE_URL not set"; exit 1; }
           [[ -n "$SUPABASE_SECRET_KEY" ]] || { echo "❌ SUPABASE_SECRET_KEY not set"; exit 1; }
