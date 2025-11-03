@@ -40,6 +40,46 @@ npx playwright test --ui
 npx playwright test --debug
 ```
 
+## Port Requirements & Conflicts
+
+### Default Port: 3000
+
+E2E tests run on **port 3000** by default (configured in `.env.test`). This ensures:
+- ✅ Consistent test URLs across environments
+- ✅ No localhost subdomain routing issues
+- ✅ Predictable authentication callbacks
+
+### Port Conflict Resolution
+
+If port 3000 is already in use (e.g., your dev server is running):
+
+**Option 1: Stop Dev Server (Recommended)**
+```bash
+# Stop your dev server before running tests
+npm run e2e
+```
+
+**Option 2: Use Alternate Port**
+```bash
+# Override port in .env.test temporarily
+PORT=3100 npm run e2e
+```
+
+**Option 3: CI Mode (No Server Reuse)**
+```bash
+# Force fresh server start (slower)
+CI=true npm run e2e
+```
+
+### Why Not `reuseExistingServer`?
+
+Currently disabled (`reuseExistingServer: false`) to ensure clean test state. This prevents:
+- ❌ Stale middleware state
+- ❌ Module cache pollution
+- ❌ Environment variable contamination
+
+**Future:** May re-enable with `!process.env.CI` flag once test isolation is verified.
+
 ## Test Categories
 
 ### 1. Authentication Setup (`auth.setup.ts`)

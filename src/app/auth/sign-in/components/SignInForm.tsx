@@ -84,9 +84,7 @@ export function SignInForm(): React.JSX.Element {
     <Card className="w-full">
       <CardHeader>
         <CardTitle>Sign In</CardTitle>
-        <CardDescription>
-          Sign in to Austin Pinball Collective
-        </CardDescription>
+        <CardDescription>Sign in to Austin Pinball Collective</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Google OAuth */}

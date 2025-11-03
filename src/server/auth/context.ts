@@ -85,9 +85,9 @@ const resolveAuthContext = async (): Promise<AuthContext> => {
 
     // 3. Org Context Layer: Metadata-only (Alpha Single-Org)
     // Priority: user.app_metadata.organizationId → ALPHA_ORG_ID
-    const metadataOrgId = user.app_metadata[
-      METADATA_KEYS.ORGANIZATION_ID
-    ] as string | undefined;
+    const metadataOrgId = user.app_metadata[METADATA_KEYS.ORGANIZATION_ID] as
+      | string
+      | undefined;
 
     // Alpha: If no metadata, use hardcoded org ID
     const orgId = metadataOrgId ?? env.ALPHA_ORG_ID;

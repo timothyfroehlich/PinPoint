@@ -63,10 +63,13 @@ setup("authenticate as Tim dev user", async ({ page }) => {
 
   const cookies = await page.context().cookies();
   const hasSupabaseAuth = cookies.some(
-    (cookie) => cookie.name.startsWith("sb-") && cookie.name.endsWith("auth-token"),
+    (cookie) =>
+      cookie.name.startsWith("sb-") && cookie.name.endsWith("auth-token"),
   );
   if (!hasSupabaseAuth) {
-    throw new Error("Authentication succeeded but Supabase auth cookie missing.");
+    throw new Error(
+      "Authentication succeeded but Supabase auth cookie missing.",
+    );
   }
 
   // Save signed-in state to 'e2e/.auth/user.json'

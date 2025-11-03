@@ -2,7 +2,10 @@ import { config as loadEnv } from "dotenv";
 import { defineConfig, devices } from "@playwright/test";
 
 // Auto-load .env.test for local Playwright runs unless explicitly disabled.
-if (!process.env.PLAYWRIGHT_ENV_LOADED && process.env.SKIP_PLAYWRIGHT_ENV_LOAD !== "1") {
+if (
+  !process.env.PLAYWRIGHT_ENV_LOADED &&
+  process.env.SKIP_PLAYWRIGHT_ENV_LOAD !== "1"
+) {
   loadEnv({ path: ".env.test", override: false });
   process.env.PLAYWRIGHT_ENV_LOADED = "true";
 }

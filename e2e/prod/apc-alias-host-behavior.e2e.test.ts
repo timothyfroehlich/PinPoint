@@ -6,7 +6,9 @@ test.describe("prod: APC alias host", () => {
   test.beforeEach(({}, testInfo) => {
     const base = testInfo.project.use.baseURL ?? "";
     if (base.includes("localhost")) {
-      testInfo.skip("Prod alias behavior disabled for single-tenant alpha / localhost");
+      testInfo.skip(
+        "Prod alias behavior disabled for single-tenant alpha / localhost",
+      );
     }
   });
 

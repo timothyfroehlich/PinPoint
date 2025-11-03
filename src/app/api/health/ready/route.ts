@@ -22,6 +22,8 @@
 import { sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
+import { env } from "~/env";
+// eslint-disable-next-line no-restricted-imports -- Health check endpoint needs direct DB access for seeding verification (dev/test only)
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 
 /**
@@ -41,7 +43,7 @@ const MINIMUM_THRESHOLDS = {
 
 export async function GET(): Promise<NextResponse> {
   // Only available in development/test environments
-  if (process.env.NODE_ENV === "production") {
+  if (env.NODE_ENV === "production") {
     return NextResponse.json(
       { error: "Health check not available in production" },
       { status: 404 },
@@ -80,14 +82,13 @@ export async function GET(): Promise<NextResponse> {
 
     // Check each table against minimum threshold
     // Return boolean only (not actual counts for security)
-    const checks = Object.entries(MINIMUM_THRESHOLDS).reduce(
-      (acc, [table, minCount]) => {
-        const actualCount = counts[table] ?? 0;
-        acc[table] = actualCount >= minCount;
-        return acc;
-      },
-      {} as Record<string, boolean>,
-    );
+    const checks = Object.entries(MINIMUM_THRESHOLDS).reduce<
+      Record<string, boolean>
+    >((acc, [table, minCount]) => {
+      const actualCount = counts[table] ?? 0;
+      acc[table] = actualCount >= minCount;
+      return acc;
+    }, {});
 
     // Database is ready if ALL checks pass
     const ready = Object.values(checks).every((passed) => passed);
@@ -108,7 +109,8 @@ export async function GET(): Promise<NextResponse> {
       {
         ready: false,
         checks,
-        message: "Database seeding incomplete - some tables below minimum thresholds",
+        message:
+          "Database seeding incomplete - some tables below minimum thresholds",
       },
       { status: 503 },
     );

@@ -8,7 +8,9 @@ import { test, expect } from "@playwright/test";
 test.describe("Authentication Redirects", () => {
   test.beforeEach(({}, testInfo) => {
     if (testInfo.project.name.includes("auth")) {
-      testInfo.skip("Authentication redirect tests require unauthenticated browser project");
+      testInfo.skip(
+        "Authentication redirect tests require unauthenticated browser project",
+      );
     }
   });
 

@@ -25,7 +25,9 @@ test.describe("prod: pre-beta-user-testing", () => {
   test.beforeEach(({}, testInfo) => {
     const base = testInfo.project.use.baseURL ?? "";
     if (base.includes("localhost")) {
-      testInfo.skip("Prod pre-beta behaviours disabled for single-tenant alpha / localhost");
+      testInfo.skip(
+        "Prod pre-beta behaviours disabled for single-tenant alpha / localhost",
+      );
     }
   });
 
