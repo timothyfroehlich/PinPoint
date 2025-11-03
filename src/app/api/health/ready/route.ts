@@ -23,7 +23,8 @@ import { sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { env } from "~/env";
-// eslint-disable-next-line no-restricted-imports -- Health check endpoint needs direct DB access for seeding verification (dev/test only)
+// Health check endpoint needs direct DB access for seeding verification (dev/test only)
+// eslint-disable-next-line no-restricted-imports
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 
 /**
