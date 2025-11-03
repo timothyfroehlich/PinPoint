@@ -7,7 +7,7 @@
     "_comment_primary": "========== Primary Commands ==========",
     "dev": "next dev --turbo",
     "build": "next build",
-    "validate": "npm-run-all --parallel security:check test:all typecheck lint format audit",
+    "validate": "npm-run-all --parallel lint format typecheck audit security:check --sequential test:all",
     "typecheck": "tsc --noEmit --pretty false && tsc --project tsconfig.config.json --noEmit --pretty false",
     "lint": "eslint . --max-warnings 220 --quiet",
     "format": "prettier --check \"**/*.{ts,tsx,js,jsx,mdx}\" --ignore-path .prettierignore --cache --log-level warn",
