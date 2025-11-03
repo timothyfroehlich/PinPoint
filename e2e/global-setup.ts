@@ -11,7 +11,8 @@
 import { execSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
+import { dirname } from "node:path";
+import { resolve } from "node:path";
 import type { FullConfig } from "@playwright/test";
 
 const __filename = fileURLToPath(import.meta.url);
