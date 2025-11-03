@@ -80,11 +80,32 @@ async function createDevUsers() {
     ""
   ).trim();
 
+  // Debug logging for environment variable availability (without exposing secrets)
+  console.log("🔍 Environment variable check:");
+  console.log(`  SUPABASE_URL: ${process.env.SUPABASE_URL ? "✓ set" : "✗ not set"}`);
+  console.log(`  NEXT_PUBLIC_SUPABASE_URL: ${process.env.NEXT_PUBLIC_SUPABASE_URL ? "✓ set" : "✗ not set"}`);
+  console.log(`  API_URL: ${process.env.API_URL ? "✓ set" : "✗ not set"}`);
+  console.log(`  SUPABASE_SECRET_KEY: ${process.env.SUPABASE_SECRET_KEY ? `✓ set (length: ${process.env.SUPABASE_SECRET_KEY.length})` : "✗ not set"}`);
+  console.log(`  SERVICE_ROLE_KEY: ${process.env.SERVICE_ROLE_KEY ? `✓ set (length: ${process.env.SERVICE_ROLE_KEY.length})` : "✗ not set"}`);
+  console.log(`  Selected URL: ${rawSupabaseUrl ? `✓ "${rawSupabaseUrl}"` : "✗ empty"}`);
+  console.log(`  Selected Secret Key: ${supabaseSecretKey ? `✓ present (length: ${supabaseSecretKey.length})` : "✗ empty"}`);
+
   if (!rawSupabaseUrl || !supabaseSecretKey) {
     console.error("❌ Missing required environment variables:");
     if (!rawSupabaseUrl)
-      console.error("  - SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL)");
-    if (!supabaseSecretKey) console.error("  - SUPABASE_SECRET_KEY");
+      console.error("  - SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL or API_URL)");
+    if (!supabaseSecretKey) console.error("  - SUPABASE_SECRET_KEY (or SERVICE_ROLE_KEY)");
+    process.exit(1);
+  }
+
+  // Validate JWT format (should be three base64 segments separated by dots)
+  const jwtPattern = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+  if (!jwtPattern.test(supabaseSecretKey)) {
+    console.error("❌ SUPABASE_SECRET_KEY does not appear to be a valid JWT token");
+    console.error("   Expected format: header.payload.signature (base64 encoded)");
+    console.error(`   Received format appears invalid (length: ${supabaseSecretKey.length})`);
+    console.error("   First 20 chars:", supabaseSecretKey.substring(0, 20));
+    console.error("   Last 20 chars:", supabaseSecretKey.substring(supabaseSecretKey.length - 20));
     process.exit(1);
   }
 
