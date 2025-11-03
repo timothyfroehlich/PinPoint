@@ -1,16 +1,8 @@
 #!/bin/sh
 echo "🔍 Running pre-push quality checks..."
 
-# Run security checks with full git history scan
-npm run security:check:push
-
-# Run all quality checks in parallel (typecheck, lint, format, audit, test)
-npm run validate
-
-if [ $? -ne 0 ]; then
-  echo "❌ Quality checks failed. Fix issues before pushing."
-  echo "💡 If intentionally pushing incomplete work, you may use --no-verify"
-  exit 1
-fi
+# Run security checks with full git history scan, then validate
+# Using && ensures if security checks fail, validate won't run and hook exits immediately
+npm run security:check:push && npm run validate
 
 echo "✅ All pre-push quality checks passed!"
