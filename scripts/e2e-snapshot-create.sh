@@ -16,6 +16,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 SNAPSHOT_FILE="${PROJECT_ROOT}/e2e/fixtures/test-database.dump"
 
+# Ensure snapshot directory exists (first-run convenience)
+mkdir -p "$(dirname "${SNAPSHOT_FILE}")"
+
 # Supabase local PostgreSQL connection details
 PGHOST="${PGHOST:-127.0.0.1}"
 PGPORT="${PGPORT:-54322}"
