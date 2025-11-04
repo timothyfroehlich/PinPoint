@@ -11,7 +11,7 @@ SELECT plan(12);
 -- Test 1: Verify seeded users exist in database (without RLS context)
 -- This test runs as superuser to verify all expected users exist before testing isolation
 SELECT results_eq(
-  'SELECT COUNT(*)::integer FROM users WHERE email IN (''tim.froehlich@example.com'', ''harry.williams@example.com'', ''escher.lefkoff@example.com'')',
+  'SELECT COUNT(*)::integer FROM auth.users WHERE email IN (''tim.froehlich@example.com'', ''harry.williams@example.com'', ''escher.lefkoff@example.com'')',
   'VALUES (3)',
   'Seeded users exist in database (3 users from seed data with correct email domains)'
 );
