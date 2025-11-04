@@ -10,9 +10,12 @@ SELECT plan(12);
 
 -- Test 1: Verify seeded users exist in database (without RLS context)
 -- This test runs as superuser to verify all expected users exist before testing isolation
-SELECT results_eq(
-  'SELECT COUNT(*)::integer FROM memberships WHERE user_id IN (' || quote_literal(test_user_admin()) || ', ' || quote_literal(test_user_member1()) || ', ' || quote_literal(test_user_member2()) || ')',
-  'VALUES (3)',
+SELECT ok(
+  (
+    SELECT COUNT(DISTINCT user_id)
+    FROM memberships
+    WHERE user_id IN (test_user_admin(), test_user_member1(), test_user_member2())
+  ) = 3,
   'Seeded memberships exist for test users (baseline)'
 );
 
