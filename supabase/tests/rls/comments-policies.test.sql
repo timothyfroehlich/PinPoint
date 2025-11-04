@@ -19,30 +19,36 @@ SELECT lives_ok(
   'Author can update own comment'
 );
 
--- Test 2: Another member cannot update author's comment (RLS filters row)
 INSERT INTO comments (id, content, organization_id, issue_id, commenter_type, author_id)
 VALUES ('test-comment-2', 'Member1 comment', test_org_primary(), 'issue-kaiju-figures-001', 'authenticated', test_user_member1());
 
-SELECT set_jwt_claims_for_test(test_org_primary(), test_user_member2(), 'member', ARRAY['comment:view', 'comment:create']);
+-- Verify baseline content as a primary org member (read permitted)
+SELECT set_jwt_claims_for_test(test_org_primary(), test_user_member1(), 'member', ARRAY['*']);
 SELECT is(
   (SELECT COUNT(*) FROM comments WHERE id = 'test-comment-2' AND content = 'Member1 comment'),
   1::bigint,
   'Comment exists with original content before unauthorized update attempt'
 );
 
+-- Attempt unauthorized update as a different member in same org (no author/mod perms)
+SELECT set_jwt_claims_for_test(test_org_primary(), test_user_member2(), 'member', ARRAY['comment:view', 'comment:create']);
 -- This UPDATE will silently affect 0 rows due to RLS USING clause filtering
 UPDATE comments SET content = 'Edited by member2' WHERE id = 'test-comment-2';
 
+-- Switch back to primary org member1 to verify content unchanged (read permitted)
+SELECT set_jwt_claims_for_test(test_org_primary(), test_user_member1(), 'member', ARRAY['*']);
 SELECT is(
   (SELECT COUNT(*) FROM comments WHERE id = 'test-comment-2' AND content = 'Member1 comment'),  
   1::bigint,
   'Member cannot update another member comment - content unchanged by RLS filtering'
 );
 
--- Test 3: Admin with comment:moderate can update any comment
+-- Insert authored by member1 (ensure insert occurs under a valid org member)
+SELECT set_jwt_claims_for_test(test_org_primary(), test_user_member1(), 'member', ARRAY['*']);
 INSERT INTO comments (id, content, organization_id, issue_id, commenter_type, author_id)
 VALUES ('test-comment-3', 'Member comment for admin to moderate', test_org_primary(), 'issue-kaiju-figures-001', 'authenticated', test_user_member1());
 
+-- Admin with moderation permission can update
 SELECT set_jwt_claims_for_test(test_org_primary(), test_user_admin(), 'admin', ARRAY['comment:moderate']);
 SELECT lives_ok(
   $$ UPDATE comments SET content = 'Edited by admin with moderation' WHERE id = 'test-comment-3' $$,
@@ -82,4 +88,3 @@ SELECT is(
 
 SELECT * FROM finish();
 ROLLBACK;
-

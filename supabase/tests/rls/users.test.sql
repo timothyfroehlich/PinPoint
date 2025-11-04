@@ -118,9 +118,10 @@ SELECT results_eq(
 SET LOCAL role = 'authenticated';
 SELECT set_primary_org_context();
 SELECT set_jwt_claims_for_test(test_org_primary(), test_user_member1(), 'member', ARRAY['user:view']);
-SELECT ok(
-  (SELECT COUNT(*) FROM users u JOIN memberships m ON u.id = m.user_id WHERE m.organization_id = test_org_primary()) > 0,
-  'Member can view users within their organization'
+SELECT results_eq(
+  'SELECT COUNT(*)::integer FROM users WHERE id = ' || quote_literal(auth.uid()::text),
+  'VALUES (1)',
+  'Member can view own user record within their organization'
 );
 
 SELECT * FROM finish();
