@@ -98,31 +98,19 @@ async function createDevUsers() {
     process.exit(1);
   }
 
-  // Validate JWT format (should be three base64 segments separated by dots)
-  // Supabase service role keys are typically 150+ chars; catch truncation
-  if (supabaseSecretKey.length < 100) {
-    console.error("❌ SUPABASE_SECRET_KEY is too short to be a valid service role key");
-    console.error("   The received key appears truncated or invalid (expected at least 100 characters).");
-    console.error("   This usually means the secret is truncated or misconfigured.");
+  // Accept both historical JWT-style keys and new sb_secret_* keys
+  const isJwtLike = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(
+    supabaseSecretKey,
+  );
+  const isSbSecret = supabaseSecretKey.startsWith("sb_secret_");
+  if (!isJwtLike && !isSbSecret) {
+    console.error("❌ SUPABASE_SECRET_KEY format not recognized");
+    console.error(
+      "   Expected either a JWT-like token (header.payload.signature) or an sb_secret_* key",
+    );
     process.exit(1);
   }
-
-  const jwtPattern = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
-  if (!jwtPattern.test(supabaseSecretKey)) {
-    console.error("❌ SUPABASE_SECRET_KEY does not appear to be a valid JWT token");
-    console.error("   Expected format: header.payload.signature (base64 encoded)");
-    console.error("   Received format appears invalid");
-    console.error("   Token structure validation failed - check for:");
-    console.error("   - Truncated/incomplete token");
-    console.error("   - Extra whitespace or newlines");
-    console.error("   - Missing environment variable in GitHub Actions secrets");
-    process.exit(1);
-  }
-
-  // Masked diagnostics for service role key (safe for logs)
-  // Do not log any portion of the secret
-  // Only log that validation succeeded and the length
-  console.log(`✅ Service role key validated`);
+  console.log(`✅ Service key format accepted (${isSbSecret ? "sb_secret" : "jwt"})`);
 
   // Sanitize/build Supabase URL
   function buildSupabaseUrl(input: string): string {
