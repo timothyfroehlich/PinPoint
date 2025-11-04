@@ -87,7 +87,7 @@ export type Database = {
           entity_id: string | null
           entity_type: string
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           organization_id: string
           severity: string
           user_agent: string | null
@@ -100,7 +100,7 @@ export type Database = {
           entity_id?: string | null
           entity_type: string
           id: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           organization_id: string
           severity?: string
           user_agent?: string | null
@@ -113,7 +113,7 @@ export type Database = {
           entity_id?: string | null
           entity_type?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           organization_id?: string
           severity?: string
           user_agent?: string | null
@@ -1121,6 +1121,27 @@ export type Database = {
       }
     }
     Views: {
+      pg_all_foreign_keys: {
+        Row: {
+          fk_columns: unknown[] | null
+          fk_constraint_name: unknown
+          fk_schema_name: unknown
+          fk_table_name: unknown
+          fk_table_oid: unknown
+          is_deferrable: boolean | null
+          is_deferred: boolean | null
+          match_type: string | null
+          on_delete: string | null
+          on_update: string | null
+          pk_columns: unknown[] | null
+          pk_constraint_name: unknown
+          pk_index_name: unknown
+          pk_schema_name: unknown
+          pk_table_name: unknown
+          pk_table_oid: unknown
+        }
+        Relationships: []
+      }
       public_organizations_minimal: {
         Row: {
           id: string | null
@@ -1130,12 +1151,102 @@ export type Database = {
         }
         Relationships: []
       }
+      tap_funky: {
+        Row: {
+          args: string | null
+          is_definer: boolean | null
+          is_strict: boolean | null
+          is_visible: boolean | null
+          kind: unknown
+          langoid: unknown
+          name: unknown
+          oid: unknown
+          owner: unknown
+          returns: string | null
+          returns_set: boolean | null
+          schema: unknown
+          volatility: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      cleanup_anonymous_rate_limits: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      _cleanup: { Args: never; Returns: boolean }
+      _contract_on: { Args: { "": string }; Returns: unknown }
+      _currtest: { Args: never; Returns: number }
+      _db_privs: { Args: never; Returns: unknown[] }
+      _extensions: { Args: never; Returns: unknown[] }
+      _get: { Args: { "": string }; Returns: number }
+      _get_latest: { Args: { "": string }; Returns: number[] }
+      _get_note: { Args: { "": string }; Returns: string }
+      _is_verbose: { Args: never; Returns: boolean }
+      _prokind: { Args: { p_oid: unknown }; Returns: unknown }
+      _query: { Args: { "": string }; Returns: string }
+      _refine_vol: { Args: { "": string }; Returns: string }
+      _table_privs: { Args: never; Returns: unknown[] }
+      _temptypes: { Args: { "": string }; Returns: string }
+      _todo: { Args: never; Returns: string }
+      cleanup_anonymous_rate_limits: { Args: never; Returns: undefined }
+      clear_jwt_context: { Args: never; Returns: undefined }
+      col_is_null:
+        | {
+            Args: {
+              column_name: unknown
+              description?: string
+              table_name: unknown
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              column_name: unknown
+              description?: string
+              schema_name: unknown
+              table_name: unknown
+            }
+            Returns: string
+          }
+      col_not_null:
+        | {
+            Args: {
+              column_name: unknown
+              description?: string
+              table_name: unknown
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              column_name: unknown
+              description?: string
+              schema_name: unknown
+              table_name: unknown
+            }
+            Returns: string
+          }
+      diag:
+        | {
+            Args: { msg: unknown }
+            Returns: {
+              error: true
+            } & "Could not choose the best candidate function between: public.diag(msg => text), public.diag(msg => anyelement). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
+          }
+        | {
+            Args: { msg: string }
+            Returns: {
+              error: true
+            } & "Could not choose the best candidate function between: public.diag(msg => text), public.diag(msg => anyelement). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
+          }
+      diag_test_name: { Args: { "": string }; Returns: string }
+      do_tap:
+        | { Args: { "": string }; Returns: string[] }
+        | { Args: never; Returns: string[] }
+      ensure_test_memberships: { Args: never; Returns: undefined }
+      fail:
+        | { Args: never; Returns: string }
+        | { Args: { "": string }; Returns: string }
+      findfuncs: { Args: { "": string }; Returns: string[] }
+      finish: { Args: { exception_on_failure?: boolean }; Returns: string[] }
       fn_effective_issue_public: {
         Args: { issue_id: string }
         Returns: boolean
@@ -1157,7 +1268,7 @@ export type Database = {
         Returns: boolean
       }
       fn_public_organizations_minimal: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           id: string
           logo_url: string
@@ -1169,6 +1280,71 @@ export type Database = {
         Args: { p_org_id: string; p_role_id: string; p_user_id: string }
         Returns: undefined
       }
+      has_unique: { Args: { "": string }; Returns: string }
+      in_todo: { Args: never; Returns: boolean }
+      is_empty: { Args: { "": string }; Returns: string }
+      isnt_empty: { Args: { "": string }; Returns: string }
+      lives_ok: { Args: { "": string }; Returns: string }
+      no_plan: { Args: never; Returns: boolean[] }
+      num_failed: { Args: never; Returns: number }
+      os_name: { Args: never; Returns: string }
+      pass:
+        | { Args: never; Returns: string }
+        | { Args: { "": string }; Returns: string }
+      pg_version: { Args: never; Returns: string }
+      pg_version_num: { Args: never; Returns: number }
+      pgtap_version: { Args: never; Returns: number }
+      runtests:
+        | { Args: never; Returns: string[] }
+        | { Args: { "": string }; Returns: string[] }
+      set_competitor_org_context: {
+        Args: { role_name?: string; user_id?: string }
+        Returns: undefined
+      }
+      set_jwt_claims_for_test: {
+        Args: {
+          org_id: string
+          permissions?: string[]
+          role_name?: string
+          user_id?: string
+        }
+        Returns: undefined
+      }
+      set_primary_org_context: {
+        Args: { role_name?: string; user_id?: string }
+        Returns: undefined
+      }
+      skip:
+        | { Args: { how_many: number; why: string }; Returns: string }
+        | { Args: { "": string }; Returns: string }
+      test_email_admin: { Args: never; Returns: string }
+      test_email_member1: { Args: never; Returns: string }
+      test_email_member2: { Args: never; Returns: string }
+      test_id: { Args: { prefix: string; suffix?: string }; Returns: string }
+      test_issue_id: { Args: { suffix?: string }; Returns: string }
+      test_location_id: { Args: { suffix?: string }; Returns: string }
+      test_machine_id: { Args: { suffix?: string }; Returns: string }
+      test_model_id: { Args: { suffix?: string }; Returns: string }
+      test_name_admin: { Args: never; Returns: string }
+      test_name_member1: { Args: never; Returns: string }
+      test_name_member2: { Args: never; Returns: string }
+      test_org_competitor: { Args: never; Returns: string }
+      test_org_primary: { Args: never; Returns: string }
+      test_priority_id: { Args: { suffix?: string }; Returns: string }
+      test_status_id: { Args: { suffix?: string }; Returns: string }
+      test_user_admin: { Args: never; Returns: string }
+      test_user_member1: { Args: never; Returns: string }
+      test_user_member2: { Args: never; Returns: string }
+      throws_ok: { Args: { "": string }; Returns: string }
+      todo:
+        | { Args: { how_many: number; why: string }; Returns: boolean[] }
+        | { Args: { how_many: number; why: string }; Returns: boolean[] }
+        | { Args: { how_many: number }; Returns: boolean[] }
+        | { Args: { why: string }; Returns: boolean[] }
+      todo_end: { Args: never; Returns: boolean[] }
+      todo_start:
+        | { Args: { "": string }; Returns: boolean[] }
+        | { Args: never; Returns: boolean[] }
     }
     Enums: {
       activity_type:
@@ -1200,7 +1376,9 @@ export type Database = {
       voter_type: "authenticated" | "anonymous"
     }
     CompositeTypes: {
-      [_ in never]: never
+      _time_trial_type: {
+        a_time: number | null
+      }
     }
   }
 }

@@ -109,6 +109,27 @@ npm run dev
 
 # 5. Validate setup
 npm run check
+
+### Supabase Keys (Local)
+
+Supabase CLI now exposes new-style local keys:
+
+- Publishable (public): `sb_publishable_…`
+- Secret (service role): `sb_secret_…`
+
+Use `supabase status` to view them. Our scripts expect:
+
+- `NEXT_PUBLIC_SUPABASE_URL` (e.g., `http://127.0.0.1:54321`)
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (publishable key)
+- `SUPABASE_SECRET_KEY` (secret key)
+
+Notes:
+
+- `scripts/db-reset.sh` auto-detects these for local runs if missing.
+- Dev users are created via `scripts/create-dev-users.ts` and accept both new `sb_secret_*` keys and legacy JWT-style tokens.
+- E2E runs on a dedicated port to avoid conflicts.
+
+See docs/developer-guides/local-supabase-keys.md for details.
 ```
 
 Your development server will be running at **http://localhost:49200**

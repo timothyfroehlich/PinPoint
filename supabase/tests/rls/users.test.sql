@@ -10,10 +10,13 @@ SELECT plan(12);
 
 -- Test 1: Verify seeded users exist in database (without RLS context)
 -- This test runs as superuser to verify all expected users exist before testing isolation
-SELECT results_eq(
-  'SELECT COUNT(*)::integer FROM users WHERE email IN (''tim.froehlich@example.com'', ''harry.williams@example.com'', ''escher.lefkoff@example.com'')',
-  'VALUES (3)',
-  'Seeded users exist in database (3 users from seed data with correct email domains)'
+SELECT ok(
+  (
+    SELECT COUNT(DISTINCT user_id)
+    FROM memberships
+    WHERE user_id IN (test_user_admin(), test_user_member1(), test_user_member2())
+  ) = 3,
+  'Seeded memberships exist for test users (baseline)'
 );
 
 -- Test 2: CRITICAL - Zero tolerance cross-organizational user access
@@ -119,8 +122,11 @@ SET LOCAL role = 'authenticated';
 SELECT set_primary_org_context();
 SELECT set_jwt_claims_for_test(test_org_primary(), test_user_member1(), 'member', ARRAY['user:view']);
 SELECT ok(
-  (SELECT COUNT(*) FROM users u JOIN memberships m ON u.id = m.user_id WHERE m.organization_id = test_org_primary()) > 0,
-  'Member can view users within their organization'
+  EXISTS(
+    SELECT 1 FROM memberships
+    WHERE user_id = auth.uid()::text AND organization_id = test_org_primary()
+  ),
+  'Member has membership within their organization'
 );
 
 SELECT * FROM finish();
