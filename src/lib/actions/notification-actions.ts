@@ -77,8 +77,8 @@ export async function markNotificationAsReadAction(
 
     // Granular cache invalidation
     revalidatePath("/notifications");
-    revalidateTag(`notifications-${user.id}`);
-    revalidateTag(`notification-count-${user.id}`);
+    revalidateTag(`notifications-${user.id}`, "max");
+    revalidateTag(`notification-count-${user.id}`, "max");
 
     // Background processing
     runAfterResponse(() => {
@@ -147,8 +147,8 @@ export async function bulkMarkNotificationsAsReadAction(
 
     // Cache invalidation
     revalidatePath("/notifications");
-    revalidateTag(`notifications-${user.id}`);
-    revalidateTag(`notification-count-${user.id}`);
+    revalidateTag(`notifications-${user.id}`, "max");
+    revalidateTag(`notification-count-${user.id}`, "max");
 
     // Background processing
     runAfterResponse(() => {
@@ -208,8 +208,8 @@ export async function markAllNotificationsAsReadAction(
 
     // Cache invalidation
     revalidatePath("/notifications");
-    revalidateTag(`notifications-${user.id}`);
-    revalidateTag(`notification-count-${user.id}`);
+    revalidateTag(`notifications-${user.id}`, "max");
+    revalidateTag(`notification-count-${user.id}`, "max");
 
     // Background processing
     runAfterResponse(() => {
@@ -272,8 +272,8 @@ export async function markNotificationAsUnreadAction(
 
     // Cache invalidation
     revalidatePath("/notifications");
-    revalidateTag(`notifications-${user.id}`);
-    revalidateTag(`notification-count-${user.id}`);
+    revalidateTag(`notifications-${user.id}`, "max");
+    revalidateTag(`notification-count-${user.id}`, "max");
 
     // Background processing
     runAfterResponse(() => {

@@ -12,11 +12,6 @@ const config = {
     // Don't artificially create this variable - let client code handle undefined case
     ...(process.env.VERCEL_ENV ? { NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV } : {}),
   },
-  eslint: {
-    // Warning: This allows production builds to successfully complete even if
-    // your project has ESLint errors.
-    ignoreDuringBuilds: true,
-  },
   
   // Fix pino logging worker thread issues with Turbopack
   serverExternalPackages: [
@@ -28,8 +23,10 @@ const config = {
   ],
 
   // React Compiler for automatic optimization (2025)
+  // In Next.js 16, reactCompiler is now a top-level option
+  reactCompiler: true,
+  
   experimental: {
-    reactCompiler: true, // Enable React Compiler optimization
     // optimizeCss: true, // Temporarily disabled while Tailwind v4 is stabilizing
   },
 };

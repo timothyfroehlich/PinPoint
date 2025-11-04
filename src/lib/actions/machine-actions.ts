@@ -109,8 +109,8 @@ export async function createMachineAction(
     }
 
     // Cache invalidation
-    revalidateTag(`machines-${organizationId}`);
-    revalidateTag(`dashboard-${organizationId}`);
+    revalidateTag(`machines-${organizationId}`, "max");
+    revalidateTag(`dashboard-${organizationId}`, "max");
     revalidatePath("/machines");
 
     return { success: true, data: { machineId: machine.id } };
@@ -177,8 +177,8 @@ export async function updateMachineAction(
     }
 
     // Cache invalidation
-    revalidateTag(`machine-${updatedMachine.id}`);
-    revalidateTag(`machines-${organizationId}`);
+    revalidateTag(`machine-${updatedMachine.id}`, "max");
+    revalidateTag(`machines-${organizationId}`, "max");
     revalidatePath(`/machines/${updatedMachine.id}`);
     revalidatePath("/machines");
 
@@ -231,8 +231,8 @@ export async function deleteMachineAction(
     }
 
     // Cache invalidation
-    revalidateTag(`machines-${organizationId}`);
-    revalidateTag(`dashboard-${organizationId}`);
+    revalidateTag(`machines-${organizationId}`, "max");
+    revalidateTag(`dashboard-${organizationId}`, "max");
     revalidatePath("/machines");
 
     return { success: true, data: { deleted: true } };
@@ -306,7 +306,7 @@ export async function bulkUpdateMachinesAction(
       .returning({ id: machines.id });
 
     // Cache invalidation
-    revalidateTag(`machines-${organizationId}`);
+    revalidateTag(`machines-${organizationId}`, "max");
     revalidatePath("/machines");
 
     return { success: true, data: { updatedCount: updatedMachines.length } };
@@ -384,8 +384,8 @@ export async function generateQRCodeAction(
     }
 
     // Cache invalidation
-    revalidateTag(`machine-${result.data.machineId}`);
-    revalidateTag(`machines-${organizationId}`);
+    revalidateTag(`machine-${result.data.machineId}`, "max");
+    revalidateTag(`machines-${organizationId}`, "max");
     revalidatePath(`/machines/${result.data.machineId}`);
     revalidatePath("/machines");
 
@@ -455,8 +455,8 @@ export async function regenerateQRCodeAction(
     }
 
     // Cache invalidation
-    revalidateTag(`machine-${machineId}`);
-    revalidateTag(`machines-${organizationId}`);
+    revalidateTag(`machine-${machineId}`, "max");
+    revalidateTag(`machines-${organizationId}`, "max");
     revalidatePath(`/machines/${machineId}`);
     revalidatePath("/machines");
 
@@ -545,7 +545,7 @@ export async function bulkGenerateQRCodesAction(
     }
 
     // Cache invalidation
-    revalidateTag(`machines-${organizationId}`);
+    revalidateTag(`machines-${organizationId}`, "max");
     revalidatePath("/machines");
 
     return { success: true, data: { processedCount } };

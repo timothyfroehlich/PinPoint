@@ -209,17 +209,17 @@ export function runAfterResponse(task: () => Promise<void>): void {
  */
 export function revalidateIssues(): void {
   revalidatePath("/issues");
-  revalidateTag("issues");
+  revalidateTag("issues", "max");
 }
 
 export function revalidateMachines(): void {
   revalidatePath("/machines");
-  revalidateTag("machines");
+  revalidateTag("machines", "max");
 }
 
 export function revalidateDashboard(): void {
   revalidatePath("/dashboard");
-  revalidateTag("dashboard");
+  revalidateTag("dashboard", "max");
 }
 
 /**

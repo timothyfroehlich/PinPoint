@@ -205,8 +205,8 @@ export async function inviteUserAction(
     // Cache invalidation
     revalidatePath("/settings/users");
     revalidatePath("/settings");
-    revalidateTag("admin");
-    revalidateTag("users");
+    revalidateTag("admin", "max");
+    revalidateTag("users", "max");
 
     // Background processing
     runAfterResponse(async () => {
@@ -324,8 +324,8 @@ export async function updateUserRoleAction(
     // Cache invalidation
     revalidatePath("/settings/users");
     revalidatePath("/settings/roles");
-    revalidateTag("admin");
-    revalidateTag("users");
+    revalidateTag("admin", "max");
+    revalidateTag("users", "max");
 
     // Background processing
     runAfterResponse(async () => {
@@ -414,8 +414,8 @@ export async function removeUserAction(
 
     // Cache invalidation
     revalidatePath("/settings/users");
-    revalidateTag("admin");
-    revalidateTag("users");
+    revalidateTag("admin", "max");
+    revalidateTag("users", "max");
 
     // Background processing
     runAfterResponse(async () => {
@@ -520,8 +520,8 @@ export async function updateSystemSettingsAction(
     // Cache invalidation
     revalidatePath("/settings/system");
     revalidatePath("/settings");
-    revalidateTag("admin");
-    revalidateTag("settings");
+    revalidateTag("admin", "max");
+    revalidateTag("settings", "max");
 
     // Background processing
     runAfterResponse(async () => {
