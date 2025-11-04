@@ -85,6 +85,7 @@ export default defineConfig({
   // Database state is managed separately via globalSetup (snapshot restore).
   webServer: (() => {
     const usePreview = process.env.PLAYWRIGHT_USE_PREVIEW === "1";
+    const reuse = process.env.PLAYWRIGHT_REUSE === "1" ? true : !process.env.CI;
     return {
       command: usePreview
         ? `npm run preview` // next build && next start
@@ -93,7 +94,7 @@ export default defineConfig({
       // Database health is verified in globalSetup (separation of concerns)
       url: BASE_URL,
       // Reuse existing server locally for speed, fresh server in CI
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: reuse,
       timeout: 60_000, // 1 minute (sufficient now that database restore is separate)
       env: {
         NEXT_PUBLIC_ENABLE_DEV_FEATURES: "true",
