@@ -7,6 +7,7 @@ applyTo: "src/app/**/*.tsx,src/components/**/*.tsx"
 ## Server Components vs Client Components
 
 ### Default to Server Components (CORE)
+
 - **ALWAYS** prefer Server Components unless interactivity is required
 - Server Components are the default in Next.js 15 App Router
 - Only add `"use client"` directive when necessary for:
@@ -18,6 +19,7 @@ applyTo: "src/app/**/*.tsx,src/components/**/*.tsx"
 ### Server Component Patterns
 
 **Organization Context (CRITICAL)**:
+
 ```typescript
 // ✅ Server Component receiving organization context
 async function IssueList({ organizationId }: { organizationId: string }) {
@@ -33,6 +35,7 @@ async function IssueList() {
 ```
 
 **Data Fetching with Cache**:
+
 ```typescript
 import { cache } from "react";
 
@@ -47,6 +50,7 @@ const getIssues = cache(async (organizationId: string) => {
 ### Client Component Patterns
 
 **Minimal Client Islands**:
+
 ```typescript
 // ✅ Small, focused client component
 "use client";
@@ -61,6 +65,7 @@ export default function IssuesPage() { ... }
 ```
 
 **Server + Client Hybrid**:
+
 ```typescript
 // ✅ Server Component shell with Client Component island
 async function IssuesPage({ organizationId }: { organizationId: string }) {
@@ -77,11 +82,13 @@ async function IssuesPage({ organizationId }: { organizationId: string }) {
 ## Component Organization
 
 ### File Naming
+
 - **PascalCase** for component files: `IssueCard.tsx`, `ProfilePictureUpload.tsx`
 - **Client-only suffix**: `-client.tsx` for pure client components
 - **Server-only suffix**: Not needed (default is server)
 
 ### Import Patterns
+
 - **ALWAYS use `~/` path aliases**, never deep relative imports
 - `~/lib/types` for shared types
 - `~/lib/utils` for utilities
@@ -99,6 +106,7 @@ import { IssueFilters } from "../../../lib/types";
 ## UI Framework Standards
 
 ### shadcn/ui ONLY
+
 - **REQUIRED**: Use shadcn/ui for all new UI components
 - **FORBIDDEN**: New Material UI components
 - Use Material Design 3 colors from `globals.css`
@@ -115,6 +123,7 @@ import { Button } from "@mui/material"; // FORBIDDEN
 ## Type Safety
 
 ### Props Typing
+
 ```typescript
 // ✅ Explicit props interface
 interface IssueCardProps {
@@ -128,12 +137,14 @@ export function IssueCard({ issue, organizationId, onUpdate }: IssueCardProps) {
 }
 
 // ❌ Inline type without interface
-export function IssueCard({ issue }: { issue: any }) { // FORBIDDEN: any
+export function IssueCard({ issue }: { issue: any }) {
+  // FORBIDDEN: any
   // Implementation
 }
 ```
 
 ### No TypeScript Safety Defeats
+
 - **FORBIDDEN**: `any` type
 - **FORBIDDEN**: Non-null assertion `!`
 - **FORBIDDEN**: Unsafe `as` casting
@@ -142,6 +153,7 @@ export function IssueCard({ issue }: { issue: any }) { // FORBIDDEN: any
 ## Error Handling
 
 ### Error Boundaries
+
 - Server Components should have `error.tsx` boundaries
 - Use structured error types from `~/lib/errors`
 - Never expose internal details to users
