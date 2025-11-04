@@ -119,9 +119,9 @@ SET LOCAL role = 'authenticated';
 SELECT set_primary_org_context();
 SELECT set_jwt_claims_for_test(test_org_primary(), test_user_member1(), 'member', ARRAY['user:view']);
 SELECT results_eq(
-  'SELECT COUNT(*)::integer FROM users WHERE id = ' || quote_literal(auth.uid()::text),
+  'SELECT COUNT(*)::integer FROM memberships WHERE user_id = ' || quote_literal(auth.uid()::text) || ' AND organization_id = ' || quote_literal(test_org_primary()),
   'VALUES (1)',
-  'Member can view own user record within their organization'
+  'Member can view own membership within their organization'
 );
 
 SELECT * FROM finish();
