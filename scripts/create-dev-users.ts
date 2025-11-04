@@ -102,7 +102,7 @@ async function createDevUsers() {
   // Supabase service role keys are typically 150+ chars; catch truncation
   if (supabaseSecretKey.length < 100) {
     console.error("❌ SUPABASE_SECRET_KEY is too short to be a valid service role key");
-    console.error(`   Received length: ${supabaseSecretKey.length} (expected at least 100)`);
+    console.error("   The received key appears truncated or invalid (expected at least 100 characters).");
     console.error("   This usually means the secret is truncated or misconfigured.");
     process.exit(1);
   }
