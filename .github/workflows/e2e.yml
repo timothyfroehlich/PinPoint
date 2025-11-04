@@ -33,13 +33,13 @@ jobs:
         with:
           exclude: studio,realtime,storage-api,edge-runtime,logflare,vector,imgproxy,supavisor,postgres-meta,mailpit
 
-      - name: Map Supabase env for Next.js
+      - name: Map Supabase env for Next.js (new key style)
         run: |
           set -e
-          echo "🔧 Mapping Supabase CLI env to Next.js expected variables"
+          echo "🔧 Mapping Supabase CLI env to Next.js expected variables (publishable/secret)"
           [[ -n "$API_URL" ]] || { echo "❌ API_URL not set by Supabase CLI"; exit 1; }
-          [[ -n "$ANON_KEY" ]] || { echo "❌ ANON_KEY not set by Supabase CLI"; exit 1; }
-          [[ -n "$SERVICE_ROLE_KEY" ]] || { echo "❌ SERVICE_ROLE_KEY not set by Supabase CLI"; exit 1; }
+          [[ -n "$ANON_KEY" ]] || { echo "❌ ANON_KEY (publishable) not set by Supabase CLI"; exit 1; }
+          [[ -n "$SERVICE_ROLE_KEY" ]] || { echo "❌ SERVICE_ROLE_KEY (secret) not set by Supabase CLI"; exit 1; }
           [[ -n "$DB_URL" ]] || { echo "❌ DB_URL not set by Supabase CLI"; exit 1; }
 
           # Clean API_URL: remove quotes, trailing slash, and whitespace
@@ -48,12 +48,12 @@ jobs:
           CLEAN_API_URL="${CLEAN_API_URL#\"}"
           CLEAN_API_URL="${CLEAN_API_URL//[[:space:]]/}"
 
-          # Clean ANON_KEY: remove quotes and whitespace
+          # Clean ANON_KEY (publishable): remove quotes and whitespace
           ANON_KEY_CLEAN="${ANON_KEY%\"}"
           ANON_KEY_CLEAN="${ANON_KEY_CLEAN#\"}"
           ANON_KEY_CLEAN="${ANON_KEY_CLEAN//[[:space:]]/}"
 
-          # Clean SERVICE_ROLE_KEY: remove quotes and whitespace
+          # Clean SERVICE_ROLE_KEY (secret): remove quotes and whitespace
           SERVICE_ROLE_KEY_CLEAN="${SERVICE_ROLE_KEY%\"}"
           SERVICE_ROLE_KEY_CLEAN="${SERVICE_ROLE_KEY_CLEAN#\"}"
           SERVICE_ROLE_KEY_CLEAN="${SERVICE_ROLE_KEY_CLEAN//[[:space:]]/}"
@@ -69,26 +69,14 @@ jobs:
           DB_NAME="postgres"
           RECONSTRUCTED_DB_URL="postgresql://postgres:postgres@${DB_HOST}:${DB_PORT}/${DB_NAME}"
 
-          # Fail-fast JWT validation: check both keys have 3 segments and length > 100
-          echo "🔍 Validating JWT format for cleaned keys..."
-          
-          # Validate ANON_KEY_CLEAN
-          if [[ ${#ANON_KEY_CLEAN} -lt 100 ]]; then
-            echo "❌ ANON_KEY appears malformed (length: ${#ANON_KEY_CLEAN}, expected > 100)"
+          # Validate new style keys: accept sb_publishable_* and sb_secret_* (or legacy JWTs)
+          echo "🔍 Validating key formats..."
+          if ! echo "$ANON_KEY_CLEAN" | grep -Eq '^(sb_publishable_|sbp_)|(^[^.]+\.[^.]+\.[^.]+$)'; then
+            echo "❌ Publishable key format not recognized"
             exit 1
           fi
-          if ! echo "$ANON_KEY_CLEAN" | grep -Eq '^[^.]+\.[^.]+\.[^.]+$'; then
-            echo "❌ ANON_KEY appears malformed (expected 3 dot-separated segments)"
-            exit 1
-          fi
-
-          # Validate SERVICE_ROLE_KEY_CLEAN
-          if [[ ${#SERVICE_ROLE_KEY_CLEAN} -lt 100 ]]; then
-            echo "❌ SERVICE_ROLE_KEY appears malformed (length: ${#SERVICE_ROLE_KEY_CLEAN}, expected > 100)"
-            exit 1
-          fi
-          if ! echo "$SERVICE_ROLE_KEY_CLEAN" | grep -Eq '^[^.]+\.[^.]+\.[^.]+$'; then
-            echo "❌ SERVICE_ROLE_KEY appears malformed (expected 3 dot-separated segments)"
+          if ! echo "$SERVICE_ROLE_KEY_CLEAN" | grep -Eq '^(sb_secret_)|(^[^.]+\.[^.]+\.[^.]+$)'; then
+            echo "❌ Secret key format not recognized"
             exit 1
           fi
 
@@ -107,8 +95,8 @@ jobs:
           echo "  API_URL cleaned: '$CLEAN_API_URL'"
           echo "  DB_PORT extracted: '$DB_PORT'"
           echo "  DATABASE_URL reconstructed: postgresql://postgres:postgres@${DB_HOST}:${DB_PORT}/${DB_NAME}"
-          echo "  ANON_KEY_CLEAN length: ${#ANON_KEY_CLEAN} chars, masked: ${ANON_KEY_CLEAN:0:4}...${ANON_KEY_CLEAN: -4}"
-          echo "  SERVICE_ROLE_KEY_CLEAN length: ${#SERVICE_ROLE_KEY_CLEAN} chars, masked: ${SERVICE_ROLE_KEY_CLEAN:0:4}...${SERVICE_ROLE_KEY_CLEAN: -4}"
+          echo "  Publishable key prefix: ${ANON_KEY_CLEAN:0:12}..."
+          echo "  Secret key prefix: ${SERVICE_ROLE_KEY_CLEAN:0:10}..."
 
 
       - name: Cache Playwright Browsers

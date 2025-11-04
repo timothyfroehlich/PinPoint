@@ -103,6 +103,29 @@ validate_dependencies() {
     log_success "All dependencies available"
 }
 
+# Try to detect local Supabase URL and keys from `supabase status` when missing
+detect_local_supabase_keys() {
+    if [[ -n "${SUPABASE_URL:-}" && -n "${SUPABASE_SECRET_KEY:-}" && -n "${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}" ]]; then
+        return 0
+    fi
+    if ! command -v supabase >/dev/null 2>&1; then
+        return 0
+    fi
+    local STATUS
+    STATUS=$(supabase status 2>/dev/null || true)
+    if [[ -z "$STATUS" ]]; then
+        return 0
+    fi
+    # Parse values; tolerate both IPv4/IPv6 and spacing
+    local API_URL PUBLISHABLE SECRET
+    API_URL=$(printf "%s\n" "$STATUS" | awk -F': ' '/API URL:/ {print $2; exit}')
+    PUBLISHABLE=$(printf "%s\n" "$STATUS" | awk -F': ' '/Publishable key:/ {print $2; exit}')
+    SECRET=$(printf "%s\n" "$STATUS" | awk -F': ' '/Secret key:/ {print $2; exit}')
+    [[ -z "${SUPABASE_URL:-}" && -n "$API_URL" ]] && export SUPABASE_URL="$API_URL"
+    [[ -z "${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}" && -n "$PUBLISHABLE" ]] && export NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$PUBLISHABLE"
+    [[ -z "${SUPABASE_SECRET_KEY:-}" && -n "$SECRET" ]] && export SUPABASE_SECRET_KEY="$SECRET"
+}
+
 # =============================================================================
 # Environment Safety Checks
 # =============================================================================
@@ -474,6 +497,8 @@ reset_supabase_database() {
 
     # Create dev users via Supabase Admin API (only for dev environments)
     if [[ "$env" == "local" ]]; then
+        # Opportunistically detect local Supabase keys if not set
+        detect_local_supabase_keys || true
         log_info "Creating dev users via Supabase Admin API..."
         if command -v tsx >/dev/null 2>&1; then
             if tsx scripts/create-dev-users.ts; then
