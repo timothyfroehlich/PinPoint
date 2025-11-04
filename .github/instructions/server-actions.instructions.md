@@ -295,9 +295,11 @@ export const submitContactForm = async (formData: FormData) => {
 
   return { success: true };
 };
+```
 
-// Client Component
-("use client");
+```tsx
+// Client Component file
+"use client";
 
 export function ContactForm() {
   const [state, formAction] = useFormState(submitContactForm, null);
