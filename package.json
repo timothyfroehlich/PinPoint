@@ -74,7 +74,7 @@
     "e2e:snapshot:create": "./scripts/e2e-snapshot-create.sh",
     "e2e:snapshot:restore": "./scripts/e2e-snapshot-restore.sh",
     "test:e2e:prod": "playwright test -c playwright.prod.config.ts --reporter=line",
-    "lint:sarif": "next lint --format @microsoft/eslint-formatter-sarif --output-file eslint-results.sarif",
+    "lint:sarif": "eslint . --format @microsoft/eslint-formatter-sarif --output-file eslint-results.sarif --max-warnings 220",
     "_comment_status": "========== Status Commands ==========",
     "status:overview": "node scripts/status-overview.cjs",
     "status:pr": "./scripts/status-pr.sh",
