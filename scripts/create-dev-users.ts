@@ -100,9 +100,10 @@ async function createDevUsers() {
 
   // Validate JWT format (should be three base64 segments separated by dots)
   // Supabase service role keys are typically 150+ chars; catch truncation
-  if (supabaseSecretKey.length < 100) {
+  const keyLength = supabaseSecretKey.length;
+  if (keyLength < 100) {
     console.error("❌ SUPABASE_SECRET_KEY is too short to be a valid service role key");
-    console.error(`   Received length: ${supabaseSecretKey.length} (expected at least 100)`);
+    console.error(`   Received length: ${keyLength} (expected at least 100)`);
     console.error("   This usually means the secret is truncated or misconfigured.");
     process.exit(1);
   }
@@ -121,8 +122,8 @@ async function createDevUsers() {
 
   // Masked diagnostics for service role key (safe for logs)
   const keyHead = supabaseSecretKey.substring(0, 4);
-  const keyTail = supabaseSecretKey.substring(supabaseSecretKey.length - 4);
-  console.log(`✅ Service role key validated: length=${supabaseSecretKey.length}, masked=${keyHead}...${keyTail}`);
+  const keyTail = supabaseSecretKey.substring(keyLength - 4);
+  console.log(`✅ Service role key validated: length=${keyLength}, masked=${keyHead}...${keyTail}`);
 
   // Sanitize/build Supabase URL
   function buildSupabaseUrl(input: string): string {
