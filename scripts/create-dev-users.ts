@@ -120,9 +120,9 @@ async function createDevUsers() {
   }
 
   // Masked diagnostics for service role key (safe for logs)
-  const keyHead = supabaseSecretKey.substring(0, 4);
-  const keyTail = supabaseSecretKey.substring(supabaseSecretKey.length - 4);
-  console.log(`✅ Service role key validated: length=${supabaseSecretKey.length}, masked=${keyHead}...${keyTail}`);
+  // Do not log any portion of the secret
+  // Only log that validation succeeded and the length
+  console.log(`✅ Service role key validated: length=${supabaseSecretKey.length}`);
 
   // Sanitize/build Supabase URL
   function buildSupabaseUrl(input: string): string {
