@@ -80,13 +80,49 @@ async function createDevUsers() {
     ""
   ).trim();
 
+  // Debug logging for environment variable availability (without exposing secrets)
+  console.log("🔍 Environment variable check:");
+  console.log(`  SUPABASE_URL: ${process.env.SUPABASE_URL ? "✓ set" : "✗ not set"}`);
+  console.log(`  NEXT_PUBLIC_SUPABASE_URL: ${process.env.NEXT_PUBLIC_SUPABASE_URL ? "✓ set" : "✗ not set"}`);
+  console.log(`  API_URL: ${process.env.API_URL ? "✓ set" : "✗ not set"}`);
+  console.log(`  SUPABASE_SECRET_KEY: ${process.env.SUPABASE_SECRET_KEY ? "✓ set" : "✗ not set"}`);
+  console.log(`  SERVICE_ROLE_KEY: ${process.env.SERVICE_ROLE_KEY ? "✓ set" : "✗ not set"}`);
+  console.log(`  Selected URL: ${rawSupabaseUrl ? "✓ selected" : "✗ empty"}`);
+  console.log(`  Selected Secret Key: ${supabaseSecretKey ? "✓ present" : "✗ empty"}`);
+
   if (!rawSupabaseUrl || !supabaseSecretKey) {
     console.error("❌ Missing required environment variables:");
     if (!rawSupabaseUrl)
-      console.error("  - SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL)");
-    if (!supabaseSecretKey) console.error("  - SUPABASE_SECRET_KEY");
+      console.error("  - SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL or API_URL)");
+    if (!supabaseSecretKey) console.error("  - SUPABASE_SECRET_KEY (or SERVICE_ROLE_KEY)");
     process.exit(1);
   }
+
+  // Validate JWT format (should be three base64 segments separated by dots)
+  // Supabase service role keys are typically 150+ chars; catch truncation
+  if (supabaseSecretKey.length < 100) {
+    console.error("❌ SUPABASE_SECRET_KEY is too short to be a valid service role key");
+    console.error("   The received key appears truncated or invalid (expected at least 100 characters).");
+    console.error("   This usually means the secret is truncated or misconfigured.");
+    process.exit(1);
+  }
+
+  const jwtPattern = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+  if (!jwtPattern.test(supabaseSecretKey)) {
+    console.error("❌ SUPABASE_SECRET_KEY does not appear to be a valid JWT token");
+    console.error("   Expected format: header.payload.signature (base64 encoded)");
+    console.error("   Received format appears invalid");
+    console.error("   Token structure validation failed - check for:");
+    console.error("   - Truncated/incomplete token");
+    console.error("   - Extra whitespace or newlines");
+    console.error("   - Missing environment variable in GitHub Actions secrets");
+    process.exit(1);
+  }
+
+  // Masked diagnostics for service role key (safe for logs)
+  // Do not log any portion of the secret
+  // Only log that validation succeeded and the length
+  console.log(`✅ Service role key validated`);
 
   // Sanitize/build Supabase URL
   function buildSupabaseUrl(input: string): string {
