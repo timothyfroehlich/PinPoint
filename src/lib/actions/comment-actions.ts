@@ -106,9 +106,9 @@ export async function addCommentAction(
 
     // Granular cache invalidation
     revalidatePath(`/issues/${issueId}`);
-    revalidateTag("issues");
-    revalidateTag(`comments-${issueId}`);
-    revalidateTag(`recent-comments-${organizationId}`);
+    revalidateTag("issues", "max");
+    revalidateTag(`comments-${issueId}`, "max");
+    revalidateTag(`recent-comments-${organizationId}`, "max");
 
     // Background processing (runs after response sent to user)
     runAfterResponse(async () => {
@@ -192,9 +192,9 @@ export async function editCommentAction(
 
     // Granular cache invalidation
     revalidatePath(`/issues/${comment.issue_id}`);
-    revalidateTag("issues");
-    revalidateTag(`comments-${comment.issue_id}`);
-    revalidateTag(`recent-comments-${organizationId}`);
+    revalidateTag("issues", "max");
+    revalidateTag(`comments-${comment.issue_id}`, "max");
+    revalidateTag(`recent-comments-${organizationId}`, "max");
 
     // Background processing
     runAfterResponse(() => {
@@ -256,9 +256,9 @@ export async function deleteCommentAction(
 
     // Granular cache invalidation
     revalidatePath(`/issues/${comment.issue_id}`);
-    revalidateTag("issues");
-    revalidateTag(`comments-${comment.issue_id}`);
-    revalidateTag(`recent-comments-${organizationId}`);
+    revalidateTag("issues", "max");
+    revalidateTag(`comments-${comment.issue_id}`, "max");
+    revalidateTag(`recent-comments-${organizationId}`, "max");
 
     // Background processing
     runAfterResponse(() => {
@@ -320,9 +320,9 @@ export async function restoreCommentAction(
 
     // Cache invalidation
     revalidatePath(`/issues/${comment.issue_id}`);
-    revalidateTag("issues");
-    revalidateTag(`comments-${comment.issue_id}`);
-    revalidateTag(`recent-comments-${organizationId}`);
+    revalidateTag("issues", "max");
+    revalidateTag(`comments-${comment.issue_id}`, "max");
+    revalidateTag(`recent-comments-${organizationId}`, "max");
 
     // Background processing
     runAfterResponse(() => {

@@ -118,8 +118,8 @@ export async function updateOrganizationProfileAction(
     revalidatePath("/settings/organization");
     revalidatePath("/settings");
     revalidatePath("/dashboard");
-    revalidateTag("organizations");
-    revalidateTag(`organization-${organizationId}`);
+    revalidateTag("organizations", "max");
+    revalidateTag(`organization-${organizationId}`, "max");
 
     // Background processing
     runAfterResponse(() => {
@@ -182,8 +182,8 @@ export async function updateOrganizationLogoAction(
     // Cache invalidation
     revalidatePath("/settings/organization");
     revalidatePath("/settings");
-    revalidateTag("organizations");
-    revalidateTag(`organization-${organizationId}`);
+    revalidateTag("organizations", "max");
+    revalidateTag(`organization-${organizationId}`, "max");
 
     // Background processing
     runAfterResponse(() => {
