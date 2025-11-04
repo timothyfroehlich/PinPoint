@@ -1,7 +1,13 @@
 #!/bin/bash
 # Check that required security tools are installed
 
-echo '🔧 Checking security dependencies...'
+# Skip trufflehog check in remote environments (complex installation)
+if [ -n "${IS_REMOTE_ENVIRONMENT:-}" ]; then
+  echo "ℹ️  Skipping trufflehog check in remote environment - this check will run in CI instead"
+  echo '🔧 Checking security dependencies (remote environment mode)...'
+else
+  echo '🔧 Checking security dependencies...'
+fi
 
 # Function to show installation instructions based on OS
 show_install_instructions() {
@@ -26,10 +32,14 @@ if ! which gitleaks > /dev/null; then
   exit 1
 fi
 
-# Check for trufflehog
-if ! which trufflehog > /dev/null; then
-  show_install_instructions "TruffleHog" "brew install trufflesecurity/trufflehog/trufflehog" "apt install trufflehog"
-  exit 1
+# Check for trufflehog (skip in remote environments)
+if [ -z "${IS_REMOTE_ENVIRONMENT:-}" ]; then
+  if ! which trufflehog > /dev/null; then
+    show_install_instructions "TruffleHog" "brew install trufflesecurity/trufflehog/trufflehog" "apt install trufflehog"
+    exit 1
+  fi
+else
+  echo "   ⏭️  Skipping trufflehog (remote environment)"
 fi
 
 # Check for jq

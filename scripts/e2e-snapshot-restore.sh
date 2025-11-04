@@ -10,6 +10,12 @@
 #   # or directly:
 #   ./scripts/e2e-snapshot-restore.sh
 
+# Skip in remote environments (requires Supabase and pg_restore)
+if [ -n "${IS_REMOTE_ENVIRONMENT:-}" ]; then
+  echo "ℹ️  Skipping E2E snapshot restoration in remote environment - this operation requires Supabase CLI and PostgreSQL client tools and will run in CI instead"
+  exit 0
+fi
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

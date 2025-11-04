@@ -4,6 +4,12 @@
 # Part of dual-track testing strategy - Track 1: RLS Security Testing
 # See: docs/testing/dual-track-testing-strategy.md
 
+# Skip in remote environments (requires Supabase CLI)
+if [ -n "${IS_REMOTE_ENVIRONMENT:-}" ]; then
+  echo "ℹ️  Skipping RLS tests in remote environment - these tests require Supabase CLI and will run in CI instead"
+  exit 0
+fi
+
 set -euo pipefail
 
 # Colors for output formatting

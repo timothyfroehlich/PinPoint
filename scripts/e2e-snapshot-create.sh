@@ -10,6 +10,12 @@
 #   # or directly:
 #   ./scripts/e2e-snapshot-create.sh
 
+# Skip in remote environments (requires Supabase and pg_dump)
+if [ -n "${IS_REMOTE_ENVIRONMENT:-}" ]; then
+  echo "ℹ️  Skipping E2E snapshot creation in remote environment - this operation requires Supabase CLI and PostgreSQL client tools and will run in CI instead"
+  exit 0
+fi
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -14,6 +14,12 @@
 #   --wait    Wait for the workflow to complete and show results
 # =============================================================================
 
+# Skip in remote environments (requires Supabase CLI and GitHub CLI)
+if [ -n "${IS_REMOTE_ENVIRONMENT:-}" ]; then
+  echo "ℹ️  Skipping preview seeding in remote environment - this operation requires Supabase CLI and GitHub CLI and will run in CI instead"
+  exit 0
+fi
+
 set -euo pipefail  # Exit on error, undefined vars, pipe failures
 
 # Colors for output

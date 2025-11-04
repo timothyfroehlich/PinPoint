@@ -18,6 +18,12 @@
 # - Identical RLS policies across all environments
 # =============================================================================
 
+# Skip in remote environments (requires Supabase CLI and Docker)
+if [ -n "${IS_REMOTE_ENVIRONMENT:-}" ]; then
+  echo "ℹ️  Skipping database reset in remote environment - this operation requires Supabase CLI and will run in CI instead"
+  exit 0
+fi
+
 set -euo pipefail  # Exit on error, undefined vars, pipe failures
 
 # Force non-interactive output (prevent psql/supabase from invoking less)
