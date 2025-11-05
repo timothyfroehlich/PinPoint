@@ -169,6 +169,27 @@ Your development server will be running at **http://localhost:49200**
 - **Decision**: Only switch to worktree-specific after explicit confirmation
 - **Ports**: Supabase uses fixed ports (54321, 54322) - only one instance can run at a time
 
+### GitHub Copilot Instructions
+
+This repository includes comprehensive GitHub Copilot instructions to help you follow PinPoint's architectural patterns:
+
+- **Repository-wide guidance**: `.github/copilot-instructions.md`
+- **Pattern-specific instructions**: `.github/instructions/*.instructions.md`
+  - Component development (Server/Client Components)
+  - API routes and tRPC routers
+  - Server Actions
+  - Database layer and RLS
+  - Authentication patterns
+  - Testing strategies
+
+When you use GitHub Copilot in this repository, it will automatically provide context-aware suggestions based on the file you're working on. The instructions emphasize:
+- Multi-tenant security (organization scoping)
+- Server-first architecture
+- TypeScript strictest patterns
+- Memory-safe testing patterns
+
+For details, see [`.github/COPILOT_INSTRUCTIONS.md`](./.github/COPILOT_INSTRUCTIONS.md).
+
 ### Prerequisites
 
 **Required Global Installs:**
