@@ -4,6 +4,11 @@
  * SECURITY: Only available in development and test environments.
  * Provides authenticated endpoints for E2E test setup that respect RLS policies.
  *
+ * BUILD-TIME EXCLUSION: This route handler is conditionally exported based on NODE_ENV.
+ * In production builds, only a 404 handler is exported, allowing the bundler to
+ * tree-shake all test setup logic. The runtime environment check remains as
+ * defense-in-depth for non-production deployments.
+ *
  * This replaces direct database writes in E2E tests with proper API calls.
  */
 
@@ -83,8 +88,21 @@ type TestSetupRequest =
   | CaptureStateRequest
   | RestoreStateRequest;
 
-export async function POST(request: NextRequest) {
+/**
+ * Production handler: Returns 404 to exclude test setup API from production
+ * This allows tree-shaking to remove all test setup logic from production bundles
+ */
+async function productionPOSTHandler(): Promise<NextResponse> {
+  return new NextResponse(null, { status: 404 });
+}
+
+/**
+ * Development/Test handler: Full test setup API implementation
+ * Only bundled in non-production builds
+ */
+async function developmentPOSTHandler(request: NextRequest): Promise<NextResponse> {
   try {
+    // Defense-in-depth: Runtime check in case of misconfiguration
     ensureTestEnvironment();
 
     const body: TestSetupRequest = await request.json();
@@ -281,3 +299,14 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+/**
+ * Conditional export: Use production 404 handler in production builds,
+ * full test setup handler in development/test builds.
+ *
+ * This enables tree-shaking to remove all test setup code from production bundles.
+ */
+export const POST =
+  process.env.NODE_ENV === "production"
+    ? productionPOSTHandler
+    : developmentPOSTHandler;
