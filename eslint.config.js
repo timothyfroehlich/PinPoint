@@ -248,6 +248,7 @@ export default tseslint.config(
       "@typescript-eslint/consistent-type-definitions": "off",
       "@typescript-eslint/consistent-indexed-object-style": "off",
       "@typescript-eslint/no-redundant-type-constituents": "off",
+      "@typescript-eslint/no-duplicate-type-constituents": "off",
     },
   },
   {

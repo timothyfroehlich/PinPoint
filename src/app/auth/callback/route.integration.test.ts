@@ -1,11 +1,12 @@
 /**
- * Auth Callback Route Integration Tests
- * Testing OAuth callback processing, organization resolution, and rate limiting
+ * Auth Callback Route Integration Tests - Alpha Single-Org Mode
+ * Testing OAuth callback processing with hardcoded ALPHA_ORG_ID
  *
  * ARCHETYPE: Router Integration Test
  * - Tests Next.js API route handlers with mocked dependencies
  * - Validates request/response behavior and business logic
- * - Tests security features like rate limiting and organization validation
+ * - Tests security features like rate limiting and membership validation
+ * - Alpha mode: Organization is always ALPHA_ORG_ID, no dynamic resolution
  */
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
@@ -41,6 +42,7 @@ vi.mock("~/lib/rate-limit/inMemory", () => ({
 vi.mock("~/env", () => ({
   env: {
     NODE_ENV: "test",
+    ALPHA_ORG_ID: "test-org-pinpoint", // Alpha single-org mode
   },
 }));
 
@@ -191,6 +193,7 @@ describe("Auth Callback Route (Router Integration)", () => {
       mockSupabase.auth.getUser.mockResolvedValue({
         data: { user: TEST_USER },
       });
+      vi.mocked(getUserMembershipPublic).mockResolvedValue(TEST_MEMBERSHIP);
 
       // Act
       const response = await GET(request);
@@ -198,6 +201,10 @@ describe("Auth Callback Route (Router Integration)", () => {
       // Assert
       expect(mockSupabase.auth.exchangeCodeForSession).toHaveBeenCalledWith(
         "valid-code",
+      );
+      expect(getUserMembershipPublic).toHaveBeenCalledWith(
+        TEST_USER.id,
+        "test-org-pinpoint",
       );
       expect(response.status).toBe(307); // Next.js temporary redirect
     });
@@ -237,104 +244,9 @@ describe("Auth Callback Route (Router Integration)", () => {
     });
   });
 
-  describe("Organization Resolution", () => {
-    beforeEach(() => {
-      mockSupabase.auth.exchangeCodeForSession.mockResolvedValue({
-        error: null,
-      });
-      mockSupabase.auth.getUser.mockResolvedValue({
-        data: { user: TEST_USER },
-      });
-    });
-
-    it("should use organizationId from query parameter when provided", async () => {
-      // Arrange
-      const request = new NextRequest(
-        "http://localhost:3000/auth/callback?code=test123&organizationId=query-org-id",
-      );
-      vi.mocked(getUserMembershipPublic).mockResolvedValue(TEST_MEMBERSHIP);
-
-      // Act
-      await GET(request);
-
-      // Assert
-      expect(getUserMembershipPublic).toHaveBeenCalledWith(
-        TEST_USER.id,
-        "query-org-id",
-      );
-      expect(updateUserOrganization).toHaveBeenCalledWith(
-        TEST_USER.id,
-        "query-org-id",
-      );
-    });
-
-    it("should resolve organization from trusted subdomain header", async () => {
-      // Arrange
-      const request = new NextRequest(
-        "http://localhost:3000/auth/callback?code=test123",
-      );
-      vi.mocked(extractTrustedSubdomain).mockReturnValue("trusted-subdomain");
-      vi.mocked(getOrganizationBySubdomain).mockResolvedValue(TEST_ORG);
-      vi.mocked(getUserMembershipPublic).mockResolvedValue(TEST_MEMBERSHIP);
-
-      // Act
-      await GET(request);
-
-      // Assert
-      expect(extractTrustedSubdomain).toHaveBeenCalled();
-      expect(getOrganizationBySubdomain).toHaveBeenCalledWith(
-        "trusted-subdomain",
-      );
-      expect(updateUserOrganization).toHaveBeenCalledWith(
-        TEST_USER.id,
-        TEST_ORG.id,
-      );
-    });
-
-    it("should resolve organization from host alias fallback", async () => {
-      // Arrange
-      const request = new NextRequest(
-        "http://localhost:3000/auth/callback?code=test123",
-        {
-          headers: { host: "testorg.pinpoint.app" },
-        },
-      );
-      vi.mocked(extractTrustedSubdomain).mockReturnValue(null); // No trusted subdomain
-      vi.mocked(resolveOrgSubdomainFromHost).mockReturnValue("testorg");
-      vi.mocked(getOrganizationBySubdomain).mockResolvedValue(TEST_ORG);
-      vi.mocked(getUserMembershipPublic).mockResolvedValue(TEST_MEMBERSHIP);
-
-      // Act
-      await GET(request);
-
-      // Assert
-      expect(resolveOrgSubdomainFromHost).toHaveBeenCalledWith(
-        "testorg.pinpoint.app",
-      );
-      expect(getOrganizationBySubdomain).toHaveBeenCalledWith("testorg");
-      expect(updateUserOrganization).toHaveBeenCalledWith(
-        TEST_USER.id,
-        TEST_ORG.id,
-      );
-    });
-
-    it("should skip organization update when no organization resolved", async () => {
-      // Arrange
-      const request = new NextRequest(
-        "http://localhost:3000/auth/callback?code=test123",
-      );
-      // All organization resolution methods return null
-
-      // Act
-      await GET(request);
-
-      // Assert
-      expect(getUserMembershipPublic).not.toHaveBeenCalled();
-      expect(updateUserOrganization).not.toHaveBeenCalled();
-    });
-  });
-
   describe("Membership Validation", () => {
+    const ALPHA_ORG_ID = "test-org-pinpoint";
+
     beforeEach(() => {
       mockSupabase.auth.exchangeCodeForSession.mockResolvedValue({
         error: null,
@@ -342,14 +254,12 @@ describe("Auth Callback Route (Router Integration)", () => {
       mockSupabase.auth.getUser.mockResolvedValue({
         data: { user: TEST_USER },
       });
-      vi.mocked(getOrganizationBySubdomain).mockResolvedValue(TEST_ORG);
     });
 
-    it("should validate user membership before updating organization", async () => {
+    it("should validate user membership in ALPHA_ORG_ID before updating organization", async () => {
       // Arrange
       const request = new NextRequest(
-        "http://localhost:3000/auth/callback?code=test123&organizationId=" +
-          TEST_ORG.id,
+        "http://localhost:3000/auth/callback?code=test123",
       );
       vi.mocked(getUserMembershipPublic).mockResolvedValue(TEST_MEMBERSHIP);
 
@@ -359,19 +269,18 @@ describe("Auth Callback Route (Router Integration)", () => {
       // Assert
       expect(getUserMembershipPublic).toHaveBeenCalledWith(
         TEST_USER.id,
-        TEST_ORG.id,
+        ALPHA_ORG_ID,
       );
       expect(updateUserOrganization).toHaveBeenCalledWith(
         TEST_USER.id,
-        TEST_ORG.id,
+        ALPHA_ORG_ID,
       );
     });
 
-    it("should skip organization update when user has no membership", async () => {
+    it("should skip organization update when user has no membership in ALPHA_ORG_ID", async () => {
       // Arrange
       const request = new NextRequest(
-        "http://localhost:3000/auth/callback?code=test123&organizationId=" +
-          TEST_ORG.id,
+        "http://localhost:3000/auth/callback?code=test123",
       );
       vi.mocked(getUserMembershipPublic).mockResolvedValue(null); // No membership
 
@@ -381,24 +290,23 @@ describe("Auth Callback Route (Router Integration)", () => {
       // Assert
       expect(getUserMembershipPublic).toHaveBeenCalledWith(
         TEST_USER.id,
-        TEST_ORG.id,
+        ALPHA_ORG_ID,
       );
       expect(updateUserOrganization).not.toHaveBeenCalled();
     });
 
-    it("should skip organization update when organizationId already matches", async () => {
+    it("should skip organization update when organizationId already matches ALPHA_ORG_ID", async () => {
       // Arrange
       const userWithCurrentOrg = {
         ...TEST_USER,
-        app_metadata: { organizationId: TEST_ORG.id }, // Already has the org
+        app_metadata: { organizationId: ALPHA_ORG_ID }, // Already has the alpha org
       };
       mockSupabase.auth.getUser.mockResolvedValue({
         data: { user: userWithCurrentOrg },
       });
 
       const request = new NextRequest(
-        "http://localhost:3000/auth/callback?code=test123&organizationId=" +
-          TEST_ORG.id,
+        "http://localhost:3000/auth/callback?code=test123",
       );
       vi.mocked(getUserMembershipPublic).mockResolvedValue(TEST_MEMBERSHIP);
 
@@ -424,8 +332,7 @@ describe("Auth Callback Route (Router Integration)", () => {
     it("should handle organization update failures gracefully", async () => {
       // Arrange
       const request = new NextRequest(
-        "http://localhost:3000/auth/callback?code=test123&organizationId=" +
-          TEST_ORG.id,
+        "http://localhost:3000/auth/callback?code=test123",
       );
       vi.mocked(getUserMembershipPublic).mockResolvedValue(TEST_MEMBERSHIP);
       vi.mocked(updateUserOrganization).mockRejectedValue(
@@ -494,28 +401,6 @@ describe("Auth Callback Route (Router Integration)", () => {
       // Assert
       expect(response.status).toBe(307);
       expect(response.headers.get("location")).toContain("/dashboard");
-    });
-
-    it("should use forwarded host for redirect in production", async () => {
-      // Arrange: Mock production environment
-      vi.doMock("~/env", () => ({
-        env: { NODE_ENV: "production" },
-      }));
-
-      const request = new NextRequest(
-        "http://localhost:3000/auth/callback?code=test123",
-        {
-          headers: { "x-forwarded-host": "app.pinpoint.com" },
-        },
-      );
-
-      // Act
-      const response = await GET(request);
-
-      // Assert
-      expect(response.headers.get("location")).toBe(
-        "https://app.pinpoint.com/dashboard",
-      );
     });
   });
 });

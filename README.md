@@ -109,6 +109,27 @@ npm run dev
 
 # 5. Validate setup
 npm run check
+
+### Supabase Keys (Local)
+
+Supabase CLI now exposes new-style local keys:
+
+- Publishable (public): `sb_publishable_…`
+- Secret (service role): `sb_secret_…`
+
+Use `supabase status` to view them. Our scripts expect:
+
+- `NEXT_PUBLIC_SUPABASE_URL` (e.g., `http://127.0.0.1:54321`)
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (publishable key)
+- `SUPABASE_SECRET_KEY` (secret key)
+
+Notes:
+
+- `scripts/db-reset.sh` auto-detects these for local runs if missing.
+- Dev users are created via `scripts/create-dev-users.ts` and accept both new `sb_secret_*` keys and legacy JWT-style tokens.
+- E2E runs on a dedicated port to avoid conflicts.
+
+See docs/developer-guides/local-supabase-keys.md for details.
 ```
 
 Your development server will be running at **http://localhost:49200**
@@ -147,6 +168,27 @@ Your development server will be running at **http://localhost:49200**
 - **Exception**: For major schema changes, stop root instance and start from current worktree
 - **Decision**: Only switch to worktree-specific after explicit confirmation
 - **Ports**: Supabase uses fixed ports (54321, 54322) - only one instance can run at a time
+
+### GitHub Copilot Instructions
+
+This repository includes comprehensive GitHub Copilot instructions to help you follow PinPoint's architectural patterns:
+
+- **Repository-wide guidance**: `.github/copilot-instructions.md`
+- **Pattern-specific instructions**: `.github/instructions/*.instructions.md`
+  - Component development (Server/Client Components)
+  - API routes and tRPC routers
+  - Server Actions
+  - Database layer and RLS
+  - Authentication patterns
+  - Testing strategies
+
+When you use GitHub Copilot in this repository, it will automatically provide context-aware suggestions based on the file you're working on. The instructions emphasize:
+- Multi-tenant security (organization scoping)
+- Server-first architecture
+- TypeScript strictest patterns
+- Memory-safe testing patterns
+
+For details, see [`.github/COPILOT_INSTRUCTIONS.md`](./.github/COPILOT_INSTRUCTIONS.md).
 
 ### Prerequisites
 

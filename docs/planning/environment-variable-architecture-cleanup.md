@@ -70,7 +70,7 @@ This strategy provides clear separation of concerns while respecting project con
    \# Overrides for local development using the single shared Supabase instance.  
    DATABASE_URL="postgresql://postgres:postgres@localhost:54322/postgres"  
    NEXT_PUBLIC_SUPABASE_URL="http://localhost:54321"  
-   NEXT_PUBLIC_SUPABASE_ANON_KEY="\<your-local-anon-key\>"  
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="\<your-local-publishable-key\>"  
    ENABLE_DEV_FEATURES="true"
 
 4. **Update .env.example**: Ensure this template is up-to-date and clearly instructs developers on what secrets they need to create in their personal, git-ignored .env.local file.

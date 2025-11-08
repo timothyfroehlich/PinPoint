@@ -80,13 +80,37 @@ async function createDevUsers() {
     ""
   ).trim();
 
+  // Debug logging for environment variable availability (without exposing secrets)
+  console.log("🔍 Environment variable check:");
+  console.log(`  SUPABASE_URL: ${process.env.SUPABASE_URL ? "✓ set" : "✗ not set"}`);
+  console.log(`  NEXT_PUBLIC_SUPABASE_URL: ${process.env.NEXT_PUBLIC_SUPABASE_URL ? "✓ set" : "✗ not set"}`);
+  console.log(`  API_URL: ${process.env.API_URL ? "✓ set" : "✗ not set"}`);
+  console.log(`  SUPABASE_SECRET_KEY: ${process.env.SUPABASE_SECRET_KEY ? "✓ set" : "✗ not set"}`);
+  console.log(`  SERVICE_ROLE_KEY: ${process.env.SERVICE_ROLE_KEY ? "✓ set" : "✗ not set"}`);
+  console.log(`  Selected URL: ${rawSupabaseUrl ? "✓ selected" : "✗ empty"}`);
+  console.log(`  Selected Secret Key: ${supabaseSecretKey ? "✓ present" : "✗ empty"}`);
+
   if (!rawSupabaseUrl || !supabaseSecretKey) {
     console.error("❌ Missing required environment variables:");
     if (!rawSupabaseUrl)
-      console.error("  - SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL)");
-    if (!supabaseSecretKey) console.error("  - SUPABASE_SECRET_KEY");
+      console.error("  - SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL or API_URL)");
+    if (!supabaseSecretKey) console.error("  - SUPABASE_SECRET_KEY (or SERVICE_ROLE_KEY)");
     process.exit(1);
   }
+
+  // Accept both historical JWT-style keys and new sb_secret_* keys
+  const isJwtLike = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(
+    supabaseSecretKey,
+  );
+  const isSbSecret = supabaseSecretKey.startsWith("sb_secret_");
+  if (!isJwtLike && !isSbSecret) {
+    console.error("❌ SUPABASE_SECRET_KEY format not recognized");
+    console.error(
+      "   Expected either a JWT-like token (header.payload.signature) or an sb_secret_* key",
+    );
+    process.exit(1);
+  }
+  console.log(`✅ Service key format accepted (${isSbSecret ? "sb_secret" : "jwt"})`);
 
   // Sanitize/build Supabase URL
   function buildSupabaseUrl(input: string): string {

@@ -137,7 +137,7 @@ export const canUserAccessComment = cache(
           author_id: true,
         },
       });
-      return comment !== undefined && comment.author_id === userId;
+      return comment?.author_id === userId;
     });
   },
 );

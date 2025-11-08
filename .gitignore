@@ -70,6 +70,8 @@ node_modules/
 /blob-report/
 /playwright/.cache/
 /trace/
+/e2e/fixtures/*.dump
+/e2e/.auth/user.json
 
 
 # Git worktrees and Claude Code worktree management

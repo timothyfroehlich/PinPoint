@@ -1,7 +1,7 @@
 # Testing Guide (Source of Truth)
 
-Last Reviewed: 2025-09-13
-Last Updated: 2025-09-13
+Last Reviewed: 2025-11-02
+Last Updated: 2025-11-02
 
 Scope: All contributors. This is the single source of truth for creating and updating tests. It replaces prior archetype-era documentation and any deprecated automation around test scaffolding.
 
@@ -103,12 +103,97 @@ Don’t
 - For RLS/Schema: cites `DATABASE_SECURITY_SPEC` sections.
 - Feature spec updated (Test Spec + Associated Test Files) if behavior changed.
 
+## E2E Best Practices & Common Pitfalls
+
+### Project Scoping Behavior
+- Playwright runs tests on ALL configured projects by default unless explicitly restricted via `testMatch`, `testIgnore`, or guards.
+- Only `auth.setup.ts` has explicit `testMatch` restriction in config.
+- Without guards, authenticated tests run on unauthenticated projects and vice versa, causing failures.
+
+### Project Guards (Required Pattern)
+**Auth-required tests** (smoke tests, authenticated flows):
+```typescript
+test.beforeEach(({ page }, testInfo) => {
+  if (!testInfo.project.name.includes("auth")) {
+    test.skip("Requires authenticated storage state");
+  }
+});
+```
+
+**Guest-required tests** (unauthenticated redirects, sign-in flows):
+```typescript
+test.beforeEach(({ page }, testInfo) => {
+  if (testInfo.project.name.includes("auth")) {
+    test.skip("Requires unauthenticated state to test redirects");
+  }
+});
+```
+
+### Storage State Management
+- `e2e/.auth/user.json` persists across test runs once created.
+- Stale auth state causes unexpected authenticated behavior in guest tests.
+- Guest tests should use `test.use({ storageState: undefined })` to ensure clean state.
+- Auth setup should clear existing state before creating new session.
+
+### Global Setup Separation of Concerns
+- **Global setup** (`e2e/global-setup.ts`): Database snapshot restore only. No server interaction.
+- **WebServer config**: Server lifecycle management and readiness checks.
+- **Auth setup project**: Authentication flow and storage state creation.
+- Do not launch browsers in global-setup; interferes with Playwright's webServer lifecycle.
+
+### Test Filtering Patterns
+- `--grep` matches test TITLES (describe/test names), not file paths.
+- Pattern `--grep-invert='e2e/prod/'` does NOT filter files; matches test names only.
+- Use `testMatch`/`testIgnore` in config or split npm scripts for file-based filtering.
+- Tag-based filtering: `test.describe.configure({ tags: ["@prod"] })` then `--grep-invert @prod`.
+
+### Environment-Specific Tests
+- Prod tests expecting multi-org behavior will fail in alpha single-org mode.
+- Use environment checks: `test.skip(baseURL?.includes("localhost"), "Prod-only behavior")`.
+- Separate scripts: `e2e:smoke` (local) vs `e2e:prod` (deployed).
+
+### Auth Setup Patterns
+- Verify server readiness before auth flow (health endpoint with retry).
+- Use stable selectors: `data-testid` over text content.
+- Add retry logic for flaky UI interactions (button clicks).
+- Better error messages: log current URL and state on timeout.
+- Confirm authentication success before saving storage state.
+
+### Common Failure Modes
+| Symptom | Root Cause | Fix |
+|---------|------------|-----|
+| Auth test fails on `chromium` project | Test runs on wrong project | Add project guard |
+| Guest test doesn't see redirect | Running on `chromium-auth` with stored auth | Add guest guard or clear storage state |
+| Prod tests fail locally | Alpha vs prod behavior mismatch | Skip prod tests in local scripts |
+| `--grep-invert` doesn't filter files | grep matches titles not paths | Use `testMatch`/`testIgnore` or tags |
+| Auth setup timeout | Server not ready or missing health check | Add health check with retry |
+| Tests pass individually, fail in suite | Project scoping leakage | Add guards to all auth/guest tests |
+
+### Diagnostic Commands
+```bash
+# List which tests run on which projects
+npx playwright test --list --project=chromium | grep "test-name"
+npx playwright test --list --project=chromium-auth | grep "test-name"
+
+# Verify grep filter behavior
+npx playwright test --list --grep-invert='pattern' --project=chromium | wc -l
+
+# Debug webServer startup
+DEBUG=pw:webserver npm run e2e
+
+# Run single project
+npx playwright test --project=chromium-auth
+```
+
 ## Commands
 - Unit/Integration: `npm test`, `npm run test:watch`
 - RLS: `npm run test:rls`
 - E2E smoke: `npm run smoke`
+- E2E full suite: `npm run e2e`
+- E2E single project: `npx playwright test --project=chromium-auth`
 
 ## References
 - Security authority: `docs/CORE/DATABASE_SECURITY_SPEC.md`
 - Vitest modern mocking: `docs/CORE/latest-updates/vitest.md`
 - Test infra (helpers/templates/constants): `src/test/`
+- Investigation archive: Lessons from Nov 2025 E2E failures incorporated above
