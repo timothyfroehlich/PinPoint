@@ -119,4 +119,27 @@ test.describe("Issue Create – Member (E2E)", () => {
       SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
     );
   });
+
+  test("member can see and select severity field", async ({ page }) => {
+    await page.goto("/issues/create");
+
+    // Verify severity select is visible
+    const severityTrigger = page.getByTestId("severity-select-trigger");
+    await expect(severityTrigger).toBeVisible();
+
+    // Open the severity dropdown
+    await severityTrigger.click();
+
+    // Verify all severity options are available
+    await expect(page.getByTestId("severity-option-low")).toBeVisible();
+    await expect(page.getByTestId("severity-option-medium")).toBeVisible();
+    await expect(page.getByTestId("severity-option-high")).toBeVisible();
+    await expect(page.getByTestId("severity-option-critical")).toBeVisible();
+
+    // Select "high" severity
+    await page.getByTestId("severity-option-high").click();
+
+    // Verify selection was made by checking the hidden input value
+    await expect(page.getByTestId("severity-hidden")).toHaveValue("high");
+  });
 });
