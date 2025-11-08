@@ -2,46 +2,93 @@
 
 ## Branch Snapshot
 - **Branch:** `feat_issue_creation`
-- **Goal:** Land the issue creation feature spec and a complete, passing test suite (unit, integration, E2E) before merge.
-- **Current state:**
-  - Feature spec updates (`docs/feature_specs/issue-creation.md` and supporting guidance) are merged locally and pushed.
-  - New test files exist but contain WIP implementations that are not yet green.
-  - Recent commits have been force-pushed so the remote branch now mirrors this trimmed history.
-  - As of 2025-09-27 we are auditing each test file sequentially, reviewing intent, authoring the full spec, and executing TDD (write failing test, then fix source).
+- **Scope (unchanged):** Ship the Issue Creation feature spec plus full passing coverage for member and anonymous/QR flows before merge. Anonymous reporting stays in this branch so behavior parity is guaranteed.
+- **State (2025-09-27):**
+  - Feature spec + agent guidance are merged but still reference planned tests.
+  - Unit validation suite is green; integration + E2E suites remain skeletal.
+  - `createIssueAction` integration test is red, revealing a whitespace-title bug in production code that must be fixed before the suite can pass.
 
-## Execution Plan (Rolling)
-1. Work through the outstanding test suites one file at a time (ordering: deterministic alphabetical by path unless a dependency suggests otherwise).
-2. For each file:
-   - Summarize the coverage goals and acceptance criteria to confirm scope.
-   - Rewrite/complete the test implementation to reflect the agreed spec, accepting red failures caused by missing production behavior.
-   - Capture any discovered gaps or upstream bugs in inline `TODO` notes or the Supporting Tasks list.
-3. After every test file lands green, revisit related source modules and fix regressions before moving to the next test file.
-4. Maintain this document with deltas after each file (updated status table + notes).
+## Parallel Task Board
+Each task below is intentionally scoped so a separate agent can execute it without touching files owned by another task. All tasks share the same Definition of Done (see bottom) but run in parallel once dependencies are satisfied.
 
-## Test Suites That Need Full Implementation
-| File | Purpose | Current Status | Required Work |
-|------|---------|----------------|---------------|
-| `src/lib/issues/assignmentValidation.issueCreation.unit.test.ts` | Pure validation logic for `validateIssueCreation` and helpers. | ✅ Implemented with seed-based mocks and passes. | (Follow-up) None pending — proceed to source fixes only if later tests reveal new gaps. |
-| `src/server/api/routers/issue.core.create.integration.test.ts` | Authorized member flow through the tRPC router. | Still the original skeleton with `expect("test implemented").toBe("true")`. | Use server test harness helpers (org context, mocked drizzle) to exercise: success path (issue inserts, defaults applied, activity + notifications triggered) and failure cases (soft-deleted machine, missing defaults, permission denial, validation errors). Leverage `setupOrganizationMocks` / RLS-safe mocks and assert on both DB writes and emitted errors. |
-| `src/server/api/routers/issue.core.publicCreate.integration.test.ts` | Anonymous QR flow through the public create router. | Skeleton only. | Similar to above but ensure `createdById` is `null`, no activity record, notifications triggered when configured, and RLS blocks cross-org or private machines. Include reporter email validation and missing default resource scenarios. |
-| `src/lib/actions/issue-actions.createIssueAction.integration.test.ts` | Server Action wiring (FormData → validation → DB + cache). | 🚨 Implemented; suite red due to whitespace-title bug in production action (returns success instead of field error). | Source fix required: tighten `createIssueAction` title validation so whitespace fails, then ensure error messaging stays user-friendly. |
-| `e2e/issues/issue-create-member.e2e.test.ts` | Member journey via `/issues/create`. | Steps partly filled in (uses Playwright and SEED IDs) but not yet validated against live UI. | Finish wiring with stable `data-testid`s; confirm seeds exist for referenced machines; ensure success assertion matches actual redirect/toast behavior. Add teardown if necessary to avoid polluting shared data, or rely on seed reset between tests. |
-| `e2e/issues/issue-create-anon-qr.e2e.test.ts` | Anonymous QR flow from QR endpoint to report form. | Still mostly placeholder sections. | Implement using QR seed (from `SEED_TEST_IDS.QR_CODES`). Steps: call `/api/qr/{id}`, follow redirect, submit anonymous form, ensure issue created without auth and no private data leak. Cover validation and visibility rules (guest cannot reach private machines). |
+| Task ID | Status | Files / Areas | Notes |
+|---------|--------|---------------|-------|
+| **T1 – Server Action Validation Fix** | ⚠️ Blocked on implementation | `src/lib/actions/issue-actions.ts` only | Fix whitespace-title bug so `createIssueAction` surfaces field errors; `src/lib/actions/issue-actions.createIssueAction.integration.test.ts` already encodes expectations and should pass without edits once the fix lands. |
+| **T2 – Router Integration (Member)** | 🚧 Not started | `src/server/api/routers/issue.core.create.integration.test.ts` | Replace skeleton with full harness-based tests for `issue.core.create`. Must not modify router implementation files owned by other workstreams. |
+| **T3 – Router Integration (Anonymous)** | 🚧 Not started | `src/server/api/routers/issue.core.publicCreate.integration.test.ts` | Implement tests for `issue.core.publicCreate`, ensuring anonymous-specific behavior. Avoid touching files from T2. |
+| **T4 – Playwright Member Flow** | 🚧 Not started | `e2e/issues/issue-create-member.e2e.test.ts` | Finalize `/issues/create` journey using existing member auth storage. |
+| **T5 – Playwright Anonymous QR Flow** | 🚧 Not started | `e2e/issues/issue-create-anon-qr.e2e.test.ts`, QR route configuration (read-only) | Implement QR redirect + anonymous submission journey while keeping guest context isolated. |
+| **T6 – Documentation & Plan Sync** | ⏳ Blocked on T1–T5 | `docs/feature_specs/issue-creation.md`, `docs/feature_specs/AGENTS.md`, `CURRENT_TASK.md` | After tests are green, update specs to list the implemented files and bump review dates. No other task should modify docs to avoid conflicts. |
 
-## Supporting Tasks
-- **Seed/Test Data:** Confirm every test uses `SEED_TEST_IDS` and seed-based mocks; avoid hard-coded UUIDs.
-- **Helpers:** Identify the correct test utilities (`setupAuthorizedContext`, `SeedBasedMockFactory`, Playwright auth fixtures) and use them instead of custom mocks.
-- **Cleanup:** Ensure each test restores mutated state (e.g., database records, caches) or runs inside existing reset helpers so it remains deterministic.
-- **Documentation Sync:** Update the spec’s "Associated Test Files" list once implementations settle; right now it still lists planned files with placeholder statuses.
+### T1 – Server Action Validation Fix
+- **Goal:** Make `createIssueAction` reject whitespace-only titles so `src/lib/actions/issue-actions.createIssueAction.integration.test.ts` passes without changes.
+- **Context:** The integration test already covers required behavior (field errors for whitespace, successful insert, permission downgrades). Production code currently trims nothing and allows the form through.
+- **Steps:**
+  1. Update `src/lib/actions/issue-actions.ts` to normalize the title (trim + non-empty guard) before validation/insert.
+  2. Ensure returned `fieldErrors.title` matches existing messaging when invalid.
+  3. Run `npx vitest run src/lib/actions/issue-actions.createIssueAction.integration.test.ts`.
+- **Deliverables:** Passing test suite; zero edits to test file.
 
-## Definition of Done
-1. All six test suites execute and pass locally:
-   - `npm run test` (unit + integration)
-   - `npm run test:rls` if new RLS coverage added
-   - `npm run smoke` / targeted Playwright command for the new E2E flows.
-2. No `expect("test implemented")` or equivalent placeholders remain.
-3. Assertions match the feature spec acceptance criteria (particularly around defaults, permissions, and notifications).
-4. Spec documentation reflects the final test coverage and dates are bumped if behavior changed during implementation.
-5. CI plan updated if additional setup (e.g., new auth fixture) is required.
+### T2 – Router Integration (Member)
+- **Goal:** Fully cover the member tRPC procedure (`issue.core.create`) with integration tests.
+- **Allowed Files:** `src/server/api/routers/issue.core.create.integration.test.ts` plus new helper fixtures under `src/test/**` if absolutely necessary (coordinate before adding shared helpers).
+- **Requirements:**
+  - Use existing org-auth context helpers (`setupAuthorizedContext` or equivalent) instead of ad-hoc objects.
+  - Assert success path: machine + defaults from same org, insert payload includes `createdById`, activity + notification services invoked.
+  - Assert failures: soft-deleted machine (null), missing default status, missing default priority, insufficient permission (basic vs full), schema validation (blank title, empty machineId).
+  - Keep mocks deterministic via `SEED_TEST_IDS`.
+  - No edits to router implementation or other suites.
+- **Validation:** `npx vitest run src/server/api/routers/issue.core.create.integration.test.ts`.
+
+### T3 – Router Integration (Anonymous)
+- **Goal:** Mirror T2 for `issue.core.publicCreate`, focusing on anonymous behavior.
+- **Allowed Files:** `src/server/api/routers/issue.core.publicCreate.integration.test.ts` (plus new helper files under `src/test/**` if unique to anonymous flow).
+- **Requirements:**
+  - Success: insert with `createdById = null`, no activity recorded, notification service invoked, reporter email persisted.
+  - Failures: machine missing/soft-deleted, cross-org machine, missing default status or priority, invalid reporter email, private machine blocked per visibility helper (mock accordingly).
+  - Ensure tests document that anonymous flow never calls `recordIssueCreated`.
+- **Validation:** `npx vitest run src/server/api/routers/issue.core.publicCreate.integration.test.ts`.
+
+### T4 – Playwright Member Flow
+- **Goal:** Complete `e2e/issues/issue-create-member.e2e.test.ts` to cover the authenticated `/issues/create` journey.
+- **Allowed Files:** That test file only (can read existing fixtures/config). Do not edit shared Playwright config.
+- **Requirements:**
+  - Use `test.beforeEach` guard to ensure the suite only runs on auth-enabled projects (`chromium-auth` etc.).
+  - Implement happy path: load page, fill required fields (`data-testid` from spec), submit, assert on redirect/toast or detail view.
+  - Implement validation path: submitting empty form shows inline errors that clear appropriately.
+  - Implement visibility path: confirm member sees private machines in select menu.
+  - Keep assertions resilient (avoid text brittle to localization).
+- **Validation:** `npx playwright test e2e/issues/issue-create-member.e2e.test.ts --project=chromium-auth`.
+
+### T5 – Playwright Anonymous QR Flow
+- **Goal:** Finalize `e2e/issues/issue-create-anon-qr.e2e.test.ts` to exercise `/api/qr/[qrCodeId]` redirect and guest submission.
+- **Allowed Files:** `e2e/issues/issue-create-anon-qr.e2e.test.ts` only. Run tests in guest project (ensure `storageState` undefined).
+- **Requirements:**
+  - Test QR redirect: hitting `/api/qr/{SEED_TEST_IDS.QR_CODES.machinePrimary}` should land on the report form for that machine; assert machine name + form presence.
+  - Test submission: fill title/description/reporterEmail, submit, assert success message/redirect; fetch issue list if necessary to confirm creation (reuse existing helper APIs if available).
+  - Negative assertions: anonymous user cannot access edit page or attachment uploads on the created issue (expect redirect/login prompt).
+  - Guard tests to skip on auth-enabled projects.
+- **Validation:** `npx playwright test e2e/issues/issue-create-anon-qr.e2e.test.ts --project=chromium`.
+
+### T6 – Documentation & Plan Sync
+- **Goal:** Once T1–T5 are green, update documentation to reflect reality.
+- **Allowed Files:** `docs/feature_specs/issue-creation.md`, `docs/feature_specs/AGENTS.md`, `CURRENT_TASK.md`.
+- **Steps:**
+  1. Move implemented test files from “Planned” to “Current” in the feature spec, add any new helper references, bump Last Reviewed/Updated dates.
+  2. Summarize final coverage + outcomes in this task file; mark tasks complete.
+  3. If agent workflow guidance needs updates (e.g., spec references), adjust `docs/feature_specs/AGENTS.md`.
+- **Validation:** Docs lint (markdown) if available; no code tests required.
+
+## Shared Supporting Notes
+- Always use `SEED_TEST_IDS` + Seed-based mock factories for deterministic data.
+- Follow `docs/CORE/TESTING_GUIDE.md` (worker-scoped DB, no per-test PGlite).
+- Do not edit another task’s owned files without live coordination; if unavoidable, document the conflict here before proceeding.
+
+## Definition of Done (unchanged)
+1. `npm run test` (unit + integration) passes with new suites enabled.
+2. Playwright flows (`npm run smoke` or targeted commands above) pass locally.
+3. No placeholder assertions remain; specs + docs reflect shipped behavior.
+4. Anonymous + member flows both validated end-to-end.
+5. CI instructions remain accurate (update if new env/setup is required).
 
 Document updated: 2025-09-27
