@@ -1,15 +1,75 @@
 /**
- * Test Setup API Endpoint
+ * Test Setup API - E2E Test Helpers
  *
- * SECURITY: Only available in development and test environments.
- * Provides authenticated endpoints for E2E test setup that respect RLS policies.
+ * ⚠️ CRITICAL SECURITY WARNING ⚠️
+ * This API provides direct database access for E2E test setup WITHOUT any
+ * authentication, authorization, or organization access validation.
  *
- * BUILD-TIME EXCLUSION: This route handler is conditionally exported based on NODE_ENV.
- * In production builds, only a 404 handler is exported, allowing the bundler to
- * tree-shake all test setup logic. The runtime environment check remains as
- * defense-in-depth for non-production deployments.
+ * ENVIRONMENT RESTRICTIONS:
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━
+ * ✓ ONLY for use in isolated E2E test environments
+ * ✓ Assumes single-tenant test database (one test run = one database)
+ * ✗ NO authentication or authorization checks
+ * ✗ NO organization access validation
+ * ✗ NO RLS policy enforcement on mutations
  *
- * This replaces direct database writes in E2E tests with proper API calls.
+ * SECURITY IMPLICATIONS:
+ * ━━━━━━━━━━━━━━━━━━━━━━━
+ * - Direct database mutations bypass ALL security boundaries
+ * - Can modify ANY organization's data regardless of caller identity
+ * - Can cause data corruption in shared/multi-tenant environments
+ * - Violates CORE-SEC-001 (organization scoping) by design
+ * - If exposed in production, can cause catastrophic data loss
+ *
+ * WHY NO ORGANIZATION SCOPING?
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━
+ * This API intentionally violates organization scoping rules because:
+ * 1. E2E tests run in isolated environments (one test = one database)
+ * 2. Tests need to manipulate state across organization boundaries
+ * 3. Test setup happens before authentication exists in the test flow
+ * 4. Enforcing scoping would require complex test authentication setup
+ * 5. Isolation provides security instead of access controls
+ *
+ * BUILD-TIME EXCLUSION:
+ * ━━━━━━━━━━━━━━━━━━━━
+ * - Conditionally exports handlers based on NODE_ENV
+ * - Production builds only export a 404 handler
+ * - Bundler can tree-shake all test setup logic from production
+ * - Runtime environment check provides defense-in-depth
+ *
+ * SAFE USAGE PATTERNS:
+ * ━━━━━━━━━━━━━━━━━━━━
+ * ✓ Playwright E2E tests with isolated test database
+ * ✓ Local development with `npm run db:reset` between runs
+ * ✓ CI environments with ephemeral databases
+ * ✓ Docker containers with database per test suite
+ *
+ * UNSAFE USAGE PATTERNS (DO NOT USE):
+ * ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ * ✗ Shared development databases with multiple developers
+ * ✗ Staging environments with real/shared data
+ * ✗ Any multi-tenant environment
+ * ✗ Production (prevented by build-time exclusion + runtime check)
+ * ✗ Integration tests that share database state
+ *
+ * TECHNICAL DETAILS:
+ * ━━━━━━━━━━━━━━━━━━
+ * - Direct Drizzle ORM access bypasses RLS policies
+ * - No session validation or user context
+ * - Organization IDs accepted as raw input without validation
+ * - Machine IDs accepted without ownership checks
+ * - State mutations are immediate and permanent
+ *
+ * ACTIONS PROVIDED:
+ * ━━━━━━━━━━━━━━━━━
+ * - enableAnonymousReporting: Enable org-wide anonymous issue creation
+ * - ensureQRCode: Generate/retrieve QR code for machine
+ * - findIssue: Query issues by title without scoping
+ * - captureState: Snapshot machine/org state for restoration
+ * - restoreState: Restore previously captured state
+ *
+ * @see {@link https://github.com/user/PinPoint/issues/3} - Security review findings
+ * @see docs/CORE/NON_NEGOTIABLES.md - CORE-SEC-001 organization scoping requirement
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -99,6 +159,9 @@ async function productionPOSTHandler(): Promise<NextResponse> {
 /**
  * Development/Test handler: Full test setup API implementation
  * Only bundled in non-production builds
+ *
+ * ⚠️ WARNING: All operations in this handler perform direct database mutations
+ * without authentication or organization scoping validation.
  */
 async function developmentPOSTHandler(request: NextRequest): Promise<NextResponse> {
   try {
@@ -109,7 +172,24 @@ async function developmentPOSTHandler(request: NextRequest): Promise<NextRespons
 
     switch (body.action) {
       case "enableAnonymousReporting": {
-        // Update organization settings
+        /**
+         * Enable Anonymous Reporting
+         *
+         * Modifies organization and machine settings to allow anonymous issue creation.
+         *
+         * ⚠️ SECURITY VIOLATION: No organization access validation
+         * - Accepts organizationId as raw input without checking caller permissions
+         * - Directly mutates organization settings bypassing RLS policies
+         * - Can enable anonymous reporting for ANY organization
+         *
+         * Safe only in isolated test environments where:
+         * - Single tenant per database
+         * - No shared data between tests
+         * - Database reset between test runs
+         */
+
+        // WARNING: Direct organization mutation without access validation
+        // Violates CORE-SEC-001: Organization scoping requirement
         await db
           .update(organizations)
           .set({
@@ -119,7 +199,7 @@ async function developmentPOSTHandler(request: NextRequest): Promise<NextRespons
           })
           .where(eq(organizations.id, body.organizationId));
 
-        // Update machine to be public
+        // WARNING: Direct machine mutation without ownership validation
         await db
           .update(machines)
           .set({
@@ -130,6 +210,7 @@ async function developmentPOSTHandler(request: NextRequest): Promise<NextRespons
 
         // Set default status if provided
         if (body.statusId) {
+          // WARNING: Modifies ALL statuses in organization without scoping check
           await db
             .update(issueStatuses)
             .set({ is_default: false })
@@ -148,6 +229,7 @@ async function developmentPOSTHandler(request: NextRequest): Promise<NextRespons
 
         // Set default priority if provided
         if (body.priorityId) {
+          // WARNING: Modifies ALL priorities in organization without scoping check
           await db
             .update(priorities)
             .set({ is_default: false })
@@ -168,7 +250,18 @@ async function developmentPOSTHandler(request: NextRequest): Promise<NextRespons
       }
 
       case "ensureQRCode": {
-        // Check if QR code already exists
+        /**
+         * Ensure QR Code Exists
+         *
+         * Generates or retrieves QR code for a machine.
+         *
+         * ⚠️ SECURITY VIOLATION: No machine ownership validation
+         * - Accepts machineId as raw input without checking ownership
+         * - Can generate QR codes for ANY machine in the database
+         * - No verification that caller has access to this machine
+         */
+
+        // WARNING: Query any machine without ownership validation
         const [machine] = await db
           .select({ qr_code_id: machines.qr_code_id })
           .from(machines)
@@ -181,6 +274,7 @@ async function developmentPOSTHandler(request: NextRequest): Promise<NextRespons
         // Generate new QR code ID
         const qrCodeId = `qr-${randomUUID()}`;
 
+        // WARNING: Direct machine mutation without ownership validation
         await db
           .update(machines)
           .set({
@@ -195,7 +289,19 @@ async function developmentPOSTHandler(request: NextRequest): Promise<NextRespons
       }
 
       case "findIssue": {
-        // Find issue by title
+        /**
+         * Find Issue by Title
+         *
+         * Queries issues across ALL organizations without scoping.
+         *
+         * ⚠️ SECURITY VIOLATION: No organization scoping
+         * - Searches ALL issues in database regardless of organization
+         * - Can find issues from ANY organization
+         * - Potential data leakage if used in shared environments
+         */
+
+        // WARNING: Query issues without organization scoping
+        // Violates CORE-SEC-001: Returns issues from ANY organization
         const [issue] = await db
           .select({ id: issues.id })
           .from(issues)
@@ -211,7 +317,18 @@ async function developmentPOSTHandler(request: NextRequest): Promise<NextRespons
       }
 
       case "captureState": {
-        // Capture current state for later restoration
+        /**
+         * Capture State
+         *
+         * Snapshots current machine and organization state for later restoration.
+         *
+         * ⚠️ SECURITY VIOLATION: No access validation
+         * - Can capture state from ANY machine/organization
+         * - No verification of caller permissions
+         * - Exposes internal state without authorization
+         */
+
+        // WARNING: Read machine state without ownership validation
         const [machineData] = await db
           .select({
             qr_code_id: machines.qr_code_id,
@@ -220,6 +337,7 @@ async function developmentPOSTHandler(request: NextRequest): Promise<NextRespons
           .from(machines)
           .where(eq(machines.id, body.machineId));
 
+        // WARNING: Read organization state without access validation
         const [orgData] = await db
           .select({
             allow_anonymous_issues: organizations.allow_anonymous_issues,
@@ -262,7 +380,19 @@ async function developmentPOSTHandler(request: NextRequest): Promise<NextRespons
       }
 
       case "restoreState": {
-        // Restore previously captured state
+        /**
+         * Restore State
+         *
+         * Restores previously captured machine and organization state.
+         *
+         * ⚠️ SECURITY VIOLATION: No access validation
+         * - Can restore state to ANY machine/organization
+         * - No verification of caller permissions
+         * - Direct state mutation bypassing all security controls
+         * - Can overwrite production data if accidentally exposed
+         */
+
+        // WARNING: Direct machine state mutation without ownership validation
         await db
           .update(machines)
           .set({
@@ -272,6 +402,7 @@ async function developmentPOSTHandler(request: NextRequest): Promise<NextRespons
           })
           .where(eq(machines.id, body.machineId));
 
+        // WARNING: Direct organization state mutation without access validation
         await db
           .update(organizations)
           .set({
