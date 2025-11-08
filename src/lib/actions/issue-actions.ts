@@ -254,6 +254,21 @@ export async function createIssueAction(
  * - Restricts ability to set priority / assignee.
  * - Allows specifying severity + title/description + machine.
  * - Records reporter metadata (optional name/email).
+ *
+ * SECURITY ARCHITECTURE:
+ * This Server Action uses manual visibility validation rather than RLS because:
+ * 1. Server Actions run with service role credentials (bypass RLS for performance)
+ * 2. Manual validation mirrors RLS policies defined in 01-rls-policies.sql
+ * 3. Provides clearer error messages to anonymous users
+ * 4. See inline comments below for detailed policy mapping
+ *
+ * CONSISTENCY:
+ * - Must stay synchronized with RLS policies:
+ *   - machines_public_read (01-rls-policies.sql:317-345)
+ *   - organizations_context_read (01-rls-policies.sql:150-154)
+ *   - issues_public_read (01-rls-policies.sql:415-445)
+ * - Changes to RLS policies require corresponding updates here
+ * - Validated by RLS integration tests in supabase/tests/
  */
 export async function createPublicIssueAction(
   _prevState: ActionResult<{ id: string }> | null,
@@ -302,23 +317,62 @@ export async function createPublicIssueAction(
   const { machineId, title, description, severity } = validation.data;
 
   try {
-    // Fetch machine
+    // =============================================================================
+    // SECURITY MODEL: Manual Visibility Validation
+    // =============================================================================
+    // Server Actions use the global database provider (db from ~/lib/dal/shared)
+    // which bypasses RLS (Row-Level Security). This differs from tRPC procedures
+    // which use RLS-scoped clients that automatically enforce policies.
+    //
+    // We manually validate visibility here to mirror the RLS policies:
+    // - machines_public_read policy (01-rls-policies.sql lines 317-345):
+    //   Allows anon/authenticated users to read machines where is_public = true
+    //   or inherits public status from location/organization
+    // - organizations_context_read policy (01-rls-policies.sql lines 150-154):
+    //   Allows anon users to read the current organization in context
+    // - issues_public_read policy (01-rls-policies.sql lines 415-445):
+    //   Allows anon users to read public issues with nested visibility checks
+    //
+    // This ensures anonymous users can only create issues for:
+    // 1. Explicitly public machines (is_public = true)
+    // 2. In organizations that allow anonymous reporting (allow_anonymous_issues = true)
+    // 3. In organizations that are public (is_public = true)
+    //
+    // Why manual validation instead of RLS?
+    // - Server Actions run with admin/service role credentials for performance
+    // - RLS policies require per-request session context setup
+    // - Manual validation provides clearer error messages for users
+    // - Keeps validation logic co-located with the action for maintainability
+    //
+    // Related validations:
+    // - createIssueAction (lines 116-249): Uses permission checks for members
+    // - tRPC issueRouter: Uses RLS-scoped client for automatic policy enforcement
+    // =============================================================================
+
+    // Fetch machine with visibility flags
     const machineRecord = await db.query.machines.findFirst({
       where: eq(machines.id, machineId),
       columns: { id: true, organization_id: true, is_public: true },
     });
     if (!machineRecord) return actionError("Machine not found");
 
-    // Fetch organization settings
+    // Fetch organization settings and public status
     const orgRecord = await db.query.organizations.findFirst({
       where: eq(organizations.id, machineRecord.organization_id),
       columns: { allow_anonymous_issues: true, is_public: true },
     });
     if (!orgRecord) return actionError("Organization not found");
+
+    // Validate machine public visibility (must be explicitly true, not inherited)
+    // This mirrors the machines_public_read RLS policy's explicit is_public check
     if (!orgRecord.is_public || machineRecord.is_public !== true)
       return actionError("Machine not available for public reporting");
+
+    // Validate organization allows anonymous issue creation
+    // This is a business logic check beyond RLS - controls issue creation permission
     if (!orgRecord.allow_anonymous_issues)
       return actionError("Anonymous reporting disabled");
+
     // At public path we implicitly allow BASIC creation only (no priority / assignee fields honored)
 
     const organizationId = machineRecord.organization_id;
