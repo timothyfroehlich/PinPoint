@@ -2,13 +2,18 @@
 
 _Advanced mocking patterns for type-safe testing in modern JavaScript applications_
 
-## Key Changes (2024-2025)
+## Key Changes (2025)
 
-### **🚀 Vitest 3.0 Updates (2025)**
+### **🚀 Vitest 4.0 Stable Release (November 2025)**
 
-**Enhanced Browser Mode**: Better ES module support for browser-based testing  
-**Performance Improvements**: Faster test execution and module resolution  
+**CURRENT VERSION:** Vitest 4.0.8
+
+**Spy Implementation Rewrite**: Complete rewrite of spy system for more predictable mocking behavior
+**Enhanced Browser Mode**: Better ES module support for browser-based testing
+**Performance Improvements**: Faster test execution and module resolution
 **Improved TypeScript Integration**: Better type inference for mock functions
+
+**PinPoint Status:** ✅ Upgraded from 3.2.4 → 4.0.8 in commit 5b394ed (Nov 8, 2025)
 
 ### 🎯 **Modern ES Module Mocking Standard**
 
@@ -30,7 +35,7 @@ _Advanced mocking patterns for type-safe testing in modern JavaScript applicatio
 - **DON'T:** Try to reference test variables directly in mock factories
 - **Migration Benefit:** Clean separation of mock setup from test logic
 
-### ⚡ **Vitest v4.0 Beta Changes**
+### ⚡ **Vitest 4.0 Stable Breaking Changes**
 
 **Configuration Updates**
 
@@ -38,12 +43,14 @@ _Advanced mocking patterns for type-safe testing in modern JavaScript applicatio
 - **DO:** Migrate to `projects` configuration for monorepo setups
 - **DON'T:** Rely on deprecated `workspace` configuration
 - **Migration Impact:** Better support for distinct test configurations per project
+- **PinPoint Status:** ✅ No workspace config used, no migration needed
 
 **Spy Implementation Rewrite**
 
 - **DO:** Use new intuitive spying patterns in v4.0
 - **DON'T:** Rely on complex workarounds from earlier versions
 - **Migration Benefit:** More predictable module mocking behavior
+- **PinPoint Status:** ✅ All 402 tests passing with Vitest 4.0.8
 
 ### 🛠 **Integration Patterns**
 

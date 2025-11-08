@@ -2,7 +2,36 @@
 
 _Server Components, Server Actions, and critical caching changes for full-stack architecture_
 
-## 🚨 CRITICAL BREAKING CHANGES (Next.js 15.x - 2025)
+## 🚨 CRITICAL BREAKING CHANGES (Next.js 16.x - November 2025)
+
+### **React Compiler Configuration Change**
+
+**BREAKING:** Next.js 16.0.1 moved React Compiler from experimental to top-level config:
+
+```javascript
+// BEFORE Next.js 16: React Compiler in experimental
+const config = {
+  experimental: {
+    reactCompiler: true, // ❌ No longer valid in Next.js 16
+  },
+}
+
+// AFTER Next.js 16: React Compiler is top-level
+const config = {
+  reactCompiler: true, // ✅ Now a top-level option
+  experimental: {
+    // Other experimental features
+  },
+}
+```
+
+**Migration Impact:** Update `next.config.mjs` to move `reactCompiler` out of `experimental` object.
+
+**PinPoint Status:** ✅ Migrated in commit 987af66 (Nov 4, 2025)
+
+---
+
+## 🚨 CRITICAL BREAKING CHANGES (Next.js 15.x - August 2025)
 
 ### **Caching Defaults Completely Changed**
 

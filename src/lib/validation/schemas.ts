@@ -250,16 +250,21 @@ export const optionalCommentSchema = optional(commentContentSchema);
 /**
  * Title validation for issues and similar short descriptive text.
  * Requires non-empty content with reasonable length limits.
+ * Rejects whitespace-only strings.
  *
  * @example
  * ```typescript
  * const title = titleSchema.parse("Pinball machine not working"); // ✓
  * titleSchema.parse(""); // ✗ "Title is required"
+ * titleSchema.parse("   \n\t  "); // ✗ "Title cannot be only whitespace"
  * ```
  */
 export const titleSchema = z
   .string()
   .min(1, { message: "Title is required" })
+  .refine((s) => s.trim().length > 0, {
+    message: "Title cannot be only whitespace",
+  })
   .max(LIMITS.TITLE_MAX, {
     message: `Title must be less than ${LIMITS.TITLE_MAX.toString()} characters`,
   })
