@@ -208,6 +208,13 @@ export async function createIssueAction(
     };
 
     // Create issue in database
+    // SAFE TYPE ASSERTION: transformKeysToSnakeCase is deterministic key transformation
+    // - issueData object explicitly constructed with all required schema fields above (lines 197-208)
+    // - All fields validated via Zod schema before reaching this point
+    // - Transformer only renames keys (camelCase → snake_case), preserves values
+    // - TypeScript validates field types at object construction (line 197)
+    // LIMITATION: If schema adds new required field without default, error occurs at runtime
+    // MITIGATION: Integration tests validate all insert paths against live schema
     await db
       .insert(issues)
       .values(
@@ -218,7 +225,7 @@ export async function createIssueAction(
     revalidatePath("/issues");
     revalidatePath(`/issues/${issueData.id}`);
     revalidatePath("/dashboard");
-    revalidateTag("issues");
+    revalidateTag("issues", "max");
 
     // Background processing (runs after response sent to user)
     runAfterResponse(async () => {
@@ -254,12 +261,54 @@ export async function createIssueAction(
  * - Restricts ability to set priority / assignee.
  * - Allows specifying severity + title/description + machine.
  * - Records reporter metadata (optional name/email).
+ *
+ * SECURITY ARCHITECTURE:
+ * This Server Action uses manual visibility validation rather than RLS because:
+ * 1. Server Actions run with service role credentials (bypass RLS for performance)
+ * 2. Manual validation mirrors RLS policies defined in 01-rls-policies.sql
+ * 3. Provides clearer error messages to anonymous users
+ * 4. See inline comments below for detailed policy mapping
+ *
+ * CONSISTENCY:
+ * - Must stay synchronized with RLS policies:
+ *   - machines_public_read (01-rls-policies.sql:317-345)
+ *   - organizations_context_read (01-rls-policies.sql:150-154)
+ *   - issues_public_read (01-rls-policies.sql:415-445)
+ * - Changes to RLS policies require corresponding updates here
+ * - Validated by RLS integration tests in supabase/tests/
  */
 export async function createPublicIssueAction(
   _prevState: ActionResult<{ id: string }> | null,
   formData: FormData,
 ): Promise<ActionResult<{ id: string }>> {
-  // Basic rate limiting (IP + machine) – naive in-memory (single instance)
+  // =============================================================================
+  // RATE LIMITING: In-Memory Implementation
+  // =============================================================================
+  // ARCHITECTURE: Naive in-memory rate limiting for single-instance deployments
+  //
+  // LIMITATIONS:
+  // 1. Single-instance only: State not shared across multiple server instances
+  // 2. Memory loss on restart: Limits reset when server restarts/redeploys
+  // 3. No persistence: Limits not stored in database or cache
+  // 4. Easy bypass: Users can evade limits by changing IP or machine
+  // 5. Testing override: Uses global variable hack for test environments
+  //
+  // CONFIGURATION:
+  // - Window: 60 seconds (60_000ms)
+  // - Max requests: 5 per IP+machine combination
+  // - Key format: "public_issue:{ip}:{machineId}"
+  //
+  // PRODUCTION CONSIDERATIONS:
+  // - For multi-instance deployments, migrate to Redis-based rate limiting
+  // - Consider using edge middleware (Cloudflare, Vercel) for distributed limits
+  // - Add database-level throttling as defense-in-depth
+  // - Monitor for abuse patterns and adjust limits accordingly
+  //
+  // SECURITY:
+  // - IP spoofing possible (honors X-Forwarded-For headers)
+  // - Not suitable for high-security scenarios
+  // - Provides basic protection against simple automated abuse
+  // =============================================================================
   try {
     const { headers } = await import("next/headers");
     const h = await headers();
@@ -287,8 +336,15 @@ export async function createPublicIssueAction(
         "Too many submissions. Please wait a minute and try again.",
       );
     }
-  } catch {
-    // ignore rate limit errors
+  } catch (error) {
+    // Rate limiting is best-effort only. Failures are logged but don't block requests.
+    // Possible failure scenarios:
+    // - Header parsing errors (malformed X-Forwarded-For)
+    // - Rate limiter initialization failures
+    // - Memory pressure causing eviction failures
+    // Rationale: Better to allow anonymous issue creation than block legitimate users
+    // due to rate limiting infrastructure issues.
+    console.warn("Rate limiting check failed (non-blocking):", error);
   }
   // Validate (priority/assignee will be ignored even if passed)
   const validation = validateFormData(formData, createIssueSchema);
@@ -302,23 +358,62 @@ export async function createPublicIssueAction(
   const { machineId, title, description, severity } = validation.data;
 
   try {
-    // Fetch machine
+    // =============================================================================
+    // SECURITY MODEL: Manual Visibility Validation
+    // =============================================================================
+    // Server Actions use the global database provider (db from ~/lib/dal/shared)
+    // which bypasses RLS (Row-Level Security). This differs from tRPC procedures
+    // which use RLS-scoped clients that automatically enforce policies.
+    //
+    // We manually validate visibility here to mirror the RLS policies:
+    // - machines_public_read policy (01-rls-policies.sql lines 317-345):
+    //   Allows anon/authenticated users to read machines where is_public = true
+    //   or inherits public status from location/organization
+    // - organizations_context_read policy (01-rls-policies.sql lines 150-154):
+    //   Allows anon users to read the current organization in context
+    // - issues_public_read policy (01-rls-policies.sql lines 415-445):
+    //   Allows anon users to read public issues with nested visibility checks
+    //
+    // This ensures anonymous users can only create issues for:
+    // 1. Explicitly public machines (is_public = true)
+    // 2. In organizations that allow anonymous reporting (allow_anonymous_issues = true)
+    // 3. In organizations that are public (is_public = true)
+    //
+    // Why manual validation instead of RLS?
+    // - Server Actions run with admin/service role credentials for performance
+    // - RLS policies require per-request session context setup
+    // - Manual validation provides clearer error messages for users
+    // - Keeps validation logic co-located with the action for maintainability
+    //
+    // Related validations:
+    // - createIssueAction (lines 116-249): Uses permission checks for members
+    // - tRPC issueRouter: Uses RLS-scoped client for automatic policy enforcement
+    // =============================================================================
+
+    // Fetch machine with visibility flags
     const machineRecord = await db.query.machines.findFirst({
       where: eq(machines.id, machineId),
       columns: { id: true, organization_id: true, is_public: true },
     });
     if (!machineRecord) return actionError("Machine not found");
 
-    // Fetch organization settings
+    // Fetch organization settings and public status
     const orgRecord = await db.query.organizations.findFirst({
       where: eq(organizations.id, machineRecord.organization_id),
       columns: { allow_anonymous_issues: true, is_public: true },
     });
     if (!orgRecord) return actionError("Organization not found");
+
+    // Validate machine public visibility (must be explicitly true, not inherited)
+    // This mirrors the machines_public_read RLS policy's explicit is_public check
     if (!orgRecord.is_public || machineRecord.is_public !== true)
       return actionError("Machine not available for public reporting");
+
+    // Validate organization allows anonymous issue creation
+    // This is a business logic check beyond RLS - controls issue creation permission
     if (!orgRecord.allow_anonymous_issues)
       return actionError("Anonymous reporting disabled");
+
     // At public path we implicitly allow BASIC creation only (no priority / assignee fields honored)
 
     const organizationId = machineRecord.organization_id;
@@ -356,6 +451,13 @@ export async function createPublicIssueAction(
       severity,
     };
 
+    // SAFE TYPE ASSERTION: transformKeysToSnakeCase is deterministic key transformation
+    // - issueData object explicitly constructed with all required schema fields above (lines 397-411)
+    // - Public creation validated via manual visibility checks (lines 352-374)
+    // - Transformer only renames keys (camelCase → snake_case), preserves values
+    // - TypeScript validates field types at object construction (line 397)
+    // LIMITATION: If schema adds new required field without default, error occurs at runtime
+    // MITIGATION: Integration tests validate all insert paths against live schema
     await db
       .insert(issues)
       .values(
@@ -363,7 +465,7 @@ export async function createPublicIssueAction(
       );
 
     revalidatePath(`/machines/${machineId}`);
-    revalidateTag("issues");
+    revalidateTag("issues", "max");
     return actionSuccess({ id: issueData.id }, "Issue reported successfully");
   } catch (error) {
     console.error("createPublicIssueAction error:", error);
@@ -419,7 +521,7 @@ export async function updateIssueStatusAction(
     revalidatePath(`/issues/${issueId}`);
     revalidatePath("/issues");
     revalidatePath("/dashboard");
-    revalidateTag("issues");
+    revalidateTag("issues", "max");
 
     // Background processing
     runAfterResponse(async () => {
@@ -514,8 +616,8 @@ export async function addCommentAction(
 
     // Cache invalidation
     revalidatePath(`/issues/${issueId}`);
-    revalidateTag("issues");
-    revalidateTag(`comments-${issueId}`);
+    revalidateTag("issues", "max");
+    revalidateTag(`comments-${issueId}`, "max");
 
     // Background processing
     runAfterResponse(() => {
@@ -597,7 +699,7 @@ export async function updateIssueAssignmentAction(
     revalidatePath(`/issues/${issueId}`);
     revalidatePath("/issues");
     revalidatePath("/dashboard");
-    revalidateTag("issues");
+    revalidateTag("issues", "max");
 
     // Background processing
     runAfterResponse(async () => {
@@ -693,7 +795,7 @@ export async function bulkUpdateIssuesAction(
     // Cache invalidation
     revalidatePath("/issues");
     revalidatePath("/dashboard");
-    revalidateTag("issues");
+    revalidateTag("issues", "max");
 
     // Background processing
     runAfterResponse(() => {

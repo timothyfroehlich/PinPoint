@@ -4,16 +4,18 @@
 Issue creation lets organization members use `/issues/create` and anonymous users via QR‑resolved links report problems for a specific machine; both paths validate org context, apply default status and priority, and notify machine owners when configured, while only member creations record activity and anonymous inserts have `createdById = null`. Creation controls are permission‑gated (basic vs full) with the current UI defaulting to full for members, and the public path constrained by server‑side validation; anonymous content is immutable by the author and anonymous initial attachments are currently not implemented.
 
 ## Last Reviewed / Last Updated
-- Last Reviewed: 2025-09-13
-- Last Updated: 2025-09-13
+- Last Reviewed: 2025-11-08
+- Last Updated: 2025-11-08
 
 ## Key Source Files
 - `src/server/api/routers/issue.core.ts`: tRPC router for issues (publicCreate, create, getAll, assignment, status update). Handles validation, inserts, activity, notifications.
 - `src/server/api/schemas/issue.schema.ts`: Zod schemas including `issueCreateSchema` and `publicIssueCreateSchema`.
 - `src/app/issues/create/page.tsx`: Auth‑guarded Server Component page for member creation; uses Server Action and DAL fetchers.
-- `src/lib/actions/issue-actions.ts`: Server Action `createIssueAction` used by the form for member flow.
+- `src/app/machines/[machineId]/report-issue/page.tsx`: Anonymous issue reporting page for QR-resolved machine context (correct route structure as of 2025-11-08).
+- `src/components/forms/CreateIssueFormServer.tsx`: Member issue creation form with severity and priority fields.
+- `src/lib/actions/issue-actions.ts`: Server Action `createIssueAction` used by the form for member flow; includes severity field support.
 - `src/lib/issues/assignmentValidation.ts`: Pure business rule validators including `validateIssueCreation` and dependencies.
-- `src/app/api/qr/[qrCodeId]/route.ts`: QR route; resolves QR → report URL redirect.
+- `src/app/api/qr/[qrCodeId]/route.ts`: QR route; resolves QR → report URL redirect (redirects to `/machines/[machineId]/report-issue`).
 - `src/lib/dal/qr-codes.ts`: QR resolution using services and DB provider.
 - `src/server/utils/qrCodeUtils.ts`: Constructs organization‑aware report URLs.
 - `src/server/auth/permissions.constants.ts`: Permission constants for creation/edit/attachments.
@@ -24,12 +26,12 @@ Issue creation lets organization members use `/issues/create` and anonymous user
 ## Detailed Feature Spec
 - Member creation flow
   - Access: Authenticated member within an organization context.
-  - Form: `/issues/create` lists machines and assignable users; gating via `computeIssueCreationGating` controls priority/assignee visibility.
-  - Server validation: `issue.core.create` fetches machine + default status/priority; runs `validateIssueCreation`; inserts issue with `createdById = user.id`; records `recordIssueCreated`; sends owner notification.
+  - Form: `/issues/create` lists machines and assignable users; includes both **severity** (reporter's impact assessment) and **priority** (internal scheduling weight) fields; gating via `computeIssueCreationGating` controls priority/assignee visibility based on permissions.
+  - Server validation: `issue.core.create` fetches machine + default status/priority; runs `validateIssueCreation`; inserts issue with `createdById = user.id` including severity; records `recordIssueCreated`; sends owner notification.
   - Defaults: Uses org default status and priority (must exist and belong to org).
 
 - Public/anonymous creation flow
-  - Entry: User scans machine QR → `/api/qr/[qrCodeId]` → redirect to a report URL for that machine within the org domain.
+  - Entry: User scans machine QR → `/api/qr/[qrCodeId]` → redirect to `/machines/[machineId]/report-issue` for that machine within the org domain.
   - Server validation: `issue.core.publicCreate` requires `publicIssueCreateSchema` (includes reporterEmail), resolves org context, validates resources, inserts with `createdById = null`; activity recording is skipped; notifications sent to owner when applicable.
   - Constraints: Only permitted against machines that are effectively accessible by guests per org visibility and policy; no post‑creation mutation allowed for the anonymous author.
 
@@ -43,7 +45,12 @@ Issue creation lets organization members use `/issues/create` and anonymous user
 
 - Current gaps/TODOs
   - Anonymous initial attachments: Not implemented in `publicCreate`. Align with DB spec (guest may attach during initial creation only) and add org policy checks before enabling.
-  - UI for anonymous report form: Ensure a server page exists to render the anonymous create form at the report URL resolved by QR.
+
+- Recent updates (2025-11-08)
+  - ✅ Route structure corrected: Anonymous reporting now at `/machines/[machineId]/report-issue` (was `/report/[machineId]`)
+  - ✅ Severity field added: Both member and anonymous forms now include severity selector (low/medium/high/critical)
+  - ✅ Anonymous UI implemented: Server page exists at `/machines/[machineId]/report-issue` with full form functionality
+  - ✅ Full test coverage: Member and anonymous flows validated with integration and E2E tests
 
 ## Security / RLS Spec
 - Organization scoping: All DB access is org‑scoped; RLS enforces `organization_id` matching throughout. See `docs/CORE/DATABASE_SECURITY_SPEC.md`.
@@ -79,20 +86,22 @@ References: `docs/CORE/DATABASE_SECURITY_SPEC.md`, `docs/CORE/CUJS_LIST.md` (Ano
   - Notifications to machine owner fire on success when configured.
 
 ## Associated Test Files
-- Current
-  - `src/lib/actions/issue-actions.server.test.ts` (Server Action create flow)
+- Current (as of 2025-11-08)
+  - `src/lib/actions/issue-actions.server.test.ts` - Server Action create flow validation
+  - `src/lib/actions/issue-actions.createIssueAction.integration.test.ts` - Server Action integration tests with whitespace validation
+  - `src/server/api/routers/issue.core.create.integration.test.ts` - Member tRPC procedure integration tests with canonical context helpers
+  - `src/server/api/routers/issue.core.publicCreate.integration.test.ts` - Anonymous tRPC procedure integration tests with visibility coverage
+  - `e2e/issues/issue-create-member.e2e.test.ts` - Member flow E2E tests with severity field coverage
+  - `e2e/issues/issue-create-anon-qr.e2e.test.ts` - Anonymous QR flow E2E tests using sanctioned APIs
+  - `src/test/helpers/test-context.ts` - Canonical test context helper for integration tests
 
 - Planned
-  - `src/lib/issues/assignmentValidation.issueCreation.unit.test.ts`
-  - `src/server/api/routers/issue.core.publicCreate.integration.test.ts`
-  - `src/server/api/routers/issue.core.create.integration.test.ts`
-  - `e2e/issues/issue-create-member.e2e.test.ts`
-  - `e2e/issues/issue-create-anon-qr.e2e.test.ts`
+  - `src/lib/issues/assignmentValidation.issueCreation.unit.test.ts` - Pure business logic unit tests for issue creation validation
 
 ## UI Spec (concise)
 - Screens & Routes
-  - Member: `/issues/create` (breadcrumbs: Home → Issues → Create). Success → detail/list page (as implemented by form action). Failure → stay with inline errors.
-  - Anonymous (planned): `/machines/[machineId]/report-issue` (target of QR resolution). Success → confirmation page or public issue view; Failure → stay with inline errors.
+  - Member: `/issues/create` (breadcrumbs: Home → Issues → Create). Success → detail/list page (as implemented by form action). Failure → stay with inline errors. Includes severity and priority fields.
+  - Anonymous: `/machines/[machineId]/report-issue` (target of QR resolution, implemented as of 2025-11-08). Success → confirmation page or public issue view; Failure → stay with inline errors.
 
 - States
   - Loading: initial server data fetch; render skeleton or disabled form until machines/users load.
@@ -101,8 +110,8 @@ References: `docs/CORE/DATABASE_SECURITY_SPEC.md`, `docs/CORE/CUJS_LIST.md` (Ano
   - Validation: client-side hints if present; server action returns field errors mapped to inputs.
 
 - Form Contract
-  - Member: fields — machine (required), title (required), description (optional); priority and assignee shown when gating allows. Submit enabled only when required fields valid.
-  - Anonymous (planned): fields — title (required), description (optional), reporterEmail (required), submitterName (optional); machineId derives from route.
+  - Member: fields — machine (required), title (required), description (optional), **severity** (required: low/medium/high/critical), priority (shown when full permission granted), assignee (shown when gating allows). Submit enabled only when required fields valid.
+  - Anonymous: fields — title (required), description (optional), **severity** (required: low/medium/high/critical), reporterEmail (required), submitterName (optional); machineId derives from route.
   - Messages: use Zod schema messages for title/email; show one-line inline errors; keep button disabled during submission.
   - Attachments: not in create form; public path does not allow uploads.
 
@@ -119,7 +128,8 @@ References: `docs/CORE/DATABASE_SECURITY_SPEC.md`, `docs/CORE/CUJS_LIST.md` (Ano
 - Selectors (use for E2E)
   - `data-testid="issue-form"`
   - `data-testid="machine-select"`, `data-testid="title-input"`, `data-testid="description-input"`
-  - `data-testid="priority-select"`, `data-testid="assignee-select"` (shown when gated)
+  - `data-testid="severity-select"` (shown on both member and anonymous forms as of 2025-11-08)
+  - `data-testid="priority-select"`, `data-testid="assignee-select"` (shown when gated, member only)
   - `data-testid="reporter-email-input"`, `data-testid="submitter-name-input"` (anonymous route)
   - `data-testid="submit-button"`, `data-testid="error-summary"`
 

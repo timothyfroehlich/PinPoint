@@ -8,7 +8,7 @@ import "server-only";
 
 import { cache } from "react";
 import { eq } from "drizzle-orm";
-import { machines } from "~/server/db/schema";
+import { machines, organizations } from "~/server/db/schema";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 
 /**
@@ -54,6 +54,26 @@ export const getPublicMachineById = cache(
     });
 
     if (!machineRecord) {
+      return null;
+    }
+
+    // SECURITY: Validate machine visibility before exposing to anonymous users
+    // Machine must explicitly be public (is_public: true)
+    if (machineRecord.is_public !== true) {
+      return null;
+    }
+
+    // SECURITY: Validate organization visibility settings
+    // Organization must be public AND allow anonymous issues
+    const org = await db.query.organizations.findFirst({
+      where: eq(organizations.id, machineRecord.location.organization_id),
+      columns: {
+        is_public: true,
+        allow_anonymous_issues: true
+      },
+    });
+
+    if (!org?.is_public || !org?.allow_anonymous_issues) {
       return null;
     }
 

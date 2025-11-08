@@ -144,6 +144,7 @@ async function CreateIssueContent({
         {...(resolvedSearchParams.machineId && {
           initialMachineId: resolvedSearchParams.machineId,
         })}
+        showSeverity={true}
         showPriority={gating.showPriority}
         showAssignee={gating.showAssignee}
       />
