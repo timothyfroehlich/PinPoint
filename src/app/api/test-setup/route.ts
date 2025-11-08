@@ -72,25 +72,21 @@
  * @see docs/CORE/NON_NEGOTIABLES.md - CORE-SEC-001 organization scoping requirement
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { eq, and } from "drizzle-orm";
-import { db } from "~/lib/dal/shared";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+import { env } from "~/env";
 import {
-  machines,
-  organizations,
-  issueStatuses,
-  priorities,
-  issues,
-} from "~/server/db/schema";
-import { randomUUID } from "crypto";
+  captureStateSnapshot,
+  enableAnonymousReportingMutation,
+  ensureQrCodeMutation,
+  findIssueByTitle,
+  restoreStateMutation,
+  type TestSetupState,
+} from "~/lib/test-support/test-setup-service";
 
 // Security: Verify environment
 function isTestEnvironment(): boolean {
-  return (
-    process.env.NODE_ENV === "test" ||
-    process.env.NODE_ENV === "development" ||
-    process.env.E2E_TEST === "true"
-  );
+  return env.NODE_ENV !== "production" || env.CI === "true";
 }
 
 // Security: Block in production
@@ -130,15 +126,7 @@ interface RestoreStateRequest {
   action: "restoreState";
   machineId: string;
   organizationId: string;
-  state: {
-    machine: { qrCodeId: string | null; isPublic: boolean | null };
-    organization: {
-      allowAnonymousIssues: boolean;
-      isPublic: boolean | null;
-    };
-    statusDefaults?: boolean;
-    priorityDefaults?: boolean;
-  };
+  state: TestSetupState;
 }
 
 type TestSetupRequest =
@@ -152,7 +140,7 @@ type TestSetupRequest =
  * Production handler: Returns 404 to exclude test setup API from production
  * This allows tree-shaking to remove all test setup logic from production bundles
  */
-async function productionPOSTHandler(): Promise<NextResponse> {
+function productionPOSTHandler(): NextResponse {
   return new NextResponse(null, { status: 404 });
 }
 
@@ -168,7 +156,7 @@ async function developmentPOSTHandler(request: NextRequest): Promise<NextRespons
     // Defense-in-depth: Runtime check in case of misconfiguration
     ensureTestEnvironment();
 
-    const body: TestSetupRequest = await request.json();
+    const body = (await request.json()) as TestSetupRequest;
 
     switch (body.action) {
       case "enableAnonymousReporting": {
@@ -187,64 +175,12 @@ async function developmentPOSTHandler(request: NextRequest): Promise<NextRespons
          * - No shared data between tests
          * - Database reset between test runs
          */
-
-        // WARNING: Direct organization mutation without access validation
-        // Violates CORE-SEC-001: Organization scoping requirement
-        await db
-          .update(organizations)
-          .set({
-            allow_anonymous_issues: true,
-            is_public: true,
-            updated_at: new Date(),
-          })
-          .where(eq(organizations.id, body.organizationId));
-
-        // WARNING: Direct machine mutation without ownership validation
-        await db
-          .update(machines)
-          .set({
-            is_public: true,
-            updated_at: new Date(),
-          })
-          .where(eq(machines.id, body.machineId));
-
-        // Set default status if provided
-        if (body.statusId) {
-          // WARNING: Modifies ALL statuses in organization without scoping check
-          await db
-            .update(issueStatuses)
-            .set({ is_default: false })
-            .where(eq(issueStatuses.organization_id, body.organizationId));
-
-          await db
-            .update(issueStatuses)
-            .set({ is_default: true })
-            .where(
-              and(
-                eq(issueStatuses.id, body.statusId),
-                eq(issueStatuses.organization_id, body.organizationId),
-              ),
-            );
-        }
-
-        // Set default priority if provided
-        if (body.priorityId) {
-          // WARNING: Modifies ALL priorities in organization without scoping check
-          await db
-            .update(priorities)
-            .set({ is_default: false })
-            .where(eq(priorities.organization_id, body.organizationId));
-
-          await db
-            .update(priorities)
-            .set({ is_default: true })
-            .where(
-              and(
-                eq(priorities.id, body.priorityId),
-                eq(priorities.organization_id, body.organizationId),
-              ),
-            );
-        }
+        await enableAnonymousReportingMutation({
+          machineId: body.machineId,
+          organizationId: body.organizationId,
+          ...(body.statusId ? { statusId: body.statusId } : {}),
+          ...(body.priorityId ? { priorityId: body.priorityId } : {}),
+        });
 
         return NextResponse.json({ success: true });
       }
@@ -260,30 +196,7 @@ async function developmentPOSTHandler(request: NextRequest): Promise<NextRespons
          * - Can generate QR codes for ANY machine in the database
          * - No verification that caller has access to this machine
          */
-
-        // WARNING: Query any machine without ownership validation
-        const [machine] = await db
-          .select({ qr_code_id: machines.qr_code_id })
-          .from(machines)
-          .where(eq(machines.id, body.machineId));
-
-        if (machine?.qr_code_id) {
-          return NextResponse.json({ qrCodeId: machine.qr_code_id });
-        }
-
-        // Generate new QR code ID
-        const qrCodeId = `qr-${randomUUID()}`;
-
-        // WARNING: Direct machine mutation without ownership validation
-        await db
-          .update(machines)
-          .set({
-            qr_code_id: qrCodeId,
-            qr_code_url: null,
-            qr_code_generated_at: new Date(),
-            updated_at: new Date(),
-          })
-          .where(eq(machines.id, body.machineId));
+        const qrCodeId = await ensureQrCodeMutation(body.machineId);
 
         return NextResponse.json({ qrCodeId });
       }
@@ -302,18 +215,12 @@ async function developmentPOSTHandler(request: NextRequest): Promise<NextRespons
 
         // WARNING: Query issues without organization scoping
         // Violates CORE-SEC-001: Returns issues from ANY organization
-        const [issue] = await db
-          .select({ id: issues.id })
-          .from(issues)
-          .where(eq(issues.title, body.title))
-          .orderBy(issues.created_at)
-          .limit(1);
-
-        if (!issue) {
+        const issueId = await findIssueByTitle(body.title);
+        if (!issueId) {
           return NextResponse.json({ found: false, issueId: null });
         }
 
-        return NextResponse.json({ found: true, issueId: issue.id });
+        return NextResponse.json({ found: true, issueId });
       }
 
       case "captureState": {
@@ -327,56 +234,12 @@ async function developmentPOSTHandler(request: NextRequest): Promise<NextRespons
          * - No verification of caller permissions
          * - Exposes internal state without authorization
          */
-
-        // WARNING: Read machine state without ownership validation
-        const [machineData] = await db
-          .select({
-            qr_code_id: machines.qr_code_id,
-            is_public: machines.is_public,
-          })
-          .from(machines)
-          .where(eq(machines.id, body.machineId));
-
-        // WARNING: Read organization state without access validation
-        const [orgData] = await db
-          .select({
-            allow_anonymous_issues: organizations.allow_anonymous_issues,
-            is_public: organizations.is_public,
-          })
-          .from(organizations)
-          .where(eq(organizations.id, body.organizationId));
-
-        let statusDefaults = false;
-        let priorityDefaults = false;
-
-        if (body.statusId) {
-          const [status] = await db
-            .select({ is_default: issueStatuses.is_default })
-            .from(issueStatuses)
-            .where(eq(issueStatuses.id, body.statusId));
-          statusDefaults = status?.is_default ?? false;
-        }
-
-        if (body.priorityId) {
-          const [priority] = await db
-            .select({ is_default: priorities.is_default })
-            .from(priorities)
-            .where(eq(priorities.id, body.priorityId));
-          priorityDefaults = priority?.is_default ?? false;
-        }
-
-        return NextResponse.json({
-          machine: {
-            qrCodeId: machineData?.qr_code_id ?? null,
-            isPublic: machineData?.is_public ?? null,
-          },
-          organization: {
-            allowAnonymousIssues: orgData?.allow_anonymous_issues ?? false,
-            isPublic: orgData?.is_public ?? null,
-          },
-          statusDefaults,
-          priorityDefaults,
+        const state = await captureStateSnapshot({
+          machineId: body.machineId,
+          organizationId: body.organizationId,
         });
+
+        return NextResponse.json(state);
       }
 
       case "restoreState": {
@@ -391,26 +254,11 @@ async function developmentPOSTHandler(request: NextRequest): Promise<NextRespons
          * - Direct state mutation bypassing all security controls
          * - Can overwrite production data if accidentally exposed
          */
-
-        // WARNING: Direct machine state mutation without ownership validation
-        await db
-          .update(machines)
-          .set({
-            qr_code_id: body.state.machine.qrCodeId,
-            is_public: body.state.machine.isPublic,
-            updated_at: new Date(),
-          })
-          .where(eq(machines.id, body.machineId));
-
-        // WARNING: Direct organization state mutation without access validation
-        await db
-          .update(organizations)
-          .set({
-            allow_anonymous_issues: body.state.organization.allowAnonymousIssues,
-            is_public: body.state.organization.isPublic,
-            updated_at: new Date(),
-          })
-          .where(eq(organizations.id, body.organizationId));
+        await restoreStateMutation({
+          machineId: body.machineId,
+          organizationId: body.organizationId,
+          state: body.state,
+        });
 
         return NextResponse.json({ success: true });
       }
@@ -438,6 +286,6 @@ async function developmentPOSTHandler(request: NextRequest): Promise<NextRespons
  * This enables tree-shaking to remove all test setup code from production bundles.
  */
 export const POST =
-  process.env.NODE_ENV === "production"
+  env.NODE_ENV === "production"
     ? productionPOSTHandler
     : developmentPOSTHandler;

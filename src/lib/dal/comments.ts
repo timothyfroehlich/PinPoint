@@ -9,7 +9,7 @@ import { comments } from "~/server/db/schema";
 import { safeCount, type CountResult } from "~/lib/types/database-results";
 
 import { withOrgRLS } from "~/server/db/utils/rls";
-import { db } from "./shared";
+import { getDb } from "./shared";
 
 /**
  * Get comments for a specific issue with author details
@@ -18,7 +18,7 @@ import { db } from "./shared";
  */
 export const getCommentsForIssue = cache(
   async (issueId: string, organizationId: string) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       return await tx.query.comments.findMany({
         where: and(
           eq(comments.issue_id, issueId),
@@ -47,7 +47,7 @@ export const getCommentsForIssue = cache(
  */
 export const getCommentById = cache(
   async (commentId: string, organizationId: string) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       return await tx.query.comments.findFirst({
         where: and(
           eq(comments.id, commentId),
@@ -82,7 +82,7 @@ export const getCommentById = cache(
  */
 export const getRecentCommentsForOrg = cache(
   async (limit = 10, organizationId: string) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       return await tx.query.comments.findMany({
         where: and(
           eq(comments.organization_id, organizationId),
@@ -125,7 +125,7 @@ export const getRecentCommentsForOrg = cache(
  */
 export const canUserAccessComment = cache(
   async (commentId: string, userId: string, organizationId: string) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       const comment = await tx.query.comments.findFirst({
         where: and(
           eq(comments.id, commentId),
@@ -147,7 +147,7 @@ export const canUserAccessComment = cache(
  */
 export const getCommentCountForIssue = cache(
   async (issueId: string, organizationId: string) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       const result: CountResult[] = await tx
         .select({ count: sql<number>`count(*)` })
         .from(comments)

@@ -10,6 +10,8 @@ import {
 } from "~/lib/validation/schemas";
 import { ISSUE_SORT_OPTIONS } from "~/lib/types/filters";
 
+const severityLevels = z.enum(["low", "medium", "high", "critical"]);
+
 /**
  * Issue Creation Schema
  * Core schema for creating issues with additional validation
@@ -21,6 +23,7 @@ export const issueCreateSchema = z.object({
   submitterName: z.string().optional(),
   reporterEmail: emailSchema.optional(),
   organizationId: idSchema.optional(),
+  severity: severityLevels.default("medium"),
 });
 
 /**
@@ -85,6 +88,7 @@ export const publicIssueCreateSchema = z.object({
   machineId: idSchema,
   submitterName: z.string().optional(),
   reporterEmail: emailSchema,
+  severity: severityLevels.default("medium"),
 });
 
 /**
@@ -94,6 +98,7 @@ export const issueResponseSchema = z.object({
   id: issueIdSchema,
   title: z.string(),
   description: z.string().nullable(),
+  severity: severityLevels,
   machineId: idSchema,
   organizationId: idSchema,
   statusId: idSchema,

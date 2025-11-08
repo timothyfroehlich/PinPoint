@@ -11,10 +11,7 @@
 import { vi } from "vitest";
 import type { MockProxy } from "vitest-mock-extended";
 import { mockDeep } from "vitest-mock-extended";
-import type {
-  TRPCContext,
-  RLSOrganizationTRPCContext,
-} from "~/server/api/trpc.base";
+import type { RLSOrganizationTRPCContext } from "~/server/api/trpc.base";
 import type { DrizzleClient } from "~/server/db/drizzle";
 import type { SupabaseServerClient } from "~/lib/supabase/server";
 import type { PinPointSupabaseUser } from "~/lib/types";

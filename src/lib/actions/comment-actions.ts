@@ -5,13 +5,14 @@
 
 "use server";
 
+import { getDb } from "~/lib/dal/shared";
+
 import { revalidatePath, revalidateTag } from "next/cache";
 import { cache } from "react"; // React 19 cache API
 import { z } from "zod";
 import { commentContentSchema } from "~/lib/validation/schemas";
 import { and, eq, isNull } from "drizzle-orm";
 import { comments, issues } from "~/server/db/schema";
-import { db } from "~/lib/dal/shared";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import {
   validateFormData,
@@ -38,7 +39,7 @@ const editCommentSchema = z.object({
 // Performance: Cached database queries for verification
 const getCommentWithAccess = cache(
   async (commentId: string, organizationId: string, userId: string) => {
-    return await db.query.comments.findFirst({
+    return await getDb().query.comments.findFirst({
       where: and(
         eq(comments.id, commentId),
         eq(comments.organization_id, organizationId),
@@ -51,7 +52,7 @@ const getCommentWithAccess = cache(
 
 const getIssueWithAccess = cache(
   async (issueId: string, organizationId: string) => {
-    return await db.query.issues.findFirst({
+    return await getDb().query.issues.findFirst({
       where: and(
         eq(issues.id, issueId),
         eq(issues.organization_id, organizationId),
@@ -102,7 +103,7 @@ export async function addCommentAction(
       organization_id: organizationId,
     };
 
-    await db.insert(comments).values(commentData);
+    await getDb().insert(comments).values(commentData);
 
     // Granular cache invalidation
     revalidatePath(`/issues/${issueId}`);
@@ -160,7 +161,7 @@ export async function editCommentAction(
     await requirePermission(
       { role_id: membership.role.id },
       PERMISSIONS.ISSUE_CREATE_BASIC,
-      db,
+      getDb(),
     );
 
     // Enhanced validation
@@ -182,7 +183,7 @@ export async function editCommentAction(
     }
 
     // Update comment
-    await db
+    await getDb()
       .update(comments)
       .set({
         content: validation.data.content,
@@ -230,7 +231,7 @@ export async function deleteCommentAction(
     await requirePermission(
       { role_id: membership.role.id },
       PERMISSIONS.ISSUE_CREATE_BASIC,
-      db,
+      getDb(),
     );
 
     // Verify comment exists and user has permission to delete
@@ -246,7 +247,7 @@ export async function deleteCommentAction(
     }
 
     // Soft delete comment (preserve for audit trail)
-    await db
+    await getDb()
       .update(comments)
       .set({
         deleted_at: new Date(),
@@ -293,11 +294,11 @@ export async function restoreCommentAction(
     await requirePermission(
       { role_id: membership.role.id },
       PERMISSIONS.ISSUE_CREATE_BASIC,
-      db,
+      getDb(),
     );
 
     // Find soft-deleted comment that user authored
-    const comment = await db.query.comments.findFirst({
+    const comment = await getDb().query.comments.findFirst({
       where: and(
         eq(comments.id, commentId),
         eq(comments.organization_id, organizationId),
@@ -310,7 +311,7 @@ export async function restoreCommentAction(
     }
 
     // Restore comment
-    await db
+    await getDb()
       .update(comments)
       .set({
         deleted_at: null,

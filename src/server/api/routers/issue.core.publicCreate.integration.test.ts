@@ -20,9 +20,9 @@ import { issueRouter } from "~/server/api/routers/issue";
 import { anonymousTestUtils } from "~/test/helpers/anonymous-test-helpers";
 
 // Narrow service type for our spy
-type MockedNotificationService = {
+interface MockedNotificationService {
   notifyMachineOwnerOfIssue: ReturnType<typeof vi.fn>;
-};
+}
 
 describe("issue.core.publicCreate (integration)", () => {
   let ctx: ReturnType<typeof anonymousTestUtils.createContext>;
@@ -407,4 +407,3 @@ describe("issue.core.publicCreate (integration)", () => {
     expect(result.createdById).toBeNull();
   });
 });
-

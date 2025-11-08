@@ -3,7 +3,7 @@
  * Automatically creates notifications for issue events, comments, and assignments
  */
 
-import { db } from "~/lib/dal/shared";
+import { getDb } from "~/lib/dal/shared";
 import { issues, notifications } from "~/server/db/schema";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { createNotificationActionUrl } from "~/lib/dal/notifications";
@@ -64,7 +64,7 @@ async function createNotificationForUser(
 
   const notificationId = generatePrefixedId("notification");
 
-  await db.insert(notifications).values({
+  await getDb().insert(notifications).values({
     id: notificationId,
     user_id: userId,
     organization_id: context.organizationId,
@@ -98,7 +98,7 @@ async function getIssueStakeholders(
     role: string;
   }[]
 > {
-  const issue = await db.query.issues.findFirst({
+  const issue = await getDb().query.issues.findFirst({
     where: and(
       eq(issues.id, issueId),
       eq(issues.organization_id, organizationId),
@@ -185,7 +185,7 @@ export async function generateCommentNotifications(
 ): Promise<string[]> {
   try {
     // Get issue details and stakeholders
-    const issue = await db.query.issues.findFirst({
+    const issue = await getDb().query.issues.findFirst({
       where: and(
         eq(issues.id, issueId),
         eq(issues.organization_id, context.organizationId),
@@ -250,7 +250,7 @@ export async function generateAssignmentNotifications(
   context: NotificationContext,
 ): Promise<string[]> {
   try {
-    const issue = await db.query.issues.findFirst({
+    const issue = await getDb().query.issues.findFirst({
       where: and(
         eq(issues.id, issueId),
         eq(issues.organization_id, context.organizationId),
@@ -308,7 +308,7 @@ export async function generateStatusChangeNotifications(
   context: NotificationContext,
 ): Promise<string[]> {
   try {
-    const issue = await db.query.issues.findFirst({
+    const issue = await getDb().query.issues.findFirst({
       where: and(
         eq(issues.id, issueId),
         eq(issues.organization_id, context.organizationId),
@@ -372,7 +372,7 @@ export async function generateIssueCreationNotifications(
   context: NotificationContext,
 ): Promise<string[]> {
   try {
-    const issue = await db.query.issues.findFirst({
+    const issue = await getDb().query.issues.findFirst({
       where: and(
         eq(issues.id, issueId),
         eq(issues.organization_id, context.organizationId),

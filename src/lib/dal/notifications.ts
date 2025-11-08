@@ -9,7 +9,7 @@ import { notifications } from "~/server/db/schema";
 import { safeCount, type CountResult } from "~/lib/types/database-results";
 
 import { withOrgRLS } from "~/server/db/utils/rls";
-import { db } from "./shared";
+import { getDb } from "./shared";
 
 /**
  * Get notifications for the current user with pagination
@@ -23,7 +23,7 @@ export const getUserNotifications = cache(
     limit = 20,
     includeRead = true,
   ) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       if (!userId) {
         throw new Error("User ID required");
       }
@@ -62,7 +62,7 @@ export const getUserNotifications = cache(
  */
 export const getUnreadNotificationCount = cache(
   async (userId: string, organizationId: string) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       if (!userId) {
         throw new Error("User ID required");
       }
@@ -89,7 +89,7 @@ export const getUnreadNotificationCount = cache(
  */
 export const getRecentUnreadNotifications = cache(
   async (userId: string, organizationId: string, limit = 5) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       if (!userId) {
         throw new Error("User ID required");
       }
@@ -133,7 +133,7 @@ export const getNotificationsByType = cache(
       | "SYSTEM_ANNOUNCEMENT",
     limit = 10,
   ) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       if (!userId) {
         throw new Error("User ID required");
       }
@@ -167,7 +167,7 @@ export const getNotificationsByType = cache(
  */
 export const getNotificationById = cache(
   async (userId: string, organizationId: string, notificationId: string) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       if (!userId) {
         throw new Error("User ID required");
       }
@@ -210,7 +210,7 @@ export const hasUnreadNotifications = cache(
  */
 export const getNotificationStats = cache(
   async (userId: string, organizationId: string) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       if (!userId) {
         throw new Error("User ID required");
       }

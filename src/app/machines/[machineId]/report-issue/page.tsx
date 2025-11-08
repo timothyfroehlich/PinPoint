@@ -58,6 +58,14 @@ export default async function ReportMachinePage(
       </div>
     );
   } catch (error) {
+    if (
+      error instanceof Error &&
+      typeof (error as { digest?: unknown }).digest === "string" &&
+      (error as { digest?: unknown }).digest === "NEXT_NOT_FOUND"
+    ) {
+      throw error;
+    }
+
     console.error("Failed to load machine for issue reporting:", error);
 
     return (

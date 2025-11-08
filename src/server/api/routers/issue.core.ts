@@ -183,6 +183,7 @@ export const issueCoreRouter = createTRPCRouter({
         machineId: string;
         statusId: string;
         priorityId: string;
+        severity: typeof input.severity;
       } = {
         id: generatePrefixedId("issue"),
         title: input.title,
@@ -191,6 +192,7 @@ export const issueCoreRouter = createTRPCRouter({
         machineId: input.machineId,
         statusId: defaultStatus.id,
         priorityId: defaultPriority.id,
+        severity: input.severity,
       };
 
       if (input.description) {
@@ -390,6 +392,7 @@ export const issueCoreRouter = createTRPCRouter({
         machineId: string;
         statusId: string;
         priorityId: string;
+        severity: typeof input.severity;
       } = {
         id: generatePrefixedId("issue"),
         title: input.title,
@@ -398,6 +401,7 @@ export const issueCoreRouter = createTRPCRouter({
         machineId: input.machineId,
         statusId: defaultStatus.id,
         priorityId: defaultPriority.id,
+        severity: input.severity,
       };
 
       if (input.description) {

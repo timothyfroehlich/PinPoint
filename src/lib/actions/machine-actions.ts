@@ -6,12 +6,13 @@
 
 "use server";
 
+import { getDb } from "~/lib/dal/shared";
+
 import { revalidateTag, revalidatePath } from "next/cache";
 import { z } from "zod";
 import { nameSchema, idSchema } from "~/lib/validation/schemas";
 import { eq, and, inArray } from "drizzle-orm";
 import { getRequestAuthContext } from "~/server/auth/context";
-import { db } from "~/lib/dal/shared";
 import { machines } from "~/server/db/schema";
 import {
   generateMachineQRCode,
@@ -86,7 +87,7 @@ export async function createMachineAction(
 
   try {
     // Create machine with organization scoping
-    const machineResult = await db
+    const machineResult = await getDb()
       .insert(machines)
       .values({
         id: crypto.randomUUID(),
@@ -156,7 +157,7 @@ export async function updateMachineAction(
       updateData.owner_id = validation.data.ownerId ?? null;
 
     // Update with organization scoping
-    const updatedMachineResult = await db
+    const updatedMachineResult = await getDb()
       .update(machines)
       .set(updateData)
       .where(
@@ -211,7 +212,7 @@ export async function deleteMachineAction(
 
   try {
     // Delete with organization scoping
-    const deletedMachineResult = await db
+    const deletedMachineResult = await getDb()
       .delete(machines)
       .where(
         and(
@@ -293,7 +294,7 @@ export async function bulkUpdateMachinesAction(
       updateData.owner_id = validation.data.ownerId ?? null;
 
     // Update machines with organization scoping using inArray for multiple IDs
-    const updatedMachines = await db
+    const updatedMachines = await getDb()
       .update(machines)
       .set(updateData)
       .where(
@@ -358,7 +359,7 @@ export async function generateQRCodeAction(
     const qrCode = await generateMachineQRCode(result.data.machineId);
 
     // Update machine with QR code information
-    const updatedMachineResult = await db
+    const updatedMachineResult = await getDb()
       .update(machines)
       .set({
         qr_code_id: qrCode.id,
@@ -429,7 +430,7 @@ export async function regenerateQRCodeAction(
     const qrCode = await generateMachineQRCode(machineId);
 
     // Update machine with new QR code
-    const updatedMachineResult = await db
+    const updatedMachineResult = await getDb()
       .update(machines)
       .set({
         qr_code_id: qrCode.id,
@@ -514,7 +515,7 @@ export async function bulkGenerateQRCodesAction(
           // Generate actual QR code
           const qrCode = await generateMachineQRCode(machineId);
 
-          const updatedMachineResult = await db
+          const updatedMachineResult = await getDb()
             .update(machines)
             .set({
               qr_code_id: qrCode.id,

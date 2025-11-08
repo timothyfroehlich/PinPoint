@@ -5,7 +5,7 @@
 
 import { cache } from "react";
 import { eq, and } from "drizzle-orm";
-import { db } from "./shared";
+import { getDb } from "./shared";
 import { withOrgRLS } from "~/server/db/utils/rls";
 import { systemSettings } from "~/server/db/schema";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
@@ -82,7 +82,7 @@ export const getSystemSettings = cache(
         throw new Error("Organization ID is required");
       }
 
-      const settings = await withOrgRLS(db, organizationId, async (tx) =>
+      const settings = await withOrgRLS(getDb(), organizationId, async (tx) =>
         tx.query.systemSettings.findMany({
           where: eq(systemSettings.organization_id, organizationId),
         }),
@@ -201,7 +201,7 @@ export async function updateSystemSettings(
   }
 
   // Update or insert each setting
-  await withOrgRLS(db, organizationId, async (tx) => {
+  await withOrgRLS(getDb(), organizationId, async (tx) => {
     for (const { key, value } of settingsToUpsert) {
       const existingSetting = await tx.query.systemSettings.findFirst({
         where: and(
@@ -240,7 +240,7 @@ export const getSystemSetting = cache(
         return null;
       }
 
-      const setting = await withOrgRLS(db, organizationId, async (tx) =>
+      const setting = await withOrgRLS(getDb(), organizationId, async (tx) =>
         tx.query.systemSettings.findFirst({
           where: and(
             eq(systemSettings.organization_id, organizationId),
@@ -267,7 +267,7 @@ export async function resetSystemSettings(
   if (!organizationId) {
     throw new Error("Organization ID is required");
   }
-  await withOrgRLS(db, organizationId, async (tx) => {
+  await withOrgRLS(getDb(), organizationId, async (tx) => {
     await tx
       .delete(systemSettings)
       .where(eq(systemSettings.organization_id, organizationId));

@@ -294,7 +294,7 @@ describe("issue.core.create (integration)", () => {
         machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
       }),
     ).rejects.toMatchObject({
-      message: "Issue title cannot be empty",
+      message: expect.stringContaining("Title cannot be only whitespace"),
     });
   });
 

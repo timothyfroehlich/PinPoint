@@ -8,7 +8,7 @@ import { cache } from "react";
 import { and, eq, desc, or } from "drizzle-orm";
 import { users, memberships, issues } from "~/server/db/schema";
 import { withOrgRLS } from "~/server/db/utils/rls";
-import { db } from "./shared";
+import { getDb } from "./shared";
 
 /**
  * Get current authenticated user profile
@@ -17,7 +17,7 @@ import { db } from "./shared";
  */
 export const getCurrentUserProfile = cache(
   async (userId: string, organizationId: string) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       if (!userId) {
         throw new Error("User ID required");
       }
@@ -51,7 +51,7 @@ export const getCurrentUserProfile = cache(
  */
 export const getUserById = cache(
   async (userId: string, organizationId: string) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       const membership = await tx.query.memberships.findFirst({
         where: and(
           eq(memberships.user_id, userId),
@@ -87,7 +87,7 @@ export const getUserById = cache(
  */
 export const getCurrentUserMembership = cache(
   async (userId: string, organizationId: string) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       if (!userId) {
         throw new Error("User ID required");
       }
@@ -159,7 +159,7 @@ export const getCurrentUserPermissions = cache(
  */
 export const getUserActivityStats = cache(
   async (currentUserId: string, organizationId: string, userId?: string) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       if (!currentUserId) {
         throw new Error("Current user ID required");
       }
@@ -206,7 +206,7 @@ export const getUserActivityStats = cache(
  * Uses React 19 cache() for request-level memoization
  */
 export const getAssignableUsers = cache(async (organizationId: string) => {
-  return withOrgRLS(db, organizationId, async (tx) => {
+  return withOrgRLS(getDb(), organizationId, async (tx) => {
     const assignableUsers = await tx.query.memberships.findMany({
       where: eq(memberships.organization_id, organizationId),
       with: {
@@ -245,7 +245,7 @@ export const getUserRecentActivity = cache(
     limit = 10,
     userId?: string,
   ) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       if (!currentUserId) {
         throw new Error("Current user ID required");
       }
@@ -317,7 +317,7 @@ export const userHasPermission = cache(
  */
 export const getUserPublicProfile = cache(
   async (userId: string, organizationId: string) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       const membership = await tx.query.memberships.findFirst({
         where: and(
           eq(memberships.user_id, userId),

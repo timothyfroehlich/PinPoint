@@ -5,7 +5,7 @@
 
 import { cache } from "react";
 import { desc, eq, and, between } from "drizzle-orm";
-import { db } from "./shared";
+import { getDb } from "./shared";
 import { withOrgRLS } from "~/server/db/utils/rls";
 import { activityLog } from "~/server/db/schema";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
@@ -154,7 +154,7 @@ export const getActivityLog = cache(
           : whereConditions[0];
 
       // Get total count for pagination
-      const totalResult = await withOrgRLS(db, organizationId, async (tx) =>
+      const totalResult = await withOrgRLS(getDb(), organizationId, async (tx) =>
         tx
           .select({ count: activityLog.id })
           .from(activityLog)
@@ -166,7 +166,7 @@ export const getActivityLog = cache(
       const offset = (page - 1) * limit;
 
       // Get activity log entries with user information
-      const entries = await withOrgRLS(db, organizationId, async (tx) =>
+      const entries = await withOrgRLS(getDb(), organizationId, async (tx) =>
         tx.query.activityLog.findMany({
           where: whereClause,
           with: {
@@ -250,7 +250,7 @@ export async function logActivity(params: {
       throw new Error("Required parameters missing for activity logging");
     }
 
-    await withOrgRLS(db, organizationId, async (tx) =>
+    await withOrgRLS(getDb(), organizationId, async (tx) =>
       tx.insert(activityLog).values({
         id: generatePrefixedId("activity"),
         organization_id: organizationId,
@@ -289,7 +289,7 @@ export const getActivityStats = cache(
         throw new Error("Organization ID is required");
       }
 
-      const stats = await withOrgRLS(db, organizationId, async (tx) =>
+      const stats = await withOrgRLS(getDb(), organizationId, async (tx) =>
         tx.query.activityLog.findMany({
           where: eq(activityLog.organization_id, organizationId),
           columns: {

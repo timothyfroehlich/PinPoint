@@ -77,6 +77,7 @@ export interface IssueCreationInput {
   readonly createdById?: string | null;
   readonly reporterEmail?: string;
   readonly submitterName?: string;
+  readonly severity?: "low" | "medium" | "high" | "critical";
 }
 
 export interface MachineValidationInput {

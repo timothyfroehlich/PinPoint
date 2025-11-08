@@ -5,12 +5,13 @@
 
 "use server";
 
+import { getDb } from "~/lib/dal/shared";
+
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { nameSchema, LIMITS } from "~/lib/validation/schemas";
 import { eq } from "drizzle-orm";
 import { organizations } from "~/server/db/schema";
-import { db } from "~/lib/dal/shared";
 import { transformKeysToSnakeCase } from "~/lib/utils/case-transformers";
 import {
   validateFormData,
@@ -78,7 +79,7 @@ export async function updateOrganizationProfileAction(
     await requirePermission(
       { role_id: membership.role.id },
       PERMISSIONS.ORGANIZATION_MANAGE,
-      db,
+      getDb(),
     );
 
     // Enhanced validation with Zod
@@ -108,7 +109,7 @@ export async function updateOrganizationProfileAction(
     // - UPDATE operations are more lenient than INSERT (partial fields allowed)
     // LIMITATION: If schema adds new required field without default, could cause constraint violations
     // MITIGATION: Integration tests validate all update paths against live schema
-    const [updatedOrg] = await db
+    const [updatedOrg] = await getDb()
       .update(organizations)
       .set(
         transformKeysToSnakeCase(
@@ -164,7 +165,7 @@ export async function updateOrganizationLogoAction(
     await requirePermission(
       { role_id: membership.role.id },
       PERMISSIONS.ORGANIZATION_MANAGE,
-      db,
+      getDb(),
     );
 
     // Enhanced validation
@@ -174,7 +175,7 @@ export async function updateOrganizationLogoAction(
     }
 
     // Update logo URL
-    const [updatedOrg] = await db
+    const [updatedOrg] = await getDb()
       .update(organizations)
       .set({
         logo_url: validation.data.logoUrl ?? null,

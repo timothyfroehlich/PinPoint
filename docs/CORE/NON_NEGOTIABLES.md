@@ -1,9 +1,9 @@
 # PinPoint Non‑Negotiables (Core)
 
-**Last Updated**: September 5, 2025
+**Last Updated**: November 8, 2025
 **Last Reviewed**: 2025-11-08
 
-**Status:** Successfully resolved authentication infrastructure over-engineering. Authentication cleanup complete with 53% ESLint improvement through parallel agent strategy. Document updated to reflect infrastructure complexity lessons learned.
+**Status:** Database client HMR pattern established (CORE-PERF-003). All DAL modules converted to function-based access pattern. Authentication infrastructure cleanup complete with 53% ESLint improvement. Document reflects current architectural patterns and lessons learned.
 
 ## Overview
 
@@ -165,8 +165,24 @@
 - **Severity:** Required (CORE‑PERF‑002)
 - **Why:** Controls network behavior in Next.js 15.
 - **Do:** Add `cache: "force-cache"` or appropriate options.
-- **Don’t:** Rely on implicit defaults.
+- **Don't:** Rely on implicit defaults.
 - **Reference:** Next.js fetch docs
+
+**CORE-PERF-003:** Use function-based database client access
+- **Severity:** Required (CORE‑PERF‑003)
+- **Why:** Module-level exports become stale during Next.js HMR, causing CONNECTION_ENDED errors during long-running operations like E2E test polling.
+- **Do:** Use `getDb()` function to get fresh client reference per-request; ensures connection validity across HMR cycles. Example:
+
+  ```ts
+  import { getDb } from "~/lib/dal/shared";
+
+  export async function getLatestIssues() {
+    const db = getDb();
+    return db.query.issues.findMany();
+  }
+  ```
+- **Don't:** Export database client as module-level constant (`export const db = getClient()`).
+- **Reference:** `src/lib/dal/shared.ts`
 
 ---
 
@@ -208,6 +224,7 @@
 - Deep relative imports; use `~/` aliases.
 - Seed data ID changes (locked constants).
 - Uncached fetch() in Next.js 15 where caching is required.
+- Module-level database client exports: `export const db = getClient()` becomes stale during HMR.
 - Tailwind v4 projects adding v3 `tailwind.config.js`.
 - Overuse of Client Components.
 - New Material UI components (use shadcn/ui).
@@ -238,9 +255,12 @@
   - CORE‑SSR‑003: Middleware required
   - CORE‑SSR‑004: Don't modify Supabase response
   - CORE‑SEC‑001..003: Org scoping, API protection, RLS track separation
-  - CORE‑PERF‑001..002: cache(), fetch caching
-- CORE‑TEST‑001..003: Test types, server components, follow CORE Testing Guide
+  - CORE‑PERF‑001: cache() for server fetchers
+  - CORE‑PERF‑002: Explicit fetch caching
+  - CORE‑PERF‑003: Function-based database client access
+  - CORE‑TEST‑001..003: Test types, server components, follow CORE Testing Guide
 
 - **Changelog:**
+  - 2025‑11‑08: **Database client HMR fix**: Added CORE‑PERF‑003 to prevent stale database connections during Next.js HMR. Converted all DAL module-level `db` exports to `getDb()` function calls. Eliminates CONNECTION_ENDED errors during E2E test polling and long-running operations.
   - 2025‑09‑05: **Authentication cleanup success**: Eliminated ~500 lines of over-engineered infrastructure. Reduced ESLint errors from 87 to 41 (53% improvement) through parallel agent strategy. Added enterprise infrastructure anti-patterns. Confirmed authentication system was already well-architected with canonical `getRequestAuthContext()` resolver.
   - 2025‑09‑01: v2 restructure adopted; added TYPE_INVENTORY.md reference.

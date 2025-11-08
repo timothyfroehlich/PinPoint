@@ -83,6 +83,7 @@ export interface IssueWithRelationsResponse {
   // Anonymous reporting support
   reporterEmail: string | null;
   submitterName: string | null;
+  severity: "low" | "medium" | "high" | "critical";
   status: IssueStatus;
   priority: IssuePriority;
   assignedTo: Pick<

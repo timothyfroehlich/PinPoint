@@ -9,12 +9,7 @@ import "server-only";
 import { cache } from "react";
 import { eq } from "drizzle-orm";
 import { machines, organizations } from "~/server/db/schema";
-import { getGlobalDatabaseProvider } from "~/server/db/provider";
-
-/**
- * Database instance for public queries (no auth context required)
- */
-const db = getGlobalDatabaseProvider().getClient();
+import { getDb } from "./shared";
 
 /**
  * Machine data structure for public display
@@ -45,6 +40,7 @@ export const getPublicMachineById = cache(
       return null;
     }
 
+    const db = getDb();
     const machineRecord = await db.query.machines.findFirst({
       where: eq(machines.id, machineId),
       with: {
@@ -103,6 +99,7 @@ export const getPublicMachineById = cache(
 export const validatePublicMachineExists = cache(
   async (machineId: string): Promise<boolean> => {
     try {
+      const db = getDb();
       const machine = await db.query.machines.findFirst({
         where: eq(machines.id, machineId),
         columns: {

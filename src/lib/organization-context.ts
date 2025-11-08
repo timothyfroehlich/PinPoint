@@ -6,8 +6,8 @@
  * with appropriate access level determination.
  */
 
+import { getDb } from "~/lib/dal/shared";
 import { sql } from "drizzle-orm";
-import { db } from "~/lib/dal/shared";
 // Phase 1: Import canonical resolver directly (legacy wrappers removed)
 import { requireAuthorized } from "~/server/auth/context";
 import { withOrgRLS } from "~/server/db/utils/rls";
@@ -24,7 +24,7 @@ export const setRLSOrganizationContext = async (
 ): Promise<void> => {
   try {
     // Use Drizzle sql template for safe parameterization
-    await db.execute(
+    await getDb().execute(
       sql`SET LOCAL app.current_organization_id = ${organizationId}`,
     );
   } catch (error) {
@@ -55,5 +55,5 @@ export async function ensureOrgContextAndBindRLS<T>(
     accessLevel: "member" as const,
   };
 
-  return withOrgRLS(db, context.organization.id, async (tx) => fn(tx, context));
+  return withOrgRLS(getDb(), context.organization.id, async (tx) => fn(tx, context));
 }

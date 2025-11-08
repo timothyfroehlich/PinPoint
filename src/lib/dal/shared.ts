@@ -5,12 +5,15 @@
 
 import { cache } from "react";
 import { createClient } from "~/lib/supabase/server";
+import { type DrizzleClient } from "~/server/db/drizzle";
 import { getGlobalDatabaseProvider } from "~/server/db/provider";
 
 /**
  * Database instance for DAL functions
+ * Returns fresh database client to avoid stale connection references during HMR
  */
-export const db = getGlobalDatabaseProvider().getClient();
+export const getDb = (): DrizzleClient =>
+  getGlobalDatabaseProvider().getClient();
 
 /**
  * Get current authenticated user for DAL functions (no organization context)

@@ -15,8 +15,8 @@ import {
   priorities,
   issueStatuses,
 } from "~/server/db/schema";
-import { db } from "~/lib/dal/shared";
 import { safeCount, type CountResult } from "~/lib/types/database-results";
+import { getDb } from "~/lib/dal/shared";
 
 export type SearchEntity =
   | "issues"
@@ -215,6 +215,7 @@ async function searchIssues(
   organizationId: string,
   limit: number,
 ): Promise<SearchResult[]> {
+  const db = getDb();
   const searchVector = sql`to_tsvector('english', ${issues.title} || ' ' || coalesce(${issues.description}, '') || ' ' || coalesce(${issues.consistency}, ''))`;
   const searchQuery = sql`to_tsquery('english', ${query
     .split(" ")
@@ -291,7 +292,8 @@ async function searchMachines(
   organizationId: string,
   limit: number,
 ): Promise<SearchResult[]> {
-  const searchVector = sql`to_tsvector('english', ${machines.name} || ' ' || coalesce(${models.name}, '') || ' ' || coalesce(${models.manufacturer}, ''))`;
+  const db = getDb();
+  const searchVector = sql`to_tsvector('english', ${machines.name} || ' ' || coalesce(${machines.description}, '') || ' ' || coalesce(${models.name}, ''))`;
   const searchQuery = sql`to_tsquery('english', ${query
     .split(" ")
     .map((term) => `${term}:*`)
@@ -368,7 +370,8 @@ async function searchUsers(
   organizationId: string,
   limit: number,
 ): Promise<SearchResult[]> {
-  const searchVector = sql`to_tsvector('english', coalesce(${users.name}, '') || ' ' || coalesce(${users.email}, '') || ' ' || coalesce(${users.bio}, ''))`;
+  const db = getDb();
+  const searchVector = sql`to_tsvector('english', ${users.name} || ' ' || coalesce(${users.email}, '') || ' ' || coalesce(${users.bio}, ''))`;
   const searchQuery = sql`to_tsquery('english', ${query
     .split(" ")
     .map((term) => `${term}:*`)
@@ -427,6 +430,7 @@ async function searchLocations(
   organizationId: string,
   limit: number,
 ): Promise<SearchResult[]> {
+  const db = getDb();
   const searchVector = sql`to_tsvector('english', ${locations.name} || ' ' || coalesce(${locations.description}, '') || ' ' || coalesce(${locations.city}, ''))`;
   const searchQuery = sql`to_tsquery('english', ${query
     .split(" ")
@@ -492,6 +496,7 @@ async function countIssues(
   query: string,
   organizationId: string,
 ): Promise<number> {
+  const db = getDb();
   const searchVector = sql`to_tsvector('english', ${issues.title} || ' ' || coalesce(${issues.description}, '') || ' ' || coalesce(${issues.consistency}, ''))`;
   const searchQuery = sql`to_tsquery('english', ${query
     .split(" ")
@@ -515,6 +520,7 @@ async function countMachines(
   query: string,
   organizationId: string,
 ): Promise<number> {
+  const db = getDb();
   const searchVector = sql`to_tsvector('english', ${machines.name} || ' ' || coalesce(${models.name}, '') || ' ' || coalesce(${models.manufacturer}, ''))`;
   const searchQuery = sql`to_tsquery('english', ${query
     .split(" ")
@@ -534,12 +540,12 @@ async function countMachines(
 
   return safeCount(result);
 }
-
 async function countUsers(
   query: string,
   organizationId: string,
 ): Promise<number> {
-  const searchVector = sql`to_tsvector('english', coalesce(${users.name}, '') || ' ' || coalesce(${users.email}, '') || ' ' || coalesce(${users.bio}, ''))`;
+  const db = getDb();
+  const searchVector = sql`to_tsvector('english', ${users.name} || ' ' || coalesce(${users.email}, '') || ' ' || coalesce(${users.bio}, ''))`;
   const searchQuery = sql`to_tsquery('english', ${query
     .split(" ")
     .map((term) => `${term}:*`)
@@ -558,11 +564,11 @@ async function countUsers(
 
   return safeCount(result);
 }
-
 async function countLocations(
   query: string,
   organizationId: string,
 ): Promise<number> {
+  const db = getDb();
   const searchVector = sql`to_tsvector('english', ${locations.name} || ' ' || coalesce(${locations.description}, '') || ' ' || coalesce(${locations.city}, ''))`;
   const searchQuery = sql`to_tsquery('english', ${query
     .split(" ")

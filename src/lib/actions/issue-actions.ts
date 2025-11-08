@@ -21,12 +21,11 @@ import {
   issueStatuses,
   priorities,
   machines,
-  organizations,
   comments,
 } from "~/server/db/schema";
-import { db } from "~/lib/dal/shared";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
 import { transformKeysToSnakeCase } from "~/lib/utils/case-transformers";
+import { getDb } from "~/lib/dal/shared";
 import {
   validateFormData,
   actionSuccess,
@@ -44,6 +43,7 @@ import {
   generateAssignmentNotifications,
 } from "~/lib/services/notification-generator";
 import { getInMemoryRateLimiter } from "~/lib/rate-limit/inMemory";
+import { calculateEffectiveMachineVisibility } from "~/lib/utils/visibility-inheritance";
 
 // Enhanced validation schemas with better error messages
 // Accept either a UUID or a deterministic seeded machine id (e.g. "machine-mm-001")
@@ -92,7 +92,7 @@ const bulkUpdateIssuesSchema = z.object({
 
 // Performance: Cached database queries for default values
 const getDefaultStatus = cache(async (organizationId: string) => {
-  return await db.query.issueStatuses.findFirst({
+  return await getDb().query.issueStatuses.findFirst({
     where: and(
       eq(issueStatuses.is_default, true),
       eq(issueStatuses.organization_id, organizationId),
@@ -101,7 +101,7 @@ const getDefaultStatus = cache(async (organizationId: string) => {
 });
 
 const getDefaultPriority = cache(async (organizationId: string) => {
-  return await db.query.priorities.findFirst({
+  return await getDb().query.priorities.findFirst({
     where: and(
       eq(priorities.is_default, true),
       eq(priorities.organization_id, organizationId),
@@ -166,7 +166,7 @@ export async function createIssueAction(
     let resolvedPriority = defaultPriority;
     // Fallback: pick first available status/priority to avoid hard failure in mis-seeded envs
     if (!resolvedStatus) {
-      resolvedStatus = await db.query.issueStatuses.findFirst({
+      resolvedStatus = await getDb().query.issueStatuses.findFirst({
         where: eq(issueStatuses.organization_id, organizationId),
       });
       if (!resolvedStatus) {
@@ -176,7 +176,7 @@ export async function createIssueAction(
       }
     }
     if (!resolvedPriority) {
-      resolvedPriority = await db.query.priorities.findFirst({
+      resolvedPriority = await getDb().query.priorities.findFirst({
         where: eq(priorities.organization_id, organizationId),
       });
       if (!resolvedPriority) {
@@ -215,7 +215,7 @@ export async function createIssueAction(
     // - TypeScript validates field types at object construction (line 197)
     // LIMITATION: If schema adds new required field without default, error occurs at runtime
     // MITIGATION: Integration tests validate all insert paths against live schema
-    await db
+    await getDb()
       .insert(issues)
       .values(
         transformKeysToSnakeCase(issueData) as typeof issues.$inferInsert,
@@ -391,28 +391,50 @@ export async function createPublicIssueAction(
     // =============================================================================
 
     // Fetch machine with visibility flags
-    const machineRecord = await db.query.machines.findFirst({
+    const machineRecord = await getDb().query.machines.findFirst({
       where: eq(machines.id, machineId),
-      columns: { id: true, organization_id: true, is_public: true },
+      columns: {
+        id: true,
+        organization_id: true,
+        is_public: true,
+      },
+      with: {
+        location: {
+          columns: {
+            id: true,
+            organization_id: true,
+            is_public: true,
+          },
+        },
+        organization: {
+          columns: {
+            id: true,
+            allow_anonymous_issues: true,
+            is_public: true,
+          },
+        },
+      },
     });
-    if (!machineRecord) return actionError("Machine not found");
+    if (!machineRecord) {
+      return actionError("Machine not found");
+    }
 
-    // Fetch organization settings and public status
-    const orgRecord = await db.query.organizations.findFirst({
-      where: eq(organizations.id, machineRecord.organization_id),
-      columns: { allow_anonymous_issues: true, is_public: true },
-    });
-    if (!orgRecord) return actionError("Organization not found");
-
-    // Validate machine public visibility (must be explicitly true, not inherited)
-    // This mirrors the machines_public_read RLS policy's explicit is_public check
-    if (!orgRecord.is_public || machineRecord.is_public !== true)
-      return actionError("Machine not available for public reporting");
+    const organizationRecord = machineRecord.organization;
 
     // Validate organization allows anonymous issue creation
-    // This is a business logic check beyond RLS - controls issue creation permission
-    if (!orgRecord.allow_anonymous_issues)
+    if (!organizationRecord.allow_anonymous_issues) {
       return actionError("Anonymous reporting disabled");
+    }
+
+    const machineVisible = calculateEffectiveMachineVisibility(
+      { is_public: organizationRecord.is_public },
+      { is_public: machineRecord.location.is_public },
+      { is_public: machineRecord.is_public ?? null },
+    );
+
+    if (!machineVisible) {
+      return actionError("Machine not available for public reporting");
+    }
 
     // At public path we implicitly allow BASIC creation only (no priority / assignee fields honored)
 
@@ -458,7 +480,7 @@ export async function createPublicIssueAction(
     // - TypeScript validates field types at object construction (line 397)
     // LIMITATION: If schema adds new required field without default, error occurs at runtime
     // MITIGATION: Integration tests validate all insert paths against live schema
-    await db
+    await getDb()
       .insert(issues)
       .values(
         transformKeysToSnakeCase(issueData) as typeof issues.$inferInsert,
@@ -505,7 +527,7 @@ export async function updateIssueStatusAction(
     );
 
     // Update with organization scoping for security
-    const [updatedIssue] = await db
+    const [updatedIssue] = await getDb()
       .update(issues)
       .set({ status_id: validation.data.statusId })
       .where(
@@ -530,7 +552,7 @@ export async function updateIssueStatusAction(
       // Generate notifications for status change
       try {
         // Get status name for notification message
-        const statusResult = await db.query.issueStatuses.findFirst({
+        const statusResult = await getDb().query.issueStatuses.findFirst({
           where: eq(issueStatuses.id, validation.data.statusId),
           columns: { name: true },
         });
@@ -591,7 +613,7 @@ export async function addCommentAction(
     );
 
     // Verify issue exists and user has access
-    const issue = await db.query.issues.findFirst({
+    const issue = await getDb().query.issues.findFirst({
       where: and(
         eq(issues.id, issueId),
         eq(issues.organization_id, organizationId),
@@ -612,7 +634,7 @@ export async function addCommentAction(
       organization_id: organizationId,
     };
 
-    await db.insert(comments).values(commentData);
+    await getDb().insert(comments).values(commentData);
 
     // Cache invalidation
     revalidatePath(`/issues/${issueId}`);
@@ -666,7 +688,7 @@ export async function updateIssueAssignmentAction(
     ); // was ISSUE_ASSIGN (deprecated)
 
     // Get current assignee for notification comparison
-    const currentIssue = await db.query.issues.findFirst({
+    const currentIssue = await getDb().query.issues.findFirst({
       where: and(
         eq(issues.id, issueId),
         eq(issues.organization_id, organizationId),
@@ -683,7 +705,7 @@ export async function updateIssueAssignmentAction(
         : (validation.data.assigneeId ?? null);
 
     // Update assignment with organization scoping
-    const [updatedIssue] = await db
+    const [updatedIssue] = await getDb()
       .update(issues)
       .set({ assigned_to_id: assigneeId })
       .where(
@@ -781,7 +803,7 @@ export async function bulkUpdateIssuesAction(
     }
 
     // Bulk update with organization scoping
-    const updatedIssues = await db
+    const updatedIssues = await getDb()
       .update(issues)
       .set(updateData)
       .where(

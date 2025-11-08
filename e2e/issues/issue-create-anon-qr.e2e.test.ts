@@ -16,7 +16,7 @@
  */
 
 import { test, expect, request as playwrightRequest } from "@playwright/test";
-import { SEED_TEST_IDS } from "../../src/test/constants/seed-test-ids";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import {
   captureTestState,
   restoreTestState,
@@ -95,8 +95,8 @@ test.describe("Issue Create – Anonymous via QR (E2E)", () => {
 
     expect(response.status(), "QR endpoint should redirect").toBe(307);
 
-    const locationHeader =
-      response.headers()["location"] ?? response.headers()["Location"];
+    const headers = response.headers();
+    const locationHeader = headers.location ?? headers.Location;
 
     expect(locationHeader).toBeTruthy();
     expect(locationHeader).toContain(

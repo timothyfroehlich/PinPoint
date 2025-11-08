@@ -22,7 +22,7 @@ import type { MachineFilters } from "~/lib/types";
 import { safeCount, type CountResult } from "~/lib/types/database-results";
 
 import { withOrgRLS } from "~/server/db/utils/rls";
-import { db } from "./shared";
+import { getDb } from "./shared";
 
 // ================================
 // TYPE DEFINITIONS
@@ -69,7 +69,7 @@ export const getMachinesWithFilters = cache(
     sorting: MachineSorting = { field: "created_at", order: "desc" },
     organizationId: string,
   ) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       const offset = (pagination.page - 1) * pagination.limit;
 
       // Build where conditions
@@ -217,7 +217,7 @@ export const getMachinesForOrg = cache(async (organizationId: string) => {
  */
 export const getMachineById = cache(
   async (machineId: string, organizationId: string) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       const machine = await tx.query.machines.findFirst({
         where: and(
           eq(machines.id, machineId),
@@ -263,7 +263,7 @@ export const getMachineById = cache(
  */
 export const getMachineStats = cache(
   async (organizationId: string): Promise<MachineStats> => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       // Get basic counts
       const [totalMachines, machinesWithQR, byLocation, byModel] =
         await Promise.all([
@@ -334,7 +334,7 @@ export const getMachineStats = cache(
  * Uses React 19 cache() for request-level memoization
  */
 export const getLocationsForOrg = cache(async (organizationId: string) => {
-  return withOrgRLS(db, organizationId, async (tx) => {
+  return withOrgRLS(getDb(), organizationId, async (tx) => {
     return await tx.query.locations.findMany({
       where: eq(locations.organization_id, organizationId),
       columns: { id: true, name: true, city: true, state: true },
@@ -349,7 +349,7 @@ export const getLocationsForOrg = cache(async (organizationId: string) => {
  * Uses React 19 cache() for request-level memoization
  */
 export const getModelsForOrg = cache(async (organizationId: string) => {
-  return withOrgRLS(db, organizationId, async (tx) => {
+  return withOrgRLS(getDb(), organizationId, async (tx) => {
     return await tx.query.models.findMany({
       where: or(
         sql`${models.organization_id} IS NULL`, // Global commercial models

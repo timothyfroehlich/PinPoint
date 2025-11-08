@@ -15,7 +15,7 @@ import {
   issueStatuses,
   priorities,
 } from "~/server/db/schema";
-import { db } from "./shared";
+import { getDb } from "./shared";
 import { withOrgRLS } from "~/server/db/utils/rls";
 import { safeCount, type CountResult } from "~/lib/types/database-results";
 
@@ -25,7 +25,7 @@ import { safeCount, type CountResult } from "~/lib/types/database-results";
  * Uses React 19 cache() for request-level memoization
  */
 export const getOrganizationById = cache(async (organizationId: string) => {
-  return withOrgRLS(db, organizationId, async (tx) => {
+  return withOrgRLS(getDb(), organizationId, async (tx) => {
     const organization = await tx.query.organizations.findFirst({
       where: eq(organizations.id, organizationId),
       columns: {
@@ -58,7 +58,7 @@ export const getOrganizationById = cache(async (organizationId: string) => {
  * Uses React 19 cache() for request-level memoization
  */
 export const getCurrentOrganization = cache(async (organizationId: string) => {
-  return withOrgRLS(db, organizationId, async (tx) => {
+  return withOrgRLS(getDb(), organizationId, async (tx) => {
     const org = await tx.query.organizations.findFirst({
       where: eq(organizations.id, organizationId),
       columns: {
@@ -86,7 +86,7 @@ export const getCurrentOrganization = cache(async (organizationId: string) => {
  * Uses React 19 cache() for request-level memoization
  */
 export const getOrganizationStats = cache(async (organizationId: string) => {
-  return withOrgRLS(db, organizationId, async (tx) => {
+  return withOrgRLS(getDb(), organizationId, async (tx) => {
     const [issueStats, machineCount, memberCount] = await Promise.all([
       tx
         .select({
@@ -134,7 +134,7 @@ export const getOrganizationStats = cache(async (organizationId: string) => {
  */
 export const getOrganizationStatsById = cache(
   async (organizationId: string) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       const [issueStats, machineCount, memberCount] = await Promise.all([
         tx
           .select({
@@ -183,7 +183,7 @@ export const getOrganizationStatsById = cache(
  */
 export const getOrganizationMembers = cache(
   async (page = 1, limit = 20, organizationId: string) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       const offset = (page - 1) * limit;
 
       return await tx.query.memberships.findMany({
@@ -220,7 +220,7 @@ export const getOrganizationMembers = cache(
  */
 export const getOrganizationMemberCount = cache(
   async (organizationId: string) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       const result: CountResult[] = await tx
         .select({ count: count() })
         .from(memberships)
@@ -236,7 +236,7 @@ export const getOrganizationMemberCount = cache(
  * Uses React 19 cache() for request-level memoization
  */
 export const getOrganizationRoles = cache(async (organizationId: string) => {
-  return withOrgRLS(db, organizationId, async (tx) => {
+  return withOrgRLS(getDb(), organizationId, async (tx) => {
     return await tx.query.roles.findMany({
       where: eq(roles.organization_id, organizationId),
       columns: {
@@ -257,7 +257,7 @@ export const getOrganizationRoles = cache(async (organizationId: string) => {
  */
 export const validateUserMembership = cache(
   async (userId: string, organizationId: string) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       return await tx.query.memberships.findFirst({
         where: and(
           eq(memberships.user_id, userId),
@@ -284,7 +284,7 @@ export const validateUserMembership = cache(
  */
 export const getOrganizationDashboardData = cache(
   async (organizationId: string) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       const [organization, stats] = await Promise.all([
         tx.query.organizations
           .findFirst({
@@ -309,7 +309,7 @@ export const getOrganizationDashboardData = cache(
  * Uses React 19 cache() for request-level memoization
  */
 export const getAvailableStatuses = cache(async (organizationId: string) => {
-  return withOrgRLS(db, organizationId, async (tx) => {
+  return withOrgRLS(getDb(), organizationId, async (tx) => {
     return await tx.query.issueStatuses.findMany({
       where: eq(issueStatuses.organization_id, organizationId),
       columns: {
@@ -328,7 +328,7 @@ export const getAvailableStatuses = cache(async (organizationId: string) => {
  * Uses React 19 cache() for request-level memoization
  */
 export const getAvailablePriorities = cache(async (organizationId: string) => {
-  return withOrgRLS(db, organizationId, async (tx) => {
+  return withOrgRLS(getDb(), organizationId, async (tx) => {
     return await tx.query.priorities.findMany({
       where: eq(priorities.organization_id, organizationId),
       columns: {
@@ -357,7 +357,7 @@ export const updateOrganizationSettings = cache(
       address: string;
     }>,
   ) => {
-    return withOrgRLS(db, organizationId, async (tx) => {
+    return withOrgRLS(getDb(), organizationId, async (tx) => {
       const result = await tx
         .update(organizations)
         .set({

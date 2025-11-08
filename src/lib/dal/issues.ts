@@ -6,7 +6,7 @@
 import { cache } from "react";
 import { and, desc, eq, sql, isNull, inArray, type SQL } from "drizzle-orm";
 import { issues, issueStatuses, priorities } from "~/server/db/schema";
-import { db } from "~/lib/dal/shared";
+import { getDb } from "~/lib/dal/shared";
 import type { IssueFilters } from "~/lib/types";
 import { safeCount, type CountResult } from "~/lib/types/database-results";
 
@@ -16,7 +16,7 @@ import { safeCount, type CountResult } from "~/lib/types/database-results";
  * Uses React 19 cache() for request-level memoization
  */
 export const getIssuesForOrg = cache(async (organizationId: string) => {
-  return await db.query.issues.findMany({
+  return await getDb().query.issues.findMany({
     where: eq(issues.organization_id, organizationId),
     with: {
       machine: {
@@ -149,7 +149,7 @@ export const getIssuesWithFilters = cache(
     const totalCount = safeCount(totalCountResult);
 
     // Get paginated results
-    const issuesResult = await db.query.issues.findMany({
+    const issuesResult = await getDb().query.issues.findMany({
       where: and(...whereConditions),
       with: {
         machine: {
@@ -202,7 +202,7 @@ export const getIssuesWithFilters = cache(
  */
 export const getIssueById = cache(
   async (issueId: string, organizationId: string) => {
-    const issue = await db.query.issues.findFirst({
+    const issue = await getDb().query.issues.findFirst({
       where: and(
         eq(issues.id, issueId),
         eq(issues.organization_id, organizationId),
@@ -277,7 +277,7 @@ export const getIssueStatusCounts = cache(async (organizationId: string) => {
  */
 export const getRecentIssues = cache(
   async (organizationId: string, limit = 5) => {
-    return await db.query.issues.findMany({
+    return await getDb().query.issues.findMany({
       where: eq(issues.organization_id, organizationId),
       with: {
         machine: {
@@ -303,7 +303,7 @@ export const getRecentIssues = cache(
 export const getIssueDashboardStats = cache(async (organizationId: string) => {
   const [statusBreakdown, priorityBreakdown, assignmentStats] =
     await Promise.all([
-      db.query.issues.findMany({
+      getDb().query.issues.findMany({
         where: eq(issues.organization_id, organizationId),
         with: {
           status: {
@@ -312,7 +312,7 @@ export const getIssueDashboardStats = cache(async (organizationId: string) => {
         },
         columns: { id: true, status_id: true },
       }),
-      db.query.issues.findMany({
+      getDb().query.issues.findMany({
         where: eq(issues.organization_id, organizationId),
         with: {
           priority: {
@@ -321,7 +321,7 @@ export const getIssueDashboardStats = cache(async (organizationId: string) => {
         },
         columns: { id: true, priority_id: true },
       }),
-      db.query.issues.findMany({
+      getDb().query.issues.findMany({
         where: eq(issues.organization_id, organizationId),
         columns: { id: true, assigned_to_id: true, created_by_id: true },
       }),
@@ -392,7 +392,7 @@ export const getIssueDashboardStats = cache(async (organizationId: string) => {
  */
 export const getCurrentUserAssignedIssues = cache(
   async (organizationId: string, userId: string, limit = 10) => {
-    return await db.query.issues.findMany({
+    return await getDb().query.issues.findMany({
       where: and(
         eq(issues.organization_id, organizationId),
         eq(issues.assigned_to_id, userId),
@@ -420,7 +420,7 @@ export const getCurrentUserAssignedIssues = cache(
  */
 export const getCurrentUserCreatedIssues = cache(
   async (organizationId: string, userId: string, limit = 10) => {
-    return await db.query.issues.findMany({
+    return await getDb().query.issues.findMany({
       where: and(
         eq(issues.organization_id, organizationId),
         eq(issues.created_by_id, userId),
@@ -448,7 +448,7 @@ export const getCurrentUserCreatedIssues = cache(
  */
 export const getHighPriorityUnassignedIssues = cache(
   async (organizationId: string) => {
-    return await db.query.issues.findMany({
+    return await getDb().query.issues.findMany({
       where: and(
         eq(issues.organization_id, organizationId),
         isNull(issues.assigned_to_id), // Unassigned
@@ -478,7 +478,7 @@ export const getIssueTrendData = cache(
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
 
-    const recentIssues = await db.query.issues.findMany({
+    const recentIssues = await getDb().query.issues.findMany({
       where: and(
         eq(issues.organization_id, organizationId),
         sql`${issues.created_at} >= ${cutoffDate}`,

@@ -5,6 +5,8 @@
 
 "use server";
 
+import { getDb } from "~/lib/dal/shared";
+
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { uuidSchema, emailSchema, nameSchema } from "~/lib/validation/schemas";
@@ -30,7 +32,6 @@ import {
 } from "./shared";
 import { isError, getErrorMessage } from "~/lib/utils/type-guards";
 import { getRequestAuthContext } from "~/server/auth/context";
-import { db } from "~/lib/dal/shared";
 import { requirePermission } from "./shared";
 import { PERMISSIONS } from "~/server/auth/permissions.constants";
 // Removed unused getDB alias import
@@ -112,17 +113,17 @@ export async function inviteUserAction(
     await requirePermission(
       { role_id: membership.role.id },
       PERMISSIONS.USER_MANAGE,
-      db,
+      getDb(),
     );
 
     // Check if user already exists in the system
-    const existingUser = await db.query.users.findFirst({
+    const existingUser = await getDb().query.users.findFirst({
       where: eq(users.email, validation.data.email),
     });
 
     if (existingUser) {
       // Check if user is already a member of this organization
-      const existingMembership = await db.query.memberships.findFirst({
+      const existingMembership = await getDb().query.memberships.findFirst({
         where: and(
           eq(memberships.user_id, existingUser.id),
           eq(memberships.organization_id, organizationId),
@@ -137,7 +138,7 @@ export async function inviteUserAction(
     // Get default role if none specified
     let roleId = validation.data.roleId;
     if (!roleId) {
-      const defaultRole = await db.query.roles.findFirst({
+      const defaultRole = await getDb().query.roles.findFirst({
         where: and(
           eq(roles.organization_id, organizationId),
           eq(roles.is_default, true),
@@ -157,7 +158,7 @@ export async function inviteUserAction(
     let userId = existingUser?.id;
     if (!existingUser) {
       // Create a new user record with unverified email
-      const newUserResult = await db
+      const newUserResult = await getDb()
         .insert(users)
         .values({
           id: generatePrefixedId("user"),
@@ -180,7 +181,7 @@ export async function inviteUserAction(
     }
 
     // Create membership for the user
-    const [newMembership] = await db
+    const [newMembership] = await getDb()
       .insert(memberships)
       .values({
         id: generatePrefixedId("membership"),
@@ -290,11 +291,11 @@ export async function updateUserRoleAction(
     await requirePermission(
       { role_id: membership.role.id },
       PERMISSIONS.USER_MANAGE,
-      db,
+      getDb(),
     );
 
     // Verify role exists in this organization
-    const role = await db.query.roles.findFirst({
+    const role = await getDb().query.roles.findFirst({
       where: and(
         eq(roles.id, validation.data.roleId),
         eq(roles.organization_id, organizationId),
@@ -306,7 +307,7 @@ export async function updateUserRoleAction(
     }
 
     // Update user role (membership)
-    const [updatedMembership] = await db
+    const [updatedMembership] = await getDb()
       .update(memberships)
       .set({ role_id: validation.data.roleId })
       .where(
@@ -384,11 +385,11 @@ export async function removeUserAction(
     await requirePermission(
       { role_id: membership.role.id },
       PERMISSIONS.USER_MANAGE,
-      db,
+      getDb(),
     );
 
     // Verify user exists and email matches (safety check)
-    const targetUser = await db.query.users.findFirst({
+    const targetUser = await getDb().query.users.findFirst({
       where: eq(users.id, validation.data.userId),
       columns: { id: true, email: true },
     });
@@ -398,7 +399,7 @@ export async function removeUserAction(
     }
 
     // Remove membership (soft delete would be better for audit trail)
-    const [removedMembership] = await db
+    const [removedMembership] = await getDb()
       .delete(memberships)
       .where(
         and(
@@ -481,7 +482,7 @@ export async function updateSystemSettingsAction(
     await requirePermission(
       { role_id: membership.role.id },
       PERMISSIONS.ORGANIZATION_MANAGE,
-      db,
+      getDb(),
     );
 
     // Convert flat form data to nested SystemSettingsData structure
@@ -564,7 +565,7 @@ export async function exportActivityLogAction(): Promise<Response> {
     await requirePermission(
       { role_id: membership.role.id },
       PERMISSIONS.ADMIN_VIEW_ANALYTICS,
-      db,
+      getDb(),
     );
 
     // Export activity log to CSV

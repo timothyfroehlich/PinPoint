@@ -5,12 +5,13 @@
 
 "use server";
 
+import { getDb } from "~/lib/dal/shared";
+
 import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { uuidSchema } from "~/lib/validation/schemas";
 import { and, eq, inArray } from "drizzle-orm";
 import { notifications } from "~/server/db/schema";
-import { db } from "~/lib/dal/shared";
 import {
   validateFormData,
   actionSuccess,
@@ -59,7 +60,7 @@ export async function markNotificationAsReadAction(
     }
 
     // Update notification with proper access control
-    const [updatedNotification] = await db
+    const [updatedNotification] = await getDb()
       .update(notifications)
       .set({ read: true })
       .where(
@@ -132,7 +133,7 @@ export async function bulkMarkNotificationsAsReadAction(
     const { notificationIds } = validation.data;
 
     // Bulk update with proper access control
-    const updatedNotifications = await db
+    const updatedNotifications = await getDb()
       .update(notifications)
       .set({ read: true })
       .where(
@@ -194,7 +195,7 @@ export async function markAllNotificationsAsReadAction(
     }
 
     // Mark all unread notifications as read
-    const updatedNotifications = await db
+    const updatedNotifications = await getDb()
       .update(notifications)
       .set({ read: true })
       .where(
@@ -254,7 +255,7 @@ export async function markNotificationAsUnreadAction(
     }
 
     // Update notification with proper access control
-    const [updatedNotification] = await db
+    const [updatedNotification] = await getDb()
       .update(notifications)
       .set({ read: false })
       .where(

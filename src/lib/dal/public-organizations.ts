@@ -9,12 +9,7 @@ import "server-only";
 import { cache } from "react";
 import { eq, and } from "drizzle-orm";
 import { organizations, memberships } from "~/server/db/schema";
-import { getGlobalDatabaseProvider } from "~/server/db/provider";
-
-/**
- * Database instance for public queries (no auth context required)
- */
-const db = getGlobalDatabaseProvider().getClient();
+import { getDb } from "./shared";
 
 /**
  * Organization option for login dropdown
@@ -33,6 +28,7 @@ export interface OrganizationOption {
  */
 export const getAllOrganizationsForLogin = cache(
   async (): Promise<OrganizationOption[]> => {
+    const db = getDb();
     const orgs = await db.query.organizations.findMany({
       where: eq(organizations.is_public, true),
       columns: {
@@ -57,6 +53,7 @@ export const getOrganizationBySubdomain = cache(async (subdomain: string) => {
     return null;
   }
 
+  const db = getDb();
   const organization = await db.query.organizations.findFirst({
     where: eq(organizations.subdomain, subdomain),
     columns: {
@@ -77,6 +74,7 @@ export const getOrganizationBySubdomain = cache(async (subdomain: string) => {
  */
 export const getPublicOrganizationById = cache(
   async (organizationId: string) => {
+    const db = getDb();
     const organization = await db.query.organizations.findFirst({
       where: eq(organizations.id, organizationId),
       columns: {
@@ -129,6 +127,7 @@ export const getOrganizationSelectOptions = cache(async () => {
 export const validateOrganizationExists = cache(
   async (organizationId: string): Promise<boolean> => {
     try {
+      const db = getDb();
       const organization = await db.query.organizations.findFirst({
         where: eq(organizations.id, organizationId),
         columns: {
@@ -151,6 +150,7 @@ export const validateOrganizationExists = cache(
  */
 export const getOrganizationSubdomainById = cache(
   async (organizationId: string): Promise<string | null> => {
+    const db = getDb();
     const organization = await db.query.organizations.findFirst({
       where: eq(organizations.id, organizationId),
       columns: {
@@ -169,6 +169,7 @@ export const getOrganizationSubdomainById = cache(
  */
 export const getUserMembershipPublic = cache(
   async (userId: string, organizationId: string) => {
+    const db = getDb();
     const membership = await db.query.memberships.findFirst({
       where: and(
         eq(memberships.user_id, userId),

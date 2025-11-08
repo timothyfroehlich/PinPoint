@@ -3,6 +3,7 @@
  * Form handling and mutations for RSC architecture with React 19 cache API
  */
 
+import { getDb } from "~/lib/dal/shared";
 import { redirect } from "next/navigation";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { cache } from "react"; // React 19 cache API
@@ -12,7 +13,6 @@ import type { z } from "zod";
 import { createClient } from "~/lib/supabase/server";
 import { getRequestAuthContext } from "~/server/auth/context";
 import { requirePermission as baseRequirePermission } from "~/server/auth/permissions";
-import { db } from "~/lib/dal/shared";
 import { getErrorMessage } from "~/lib/utils/type-guards";
 
 /**
@@ -70,7 +70,7 @@ export async function requireActionAuthContextWithPermission(
   }
   const { user, org: organization, membership } = authContext;
   const organizationId = organization.id;
-  await baseRequirePermission({ roleId: membership.role.id }, permission, db);
+  await baseRequirePermission({ roleId: membership.role.id }, permission, getDb());
   const name = user.name ?? user.email;
   return {
     user: { id: user.id, email: user.email, name },
@@ -234,7 +234,7 @@ export async function requirePermission(
   await baseRequirePermission(
     { roleId: membership?.role_id ?? null },
     permission,
-    db,
+    getDb(),
   );
 }
 

@@ -20,8 +20,10 @@ interface OrganizationSetupState {
 interface SetupState {
   machine: MachineSetupState;
   organization: OrganizationSetupState;
-  statusDefaults?: boolean;
-  priorityDefaults?: boolean;
+  defaults: {
+    statusId: string | null;
+    priorityId: string | null;
+  };
 }
 
 /**
