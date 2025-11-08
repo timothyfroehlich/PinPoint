@@ -101,6 +101,16 @@ export const env = createEnv({
     // Test environment variables
     VITEST: z.string().optional(), // Set by Vitest test runner
     CI: z.string().optional(), // Set by CI environments
+    // Email Configuration (Resend)
+    RESEND_API_KEY:
+      getEnvironmentType() === "production"
+        ? z.string().min(1, "Resend API key is required in production")
+        : z.string().optional(),
+    INVITATION_FROM_EMAIL: z
+      .string()
+      .email()
+      .default("noreply@pinpoint.app"),
+    INVITATION_FROM_NAME: z.string().default("PinPoint"),
   },
 
   /**
@@ -122,6 +132,11 @@ export const env = createEnv({
     NEXT_PUBLIC_APP_URL: z
       .string()
       .url("App URL must be a valid URL")
+      .default("https://pinpoint.app"),
+    // Base URL for email links (invitation acceptance, etc.)
+    NEXT_PUBLIC_BASE_URL: z
+      .string()
+      .url("Base URL must be a valid URL")
       .default("https://pinpoint.app"),
     // Supabase Public Configuration
     NEXT_PUBLIC_SUPABASE_URL:
@@ -177,6 +192,11 @@ export const env = createEnv({
     CI: process.env["CI"],
     NEXT_PUBLIC_ENABLE_DEV_FEATURES:
       process.env["NEXT_PUBLIC_ENABLE_DEV_FEATURES"],
+    // Email Configuration (Resend)
+    RESEND_API_KEY: process.env["RESEND_API_KEY"],
+    INVITATION_FROM_EMAIL: process.env["INVITATION_FROM_EMAIL"],
+    INVITATION_FROM_NAME: process.env["INVITATION_FROM_NAME"],
+    NEXT_PUBLIC_BASE_URL: process.env["NEXT_PUBLIC_BASE_URL"],
     // Next.js automatically exposes NODE_ENV to the client
   },
   /**

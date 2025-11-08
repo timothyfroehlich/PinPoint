@@ -9,8 +9,10 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import { uuidSchema, emailSchema, nameSchema } from "~/lib/validation/schemas";
 import { eq, and } from "drizzle-orm";
-import { users, memberships, roles } from "~/server/db/schema";
+import { users, memberships, roles, invitations } from "~/server/db/schema";
 import { generatePrefixedId } from "~/lib/utils/id-generation";
+import { generateInvitationToken } from "~/lib/utils/invitation-tokens";
+import { sendInvitationEmail } from "~/lib/email/resend";
 import {
   updateSystemSettings,
   type SystemSettingsData,
@@ -134,8 +136,10 @@ export async function inviteUserAction(
       }
     }
 
-    // Get default role if none specified
+    // Get role information (default role if none specified)
     let roleId = validation.data.roleId;
+    let roleName = "";
+
     if (!roleId) {
       const defaultRole = await db.query.roles.findFirst({
         where: and(
@@ -151,6 +155,18 @@ export async function inviteUserAction(
       }
 
       roleId = defaultRole.id;
+      roleName = defaultRole.name;
+    } else {
+      // Get role name for email
+      const selectedRole = await db.query.roles.findFirst({
+        where: eq(roles.id, roleId),
+      });
+
+      if (!selectedRole) {
+        return actionError("Selected role not found");
+      }
+
+      roleName = selectedRole.name;
     }
 
     // Create user record if they don't exist
@@ -179,6 +195,11 @@ export async function inviteUserAction(
       return actionError("User ID not available");
     }
 
+    // Generate secure invitation token
+    const { token, hash } = generateInvitationToken();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days from now
+
     // Create membership for the user
     const [newMembership] = await db
       .insert(memberships)
@@ -194,12 +215,32 @@ export async function inviteUserAction(
       return actionError("Failed to create user membership");
     }
 
+    // Create invitation record with hashed token
+    const [invitation] = await db
+      .insert(invitations)
+      .values({
+        id: generatePrefixedId("invitation"),
+        organization_id: organizationId,
+        email: validation.data.email,
+        role_id: roleId,
+        token: hash, // Store hashed token for security
+        invited_by: user.id,
+        status: "pending",
+        expires_at: expiresAt,
+      })
+      .returning({ id: invitations.id });
+
+    if (!invitation) {
+      return actionError("Failed to create invitation record");
+    }
+
     console.log("User invitation processed:", {
       email: validation.data.email,
       userId,
       organizationId,
       roleId,
       membershipId: newMembership.id,
+      invitationId: invitation.id,
     });
 
     // Cache invalidation
@@ -208,49 +249,66 @@ export async function inviteUserAction(
     revalidateTag("admin", "max");
     revalidateTag("users", "max");
 
-    // Background processing
-    runAfterResponse(async () => {
-      console.log(
-        `User invitation processed for ${validation.data.email} by ${user.email}`,
-        {
-          userId,
-          membershipId: newMembership.id,
-          organizationId,
-          roleId,
-        },
-      );
+    // Send invitation email (with plain token, not hash)
+    const emailResult = await sendInvitationEmail({
+      to: validation.data.email,
+      organizationName: organization.name,
+      inviterName: user.name || user.email || "A team member",
+      roleName,
+      token, // Plain token for email link
+      expiresAt,
+      personalMessage: validation.data.message,
+    });
 
-      // Log the activity
+    if (!emailResult.success) {
+      // Log error but don't fail the invitation
+      // User is already created, admin can resend later
+      console.error("Invitation email failed:", {
+        email: validation.data.email,
+        error: emailResult.error,
+        invitationId: invitation.id,
+      });
+
+      // Log email failure to activity log
       await logActivity({
         organizationId,
         userId: user.id,
         action: ACTIVITY_ACTIONS.INVITATION_SENT,
         entity: ACTIVITY_ENTITIES.USER,
         entityId: userId,
-        details: `Invited ${validation.data.email} to join the organization`,
-        severity: "info",
+        details: `Invitation created for ${validation.data.email} but email delivery failed: ${emailResult.error}`,
+        severity: "error",
       });
 
-      // TODO: Send actual invitation email with signup/login link
-      // The email should include:
-      // - Welcome message with personal note if provided
-      // - Link to complete account setup (for new users)
-      // - Link to login and accept invitation (for existing users)
-      // - Organization details and role information
-      //
-      // Example implementation:
-      // await sendInvitationEmail({
-      //   to: validation.data.email,
-      //   userExists: !!existingUser,
-      //   organizationName: organization.name,
-      //   organizationId,
-      //   inviterName: user.name || user.email,
-      //   roleName: role.name,
-      //   personalMessage: validation.data.message,
-      //   signupUrl: existingUser
-      //     ? `${baseUrl}/auth/sign-in?invitation=${invitationToken}`
-      //     : `${baseUrl}/auth/sign-up?invitation=${invitationToken}`,
-      // });
+      return actionError(
+        `User invited but email could not be sent. Error: ${emailResult.error}. Please contact the user directly or try resending the invitation.`,
+      );
+    }
+
+    // Background processing
+    runAfterResponse(async () => {
+      console.log(
+        `User invitation sent successfully to ${validation.data.email} by ${user.email}`,
+        {
+          userId,
+          membershipId: newMembership.id,
+          organizationId,
+          roleId,
+          invitationId: invitation.id,
+          messageId: emailResult.messageId,
+        },
+      );
+
+      // Log the successful activity
+      await logActivity({
+        organizationId,
+        userId: user.id,
+        action: ACTIVITY_ACTIONS.INVITATION_SENT,
+        entity: ACTIVITY_ENTITIES.USER,
+        entityId: userId,
+        details: `Invited ${validation.data.email} to join the organization as ${roleName}`,
+        severity: "info",
+      });
     });
 
     return actionSuccess(
