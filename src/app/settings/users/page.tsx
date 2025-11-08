@@ -21,6 +21,8 @@ import { api } from "~/trpc/server";
 import { UserTableActions } from "./components/UserTableActions";
 import { InviteUserDialog } from "./components/InviteUserDialog";
 import { format } from "date-fns";
+import { checkPermission } from "~/lib/auth/server-permissions";
+import { PERMISSIONS } from "~/server/auth/permissions.constants";
 
 export default async function UsersSettingsPage(): Promise<React.JSX.Element> {
   const authContext = await getRequestAuthContext();
@@ -41,6 +43,13 @@ async function UsersSettingsPageContent(): Promise<React.JSX.Element> {
   if (authContext.kind !== "authorized") {
     throw new Error("Unauthorized access"); // This should never happen due to AuthGuard
   }
+
+  // Check current user's permissions
+  const canManageUsers = await checkPermission(
+    authContext,
+    PERMISSIONS.USER_MANAGE,
+  );
+
   // Fetch organization users and roles using the existing admin router
   const [users, roles] = await Promise.all([
     api.admin.getUsers(),
@@ -177,7 +186,7 @@ async function UsersSettingsPageContent(): Promise<React.JSX.Element> {
 
                     <UserTableActions
                       user={user}
-                      currentUserCanManage={true} // TODO: Add proper permission checking
+                      currentUserCanManage={canManageUsers}
                       availableRoles={availableRoles}
                     />
                   </div>

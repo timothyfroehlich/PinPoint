@@ -9,6 +9,7 @@ import { createIssueAction } from "~/lib/actions/issue-actions";
 import { getMachinesForOrg } from "~/lib/dal/machines";
 import { getAssignableUsers } from "~/lib/dal/users";
 import { computeIssueCreationGating } from "~/lib/permissions/issueCreationGating";
+import { getAuthPermissions } from "~/lib/auth/server-permissions";
 
 // Transform DAL data for CreateIssueFormServer component
 function transformMachinesForForm(
@@ -92,19 +93,19 @@ async function CreateIssueContent({
   const resolvedSearchParams = await searchParams;
 
   // Parallel data fetching using real DAL functions with React 19 cache()
-  const [machinesRaw, assignableUsersRaw] = await Promise.all([
+  const [machinesRaw, assignableUsersRaw, userPermissions] = await Promise.all([
     getMachinesForOrg(authContext.org.id),
     getAssignableUsers(authContext.org.id),
+    getAuthPermissions(authContext),
   ]);
 
   // Transform data to match component expectations
   const machines = transformMachinesForForm(machinesRaw);
   const users = transformUsersForForm(assignableUsersRaw);
 
-  // For now, give all authenticated members full creation permissions
-  // TODO: Implement proper permission checking via DAL function
+  // Use actual user permissions for gating
   const gating = computeIssueCreationGating({
-    permissions: ["ISSUE_CREATE_FULL"],
+    permissions: userPermissions,
   });
 
   return (
