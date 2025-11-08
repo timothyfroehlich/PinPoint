@@ -257,7 +257,7 @@ export async function inviteUserAction(
       roleName,
       token, // Plain token for email link
       expiresAt,
-      personalMessage: validation.data.message,
+      ...(validation.data.message && { personalMessage: validation.data.message }),
     });
 
     if (!emailResult.success) {

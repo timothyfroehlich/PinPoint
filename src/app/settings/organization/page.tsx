@@ -23,6 +23,7 @@ import {
 import { OrganizationProfileForm } from "./components/OrganizationProfileForm";
 import { AnonymousIssueToggle } from "./components/AnonymousIssueToggle";
 import { OrganizationLogoForm } from "./components/OrganizationLogoForm";
+import { PublicPermissionsSettings } from "~/components/settings/PublicPermissionsSettings";
 import { format } from "date-fns";
 
 export default async function OrganizationSettingsPage(): Promise<React.JSX.Element> {
@@ -142,6 +143,9 @@ async function OrganizationSettingsPageContent(): Promise<React.JSX.Element> {
           </CardContent>
         </Card>
       </div>
+
+      {/* Public Permissions */}
+      <PublicPermissionsSettings />
 
       {/* Advanced Settings */}
       <Card>

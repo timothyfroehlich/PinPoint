@@ -74,7 +74,7 @@ export async function sendInvitationEmail(
         roleName,
         acceptUrl,
         expiresFormatted,
-        personalMessage,
+        ...(personalMessage && { personalMessage }),
       }),
       text: renderInvitationEmailText({
         organizationName,
@@ -82,7 +82,7 @@ export async function sendInvitationEmail(
         roleName,
         acceptUrl,
         expiresFormatted,
-        personalMessage,
+        ...(personalMessage && { personalMessage }),
       }),
     });
 

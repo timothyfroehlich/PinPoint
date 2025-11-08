@@ -6,7 +6,7 @@
  */
 
 import { redirect } from "next/navigation";
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "~/lib/dal/shared";
 import { invitations, users } from "~/server/db/schema";
 import { hashToken, isValidTokenFormat } from "~/lib/utils/invitation-tokens";
@@ -113,10 +113,11 @@ export default async function AcceptInvitationPage({
     );
   } catch (error) {
     console.error("Invitation acceptance error:", error);
+    const errorMessage = error instanceof Error ? error.message : undefined;
     return (
       <InvalidTokenError
         message="An error occurred while processing your invitation"
-        error={error instanceof Error ? error.message : undefined}
+        {...(errorMessage && { error: errorMessage })}
       />
     );
   }
@@ -169,9 +170,9 @@ function AcceptInvitationFlow({
   };
   existingUser?: {
     id: string;
-    email: string;
+    email: string | null;
     email_verified: Date | null;
-  } | null;
+  } | null | undefined;
   token: string;
 }): React.JSX.Element {
   const isNewUser = !existingUser;
