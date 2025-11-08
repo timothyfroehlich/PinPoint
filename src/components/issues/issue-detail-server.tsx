@@ -14,6 +14,7 @@ import { IssueStatusUpdateClient } from "./issue-status-update-client";
 import { IssueAssignmentClient } from "./issue-assignment-client";
 import { IssueSeverityClient } from "./issue-severity-client";
 import { IssuePriorityClient } from "./issue-priority-client";
+import { IssueEditDialogClient } from "./issue-edit-dialog-client";
 import { CommentFormClient } from "./comment-form-client";
 import { RealtimeCommentsClient } from "./realtime-comments-client";
 
@@ -76,9 +77,16 @@ export async function IssueDetailServer({
       {/* Issue Header */}
       <div className="flex justify-between items-start">
         <div className="flex-1">
-          <h1 className="text-3xl font-bold" data-testid="issue-title">
-            {issue.title}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold" data-testid="issue-title">
+              {issue.title}
+            </h1>
+            <IssueEditDialogClient
+              issueId={issue.id}
+              currentTitle={issue.title}
+              currentDescription={issue.description}
+            />
+          </div>
           <div className="flex items-center gap-4 mt-2 text-muted-foreground">
             <span>Issue #{issue.id.slice(0, 8)}</span>
             <span>•</span>
