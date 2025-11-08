@@ -218,7 +218,7 @@ export async function createIssueAction(
     revalidatePath("/issues");
     revalidatePath(`/issues/${issueData.id}`);
     revalidatePath("/dashboard");
-    revalidateTag("issues");
+    revalidateTag("issues", "max");
 
     // Background processing (runs after response sent to user)
     runAfterResponse(async () => {
@@ -363,7 +363,7 @@ export async function createPublicIssueAction(
       );
 
     revalidatePath(`/machines/${machineId}`);
-    revalidateTag("issues");
+    revalidateTag("issues", "max");
     return actionSuccess({ id: issueData.id }, "Issue reported successfully");
   } catch (error) {
     console.error("createPublicIssueAction error:", error);
@@ -419,7 +419,7 @@ export async function updateIssueStatusAction(
     revalidatePath(`/issues/${issueId}`);
     revalidatePath("/issues");
     revalidatePath("/dashboard");
-    revalidateTag("issues");
+    revalidateTag("issues", "max");
 
     // Background processing
     runAfterResponse(async () => {
@@ -514,8 +514,8 @@ export async function addCommentAction(
 
     // Cache invalidation
     revalidatePath(`/issues/${issueId}`);
-    revalidateTag("issues");
-    revalidateTag(`comments-${issueId}`);
+    revalidateTag("issues", "max");
+    revalidateTag(`comments-${issueId}`, "max");
 
     // Background processing
     runAfterResponse(() => {
@@ -597,7 +597,7 @@ export async function updateIssueAssignmentAction(
     revalidatePath(`/issues/${issueId}`);
     revalidatePath("/issues");
     revalidatePath("/dashboard");
-    revalidateTag("issues");
+    revalidateTag("issues", "max");
 
     // Background processing
     runAfterResponse(async () => {
@@ -693,7 +693,7 @@ export async function bulkUpdateIssuesAction(
     // Cache invalidation
     revalidatePath("/issues");
     revalidatePath("/dashboard");
-    revalidateTag("issues");
+    revalidateTag("issues", "max");
 
     // Background processing
     runAfterResponse(() => {
