@@ -20,7 +20,7 @@ Each task below is intentionally scoped so a separate agent can execute it witho
 | **T1 – Server Action Validation Fix** | ✅ **COMPLETE** | `src/lib/actions/issue-actions.ts`, `src/lib/validation/schemas.ts` | Fixed whitespace-title validation bug (added `.refine()` check) and corrected all `revalidateTag()` signatures. All 5 integration tests passing. Commit: dad5c55 |
 | **T2 – Router Integration (Member)** | 🔨 In progress (other agent) | `src/server/api/routers/issue.core.create.integration.test.ts` | Replace skeleton with full harness-based tests for `issue.core.create`. Must not modify router implementation files owned by other workstreams. |
 | **T3 – Router Integration (Anonymous)** | 🔨 In progress (other agent) | `src/server/api/routers/issue.core.publicCreate.integration.test.ts` | Implement tests for `issue.core.publicCreate`, ensuring anonymous-specific behavior. Avoid touching files from T2. |
-| **T4 – Playwright Member Flow** | 🚧 Ready to start | `e2e/issues/issue-create-member.e2e.test.ts` | Finalize `/issues/create` journey. Known issues: auth fixture uses `user.json` not `member.json`, data-testid mismatches need fixing (`issue-title-input` vs `title-input`, etc). |
+| **T4 – Playwright Member Flow** | ✅ **COMPLETE** | `e2e/issues/issue-create-member.e2e.test.ts` | Fixed auth fixture path, updated all data-testids to match UI, added beforeEach guard. All 3 test scenarios implemented (happy path, validation, visibility). Commit: ea00879 |
 | **T5 – Playwright Anonymous QR Flow** | 🚧 Ready to start | `e2e/issues/issue-create-anon-qr.e2e.test.ts`, QR route configuration (read-only) | Implement QR redirect + anonymous submission journey while keeping guest context isolated. |
 | **T6 – Documentation & Plan Sync** | ⏳ Blocked on T2–T5 | `docs/feature_specs/issue-creation.md`, `docs/feature_specs/AGENTS.md`, `CURRENT_TASK.md` | After tests are green, update specs to list the implemented files and bump review dates. No other task should modify docs to avoid conflicts. |
 
@@ -43,6 +43,7 @@ Each task below is intentionally scoped so a separate agent can execute it witho
   - Assert failures: soft-deleted machine (null), missing default status, missing default priority, insufficient permission (basic vs full), schema validation (blank title, empty machineId).
   - Keep mocks deterministic via `SEED_TEST_IDS`.
   - No edits to router implementation or other suites.
+- **Status (2025-11-08):** Test harness + scenarios drafted; `npm run test -- src/server/api/routers/issue.core.create.integration.test.ts` currently fails because the Vitest worker exits before executing tests (`[vitest-pool]: Worker forks emitted error`). Needs investigation before marking complete.
 - **Validation:** `npx vitest run src/server/api/routers/issue.core.create.integration.test.ts`.
 
 ### T3 – Router Integration (Anonymous)
