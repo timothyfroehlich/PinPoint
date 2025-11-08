@@ -230,7 +230,12 @@ export function PublicPermissionsSettings() {
   };
 
   const handleSave = async () => {
-    await updateMutation.mutateAsync({ permissions });
+    try {
+      await updateMutation.mutateAsync({ permissions });
+    } catch (error) {
+      // Error is already handled by onError callback in mutation config
+      // This catch prevents unhandled promise rejection
+    }
   };
 
   const handleDiscard = () => {

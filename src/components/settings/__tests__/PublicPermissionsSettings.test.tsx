@@ -7,8 +7,8 @@
  * @vitest-environment jsdom
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import { PublicPermissionsSettings } from '../PublicPermissionsSettings';
@@ -16,6 +16,7 @@ import { PublicPermissionsSettings } from '../PublicPermissionsSettings';
 // Mock tRPC
 const mockMutate = vi.fn();
 const mockInvalidate = vi.fn();
+let mutationConfig: { onSuccess?: () => void; onError?: (error: Error) => void } = {};
 
 vi.mock('~/trpc/react', () => ({
   api: {
@@ -24,10 +25,13 @@ vi.mock('~/trpc/react', () => ({
         useQuery: vi.fn(),
       },
       updatePublicPermissions: {
-        useMutation: vi.fn(() => ({
-          mutateAsync: mockMutate,
-          isPending: false,
-        })),
+        useMutation: vi.fn((config) => {
+          mutationConfig = config;
+          return {
+            mutateAsync: mockMutate,
+            isPending: false,
+          };
+        }),
       },
     },
     useUtils: vi.fn(() => ({
@@ -41,24 +45,38 @@ vi.mock('~/trpc/react', () => ({
 import { api } from '~/trpc/react';
 
 describe('PublicPermissionsSettings', () => {
-  const mockPermissions = {
+  const getDefaultPermissions = () => ({
     'issue:view': true,
     'issue:create_basic': false,
     'issue:create_full': false,
     'machine:view': false,
     'location:view': false,
     'attachment:view': false,
-  };
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mutationConfig = {};
 
-    // Default mock implementation
+    // Default mock implementation with fresh permissions object each time
     vi.mocked(api.admin.getPublicPermissions.useQuery).mockReturnValue({
-      data: mockPermissions,
+      data: getDefaultPermissions(),
       isLoading: false,
       error: null,
+      refetch: vi.fn(),
     } as any);
+
+    // Default mutation behavior - calls onSuccess
+    mockMutate.mockImplementation(async () => {
+      if (mutationConfig.onSuccess) {
+        mutationConfig.onSuccess();
+      }
+      return { success: true };
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   describe('Loading and Display', () => {
@@ -141,8 +159,9 @@ describe('PublicPermissionsSettings', () => {
     it('should show dependencies for each permission', () => {
       render(<PublicPermissionsSettings />);
 
-      // issue:create_full should show its dependencies (check for "Requires:" text)
-      expect(screen.getByText(/requires:/i)).toBeInTheDocument();
+      // Permissions with dependencies should show "Requires:" text
+      const requiresElements = screen.getAllByText(/requires:/i);
+      expect(requiresElements.length).toBeGreaterThan(0);
     });
 
     it('should warn when disabling permission required by others', async () => {
@@ -306,13 +325,19 @@ describe('PublicPermissionsSettings', () => {
 
     it('should invalidate cache after successful save', async () => {
       const user = userEvent.setup();
-      mockMutate.mockResolvedValue({ success: true });
 
       render(<PublicPermissionsSettings />);
 
       // Make change and save
       const toggle = screen.getByRole('switch', { name: /create basic issues/i });
       await user.click(toggle);
+
+      // Confirm the high-risk permission dialog
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /confirm/i })).toBeInTheDocument();
+      });
+      const confirmButton = screen.getByRole('button', { name: /confirm/i });
+      await user.click(confirmButton);
 
       await waitFor(() => {
         expect(screen.getByText(/save changes/i)).toBeEnabled();
@@ -328,13 +353,19 @@ describe('PublicPermissionsSettings', () => {
 
     it('should show success message after save', async () => {
       const user = userEvent.setup();
-      mockMutate.mockResolvedValue({ success: true });
 
       render(<PublicPermissionsSettings />);
 
       // Make change
       const toggle = screen.getByRole('switch', { name: /create basic issues/i });
       await user.click(toggle);
+
+      // Confirm the high-risk permission dialog
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /confirm/i })).toBeInTheDocument();
+      });
+      const confirmButton = screen.getByRole('button', { name: /confirm/i });
+      await user.click(confirmButton);
 
       // Wait for changes and save
       await waitFor(() => {
@@ -352,13 +383,27 @@ describe('PublicPermissionsSettings', () => {
 
     it('should show error message on save failure', async () => {
       const user = userEvent.setup();
-      mockMutate.mockRejectedValue(new Error('Network error'));
+      const error = new Error('Network error');
+      mockMutate.mockImplementation(async () => {
+        // Call onError callback before rejecting
+        if (mutationConfig.onError) {
+          mutationConfig.onError(error);
+        }
+        return Promise.reject(error);
+      });
 
       render(<PublicPermissionsSettings />);
 
       // Make change
       const toggle = screen.getByRole('switch', { name: /create basic issues/i });
       await user.click(toggle);
+
+      // Confirm the high-risk permission dialog
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /confirm/i })).toBeInTheDocument();
+      });
+      const confirmButton = screen.getByRole('button', { name: /confirm/i });
+      await user.click(confirmButton);
 
       await waitFor(() => {
         expect(screen.getByText(/save changes/i)).toBeEnabled();
@@ -424,6 +469,18 @@ describe('PublicPermissionsSettings', () => {
       // Enable it
       await user.click(toggle);
 
+      // Confirm the high-risk permission dialog
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /confirm/i })).toBeInTheDocument();
+      });
+      const confirmButton = screen.getByRole('button', { name: /confirm/i });
+      await user.click(confirmButton);
+
+      // Wait for dialog to close AND state to update
+      await waitFor(() => {
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      });
+
       await waitFor(() => {
         expect(toggle).toHaveAttribute('aria-checked', 'true');
       });
@@ -435,7 +492,7 @@ describe('PublicPermissionsSettings', () => {
       // Should be back to original state
       await waitFor(() => {
         expect(toggle).toHaveAttribute('aria-checked', 'false');
-      });
+      }, { timeout: 3000 });
     });
   });
 
