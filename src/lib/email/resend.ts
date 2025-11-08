@@ -108,6 +108,18 @@ export async function sendInvitationEmail(
 }
 
 /**
+ * Escape HTML special characters to prevent XSS
+ */
+function escapeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+/**
  * Render invitation email HTML template
  */
 function renderInvitationEmailHtml({
@@ -125,13 +137,19 @@ function renderInvitationEmailHtml({
   expiresFormatted: string;
   personalMessage?: string;
 }): string {
+  // Escape all user-provided content to prevent XSS
+  const safeOrgName = escapeHtml(organizationName);
+  const safeInviterName = escapeHtml(inviterName);
+  const safeRoleName = escapeHtml(roleName);
+  const safePersonalMessage = personalMessage ? escapeHtml(personalMessage) : undefined;
+
   return `
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Invitation to ${organizationName}</title>
+  <title>Invitation to ${safeOrgName}</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
   <table role="presentation" style="width: 100%; border-collapse: collapse;">
@@ -151,20 +169,20 @@ function renderInvitationEmailHtml({
           <tr>
             <td style="padding: 40px;">
               <h2 style="margin: 0 0 20px; color: #333333; font-size: 20px; font-weight: 600;">
-                Join ${organizationName}
+                Join ${safeOrgName}
               </h2>
 
               <p style="margin: 0 0 20px; color: #555555; font-size: 16px; line-height: 1.6;">
-                ${inviterName} has invited you to join <strong>${organizationName}</strong> on PinPoint as a <strong>${roleName}</strong>.
+                ${safeInviterName} has invited you to join <strong>${safeOrgName}</strong> on PinPoint as a <strong>${safeRoleName}</strong>.
               </p>
 
-              ${personalMessage ? `
+              ${safePersonalMessage ? `
               <div style="margin: 0 0 30px; padding: 20px; background-color: #f8f9fa; border-left: 4px solid #667eea; border-radius: 4px;">
                 <p style="margin: 0; color: #555555; font-size: 15px; line-height: 1.6; font-style: italic;">
-                  "${personalMessage}"
+                  "${safePersonalMessage}"
                 </p>
                 <p style="margin: 10px 0 0; color: #888888; font-size: 13px;">
-                  — ${inviterName}
+                  — ${safeInviterName}
                 </p>
               </div>
               ` : ''}
@@ -185,7 +203,7 @@ function renderInvitationEmailHtml({
               </p>
 
               <p style="margin: 20px 0 0; color: #888888; font-size: 14px; line-height: 1.6;">
-                If you have any questions, please contact ${inviterName}.
+                If you have any questions, please contact ${safeInviterName}.
               </p>
             </td>
           </tr>
@@ -200,7 +218,7 @@ function renderInvitationEmailHtml({
                 ${acceptUrl}
               </p>
               <p style="margin: 20px 0 0; color: #aaaaaa; font-size: 12px; line-height: 1.6;">
-                You received this email because ${inviterName} invited you to join ${organizationName} on PinPoint.
+                You received this email because ${safeInviterName} invited you to join ${safeOrgName} on PinPoint.
               </p>
             </td>
           </tr>
