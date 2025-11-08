@@ -281,7 +281,34 @@ export async function createPublicIssueAction(
   _prevState: ActionResult<{ id: string }> | null,
   formData: FormData,
 ): Promise<ActionResult<{ id: string }>> {
-  // Basic rate limiting (IP + machine) – naive in-memory (single instance)
+  // =============================================================================
+  // RATE LIMITING: In-Memory Implementation
+  // =============================================================================
+  // ARCHITECTURE: Naive in-memory rate limiting for single-instance deployments
+  //
+  // LIMITATIONS:
+  // 1. Single-instance only: State not shared across multiple server instances
+  // 2. Memory loss on restart: Limits reset when server restarts/redeploys
+  // 3. No persistence: Limits not stored in database or cache
+  // 4. Easy bypass: Users can evade limits by changing IP or machine
+  // 5. Testing override: Uses global variable hack for test environments
+  //
+  // CONFIGURATION:
+  // - Window: 60 seconds (60_000ms)
+  // - Max requests: 5 per IP+machine combination
+  // - Key format: "public_issue:{ip}:{machineId}"
+  //
+  // PRODUCTION CONSIDERATIONS:
+  // - For multi-instance deployments, migrate to Redis-based rate limiting
+  // - Consider using edge middleware (Cloudflare, Vercel) for distributed limits
+  // - Add database-level throttling as defense-in-depth
+  // - Monitor for abuse patterns and adjust limits accordingly
+  //
+  // SECURITY:
+  // - IP spoofing possible (honors X-Forwarded-For headers)
+  // - Not suitable for high-security scenarios
+  // - Provides basic protection against simple automated abuse
+  // =============================================================================
   try {
     const { headers } = await import("next/headers");
     const h = await headers();
@@ -309,8 +336,15 @@ export async function createPublicIssueAction(
         "Too many submissions. Please wait a minute and try again.",
       );
     }
-  } catch {
-    // ignore rate limit errors
+  } catch (error) {
+    // Rate limiting is best-effort only. Failures are logged but don't block requests.
+    // Possible failure scenarios:
+    // - Header parsing errors (malformed X-Forwarded-For)
+    // - Rate limiter initialization failures
+    // - Memory pressure causing eviction failures
+    // Rationale: Better to allow anonymous issue creation than block legitimate users
+    // due to rate limiting infrastructure issues.
+    console.warn("Rate limiting check failed (non-blocking):", error);
   }
   // Validate (priority/assignee will be ignored even if passed)
   const validation = validateFormData(formData, createIssueSchema);
