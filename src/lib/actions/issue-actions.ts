@@ -90,6 +90,16 @@ const bulkUpdateIssuesSchema = z.object({
   assigneeId: uuidSchema.optional(),
 });
 
+const updateIssueSeveritySchema = z.object({
+  severity: z.enum(["low", "medium", "high", "critical"], {
+    errorMap: () => ({ message: "Please select a valid severity level" }),
+  }),
+});
+
+const updateIssuePrioritySchema = z.object({
+  priorityId: uuidSchema,
+});
+
 // Performance: Cached database queries for default values
 const getDefaultStatus = cache(async (organizationId: string) => {
   return await db.query.issueStatuses.findFirst({
@@ -631,6 +641,171 @@ export async function updateIssueAssignmentAction(
     console.error("Update issue assignment error:", error);
     return actionError(
       isError(error) ? error.message : "Failed to update assignment",
+    );
+  }
+}
+
+/**
+ * Update issue severity via Server Action (React 19 useActionState compatible)
+ */
+export async function updateIssueSeverityAction(
+  issueId: string,
+  _prevState: ActionResult<{ severity: string }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ severity: string }>> {
+  try {
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization, membership } = authContext;
+    const organizationId = organization.id;
+
+    // Enhanced validation
+    const validation = validateFormData(formData, updateIssueSeveritySchema);
+    if (!validation.success) {
+      return validation as ActionResult<{ severity: string }>;
+    }
+
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.ISSUE_EDIT,
+      db,
+    );
+
+    // Get current severity for activity logging
+    const currentIssue = await db.query.issues.findFirst({
+      where: and(eq(issues.id, issueId), eq(issues.organization_id, organizationId)),
+      columns: { severity: true },
+    });
+
+    if (!currentIssue) {
+      return actionError("Issue not found or access denied");
+    }
+
+    const oldSeverity = currentIssue.severity;
+    const newSeverity = validation.data.severity;
+
+    // Update with organization scoping for security
+    const [updatedIssue] = await db
+      .update(issues)
+      .set({
+        severity: newSeverity,
+        updated_at: new Date(),
+      })
+      .where(
+        and(eq(issues.id, issueId), eq(issues.organization_id, organizationId)),
+      )
+      .returning({ severity: issues.severity });
+
+    if (!updatedIssue) {
+      return actionError("Issue not found or access denied");
+    }
+
+    // Granular cache invalidation
+    revalidatePath(`/issues/${issueId}`);
+    revalidatePath("/issues");
+    revalidatePath("/dashboard");
+    revalidateTag("issues", "max");
+
+    // Background processing
+    runAfterResponse(async () => {
+      console.log(`Issue ${issueId} severity updated from ${oldSeverity} to ${newSeverity} by ${user.email}`);
+
+      // TODO: Generate notifications if severity increased to high/critical
+      // This would require issue activity service integration
+    });
+
+    return actionSuccess(
+      { severity: updatedIssue.severity },
+      "Issue severity updated successfully",
+    );
+  } catch (error) {
+    console.error("Update issue severity error:", error);
+    return actionError(
+      isError(error) ? error.message : "Failed to update issue severity",
+    );
+  }
+}
+
+/**
+ * Update issue priority via Server Action (React 19 useActionState compatible)
+ */
+export async function updateIssuePriorityAction(
+  issueId: string,
+  _prevState: ActionResult<{ priorityId: string }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ priorityId: string }>> {
+  try {
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization, membership } = authContext;
+    const organizationId = organization.id;
+
+    // Enhanced validation
+    const validation = validateFormData(formData, updateIssuePrioritySchema);
+    if (!validation.success) {
+      return validation as ActionResult<{ priorityId: string }>;
+    }
+
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.ISSUE_EDIT,
+      db,
+    );
+
+    // Verify the priority exists and belongs to the organization
+    const priority = await db.query.priorities.findFirst({
+      where: and(
+        eq(priorities.id, validation.data.priorityId),
+        eq(priorities.organization_id, organizationId),
+      ),
+    });
+
+    if (!priority) {
+      return actionError("Invalid priority or access denied");
+    }
+
+    // Update with organization scoping for security
+    const [updatedIssue] = await db
+      .update(issues)
+      .set({
+        priority_id: validation.data.priorityId,
+        updated_at: new Date(),
+      })
+      .where(
+        and(eq(issues.id, issueId), eq(issues.organization_id, organizationId)),
+      )
+      .returning({ priority_id: issues.priority_id });
+
+    if (!updatedIssue) {
+      return actionError("Issue not found or access denied");
+    }
+
+    // Granular cache invalidation
+    revalidatePath(`/issues/${issueId}`);
+    revalidatePath("/issues");
+    revalidatePath("/dashboard");
+    revalidateTag("issues", "max");
+
+    // Background processing
+    runAfterResponse(async () => {
+      console.log(`Issue ${issueId} priority updated to ${priority.name} by ${user.email}`);
+
+      // TODO: Generate notifications if priority significantly elevated
+      // This would require issue activity service integration
+    });
+
+    return actionSuccess(
+      { priorityId: updatedIssue.priority_id },
+      "Issue priority updated successfully",
+    );
+  } catch (error) {
+    console.error("Update issue priority error:", error);
+    return actionError(
+      isError(error) ? error.message : "Failed to update issue priority",
     );
   }
 }

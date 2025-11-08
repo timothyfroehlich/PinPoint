@@ -8,10 +8,12 @@ import {
   getCommentCountForIssue,
 } from "~/lib/dal/comments";
 import { getAssignableUsers } from "~/lib/dal/users";
-import { getAvailableStatuses } from "~/lib/dal/organizations";
+import { getAvailableStatuses, getAvailablePriorities } from "~/lib/dal/organizations";
 import { formatDistanceToNow, format } from "date-fns";
 import { IssueStatusUpdateClient } from "./issue-status-update-client";
 import { IssueAssignmentClient } from "./issue-assignment-client";
+import { IssueSeverityClient } from "./issue-severity-client";
+import { IssuePriorityClient } from "./issue-priority-client";
 import { CommentFormClient } from "./comment-form-client";
 import { RealtimeCommentsClient } from "./realtime-comments-client";
 
@@ -26,13 +28,14 @@ export async function IssueDetailServer({
   organizationId,
   userId,
 }: IssueDetailServerProps): Promise<JSX.Element> {
-  const [issue, comments, commentCount, assignableUsers, availableStatuses] =
+  const [issue, comments, commentCount, assignableUsers, availableStatuses, availablePriorities] =
     await Promise.all([
       getIssueById(issueId, organizationId),
       getCommentsForIssue(issueId, organizationId),
       getCommentCountForIssue(issueId, organizationId),
       getAssignableUsers(organizationId),
       getAvailableStatuses(organizationId),
+      getAvailablePriorities(organizationId),
     ]);
 
   // Dynamic status colors based on status category
@@ -49,7 +52,24 @@ export async function IssueDetailServer({
     }
   };
 
+  // Dynamic severity colors
+  const getSeverityColorClass = (severity: string): string => {
+    switch (severity) {
+      case "critical":
+        return "bg-error text-on-error border-error";
+      case "high":
+        return "bg-[hsl(var(--warning))] text-[hsl(var(--on-warning))] border-[hsl(var(--warning))]";
+      case "medium":
+        return "bg-[hsl(var(--caution))] text-[hsl(var(--on-caution))] border-[hsl(var(--caution))]";
+      case "low":
+        return "bg-[hsl(var(--info))] text-[hsl(var(--on-info))] border-[hsl(var(--info))]";
+      default:
+        return "bg-surface-container-low text-on-surface border-outline-variant";
+    }
+  };
+
   const statusColor = getStatusColorClass(issue.status.category);
+  const severityColor = getSeverityColorClass(issue.severity);
 
   return (
     <div className="space-y-6">
@@ -77,6 +97,20 @@ export async function IssueDetailServer({
             data-testid="issue-status-badge"
           >
             {issue.status.name}
+          </Badge>
+          <Badge
+            variant="outline"
+            className={severityColor}
+            data-testid="issue-severity-badge"
+          >
+            {issue.severity.charAt(0).toUpperCase() + issue.severity.slice(1)}
+          </Badge>
+          <Badge
+            variant="outline"
+            className="bg-surface-container text-on-surface border-outline"
+            data-testid="issue-priority-badge"
+          >
+            {issue.priority.name}
           </Badge>
         </div>
       </div>
@@ -268,6 +302,44 @@ export async function IssueDetailServer({
                   currentStatusId={issue.status.id}
                   currentStatusName={issue.status.name}
                   availableStatuses={availableStatuses}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Issue Details - Severity and Priority */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Issue Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Severity */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Severity:</span>
+                  <Badge variant="outline" className={severityColor}>
+                    {issue.severity.charAt(0).toUpperCase() + issue.severity.slice(1)}
+                  </Badge>
+                </div>
+                <IssueSeverityClient
+                  issueId={issue.id}
+                  currentSeverity={issue.severity as "low" | "medium" | "high" | "critical"}
+                />
+              </div>
+
+              {/* Priority */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Priority:</span>
+                  <Badge variant="outline" className="bg-surface-container text-on-surface border-outline">
+                    {issue.priority.name}
+                  </Badge>
+                </div>
+                <IssuePriorityClient
+                  issueId={issue.id}
+                  currentPriorityId={issue.priority.id}
+                  currentPriorityName={issue.priority.name}
+                  availablePriorities={availablePriorities}
                 />
               </div>
             </CardContent>
