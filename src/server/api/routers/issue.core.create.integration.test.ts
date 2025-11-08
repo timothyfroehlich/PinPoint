@@ -68,8 +68,12 @@ describe("issue.core.create (integration)", () => {
 
   it("creates member issue with defaults, activity recorded, and notification sent", async () => {
     const { db } = await import("~/server/db");
-    const { recordIssueCreated } = await import("~/server/services/issueActivityService");
-    const { notifyMachineOwner } = await import("~/server/services/notificationService");
+    const { recordIssueCreated } = await import(
+      "~/server/services/issueActivityService"
+    );
+    const { notifyMachineOwner } = await import(
+      "~/server/services/notificationService"
+    );
 
     // Setup mocks
     (db.query.machines.findFirst as any).mockResolvedValue({
@@ -111,14 +115,18 @@ describe("issue.core.create (integration)", () => {
 
     expect(result.id).toBe(SEED_TEST_IDS.ISSUES.KAIJU_FIGURES);
     expect(result.createdById).toBe(SEED_TEST_IDS.USERS.ADMIN);
-    expect(recordIssueCreated).toHaveBeenCalledWith(expect.objectContaining({
-      issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
-      userId: SEED_TEST_IDS.USERS.ADMIN,
-    }));
-    expect(notifyMachineOwner).toHaveBeenCalledWith(expect.objectContaining({
-      issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
-      machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
-    }));
+    expect(recordIssueCreated).toHaveBeenCalledWith(
+      expect.objectContaining({
+        issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+        userId: SEED_TEST_IDS.USERS.ADMIN,
+      }),
+    );
+    expect(notifyMachineOwner).toHaveBeenCalledWith(
+      expect.objectContaining({
+        issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+        machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+      }),
+    );
   });
 
   it("rejects create when target machine is soft-deleted", async () => {
@@ -133,7 +141,7 @@ describe("issue.core.create (integration)", () => {
       caller.core.create({
         title: "Test Issue",
         machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
-      })
+      }),
     ).rejects.toThrow(TRPCError);
   });
 
@@ -161,7 +169,7 @@ describe("issue.core.create (integration)", () => {
       caller.core.create({
         title: "Test Issue",
         machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
-      })
+      }),
     ).rejects.toThrow(TRPCError);
   });
 
@@ -172,14 +180,14 @@ describe("issue.core.create (integration)", () => {
       caller.core.create({
         title: "", // Invalid empty title
         machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
-      })
+      }),
     ).rejects.toThrow(TRPCError);
 
     await expect(
       caller.core.create({
         title: "Valid title",
         machineId: "", // Invalid empty machine ID
-      })
+      }),
     ).rejects.toThrow(TRPCError);
   });
 
@@ -196,7 +204,7 @@ describe("issue.core.create (integration)", () => {
       caller.core.create({
         title: "Test Issue",
         machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
-      })
+      }),
     ).rejects.toThrow(TRPCError);
   });
 });

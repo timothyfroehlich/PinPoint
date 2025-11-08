@@ -154,9 +154,7 @@ describe("validateIssueCreation", () => {
     expect(result.error).toBe(
       "Machine not found or does not belong to this organization",
     );
-    expect(result.error).not.toContain(
-      SEED_TEST_IDS.ORGANIZATIONS.competitor,
-    );
+    expect(result.error).not.toContain(SEED_TEST_IDS.ORGANIZATIONS.competitor);
   });
 
   it("fails when default status is missing", () => {

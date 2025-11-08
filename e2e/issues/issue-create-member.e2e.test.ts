@@ -23,13 +23,19 @@ test.describe("Issue Create – Member (E2E)", () => {
     await page.goto("/issues/create");
 
     // Verify page loaded correctly
-    await expect(page.getByTestId("page-title")).toContainText("Create New Issue");
+    await expect(page.getByTestId("page-title")).toContainText(
+      "Create New Issue",
+    );
     await expect(page.getByTestId("issue-form")).toBeVisible();
 
     // Fill in the form
     await page.getByTestId("title-input").fill("Test Member Issue");
-    await page.getByTestId("description-input").fill("Detailed description of the issue");
-    await page.getByTestId("machine-select").selectOption(SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1);
+    await page
+      .getByTestId("description-input")
+      .fill("Detailed description of the issue");
+    await page
+      .getByTestId("machine-select")
+      .selectOption(SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1);
 
     // Submit the form
     await page.getByTestId("submit-button").click();
@@ -43,7 +49,9 @@ test.describe("Issue Create – Member (E2E)", () => {
     // await expect(page).toHaveURL(/\/issues\/[^\/]+$/);
   });
 
-  test("validation shows inline errors for missing required fields", async ({ page }) => {
+  test("validation shows inline errors for missing required fields", async ({
+    page,
+  }) => {
     await page.goto("/issues/create");
 
     // Try to submit without filling required fields
@@ -68,7 +76,9 @@ test.describe("Issue Create – Member (E2E)", () => {
     await expect(page.getByTestId("machine-error")).toBeVisible();
   });
 
-  test("member can see private-location machines when organization member", async ({ page }) => {
+  test("member can see private-location machines when organization member", async ({
+    page,
+  }) => {
     await page.goto("/issues/create");
 
     // Verify machine select shows options
@@ -79,11 +89,17 @@ test.describe("Issue Create – Member (E2E)", () => {
     await machineSelect.click();
 
     // Verify private machines are visible to organization members
-    await expect(page.getByRole("option", { name: /Medieval Madness/i })).toBeVisible();
-    await expect(page.getByRole("option", { name: /Cactus Canyon/i })).toBeVisible();
+    await expect(
+      page.getByRole("option", { name: /Medieval Madness/i }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("option", { name: /Cactus Canyon/i }),
+    ).toBeVisible();
 
     // Verify we can select a private machine
     await page.getByRole("option", { name: /Medieval Madness/i }).click();
-    await expect(machineSelect).toHaveValue(SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1);
+    await expect(machineSelect).toHaveValue(
+      SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+    );
   });
 });

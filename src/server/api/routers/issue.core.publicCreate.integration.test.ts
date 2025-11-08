@@ -64,8 +64,12 @@ describe("issue.core.publicCreate (integration)", () => {
 
   it("creates anonymous issue with defaults and notifies owner (no activity)", async () => {
     const { db } = await import("~/server/db");
-    const { recordIssueCreated } = await import("~/server/services/issueActivityService");
-    const { notifyMachineOwner } = await import("~/server/services/notificationService");
+    const { recordIssueCreated } = await import(
+      "~/server/services/issueActivityService"
+    );
+    const { notifyMachineOwner } = await import(
+      "~/server/services/notificationService"
+    );
 
     // Setup mocks
     (db.query.machines.findFirst as any).mockResolvedValue({
@@ -110,16 +114,20 @@ describe("issue.core.publicCreate (integration)", () => {
     expect(result.createdById).toBeNull(); // Anonymous
     expect(result.reporterEmail).toBe("reporter@example.com");
     expect(recordIssueCreated).not.toHaveBeenCalled(); // No activity for anonymous
-    expect(notifyMachineOwner).toHaveBeenCalledWith(expect.objectContaining({
-      issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
-      machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
-    }));
+    expect(notifyMachineOwner).toHaveBeenCalledWith(
+      expect.objectContaining({
+        issueId: SEED_TEST_IDS.ISSUES.KAIJU_FIGURES,
+        machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+      }),
+    );
   });
 
   it("skips activity recording due to no actor", async () => {
     // This test is covered by the first test - anonymous issues don't record activity
     // We verify recordIssueCreated is NOT called for anonymous issues
-    const { recordIssueCreated } = await import("~/server/services/issueActivityService");
+    const { recordIssueCreated } = await import(
+      "~/server/services/issueActivityService"
+    );
 
     // Just verify the mock was never called
     expect(recordIssueCreated).not.toHaveBeenCalled();
@@ -138,7 +146,7 @@ describe("issue.core.publicCreate (integration)", () => {
         title: "Test Issue",
         reporterEmail: "reporter@example.com",
         machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
-      })
+      }),
     ).rejects.toThrow(TRPCError);
   });
 
@@ -167,7 +175,7 @@ describe("issue.core.publicCreate (integration)", () => {
         title: "Test Issue",
         reporterEmail: "reporter@example.com",
         machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
-      })
+      }),
     ).rejects.toThrow(TRPCError);
   });
 
@@ -189,7 +197,7 @@ describe("issue.core.publicCreate (integration)", () => {
         title: "Test Issue",
         reporterEmail: "reporter@example.com",
         machineId: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
-      })
+      }),
     ).rejects.toThrow(TRPCError);
   });
 });

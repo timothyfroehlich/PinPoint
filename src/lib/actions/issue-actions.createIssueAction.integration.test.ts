@@ -139,7 +139,10 @@ const buildAuthContext = (organizationId: string) => ({
 });
 
 const uniqueOrgId = (suffix: string) =>
-  `${SEED_TEST_IDS.ORGANIZATIONS.primary}-${suffix}`.replace(/[^a-z0-9-]/gi, "-");
+  `${SEED_TEST_IDS.ORGANIZATIONS.primary}-${suffix}`.replace(
+    /[^a-z0-9-]/gi,
+    "-",
+  );
 
 const flushMicrotasks = async () => {
   await Promise.resolve();
@@ -175,23 +178,35 @@ describe("createIssueAction (integration)", () => {
 
   it("surfaces field errors when required values are missing", async () => {
     const organizationId = uniqueOrgId("missing-required");
-    getRequestAuthContextMock.mockResolvedValue(buildAuthContext(organizationId));
+    getRequestAuthContextMock.mockResolvedValue(
+      buildAuthContext(organizationId),
+    );
 
     const formData = new FormData();
 
     const result = await createIssueAction(null, formData);
 
     expect(result.success).toBe(false);
-  expect(result.fieldErrors?.title?.[0]).toMatch(/required|title|expected string/i);
-  expect(result.fieldErrors?.machineId?.[0]).toMatch(/required|machine|expected string/i);
+    expect(result.fieldErrors?.title?.[0]).toMatch(
+      /required|title|expected string/i,
+    );
+    expect(result.fieldErrors?.machineId?.[0]).toMatch(
+      /required|machine|expected string/i,
+    );
     expect(requirePermissionMock).not.toHaveBeenCalled();
   });
 
   it("treats whitespace-only titles as invalid input", async () => {
     const organizationId = uniqueOrgId("whitespace");
-    getRequestAuthContextMock.mockResolvedValue(buildAuthContext(organizationId));
-    issueStatusesFindFirstMock.mockResolvedValueOnce(buildStatusRecord(organizationId));
-    prioritiesFindFirstMock.mockResolvedValueOnce(buildPriorityRecord(organizationId));
+    getRequestAuthContextMock.mockResolvedValue(
+      buildAuthContext(organizationId),
+    );
+    issueStatusesFindFirstMock.mockResolvedValueOnce(
+      buildStatusRecord(organizationId),
+    );
+    prioritiesFindFirstMock.mockResolvedValueOnce(
+      buildPriorityRecord(organizationId),
+    );
 
     const formData = new FormData();
     formData.append("title", "   \n\t  ");
@@ -205,13 +220,22 @@ describe("createIssueAction (integration)", () => {
 
   it("creates an issue, revalidates caches, and schedules notifications", async () => {
     const organizationId = uniqueOrgId("success");
-    getRequestAuthContextMock.mockResolvedValue(buildAuthContext(organizationId));
-    issueStatusesFindFirstMock.mockResolvedValueOnce(buildStatusRecord(organizationId));
-    prioritiesFindFirstMock.mockResolvedValueOnce(buildPriorityRecord(organizationId));
+    getRequestAuthContextMock.mockResolvedValue(
+      buildAuthContext(organizationId),
+    );
+    issueStatusesFindFirstMock.mockResolvedValueOnce(
+      buildStatusRecord(organizationId),
+    );
+    prioritiesFindFirstMock.mockResolvedValueOnce(
+      buildPriorityRecord(organizationId),
+    );
 
     const formData = new FormData();
     formData.append("title", "Flipper misfires intermittently");
-    formData.append("description", "Player reports left flipper drops mid-game.");
+    formData.append(
+      "description",
+      "Player reports left flipper drops mid-game.",
+    );
     formData.append("machineId", SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1);
 
     const result = await createIssueAction(null, formData);
@@ -225,7 +249,9 @@ describe("createIssueAction (integration)", () => {
       expect.any(Object),
     );
     expect(revalidatePathMock).toHaveBeenCalledWith("/issues");
-    expect(revalidatePathMock).toHaveBeenCalledWith(`/issues/${result.data.id}`);
+    expect(revalidatePathMock).toHaveBeenCalledWith(
+      `/issues/${result.data.id}`,
+    );
     expect(revalidatePathMock).toHaveBeenCalledWith("/dashboard");
     expect(revalidateTagMock).toHaveBeenCalledWith("issues");
     expect(transformKeysToSnakeCaseMock).toHaveBeenCalledWith(
@@ -260,8 +286,12 @@ describe("createIssueAction (integration)", () => {
       .mockRejectedValueOnce(new Error("full access denied"))
       .mockResolvedValueOnce(undefined);
 
-    issueStatusesFindFirstMock.mockResolvedValueOnce(buildStatusRecord(organizationId));
-    prioritiesFindFirstMock.mockResolvedValueOnce(buildPriorityRecord(organizationId));
+    issueStatusesFindFirstMock.mockResolvedValueOnce(
+      buildStatusRecord(organizationId),
+    );
+    prioritiesFindFirstMock.mockResolvedValueOnce(
+      buildPriorityRecord(organizationId),
+    );
 
     const formData = new FormData();
     formData.append("title", "Drop target bank failure");
@@ -283,12 +313,16 @@ describe("createIssueAction (integration)", () => {
 
   it("returns a configuration error when no status is available", async () => {
     const organizationId = uniqueOrgId("missing-status");
-    getRequestAuthContextMock.mockResolvedValue(buildAuthContext(organizationId));
+    getRequestAuthContextMock.mockResolvedValue(
+      buildAuthContext(organizationId),
+    );
 
     issueStatusesFindFirstMock
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null);
-    prioritiesFindFirstMock.mockResolvedValueOnce(buildPriorityRecord(organizationId));
+    prioritiesFindFirstMock.mockResolvedValueOnce(
+      buildPriorityRecord(organizationId),
+    );
 
     const formData = new FormData();
     formData.append("title", "Score display flickers");

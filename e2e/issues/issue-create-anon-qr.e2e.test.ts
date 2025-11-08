@@ -27,13 +27,19 @@ test.describe("Issue Create – Anonymous via QR (E2E)", () => {
     await expect(page.getByTestId("issue-form")).toBeVisible();
   });
 
-  test("anonymous can submit a minimal report successfully", async ({ page }) => {
+  test("anonymous can submit a minimal report successfully", async ({
+    page,
+  }) => {
     // Navigate directly to machine report page
-    await page.goto(`/machines/${SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1}/report-issue`);
+    await page.goto(
+      `/machines/${SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1}/report-issue`,
+    );
 
     // Fill in required fields
     await page.getByTestId("title-input").fill("Machine making loud noise");
-    await page.getByTestId("description-input").fill("The machine is making a loud buzzing sound");
+    await page
+      .getByTestId("description-input")
+      .fill("The machine is making a loud buzzing sound");
     await page.getByTestId("reporter-email-input").fill("reporter@example.com");
 
     // Submit the form
@@ -41,12 +47,16 @@ test.describe("Issue Create – Anonymous via QR (E2E)", () => {
 
     // Verify success
     await expect(page.getByTestId("success-message")).toBeVisible();
-    await expect(page.getByTestId("success-message")).toContainText("Issue created successfully");
+    await expect(page.getByTestId("success-message")).toContainText(
+      "Issue created successfully",
+    );
   });
 
   test("anonymous cannot edit the issue after creation", async ({ page }) => {
     // First create an issue (assuming we have a created issue ID)
-    await page.goto(`/machines/${SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1}/report-issue`);
+    await page.goto(
+      `/machines/${SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1}/report-issue`,
+    );
     await page.getByTestId("title-input").fill("Test Issue");
     await page.getByTestId("reporter-email-input").fill("test@example.com");
     await page.getByTestId("submit-button").click();
