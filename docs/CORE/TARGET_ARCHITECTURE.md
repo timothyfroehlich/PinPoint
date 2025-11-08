@@ -1,7 +1,7 @@
 # PinPoint Target Architecture
 
-**Last Updated**: September 2, 2025
-**Last Reviewed**: September 2, 2025
+**Last Updated**: 2025-11-08
+**Last Reviewed**: 2025-11-08
 
 _The definitive architectural blueprint for PinPoint's server-first, multi-tenant issue tracking platform_
 
@@ -34,7 +34,8 @@ _The definitive architectural blueprint for PinPoint's server-first, multi-tenan
 - React cache() API for request-level memoization to eliminate duplicate database queries
 - React Compiler enabled for automatic optimization and performance improvements
 
-**Next.js 15 App Router**
+**Next.js 16 App Router**
+- React Compiler moved to top-level configuration (breaking change from v15)
 - Server Actions for form handling and mutations replacing client-side API calls
 - Streaming and Suspense for progressive loading experiences
 - Route-based code splitting with Server Component defaults
@@ -137,7 +138,7 @@ _The definitive architectural blueprint for PinPoint's server-first, multi-tenan
 - Only optimizes code that follows React's rules, safely skipping problematic components rather than failing builds
 
 **Server Components Optimization Strategy**
-- Perfect compatibility with Next.js 15 Server Components enabling automatic memoization of server-side data fetching
+- Perfect compatibility with Next.js 16 Server Components enabling automatic memoization of server-side data fetching
 - Optimized component rendering on both server and client with intelligent caching strategies
 - Compatible with async Server Components patterns and request-level memoization using React 19 cache() API
 - Hybrid architecture support optimizing both server data fetching and client interactivity boundaries
@@ -175,7 +176,7 @@ function ExpensiveComponent({ organizationId }) {
 
 ### Build Integration and Configuration
 
-**Next.js 15 Configuration Architecture**
+**Next.js 16 Configuration Architecture**
 ```javascript
 // next.config.js - React Compiler integration
 const nextConfig = {
@@ -535,7 +536,7 @@ export async function createOrganizationAwareClient() {
 
 ### Server Components Organization Scoping
 
-**Next.js 15 Server Components with Organization Context**
+**Next.js 16 Server Components with Organization Context**
 ```typescript
 // Server Component with organization scoping
 export default async function IssuesPage() {

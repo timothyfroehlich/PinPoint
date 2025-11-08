@@ -1,6 +1,6 @@
 # Testing Guide (Source of Truth)
 
-Last Reviewed: 2025-11-02
+Last Reviewed: 2025-11-08
 Last Updated: 2025-11-02
 
 Scope: All contributors. This is the single source of truth for creating and updating tests. It replaces prior archetype-era documentation and any deprecated automation around test scaffolding.
