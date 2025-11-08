@@ -15,38 +15,47 @@ import { test, expect } from "@playwright/test";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 // Use authenticated context for member tests
-test.use({ storageState: "e2e/.auth/member.json" });
+test.use({ storageState: "e2e/.auth/user.json" });
 
 test.describe("Issue Create – Member (E2E)", () => {
+  test.beforeEach(({}, testInfo) => {
+    if (!testInfo.project.name.includes("auth")) {
+      testInfo.skip(
+        "Member issue creation tests require authenticated storage state project",
+      );
+    }
+  });
+
   test("member can create an issue via /issues/create", async ({ page }) => {
     // Navigate to issue creation page
     await page.goto("/issues/create");
 
     // Verify page loaded correctly
-    await expect(page.getByTestId("page-title")).toContainText(
-      "Create New Issue",
-    );
-    await expect(page.getByTestId("issue-form")).toBeVisible();
+    await expect(page.locator("h1")).toContainText("Create New Issue");
+    await expect(page.getByTestId("create-issue-form")).toBeVisible();
 
     // Fill in the form
-    await page.getByTestId("title-input").fill("Test Member Issue");
+    await page.getByTestId("issue-title-input").fill("Test Member Issue");
     await page
-      .getByTestId("description-input")
+      .getByTestId("issue-description-input")
       .fill("Detailed description of the issue");
+
+    // Select a machine - using the select trigger
+    await page.getByTestId("machine-select-trigger").click();
     await page
-      .getByTestId("machine-select")
-      .selectOption(SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1);
+      .getByTestId("machine-option")
+      .filter({ hasText: "Medieval Madness" })
+      .first()
+      .click();
 
     // Submit the form
-    await page.getByTestId("submit-button").click();
+    await page.getByTestId("create-issue-submit").click();
 
-    // Verify success - should redirect away from create page
-    await expect(page).not.toHaveURL("/issues/create");
+    // Verify success - wait for redirect (Server Action may take a moment)
+    await page.waitForURL(/\/issues\/[^/]+$/, { timeout: 10000 });
 
-    // Verify success notification or redirect to issue detail
-    await expect(page.getByTestId("success-notification")).toBeVisible();
-    // OR verify we're on the issue detail page
-    // await expect(page).toHaveURL(/\/issues\/[^\/]+$/);
+    // Verify we're on an issue detail page
+    await expect(page).toHaveURL(/\/issues\/[^/]+$/);
   });
 
   test("validation shows inline errors for missing required fields", async ({
@@ -55,25 +64,27 @@ test.describe("Issue Create – Member (E2E)", () => {
     await page.goto("/issues/create");
 
     // Try to submit without filling required fields
-    await page.getByTestId("submit-button").click();
+    await page.getByTestId("create-issue-submit").click();
 
-    // Verify validation errors appear
-    await expect(page.getByTestId("title-error")).toBeVisible();
-    await expect(page.getByTestId("title-error")).toContainText("title");
+    // Verify validation errors appear in the field errors list
+    const fieldErrors = page.getByTestId("create-issue-field-errors");
+    await expect(fieldErrors).toBeVisible();
 
-    await expect(page.getByTestId("machine-error")).toBeVisible();
-    await expect(page.getByTestId("machine-error")).toContainText("machine");
+    // Check that errors mention both required fields
+    await expect(fieldErrors).toContainText(/title/i);
+    await expect(fieldErrors).toContainText(/machine/i);
 
     // Verify we're still on the create page
     await expect(page).toHaveURL("/issues/create");
 
     // Fill title but leave machine empty
-    await page.getByTestId("title-input").fill("Valid title");
-    await page.getByTestId("submit-button").click();
+    await page.getByTestId("issue-title-input").fill("Valid title");
+    await page.getByTestId("create-issue-submit").click();
 
-    // Title error should disappear, machine error should remain
-    await expect(page.getByTestId("title-error")).not.toBeVisible();
-    await expect(page.getByTestId("machine-error")).toBeVisible();
+    // Field errors should still be visible but only for machine now
+    await expect(fieldErrors).toBeVisible();
+    await expect(fieldErrors).toContainText(/machine/i);
+    await expect(fieldErrors).not.toContainText(/title/i);
   });
 
   test("member can see private-location machines when organization member", async ({
@@ -81,24 +92,30 @@ test.describe("Issue Create – Member (E2E)", () => {
   }) => {
     await page.goto("/issues/create");
 
-    // Verify machine select shows options
-    const machineSelect = page.getByTestId("machine-select");
-    await expect(machineSelect).toBeVisible();
+    // Verify machine select trigger is visible
+    const machineTrigger = page.getByTestId("machine-select-trigger");
+    await expect(machineTrigger).toBeVisible();
 
     // Open the select dropdown
-    await machineSelect.click();
+    await machineTrigger.click();
 
     // Verify private machines are visible to organization members
-    await expect(
-      page.getByRole("option", { name: /Medieval Madness/i }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("option", { name: /Cactus Canyon/i }),
-    ).toBeVisible();
+    // Using testid machine-option and filtering by text
+    const medievalOption = page
+      .getByTestId("machine-option")
+      .filter({ hasText: /Medieval Madness/i });
+    const cactusOption = page
+      .getByTestId("machine-option")
+      .filter({ hasText: /Cactus Canyon/i });
+
+    await expect(medievalOption.first()).toBeVisible();
+    await expect(cactusOption.first()).toBeVisible();
 
     // Verify we can select a private machine
-    await page.getByRole("option", { name: /Medieval Madness/i }).click();
-    await expect(machineSelect).toHaveValue(
+    await medievalOption.first().click();
+
+    // Verify selection was made by checking the hidden input value
+    await expect(page.getByTestId("machineId-hidden")).toHaveValue(
       SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
     );
   });
