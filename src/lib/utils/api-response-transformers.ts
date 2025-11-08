@@ -4,6 +4,29 @@
  * This module provides specialized transformation utilities for API responses,
  * converting database snake_case results to camelCase for TypeScript interfaces.
  *
+ * TYPE ASSERTION SAFETY:
+ * This file contains multiple type assertions like:
+ *   `transformKeysToCamelCase(issue) as IssueResponse`
+ *   `transformKeysToCamelCase(comment) as CommentWithAuthorResponse`
+ *
+ * WHY THESE ASSERTIONS ARE SAFE:
+ * 1. Data source: Queried directly from database via Drizzle ORM (type-safe queries)
+ * 2. Schema validation: Database enforces schema constraints at storage time
+ * 3. RLS protection: Row-level security ensures only valid data is accessible
+ * 4. Transformation: transformKeysToCamelCase is purely syntactic (renames keys only)
+ * 5. Testing: Integration tests validate all transformation paths
+ *
+ * RISK FACTORS:
+ * 1. MEDIUM: If response type doesn't match query shape → wrong field names
+ * 2. LOW: Database schema changes → missing/extra fields (non-breaking for reads)
+ * 3. LOW: Null handling → unexpected nulls if schema allows but type doesn't
+ *
+ * MITIGATION:
+ * - Drizzle queries use .with() for relations → guaranteed shape
+ * - Response types defined in ~/lib/types/api.ts match database schema
+ * - Integration tests verify query results match expected types
+ * - TypeScript strict mode catches most type mismatches
+ *
  * @module api-response-transformers
  */
 

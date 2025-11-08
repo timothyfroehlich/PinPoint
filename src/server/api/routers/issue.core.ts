@@ -205,6 +205,13 @@ export const issueCoreRouter = createTRPCRouter({
         issueData.reporterEmail = input.reporterEmail;
       }
 
+      // SAFE TYPE ASSERTION: transformKeysToSnakeCase is deterministic key transformation
+      // - issueData object explicitly constructed with all required schema fields above (lines 175-194)
+      // - Public creation validated via validateIssueCreation pure function (line 145)
+      // - Transformer only renames keys (camelCase → snake_case), preserves values
+      // - TypeScript validates field types at object construction (line 175)
+      // LIMITATION: If schema adds new required field without default, error occurs at runtime
+      // MITIGATION: Integration tests validate all tRPC procedures against live schema
       await ctx.db
         .insert(issues)
         .values(
@@ -397,6 +404,13 @@ export const issueCoreRouter = createTRPCRouter({
         issueData.description = input.description;
       }
 
+      // SAFE TYPE ASSERTION: transformKeysToSnakeCase is deterministic key transformation
+      // - issueData object explicitly constructed with all required schema fields above (lines 377-394)
+      // - Member creation validated via validateIssueCreation pure function (line 344)
+      // - Transformer only renames keys (camelCase → snake_case), preserves values
+      // - TypeScript validates field types at object construction (line 377)
+      // LIMITATION: If schema adds new required field without default, error occurs at runtime
+      // MITIGATION: Integration tests validate all tRPC procedures against live schema
       await ctx.db
         .insert(issues)
         .values(

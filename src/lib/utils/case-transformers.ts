@@ -13,6 +13,29 @@
  * 3. Property names are transformed predictably (snake_case ↔ camelCase)
  * 4. No user input directly controls property access patterns
  *
+ * TYPE ASSERTION SAFETY (for `as` casts using these transformers):
+ *
+ * These transformers are used throughout the codebase with type assertions like:
+ *   `transformKeysToCamelCase(dbData) as IssueResponse`
+ *   `transformKeysToSnakeCase(appData) as typeof issues.$inferInsert`
+ *
+ * WHY THESE ASSERTIONS ARE GENERALLY SAFE:
+ * 1. Transformers are PURELY SYNTACTIC - they only rename keys, never modify values
+ * 2. Data is typically pre-validated via Zod schemas or TypeScript construction
+ * 3. Transformers are deterministic and extensively tested
+ * 4. TypeScript catches type errors at data construction time (before transformation)
+ *
+ * WHEN ASSERTIONS ARE RISKY:
+ * 1. Schema changes: Adding new required fields without defaults → runtime errors
+ * 2. Type mismatches: Wrong response type → incorrect field names in client code
+ * 3. Missing fields: Incomplete data construction → undefined values at runtime
+ *
+ * RECOMMENDED PRACTICES:
+ * 1. For database inserts: Construct objects with explicit fields before transforming
+ * 2. For API responses: Use dedicated transformer functions (see api-response-transformers.ts)
+ * 3. For high-risk paths: Add inline safety comments explaining why assertion is safe
+ * 4. Always have integration tests validating the transformation paths
+ *
  * @example
  * ```typescript
  * // String transformations
@@ -27,6 +50,18 @@
  * // Type-level transformations
  * type DbUser = { user_id: number; first_name: string }
  * type AppUser = CamelCased<DbUser> // { userId: number; firstName: string }
+ *
+ * // Safe assertion pattern (recommended)
+ * const issueData = {
+ *   id: generateId(),
+ *   title: validatedTitle,
+ *   machineId: validatedMachineId,
+ *   // ... all required fields explicitly provided
+ * };
+ * // SAFE: All fields constructed above, transformer only renames keys
+ * await db.insert(issues).values(
+ *   transformKeysToSnakeCase(issueData) as typeof issues.$inferInsert
+ * );
  * ```
  */
 

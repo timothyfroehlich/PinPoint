@@ -208,6 +208,13 @@ export async function createIssueAction(
     };
 
     // Create issue in database
+    // SAFE TYPE ASSERTION: transformKeysToSnakeCase is deterministic key transformation
+    // - issueData object explicitly constructed with all required schema fields above (lines 197-208)
+    // - All fields validated via Zod schema before reaching this point
+    // - Transformer only renames keys (camelCase → snake_case), preserves values
+    // - TypeScript validates field types at object construction (line 197)
+    // LIMITATION: If schema adds new required field without default, error occurs at runtime
+    // MITIGATION: Integration tests validate all insert paths against live schema
     await db
       .insert(issues)
       .values(
@@ -410,6 +417,13 @@ export async function createPublicIssueAction(
       severity,
     };
 
+    // SAFE TYPE ASSERTION: transformKeysToSnakeCase is deterministic key transformation
+    // - issueData object explicitly constructed with all required schema fields above (lines 397-411)
+    // - Public creation validated via manual visibility checks (lines 352-374)
+    // - Transformer only renames keys (camelCase → snake_case), preserves values
+    // - TypeScript validates field types at object construction (line 397)
+    // LIMITATION: If schema adds new required field without default, error occurs at runtime
+    // MITIGATION: Integration tests validate all insert paths against live schema
     await db
       .insert(issues)
       .values(

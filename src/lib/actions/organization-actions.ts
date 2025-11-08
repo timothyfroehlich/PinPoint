@@ -100,6 +100,14 @@ export async function updateOrganizationProfileAction(
       updated_at: new Date(),
     };
 
+    // SAFE TYPE ASSERTION: transformKeysToSnakeCase is deterministic key transformation
+    // - updateData object explicitly constructed with validated fields above (lines 94-101)
+    // - All fields validated via Zod schema before reaching this point
+    // - Transformer only renames keys (camelCase → snake_case), preserves values
+    // - TypeScript validates field types at object construction (line 94)
+    // - UPDATE operations are more lenient than INSERT (partial fields allowed)
+    // LIMITATION: If schema adds new required field without default, could cause constraint violations
+    // MITIGATION: Integration tests validate all update paths against live schema
     const [updatedOrg] = await db
       .update(organizations)
       .set(
