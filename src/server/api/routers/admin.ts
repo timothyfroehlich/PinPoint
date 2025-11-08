@@ -30,7 +30,13 @@ import {
 import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
 
 // Database schema (alphabetical)
-import { memberships, roles, users } from "~/server/db/schema";
+import {
+  memberships,
+  organizations,
+  rolePermissions,
+  roles,
+  users,
+} from "~/server/db/schema";
 import { ensureAtLeastOneAdmin } from "~/server/db/utils";
 
 // Admin-specific interfaces
@@ -834,6 +840,133 @@ export const adminRouter = createTRPCRouter({
       if (!remainingMembership) {
         await ctx.db.delete(users).where(eq(users.id, input.userId));
       }
+
+      return { success: true };
+    }),
+
+  /**
+   * Get public permissions (Unauthenticated role permissions)
+   */
+  getPublicPermissions: organizationProcedure.query(async ({ ctx }) => {
+    // Find the Unauthenticated role for this organization
+    const [unauthenticatedRole] = await ctx.db
+      .select()
+      .from(roles)
+      .where(
+        and(
+          eq(roles.organization_id, ctx.organizationId),
+          eq(roles.name, "Unauthenticated"),
+        ),
+      )
+      .limit(1);
+
+    if (!unauthenticatedRole) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Unauthenticated role not found for this organization",
+      });
+    }
+
+    // Get all permissions for the Unauthenticated role
+    const rolePerms = await ctx.db.query.rolePermissions.findMany({
+      where: (rp, { eq }) => eq(rp.role_id, unauthenticatedRole.id),
+      with: {
+        permission: true,
+      },
+    });
+
+    // Convert to permission_name: boolean map
+    const permissionMap: Record<string, boolean> = {};
+
+    // Get all available permissions to ensure we return complete map
+    const allPermissions = await ctx.db.query.permissions.findMany();
+
+    // Initialize all permissions as false
+    allPermissions.forEach((p) => {
+      permissionMap[p.name] = false;
+    });
+
+    // Set enabled permissions to true
+    rolePerms.forEach((rp) => {
+      if (rp.permission) {
+        permissionMap[rp.permission.name] = true;
+      }
+    });
+
+    return permissionMap;
+  }),
+
+  /**
+   * Update public permissions (Unauthenticated role permissions)
+   */
+  updatePublicPermissions: organizationProcedure
+    .input(
+      z.object({
+        permissions: z.record(z.string(), z.boolean()),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Find the Unauthenticated role for this organization
+      const [unauthenticatedRole] = await ctx.db
+        .select()
+        .from(roles)
+        .where(
+          and(
+            eq(roles.organization_id, ctx.organizationId),
+            eq(roles.name, "Unauthenticated"),
+          ),
+        )
+        .limit(1);
+
+      if (!unauthenticatedRole) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Unauthenticated role not found for this organization",
+        });
+      }
+
+      // Get all permission records to map names to IDs
+      const allPermissions = await ctx.db.query.permissions.findMany();
+      const permissionIdMap = new Map(
+        allPermissions.map((p) => [p.name, p.id]),
+      );
+
+      // Delete existing permissions for this role
+      await ctx.db
+        .delete(rolePermissions)
+        .where(eq(rolePermissions.role_id, unauthenticatedRole.id));
+
+      // Insert enabled permissions
+      const enabledPermissions = Object.entries(input.permissions)
+        .filter(([_, enabled]) => enabled)
+        .map(([permissionName]) => permissionName);
+
+      if (enabledPermissions.length > 0) {
+        const permissionsToInsert = enabledPermissions
+          .map((permName) => {
+            const permId = permissionIdMap.get(permName);
+            if (!permId) return null;
+            return {
+              role_id: unauthenticatedRole.id,
+              permission_id: permId,
+            };
+          })
+          .filter((p): p is NonNullable<typeof p> => p !== null);
+
+        if (permissionsToInsert.length > 0) {
+          await ctx.db.insert(rolePermissions).values(permissionsToInsert);
+        }
+      }
+
+      // Update organization flag if issue creation permission changed
+      const issueCreateEnabled =
+        input.permissions["issue:create_basic"] === true ||
+        input.permissions["issue:create_full"] === true;
+
+      await ctx.db
+        .update(organizations)
+        .set({ allow_anonymous_issues: issueCreateEnabled })
+        .where(eq(organizations.id, ctx.organizationId));
 
       return { success: true };
     }),

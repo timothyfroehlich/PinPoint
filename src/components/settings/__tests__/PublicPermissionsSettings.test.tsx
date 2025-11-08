@@ -3,11 +3,14 @@
  *
  * Tests for managing Unauthenticated role permissions with dependency handling
  * and security warnings.
+ *
+ * @vitest-environment jsdom
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import '@testing-library/jest-dom/vitest';
 import { PublicPermissionsSettings } from '../PublicPermissionsSettings';
 
 // Mock tRPC
