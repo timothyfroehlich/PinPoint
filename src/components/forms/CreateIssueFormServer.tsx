@@ -161,7 +161,7 @@ export function CreateIssueFormServer({
                 type="hidden"
                 name="machineId"
                 value={machineId ?? ""}
-                data-testid="machineId-hidden"
+                data-testid="machine-id-hidden"
                 required
               />
             </div>
@@ -171,7 +171,7 @@ export function CreateIssueFormServer({
                 type="hidden"
                 name="machineId"
                 value={machineId ?? ""}
-                data-testid="machineId-hidden"
+                data-testid="machine-id-hidden"
                 required
               />
             </>
@@ -338,7 +338,7 @@ export function CreateIssueFormServer({
                 type="hidden"
                 name="assigneeId"
                 value={assigneeId ?? ""}
-                data-testid="assigneeId-hidden"
+                data-testid="assignee-id-hidden"
               />
             </div>
           )}

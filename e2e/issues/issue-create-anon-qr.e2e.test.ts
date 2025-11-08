@@ -115,7 +115,7 @@ test.describe("Issue Create – Anonymous via QR (E2E)", () => {
     await expect(
       page.locator("text=You're reporting a problem with"),
     ).toContainText(MACHINE_DISPLAY_NAME);
-    await expect(page.getByTestId("machineId-hidden")).toHaveValue(MACHINE_ID);
+    await expect(page.getByTestId("machine-id-hidden")).toHaveValue(MACHINE_ID);
 
     const title = `Anon QR issue ${Date.now()}`;
     await page.getByTestId("issue-title-input").fill(title);

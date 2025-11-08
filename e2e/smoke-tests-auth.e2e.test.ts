@@ -71,7 +71,7 @@ test.describe("Smoke Tests", () => {
 
     // Wait for machine selection to populate hidden input
     const hiddenMachineId = page
-      .locator("[data-testid='machineId-hidden']")
+      .locator("[data-testid='machine-id-hidden']")
       .first();
     await expect(hiddenMachineId).toHaveAttribute("value", /.+/, {
       timeout: 5000,

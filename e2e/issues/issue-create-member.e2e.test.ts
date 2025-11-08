@@ -115,7 +115,7 @@ test.describe("Issue Create – Member (E2E)", () => {
     await medievalOption.first().click();
 
     // Verify selection was made by checking the hidden input value
-    await expect(page.getByTestId("machineId-hidden")).toHaveValue(
+    await expect(page.getByTestId("machine-id-hidden")).toHaveValue(
       SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
     );
   });
