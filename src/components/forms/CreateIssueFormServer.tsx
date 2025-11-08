@@ -45,7 +45,7 @@ interface CreateIssueFormServerProps {
   showAssignee?: boolean;
   /** Show severity selection (public + internal unified concept, distinct from priority) */
   showSeverity?: boolean;
-  /** Show machine selector; disable for fixed machine context (/report/[machineId]) */
+  /** Show machine selector; disable for fixed machine context (/machines/[machineId]/report-issue) */
   showMachineSelect?: boolean;
   /** Whether to show reporter contact optional fields (public anonymous context) */
   showReporterFields?: boolean;

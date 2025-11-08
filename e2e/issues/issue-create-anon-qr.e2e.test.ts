@@ -55,7 +55,7 @@ test.describe("Issue Create – Anonymous via QR (E2E)", () => {
   test("anonymous user can submit the report form but cannot view the new issue", async ({
     page,
   }) => {
-    await page.goto(`/report/${MACHINE_ID}`);
+    await page.goto(`/machines/${MACHINE_ID}/report-issue`);
 
     await expect(
       page.getByRole("heading", { name: "Report an Issue" }),
