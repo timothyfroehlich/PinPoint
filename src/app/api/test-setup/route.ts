@@ -83,6 +83,7 @@ import {
   restoreStateMutation,
   type TestSetupState,
 } from "~/lib/test-support/test-setup-service";
+import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 
 // Security: Verify environment
 function isTestEnvironment(): boolean {
@@ -93,6 +94,24 @@ function isTestEnvironment(): boolean {
 function ensureTestEnvironment(): void {
   if (!isTestEnvironment()) {
     throw new Error("Test setup API is only available in test environments");
+  }
+}
+
+// Security: Organization allowlist - only permit test org
+function isAllowedOrganization(organizationId: string): boolean {
+  return (
+    organizationId === SEED_TEST_IDS.ORGANIZATIONS.primary ||
+    organizationId === SEED_TEST_IDS.ORGANIZATIONS.competitor
+  );
+}
+
+// Security: Validate organization access
+function ensureAllowedOrganization(organizationId: string): void {
+  if (!isAllowedOrganization(organizationId)) {
+    throw new Error(
+      `Test setup API only allows operations on test organizations. ` +
+        `Requested: ${organizationId}, Allowed: ${SEED_TEST_IDS.ORGANIZATIONS.primary}, ${SEED_TEST_IDS.ORGANIZATIONS.competitor}`,
+    );
   }
 }
 
@@ -167,16 +186,19 @@ async function developmentPOSTHandler(
          *
          * Modifies organization and machine settings to allow anonymous issue creation.
          *
-         * ⚠️ SECURITY VIOLATION: No organization access validation
-         * - Accepts organizationId as raw input without checking caller permissions
+         * SECURITY: Organization allowlist validation
+         * - Only permits test organizations (test-org-pinpoint, test-org-competitor)
+         * - Test orgs only exist in dev/preview environments (not production)
+         * - Physical database constraint prevents production misuse
          * - Directly mutates organization settings bypassing RLS policies
-         * - Can enable anonymous reporting for ANY organization
          *
          * Safe only in isolated test environments where:
          * - Single tenant per database
          * - No shared data between tests
          * - Database reset between test runs
          */
+        ensureAllowedOrganization(body.organizationId);
+
         await enableAnonymousReportingMutation({
           machineId: body.machineId,
           organizationId: body.organizationId,
@@ -231,11 +253,13 @@ async function developmentPOSTHandler(
          *
          * Snapshots current machine and organization state for later restoration.
          *
-         * ⚠️ SECURITY VIOLATION: No access validation
-         * - Can capture state from ANY machine/organization
-         * - No verification of caller permissions
+         * SECURITY: Organization allowlist validation
+         * - Only permits test organizations (test-org-pinpoint, test-org-competitor)
+         * - Test orgs only exist in dev/preview environments (not production)
          * - Exposes internal state without authorization
          */
+        ensureAllowedOrganization(body.organizationId);
+
         const state = await captureStateSnapshot({
           machineId: body.machineId,
           organizationId: body.organizationId,
@@ -250,12 +274,13 @@ async function developmentPOSTHandler(
          *
          * Restores previously captured machine and organization state.
          *
-         * ⚠️ SECURITY VIOLATION: No access validation
-         * - Can restore state to ANY machine/organization
-         * - No verification of caller permissions
+         * SECURITY: Organization allowlist validation
+         * - Only permits test organizations (test-org-pinpoint, test-org-competitor)
+         * - Test orgs only exist in dev/preview environments (not production)
          * - Direct state mutation bypassing all security controls
-         * - Can overwrite production data if accidentally exposed
          */
+        ensureAllowedOrganization(body.organizationId);
+
         await restoreStateMutation({
           machineId: body.machineId,
           organizationId: body.organizationId,

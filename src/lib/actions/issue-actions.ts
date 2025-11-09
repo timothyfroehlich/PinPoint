@@ -307,6 +307,10 @@ export async function createPublicIssueAction(
   // - Not suitable for high-security scenarios
   // - Provides basic protection against simple automated abuse
   // =============================================================================
+
+  let rateLimitIp = "unknown";
+  let rateLimitMachineId = "none";
+
   try {
     const { headers } = await import("next/headers");
     const h = await headers();
@@ -320,16 +324,21 @@ export async function createPublicIssueAction(
         ? (globalThis as unknown as { ISSUE_RATE_LIMIT_IP: string })
             .ISSUE_RATE_LIMIT_IP
         : undefined;
-    const ip: string =
-      issueRateLimitIp ?? raw.split(",")[0]?.trim() ?? "unknown";
+    rateLimitIp = issueRateLimitIp ?? raw.split(",")[0]?.trim() ?? "unknown";
     const machineIdValue = formData.get("machineId");
-    const machineId =
+    rateLimitMachineId =
       machineIdValue && typeof machineIdValue === "string"
         ? machineIdValue
         : "none";
-    const key = `public_issue:${ip}:${machineId}`;
+    const key = `public_issue:${rateLimitIp}:${rateLimitMachineId}`;
     const limiter = getInMemoryRateLimiter();
     if (!limiter.check(key, { windowMs: 60_000, max: 5 })) {
+      console.warn("[RATE_LIMIT] Throttled anonymous issue creation", {
+        ip: rateLimitIp,
+        machineId: rateLimitMachineId,
+        action: "createPublicIssue",
+        limit: "5 per minute",
+      });
       return actionError(
         "Too many submissions. Please wait a minute and try again.",
       );
@@ -342,7 +351,12 @@ export async function createPublicIssueAction(
     // - Memory pressure causing eviction failures
     // Rationale: Better to allow anonymous issue creation than block legitimate users
     // due to rate limiting infrastructure issues.
-    console.warn("Rate limiting check failed (non-blocking):", error);
+    console.error("[RATE_LIMIT] Rate limiting check failed (non-blocking)", {
+      ip: rateLimitIp,
+      machineId: rateLimitMachineId,
+      action: "createPublicIssue",
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
   // Validate (priority/assignee will be ignored even if passed)
   const validation = validateFormData(formData, createIssueSchema);

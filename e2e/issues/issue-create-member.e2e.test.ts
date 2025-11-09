@@ -70,7 +70,9 @@ test.describe("Issue Create – Member (E2E)", () => {
     await page.goto("/issues/create");
     const createIssueForm = page.getByTestId("create-issue-form").first();
     const titleInput = createIssueForm.getByTestId("issue-title-input");
-    const submitButton = createIssueForm.getByTestId("create-issue-submit").first();
+    const submitButton = createIssueForm
+      .getByTestId("create-issue-submit")
+      .first();
     const machineHiddenInput = createIssueForm.getByTestId("machine-id-hidden");
 
     await expect(titleInput).toHaveAttribute("required", "");
