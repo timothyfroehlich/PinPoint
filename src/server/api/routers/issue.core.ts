@@ -106,7 +106,7 @@ export const issueCoreRouter = createTRPCRouter({
       const context: AssignmentValidationContext = {
         organizationId: ctx.organizationId,
         actorUserId: "anonymous", // Anonymous user
-        userPermissions: ["issue:create_basic"], // Anonymous creation allowed
+        userPermissions: ["issue:create_basic"], // Anonymous creation allowed (basic fields only)
       };
 
       // Transform machine data to camelCase for validation

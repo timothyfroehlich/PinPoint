@@ -4,7 +4,6 @@
 
 INSERT INTO permissions (id, name, description) VALUES
   ('perm-issue-view-001', 'issue:view', 'View issues in the organization'),
-  -- New split create permissions
   ('perm-issue-create-basic-002a', 'issue:create_basic', 'Create new issues (basic fields only)'),
   ('perm-issue-create-full-002b', 'issue:create_full', 'Create new issues with priority and assignee control'),
   ('perm-issue-edit-003', 'issue:edit', 'Edit existing issues'),

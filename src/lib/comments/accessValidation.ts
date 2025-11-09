@@ -160,8 +160,10 @@ export function validateCommentAccess(
     };
   }
 
-  // Check permissions - require at least issue:create for comment creation
-  if (!context.userPermissions.includes("issue:create_basic")) {
+  // Check permissions - require at least issue:create_basic for comment creation
+  const canCreate = context.userPermissions.includes("issue:create_basic") ||
+                     context.userPermissions.includes("issue:create_full");
+  if (!canCreate) {
     return {
       valid: false,
       error: "User does not have permission to create comments",

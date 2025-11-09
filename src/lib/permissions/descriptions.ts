@@ -8,7 +8,8 @@
 export const PERMISSION_DESCRIPTIONS: Record<string, string> = {
   // Issues
   "issue:view": "View issues and their details",
-  
+  "issue:create_basic": "Create new issues (basic fields only)",
+  "issue:create_full": "Create new issues with all fields",
   "issue:edit": "Edit existing issues",
   "issue:delete": "Delete issues",
   "issue:assign": "Assign issues to users",
