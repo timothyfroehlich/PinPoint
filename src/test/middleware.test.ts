@@ -21,7 +21,7 @@ vi.mock("~/server/db/schema", () => ({
 }));
 
 vi.mock("~/utils/supabase/middleware", () => ({
-  updateSession: vi.fn(async (req) => new Response(null, { status: 200 })),
+  updateSession: vi.fn(async (_req) => new Response(null, { status: 200 })),
 }));
 
 describe("Middleware - Production Safety Check", () => {

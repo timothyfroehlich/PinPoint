@@ -216,6 +216,7 @@ export const memberships = pgTable("memberships", {
 }, (table) => [
 	index("memberships_organization_id_idx").using("btree", table.organizationId.asc().nullsLast().op("text_ops")),
 	index("memberships_user_id_organization_id_idx").using("btree", table.userId.asc().nullsLast().op("text_ops"), table.organizationId.asc().nullsLast().op("text_ops")),
+	unique("memberships_user_org_unique").on(table.userId, table.organizationId),
 	pgPolicy("memberships_self_access", { as: "permissive", for: "all", to: ["authenticated"], using: sql`((user_id = (auth.uid())::text) AND (organization_id = current_setting('app.current_organization_id'::text, true)))`, withCheck: sql`((user_id = (auth.uid())::text) AND (organization_id = current_setting('app.current_organization_id'::text, true)))`  }),
 	pgPolicy("memberships_org_member_read", { as: "permissive", for: "select", to: ["authenticated"] }),
 ]);

@@ -6,6 +6,7 @@ import {
   index,
   jsonb,
   inet,
+  unique,
 } from "drizzle-orm/pg-core";
 
 // =================================
@@ -56,6 +57,11 @@ export const memberships = pgTable(
     role_id: text().notNull(),
   },
   (table) => [
+    // Ensure a user can only have one membership per organization
+    unique("memberships_user_org_unique").on(
+      table.user_id,
+      table.organization_id,
+    ),
     // Multi-tenancy: organization_id filtering (most critical for performance)
     index("memberships_user_id_organization_id_idx").on(
       table.user_id,

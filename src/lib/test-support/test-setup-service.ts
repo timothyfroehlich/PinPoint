@@ -3,9 +3,11 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "~/lib/dal/shared";
+// eslint-disable-next-line no-restricted-imports -- Test infrastructure requires direct schema access for dynamic table operations
+import type * as schema from "~/server/db/schema";
 
-// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-async function getSchemaTables() {
+async function getSchemaTables(): Promise<typeof schema> {
+  // eslint-disable-next-line no-restricted-imports -- Dynamic import needed for test setup mutations
   return await import("~/server/db/schema");
 }
 
