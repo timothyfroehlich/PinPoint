@@ -50,7 +50,7 @@ SELECT lives_ok(
 -- Test 2: §9.6 attachments: Auth user without attachment:create denied (throws 42501)
 SET LOCAL role = 'authenticated';
 -- Use a non-member to ensure membership requirement denies insert
-SELECT set_jwt_claims_for_test(test_org_primary(), 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'member', ARRAY['issue:view', 'issue:create']);
+SELECT set_jwt_claims_for_test(test_org_primary(), 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'member', ARRAY['issue:view', 'issue:create_full']);
 SELECT throws_ok(
   $$ INSERT INTO attachments (id, url, file_name, file_type, organization_id, issue_id)
      VALUES ('test-attach-no-perm', 'https://example.com/b.jpg', 'b.jpg', 'image/jpeg', test_org_primary(), 'test-issue-comments') $$,

@@ -16,7 +16,11 @@ type Session = {
   expires: string;
 } | null;
 
-import { requirePermissionForSession } from "~/server/auth/permissions";
+import {
+  requirePermissionForSession,
+  getUserPermissionsForSession,
+} from "~/server/auth/permissions";
+import { TRPCError } from "@trpc/server";
 
 /**
  * Convert Supabase user to NextAuth-compatible session for permission system
@@ -58,8 +62,22 @@ export const issueViewProcedure = organizationProcedure.use(async (opts) => {
 
 export const issueCreateProcedure = organizationProcedure.use(async (opts) => {
   const session = supabaseUserToSession(opts.ctx.user, opts.ctx.organizationId);
-  await requirePermissionForSession(session, "issue:create", opts.ctx.db);
-  return opts.next();
+  const permissions = await getUserPermissionsForSession(session, opts.ctx.db);
+  if (
+    !permissions.includes("issue:create_basic") &&
+    !permissions.includes("issue:create_full")
+  ) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `Permission required: issue:create_basic or issue:create_full`,
+    });
+  }
+  return opts.next({
+    ctx: {
+      ...opts.ctx,
+      userPermissions: permissions,
+    },
+  });
 });
 
 export const issueEditProcedure = organizationProcedure.use(async (opts) => {

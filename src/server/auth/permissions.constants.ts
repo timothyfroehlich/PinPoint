@@ -8,8 +8,6 @@
 export const PERMISSIONS = {
   // Issues
   ISSUE_VIEW: "issue:view",
-  // Legacy alias kept pre-beta; prefer ISSUE_CREATE_FULL or ISSUE_CREATE_BASIC
-  ISSUE_CREATE: "issue:create", // legacy alias kept pre-beta
   ISSUE_CREATE_BASIC: "issue:create_basic",
   ISSUE_CREATE_FULL: "issue:create_full",
   ISSUE_EDIT: "issue:edit",
@@ -59,11 +57,6 @@ export const PERMISSION_DEPENDENCIES: Record<string, string[]> = {
   ],
   // Full creation grants basic automatically
   [PERMISSIONS.ISSUE_CREATE_FULL]: [
-    PERMISSIONS.ISSUE_VIEW,
-    PERMISSIONS.ISSUE_CREATE_BASIC,
-  ],
-  // Legacy create treated as full for transition
-  [PERMISSIONS.ISSUE_CREATE]: [
     PERMISSIONS.ISSUE_VIEW,
     PERMISSIONS.ISSUE_CREATE_BASIC,
   ],
@@ -120,7 +113,6 @@ export const PERMISSION_DESCRIPTIONS: Record<string, string> = {
   [PERMISSIONS.ISSUE_CREATE_BASIC]: "Create new issues (basic fields only)",
   [PERMISSIONS.ISSUE_CREATE_FULL]:
     "Create new issues with priority and assignee control",
-  [PERMISSIONS.ISSUE_CREATE]: "(Legacy) Create new issues (treated as full)",
   [PERMISSIONS.ISSUE_EDIT]: "Edit existing issues",
   [PERMISSIONS.ISSUE_DELETE]: "Delete issues",
   [PERMISSIONS.ISSUE_ASSIGN]: "Assign issues to users",

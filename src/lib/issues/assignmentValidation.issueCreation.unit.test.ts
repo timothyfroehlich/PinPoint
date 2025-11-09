@@ -83,7 +83,7 @@ const buildPriority = (overrides: Partial<Priority> = {}): Priority => {
 const baseContext: AssignmentValidationContext = {
   organizationId: SEED_TEST_IDS.ORGANIZATIONS.primary,
   actorUserId: SEED_TEST_IDS.USERS.ADMIN,
-  userPermissions: ["issue:create"],
+  userPermissions: ["issue:create_full"],
 };
 
 const baseInput: IssueCreationInput = {

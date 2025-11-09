@@ -43,7 +43,7 @@ model Role {
 ```prisma
 model Permission {
   id          String  @id @default(cuid())
-  name        String  @unique // e.g., "issue:create", "machine:delete"
+  name        String  @unique // e.g., "issue:create_full", "machine:delete"
   description String?
 
   roles Role[] @relation("RolePermissions")
@@ -79,7 +79,7 @@ model Membership {
 export const PERMISSIONS = {
   // Issues
   ISSUE_VIEW: "issue:view",
-  ISSUE_CREATE: "issue:create",
+  ISSUE_CREATE_FULL: "issue:create_full",
   ISSUE_EDIT: "issue:edit",
   ISSUE_DELETE: "issue:delete",
   ISSUE_ASSIGN: "issue:assign",
@@ -523,7 +523,7 @@ export const issueViewProcedure = organizationProcedure.use(async (opts) => {
 export const issueCreateProcedure = organizationProcedure.use(async (opts) => {
   await requirePermissionForSession(
     opts.ctx.session,
-    "issue:create",
+    "issue:create_full",
     opts.ctx.db,
     opts.ctx.organization.id,
   );

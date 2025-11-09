@@ -28,8 +28,7 @@ This proposal outlines an enhanced permission system that provides granular cont
 
 ```typescript
 // Issue permissions
-"issue:create:basic"; // Access simple issue form (creates unconfirmed issues)
-"issue:create:full"; // Access full issue form (can create confirmed issues)
+
 "issue:edit"; // Edit ANY issue (all fields except comments)
 "issue:delete"; // Delete ANY issue
 "issue:confirm"; // Toggle issue confirmation status
@@ -53,8 +52,7 @@ This proposal outlines an enhanced permission system that provides granular cont
 | Permission          | Unauthenticated | User | Technician | Admin |
 | ------------------- | --------------- | ---- | ---------- | ----- |
 | **Issues**          |
-| issue:create:basic  | ✓               | ✓    | ✓          | ✓     |
-| issue:create:full   | ✗               | ✗    | ✓          | ✓     |
+
 | issue:edit          | ✗               | ✗    | ✓          | ✓     |
 | issue:delete        | ✗               | ✗    | ✗          | ✓     |
 | issue:confirm       | ✗               | ✗    | ✓          | ✓     |

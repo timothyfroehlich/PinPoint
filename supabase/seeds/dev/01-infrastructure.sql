@@ -7,8 +7,6 @@
 -- =============================================================================
 INSERT INTO permissions (id, name, description) VALUES
   ('perm-issue-view-001', 'issue:view', 'View issues in the organization'),
-  -- Legacy create (pre-beta) kept for backward compatibility; treated as FULL
-  ('perm-issue-create-002', 'issue:create', '(Legacy) Create new issues (treated as full access)'),
   -- New split create permissions
   ('perm-issue-create-basic-002a', 'issue:create_basic', 'Create new issues (basic fields only)'),
   ('perm-issue-create-full-002b', 'issue:create_full', 'Create new issues with priority and assignee control'),
@@ -89,7 +87,7 @@ SELECT v.role_id, v.permission_id
 FROM (VALUES
   -- Primary organization admin permissions
   ('role-admin-primary-001', 'perm-issue-view-001'),
-  ('role-admin-primary-001', 'perm-issue-create-002'),
+  ('role-admin-primary-001', 'perm-issue-create-full-002b'),
   ('role-admin-primary-001', 'perm-issue-edit-003'),
   ('role-admin-primary-001', 'perm-issue-delete-004'),
   ('role-admin-primary-001', 'perm-issue-assign-005'),
@@ -112,7 +110,7 @@ FROM (VALUES
   ('role-admin-primary-001', 'perm-comment-moderate-022'),
   -- Competitor organization admin permissions
   ('role-admin-competitor-001', 'perm-issue-view-001'),
-  ('role-admin-competitor-001', 'perm-issue-create-002'),
+  ('role-admin-competitor-001', 'perm-issue-create-full-002b'),
   ('role-admin-competitor-001', 'perm-issue-edit-003'),
   ('role-admin-competitor-001', 'perm-issue-delete-004'),
   ('role-admin-competitor-001', 'perm-issue-assign-005'),

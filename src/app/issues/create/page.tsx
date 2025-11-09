@@ -9,6 +9,7 @@ import { createIssueAction } from "~/lib/actions/issue-actions";
 import { getMachinesForOrg } from "~/lib/dal/machines";
 import { getAssignableUsers } from "~/lib/dal/users";
 import { computeIssueCreationGating } from "~/lib/permissions/issueCreationGating";
+import { PERMISSIONS } from "~/server/auth/permissions.constants";
 
 // Transform DAL data for CreateIssueFormServer component
 function transformMachinesForForm(
@@ -104,7 +105,7 @@ async function CreateIssueContent({
   // For now, give all authenticated members full creation permissions
   // TODO: Implement proper permission checking via DAL function
   const gating = computeIssueCreationGating({
-    permissions: ["ISSUE_CREATE_FULL"],
+    permissions: [PERMISSIONS.ISSUE_CREATE_FULL],
   });
 
   return (

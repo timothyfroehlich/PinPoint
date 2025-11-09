@@ -99,7 +99,7 @@ SET LOCAL request.jwt.claims = '{
   "app_metadata": {
     "organizationId": "test-org",
     "role": "admin",
-    "permissions": ["issue:view", "issue:create", "issue:delete"]
+    "permissions": ["issue:view", "issue:create_full", "issue:delete"]
   }
 }';
 
@@ -108,7 +108,7 @@ SET LOCAL request.jwt.claims = '{
   "app_metadata": {
     "organizationId": "test-org", 
     "role": "member",
-    "permissions": ["issue:view", "issue:create"]
+    "permissions": ["issue:view", "issue:create_full"]
   }
 }';
 ```

@@ -27,7 +27,7 @@ This system will handle user identity and control what actions they can perform.
     1. Verify the user is authenticated.
     2. Identify the organization context (from subdomain or session).
     3. Check the user's Role within that organization.
-    4. Verify that the Role has the required Permission to execute the procedure (e.g., issue:create, machine:delete).
+    4. Verify that the Role has the required Permission to execute the procedure (e.g., issue:create_full, machine:delete).
     5. If the check fails, a UNAUTHORIZED error is returned.
 
 ## **3\. Multi-Tenancy & Subdomain Strategy**
@@ -185,7 +185,7 @@ permissions Permission\[\] @relation("RolePermissions")
 
 model Permission {
 id String @id @default(cuid())
-name String @unique // e.g., "issue:create", "machine:delete", "role:manage"
+name String @unique // e.g., "issue:create_full", "machine:delete", "role:manage"
 
 roles Role\[\] @relation("RolePermissions")
 }

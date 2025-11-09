@@ -79,7 +79,7 @@ export const userRouter = createTRPCRouter({
 // Requires authentication + organization membership + permissions
 export const issueRouter = createTRPCRouter({
   create: organizationProcedure
-    .requiresPermission("issue:create")
+    .requiresPermission("issue:create_full")
     .input(createIssueSchema)
     .mutation(async ({ ctx, input }) => {
       // ctx.organization and permissions verified
@@ -148,7 +148,7 @@ Format: `resource:action`
 Examples:
 
 - `issue:view` - View issues
-- `issue:create` - Create issues
+- `issue:create_full` - Create issues
 - `issue:edit` - Edit issues
 - `issue:delete` - Delete issues
 - `machine:manage` - All machine operations

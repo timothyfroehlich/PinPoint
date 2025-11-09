@@ -4,16 +4,12 @@
 
 INSERT INTO permissions (id, name, description) VALUES
   ('perm-issue-view-001', 'issue:view', 'View issues in the organization'),
-  -- Legacy create (pre-beta) kept for backward compatibility; treated as FULL
-  ('perm-issue-create-002', 'issue:create', '(Legacy) Create new issues (treated as full access)'),
   -- New split create permissions
   ('perm-issue-create-basic-002a', 'issue:create_basic', 'Create new issues (basic fields only)'),
   ('perm-issue-create-full-002b', 'issue:create_full', 'Create new issues with priority and assignee control'),
   ('perm-issue-edit-003', 'issue:edit', 'Edit existing issues'),
   ('perm-issue-delete-004', 'issue:delete', 'Delete issues'),
-  -- Deprecated: will be merged into issue:edit
   ('perm-issue-assign-005', 'issue:assign', '(Deprecated) Assign issues to users'),
-  -- Deprecated: will be merged into issue:edit
   ('perm-issue-bulk-manage-006', 'issue:bulk_manage', '(Deprecated) Bulk manage issues'),
   ('perm-machine-view-007', 'machine:view', 'View machines in the organization'),
   ('perm-machine-create-008', 'machine:create', 'Create new machines'),

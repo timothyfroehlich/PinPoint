@@ -16,7 +16,7 @@ SELECT plan(14);
 -- Create test issues in primary organization
 SET LOCAL role = 'authenticated';
 SELECT set_primary_org_context();
-SELECT set_jwt_claims_for_test(test_org_primary(), test_user_admin(), 'admin', ARRAY['issue:create']);
+SELECT set_jwt_claims_for_test(test_org_primary(), test_user_admin(), 'admin', ARRAY['issue:create_full']);
 
 INSERT INTO issues (id, title, description, organization_id, created_by_id, machine_id, status_id, priority_id)
 VALUES 
@@ -27,7 +27,7 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Create test issues in competitor organization  
 SELECT set_competitor_org_context();
-SELECT set_jwt_claims_for_test(test_org_competitor(), test_user_member2(), 'admin', ARRAY['issue:create']);
+SELECT set_jwt_claims_for_test(test_org_competitor(), test_user_member2(), 'admin', ARRAY['issue:create_full']);
 
 INSERT INTO issues (id, title, description, organization_id, created_by_id, machine_id, status_id, priority_id)
 VALUES

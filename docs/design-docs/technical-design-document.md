@@ -64,7 +64,7 @@ This schema supports all features for the v1.0 release, including user managemen
 |                                                                                  | name            | TEXT        | e.g., "Admin", "Player". Unique per org.         |
 |                                                                                  | organization_id | UUID        | FK to [Organization.id](http://organization.id/) |
 | **Permission**                                                                   | id              | UUID        | Primary Key                                      |
-|                                                                                  | name            | TEXT        | e.g., "issue:create". Globally unique.           |
+|                                                                                  | name            | TEXT        | e.g., "issue:create_full". Globally unique.           |
 | **IssueStatus**                                                                  | id              | UUID        | Primary Key                                      |
 |                                                                                  | name            | TEXT        | Not Null                                         |
 |                                                                                  | order           | INTEGER     | For defining column order on Kanban board.       |

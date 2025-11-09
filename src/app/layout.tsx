@@ -5,6 +5,9 @@ import { getRequestAuthContext } from "~/server/auth/context";
 import Providers from "./providers";
 import "./globals.css";
 
+// Auth context relies on cookies, so disable static prerendering globally
+export const dynamic = "force-dynamic";
+
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {

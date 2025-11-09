@@ -32,7 +32,7 @@ During the backend refactor, several core models were renamed for clarity and co
 - **Member**: User with a specific role within an organization
 - **Membership**: The relationship between a User and an Organization, including their Role
 - **Role**: Set of permissions within an organization (Admin, Technician, Member)
-- **Permission**: Granular access control (e.g., `issue:create`, `machine:delete`)
+- **Permission**: Granular access control (e.g., `issue:create_full`, `machine:delete`)
 
 ### Physical Assets
 

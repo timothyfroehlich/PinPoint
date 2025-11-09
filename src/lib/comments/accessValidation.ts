@@ -161,7 +161,7 @@ export function validateCommentAccess(
   }
 
   // Check permissions - require at least issue:create for comment creation
-  if (!context.userPermissions.includes("issue:create")) {
+  if (!context.userPermissions.includes("issue:create_basic")) {
     return {
       valid: false,
       error: "User does not have permission to create comments",

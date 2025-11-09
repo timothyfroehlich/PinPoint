@@ -1,5 +1,5 @@
 import { type NextRequest } from "next/server";
-import { getDb } from "~/lib/dal/shared";
+import { env } from "~/env";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 import { updateSession } from "~/utils/supabase/middleware";
 
@@ -20,6 +20,8 @@ const TEST_ORG_IDS = [
   SEED_TEST_IDS.ORGANIZATIONS.primary,
   SEED_TEST_IDS.ORGANIZATIONS.competitor,
 ] as const;
+const TEST_ORG_QUERY_PARAM = `in.(${TEST_ORG_IDS.map((id) => encodeURIComponent(id)).join(",")})`;
+const SUPABASE_REST_ORGS_PATH = "/rest/v1/organizations";
 
 interface SafetyCheckCache {
   testOrgsDetected: boolean;
@@ -37,13 +39,49 @@ const RECHECK_INTERVAL_REQUESTS = 100;
 const RECHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 async function checkForTestOrganizations(): Promise<boolean> {
+  const supabaseUrl = env.SUPABASE_URL;
+  const serviceRoleKey = env.SUPABASE_SECRET_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.error(
+      "[CRITICAL] Production safety check missing Supabase credentials - assuming unsafe",
+      {
+        supabaseUrlPresent: Boolean(supabaseUrl),
+        serviceRolePresent: Boolean(serviceRoleKey),
+        action: "SAFETY_CHECK_ENV_MISSING",
+      },
+    );
+    return true;
+  }
+
+  const restUrl = new URL(SUPABASE_REST_ORGS_PATH, supabaseUrl);
+  restUrl.searchParams.set("select", "id");
+  restUrl.searchParams.set("limit", "1");
+  restUrl.searchParams.set("id", TEST_ORG_QUERY_PARAM);
+
   try {
-    const db = getDb();
-    const results = await db.query.organizations.findMany({
-      where: (orgs, { inArray }) => inArray(orgs.id, TEST_ORG_IDS),
-      limit: 1,
-      columns: { id: true },
+    const response = await fetch(restUrl, {
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
     });
+
+    if (!response.ok) {
+      console.error(
+        "[CRITICAL] Production safety check REST query failed - assuming unsafe",
+        {
+          status: response.status,
+          statusText: response.statusText,
+          action: "SAFETY_CHECK_HTTP_FAILURE",
+        },
+      );
+      return true;
+    }
+
+    const results = (await response.json()) as { id: string }[];
 
     if (results.length > 0) {
       console.error(

@@ -60,7 +60,7 @@ SELECT throws_ok(
 
 -- Test 3: §7–8 ownership/permissions: Issue reporter (created_by) can UPDATE
 -- Create issue with specific reporter
-SELECT set_jwt_claims_for_test(test_org_primary(), test_user_admin(), 'admin', ARRAY['issue:create', 'issue:update']);
+SELECT set_jwt_claims_for_test(test_org_primary(), test_user_admin(), 'admin', ARRAY['issue:create_full', 'issue:update']);
 
 INSERT INTO issues (id, title, organization_id, machine_id, status_id, priority_id, is_public, created_by_id)
 VALUES ('test-issue-ownership', 'Issue for Ownership Test', test_org_primary(), 'test-machine-ownership', 'status-new-primary-001', 'priority-medium-primary-001', true, test_user_admin())

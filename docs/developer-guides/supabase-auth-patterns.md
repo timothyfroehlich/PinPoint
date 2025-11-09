@@ -185,7 +185,7 @@ const { data, error } = await supabase.auth.admin.updateUserById(userId, {
   app_metadata: {
     organizationId: organization.id,
     membershipId: membership.id,
-    permissions: ["issue:create", "issue:view"],
+    permissions: ["issue:create_full", "issue:view"],
   },
 });
 ```
@@ -348,7 +348,7 @@ export const mockSupabaseSession: Session = {
     email: "test@example.com",
     app_metadata: {
       organizationId: "test-org-id",
-      permissions: ["issue:create", "issue:view"],
+      permissions: ["issue:create_full", "issue:view"],
     },
     user_metadata: {
       name: "Test User",

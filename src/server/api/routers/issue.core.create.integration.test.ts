@@ -35,13 +35,14 @@ const {
   requirePermissionForSessionMock: vi.fn().mockResolvedValue(undefined),
   getUserPermissionsForSupabaseUserMock: vi
     .fn()
-    .mockResolvedValue(["issue:create", "issue:assign"]),
+    .mockResolvedValue(["issue:create_full", "issue:assign"]),
   generatePrefixedIdMock: vi.fn().mockReturnValue("issue-test-123"),
 }));
 
 vi.mock("~/server/auth/permissions", () => ({
   requirePermissionForSession: requirePermissionForSessionMock,
   getUserPermissionsForSupabaseUser: getUserPermissionsForSupabaseUserMock,
+  getUserPermissionsForSession: getUserPermissionsForSupabaseUserMock,
 }));
 
 vi.mock("~/lib/utils/id-generation", () => ({
@@ -53,7 +54,7 @@ describe("issue.core.create (integration)", () => {
     vi.clearAllMocks();
     requirePermissionForSessionMock.mockResolvedValue(undefined);
     getUserPermissionsForSupabaseUserMock.mockResolvedValue([
-      "issue:create",
+      "issue:create_full",
       "issue:assign",
     ]);
     generatePrefixedIdMock.mockReturnValue("issue-test-123");
@@ -158,15 +159,7 @@ describe("issue.core.create (integration)", () => {
     );
 
     // Verify permission check was called
-    expect(requirePermissionForSessionMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user: expect.objectContaining({
-          id: SEED_TEST_IDS.USERS.ADMIN,
-        }),
-      }),
-      "issue:create",
-      expect.any(Object),
-    );
+    expect(getUserPermissionsForSupabaseUserMock).toHaveBeenCalled();
   });
 
   it("rejects creation when the machine is missing/soft-deleted", async () => {
@@ -294,16 +287,15 @@ describe("issue.core.create (integration)", () => {
     });
   });
 
-  it("propagates permission failures from the issue:create guard", async () => {
+  it("propagates permission failures from the issue create guard", async () => {
     const ctx = authenticatedTestUtils.createContext();
-    const { mockContext } = ctx;
+    const { mockContext, mockDb } = ctx;
 
-    requirePermissionForSessionMock.mockRejectedValueOnce(
-      new TRPCError({
-        code: "FORBIDDEN",
-        message: "issue:create denied",
-      }),
-    );
+    mockDb.query.machines.findFirst.mockResolvedValue({
+      id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
+    } as never);
+
+    getUserPermissionsForSupabaseUserMock.mockResolvedValueOnce([]);
 
     const caller = issueRouter.createCaller(mockContext as never);
 
@@ -314,7 +306,7 @@ describe("issue.core.create (integration)", () => {
       }),
     ).rejects.toMatchObject({
       code: "FORBIDDEN",
-      message: "issue:create denied",
+      message: "Permission required: issue:create_basic or issue:create_full",
     });
   });
 
@@ -397,18 +389,9 @@ describe("issue.core.create (integration)", () => {
     expect(result.createdById).toBe(ctx.user.id);
 
     // Verify permission check was called (middleware ran)
-    expect(requirePermissionForSessionMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user: expect.objectContaining({
-          id: ctx.user.id,
-        }),
-      }),
-      "issue:create",
-      expect.any(Object),
-    );
+    expect(getUserPermissionsForSupabaseUserMock).toHaveBeenCalled();
 
     // Verify issue was created successfully despite basic permission
-    // (Router currently uses legacy "issue:create" permission which should pass)
     expect(mockDb.insert).toHaveBeenCalled();
   });
 });

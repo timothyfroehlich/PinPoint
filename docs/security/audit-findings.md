@@ -39,7 +39,7 @@ Comprehensive audit of 25+ tRPC router files found **0 critical vulnerabilities*
 3. **machine.core.ts**: Proper segregation of edit vs delete permissions
 4. **role.ts**: Comprehensive permissions with admin safeguards
 5. **notification.ts**: Proper ownership validation at service layer
-6. **issue.core.ts** (mutations): Proper `issue:create`, `issue:edit`, `issue:assign` checks
+6. **issue.core.ts** (mutations): Proper `issue:create_full`, `issue:edit`, `issue:assign` checks
 
 ## Permission Architecture Analysis
 
@@ -76,7 +76,7 @@ Comprehensive audit of 25+ tRPC router files found **0 critical vulnerabilities*
 | role.ts         | create               | Protected      | `role:manage`           | ✅ SECURE |
 | role.ts         | update               | Protected      | `role:manage`           | ✅ SECURE |
 | role.ts         | delete               | Protected      | `role:manage` + admin   | ✅ SECURE |
-| issue.core.ts   | create               | Protected      | `issue:create`          | ✅ SECURE |
+| issue.core.ts   | create               | Protected      | `issue:create_full`          | ✅ SECURE |
 | issue.core.ts   | update               | Protected      | `issue:edit`            | ✅ SECURE |
 | issue.core.ts   | assign               | Protected      | `issue:assign`          | ✅ SECURE |
 | issue.core.ts   | getAll               | Organization   | None                    | ⚠️ REVIEW |

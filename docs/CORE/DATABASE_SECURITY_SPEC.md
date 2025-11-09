@@ -110,7 +110,7 @@ Machine:
 - `machine:owner_manage`
 
 Issue:
-- `issue:create`
+- `issue:create_full`
 - `issue:update`
 - `issue:delete`
 - `issue:merge` (future)

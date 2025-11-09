@@ -25,7 +25,7 @@ PinPoint uses a flexible Role-Based Access Control (RBAC) system that balances s
 - **Cannot**: Be renamed or deleted
 - **Default Permissions**:
   - `issue:view` - See public issues
-  - `issue:create` - Report new issues
+  - `issue:create_full` - Report new issues
   - `attachment:create` - Upload photos with issues
 
 #### 2. Admin
@@ -55,7 +55,7 @@ PinPoint uses a flexible Role-Based Access Control (RBAC) system that balances s
 
 - **Purpose**: Minimal permissions for casual users
 - **Default Permissions**:
-  - `issue:create`
+  - `issue:create_full`
   - `attachment:create`
   - View public data
 

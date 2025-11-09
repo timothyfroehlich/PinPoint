@@ -81,7 +81,7 @@ export function createAuthenticatedTestContext(
   const orgId = options.organizationId ?? SEED_TEST_IDS.ORGANIZATIONS.primary;
   const subdomain = options.subdomain ?? "test-primary";
   const userPermissions = options.userPermissions ?? [
-    "issue:create",
+    "issue:create_full",
     "issue:assign",
   ];
   const userEmail = options.userEmail ?? SEED_TEST_IDS.EMAILS.ADMIN;

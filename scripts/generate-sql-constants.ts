@@ -88,7 +88,7 @@ CREATE OR REPLACE FUNCTION set_jwt_claims_for_test(
   org_id TEXT, 
   user_id TEXT DEFAULT NULL, 
   role_name TEXT DEFAULT 'member',
-  permissions TEXT[] DEFAULT ARRAY['issue:view', 'issue:create']
+  permissions TEXT[] DEFAULT ARRAY['issue:view', 'issue:create_full']
 ) RETURNS VOID AS $$
 BEGIN
   -- Set JWT claims for RLS policy testing

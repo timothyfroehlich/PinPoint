@@ -87,7 +87,7 @@ The multi-tenancy system architecture is implemented with the following componen
 ### RBAC Implementation
 
 - **Roles**: Admin, Technician, Member
-- **Permissions**: Granular permissions (e.g., `issue:create`, `machine:delete`)
+- **Permissions**: Granular permissions (e.g., `issue:create_full`, `machine:delete`)
 - **Default Roles**: Created automatically for new organizations
 - **Beta Status**: Fixed roles, configurable in V1.0
 
