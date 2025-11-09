@@ -1,8 +1,8 @@
 # Permissions and Roles System Implementation
 
-**Status**: ✅ **Active** - Current implementation guide  
-**Audience**: Developers, Security Review  
-**Last Updated**: July 25, 2025
+**Status**: ✅ **Active** - Current implementation guide
+**Audience**: Developers, Security Review
+**Last Updated**: January 9, 2025
 
 ---
 
@@ -578,6 +578,130 @@ export const issueRouter = createTRPCRouter({
 
 ---
 
+## Server Component Authorization
+
+### Server Permission Utilities
+
+**Location**: `src/lib/auth/server-permissions.ts`
+
+Provides reusable utilities for checking permissions in React Server Components with request-level caching:
+
+```typescript
+import { cache } from "react";
+import type { AuthContext } from "~/server/auth/context";
+import { hasPermission, getUserPermissions } from "~/server/auth/permissions";
+import { db } from "~/lib/dal/shared";
+
+type AuthorizedContext = Extract<AuthContext, { kind: "authorized" }>;
+
+// Check single permission
+export const checkPermission = cache(async (
+  authContext: AuthorizedContext,
+  permission: string,
+): Promise<boolean> => {
+  return hasPermission(
+    { roleId: authContext.membership.role.id },
+    permission,
+    db,
+  );
+});
+
+// Get all user permissions (expanded with dependencies)
+export const getAuthPermissions = cache(async (
+  authContext: AuthorizedContext,
+): Promise<string[]> => {
+  return getUserPermissions(
+    { roleId: authContext.membership.role.id },
+    db,
+  );
+});
+
+// Check multiple permissions efficiently
+export const checkMultiplePermissions = cache(async (
+  authContext: AuthorizedContext,
+  permissions: string[],
+): Promise<Record<string, boolean>> => {
+  const userPermissions = await getUserPermissions(
+    { roleId: authContext.membership.role.id },
+    db,
+  );
+
+  const result: Record<string, boolean> = {};
+  for (const permission of permissions) {
+    result[permission] = userPermissions.includes(permission);
+  }
+  return result;
+});
+```
+
+### Usage in Server Components
+
+**User Management Page** (`src/app/settings/users/page.tsx`):
+```typescript
+import { checkPermission } from "~/lib/auth/server-permissions";
+import { PERMISSIONS } from "~/server/auth/permissions.constants";
+
+async function UsersSettingsPageContent(): Promise<React.JSX.Element> {
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    throw new Error("Unauthorized access");
+  }
+
+  // Dynamic permission checking
+  const canManageUsers = await checkPermission(
+    authContext,
+    PERMISSIONS.USER_MANAGE,
+  );
+
+  return (
+    <div>
+      <UserTableActions
+        user={user}
+        currentUserCanManage={canManageUsers}
+        availableRoles={availableRoles}
+      />
+    </div>
+  );
+}
+```
+
+**Issue Creation Page** (`src/app/issues/create/page.tsx`):
+```typescript
+import { getAuthPermissions } from "~/lib/auth/server-permissions";
+
+async function IssueCreatePage(): Promise<React.JSX.Element> {
+  const authContext = await getRequestAuthContext();
+  if (authContext.kind !== "authorized") {
+    redirect("/login");
+  }
+
+  // Get all user permissions for feature gating
+  const userPermissions = await getAuthPermissions(authContext);
+
+  // Compute what features the user can access
+  const gating = computeIssueCreationGating({
+    permissions: userPermissions,
+  });
+
+  return (
+    <IssueCreationForm
+      canSetPriority={gating.canSetPriority}
+      canAssign={gating.canAssign}
+      canSetStatus={gating.canSetStatus}
+    />
+  );
+}
+```
+
+### Benefits
+
+1. **Type-Safe**: Uses discriminated union types to ensure only authorized contexts are checked
+2. **Request-Level Caching**: React 19 `cache()` prevents duplicate permission queries within same request
+3. **Reusable**: Consistent pattern across all Server Components
+4. **Performance**: Minimal database queries with automatic deduplication
+
+---
+
 ## Multi-Tenant Architecture
 
 ### Organization Context Resolution
@@ -736,6 +860,126 @@ export const issueRouter = createTRPCRouter({
     }),
 });
 ```
+
+---
+
+## Admin Actions
+
+### Invitation Management
+
+**Location**: `src/lib/actions/admin-actions.ts`
+
+Provides Server Actions for admin-level user management operations.
+
+#### Resend Invitation Action
+
+Allows admins to resend invitation emails with regenerated tokens:
+
+```typescript
+import { resendInvitationAction } from "~/lib/actions/admin-actions";
+
+export async function resendInvitationAction(
+  _prevState: ActionResult<{ success: boolean }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ success: boolean }>> {
+  try {
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+
+    // Validate permission
+    await requirePermission(
+      { role_id: authContext.membership.role.id },
+      PERMISSIONS.USER_MANAGE,
+      db,
+    );
+
+    // Get and validate invitation
+    const invitation = await db.query.invitations.findFirst({
+      where: and(
+        eq(invitations.id, validatedData.invitationId),
+        eq(invitations.organization_id, authContext.org.id),
+      ),
+    });
+
+    if (invitation.status !== "pending") {
+      return actionError("Cannot resend: invitation is " + invitation.status);
+    }
+
+    // Generate new secure token
+    const { token, hash } = generateInvitationToken();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7); // Extend by 7 days
+
+    // Update invitation with new token
+    await db.update(invitations)
+      .set({ token: hash, expires_at: expiresAt })
+      .where(eq(invitations.id, validatedData.invitationId));
+
+    // Send new invitation email
+    await sendInvitationEmail({
+      to: invitation.email,
+      organizationName: authContext.org.name,
+      token, // Plain token for email link
+      expiresAt,
+    });
+
+    return actionSuccess(
+      { success: true },
+      `Invitation resent to ${invitation.email}`,
+    );
+  } catch (error) {
+    return actionError(getErrorMessage(error));
+  }
+}
+```
+
+#### Usage in Client Components
+
+**User Table Actions** (`src/app/settings/users/components/UserTableActions.tsx`):
+
+```typescript
+'use client';
+
+import { useActionState } from "react";
+import { resendInvitationAction } from "~/lib/actions/admin-actions";
+
+export function UserTableActions({ user }: { user: AdminUserResponse }) {
+  const [resendState, resendAction, isResending] = useActionState(
+    resendInvitationAction,
+    null,
+  );
+
+  // Show resend button only for pending invitations
+  if (!user.emailVerified && user.invitationId) {
+    return (
+      <DropdownMenuItem
+        onSelect={(e) => {
+          e.preventDefault();
+          const formData = new FormData();
+          formData.set("invitationId", user.invitationId);
+          void resendAction(formData);
+        }}
+        disabled={isResending}
+      >
+        <MailIcon className="mr-2 h-4 w-4" />
+        {isResending ? "Sending..." : "Resend Invitation"}
+      </DropdownMenuItem>
+    );
+  }
+
+  return null;
+}
+```
+
+### Security Features
+
+1. **Token Regeneration**: Creates new cryptographically-secure token on resend
+2. **Permission Checking**: Requires `USER_MANAGE` permission
+3. **Status Validation**: Only allows resending pending invitations
+4. **Organization Scoping**: Ensures invitation belongs to user's organization
+5. **Activity Logging**: Records all resend actions for audit trail
 
 ---
 
@@ -912,4 +1156,25 @@ await ctx.services.createAuditService().logAction({
 - **[Multi-Config Strategy](../configuration/multi-config-strategy.md)** - TypeScript and testing configuration
 - **[Testing Architecture Patterns](../testing/architecture-patterns.md)** - Permission testing strategies
 
-**Next Review**: August 25, 2025
+**Next Review**: February 9, 2025
+
+---
+
+## Recent Updates (January 9, 2025)
+
+### Server Component Authorization
+- Added `src/lib/auth/server-permissions.ts` utilities for Server Components
+- Implemented request-level caching with React 19 `cache()` API
+- Replaced hardcoded permission checks with dynamic `checkPermission()` calls
+- Added `getAuthPermissions()` for feature gating in issue creation
+
+### Admin Actions
+- Implemented `resendInvitationAction` Server Action
+- Added token regeneration with extended expiration (7 days)
+- Integrated with React 19 `useActionState` for form handling
+- Updated `admin.getUsers` to include `invitationId` field
+
+### Integration Tests
+- Added comprehensive permission checking tests (`src/server/auth/__tests__/permissions.integration.test.ts`)
+- Tests cover Admin, Member, and custom roles
+- Validates permission dependencies are expanded correctly

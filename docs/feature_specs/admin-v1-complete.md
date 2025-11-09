@@ -3,7 +3,7 @@
 **Status**: 📋 Planned (Deferred from Alpha)
 **Target Release**: V1.0
 **Created**: 2025-01-08
-**Last Updated**: 2025-01-08
+**Last Updated**: 2025-01-09
 **Owner**: Engineering Team
 
 ---
@@ -13,6 +13,7 @@
 This specification defines the **complete admin functionality** for V1.0 production release. These features were intentionally deferred from the Alpha/Beta MVP to focus on core user management and public permissions.
 
 **V1.0 Scope:**
+- ✅ User Details Modal (deferred from Alpha)
 - ✅ Full role CRUD (create, edit, delete custom roles)
 - ✅ Custom role templates and template management
 - ✅ Bulk user operations (assign roles, remove multiple users)
@@ -723,7 +724,132 @@ export function BulkUserActions({
 
 ---
 
-## Feature 3: Advanced Activity Log
+## Feature 3: User Details Modal
+
+### Priority: 🟢 NICE-TO-HAVE for V1.0 (Deferred from Alpha)
+
+### Context
+
+This feature was originally spec'd for Alpha as Feature 4 but was deferred to V1.0 as a polish item. With Alpha complete, this provides enhanced UX for admin user management without adding critical functionality.
+
+### Requirements
+
+#### FR-3.1: User Details View
+**Nice to Have:**
+- Click user in list → Opens modal
+- Shows full user information:
+  - Name, email, profile picture
+  - Role with badge
+  - Join date
+  - Email verification status
+  - Last login (if tracked)
+  - Expanded permission list
+- Quick actions:
+  - Change role
+  - Remove user
+  - Resend invitation (if pending)
+
+### Technical Implementation
+
+**Location**: `src/app/settings/users/components/UserDetailsModal.tsx`
+
+```typescript
+// app/settings/users/components/UserDetailsModal.tsx
+
+'use client';
+
+export function UserDetailsModal({ user }: { user: AdminUserResponse }) {
+  const { data: userPermissions } = api.role.get.useQuery({ roleId: user.role.id });
+
+  return (
+    <Dialog>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>User Details</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* User info */}
+          <div className="flex items-center space-x-4">
+            <Avatar>
+              <AvatarImage src={user.profilePicture || undefined} />
+              <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
+            </Avatar>
+            <div>
+              <h3 className="font-medium">{user.name}</h3>
+              <p className="text-sm text-muted-foreground">{user.email}</p>
+            </div>
+          </div>
+
+          {/* Role and status */}
+          <div>
+            <Label>Role</Label>
+            <div className="flex items-center space-x-2 mt-1">
+              <Badge>{user.role.name}</Badge>
+              {user.emailVerified ? (
+                <Badge variant="success">Verified</Badge>
+              ) : (
+                <Badge variant="warning">Pending</Badge>
+              )}
+            </div>
+          </div>
+
+          {/* Permissions */}
+          <div>
+            <Label>Permissions ({userPermissions?.permissions.length || 0})</Label>
+            <div className="mt-2 max-h-40 overflow-y-auto space-y-1">
+              {userPermissions?.permissions.map(perm => (
+                <div key={perm.id} className="text-sm flex items-center">
+                  <Check className="h-3 w-3 mr-2 text-tertiary" />
+                  {perm.name}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Metadata */}
+          <div className="text-sm text-muted-foreground">
+            <p>Joined {format(user.createdAt, 'PPP')}</p>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <RoleChangeDialog user={user} />
+          <Button variant="destructive">Remove User</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+**Integration with User List**:
+```typescript
+// Update user row to be clickable
+<TableRow
+  key={user.userId}
+  className="cursor-pointer hover:bg-accent"
+  onClick={() => setSelectedUser(user)}
+>
+  {/* existing columns */}
+</TableRow>
+```
+
+### Success Criteria
+- ✅ Clicking user opens modal with full details
+- ✅ Permission list shows all role permissions
+- ✅ Quick actions work from modal
+- ✅ Modal provides better UX than dropdown alone
+
+### Implementation Estimate
+- **Frontend**: 4-5 hours (component + integration)
+- **Backend**: 0-1 hour (existing APIs sufficient)
+- **Testing**: 1 hour (E2E tests for modal interaction)
+- **Total**: ~5-7 hours
+
+---
+
+## Feature 4: Advanced Activity Log
 
 ### Priority: 🟢 NICE-TO-HAVE for V1.0
 
@@ -796,7 +922,7 @@ export default async function ActivityLogPage({
 
 ---
 
-## Feature 4: Security Dashboard
+## Feature 5: Security Dashboard
 
 ### Priority: 🟢 NICE-TO-HAVE for V1.0
 
@@ -840,7 +966,7 @@ Defer detailed implementation to V1.0 planning phase.
 
 ---
 
-## Feature 5: Permission Visualization
+## Feature 6: Permission Visualization
 
 ### Priority: 🟢 NICE-TO-HAVE for V1.0
 
@@ -1096,25 +1222,32 @@ Update `docs/architecture/permissions-roles-implementation.md`:
 - [ ] CSV export
 - [ ] Testing
 
-**Phase 3: Advanced Activity Log (2-3 days)**
+**Phase 3: User Details Modal (1 day)**
+- [ ] Create UserDetailsModal component
+- [ ] Add click handlers to user rows
+- [ ] Display expanded user info and permissions
+- [ ] Wire up quick actions
+- [ ] Testing
+
+**Phase 4: Advanced Activity Log (2-3 days)**
 - [ ] Advanced filtering UI
 - [ ] Filter persistence
 - [ ] Enhanced export
 - [ ] Testing
 
-**Phase 4: Security Features (4-5 days)**
+**Phase 5: Security Features (4-5 days)**
 - [ ] Session management backend
 - [ ] Session management UI
 - [ ] 2FA integration
 - [ ] Security dashboard
 - [ ] Testing
 
-**Phase 5: Permission Visualization (2 days - optional)**
+**Phase 6: Permission Visualization (2 days - optional)**
 - [ ] Dependency tree visualization
 - [ ] Role comparison matrix
 - [ ] Testing
 
-**Total: 13-17 days** (exclude optional features: 11-15 days)
+**Total: 14-18 days** (exclude optional features: 12-16 days)
 
 ---
 
@@ -1151,7 +1284,8 @@ Update `docs/architecture/permissions-roles-implementation.md`:
 
 ---
 
-**Document Status**: Draft for V1.0 Planning
-**Next Steps**: Review after Alpha completion, refine estimates
+**Document Status**: Ready for V1.0 Planning
+**Next Steps**: Prioritize features and schedule implementation
 **Change Log**:
+- 2025-01-09: Added Feature 3 (User Details Modal) deferred from Alpha, renumbered subsequent features
 - 2025-01-08: Initial creation based on Alpha deferral scope
