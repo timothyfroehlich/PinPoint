@@ -9,6 +9,7 @@ import "server-only";
 import { cache } from "react";
 import { eq } from "drizzle-orm";
 import { machines, organizations } from "~/server/db/schema";
+import { calculateEffectiveMachineVisibility } from "~/lib/utils/visibility-inheritance";
 import { getDb } from "./shared";
 
 /**
@@ -53,23 +54,31 @@ export const getPublicMachineById = cache(
       return null;
     }
 
-    // SECURITY: Validate machine visibility before exposing to anonymous users
-    // Machine must explicitly be public (is_public: true)
-    if (machineRecord.is_public !== true) {
-      return null;
-    }
-
     // SECURITY: Validate organization visibility settings
     // Organization must be public AND allow anonymous issues
     const org = await db.query.organizations.findFirst({
       where: eq(organizations.id, machineRecord.location.organization_id),
       columns: {
         is_public: true,
-        allow_anonymous_issues: true
+        allow_anonymous_issues: true,
       },
     });
 
-    if (!org?.is_public || !org?.allow_anonymous_issues) {
+    if (!org) {
+      return null;
+    }
+
+    if (!org.is_public || !org.allow_anonymous_issues) {
+      return null;
+    }
+
+    const effectiveMachineVisibility = calculateEffectiveMachineVisibility(
+      { is_public: org.is_public },
+      { is_public: machineRecord.location.is_public },
+      { is_public: machineRecord.is_public },
+    );
+
+    if (!effectiveMachineVisibility) {
       return null;
     }
 

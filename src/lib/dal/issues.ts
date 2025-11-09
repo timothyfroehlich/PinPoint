@@ -63,6 +63,7 @@ export const getIssuesWithFilters = cache(
     pagination: IssuePagination = { page: 1, limit: 20 },
     sorting: IssueSorting = { field: "created_at", order: "desc" },
   ) => {
+    const db = getDb();
     // Build where conditions
     const whereConditions: SQL[] = [eq(issues.organization_id, organizationId)];
 
@@ -82,7 +83,7 @@ export const getIssuesWithFilters = cache(
         whereConditions.push(
           inArray(
             issues.status_id,
-            statusIds.map((s) => s.id),
+            statusIds.map(({ id }) => id),
           ),
         );
       }
@@ -104,7 +105,7 @@ export const getIssuesWithFilters = cache(
         whereConditions.push(
           inArray(
             issues.priority_id,
-            priorityIds.map((p) => p.id),
+            priorityIds.map(({ id }) => id),
           ),
         );
       }
@@ -149,7 +150,7 @@ export const getIssuesWithFilters = cache(
     const totalCount = safeCount(totalCountResult);
 
     // Get paginated results
-    const issuesResult = await getDb().query.issues.findMany({
+    const issuesResult = await db.query.issues.findMany({
       where: and(...whereConditions),
       with: {
         machine: {
@@ -244,6 +245,7 @@ export const getIssueById = cache(
  * Uses React 19 cache() for request-level memoization
  */
 export const getIssueStatusCounts = cache(async (organizationId: string) => {
+  const db = getDb();
   const statusCounts = await db
     .select({
       statusId: issues.status_id,

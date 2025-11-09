@@ -32,7 +32,10 @@ export async function generateMetadata({
       };
     }
     const resolvedParams = await params;
-    const machine = await getMachineById(resolvedParams.machineId, authContext.org.id);
+    const machine = await getMachineById(
+      resolvedParams.machineId,
+      authContext.org.id,
+    );
 
     const machineName = machine.name || "Unknown Machine";
 
@@ -89,7 +92,10 @@ async function MachinePageContent({
 }): Promise<React.JSX.Element> {
   try {
     const resolvedParams = await params;
-    const machine = await getMachineById(resolvedParams.machineId, authContext.org.id);
+    const machine = await getMachineById(
+      resolvedParams.machineId,
+      authContext.org.id,
+    );
 
     return (
       <div className="container mx-auto p-6 max-w-6xl space-y-6">

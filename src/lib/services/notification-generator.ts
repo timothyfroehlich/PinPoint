@@ -64,22 +64,24 @@ async function createNotificationForUser(
 
   const notificationId = generatePrefixedId("notification");
 
-  await getDb().insert(notifications).values({
-    id: notificationId,
-    user_id: userId,
-    organization_id: context.organizationId,
-    type: notificationData.type,
-    entity_type: notificationData.entityType,
-    entity_id: notificationData.entityId,
-    message: notificationData.message,
-    action_url:
-      notificationData.actionUrl ??
-      createNotificationActionUrl(
-        notificationData.entityType,
-        notificationData.entityId,
-      ),
-    read: false,
-  });
+  await getDb()
+    .insert(notifications)
+    .values({
+      id: notificationId,
+      user_id: userId,
+      organization_id: context.organizationId,
+      type: notificationData.type,
+      entity_type: notificationData.entityType,
+      entity_id: notificationData.entityId,
+      message: notificationData.message,
+      action_url:
+        notificationData.actionUrl ??
+        createNotificationActionUrl(
+          notificationData.entityType,
+          notificationData.entityId,
+        ),
+      read: false,
+    });
 
   return notificationId;
 }

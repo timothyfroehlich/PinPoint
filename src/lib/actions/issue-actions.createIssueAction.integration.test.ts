@@ -71,8 +71,8 @@ vi.mock("~/lib/actions/shared", async () => {
   };
 });
 
-vi.mock("~/lib/dal/shared", () => ({
-  db: {
+vi.mock("~/lib/dal/shared", () => {
+  const db = {
     query: {
       issueStatuses: {
         findFirst: issueStatusesFindFirstMock,
@@ -82,8 +82,12 @@ vi.mock("~/lib/dal/shared", () => ({
       },
     },
     insert: insertMock,
-  },
-}));
+  };
+
+  return {
+    getDb: vi.fn(() => db),
+  };
+});
 
 vi.mock("~/lib/utils/id-generation", () => ({
   generatePrefixedId: generatePrefixedIdMock,
@@ -246,14 +250,13 @@ describe("createIssueAction (integration)", () => {
     expect(requirePermissionMock).toHaveBeenCalledWith(
       { role_id: SEED_TEST_IDS.ROLES.ADMIN_PRIMARY },
       PERMISSIONS.ISSUE_CREATE_FULL,
-      expect.any(Object),
     );
     expect(revalidatePathMock).toHaveBeenCalledWith("/issues");
     expect(revalidatePathMock).toHaveBeenCalledWith(
       `/issues/${result.data.id}`,
     );
     expect(revalidatePathMock).toHaveBeenCalledWith("/dashboard");
-    expect(revalidateTagMock).toHaveBeenCalledWith("issues");
+    expect(revalidateTagMock).toHaveBeenCalledWith("issues", "max");
     expect(transformKeysToSnakeCaseMock).toHaveBeenCalledWith(
       expect.objectContaining({
         title: "Flipper misfires intermittently",
@@ -307,7 +310,6 @@ describe("createIssueAction (integration)", () => {
     expect(requirePermissionMock).toHaveBeenLastCalledWith(
       { role_id: SEED_TEST_IDS.ROLES.MEMBER_PRIMARY },
       PERMISSIONS.ISSUE_CREATE_BASIC,
-      expect.any(Object),
     );
   });
 

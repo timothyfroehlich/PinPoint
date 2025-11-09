@@ -46,7 +46,7 @@
 
 - `npm test` - Unit tests (205 tests)
 - `npm run test:rls` - RLS policy tests  
-- `npm run smoke` - Playwright automation
+- `npm run e2e` - Playwright automation (guest + auth projects)
 - `npm run dev` - Development server
 - `npm run build` - Production build
 - `npm run lint` - ESLint validation

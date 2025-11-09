@@ -71,7 +71,7 @@ The following files contain critical context and should be read immediately:
 | `require()` | ES module `import` | Project is type: "module" (ESM) |
 
 ### Available Commands
-- **Testing**: `npm test`, `npm run test:watch`, `npm run test:rls`, `npm run smoke`
+- **Testing**: `npm test`, `npm run test:watch`, `npm run test:rls`, `npm run e2e`
 - **Development**: `npm run dev`, `npm run build`, `npm run lint`, `npm run type-check`
 - **Components**: `npx shadcn@latest add [component]`
 
@@ -93,7 +93,7 @@ The following files contain critical context and should be read immediately:
 - `npm run build` / `npm start`: Production build and server
 - `npm run typecheck`: Strict TypeScript checks
 - `npm test`: Vitest unit/integration suite. `npm run test:watch` for TDD
-- `npm run smoke`: Quick Playwright smoke E2E. `npm run test:ci` runs unit + RLS + smoke
+- `npm run e2e`: Full Playwright suite (guest + auth). `npm run test:ci` runs unit + RLS + e2e
 - **Database**: `npm run db:push:local` (apply schema via Drizzle push), `npm run db:generate-types` (Supabase types), `npm run db:studio` (schema explorer), `npm run db:reset` (reset local dev DB)
 
 ## ✍️ CODING STYLE & NAMING
@@ -115,7 +115,7 @@ The following files contain critical context and should be read immediately:
 
 - **Commits**: Conventional style where practical (`feat:`, `fix:`, `chore:`, `build:`), optional scope, reference issues/PRs
 - **PRs**: clear description, linked issue, screenshots for UI, notes for DB schema/seed changes, and steps to verify
-- **Before pushing**: `npm run typecheck && npm test && npm run smoke && npm run lint`
+- **Before pushing**: `npm run typecheck && npm test && npm run e2e && npm run lint`
 - **Drizzle workflow**: use `db:push:*`; do not add new SQL files under `supabase/migrations/` (initial snapshot is retained)
 
 ## 🔐 SECURITY & CONFIGURATION

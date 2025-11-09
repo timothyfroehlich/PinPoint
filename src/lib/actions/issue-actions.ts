@@ -141,7 +141,6 @@ export async function createIssueAction(
       await requirePermission(
         { role_id: membership.role.id },
         PERMISSIONS.ISSUE_CREATE_FULL,
-        db,
       );
       hasFull = true;
     } catch {
@@ -150,7 +149,6 @@ export async function createIssueAction(
         await requirePermission(
           { role_id: membership.role.id },
           PERMISSIONS.ISSUE_CREATE_BASIC,
-          db,
         );
       } catch {
         return actionError("Not authorized to create issues");
@@ -523,7 +521,6 @@ export async function updateIssueStatusAction(
     await requirePermission(
       { role_id: membership.role.id },
       PERMISSIONS.ISSUE_EDIT,
-      db,
     );
 
     // Update with organization scoping for security
@@ -609,7 +606,6 @@ export async function addCommentAction(
     await requirePermission(
       { role_id: membership.role.id },
       PERMISSIONS.ISSUE_CREATE_BASIC,
-      db,
     );
 
     // Verify issue exists and user has access
@@ -684,7 +680,6 @@ export async function updateIssueAssignmentAction(
     await requirePermission(
       { role_id: membership.role.id },
       PERMISSIONS.ISSUE_EDIT,
-      db,
     ); // was ISSUE_ASSIGN (deprecated)
 
     // Get current assignee for notification comparison
@@ -789,7 +784,6 @@ export async function bulkUpdateIssuesAction(
     await requirePermission(
       { role_id: membership.role.id },
       PERMISSIONS.ISSUE_EDIT,
-      db,
     ); // was ISSUE_BULK_MANAGE (deprecated)
     const { issueIds, statusId, assigneeId } = validation.data;
 

@@ -79,7 +79,6 @@ export async function updateOrganizationProfileAction(
     await requirePermission(
       { role_id: membership.role.id },
       PERMISSIONS.ORGANIZATION_MANAGE,
-      getDb(),
     );
 
     // Enhanced validation with Zod
@@ -165,7 +164,6 @@ export async function updateOrganizationLogoAction(
     await requirePermission(
       { role_id: membership.role.id },
       PERMISSIONS.ORGANIZATION_MANAGE,
-      getDb(),
     );
 
     // Enhanced validation

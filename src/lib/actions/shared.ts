@@ -70,7 +70,11 @@ export async function requireActionAuthContextWithPermission(
   }
   const { user, org: organization, membership } = authContext;
   const organizationId = organization.id;
-  await baseRequirePermission({ roleId: membership.role.id }, permission, getDb());
+  await baseRequirePermission(
+    { roleId: membership.role.id },
+    permission,
+    getDb(),
+  );
   const name = user.name ?? user.email;
   return {
     user: { id: user.id, email: user.email, name },
@@ -229,7 +233,6 @@ export function revalidateDashboard(): void {
 export async function requirePermission(
   membership: { role_id?: string | null } | null,
   permission: string,
-  db: Parameters<typeof baseRequirePermission>[2],
 ): Promise<void> {
   await baseRequirePermission(
     { roleId: membership?.role_id ?? null },

@@ -56,10 +56,9 @@ Use this as a compact checklist. See full details in `docs/CORE/TESTING_GUIDE.md
 ## Commands
 - Unit/Integration: `npm test`, `npm run test:watch`
 - RLS: `npm run test:rls`
-- E2E smoke: `npm run smoke`
+- E2E: `npm run e2e`
 
 ## Where to Look
 - Full guide: `docs/CORE/TESTING_GUIDE.md`
 - Security authority: `docs/CORE/DATABASE_SECURITY_SPEC.md`
 - Templates/helpers/constants: `src/test/`
-

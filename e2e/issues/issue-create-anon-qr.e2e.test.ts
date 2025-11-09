@@ -30,8 +30,7 @@ const MACHINE_ID = SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1;
 const ORGANIZATION_ID = SEED_TEST_IDS.ORGANIZATIONS.primary;
 const STATUS_ID = SEED_TEST_IDS.STATUSES.NEW_PRIMARY;
 const PRIORITY_ID = SEED_TEST_IDS.PRIORITIES.MEDIUM_PRIMARY;
-const MACHINE_DISPLAY_NAME =
-  "Ultraman: Kaiju Rumble (Blood Sucker Edition) #1";
+const MACHINE_DISPLAY_NAME = "Ultraman: Kaiju Rumble (Blood Sucker Edition) #1";
 
 test.use({ storageState: undefined });
 
@@ -82,7 +81,7 @@ test.describe("Issue Create – Anonymous via QR (E2E)", () => {
     await requestContext.dispose();
   });
 
-  test.beforeEach(({ }, testInfo) => {
+  test.beforeEach(({}, testInfo) => {
     if (testInfo.project.name.includes("auth")) {
       test.skip("Anonymous QR flow runs only on guest browsers");
     }
@@ -99,9 +98,7 @@ test.describe("Issue Create – Anonymous via QR (E2E)", () => {
     const locationHeader = headers.location ?? headers.Location;
 
     expect(locationHeader).toBeTruthy();
-    expect(locationHeader).toContain(
-      `/machines/${MACHINE_ID}/report-issue`,
-    );
+    expect(locationHeader).toContain(`/machines/${MACHINE_ID}/report-issue`);
   });
 
   test("anonymous user can submit the report form but cannot view the new issue", async ({
@@ -131,7 +128,9 @@ test.describe("Issue Create – Anonymous via QR (E2E)", () => {
     // Use API-based issue polling instead of direct DB query
     const createdIssueId = await waitForIssueCreation(requestContext, title);
 
-    await page.goto(`/issues/${createdIssueId}`, { waitUntil: "domcontentloaded" });
+    await page.goto(`/issues/${createdIssueId}`, {
+      waitUntil: "domcontentloaded",
+    });
     await expect(
       page.getByRole("heading", { name: "Issue Access Required" }),
     ).toBeVisible();

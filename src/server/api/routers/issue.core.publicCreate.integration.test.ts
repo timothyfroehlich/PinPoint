@@ -12,9 +12,11 @@ import { TRPCError } from "@trpc/server";
 import { SEED_TEST_IDS } from "~/test/constants/seed-test-ids";
 // Mock RLS helper to ensure middleware proceeds in tests
 vi.mock("~/server/db/utils/rls", () => ({
-  withOrgRLS: vi.fn(async (_db: unknown, _orgId: string, cb: (tx: unknown) => unknown) => {
-    return await cb(_db);
-  }),
+  withOrgRLS: vi.fn(
+    async (_db: unknown, _orgId: string, cb: (tx: unknown) => unknown) => {
+      return await cb(_db);
+    },
+  ),
 }));
 import { issueRouter } from "~/server/api/routers/issue";
 import { anonymousTestUtils } from "~/test/helpers/anonymous-test-helpers";
@@ -84,7 +86,9 @@ describe("issue.core.publicCreate (integration)", () => {
     // Insert chain returns created issue ID; subsequent query returns full row
     const createdIssueId = SEED_TEST_IDS.ISSUES.KAIJU_FIGURES;
     (mockDb.insert as any).mockReturnValue({
-      values: vi.fn().mockReturnValue({ returning: vi.fn().mockResolvedValue([{}]) }),
+      values: vi
+        .fn()
+        .mockReturnValue({ returning: vi.fn().mockResolvedValue([{}]) }),
     });
     mockDb.query.issues.findFirst.mockResolvedValue({
       id: createdIssueId,
@@ -93,7 +97,11 @@ describe("issue.core.publicCreate (integration)", () => {
       organization_id: SEED_TEST_IDS.ORGANIZATIONS.primary,
       machine_id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
       status: { id: SEED_TEST_IDS.STATUSES.NEW_PRIMARY, name: "New" },
-      priority: { id: SEED_TEST_IDS.PRIORITIES.MEDIUM_PRIMARY, name: "Medium", order: 2 },
+      priority: {
+        id: SEED_TEST_IDS.PRIORITIES.MEDIUM_PRIMARY,
+        name: "Medium",
+        order: 2,
+      },
       reporter_email: "reporter@example.com",
       submitter_name: null,
       description: null,
@@ -314,7 +322,9 @@ describe("issue.core.publicCreate (integration)", () => {
     // Insert chain returns created issue ID
     const createdIssueId = SEED_TEST_IDS.ISSUES.KAIJU_FIGURES;
     (mockDb.insert as any).mockReturnValue({
-      values: vi.fn().mockReturnValue({ returning: vi.fn().mockResolvedValue([{}]) }),
+      values: vi
+        .fn()
+        .mockReturnValue({ returning: vi.fn().mockResolvedValue([{}]) }),
     });
 
     mockDb.query.issues.findFirst.mockResolvedValue({
@@ -324,7 +334,11 @@ describe("issue.core.publicCreate (integration)", () => {
       organization_id: SEED_TEST_IDS.ORGANIZATIONS.primary,
       machine_id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
       status: { id: SEED_TEST_IDS.STATUSES.NEW_PRIMARY, name: "New" },
-      priority: { id: SEED_TEST_IDS.PRIORITIES.MEDIUM_PRIMARY, name: "Medium", order: 2 },
+      priority: {
+        id: SEED_TEST_IDS.PRIORITIES.MEDIUM_PRIMARY,
+        name: "Medium",
+        order: 2,
+      },
       reporter_email: "reporter@example.com",
       submitter_name: null,
       description: null,
@@ -377,7 +391,9 @@ describe("issue.core.publicCreate (integration)", () => {
 
     const createdIssueId = SEED_TEST_IDS.ISSUES.KAIJU_FIGURES;
     (mockDb.insert as any).mockReturnValue({
-      values: vi.fn().mockReturnValue({ returning: vi.fn().mockResolvedValue([{}]) }),
+      values: vi
+        .fn()
+        .mockReturnValue({ returning: vi.fn().mockResolvedValue([{}]) }),
     });
 
     mockDb.query.issues.findFirst.mockResolvedValue({
@@ -387,7 +403,11 @@ describe("issue.core.publicCreate (integration)", () => {
       organization_id: SEED_TEST_IDS.ORGANIZATIONS.primary,
       machine_id: SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
       status: { id: SEED_TEST_IDS.STATUSES.NEW_PRIMARY, name: "New" },
-      priority: { id: SEED_TEST_IDS.PRIORITIES.MEDIUM_PRIMARY, name: "Medium", order: 2 },
+      priority: {
+        id: SEED_TEST_IDS.PRIORITIES.MEDIUM_PRIMARY,
+        name: "Medium",
+        order: 2,
+      },
       reporter_email: "reporter@example.com",
       submitter_name: null,
       description: null,

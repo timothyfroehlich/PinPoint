@@ -32,12 +32,14 @@ function createMockDb() {
     },
   };
 
-  const transaction: Mock = vi.fn(async (callback: (tx: unknown) => Promise<void>) => {
-    await callback({
-      update,
-      query,
-    });
-  });
+  const transaction: Mock = vi.fn(
+    async (callback: (tx: unknown) => Promise<void>) => {
+      await callback({
+        update,
+        query,
+      });
+    },
+  );
 
   return {
     update,
@@ -59,7 +61,7 @@ function createMockDb() {
 const mockDb = createMockDb();
 
 vi.mock("~/lib/dal/shared", () => ({
-  db: mockDb,
+  getDb: () => mockDb,
 }));
 
 vi.mock("~/server/db/schema", () => ({
@@ -77,7 +79,9 @@ describe("enableAnonymousReportingMutation", () => {
 
   it("throws and leaves state untouched when provided statusId does not exist", async () => {
     mockDb.query.issueStatuses.findFirst.mockResolvedValue(null);
-    const { enableAnonymousReportingMutation } = await import("./test-setup-service");
+    const { enableAnonymousReportingMutation } = await import(
+      "./test-setup-service"
+    );
 
     await expect(
       enableAnonymousReportingMutation({
@@ -97,7 +101,9 @@ describe("enableAnonymousReportingMutation", () => {
     });
     mockDb.query.priorities.findFirst.mockResolvedValue(null);
 
-    const { enableAnonymousReportingMutation } = await import("./test-setup-service");
+    const { enableAnonymousReportingMutation } = await import(
+      "./test-setup-service"
+    );
 
     await expect(
       enableAnonymousReportingMutation({

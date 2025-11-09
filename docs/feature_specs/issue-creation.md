@@ -4,8 +4,8 @@
 Issue creation lets organization members use `/issues/create` and anonymous users via QR‑resolved links report problems for a specific machine; both paths validate org context, apply default status and priority, and notify machine owners when configured, while only member creations record activity and anonymous inserts have `createdById = null`. Creation controls are permission‑gated (basic vs full) with the current UI defaulting to full for members, and the public path constrained by server‑side validation; anonymous content is immutable by the author and anonymous initial attachments are currently not implemented.
 
 ## Last Reviewed / Last Updated
-- Last Reviewed: 2025-11-08
-- Last Updated: 2025-11-08
+- Last Reviewed: 2025-11-09
+- Last Updated: 2025-11-09
 
 ## Key Source Files
 - `src/server/api/routers/issue.core.ts`: tRPC router for issues (publicCreate, create, getAll, assignment, status update). Handles validation, inserts, activity, notifications.
@@ -22,6 +22,8 @@ Issue creation lets organization members use `/issues/create` and anonymous user
 - `src/server/api/trpc.permission.ts`: Permission‑wrapped procedures (issueCreateProcedure, etc.).
 - `src/server/services/notificationService.ts`: Notifies machine owners for new issues.
 - `src/server/services/issueActivityService.ts`: Records creation/assignment history (member path).
+- `src/lib/utils/visibility-inheritance.ts`: Visibility inheritance helpers (covered by Vitest as of 2025-11-09) used by anonymous gating.
+- `src/lib/dal/public-machines.ts`: Anonymous/public DAL fetcher that now shares the visibility helper coverage.
 
 ## Detailed Feature Spec
 - Member creation flow
@@ -46,11 +48,12 @@ Issue creation lets organization members use `/issues/create` and anonymous user
 - Current gaps/TODOs
   - Anonymous initial attachments: Not implemented in `publicCreate`. Align with DB spec (guest may attach during initial creation only) and add org policy checks before enabling.
 
-- Recent updates (2025-11-08)
+- Recent updates
   - ✅ Route structure corrected: Anonymous reporting now at `/machines/[machineId]/report-issue` (was `/report/[machineId]`)
   - ✅ Severity field added: Both member and anonymous forms now include severity selector (low/medium/high/critical)
   - ✅ Anonymous UI implemented: Server page exists at `/machines/[machineId]/report-issue` with full form functionality
   - ✅ Full test coverage: Member and anonymous flows validated with integration and E2E tests
+  - ✅ 2025-11-09: Added Vitest coverage for visibility inheritance utilities plus expanded `getPublicMachineById` tests to enforce anonymous gating rules; template updated to mock `getDb()` so DAL suites inherit worker-scoped clients.
 
 ## Security / RLS Spec
 - Organization scoping: All DB access is org‑scoped; RLS enforces `organization_id` matching throughout. See `docs/CORE/DATABASE_SECURITY_SPEC.md`.

@@ -161,7 +161,6 @@ export async function editCommentAction(
     await requirePermission(
       { role_id: membership.role.id },
       PERMISSIONS.ISSUE_CREATE_BASIC,
-      getDb(),
     );
 
     // Enhanced validation
@@ -231,7 +230,6 @@ export async function deleteCommentAction(
     await requirePermission(
       { role_id: membership.role.id },
       PERMISSIONS.ISSUE_CREATE_BASIC,
-      getDb(),
     );
 
     // Verify comment exists and user has permission to delete
@@ -294,7 +292,6 @@ export async function restoreCommentAction(
     await requirePermission(
       { role_id: membership.role.id },
       PERMISSIONS.ISSUE_CREATE_BASIC,
-      getDb(),
     );
 
     // Find soft-deleted comment that user authored

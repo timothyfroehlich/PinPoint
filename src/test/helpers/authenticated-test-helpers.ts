@@ -264,7 +264,11 @@ export function createFullPermissionTestContext(
 ): AuthenticatedTestContext {
   return createAuthenticatedTestContext({
     ...options,
-    userPermissions: ["issue:create_full", "issue:create_basic", "issue:assign"],
+    userPermissions: [
+      "issue:create_full",
+      "issue:create_basic",
+      "issue:assign",
+    ],
   });
 }
 

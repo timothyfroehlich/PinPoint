@@ -188,7 +188,7 @@ npx playwright test --project=chromium-auth
 ## Commands
 - Unit/Integration: `npm test`, `npm run test:watch`
 - RLS: `npm run test:rls`
-- E2E smoke: `npm run smoke`
+- E2E: `npm run e2e`
 - E2E full suite: `npm run e2e`
 - E2E single project: `npx playwright test --project=chromium-auth`
 

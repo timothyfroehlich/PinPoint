@@ -42,7 +42,8 @@ export default async function ReportMachinePage(
         <header className="space-y-2">
           <h1 className="text-2xl font-semibold">Report an Issue</h1>
           <p className="text-sm text-muted-foreground">
-            You're reporting a problem with <strong>{machineRecord.name}</strong>.
+            You're reporting a problem with{" "}
+            <strong>{machineRecord.name}</strong>.
           </p>
         </header>
         <CreateIssueFormServer

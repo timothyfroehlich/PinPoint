@@ -112,7 +112,7 @@ describe("Input Validation", () => {
 ```bash
 npm test                    # Unit tests (1 file, 205 tests)
 npm run test:rls           # pgTAP RLS policy tests
-npm run smoke              # Playwright smoke tests
+npm run e2e                # Playwright E2E tests
 ```
 
 **Note**: Complex integration testing infrastructure archived to `.archived-tests-2025-08-23/` during system simplification. Focus on velocity and rapid prototyping.

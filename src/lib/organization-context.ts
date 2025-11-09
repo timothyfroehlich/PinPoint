@@ -55,5 +55,7 @@ export async function ensureOrgContextAndBindRLS<T>(
     accessLevel: "member" as const,
   };
 
-  return withOrgRLS(getDb(), context.organization.id, async (tx) => fn(tx, context));
+  return withOrgRLS(getDb(), context.organization.id, async (tx) =>
+    fn(tx, context),
+  );
 }

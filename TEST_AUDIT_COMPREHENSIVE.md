@@ -68,7 +68,7 @@ Failed: 0 ✅
 
 **Root Cause Resolution:** Added missing membership data to test environment - RLS policies were correct, just missing test data for `fn_is_org_member()` validation
 
-### E2E Tests (npm run smoke) - **ENVIRONMENT PARTIALLY FIXED** ⚠️
+### E2E Tests (npm run e2e) - **ENVIRONMENT PARTIALLY FIXED** ⚠️
 ```
 Previous: net::ERR_CONNECTION_REFUSED at http://localhost:3000/undefined/auth/sign-in
 Fixed: BASE_URL configuration added to .env.test

@@ -293,7 +293,7 @@ async function searchMachines(
   limit: number,
 ): Promise<SearchResult[]> {
   const db = getDb();
-  const searchVector = sql`to_tsvector('english', ${machines.name} || ' ' || coalesce(${machines.description}, '') || ' ' || coalesce(${models.name}, ''))`;
+  const searchVector = sql`to_tsvector('english', ${machines.name} || ' ' || coalesce(${locations.name}, '') || ' ' || coalesce(${locations.description}, '') || ' ' || coalesce(${models.name}, '') || ' ' || coalesce(${models.manufacturer}, ''))`;
   const searchQuery = sql`to_tsquery('english', ${query
     .split(" ")
     .map((term) => `${term}:*`)
@@ -311,12 +311,12 @@ async function searchMachines(
       qrCodeId: machines.qr_code_id,
       createdAt: machines.created_at,
       issueCount: sql<number>`(
-        SELECT COUNT(*) 
-        FROM ${issues} 
-        WHERE ${issues.machine_id} = ${machines.id} 
+        SELECT COUNT(*)
+        FROM ${issues}
+        WHERE ${issues.machine_id} = ${machines.id}
         AND ${issues.organization_id} = ${organizationId}
         AND ${issues.status_id} IN (
-          SELECT id FROM ${issueStatuses} 
+          SELECT id FROM ${issueStatuses}
           WHERE ${issueStatuses.category} IN ('NEW', 'IN_PROGRESS')
         )
       )`.as("issue_count"),
@@ -447,9 +447,9 @@ async function searchLocations(
       street: locations.street,
       createdAt: locations.created_at,
       machineCount: sql<number>`(
-        SELECT COUNT(*) 
-        FROM ${machines} 
-        WHERE ${machines.location_id} = ${locations.id} 
+        SELECT COUNT(*)
+        FROM ${machines}
+        WHERE ${machines.location_id} = ${locations.id}
         AND ${machines.organization_id} = ${organizationId}
       )`.as("machine_count"),
       relevance: sql<number>`ts_rank(${searchVector}, ${searchQuery})`.as(

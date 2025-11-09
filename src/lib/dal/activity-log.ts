@@ -154,11 +154,14 @@ export const getActivityLog = cache(
           : whereConditions[0];
 
       // Get total count for pagination
-      const totalResult = await withOrgRLS(getDb(), organizationId, async (tx) =>
-        tx
-          .select({ count: activityLog.id })
-          .from(activityLog)
-          .where(whereClause),
+      const totalResult = await withOrgRLS(
+        getDb(),
+        organizationId,
+        async (tx) =>
+          tx
+            .select({ count: activityLog.id })
+            .from(activityLog)
+            .where(whereClause),
       );
 
       const totalCount = totalResult.length;

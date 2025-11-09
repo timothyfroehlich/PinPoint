@@ -113,7 +113,6 @@ export async function inviteUserAction(
     await requirePermission(
       { role_id: membership.role.id },
       PERMISSIONS.USER_MANAGE,
-      getDb(),
     );
 
     // Check if user already exists in the system
@@ -291,7 +290,6 @@ export async function updateUserRoleAction(
     await requirePermission(
       { role_id: membership.role.id },
       PERMISSIONS.USER_MANAGE,
-      getDb(),
     );
 
     // Verify role exists in this organization
@@ -385,7 +383,6 @@ export async function removeUserAction(
     await requirePermission(
       { role_id: membership.role.id },
       PERMISSIONS.USER_MANAGE,
-      getDb(),
     );
 
     // Verify user exists and email matches (safety check)
@@ -482,7 +479,6 @@ export async function updateSystemSettingsAction(
     await requirePermission(
       { role_id: membership.role.id },
       PERMISSIONS.ORGANIZATION_MANAGE,
-      getDb(),
     );
 
     // Convert flat form data to nested SystemSettingsData structure
@@ -565,7 +561,6 @@ export async function exportActivityLogAction(): Promise<Response> {
     await requirePermission(
       { role_id: membership.role.id },
       PERMISSIONS.ADMIN_VIEW_ANALYTICS,
-      getDb(),
     );
 
     // Export activity log to CSV

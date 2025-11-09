@@ -160,7 +160,7 @@ Your development server will be running at **http://localhost:49200**
 
 - `npm test` - Unit tests (single baseline test currently active)
 - `npm run test:rls` - pgTAP Row-Level Security policy tests
-- `npm run smoke` - Playwright smoke tests
+- `npm run e2e` - Playwright E2E suite (guest + auth projects)
 
 **Supabase Instance Strategy:**
 

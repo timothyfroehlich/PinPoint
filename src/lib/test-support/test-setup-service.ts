@@ -101,9 +101,7 @@ export async function enableAnonymousReportingMutation(params: {
   });
 }
 
-export async function ensureQrCodeMutation(
-  machineId: string,
-): Promise<string> {
+export async function ensureQrCodeMutation(machineId: string): Promise<string> {
   const { machines } = await getSchemaTables();
   const [machine] = await getDb()
     .select({ qr_code_id: machines.qr_code_id })
@@ -207,14 +205,9 @@ export async function restoreStateMutation(params: {
 }): Promise<void> {
   const { machines, organizations, issueStatuses, priorities } =
     await getSchemaTables();
-  const machineVisibility =
-    params.state.machine.isPublic === null
-      ? sql`NULL`
-      : params.state.machine.isPublic;
+  const machineVisibility = params.state.machine.isPublic ?? sql`NULL`;
   const organizationVisibility =
-    params.state.organization.isPublic === null
-      ? sql`NULL`
-      : params.state.organization.isPublic;
+    params.state.organization.isPublic ?? sql`NULL`;
   await getDb()
     .update(machines)
     .set({

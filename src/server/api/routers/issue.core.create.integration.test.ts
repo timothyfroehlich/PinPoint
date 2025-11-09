@@ -146,17 +146,13 @@ describe("issue.core.create (integration)", () => {
     );
 
     // Verify notification service was called
-    expect(
-      mockContext.services.createNotificationService,
-    ).toHaveBeenCalled();
+    expect(mockContext.services.createNotificationService).toHaveBeenCalled();
     const notificationService = (
       mockContext.services.createNotificationService as never as ReturnType<
         typeof vi.fn
       >
     )();
-    expect(
-      notificationService.notifyMachineOwnerOfIssue,
-    ).toHaveBeenCalledWith(
+    expect(notificationService.notifyMachineOwnerOfIssue).toHaveBeenCalledWith(
       "issue-test-123",
       SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
     );

@@ -151,7 +151,9 @@ function productionPOSTHandler(): NextResponse {
  * ⚠️ WARNING: All operations in this handler perform direct database mutations
  * without authentication or organization scoping validation.
  */
-async function developmentPOSTHandler(request: NextRequest): Promise<NextResponse> {
+async function developmentPOSTHandler(
+  request: NextRequest,
+): Promise<NextResponse> {
   try {
     // Defense-in-depth: Runtime check in case of misconfiguration
     ensureTestEnvironment();
@@ -264,16 +266,15 @@ async function developmentPOSTHandler(request: NextRequest): Promise<NextRespons
       }
 
       default: {
-        return NextResponse.json(
-          { error: "Unknown action" },
-          { status: 400 },
-        );
+        return NextResponse.json({ error: "Unknown action" }, { status: 400 });
       }
     }
   } catch (error) {
     console.error("Test setup API error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Internal server error" },
+      {
+        error: error instanceof Error ? error.message : "Internal server error",
+      },
       { status: 500 },
     );
   }

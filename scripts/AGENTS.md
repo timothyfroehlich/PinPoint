@@ -67,7 +67,7 @@ npm run db:generate-types      # Generate TypeScript types
 npm run typecheck             # TypeScript validation
 npm run lint                  # ESLint validation
 npm test                      # Unit/integration tests
-npm run smoke                 # Playwright smoke tests
+npm run e2e                   # Playwright E2E tests (guest + auth)
 npm run test:rls              # RLS policy tests
 ```
 

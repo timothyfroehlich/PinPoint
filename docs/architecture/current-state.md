@@ -293,7 +293,7 @@ npm run db:seed:local:sb          # Seed data only
 # Testing (Simplified System)
 npm test                    # Unit tests (1 file, 205 tests, ~214ms)
 npm run test:rls           # pgTAP RLS policy tests
-npm run smoke              # Playwright smoke tests
+npm run e2e                # Playwright E2E tests
 ```
 
 ### Multi-Agent Development

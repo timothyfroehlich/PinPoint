@@ -58,38 +58,39 @@ export function createUntrustedSubdomainHeaders(subdomain: string): Headers {
   });
 }
 
+const mockDb = {
+  query: {
+    {{ENTITY_PLURAL}}: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+    },
+    {{RELATED_ENTITIES}}: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+    },
+  },
+  select: vi.fn(() => ({
+    from: vi.fn(() => ({
+      where: vi.fn(() => ({
+        groupBy: vi.fn(),
+        limit: vi.fn(),
+        orderBy: vi.fn(),
+      })),
+    })),
+  })),
+};
+
 // Mock the database and auth context
 vi.mock("~/lib/dal/shared", async () => {
   const actual = await vi.importActual("~/lib/dal/shared");
   return {
     ...actual,
     requireAuthContext: vi.fn(),
-    db: {
-      query: {
-        {{ENTITY_PLURAL}}: {
-          findMany: vi.fn(),
-          findFirst: vi.fn(),
-        },
-        {{RELATED_ENTITIES}}: {
-          findMany: vi.fn(),
-          findFirst: vi.fn(),
-        }
-      },
-      select: vi.fn(() => ({
-        from: vi.fn(() => ({
-          where: vi.fn(() => ({
-            groupBy: vi.fn(),
-            limit: vi.fn(),
-            orderBy: vi.fn()
-          }))
-        }))
-      }))
-    }
+    getDb: vi.fn(() => mockDb),
   };
 });
 
 const mockRequireAuthContext = vi.mocked(dalShared.requireAuthContext);
-const mockDb = vi.mocked(dalShared.db);
 
 describe("{{MODULE_NAME}} (Integration Tests - DAL)", () => {
   // Test context setup with seed data

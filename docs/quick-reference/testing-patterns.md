@@ -12,7 +12,7 @@ _Minimal testing patterns for current simplified test system_
 npm test                    # Run unit tests (1 file, 205 tests, ~214ms)
 npm run test:watch         # Watch mode for unit tests
 npm run test:rls           # pgTAP RLS policy tests
-npm run smoke              # Essential Playwright smoke tests
+npm run e2e                # Playwright E2E tests (guest + auth)
 ```
 
 ### Active Test Infrastructure
@@ -59,14 +59,14 @@ npm run test:rls -- organizations.test.sql
 npm run test:rls -- multi-tenant-isolation.test.sql
 ```
 
-### Smoke Testing (Playwright)
+### E2E Testing (Playwright)
 
 ```bash
 # Essential UI validation
-npm run smoke
+npm run e2e
 
-# Tests basic authentication and navigation flows
-# Located in: e2e/smoke-test-workflow.spec.ts
+# Runs guest and authenticated journeys (see `package.json` scripts)
+# Located in: e2e/**
 ```
 
 ## Archived Infrastructure (Reference Only)
