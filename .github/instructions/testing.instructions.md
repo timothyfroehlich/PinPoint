@@ -54,7 +54,7 @@ When reviewing test code, enforce patterns from `/docs/CORE/TESTING_GUIDE.md`:
 - Follow naming conventions: `*.test.ts(x)` for unit/integration
 - Use `*.e2e.test.ts` under `e2e/` directory
 - SQL tests in `supabase/tests/rls/*.test.sql`
-- Leverage templates from `src/test/templates/`
+- Use helpers from `src/test/helpers/` and look at similar existing tests
 
 ### Vitest Safety
 

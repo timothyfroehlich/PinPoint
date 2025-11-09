@@ -1,6 +1,6 @@
 # Test Infrastructure Documentation
 
-This directory contains test utilities, templates, and constants for PinPoint's testing infrastructure.
+This directory contains test utilities, helpers, and constants for PinPoint's testing infrastructure.
 
 ## Structure
 
@@ -9,9 +9,6 @@ src/test/
 ├── helpers/                    # Test utility functions and mocks
 │   ├── service-test-helpers.ts # Service layer testing utilities
 │   └── anonymous-test-helpers.ts # Anonymous user testing utilities
-├── templates/                  # Test templates for consistent patterns
-│   ├── service.test.template.ts # Service layer test template
-│   └── anonymous-rls.test.template.ts # Anonymous user RLS test template
 ├── constants/                  # Test constants and seed data
 │   └── seed-test-ids.ts       # Predictable test IDs
 └── README.md                  # This documentation
@@ -24,7 +21,6 @@ PinPoint uses a structured approach with clear test types for different scenario
 ### 1. Service Layer Testing
 
 **File**: `helpers/service-test-helpers.ts`
-**Template**: `templates/service.test.template.ts`
 
 For testing business logic services with mocked dependencies:
 
@@ -56,7 +52,6 @@ describe("MyService", () => {
 ### 2. Anonymous User RLS Testing
 
 **File**: `helpers/anonymous-test-helpers.ts`
-**Template**: `templates/anonymous-rls.test.template.ts`
 
 For testing anonymous user scenarios with organization context from subdomain resolution:
 
@@ -311,15 +306,16 @@ CREATE POLICY "items_organization_isolation" ON items
 
 The test utilities mock the session variable setup that would normally be handled by the tRPC context creation middleware.
 
-## Migration from Legacy Tests
+## Best Practices for New Tests
 
-When updating tests to use these patterns:
+When writing new tests:
 
 1. Replace custom mock setups with `serviceTestUtils.createContext()`
 2. Use `SEED_TEST_IDS` constants instead of hardcoded values
 3. Add organization scoping validation with `expectOrgScoping()`
-4. Use templates as starting points for new test files
+4. Look at similar existing tests as starting points
 5. Test both authenticated and anonymous user scenarios where applicable
+6. See `docs/CORE/TESTING_GUIDE.md` for comprehensive patterns and examples
 
 ## Future Enhancements
 

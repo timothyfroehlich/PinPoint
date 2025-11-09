@@ -40,9 +40,5 @@
     "src/test/examples/**/*.ts",
     "src/test/helpers/**/*.ts",
     "src/test/**/*.ts"
-  ],
-  "exclude": [
-    "src/test/templates/**/*",
-    "src/**/*.template.ts"
   ]
 }

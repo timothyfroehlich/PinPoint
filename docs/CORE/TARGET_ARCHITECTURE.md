@@ -3328,7 +3328,7 @@ test.describe('Progressive Enhancement', () => {
 - Traditional React Testing Library patterns optimized for minimal interactive components within server-rendered pages
 - Server-passed props validation ensuring proper data flow from Server Components to Client Components
 - User interaction testing with event handling, form submissions, and state management validation
-- Template ready: `src/test/templates/client-island.template.tsx` providing standardized testing patterns for client islands
+- Patterns documented in `docs/CORE/TESTING_GUIDE.md` "Client Island Testing" section
 
 **Server Action Tests (`*.server-action.test.ts`)**
 - FormData processing validation with comprehensive field validation and structured error handling testing
@@ -3367,7 +3367,7 @@ test.describe('Progressive Enhancement', () => {
 - Database constraint validation and referential integrity testing
 - Foreign key relationship verification ensuring proper organizational scoping
 - Schema evolution testing with migration validation and rollback verification
-- Template ready: `src/test/templates/schema.template.sql` providing database constraint testing patterns
+- Patterns documented in `docs/CORE/TESTING_GUIDE.md` "Schema Testing" section
 
 ### Auto-Generated Mock System Architecture
 

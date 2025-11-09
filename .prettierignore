@@ -20,10 +20,6 @@ node_modules/
 logs/
 *.log
 
-# Test templates with placeholder syntax
-src/test/templates/*.template.ts
-src/test/templates/*.template.tsx
-
 # Generated files
 src/test/generated/
 *.generated.ts

@@ -104,4 +104,10 @@ Provide a consistent, reviewable spec for each user‑visible feature. These spe
 - Designed for efficient LLM consumption, context reminders without persuasion
 - Scope of changes matters, not time estimates or session planning
 
+## 🗂 CURRENT_TASK + Docs Handoff
+
+- `CURRENT_TASK.md` is branch-specific documentation. When you start a new branch, reset the heading, Branch Snapshot, and task board so they only cover that branch.
+- Document work-in-flight in `CURRENT_TASK.md` and mirror any behavior changes in the relevant spec under `docs/feature_specs/`. The spec is the long-term authority; `CURRENT_TASK.md` is the short-term ledger.
+- When handing off a branch, ensure `CURRENT_TASK.md` lists the next steps, verification commands, and any doc sections that still need updates. The incoming agent should be able to resume work by reading that file first.
+
 **USAGE**: This serves as the documentation-specific agent context for PinPoint development. Always prioritize CORE documentation and maintain feature specs as living documents.

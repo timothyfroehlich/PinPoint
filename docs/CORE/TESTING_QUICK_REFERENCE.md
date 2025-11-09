@@ -35,7 +35,7 @@ Use this as a compact checklist. See full details in `docs/CORE/TESTING_GUIDE.md
 
 ## Creation Workflow
 1) Choose test type (above).
-2) Start from a template in `src/test/templates` if available.
+2) Look for similar existing tests as examples. Use helpers from `src/test/helpers`.
 3) Place file with correct name and path.
 4) Use seed constants and deterministic mocks.
 5) Keep assertions crisp; validate contracts and errors.
@@ -61,4 +61,4 @@ Use this as a compact checklist. See full details in `docs/CORE/TESTING_GUIDE.md
 ## Where to Look
 - Full guide: `docs/CORE/TESTING_GUIDE.md`
 - Security authority: `docs/CORE/DATABASE_SECURITY_SPEC.md`
-- Templates/helpers/constants: `src/test/`
+- Helpers/constants: `src/test/helpers/`, `src/test/constants/`

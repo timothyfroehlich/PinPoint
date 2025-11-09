@@ -1,7 +1,7 @@
 # Testing Guide (Source of Truth)
 
-Last Reviewed: 2025-11-08
-Last Updated: 2025-11-02
+Last Reviewed: 2025-11-09
+Last Updated: 2025-11-09
 
 Scope: All contributors. This is the single source of truth for creating and updating tests. It replaces prior archetype-era documentation and any deprecated automation around test scaffolding.
 
@@ -72,7 +72,7 @@ Don’t
 
 ## Creation Workflow
 1) Pick the right test type (see list above). If unsure, default to Integration for boundary logic and Unit for pure logic.
-2) Start from templates and helpers under `src/test/templates` and `src/test/helpers` when available.
+2) Look for similar existing tests as examples. Use helpers from `src/test/helpers` when available.
 3) Place the file by type (see Naming and Placement). Keep paths near the code under test where practical.
 4) Use seed constants and deterministic mocks. Avoid ad-hoc generators.
 5) For Integration with DB needs, use the worker-scoped DB pattern; do not spawn per-test instances.
@@ -94,6 +94,138 @@ Don’t
 - RLS SQL tests: verify database policies, invariants, and visibility semantics.
 - Application tests (Unit/Integration/E2E): verify request flows, validations, and permissions wiring.
 - Do not bypass RLS in app tests unless the purpose is to validate service logic unrelated to RLS.
+
+## Advanced Testing Patterns
+
+### Security Testing (Multi-Tenant Isolation)
+**Zero Tolerance Philosophy:**
+- Use "zero tolerance" language in assertions (not "should fail")
+- Test with BOTH organizations to PROVE isolation exists
+- Test negative cases FIRST (can't access competitor data), then positive cases
+- Create test data for primary AND competitor orgs (can't prove isolation with empty competitor org)
+
+**Bypass Attempt Testing:**
+- Complex WHERE clauses with OR conditions
+- JOIN queries across organizations
+- Subqueries attempting cross-org access
+- UPDATE/DELETE operations on cross-org data
+
+**Example Pattern:**
+```sql
+-- Test 1: CRITICAL - Zero tolerance cross-organizational access
+SELECT results_eq(
+  'SELECT COUNT(*)::integer FROM issues WHERE organization_id = ' || quote_literal(test_org_competitor()),
+  'VALUES (0)',
+  'CRITICAL: Primary org user cannot see ANY competitor organization issues'
+);
+```
+
+### Server Action Testing
+**FormData Validation Patterns:**
+- Validation runs BEFORE authentication (fail fast)
+- Empty strings become undefined for optional fields (Next.js behavior)
+- Whitespace trimming is mandatory
+- Test validation independently from auth errors
+
+**React 19 Compatibility:**
+- Check function signature: `.length` should be 2 for create actions, 3 for updates
+- First parameter is `prevState` (often unused), second is `formData`
+- Update actions take `entityId` as first parameter
+
+**Progressive Enhancement:**
+- MUST work without JavaScript
+- Test with FormData directly (server-side submission)
+- Verify redirect handling and revalidation paths
+
+### E2E Progressive Enhancement
+**No-JavaScript Testing:**
+```typescript
+// Disable JavaScript to test server-only functionality
+await page.setJavaScriptEnabled(false);
+await page.goto("/form");
+await page.fill("input[name='title']", "Test");
+await page.click("button[type='submit']");
+// Should complete via Server Action, not client-side JS
+```
+
+**Server Component Rendering:**
+- Server Components should render IMMEDIATELY (no loading states for server data)
+- Client Islands hydrate after initial render
+- Test auth helpers: `clearAuthentication()`, `expireSession()`, `setOrganizationContext()`
+
+### RLS Testing Structure
+**PostgreSQL Error Codes:**
+- 23502: NOT NULL violation
+- 23503: Foreign key violation
+- 23514: CHECK constraint violation
+
+**Database Admin Behavior:**
+- Document that postgres role CAN bypass RLS (expected for system admin)
+- Use RESET role to test admin access, SET LOCAL role for user contexts
+
+**Test Data Requirements:**
+```sql
+-- MUST create data for both orgs to prove isolation
+INSERT INTO issues (..., organization_id) VALUES (..., test_org_primary());
+INSERT INTO issues (..., organization_id) VALUES (..., test_org_competitor());
+```
+
+### Schema Testing
+**Cross-Org Constraint Testing:**
+```sql
+-- Machine in org-1, issue in org-2 should fail FK constraint
+INSERT INTO machines (id, organization_id) VALUES ('m1', 'org-1');
+SELECT throws_ok(
+  'INSERT INTO issues (machine_id, organization_id) VALUES (''m1'', ''org-2'')',
+  '23503',
+  'Cross-organizational foreign key references rejected'
+);
+```
+
+**Cascade Behavior:**
+- Test DELETE parent → verify child handling (CASCADE vs SET NULL)
+- Test UPDATE parent → verify child updates propagate
+
+### Client Island Testing
+**State Reset Pattern:**
+```typescript
+// Test that local state resets when server props change
+const { rerender } = render(<Component {...initialProps} />);
+rerender(<Component {...updatedProps} />);
+expect(screen.getByText("Updated content")).toBeInTheDocument();
+```
+
+**Accessibility:**
+```typescript
+// Keyboard navigation
+await user.tab();
+expect(firstElement).toHaveFocus();
+await user.keyboard("{Enter}");
+```
+
+**Network Failures:**
+```typescript
+// Mock retry sequences
+mockAction
+  .mockRejectedValueOnce(new Error("Network error"))
+  .mockResolvedValueOnce({ success: true });
+```
+
+### Subdomain Context Testing
+**Trusted vs Untrusted Headers:**
+```typescript
+// Middleware-verified subdomain (trusted)
+const trustedHeaders = new Headers({
+  "x-subdomain": "test-primary",
+  "x-subdomain-verified": "1",
+});
+
+// Unverified subdomain attempt (untrusted)
+const untrustedHeaders = new Headers({
+  "x-subdomain": "test-primary",
+  // Missing verification header
+});
+```
 
 ## Review Checklist (for PRs)
 - Correct test type, naming, and placement.
@@ -195,5 +327,5 @@ npx playwright test --project=chromium-auth
 ## References
 - Security authority: `docs/CORE/DATABASE_SECURITY_SPEC.md`
 - Vitest modern mocking: `docs/CORE/latest-updates/vitest.md`
-- Test infra (helpers/templates/constants): `src/test/`
+- Test helpers and constants: `src/test/helpers/`, `src/test/constants/`
 - Investigation archive: Lessons from Nov 2025 E2E failures incorporated above

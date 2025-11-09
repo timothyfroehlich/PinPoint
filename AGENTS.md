@@ -1,5 +1,9 @@
 # PinPoint Agent Guidelines & Repository Overview
 
+## About the user
+The user's name is Tim and his github account is "timothyfroehlich".
+Tim is vibecoding this app by himself to learn about website design and experiment with agentic coding. Tim has never coded in Java/TypeScript before. When a decision is needed, the agent should provide some explanation about the options, pros and cons. Review comments on GitHub PRs can be assumed to have been written by coding agents. Their comments must be taken as suggestions and with a grain of salt. Don't assume that the agent who wrote the comment had the full context to fully understand the problem.
+
 ## ✅ Critical Context Files
 The following files contain critical context and should be read immediately:
 - `docs/CORE/NON_NEGOTIABLES.md` - Forbidden patterns and critical constraints
@@ -80,6 +84,16 @@ The following files contain critical context and should be read immediately:
 - `SEED_TEST_IDS.ORGANIZATIONS.primary` → "test-org-pinpoint"
 - `SEED_TEST_IDS.USERS.ADMIN` → "test-user-tim"
 - `SEED_TEST_IDS.MOCK_PATTERNS.MACHINE` → "mock-machine-1"
+
+### CURRENT_TASK Workflow (per branch)
+- Treat `CURRENT_TASK.md` as **branch-local state**. Each branch must describe only the work that will ship with that branch.
+- When you create or resume a branch:
+  1. Update the heading (`# Current Task: …`) and Branch Snapshot so they reflect the new scope and branch name.
+  2. Rebuild the task board with just the tasks for that branch (remove or archive tasks from previous branches).
+  3. Note today’s state/date so future contributors know when the snapshot was last refreshed.
+- Keep statuses, notes, and verification commands current as you work so another agent can pick up mid-stream.
+- Before merging, ensure the board shows the final state (all tasks ✅ or explicitly deferred) so the next branch can start from a clean slate.
+- If you branch off an in-progress branch, repeat the reset process so the child branch has its own `CURRENT_TASK.md` history instead of inheriting stale tasks.
 
 ## 📚 PROJECT STRUCTURE & MODULES
 

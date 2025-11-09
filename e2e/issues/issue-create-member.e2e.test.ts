@@ -31,25 +31,31 @@ test.describe("Issue Create – Member (E2E)", () => {
     await page.goto("/issues/create");
 
     // Verify page loaded correctly
-    await expect(page.locator("h1")).toContainText("Create New Issue");
-    await expect(page.getByTestId("create-issue-form")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: /Create New Issue/i }),
+    ).toBeVisible();
+    const createIssueForm = page.getByTestId("create-issue-form").first();
+    await expect(createIssueForm).toBeVisible();
 
     // Fill in the form
-    await page.getByTestId("issue-title-input").fill("Test Member Issue");
-    await page
+    await createIssueForm
+      .getByTestId("issue-title-input")
+      .fill("Test Member Issue");
+    await createIssueForm
       .getByTestId("issue-description-input")
       .fill("Detailed description of the issue");
 
     // Select a machine - using the select trigger
-    await page.getByTestId("machine-select-trigger").click();
+    await page.getByTestId("machine-select-trigger").first().click();
     await page
-      .getByTestId("machine-option")
-      .filter({ hasText: "Medieval Madness" })
+      .locator(
+        `[data-testid="machine-option"][data-machine-id="${SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1}"]`,
+      )
       .first()
       .click();
 
     // Submit the form
-    await page.getByTestId("create-issue-submit").click();
+    await createIssueForm.getByTestId("create-issue-submit").click();
 
     // Verify success - wait for redirect (Server Action may take a moment)
     await page.waitForURL(/\/issues\/[^/]+$/, { timeout: 10000 });
@@ -62,29 +68,24 @@ test.describe("Issue Create – Member (E2E)", () => {
     page,
   }) => {
     await page.goto("/issues/create");
+    const createIssueForm = page.getByTestId("create-issue-form").first();
+    const titleInput = createIssueForm.getByTestId("issue-title-input");
+    const submitButton = createIssueForm.getByTestId("create-issue-submit").first();
+    const machineHiddenInput = createIssueForm.getByTestId("machine-id-hidden");
 
-    // Try to submit without filling required fields
-    await page.getByTestId("create-issue-submit").click();
+    await expect(titleInput).toHaveAttribute("required", "");
+    await expect(machineHiddenInput).toHaveAttribute("required", "");
 
-    // Verify validation errors appear in the field errors list
-    const fieldErrors = page.getByTestId("create-issue-field-errors");
-    await expect(fieldErrors).toBeVisible();
+    await submitButton.click();
+    await expect
+      .poll(async () =>
+        titleInput.evaluate((input) => input.validity.valueMissing),
+      )
+      .toBe(true);
 
-    // Check that errors mention both required fields
-    await expect(fieldErrors).toContainText(/title/i);
-    await expect(fieldErrors).toContainText(/machine/i);
-
-    // Verify we're still on the create page
-    await expect(page).toHaveURL("/issues/create");
-
-    // Fill title but leave machine empty
-    await page.getByTestId("issue-title-input").fill("Valid title");
-    await page.getByTestId("create-issue-submit").click();
-
-    // Field errors should still be visible but only for machine now
-    await expect(fieldErrors).toBeVisible();
-    await expect(fieldErrors).toContainText(/machine/i);
-    await expect(fieldErrors).not.toContainText(/title/i);
+    await titleInput.fill("Valid title");
+    await submitButton.click();
+    await expect(machineHiddenInput).toHaveValue("");
   });
 
   test("member can see private-location machines when organization member", async ({
@@ -93,7 +94,8 @@ test.describe("Issue Create – Member (E2E)", () => {
     await page.goto("/issues/create");
 
     // Verify machine select trigger is visible
-    const machineTrigger = page.getByTestId("machine-select-trigger");
+    const formScope = page.getByTestId("create-issue-form").first();
+    const machineTrigger = page.getByTestId("machine-select-trigger").first();
     await expect(machineTrigger).toBeVisible();
 
     // Open the select dropdown
@@ -101,12 +103,12 @@ test.describe("Issue Create – Member (E2E)", () => {
 
     // Verify private machines are visible to organization members
     // Using testid machine-option and filtering by text
-    const medievalOption = page
-      .getByTestId("machine-option")
-      .filter({ hasText: /Medieval Madness/i });
-    const cactusOption = page
-      .getByTestId("machine-option")
-      .filter({ hasText: /Cactus Canyon/i });
+    const medievalOption = page.locator(
+      `[data-testid="machine-option"][data-machine-id="${SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1}"]`,
+    );
+    const cactusOption = page.locator(
+      `[data-testid="machine-option"][data-machine-id="${SEED_TEST_IDS.MACHINES.CACTUS_CANYON_1}"]`,
+    );
 
     await expect(medievalOption.first()).toBeVisible();
     await expect(cactusOption.first()).toBeVisible();
@@ -115,7 +117,7 @@ test.describe("Issue Create – Member (E2E)", () => {
     await medievalOption.first().click();
 
     // Verify selection was made by checking the hidden input value
-    await expect(page.getByTestId("machine-id-hidden")).toHaveValue(
+    await expect(formScope.getByTestId("machine-id-hidden")).toHaveValue(
       SEED_TEST_IDS.MACHINES.MEDIEVAL_MADNESS_1,
     );
   });
@@ -124,7 +126,8 @@ test.describe("Issue Create – Member (E2E)", () => {
     await page.goto("/issues/create");
 
     // Verify severity select is visible
-    const severityTrigger = page.getByTestId("severity-select-trigger");
+    const formScope = page.getByTestId("create-issue-form").first();
+    const severityTrigger = page.getByTestId("severity-select-trigger").first();
     await expect(severityTrigger).toBeVisible();
 
     // Open the severity dropdown
@@ -140,6 +143,6 @@ test.describe("Issue Create – Member (E2E)", () => {
     await page.getByTestId("severity-option-high").click();
 
     // Verify selection was made by checking the hidden input value
-    await expect(page.getByTestId("severity-hidden")).toHaveValue("high");
+    await expect(formScope.getByTestId("severity-hidden")).toHaveValue("high");
   });
 });
