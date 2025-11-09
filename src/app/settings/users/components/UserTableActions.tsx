@@ -5,7 +5,7 @@
 
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useActionState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { RoleChangeDialog } from "./RoleChangeDialog";
+import { resendInvitationAction } from "~/lib/actions/admin-actions";
 
 interface UserTableActionsProps {
   user: {
@@ -31,6 +32,7 @@ interface UserTableActionsProps {
     email: string;
     name: string;
     membershipId: string;
+    invitationId: string | null;
     role: {
       id: string;
       name: string;
@@ -53,18 +55,21 @@ export function UserTableActions({
   availableRoles = [],
 }: UserTableActionsProps): JSX.Element | null {
   const [isLoading, setIsLoading] = useState(false);
+  const [resendState, resendAction, isResending] = useActionState(
+    resendInvitationAction,
+    null,
+  );
 
-  const handleResendInvitation = (): void => {
-    setIsLoading(true);
-    try {
-      // TODO: Implement resend invitation
-      toast.info("Resend invitation coming soon");
-    } catch {
-      toast.error("Failed to resend invitation");
-    } finally {
-      setIsLoading(false);
+  // Handle resend state changes
+  useEffect(() => {
+    if (resendState?.success) {
+      toast.success(
+        resendState.message ?? `Invitation resent to ${user.email}`,
+      );
+    } else if (resendState?.success === false) {
+      toast.error(resendState.error ?? "Failed to resend invitation");
     }
-  };
+  }, [resendState, user.email]);
 
   const handleRemoveUser = (): void => {
     setIsLoading(true);
@@ -85,7 +90,7 @@ export function UserTableActions({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" disabled={isLoading}>
+        <Button variant="ghost" size="sm" disabled={isLoading || isResending}>
           <MoreHorizontalIcon className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -107,10 +112,18 @@ export function UserTableActions({
           </DropdownMenuItem>
         </RoleChangeDialog>
 
-        {!user.emailVerified && (
-          <DropdownMenuItem onClick={handleResendInvitation}>
+        {!user.emailVerified && user.invitationId && (
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault(); // Prevent dropdown from closing
+              const formData = new FormData();
+              formData.set("invitationId", user.invitationId ?? "");
+              void resendAction(formData);
+            }}
+            disabled={isResending}
+          >
             <MailIcon className="mr-2 h-4 w-4" />
-            Resend Invitation
+            {isResending ? "Sending..." : "Resend Invitation"}
           </DropdownMenuItem>
         )}
 

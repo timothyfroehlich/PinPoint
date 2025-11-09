@@ -67,6 +67,13 @@ const removeUserSchema = z.object({
 // Explicit type for better TypeScript inference
 type RemoveUserData = z.infer<typeof removeUserSchema>;
 
+const resendInvitationSchema = z.object({
+  invitationId: uuidSchema,
+});
+
+// Explicit type for better TypeScript inference
+type ResendInvitationData = z.infer<typeof resendInvitationSchema>;
+
 const updateSystemSettingsSchema = z.object({
   settings: z.object({
     emailNotifications: z.boolean().optional(),
@@ -603,6 +610,161 @@ export async function updateSystemSettingsAction(
     );
   } catch (error) {
     console.error("Update system settings error:", error);
+    return actionError(getErrorMessage(error));
+  }
+}
+
+/**
+ * Resend invitation email via Server Action (React 19 useActionState compatible)
+ * Regenerates token and extends expiration date
+ */
+export async function resendInvitationAction(
+  _prevState: ActionResult<{ success: boolean }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ success: boolean }>> {
+  try {
+    const authContext = await getRequestAuthContext();
+    if (authContext.kind !== "authorized") {
+      throw new Error("Member access required");
+    }
+    const { user, org: organization, membership } = authContext;
+    const organizationId = organization.id;
+
+    // Enhanced validation with Zod
+    const validation: ActionResult<ResendInvitationData> = validateFormData(
+      formData,
+      resendInvitationSchema,
+    );
+    if (!validation.success) {
+      return validation;
+    }
+
+    await requirePermission(
+      { role_id: membership.role.id },
+      PERMISSIONS.USER_MANAGE,
+      db,
+    );
+
+    // Get the invitation
+    const invitation = await db.query.invitations.findFirst({
+      where: and(
+        eq(invitations.id, validation.data.invitationId),
+        eq(invitations.organization_id, organizationId),
+      ),
+      with: {
+        role: true,
+      },
+    });
+
+    if (!invitation) {
+      return actionError("Invitation not found");
+    }
+
+    // Check if invitation is still pending
+    if (invitation.status !== "pending") {
+      return actionError(
+        `Cannot resend invitation: invitation is ${invitation.status}`,
+      );
+    }
+
+    // Check if invitation has expired
+    const now = new Date();
+    if (invitation.expires_at < now) {
+      return actionError(
+        "Cannot resend expired invitation. Please create a new invitation.",
+      );
+    }
+
+    // Generate new secure invitation token
+    const { token, hash } = generateInvitationToken();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7); // Extend by 7 days from now
+
+    // Update invitation with new token and expiration
+    await db
+      .update(invitations)
+      .set({
+        token: hash, // Store new hashed token
+        expires_at: expiresAt,
+        updated_at: now,
+      })
+      .where(eq(invitations.id, validation.data.invitationId));
+
+    console.log("Invitation token regenerated:", {
+      invitationId: invitation.id,
+      email: invitation.email,
+      organizationId,
+    });
+
+    // Cache invalidation
+    revalidatePath("/settings/users");
+    revalidatePath("/settings");
+    revalidateTag("admin", "max");
+    revalidateTag("invitations", "max");
+
+    // Send new invitation email (with plain token, not hash)
+    const emailResult = await sendInvitationEmail({
+      to: invitation.email,
+      organizationName: organization.name,
+      inviterName: user.name || user.email || "A team member",
+      roleName: invitation.role.name,
+      token, // Plain token for email link
+      expiresAt,
+    });
+
+    if (!emailResult.success) {
+      // Log error but report partial success since token was regenerated
+      console.error("Resend invitation email failed:", {
+        email: invitation.email,
+        error: emailResult.error,
+        invitationId: invitation.id,
+      });
+
+      // Log email failure to activity log
+      await logActivity({
+        organizationId,
+        userId: user.id,
+        action: ACTIVITY_ACTIONS.INVITATION_SENT,
+        entity: ACTIVITY_ENTITIES.USER,
+        entityId: invitation.id,
+        details: `Invitation token regenerated for ${invitation.email} but email delivery failed: ${emailResult.error}`,
+        severity: "error",
+      });
+
+      return actionError(
+        `Invitation updated but email could not be sent. Error: ${emailResult.error}. Please contact the user directly.`,
+      );
+    }
+
+    // Background processing
+    runAfterResponse(async () => {
+      console.log(
+        `Invitation resent successfully to ${invitation.email} by ${user.email}`,
+        {
+          invitationId: invitation.id,
+          organizationId,
+          messageId: emailResult.messageId,
+        },
+      );
+
+      // Log the successful activity
+      await logActivity({
+        organizationId,
+        userId: user.id,
+        action: ACTIVITY_ACTIONS.INVITATION_SENT,
+        entity: ACTIVITY_ENTITIES.USER,
+        entityId: invitation.id,
+        details: `Resent invitation to ${invitation.email}`,
+        severity: "info",
+      });
+    });
+
+    return actionSuccess(
+      { success: true },
+      `Invitation email resent successfully to ${invitation.email}`,
+    );
+  } catch (error) {
+    console.error("Resend invitation error:", error);
     return actionError(getErrorMessage(error));
   }
 }

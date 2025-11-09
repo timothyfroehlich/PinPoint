@@ -31,6 +31,7 @@ import { createTRPCRouter, organizationProcedure } from "~/server/api/trpc";
 
 // Database schema (alphabetical)
 import {
+  invitations,
   memberships,
   organizations,
   rolePermissions,
@@ -48,6 +49,7 @@ interface AdminUserResponse {
   emailVerified: Date | null;
   createdAt: Date;
   membershipId: string;
+  invitationId: string | null; // For pending invitations
   role: {
     id: string;
     name: string;
@@ -111,10 +113,22 @@ export const adminRouter = createTRPCRouter({
             isSystem: roles.is_system, // db is_system
             isDefault: roles.is_default, // db is_default
           },
+          invitation: {
+            id: invitations.id,
+            status: invitations.status,
+          },
         })
         .from(memberships)
         .innerJoin(users, eq(memberships.user_id, users.id))
         .innerJoin(roles, eq(memberships.role_id, roles.id))
+        .leftJoin(
+          invitations,
+          and(
+            eq(invitations.email, users.email),
+            eq(invitations.organization_id, ctx.organizationId),
+            eq(invitations.status, "pending"),
+          ),
+        )
         .where(eq(memberships.organization_id, ctx.organizationId))
         .orderBy(asc(roles.name), asc(users.name));
 
@@ -126,6 +140,7 @@ export const adminRouter = createTRPCRouter({
         emailVerified: member.user.emailVerified,
         createdAt: member.user.createdAt,
         membershipId: member.id,
+        invitationId: member.invitation?.id ?? null,
         role: {
           id: member.role.id,
           name: member.role.name,
