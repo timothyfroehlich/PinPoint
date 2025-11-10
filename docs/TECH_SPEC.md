@@ -1,15 +1,15 @@
-# PinPoint Technical Specification v2.0
+# PinPoint Technical Specification
 
 **Last Updated**: 2025-11-10
-**Status**: ACTIVE - Single-tenant simplified architecture
+**Status**: ACTIVE - Single-tenant architecture
 
 ## Core Principles
 
-1. **Single-Tenant First**: No organization scoping, no RLS complexity
+1. **Single-Tenant**: No organization scoping, no RLS complexity
 2. **Server-First**: Default to Server Components, minimal client JavaScript
-3. **Direct Data Access**: Query database directly in Server Components (no DAL/repository layers)
-4. **Proven Stack**: Use latest stable versions, avoid experiments
-5. **Type Safety**: TypeScript strictest, no escape hatches
+3. **Direct Data Access**: Query database directly in Server Components
+4. **Proven Stack**: Use latest stable versions
+5. **Type Safety**: TypeScript strictest configuration
 
 ---
 
@@ -30,8 +30,8 @@
 - `use client` directive isolated to leaf components
 
 **Styling**
-- **Tailwind CSS v4** (primary) - CSS-based configuration
-- **shadcn/ui** (components) - Server Component compatible
+- **Tailwind CSS v4** - CSS-based configuration
+- **shadcn/ui** - Server Component compatible
 - **Material Design 3 colors** - From `globals.css`
 
 **State Management**
@@ -50,7 +50,6 @@
 **Drizzle ORM**
 - Type-safe queries
 - Schema in `src/server/db/schema/`
-- NO organization scoping
 - Direct queries in Server Components
 
 **tRPC (Minimal Use)**
@@ -65,10 +64,7 @@
 ### Core Tables
 
 ```sql
--- Users (managed by Supabase Auth)
--- We don't touch auth.users directly
-
--- User Profiles (extends auth.users)
+-- User Profiles (extends Supabase auth.users)
 CREATE TABLE user_profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -101,7 +97,7 @@ CREATE TABLE issues (
   title TEXT NOT NULL,
   description TEXT,
   status TEXT NOT NULL DEFAULT 'new',  -- 'new' | 'in_progress' | 'resolved'
-  severity TEXT NOT NULL DEFAULT 'gameplay',  -- 'minor' | 'gameplay' | 'unplayable'
+  severity TEXT NOT NULL DEFAULT 'playable',  -- 'minor' | 'playable' | 'unplayable'
   reported_by UUID REFERENCES auth.users(id),  -- NULL for anonymous reports
   assigned_to UUID REFERENCES auth.users(id),
   resolved_at TIMESTAMPTZ,
@@ -152,14 +148,14 @@ CREATE INDEX idx_issue_comments_issue_id ON issue_comments(issue_id);
 
 ## Why No DAL/Repository/Service Layers?
 
-**TL;DR:** Server Components + Drizzle already provide everything those layers offer, without the overhead.
+**Server Components + Drizzle provide everything those layers offer, without the overhead.**
 
-### The Traditional Layered Approach
+### The Over-Engineered Approach
 
 ```typescript
-// ❌ Over-engineered: 3 layers for one query
+// ❌ Three layers for one query
 
-// Repository Layer
+// Repository
 class IssueRepository {
   async findByMachine(machineId: string): Promise<Issue[]> {
     return await db.query.issues.findMany({
@@ -168,16 +164,15 @@ class IssueRepository {
   }
 }
 
-// Service Layer
+// Service
 class IssueService {
   constructor(private repo: IssueRepository) {}
-
   async getIssuesForMachine(machineId: string): Promise<Issue[]> {
     return await this.repo.findByMachine(machineId)
   }
 }
 
-// Controller/Route Layer
+// Controller
 export async function getIssues(machineId: string) {
   const service = new IssueService(new IssueRepository())
   return await service.getIssuesForMachine(machineId)
@@ -186,17 +181,16 @@ export async function getIssues(machineId: string) {
 
 **Problems:**
 - 3 files to understand one query
-- Abstraction without value (just passing data through)
+- Just passing data through layers
 - Testing requires mocking all layers
-- Mental overhead tracking through layers
+- Mental overhead
 
 ### The Server Component Approach
 
 ```typescript
-// ✅ Simple: Direct query where needed
+// ✅ Direct query where needed
 
 export default async function MachinePage({ params }: { params: { id: string } }) {
-  // Query directly in the component
   const issues = await db.query.issues.findMany({
     where: eq(issues.machineId, params.id),
     with: { assignedTo: true },
@@ -208,8 +202,8 @@ export default async function MachinePage({ params }: { params: { id: string } }
 ```
 
 **Benefits:**
-- 1 file to understand the query
-- Colocated with usage (easy to modify)
+- 1 file to understand
+- Colocated with usage
 - Drizzle provides type safety
 - cache() handles deduplication
 - Less code = fewer bugs
@@ -217,10 +211,10 @@ export default async function MachinePage({ params }: { params: { id: string } }
 ### When You WOULD Need Layers
 
 Add abstractions when you have:
-- **Multiple clients** (web app + mobile app + API)
-- **Complex business logic** (multi-step transactions, saga patterns)
-- **Multiple databases** (read/write splitting, sharding)
-- **Large team** (10+ engineers needing boundaries)
+- Multiple clients (web app + mobile app + API)
+- Complex business logic (multi-step transactions, saga patterns)
+- Multiple databases (read/write splitting, sharding)
+- Large team (10+ engineers needing boundaries)
 
 **For MVP:** You have none of these. Direct queries are perfect.
 
@@ -272,7 +266,6 @@ export default async function ProtectedPage() {
     redirect('/unauthorized')
   }
 
-  // Render protected content
   return <Dashboard user={user} profile={profile} />
 }
 ```
@@ -300,7 +293,7 @@ export async function createIssue(formData: FormData) {
     title,
     machineId,
     reportedBy: user.id,
-    severity: 'gameplay',  // default
+    severity: 'playable',  // default
     status: 'new',
   })
 
@@ -379,7 +372,7 @@ export function IssueForm({ machines }: { machines: Machine[] }) {
       </select>
       <select name="severity" required>
         <option value="minor">Minor</option>
-        <option value="gameplay">Gameplay Issue</option>
+        <option value="playable">Playable Issue</option>
         <option value="unplayable">Unplayable</option>
       </select>
       <textarea name="description" />
@@ -421,7 +414,7 @@ export interface Issue {
   title: string
   description: string | null
   status: 'new' | 'in_progress' | 'resolved'
-  severity: 'minor' | 'gameplay' | 'unplayable'
+  severity: 'minor' | 'playable' | 'unplayable'
   reportedBy: string | null
   assignedTo: string | null
   resolvedAt: Date | null
@@ -473,18 +466,6 @@ SUPABASE_SERVICE_ROLE_KEY=eyJ...
 DATABASE_URL=postgresql://...
 ```
 
-### Deployment Strategy
-
-```bash
-# Preview: Vercel preview deployments
-git push origin feature-branch
-# → Auto-deploys to preview.pinpoint.dev
-
-# Production: Merge to main
-git push origin main
-# → Auto-deploys to pinpoint.dev
-```
-
 ---
 
 ## Directory Structure
@@ -493,8 +474,8 @@ git push origin main
 pinpoint/
 ├── src/
 │   ├── app/                      # Next.js App Router
-│   │   ├── (auth)/              # Auth routes (login, signup)
-│   │   ├── (public)/            # Public routes (report issue)
+│   │   ├── (auth)/              # Auth routes
+│   │   ├── (public)/            # Public routes
 │   │   ├── dashboard/           # Member dashboard
 │   │   ├── issues/              # Issue management
 │   │   │   ├── [id]/           # Issue detail
@@ -563,42 +544,7 @@ npm run e2e
 4. Test locally
 5. Repeat for production when ready
 
-**No migration files** - Pre-beta, can change schema freely with drizzle-kit push.
-
----
-
-## Performance Strategy
-
-### Caching
-
-```typescript
-import { cache } from 'react'
-
-// Request-level deduplication
-export const getIssue = cache(async (id: string) => {
-  return await db.query.issues.findFirst({
-    where: eq(issues.id, id),
-    with: {
-      machine: true,
-      assignedToUser: true,
-    }
-  })
-})
-```
-
-### Streaming & Suspense
-
-```typescript
-<Suspense fallback={<IssueListSkeleton />}>
-  <IssueList />
-</Suspense>
-```
-
-### Image Optimization
-
-- Use Next.js `<Image>` component
-- Supabase Storage auto-optimizes images
-- Lazy load images below the fold
+**No migration files** - Use drizzle-kit push for direct schema updates.
 
 ---
 
@@ -629,18 +575,18 @@ export const getIssue = cache(async (id: string) => {
 
 ---
 
-## Tech Stack Decisions Log
+## Tech Stack Decisions
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2025-11-10 | Next.js 16 | Use latest stable release |
-| 2025-11-10 | No real-time subscriptions | MVP doesn't need it, adds complexity |
+| 2025-11-10 | No real-time subscriptions | MVP doesn't need it |
 | 2025-11-10 | No DAL/Repository layers | Server Components + Drizzle is sufficient |
 | 2025-11-10 | Issues always per-machine | Aligns with reality, simplifies schema |
-| 2025-11-10 | Severity: minor/gameplay/unplayable | Player-centric, clear language |
+| 2025-11-10 | Severity: minor/playable/unplayable | Clear, player-centric language |
 | 2025-11-10 | Role: guest/member/admin | Simple, extensible permission model |
-| 2025-11-10 | Two Supabase projects | Preview/prod separation, clean data |
-| 2025-11-10 | Drizzle push (no migrations) | Pre-beta, can change schema freely |
+| 2025-11-10 | Two Supabase projects | Preview/prod separation |
+| 2025-11-10 | Drizzle push (no migrations) | Direct schema updates during development |
 
 ---
 

@@ -1,14 +1,13 @@
-# PinPoint Product Specification v2.0
+# PinPoint Product Specification
 
 **Last Updated**: 2025-11-10
-**Status**: ACTIVE - This is the source of truth for scope decisions
+**Status**: ACTIVE - Source of truth for scope decisions
 
-## Mission Statement
+## Mission
 
 Enable the Austin Pinball Collective to efficiently log, track, and resolve pinball machine issues.
 
-**Target User**: Single organization (Austin Pinball Collective)
-**Development**: Solo passion project, spare-time development
+**Target**: Single organization (Austin Pinball Collective)
 **Philosophy**: Working software over comprehensive features
 
 ---
@@ -43,17 +42,17 @@ Support multiple organizations with full data isolation.
 
 ### 1. User Accounts & Authentication
 
-**What's Included:**
+**Included:**
 - Email/password sign-up and login via Supabase Auth
 - Basic profile (name, email, avatar)
 - Password reset flow
-- Single role: **Member** (can do everything)
+- Single role: **Member** (full access)
 
-**What's NOT Included:**
+**Not Included:**
 - ❌ Guest role (MVP+)
 - ❌ Admin role (1.0)
 - ❌ Social login (1.0)
-- ❌ Self-service sign-up (MVP+ for guests, MVP allows manual member creation)
+- ❌ Self-service sign-up (MVP+ for guests)
 
 **Done When:**
 - [ ] Members can sign up with email
@@ -65,16 +64,16 @@ Support multiple organizations with full data isolation.
 
 ### 2. Machine Registry
 
-**What's Included:**
-- Machine with **name only** (bare minimum)
+**Included:**
+- Machine with **name only**
 - List of all machines
 - Machine detail page showing its issues
 - Machine status derived from open issues (operational/needs service/unplayable)
 
-**What's NOT Included:**
+**Not Included:**
 - ❌ Manufacturer, year, model, location (MVP+)
 - ❌ Machine photos (MVP+)
-- ❌ Machine search (MVP+ - small list initially)
+- ❌ Machine search (MVP+)
 - ❌ Machine ownership (MVP+)
 - ❌ Machine notes/tournament settings (1.0)
 - ❌ QR codes (MVP+)
@@ -86,17 +85,17 @@ Support multiple organizations with full data isolation.
 - [ ] Machine status reflects its open issues
 - [ ] Machine page shows its issues
 
-**Design Decision:** Issues are **always** per-machine. Every issue must have exactly one machine. No "general arcade" issues in MVP.
+**Design Decision:** Issues are **always** per-machine. Every issue must have exactly one machine.
 
 ---
 
 ### 3. Issue Tracking & Resolution
 
-**What's Included:**
+**Included:**
 - Create issue with: title, description, machine (required), severity
-- **Severity levels:** `minor` | `gameplay` | `unplayable`
-  - **minor**: Cosmetic or very minor issues
-  - **gameplay**: Affects gameplay but machine is still playable
+- **Severity levels:** `minor` | `playable` | `unplayable`
+  - **minor**: Cosmetic or very minor issues (e.g., light out)
+  - **playable**: Affects gameplay but machine is still playable (e.g., shot not registering)
   - **unplayable**: Machine cannot be played
 - Issue status: `new` → `in_progress` → `resolved`
 - Assign issue to a member
@@ -105,7 +104,7 @@ Support multiple organizations with full data isolation.
 - Filter issues by: status, severity, machine, assignee
 - Issue detail page
 
-**What's NOT Included:**
+**Not Included:**
 - ❌ Priority field (MVP+ if needed)
 - ❌ Issue photos (MVP+)
 - ❌ Custom statuses (1.0+)
@@ -129,13 +128,13 @@ Support multiple organizations with full data isolation.
 
 ### 4. Public Issue Reporting
 
-**What's Included:**
+**Included:**
 - Public-facing form to report issues (no login required)
-- Requires: machine selection, title, description, **severity**
+- Requires: machine selection, title, description, severity
 - Shows submission confirmation
 - Anonymous submissions (no email capture)
 
-**What's NOT Included:**
+**Not Included:**
 - ❌ Email capture for follow-up (MVP+)
 - ❌ Guest account creation (MVP+)
 - ❌ Public issue browsing (MVP+)
@@ -153,7 +152,7 @@ Support multiple organizations with full data isolation.
 
 ### 5. Dashboard & Lists
 
-**What's Included:**
+**Included:**
 - Member dashboard showing:
   - Issues assigned to me
   - Recently reported issues
@@ -162,7 +161,7 @@ Support multiple organizations with full data isolation.
 - Issues list with filtering (status, severity, machine, assignee)
 - Machine list (simple, no search yet)
 
-**What's NOT Included:**
+**Not Included:**
 - ❌ Public landing page (MVP+)
 - ❌ Customizable dashboard (2.0+)
 - ❌ Analytics/charts (2.0+)
@@ -188,7 +187,7 @@ These make MVP practical for daily use:
 - **Machine photos**: Identify machines visually
 - **Machine ownership**: Machines owned by members, notifications to owners
 - **Issue photos**: Upload photos with issues for better clarity
-- **QR codes**: Generate QR codes for machines, link to issue reporting
+- **QR codes**: Generate QR codes for machines, link directly to issue reporting
 
 ### User Experience
 - **Public landing page**: Show recent issues per machine (read-only)
@@ -242,7 +241,7 @@ Major features that complete the vision:
 - Billing/subscriptions if SaaS
 
 ### Advanced Features
-- **Basic analytics**: Resolution times, common problems, active users (2.0+)
+- **Analytics**: Resolution times, common problems, active users (2.0+)
 - **Third-party integrations**: Webhooks, API access
 - **Parts inventory**: Track parts and link to machines
 - **AI features**: Auto-categorization, duplicate detection
@@ -253,11 +252,10 @@ Major features that complete the vision:
 
 **Things we're NOT building:**
 
-### Forever No
+### Not Applicable
 - ❌ SLA tracking - Not a helpdesk tool
 - ❌ SMS notifications - Email is sufficient
 - ❌ Time tracking - Not needed for hobby repairs
-- ❌ Recurring maintenance schedules - Will add if users request it
 - ❌ Social features - Not a social network
 - ❌ Forums/discussion boards - Stay focused on issues
 - ❌ Event management - Use dedicated tools
@@ -299,11 +297,11 @@ If not 3/3 yes → **It goes in MVP+ or later.**
 
 A feature is "done" when:
 
-1. ✅ Core functionality works (happy path)
-2. ✅ Basic error handling exists (shows user-friendly errors)
-3. ✅ Critical paths have tests
-4. ✅ Works on mobile browsers
-5. ✅ No obvious security holes
+1. ✅ **Happy path works** - Primary use case functions correctly
+2. ✅ **Basic errors handled** - User sees friendly error messages
+3. ✅ **Critical path tested** - Integration test or E2E test passes
+4. ✅ **Works on mobile** - Responsive design, no broken layouts
+5. ✅ **No security holes** - Input validation, auth checks in place
 
 A feature is **NOT** "done" when:
 - Every edge case is handled
@@ -354,16 +352,16 @@ A feature is **NOT** "done" when:
 - Backups configured
 - Monitoring enabled
 
-**No data sharing between environments.** Fresh start for both.
+**No data sharing between environments.**
 
 ---
 
-## Questions & Decisions Log
+## Decisions Log
 
 | Date | Question | Decision | Rationale |
 |------|----------|----------|-----------|
-| 2025-11-10 | Support multiple orgs? | 2.0 | Single tenant reduces complexity by 40% |
-| 2025-11-10 | Issue severity levels? | minor/gameplay/unplayable | Clear, player-centric language |
+| 2025-11-10 | Support multiple orgs? | 2.0 | Single tenant simplifies architecture |
+| 2025-11-10 | Issue severity levels? | minor/playable/unplayable | Clear, player-centric language |
 | 2025-11-10 | Issues per-machine always? | Yes | Aligns with reality, simplifies queries |
 | 2025-11-10 | Email notifications? | 1.0 | Important but not required for MVP |
 | 2025-11-10 | Photo attachments? | MVP+ | Adds clarity but text works initially |
