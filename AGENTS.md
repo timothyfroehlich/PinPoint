@@ -10,6 +10,7 @@ Tim is vibecoding this app by himself to learn about website design and experime
 
 Read these immediately before starting work:
 - **`docs/NON_NEGOTIABLES.md`** - Forbidden patterns and critical constraints
+- **`docs/PATTERNS.md`** - Project-specific code patterns (MUST reference when coding)
 - **`docs/TYPESCRIPT_STRICTEST_PATTERNS.md`** - Type safety patterns
 - **`docs/PRODUCT_SPEC.md`** - What we're building (MVP/MVP+/1.0/2.0)
 - **`docs/TECH_SPEC.md`** - Single-tenant architecture specification
@@ -107,6 +108,18 @@ Read these immediately before starting work:
 - **Boundary**: Convert to camelCase at application boundaries
 - **Types**: Keep snake_case DB types separate from camelCase app types
 
+## Pattern Discovery & Documentation
+
+**IMPORTANT**: When implementing features, always reference `docs/PATTERNS.md` for established patterns.
+
+**Contributing New Patterns**:
+- **When**: You implement the same approach 2+ times
+- **What**: Add it to `docs/PATTERNS.md` with a working code example
+- **Why**: Future agents need to follow the same conventions
+- **How**: Keep examples concise, focus on PinPoint-specific patterns (not general Next.js knowledge)
+
+**Example**: If you create two Server Actions with similar structure, add that pattern to PATTERNS.md so the third one follows the same approach.
+
 ## Testing Strategy
 
 - **Unit tests**: Pure functions, utilities
@@ -136,6 +149,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 ## Essential Documentation
 
 - **`docs/NON_NEGOTIABLES.md`** - Critical patterns and forbidden practices
+- **`docs/PATTERNS.md`** - Project-specific code patterns (living document)
 - **`docs/PRODUCT_SPEC.md`** - Feature specifications (MVP/MVP+/1.0/2.0)
 - **`docs/TECH_SPEC.md`** - Single-tenant architecture
 - **`docs/TESTING_PLAN.md`** - Testing strategy and patterns
