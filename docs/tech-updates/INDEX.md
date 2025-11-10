@@ -1,26 +1,42 @@
-# Latest Tech Stack Updates
+# Tech Stack Reference
 
-Critical post-training updates (August 2025).
+Current best practices for PinPoint's technology stack.
 
-## 🚨 Breaking Changes Alert (August 2025)
+**Note for Greenfield Development:**
+These files contain migration context from previous codebase iterations. When reading:
+- Focus on the technical patterns and code examples
+- Ignore "Migration Context", "Phase", and "Checklist" sections
+- Ignore references to "organization scoping" (PinPoint v2 is single-tenant)
+- Use official docs + Context7 for authoritative current patterns
 
-- **Next.js 15:** fetch() now defaults to UNCACHED (CRITICAL performance risk)
-- **Tailwind v4:** CSS-based configuration, no more config files (BREAKING)
-- **Supabase:** `@supabase/auth-helpers` → `@supabase/ssr` (CRITICAL)
-- **Material UI v7:** CSS Layers, Hidden component removal
-- **Vitest:** `workspace` → `projects` configuration
+## Core Technologies
 
-## Contents
+### **Modern React & Next.js**
+- **[react-19.md](./react-19.md)** - cache() API, React Compiler, Server Actions
+- **[nextjs.md](./nextjs.md)** - App Router, Server Components, caching behavior
 
-### **Critical Updates (August 2025)**
-- **[quick-reference.md](./quick-reference.md)** - Complete migration overview and checklist with breaking changes
-- **[react-19.md](./react-19.md)** - NEW: cache() API, React Compiler, performance optimization
-- **[tailwind-css-v4.md](./tailwind-css-v4.md)** - NEW: CSS-based architecture, 5x faster builds
-- **[shadcn-ui.md](./shadcn-ui.md)** - NEW: Modern component library, Material UI replacement
-- **[nextjs.md](./nextjs.md)** - UPDATED: Critical caching changes, Server Components/Actions
+### **UI & Styling**
+- **[shadcn-ui.md](./shadcn-ui.md)** - Component library patterns and best practices
+- **[tailwind-css-v4.md](./tailwind-css-v4.md)** - CSS-based configuration, performance
 
-### **Existing Technologies**
-- **[drizzle-orm.md](./drizzle-orm.md)** - Generated columns, relational queries, PGlite testing
-- **[supabase.md](./supabase.md)** - Server-centric auth migration workflow
-- **[material-ui-v7.md](./material-ui-v7.md)** - API cleanup and CSS Layers setup
-- **[vitest.md](./vitest.md)** - Modern ES Module mocking patterns
+### **Data & Backend**
+- **[drizzle-orm.md](./drizzle-orm.md)** - Type-safe queries, relational patterns, testing
+- **[supabase.md](./supabase.md)** - Server-first authentication patterns
+
+### **Testing**
+- **[vitest.md](./vitest.md)** - Modern ES module mocking, integration testing
+
+## Key Patterns
+
+**Server-First Architecture:**
+- Default to Server Components
+- Use Server Actions for mutations
+- Request-level caching with React 19 `cache()`
+
+**Progressive Enhancement:**
+- Forms work without JavaScript
+- Selective client components for interactivity
+
+**Type Safety:**
+- Strict TypeScript configuration
+- End-to-end type safety with Drizzle
