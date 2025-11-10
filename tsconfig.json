@@ -1,17 +1,10 @@
 {
   "extends": ["./tsconfig.base.json", "@tsconfig/strictest/tsconfig.json"],
   "compilerOptions": {
-    "noEmit": true,
-    "strictNullChecks": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-    "noFallthroughCasesInSwitch": true,
-    "noImplicitReturns": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "allowUnreachableCode": false,
-    "allowUnusedLabels": false,
-    "forceConsistentCasingInFileNames": true
+    // Additional settings beyond @tsconfig/strictest
+    "noEmit": true, // We only use tsc for type checking, not emitting
+    "strictNullChecks": true, // Explicit for emphasis (part of "strict")
+    "forceConsistentCasingInFileNames": true // Cross-platform safety
   },
   "include": [
     "next-env.d.ts",
