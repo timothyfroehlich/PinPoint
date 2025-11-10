@@ -387,21 +387,48 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI) → PR 5 (
 - [ ] Initialize Playwright (`npx playwright install`)
 - [ ] Create `playwright.config.ts`
   - Configure base URL
-  - Set up test projects (chromium, firefox, webkit)
+  - Set up test projects (chromium, firefox, webkit, auth-setup, chromium-auth)
   - Configure retries and timeouts
+  - Configure use.trace, screenshot, video options
 - [ ] Create `e2e/` directory structure
   - [ ] `fixtures/` (Playwright fixtures)
   - [ ] `smoke/` (smoke tests)
+  - [ ] `auth/` (authentication setup tests)
 - [ ] Write example smoke test (home page loads)
-- [ ] Add smoke test script to package.json (`smoke`)
+- [ ] Write auth setup test (for authenticated test project)
+
+#### E2E Database Snapshots (optional but recommended)
+- [ ] Create `scripts/e2e-snapshot-create.sh`
+  - Create database snapshot before E2E tests
+  - Speeds up test runs by restoring known state
+- [ ] Create `scripts/e2e-snapshot-restore.sh`
+  - Restore database to snapshot state
+  - Use in Playwright globalSetup
+- [ ] Add scripts to package.json:
+  - [ ] `e2e:snapshot:create`
+  - [ ] `e2e:snapshot:restore`
+
+#### Enhanced Test Scripts
+- [ ] Add cross-platform E2E scripts to package.json:
+  - [ ] `smoke` - Quick smoke tests (chromium only, unauthenticated)
+  - [ ] `e2e` - Full E2E suite (guest + authenticated flows)
+  - [ ] `e2e:guest` - Unauthenticated flows only
+  - [ ] `e2e:smoke` - Authenticated smoke tests
+- [ ] Use cross-env for PORT and BASE_URL configuration
+- [ ] Configure PLAYWRIGHT_REUSE=1 for faster dev iteration
 
 #### GitHub Actions Update
 - [ ] Add test job to `.github/workflows/ci.yml`
   - Run unit/integration tests (`npm test`)
   - Upload coverage reports (optional)
+- [ ] Create `.github/workflows/tests.yml`
+  - Separate workflow for comprehensive testing
+  - Matrix strategy for parallel test execution
 - [ ] Add E2E test job to `.github/workflows/ci.yml`
   - Install Playwright browsers
   - Run smoke tests (`npm run smoke`)
+  - Upload Playwright traces on failure
+  - Upload test results
 
 ### Verification
 - [ ] `npm test` runs and passes
