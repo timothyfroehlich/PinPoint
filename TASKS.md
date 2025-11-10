@@ -43,39 +43,38 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI) → PR 5 (
 - [ ] Install @tsconfig/strictest (`npm install -D @tsconfig/strictest`)
 - [ ] Create initial Next.js app structure (manual setup or `npx create-next-app@latest`)
 
-#### Build & Dev Tools
-- [ ] Install cross-env (`npm install -D cross-env`) - only if developing cross-platform (Windows + Mac/Linux)
-
 #### TypeScript Configuration
 - [ ] Create `tsconfig.base.json` (shared configuration)
   - Path aliases (`~/` and `@/` → `./src/*`)
 - [ ] Create `tsconfig.json` (main app config)
   - Extend `tsconfig.base.json` and `@tsconfig/strictest`
   - Enable `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`
-  - Include src, middleware.ts, types
+  - Include src, middleware.ts
   - Exclude tests, config files, scripts
-- [ ] Create `tsconfig.config.json` (for config files)
-  - Looser strictness for tooling files
 - [ ] Create `tsconfig.tests.json` (for test files)
+  - Extend `tsconfig.base.json` only (NOT strictest)
   - Include test files and helpers
+  - Looser rules for test code
 - [ ] Verify all TypeScript compilation works
 
 #### Linting & Formatting
 - [ ] Install ESLint packages
   - `npm install -D eslint @typescript-eslint/eslint-plugin @typescript-eslint/parser eslint-config-next`
-  - `npm install -D @microsoft/eslint-formatter-sarif` (for GitHub Code Scanning)
 - [ ] Configure ESLint for Next.js + TypeScript
   - Type-aware rules
-  - Custom rules for security patterns
 - [ ] Install Prettier (`npm install -D prettier`)
 - [ ] Create `.prettierrc` config
 - [ ] Create `.prettierignore` file
 - [ ] Install eslint-config-prettier (`npm install -D eslint-config-prettier`)
 
-#### Security Tools (Minimal)
-- [ ] Create `scripts/` directory
-- [ ] Add gitleaks to pre-commit hook (secret scanning)
-  - Installed in CI, not locally
+#### ShellCheck & ActionLint
+- [ ] Install shellcheck locally (`brew install shellcheck` on Mac, or via apt)
+- [ ] Create `.shellcheckrc` configuration file
+- [ ] Create `scripts/` directory for bash scripts
+- [ ] Install actionlint for workflow validation
+
+#### Security Tools
+- [ ] Add gitleaks to CI (secret scanning)
   - Prevents committing API keys, passwords
 
 #### Git Hooks (Husky + lint-staged)
@@ -87,7 +86,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI) → PR 5 (
 - [ ] Add prepare script to package.json (`"prepare": "husky"`)
 - [ ] Configure lint-staged in package.json
 
-#### GitHub Actions (Minimal)
+#### GitHub Actions
 - [ ] Create `.github/workflows/` directory
 - [ ] Create `.github/workflows/ci.yml`
   - Node.js setup with dependency caching
@@ -96,11 +95,13 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI) → PR 5 (
   - Format check job (`npm run format`)
   - Build job (`npm run build`)
   - Test job (`npm test`)
+  - ShellCheck job (lint bash scripts)
+  - actionlint job (validate workflows)
   - gitleaks scan (secret detection)
   - npm audit (dependency vulnerabilities)
   - Triggers on push and pull_request to main
 
-#### GitHub Actions - CodeQL (free security scanning)
+#### GitHub Actions - CodeQL (optional)
 - [ ] Enable CodeQL in GitHub Security settings
   - Automated JavaScript/TypeScript analysis
   - Zero configuration needed
@@ -125,29 +126,36 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI) → PR 5 (
 - [ ] Create `.env.local` (gitignored)
 - [ ] Add `.gitignore` entries for env files
 
-#### Package.json Scripts (Simplified)
+#### Package.json Scripts
 **Essential Scripts:**
 - [ ] `dev` - Start Next.js dev server
 - [ ] `build` - Build for production
 - [ ] `start` - Start production server
-- [ ] `typecheck` - Run TypeScript type checking (all tsconfig files)
+- [ ] `typecheck` - Run TypeScript type checking (main + tests)
 - [ ] `lint` - Run ESLint
 - [ ] `lint:fix` - Auto-fix ESLint issues
 - [ ] `format` - Check Prettier formatting
 - [ ] `format:fix` - Auto-format with Prettier
 - [ ] `test` - Run Vitest tests
 - [ ] `test:watch` - Vitest watch mode
+- [ ] `smoke` - Run Playwright smoke tests
 - [ ] `prepare` - Husky install (runs on npm install)
+- [ ] `pre-flight` - Run everything before pushing (`typecheck && test && smoke && lint && format`)
+  - This is what you run before pushing to GitHub
+  - Runs all quality gates locally
 
 ### Verification
 - [ ] `npm run dev` starts development server
 - [ ] `npm run build` completes without errors
-- [ ] `npm run typecheck` passes (all tsconfig files)
+- [ ] `npm run typecheck` passes (main + tests)
 - [ ] `npm run lint` passes
 - [ ] `npm run format` passes
+- [ ] `npm run pre-flight` passes (runs all quality gates)
 - [ ] GitHub Actions CI workflow passes
 - [ ] Pre-commit hook runs on commit (lint-staged)
 - [ ] gitleaks scan passes in CI
+- [ ] ShellCheck validates bash scripts in CI
+- [ ] actionlint validates workflows in CI
 
 ---
 

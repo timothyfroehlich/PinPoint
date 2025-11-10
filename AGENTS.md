@@ -159,7 +159,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 ## Commit Guidelines
 
 - **Style**: Conventional commits (`feat:`, `fix:`, `chore:`)
-- **Before pushing**: `npm run typecheck && npm test && npm run smoke && npm run lint`
+- **Before pushing**: `npm run pre-flight` (runs typecheck, test, smoke, lint, format)
 - **PRs**: Clear description, screenshots for UI changes
 - **No migrations**: Schema changes via direct modification only
 
