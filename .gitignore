@@ -1,8 +1,5 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# GitHub workflows (temporarily ignored - needs manual addition via GitHub UI due to workflow permissions)
-.github/workflows/
-
 # dependencies
 /node_modules
 /.pnp
