@@ -108,13 +108,7 @@
 - **Do:** Verify authentication in Server Actions and tRPC procedures
 - **Don't:** Skip auth checks in protected routes
 
-**CORE-SEC-002:** Test RLS policies
-- **Severity:** High
-- **Why:** Catches authorization bugs
-- **Do:** Write pgTAP tests for all RLS policies
-- **Don't:** Mix RLS tests with application tests
-
-**CORE-SEC-003:** Validate all inputs
+**CORE-SEC-002:** Validate all inputs
 - **Severity:** Critical
 - **Why:** Prevent injection attacks
 - **Do:** Use Zod for all form data and user inputs
@@ -238,7 +232,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 **Rule IDs:**
 - CORE‑TS‑001..006: Type system
 - CORE‑SSR‑001..005: Supabase SSR and auth
-- CORE‑SEC‑001..003: Security
+- CORE‑SEC‑001..002: Security
 - CORE‑PERF‑001..002: Performance
 - CORE‑TEST‑001..003: Testing
 - CORE‑ARCH‑001..004: Architecture
