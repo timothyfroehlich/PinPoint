@@ -54,6 +54,8 @@ README, setup guide, environment variables documentation for easy onboarding.
   - How to run tests (`npm test`, `npm run smoke`)
   - How to add new components (`npx shadcn add [component]`)
   - Database management (`npm run db:push`, `npm run db:studio`)
+    - **NOTE**: Add migration workflow for production (`drizzle-kit generate` + `drizzle-kit migrate`)
+    - Explain when to transition from `push` (pre-beta) to migrations (production)
   - Common troubleshooting:
     - Supabase connection issues
     - Type errors with strictest config

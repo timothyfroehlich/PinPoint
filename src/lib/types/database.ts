@@ -1,0 +1,32 @@
+/**
+ * Database Type Exports
+ *
+ * Inferred types from Drizzle schema.
+ * Use these types throughout the application (camelCase).
+ * Schema uses snake_case (database convention).
+ */
+
+import type { InferSelectModel, InferInsertModel } from "drizzle-orm";
+import {
+  userProfiles,
+  machines,
+  issues,
+  issueComments,
+} from "~/server/db/schema";
+
+// Select types (full row from database)
+export type UserProfile = InferSelectModel<typeof userProfiles>;
+export type Machine = InferSelectModel<typeof machines>;
+export type Issue = InferSelectModel<typeof issues>;
+export type IssueComment = InferSelectModel<typeof issueComments>;
+
+// Insert types (for creating new rows)
+export type NewUserProfile = InferInsertModel<typeof userProfiles>;
+export type NewMachine = InferInsertModel<typeof machines>;
+export type NewIssue = InferInsertModel<typeof issues>;
+export type NewIssueComment = InferInsertModel<typeof issueComments>;
+
+// Enum types for type safety
+export type UserRole = "guest" | "member" | "admin";
+export type IssueStatus = "new" | "in_progress" | "resolved";
+export type IssueSeverity = "minor" | "playable" | "unplayable";

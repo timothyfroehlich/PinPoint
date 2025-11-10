@@ -132,6 +132,29 @@ Read these before starting your task:
 
 3. **Update docs/PATTERNS.md** if you established reusable patterns
 
+## Completed Work (What's Already Done)
+
+### Task 2: Database Schema (✅ Completed)
+**What was built:**
+- Drizzle ORM setup with `postgres` driver
+- Complete schema: `user_profiles`, `machines`, `issues`, `issue_comments`
+- Database trigger for auto-profile creation (`supabase/seed.sql`)
+- Type exports in `~/lib/types` (UserProfile, Machine, Issue, IssueComment)
+- Package.json scripts: `db:push`, `db:studio`
+
+**Key patterns established:**
+- Use `drizzle-kit push` for pre-beta (no migrations until production)
+- Cross-schema FK constraints go in `seed.sql` (Drizzle limitation)
+- Use bracket notation for `process.env["DATABASE_URL"]` (@tsconfig/strictest)
+- Schema uses snake_case, convert to camelCase at boundaries
+- All database access via `import { db } from "~/server/db"`
+
+**For Task 3 agent:**
+- Run `supabase start` to launch local database
+- Run `npm run db:push` to sync schema
+- Trigger will auto-create user_profiles on signup
+- Types ready for auth implementation
+
 ## Common Pitfalls to Avoid
 
 1. **Over-engineering**: Don't add abstractions before you need them (Rule of Three)
@@ -140,6 +163,7 @@ Read these before starting your task:
 4. **Schema changes for TypeScript**: Code adapts to schema, never the reverse
 5. **Testing Server Components directly**: Use E2E tests instead (they're async integration concerns)
 6. **Per-test PGlite instances**: Always use worker-scoped instances (system lockups otherwise)
+7. **Drizzle cross-schema references**: Can't reference auth.users in schema, use seed.sql for FK constraints
 
 ## Git Workflow
 
