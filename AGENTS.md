@@ -27,7 +27,7 @@ Read these immediately before starting work:
 
 ### Technology Stack
 - **Frontend**: Next.js 16, React 19 Server Components, shadcn/ui, Tailwind CSS v4
-- **Backend**: Drizzle ORM, PostgreSQL via Supabase (no tRPC in MVP)
+- **Backend**: Drizzle ORM, PostgreSQL via Supabase
 - **Authentication**: Supabase SSR (no RLS for single-tenant)
 - **Testing**: Vitest, Playwright, worker-scoped PGlite
 - **Language**: TypeScript with strictest configuration
