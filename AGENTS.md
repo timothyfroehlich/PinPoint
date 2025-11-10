@@ -15,7 +15,6 @@ Read these immediately before starting work:
 - **`docs/PRODUCT_SPEC.md`** - What we're building (MVP/MVP+/1.0/2.0)
 - **`docs/TECH_SPEC.md`** - Single-tenant architecture specification
 - **`docs/TESTING_PLAN.md`** - Testing strategy and patterns
-- **`docs/DISCIPLINE.md`** - Scope creep prevention guidelines
 - **`package.json`** - Available scripts, dependencies, configuration
 
 ## Project Context
@@ -153,7 +152,6 @@ If all Yes → ship it. Perfect is the enemy of done.
 - **`docs/PRODUCT_SPEC.md`** - Feature specifications (MVP/MVP+/1.0/2.0)
 - **`docs/TECH_SPEC.md`** - Single-tenant architecture
 - **`docs/TESTING_PLAN.md`** - Testing strategy and patterns
-- **`docs/DISCIPLINE.md`** - Scope creep prevention
 - **`docs/V2_ROADMAP.md`** - Deferred features parking lot
 - **`docs/TYPESCRIPT_STRICTEST_PATTERNS.md`** - Practical TypeScript patterns
 - **`docs/tech-updates/INDEX.md`** - Tech stack reference
