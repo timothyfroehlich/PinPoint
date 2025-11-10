@@ -20,6 +20,7 @@ Thumbs.db
 
 # Archived content
 archived/
+.archived_v1/
 
 # Package lock files
 package-lock.json
