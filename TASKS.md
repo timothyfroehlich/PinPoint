@@ -1058,6 +1058,16 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
     - Test setup with PGlite
   - PR workflow and quality gates
 
+#### Copilot Instructions Refresh
+- [ ] Review and update `.github/copilot-instructions.md` and files in `.github/instructions/`
+  - Promote any repeated patterns (seen ≥2 times in code) into `docs/PATTERNS.md` first
+  - If repetition is confirmed for domains (e.g., Machines, Issues, Timeline), add focused instruction files
+    - `machines.instructions.md`, `issues.instructions.md` under `.github/instructions/`
+    - Keep guidance concise; reference `docs/PATTERNS.md` instead of duplicating
+  - Ensure guidance remains single-tenant (no org/RLS/tRPC) and aligns with `docs/NON_NEGOTIABLES.md`
+  - Update "Last Updated" stamps in instruction files
+  - Open a follow-up issue to periodically revisit instruction accuracy as features evolve
+
 ### Verification
 - [ ] Friend can clone repo and follow README to get app running
 - [ ] All environment variables documented in `.env.example`
