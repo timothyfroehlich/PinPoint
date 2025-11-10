@@ -8,7 +8,7 @@
 Enable the Austin Pinball Collective to efficiently log, track, and resolve pinball machine issues.
 
 **Target User**: Single organization (Austin Pinball Collective)
-**Timeline**: MVP in weeks, not months
+**Development**: Solo passion project, spare-time development
 **Philosophy**: Working software over comprehensive features
 
 ---
@@ -18,12 +18,28 @@ Enable the Austin Pinball Collective to efficiently log, track, and resolve pinb
 A focused issue tracking system for pinball machines that:
 - Takes 30 seconds to report an issue
 - Shows maintenance staff what needs attention
-- Provides public transparency for players
 - Maintains complete issue history per machine
+- Enables efficient repair workflows
 
 ---
 
-## The 5 Core Features (v1.0 Scope)
+## Release Strategy
+
+### MVP (Minimum Viable Product)
+The absolute bare minimum to start tracking issues. Members-only, basic features.
+
+### MVP+ (Immediate Next Set)
+Polish and usability improvements that make it practical for daily use.
+
+### 1.0 (First Major Release)
+Full-featured single-tenant application with notifications, integrations, and advanced roles.
+
+### 2.0 (Multi-Tenant)
+Support multiple organizations with full data isolation.
+
+---
+
+## MVP Scope (Ship First)
 
 ### 1. User Accounts & Authentication
 
@@ -31,80 +47,79 @@ A focused issue tracking system for pinball machines that:
 - Email/password sign-up and login via Supabase Auth
 - Basic profile (name, email, avatar)
 - Password reset flow
-- Two user types: Members (can do everything) and Public (can only report)
+- Single role: **Member** (can do everything)
 
 **What's NOT Included:**
-- ❌ Social login (Google, GitHub, etc.)
-- ❌ Complex role hierarchies
-- ❌ User permissions matrix
-- ❌ Team management
-- ❌ User activity tracking
+- ❌ Guest role (MVP+)
+- ❌ Admin role (1.0)
+- ❌ Social login (1.0)
+- ❌ Self-service sign-up (MVP+ for guests, MVP allows manual member creation)
 
 **Done When:**
-- [ ] Users can sign up with email
-- [ ] Users can log in
-- [ ] Users can reset password
-- [ ] Public users can access issue reporting
-- [ ] Members can access all features
+- [ ] Members can sign up with email
+- [ ] Members can log in
+- [ ] Members can reset password
+- [ ] Profile shows name and avatar
 
 ---
 
 ### 2. Machine Registry
 
 **What's Included:**
-- Machine profile page (name, manufacturer, year, model, location, photo)
+- Machine with **name only** (bare minimum)
 - List of all machines
-- Search machines by name
-- Machine status indicator (operational, needs service, out of order)
-- Link to machine's issue list
+- Machine detail page showing its issues
+- Machine status derived from open issues (operational/needs service/unplayable)
 
 **What's NOT Included:**
-- ❌ Machine categories/tags
-- ❌ Machine history tracking
-- ❌ Parts inventory per machine
-- ❌ Maintenance schedules
-- ❌ Service history separate from issues
-- ❌ Multiple locations per machine
-- ❌ QR code generation for machines
+- ❌ Manufacturer, year, model, location (MVP+)
+- ❌ Machine photos (MVP+)
+- ❌ Machine search (MVP+ - small list initially)
+- ❌ Machine ownership (MVP+)
+- ❌ Machine notes/tournament settings (1.0)
+- ❌ QR codes (MVP+)
 
 **Done When:**
-- [ ] Can create a machine with basic info
+- [ ] Can create a machine with name
 - [ ] Can view machine detail page
 - [ ] Can see all machines in a list
-- [ ] Can search for machines
-- [ ] Machine shows current status based on open issues
+- [ ] Machine status reflects its open issues
 - [ ] Machine page shows its issues
+
+**Design Decision:** Issues are **always** per-machine. Every issue must have exactly one machine. No "general arcade" issues in MVP.
 
 ---
 
 ### 3. Issue Tracking & Resolution
 
 **What's Included:**
-- Create issue with: title, description, machine, severity (low/medium/high/critical), reporter
-- Issue status: New → In Progress → Resolved
-- Issue priority: Low → Medium → High
+- Create issue with: title, description, machine (required), severity
+- **Severity levels:** `minor` | `gameplay` | `unplayable`
+  - **minor**: Cosmetic or very minor issues
+  - **gameplay**: Affects gameplay but machine is still playable
+  - **unplayable**: Machine cannot be played
+- Issue status: `new` → `in_progress` → `resolved`
 - Assign issue to a member
 - Add comments to issues
 - Issue timeline (status changes, assignments, comments)
-- Filter issues by: status, severity, priority, machine, assignee
+- Filter issues by: status, severity, machine, assignee
 - Issue detail page
 
 **What's NOT Included:**
-- ❌ Custom statuses beyond the 3 core states
-- ❌ Issue templates
-- ❌ Related issues / dependencies
-- ❌ Issue labels/tags
-- ❌ Bulk operations
-- ❌ Due dates
-- ❌ Time tracking
-- ❌ Recurring issues
-- ❌ Email notifications
-- ❌ Issue attachments/photos (v1.0)
+- ❌ Priority field (MVP+ if needed)
+- ❌ Issue photos (MVP+)
+- ❌ Custom statuses (1.0+)
+- ❌ Issue templates (1.0+)
+- ❌ Related issues (2.0+)
+- ❌ Issue labels/tags (1.0+)
+- ❌ Bulk operations (1.0+)
+- ❌ Due dates (1.0+)
+- ❌ Email notifications (1.0)
 
 **Done When:**
 - [ ] Can create an issue for a machine
 - [ ] Can view issue detail with full timeline
-- [ ] Can change status (New/In Progress/Resolved)
+- [ ] Can change status (new/in_progress/resolved)
 - [ ] Can assign to members
 - [ ] Can add comments
 - [ ] Can filter issue list by all criteria
@@ -115,23 +130,22 @@ A focused issue tracking system for pinball machines that:
 ### 4. Public Issue Reporting
 
 **What's Included:**
-- Public-facing form to report issues (no login required for submission)
-- Requires: machine selection, title, description
-- Optional: email for follow-up
+- Public-facing form to report issues (no login required)
+- Requires: machine selection, title, description, **severity**
 - Shows submission confirmation
-- Public reporter can optionally create account to track their reports
+- Anonymous submissions (no email capture)
 
 **What's NOT Included:**
-- ❌ Public issue browsing (issues are private to members)
-- ❌ Status updates to public reporters
-- ❌ Public API
-- ❌ Rate limiting (v1.0 - add if abused)
-- ❌ CAPTCHA (v1.0 - add if abused)
-- ❌ Photo uploads from public
+- ❌ Email capture for follow-up (MVP+)
+- ❌ Guest account creation (MVP+)
+- ❌ Public issue browsing (MVP+)
+- ❌ Photo uploads (MVP+)
+- ❌ Rate limiting (add if abused)
+- ❌ CAPTCHA (add if abused)
 
 **Done When:**
 - [ ] Public form accessible without login
-- [ ] Can select machine and submit issue
+- [ ] Can select machine, severity, and submit issue
 - [ ] Issue appears in member dashboard
 - [ ] Confirmation shown after submission
 
@@ -143,104 +157,141 @@ A focused issue tracking system for pinball machines that:
 - Member dashboard showing:
   - Issues assigned to me
   - Recently reported issues
-  - Critical/high priority issues
+  - Unplayable machines (critical attention needed)
   - Quick stats (open issues, machines needing service)
-- Issues list with filtering (status, priority, severity, machine, assignee)
-- Machine list with search
+- Issues list with filtering (status, severity, machine, assignee)
+- Machine list (simple, no search yet)
 
 **What's NOT Included:**
-- ❌ Customizable dashboard widgets
-- ❌ Analytics/charts
-- ❌ Export to CSV
-- ❌ Saved filters
-- ❌ Sorting options beyond default
-- ❌ Activity feed
+- ❌ Public landing page (MVP+)
+- ❌ Customizable dashboard (2.0+)
+- ❌ Analytics/charts (2.0+)
+- ❌ Export to CSV (1.0+)
+- ❌ Saved filters (1.0+)
+- ❌ Activity feed (1.0+)
 
 **Done When:**
 - [ ] Dashboard shows key issue views
 - [ ] Shows basic stats
 - [ ] Issue list is filterable
-- [ ] Machine list is searchable
+- [ ] Machine list displays all machines
 
 ---
 
-## Explicit Non-Goals (v1.0)
+## MVP+ Scope (Immediate Next Features)
 
-These are good ideas for later, but NOT in v1.0:
+These make MVP practical for daily use:
+
+### Usability Enhancements
+- **Machine model info**: Manufacturer, year, model, location
+- **Machine search**: Find machines quickly as fleet grows
+- **Machine photos**: Identify machines visually
+- **Machine ownership**: Machines owned by members, notifications to owners
+- **Issue photos**: Upload photos with issues for better clarity
+- **QR codes**: Generate QR codes for machines, link to issue reporting
+
+### User Experience
+- **Public landing page**: Show recent issues per machine (read-only)
+- **Guest accounts**: Self-service guest sign-up for public reporters
+- **Email capture**: Optional email on public reports for follow-up
+- **Recent issues per machine**: Show last 5 issues on machine page
+
+### Polish
+- **Machine search**: Filter/search machine list
+- **Better mobile UX**: Optimized layouts for on-site repairs
+- **Issue priority**: Add priority field if severity isn't enough
+
+---
+
+## 1.0 Scope (Full-Featured Single-Tenant)
+
+Major features that complete the vision:
+
+### Notifications
+- **Email notifications**: Assignments, status changes, comments
+- **In-app notifications**: Notification bell with unread count
+
+### Roles & Permissions
+- **Guest role**: Can only report issues (read-only otherwise)
+- **Member role**: Can manage issues, machines, assignments
+- **Admin role**: Can manage users, roles, system settings
+
+### Integration
+- **OPDB integration**: Pull machine data from OPDB (Open Pinball Database)
+- **Social login**: Google, GitHub for easier onboarding
+
+### Machine Management
+- **Locations**: Track which location each machine is at
+- **Machine notes**: Tournament setup notes, known issues, maintenance history
+- **Self-service guest accounts**: Public users can create guest accounts
+
+### Issue Management
+- **Custom issue statuses**: Beyond new/in_progress/resolved (1.0+)
+- **Saved filters**: Save and name common filter combinations (1.0+)
+- **Bulk operations**: Archive multiple resolved issues (1.0+)
+- **Issue labels/tags**: Categorize issues (electrical, mechanical, cosmetic) (1.0+)
+
+---
+
+## 2.0+ Scope (Long-Term Vision)
 
 ### Multi-Tenancy
-- ❌ Multiple organizations
-- ❌ Organization switching
-- ❌ Org-scoped data isolation via RLS
-- ❌ Organization settings/management
+- Support multiple organizations
+- Organization-scoped data isolation
+- Organization switching
+- Billing/subscriptions if SaaS
 
 ### Advanced Features
-- ❌ Real-time collaboration (presence, live updates)
-- ❌ Mobile apps
-- ❌ Offline support
-- ❌ Notifications (email, push, SMS)
-- ❌ Integrations (Slack, Discord, etc.)
-- ❌ API for external tools
-- ❌ Webhooks
-- ❌ Advanced reporting/analytics
-
-### Rich Content
-- ❌ Photo/file attachments on issues
-- ❌ Rich text editor (Markdown is fine)
-- ❌ Video uploads
-- ❌ Drawing/annotation tools
-
-### Workflow Automation
-- ❌ Automatic assignments
-- ❌ SLA tracking
-- ❌ Escalation rules
-- ❌ Custom workflows
+- **Basic analytics**: Resolution times, common problems, active users (2.0+)
+- **Third-party integrations**: Webhooks, API access
+- **Parts inventory**: Track parts and link to machines
+- **AI features**: Auto-categorization, duplicate detection
 
 ---
 
-## Success Metrics (v1.0)
+## Explicit Non-Goals
 
-**Functionality:**
-- All 5 core features work reliably
-- Public can report issues in <30 seconds
-- Members can find and update issues in <10 seconds
-- Zero data loss
+**Things we're NOT building:**
 
-**Quality:**
-- 80%+ test coverage for critical paths
-- No P0 security issues
-- Works on mobile browsers
-- Loads in <2 seconds
+### Forever No
+- ❌ SLA tracking - Not a helpdesk tool
+- ❌ SMS notifications - Email is sufficient
+- ❌ Time tracking - Not needed for hobby repairs
+- ❌ Recurring maintenance schedules - Will add if users request it
+- ❌ Social features - Not a social network
+- ❌ Forums/discussion boards - Stay focused on issues
+- ❌ Event management - Use dedicated tools
 
-**Adoption:**
-- Austin Pinball Collective is actively using it
-- Receiving public issue reports
-- Issues being tracked through to resolution
+### Not Prioritized
+- Mobile native apps (PWA is sufficient)
+- Offline support (online-first is fine)
+- Video uploads (photos are enough)
+- Custom workflows (keep it simple)
+- White labeling (not a SaaS yet)
 
 ---
 
 ## The Scope Firewall
 
-**Before adding ANYTHING to v1.0, ask:**
+**Before adding ANYTHING to MVP, ask:**
 
 1. ✅ Is it one of the 5 core features?
 2. ✅ Is it required for the core feature to work?
-3. ✅ Would v1.0 be useless without it?
+3. ✅ Would MVP be useless without it?
 
-If not 3/3 yes → **It goes in the v2 backlog.**
+If not 3/3 yes → **It goes in MVP+ or later.**
 
 **Examples:**
 
 | Feature | Include? | Why? |
 |---------|----------|------|
-| Issue comments | ✅ Yes | Core feature #3 explicitly includes it |
-| Email notifications | ❌ No | Nice to have, not required for tracking |
-| Machine photos | ✅ Yes | Helps identify machines, simple to implement |
-| File attachments | ❌ No | Adds complexity, can describe issues in text |
-| Password reset | ✅ Yes | Required for auth to be usable |
-| Social login | ❌ No | Email/password is sufficient |
-| Issue filtering | ✅ Yes | Core feature #3 explicitly includes it |
-| Saved filters | ❌ No | Can re-apply filters manually |
+| Issue comments | ✅ MVP | Core feature #3 explicitly includes it |
+| Issue photos | ❌ MVP+ | Text descriptions work for MVP |
+| Machine name | ✅ MVP | Can't track without identifying machines |
+| Machine model | ❌ MVP+ | Name is sufficient initially |
+| Email notifications | ❌ 1.0 | Nice to have, not required for tracking |
+| QR codes | ❌ MVP+ | Makes reporting easier but not essential |
+| Saved filters | ❌ 1.0+ | Can re-apply filters manually |
 
 ---
 
@@ -264,38 +315,46 @@ A feature is **NOT** "done" when:
 
 ---
 
-## Timeline & Phases
+## Success Metrics
 
-### Phase 1: Foundation (Week 1)
-- Project setup
-- Auth (sign up, login, logout)
-- Machine creation & listing
-- Basic navigation
+### MVP Success
+- ✅ Austin Pinball Collective members are using it
+- ✅ Issues are being created and resolved
+- ✅ Anonymous public reports are coming in
+- ✅ No data loss, no critical bugs
+- ✅ Core workflows work reliably
 
-### Phase 2: Core Issue Tracking (Week 2)
-- Issue creation, viewing, editing
-- Status & assignment changes
-- Comments
-- Basic filtering
+### MVP+ Success
+- ✅ Members prefer PinPoint over existing methods
+- ✅ QR codes deployed on machines
+- ✅ Photo attachments improve issue clarity
+- ✅ Machine search helps find machines quickly
 
-### Phase 3: Public Reporting (Week 3)
-- Public issue form
-- Form validation
-- Submission confirmation
-
-### Phase 4: Polish & Deploy (Week 4)
-- Dashboard views
-- Bug fixes
-- Tests for critical paths
-- Deploy to production
-
-**Total: 4 weeks to v1.0**
+### 1.0 Success
+- ✅ Email notifications keep members informed
+- ✅ Guest users can self-serve
+- ✅ OPDB integration reduces manual data entry
+- ✅ Multiple locations supported if APC expands
 
 ---
 
-## V2 Backlog (Post-MVP)
+## Environment Strategy
 
-See `V2_ROADMAP.md` for prioritized enhancements after v1.0 ships.
+**Two Supabase Projects:**
+
+### Preview Environment
+- Database with test/seed data
+- Safe for experimentation
+- Used for development and staging
+- Can be reset/rebuilt freely
+
+### Production Environment
+- Real member data
+- Strict change control
+- Backups configured
+- Monitoring enabled
+
+**No data sharing between environments.** Fresh start for both.
 
 ---
 
@@ -303,10 +362,15 @@ See `V2_ROADMAP.md` for prioritized enhancements after v1.0 ships.
 
 | Date | Question | Decision | Rationale |
 |------|----------|----------|-----------|
-| 2025-11-10 | Support multiple orgs? | No | Single tenant reduces complexity by 40% |
-| 2025-11-10 | Email notifications? | v2 | Not required for core tracking functionality |
-| 2025-11-10 | Photo attachments? | v2 | Text descriptions sufficient for v1 |
+| 2025-11-10 | Support multiple orgs? | 2.0 | Single tenant reduces complexity by 40% |
+| 2025-11-10 | Issue severity levels? | minor/gameplay/unplayable | Clear, player-centric language |
+| 2025-11-10 | Issues per-machine always? | Yes | Aligns with reality, simplifies queries |
+| 2025-11-10 | Email notifications? | 1.0 | Important but not required for MVP |
+| 2025-11-10 | Photo attachments? | MVP+ | Adds clarity but text works initially |
+| 2025-11-10 | QR codes? | MVP+ | High impact but not blocking |
+| 2025-11-10 | Machine model info? | MVP+ | Name is sufficient to start |
+| 2025-11-10 | Next.js version? | 16 (latest) | Use latest stable release |
 
 ---
 
-**Remember**: This spec is your defense against scope creep. When in doubt, ship v1.0 first, then enhance.
+**Remember**: This spec is your defense against scope creep. When in doubt, defer to later release.

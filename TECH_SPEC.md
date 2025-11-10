@@ -7,8 +7,8 @@
 
 1. **Single-Tenant First**: No organization scoping, no RLS complexity
 2. **Server-First**: Default to Server Components, minimal client JavaScript
-3. **Proven Stack**: Use what you know works, avoid new tech experiments
-4. **Progressive Enhancement**: Forms work without JavaScript
+3. **Direct Data Access**: Query database directly in Server Components (no DAL/repository layers)
+4. **Proven Stack**: Use latest stable versions, avoid experiments
 5. **Type Safety**: TypeScript strictest, no escape hatches
 
 ---
@@ -17,7 +17,7 @@
 
 ### Frontend
 
-**Next.js 15 (App Router)**
+**Next.js 16 (App Router)**
 - React 19 Server Components as default
 - Server Actions for mutations
 - Streaming with Suspense
@@ -25,46 +25,32 @@
 
 **React Architecture**
 - Server Components for data fetching and layout
-- Client Components only for: forms with interactivity, real-time features, user interactions
+- Client Components only for: forms with interactivity, user interactions
 - React Compiler enabled for automatic optimization
 - `use client` directive isolated to leaf components
 
 **Styling**
 - **Tailwind CSS v4** (primary) - CSS-based configuration
 - **shadcn/ui** (components) - Server Component compatible
-- **Material Design 3 colors** - From existing `globals.css`
-- No Material UI - full shadcn/ui migration
+- **Material Design 3 colors** - From `globals.css`
 
 **State Management**
 - Server state via React cache() and Server Components
 - Client state via useState/useReducer (minimal)
-- No global state management libraries needed for v1.0
+- No global state management libraries
 
 ### Backend
 
 **Supabase**
-- Authentication (email/password only)
+- Authentication (email/password for MVP)
 - PostgreSQL database
-- Real-time subscriptions (for comments/timeline if needed)
-- File storage (for avatars, machine photos)
-
-**Supabase Auth Pattern**
-```typescript
-// Server Components & Server Actions
-import { createClient } from '~/lib/supabase/server'
-
-const supabase = await createClient()
-const { data: { user } } = await supabase.auth.getUser()
-
-if (!user) {
-  redirect('/login')
-}
-```
+- File storage (for avatars, machine photos in MVP+)
+- **No real-time subscriptions** (MVP doesn't need it)
 
 **Drizzle ORM**
 - Type-safe queries
 - Schema in `src/server/db/schema/`
-- NO organization scoping needed
+- NO organization scoping
 - Direct queries in Server Components
 
 **tRPC (Minimal Use)**
@@ -72,145 +58,232 @@ if (!user) {
 - Protected procedures require authenticated user
 - Keep router surface area small
 
-### Database Architecture
+---
 
-**Core Tables** (snake_case in DB):
+## Database Schema (MVP)
+
+### Core Tables
 
 ```sql
 -- Users (managed by Supabase Auth)
-auth.users (id, email, created_at, ...)
+-- We don't touch auth.users directly
 
--- User profiles (our extension)
-user_profiles (
-  id UUID PRIMARY KEY REFERENCES auth.users(id),
-  name TEXT,
-  avatar_url TEXT,
-  is_member BOOLEAN DEFAULT false, -- true = member, false = public
-  created_at TIMESTAMPTZ,
-  updated_at TIMESTAMPTZ
-)
-
--- Machines
-machines (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-- User Profiles (extends auth.users)
+CREATE TABLE user_profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
-  manufacturer TEXT,
-  year INTEGER,
-  model TEXT,
-  location TEXT,
-  photo_url TEXT,
-  status TEXT NOT NULL DEFAULT 'operational', -- operational | needs_service | out_of_order
+  avatar_url TEXT,
+  role TEXT NOT NULL DEFAULT 'member',  -- 'guest' | 'member' | 'admin'
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
-)
+);
 
--- Issues
-issues (
+-- Machines (MVP: name only)
+CREATE TABLE machines (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  machine_id UUID NOT NULL REFERENCES machines(id),
+  name TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- MVP+: Add machine details
+-- manufacturer TEXT
+-- year INTEGER
+-- model TEXT
+-- location TEXT
+-- photo_url TEXT
+-- owner_id UUID REFERENCES auth.users(id)
+
+-- Issues (always per-machine)
+CREATE TABLE issues (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  machine_id UUID NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   description TEXT,
-  status TEXT NOT NULL DEFAULT 'new', -- new | in_progress | resolved
-  severity TEXT NOT NULL DEFAULT 'medium', -- low | medium | high | critical
-  priority TEXT NOT NULL DEFAULT 'medium', -- low | medium | high
-  reported_by UUID REFERENCES auth.users(id), -- can be null for anonymous
-  reporter_email TEXT, -- for anonymous reports
+  status TEXT NOT NULL DEFAULT 'new',  -- 'new' | 'in_progress' | 'resolved'
+  severity TEXT NOT NULL DEFAULT 'gameplay',  -- 'minor' | 'gameplay' | 'unplayable'
+  reported_by UUID REFERENCES auth.users(id),  -- NULL for anonymous reports
   assigned_to UUID REFERENCES auth.users(id),
   resolved_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-)
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
 
--- Comments
-issue_comments (
+  CONSTRAINT issues_machine_required CHECK (machine_id IS NOT NULL)
+);
+
+-- Comments & Timeline
+CREATE TABLE issue_comments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   issue_id UUID NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES auth.users(id), -- null if system comment
+  user_id UUID REFERENCES auth.users(id),  -- NULL for system comments
   content TEXT NOT NULL,
-  is_system BOOLEAN DEFAULT false, -- true for timeline events
+  is_system BOOLEAN DEFAULT false,  -- true for timeline events
   created_at TIMESTAMPTZ DEFAULT NOW()
-)
+);
+
+-- Database Trigger: Auto-create user_profile on signup
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.user_profiles (id, name, role)
+  VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data->>'name', 'User'), 'member');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION handle_new_user();
 ```
 
-**NO RLS Policies** (single tenant, app-level security)
+### Indexes
 
-**Simplified Security Model:**
-- Public routes: Issue reporting form
-- Protected routes: Everything else (middleware redirects to login)
-- Member check: `user_profiles.is_member = true`
-
-### Type System
-
-**Simplified Type Boundaries:**
-
-```typescript
-// Database types (snake_case)
-import { type Db } from '~/lib/types/db'
-
-// Application types (camelCase)
-export interface Issue {
-  id: string
-  machineId: string
-  title: string
-  description: string | null
-  status: 'new' | 'in_progress' | 'resolved'
-  severity: 'low' | 'medium' | 'high' | 'critical'
-  priority: 'low' | 'medium' | 'high'
-  reportedBy: string | null
-  reporterEmail: string | null
-  assignedTo: string | null
-  resolvedAt: Date | null
-  createdAt: Date
-  updatedAt: Date
-}
-
-// Conversion helpers
-import { transformKeysToCamelCase } from '~/lib/utils/case-transform'
+```sql
+-- Performance indexes for common queries
+CREATE INDEX idx_issues_machine_id ON issues(machine_id);
+CREATE INDEX idx_issues_assigned_to ON issues(assigned_to);
+CREATE INDEX idx_issues_status ON issues(status);
+CREATE INDEX idx_issues_severity ON issues(severity);
+CREATE INDEX idx_issue_comments_issue_id ON issue_comments(issue_id);
 ```
-
-**Type Organization:**
-- `~/lib/types/db.ts` - Drizzle inferred types
-- `~/lib/types/models.ts` - Application domain types
-- `~/lib/types/api.ts` - API request/response types
-- `~/lib/types/forms.ts` - Form schemas (Zod)
 
 ---
 
-## Architecture Patterns
+## Why No DAL/Repository/Service Layers?
 
-### Data Access Layer
+**TL;DR:** Server Components + Drizzle already provide everything those layers offer, without the overhead.
 
-**Server Components (Primary Pattern):**
+### The Traditional Layered Approach
 
 ```typescript
-// app/issues/page.tsx
-import { db } from '~/server/db'
-import { issues, machines, userProfiles } from '~/server/db/schema'
-import { eq } from 'drizzle-orm'
+// ❌ Over-engineered: 3 layers for one query
 
-export default async function IssuesPage() {
-  const issuesList = await db.query.issues.findMany({
-    with: {
-      machine: true,
-      reportedByUser: true,
-      assignedToUser: true,
-    },
-    orderBy: (issues, { desc }) => [desc(issues.createdAt)],
-  })
+// Repository Layer
+class IssueRepository {
+  async findByMachine(machineId: string): Promise<Issue[]> {
+    return await db.query.issues.findMany({
+      where: eq(issues.machineId, machineId)
+    })
+  }
+}
 
-  return <IssuesList issues={issuesList} />
+// Service Layer
+class IssueService {
+  constructor(private repo: IssueRepository) {}
+
+  async getIssuesForMachine(machineId: string): Promise<Issue[]> {
+    return await this.repo.findByMachine(machineId)
+  }
+}
+
+// Controller/Route Layer
+export async function getIssues(machineId: string) {
+  const service = new IssueService(new IssueRepository())
+  return await service.getIssuesForMachine(machineId)
 }
 ```
 
-**Server Actions (Mutations):**
+**Problems:**
+- 3 files to understand one query
+- Abstraction without value (just passing data through)
+- Testing requires mocking all layers
+- Mental overhead tracking through layers
+
+### The Server Component Approach
 
 ```typescript
-// app/issues/actions.ts
+// ✅ Simple: Direct query where needed
+
+export default async function MachinePage({ params }: { params: { id: string } }) {
+  // Query directly in the component
+  const issues = await db.query.issues.findMany({
+    where: eq(issues.machineId, params.id),
+    with: { assignedTo: true },
+    orderBy: desc(issues.createdAt)
+  })
+
+  return <IssueList issues={issues} />
+}
+```
+
+**Benefits:**
+- 1 file to understand the query
+- Colocated with usage (easy to modify)
+- Drizzle provides type safety
+- cache() handles deduplication
+- Less code = fewer bugs
+
+### When You WOULD Need Layers
+
+Add abstractions when you have:
+- **Multiple clients** (web app + mobile app + API)
+- **Complex business logic** (multi-step transactions, saga patterns)
+- **Multiple databases** (read/write splitting, sharding)
+- **Large team** (10+ engineers needing boundaries)
+
+**For MVP:** You have none of these. Direct queries are perfect.
+
+### The Rule of Three
+
+Add abstraction when you have **3+ duplicate implementations**, not before.
+
+```typescript
+// First usage - direct query (fine)
+const issues = await db.query.issues.findMany(...)
+
+// Second usage - still direct (fine)
+const issues = await db.query.issues.findMany(...)
+
+// Third usage - NOW consider abstracting
+export const getIssuesByMachine = cache(async (machineId: string) => {
+  return await db.query.issues.findMany({
+    where: eq(issues.machineId, machineId)
+  })
+})
+```
+
+---
+
+## Authentication & Authorization
+
+### Supabase Auth Flow
+
+```typescript
+// Server Component
+import { createClient } from '~/lib/supabase/server'
+import { redirect } from 'next/navigation'
+
+export default async function ProtectedPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/login')
+  }
+
+  // Get user profile with role
+  const profile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, user.id)
+  })
+
+  // Check authorization
+  if (profile?.role !== 'member' && profile?.role !== 'admin') {
+    redirect('/unauthorized')
+  }
+
+  // Render protected content
+  return <Dashboard user={user} profile={profile} />
+}
+```
+
+### Server Action
+
+```typescript
 'use server'
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '~/lib/supabase/server'
-import { db } from '~/server/db'
 
 export async function createIssue(formData: FormData) {
   const supabase = await createClient()
@@ -227,15 +300,17 @@ export async function createIssue(formData: FormData) {
     title,
     machineId,
     reportedBy: user.id,
+    severity: 'gameplay',  // default
+    status: 'new',
   })
 
   revalidatePath('/issues')
+  redirect('/issues')
 }
 ```
 
-### Authentication Flow
+### Middleware (Session Refresh)
 
-**Middleware (Token Refresh):**
 ```typescript
 // middleware.ts
 import { type NextRequest } from 'next/server'
@@ -252,50 +327,30 @@ export const config = {
 }
 ```
 
-**Route Protection (Server Components):**
+---
+
+## Data Flow Patterns
+
+### Server Component Data Fetching
+
 ```typescript
-// app/dashboard/page.tsx
-import { redirect } from 'next/navigation'
-import { createClient } from '~/lib/supabase/server'
+import { cache } from 'react'
 
-export default async function DashboardPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/login')
-  }
-
-  // Check if member
-  const profile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
+// Deduplicate within request
+export const getMachines = cache(async () => {
+  return await db.query.machines.findMany({
+    orderBy: asc(machines.name)
   })
+})
 
-  if (!profile?.isMember) {
-    redirect('/not-authorized')
-  }
-
-  // Render protected content
+// Use in component
+export default async function MachinesPage() {
+  const machines = await getMachines()
+  return <MachineList machines={machines} />
 }
 ```
 
-**Public Routes:**
-- `/` - Homepage
-- `/login` - Login page
-- `/signup` - Sign up page
-- `/report-issue` - Public issue reporting
-- `/reset-password` - Password reset
-
-**Protected Routes (require auth):**
-- `/dashboard` - Member dashboard
-- `/issues` - Issue list
-- `/issues/[id]` - Issue detail
-- `/machines` - Machine list
-- `/machines/[id]` - Machine detail
-
-### Form Patterns
-
-**Server Action Form (Progressive Enhancement):**
+### Form with Server Action
 
 ```typescript
 // components/IssueForm.tsx
@@ -306,7 +361,11 @@ import { createIssue } from '~/app/issues/actions'
 
 function SubmitButton() {
   const { pending } = useFormStatus()
-  return <button disabled={pending}>{pending ? 'Creating...' : 'Create Issue'}</button>
+  return (
+    <button disabled={pending}>
+      {pending ? 'Creating...' : 'Create Issue'}
+    </button>
+  )
 }
 
 export function IssueForm({ machines }: { machines: Machine[] }) {
@@ -314,7 +373,14 @@ export function IssueForm({ machines }: { machines: Machine[] }) {
     <form action={createIssue}>
       <input name="title" required />
       <select name="machineId" required>
-        {machines.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+        {machines.map(m => (
+          <option key={m.id} value={m.id}>{m.name}</option>
+        ))}
+      </select>
+      <select name="severity" required>
+        <option value="minor">Minor</option>
+        <option value="gameplay">Gameplay Issue</option>
+        <option value="unplayable">Unplayable</option>
       </select>
       <textarea name="description" />
       <SubmitButton />
@@ -323,30 +389,100 @@ export function IssueForm({ machines }: { machines: Machine[] }) {
 }
 ```
 
-### File Upload (Avatars, Machine Photos)
+---
 
-**Supabase Storage Pattern:**
+## Type System
+
+### Database Types (Drizzle)
 
 ```typescript
-// Server Action
-export async function uploadMachinePhoto(formData: FormData) {
-  const supabase = await createClient()
-  const file = formData.get('photo') as File
+// src/server/db/schema/machines.ts
+import { pgTable, uuid, text, timestamp } from 'drizzle-orm/pg-core'
 
-  const fileName = `${crypto.randomUUID()}.${file.name.split('.').pop()}`
+export const machines = pgTable('machines', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+})
 
-  const { data, error } = await supabase.storage
-    .from('machine-photos')
-    .upload(fileName, file)
+export type Machine = typeof machines.$inferSelect
+export type NewMachine = typeof machines.$inferInsert
+```
 
-  if (error) throw error
+### Application Types
 
-  const { data: { publicUrl } } = supabase.storage
-    .from('machine-photos')
-    .getPublicUrl(fileName)
+```typescript
+// src/lib/types/models.ts
 
-  return publicUrl
+export interface Issue {
+  id: string
+  machineId: string
+  title: string
+  description: string | null
+  status: 'new' | 'in_progress' | 'resolved'
+  severity: 'minor' | 'gameplay' | 'unplayable'
+  reportedBy: string | null
+  assignedTo: string | null
+  resolvedAt: Date | null
+  createdAt: Date
+  updatedAt: Date
 }
+
+export interface IssueWithRelations extends Issue {
+  machine: Machine
+  reportedByUser?: UserProfile | null
+  assignedToUser?: UserProfile | null
+  comments: IssueComment[]
+}
+```
+
+---
+
+## Environment Strategy
+
+### Two Separate Supabase Projects
+
+**Preview Environment:**
+- URL: `preview.pinpoint.dev` (example)
+- Supabase project: `pinpoint-preview`
+- Database: Test/seed data
+- Purpose: Development, staging, testing
+- Can be reset/rebuilt anytime
+
+**Production Environment:**
+- URL: `pinpoint.dev` (example)
+- Supabase project: `pinpoint-prod`
+- Database: Real member data
+- Purpose: Live production use
+- Strict change control, backups enabled
+
+### Environment Variables
+
+```bash
+# .env.local (Preview)
+NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+DATABASE_URL=postgresql://...
+
+# .env.production (Production)
+NEXT_PUBLIC_SUPABASE_URL=https://yyy.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+DATABASE_URL=postgresql://...
+```
+
+### Deployment Strategy
+
+```bash
+# Preview: Vercel preview deployments
+git push origin feature-branch
+# → Auto-deploys to preview.pinpoint.dev
+
+# Production: Merge to main
+git push origin main
+# → Auto-deploys to pinpoint.dev
 ```
 
 ---
@@ -356,98 +492,102 @@ export async function uploadMachinePhoto(formData: FormData) {
 ```
 pinpoint/
 ├── src/
-│   ├── app/                    # Next.js App Router
-│   │   ├── (auth)/            # Auth pages (login, signup)
-│   │   ├── (public)/          # Public pages (homepage, report)
-│   │   ├── dashboard/         # Member dashboard
-│   │   ├── issues/            # Issue routes
-│   │   │   ├── [id]/         # Issue detail
-│   │   │   ├── page.tsx      # Issue list
-│   │   │   └── actions.ts    # Server Actions
-│   │   ├── machines/          # Machine routes
-│   │   │   ├── [id]/         # Machine detail
-│   │   │   ├── new/          # Create machine
-│   │   │   └── page.tsx      # Machine list
-│   │   ├── layout.tsx         # Root layout
-│   │   └── globals.css        # Global styles
+│   ├── app/                      # Next.js App Router
+│   │   ├── (auth)/              # Auth routes (login, signup)
+│   │   ├── (public)/            # Public routes (report issue)
+│   │   ├── dashboard/           # Member dashboard
+│   │   ├── issues/              # Issue management
+│   │   │   ├── [id]/           # Issue detail
+│   │   │   ├── page.tsx        # Issue list
+│   │   │   └── actions.ts      # Server Actions
+│   │   ├── machines/            # Machine management
+│   │   │   ├── [id]/           # Machine detail
+│   │   │   └── page.tsx        # Machine list
+│   │   ├── layout.tsx           # Root layout
+│   │   └── globals.css          # Global styles
 │   │
-│   ├── components/            # React components
-│   │   ├── ui/               # shadcn/ui components
-│   │   ├── issues/           # Issue-specific components
-│   │   ├── machines/         # Machine components
-│   │   └── layout/           # Layout components (nav, etc.)
+│   ├── components/              # React components
+│   │   ├── ui/                 # shadcn/ui components
+│   │   ├── issues/             # Issue components
+│   │   ├── machines/           # Machine components
+│   │   └── layout/             # Layout components
 │   │
-│   ├── lib/                   # Utilities & config
-│   │   ├── supabase/         # Supabase clients
-│   │   ├── types/            # TypeScript types
-│   │   └── utils/            # Helper functions
+│   ├── lib/                     # Utilities
+│   │   ├── supabase/           # Supabase clients
+│   │   ├── types/              # TypeScript types
+│   │   └── utils/              # Helper functions
 │   │
-│   └── server/                # Server-side code
-│       ├── db/               # Database
-│       │   ├── schema/       # Drizzle schema
-│       │   └── index.ts      # DB client
-│       └── api/              # tRPC routers (minimal)
+│   └── server/                  # Server-side code
+│       └── db/                 # Database
+│           ├── schema/         # Drizzle schema
+│           └── index.ts        # DB client
 │
 ├── tests/
-│   ├── unit/                  # Unit tests
-│   ├── integration/           # Integration tests
-│   └── e2e/                   # Playwright E2E
+│   ├── unit/                    # Unit tests
+│   ├── integration/             # Integration tests
+│   └── e2e/                     # Playwright E2E
 │
-├── supabase/
-│   ├── migrations/            # SQL migrations (Drizzle push)
-│   └── seed.sql               # Seed data
-│
-└── docs/
-    ├── PRODUCT_SPEC.md        # What we're building
-    ├── TECH_SPEC.md           # This file
-    └── TESTING_PLAN.md        # How we test
+└── supabase/
+    ├── migrations/              # SQL migrations
+    └── seed.sql                 # Seed data
 ```
 
 ---
 
-## What We're NOT Using (Complexity Removed)
+## Development Workflow
 
-### ❌ Multi-Tenant Features
-- No `organizationId` in queries
-- No RLS policies for org separation
-- No organization context resolution
-- No organization switching UI
-- No org-scoped caching
+### Local Development
 
-### ❌ Over-Engineered Auth
-- No complex role hierarchies
-- No permission matrices
-- No custom auth context wrappers
-- Simple: member boolean is sufficient
+```bash
+# Start Next.js dev server
+npm run dev
 
-### ❌ Premature Abstractions
-- No DAL (Data Access Layer) - query directly in Server Components
-- No repository pattern - Drizzle queries are clean enough
-- No service layer - Server Actions are services
-- No request context tracking
+# Apply schema changes (no migration files)
+npm run db:push:local
 
-### ❌ Enterprise Features We Don't Need
-- No audit logging (v1.0)
-- No activity feeds (v1.0)
-- No analytics tracking (v1.0)
-- No performance monitoring (v1.0)
-- No error tracking service (console.error is fine initially)
+# Open Drizzle Studio
+npm run db:studio
+
+# Run tests
+npm test
+
+# Run E2E tests
+npm run e2e
+```
+
+### Database Changes
+
+1. Edit schema in `src/server/db/schema/`
+2. Run `npm run db:push:local` (pushes changes directly)
+3. Update seed data if needed
+4. Test locally
+5. Repeat for production when ready
+
+**No migration files** - Pre-beta, can change schema freely with drizzle-kit push.
 
 ---
 
 ## Performance Strategy
 
 ### Caching
+
 ```typescript
 import { cache } from 'react'
 
-// Dedupe within request
-export const getMachines = cache(async () => {
-  return await db.query.machines.findMany()
+// Request-level deduplication
+export const getIssue = cache(async (id: string) => {
+  return await db.query.issues.findFirst({
+    where: eq(issues.id, id),
+    with: {
+      machine: true,
+      assignedToUser: true,
+    }
+  })
 })
 ```
 
 ### Streaming & Suspense
+
 ```typescript
 <Suspense fallback={<IssueListSkeleton />}>
   <IssueList />
@@ -455,88 +595,52 @@ export const getMachines = cache(async () => {
 ```
 
 ### Image Optimization
+
 - Use Next.js `<Image>` component
-- Supabase storage handles transformations
+- Supabase Storage auto-optimizes images
+- Lazy load images below the fold
 
 ---
 
 ## Security Checklist
 
+### Authentication
 - ✅ Supabase middleware for session refresh
 - ✅ Server Components check auth before rendering
 - ✅ Server Actions validate user auth
 - ✅ Public routes explicitly defined
-- ✅ Input validation with Zod schemas
+- ✅ Password reset flow implemented
+
+### Input Validation
+- ✅ Zod schemas for form validation
+- ✅ Server-side validation in Server Actions
 - ✅ SQL injection prevented by Drizzle parameterization
 - ✅ XSS prevented by React escaping
-- ✅ File upload validation (type, size)
-- ❌ No RLS needed (single tenant)
-- ❌ No CSRF tokens needed (Server Actions handle this)
+
+### Authorization
+- ✅ Role checking (guest/member/admin)
+- ✅ Protected routes redirect to login
+- ✅ File upload validation (type, size) in MVP+
+
+### Not Needed for Single-Tenant
+- ❌ No RLS policies (single tenant)
+- ❌ No CSRF tokens (Server Actions handle this)
+- ❌ No organization scoping
 
 ---
 
-## Development Workflow
-
-### Local Development
-```bash
-npm run dev              # Start Next.js dev server
-npm run db:push:local    # Apply schema changes
-npm run db:studio        # Open Drizzle Studio
-```
-
-### Database Changes
-1. Edit schema in `src/server/db/schema/`
-2. Run `npm run db:push:local` (no migration files)
-3. Update seed data if needed
-
-### Testing
-```bash
-npm test                 # Unit/integration tests
-npm run e2e              # Playwright E2E tests
-```
-
-### Deployment
-- Vercel (Next.js)
-- Supabase (managed PostgreSQL + Auth)
-
----
-
-## Migration from v1 (Current Codebase)
-
-**What to Keep:**
-- Existing schema structure (just remove org scoping)
-- Supabase + Drizzle + tRPC setup
-- TypeScript config
-- Testing infrastructure (Vitest, Playwright)
-- Material Design 3 color system in globals.css
-
-**What to Remove:**
-- All `organizationId` columns and queries
-- RLS policies
-- Organization management pages
-- Complex auth context
-- User role management beyond `is_member` boolean
-- Half-finished features not in PRODUCT_SPEC.md
-
-**Data Migration:**
-If keeping existing data:
-```sql
--- Remove org scoping, keep data
-ALTER TABLE machines DROP COLUMN organization_id;
-ALTER TABLE issues DROP COLUMN organization_id;
-```
-
----
-
-## Decision Log
+## Tech Stack Decisions Log
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2025-11-10 | Single tenant only | Removes 40% complexity, APC is only user |
-| 2025-11-10 | No RLS policies | Not needed for single tenant |
-| 2025-11-10 | Server Actions primary | Simpler than tRPC for most mutations |
+| 2025-11-10 | Next.js 16 | Use latest stable release |
+| 2025-11-10 | No real-time subscriptions | MVP doesn't need it, adds complexity |
+| 2025-11-10 | No DAL/Repository layers | Server Components + Drizzle is sufficient |
+| 2025-11-10 | Issues always per-machine | Aligns with reality, simplifies schema |
+| 2025-11-10 | Severity: minor/gameplay/unplayable | Player-centric, clear language |
+| 2025-11-10 | Role: guest/member/admin | Simple, extensible permission model |
+| 2025-11-10 | Two Supabase projects | Preview/prod separation, clean data |
 | 2025-11-10 | Drizzle push (no migrations) | Pre-beta, can change schema freely |
-| 2025-11-10 | `is_member` boolean vs roles | Simple permission model sufficient |
 
 ---
 

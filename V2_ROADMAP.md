@@ -1,488 +1,442 @@
-# PinPoint v2.0+ Roadmap
+# PinPoint Roadmap
 
 **Last Updated**: 2025-11-10
-**Status**: PARKING LOT - Ideas deferred from v1.0
+**Status**: PARKING LOT - Ideas deferred from MVP
 
 ## Purpose
 
-This document captures **good ideas that aren't essential for v1.0**. Everything here gets reconsidered AFTER v1.0 ships and you have real user feedback.
+This document captures **good ideas that aren't essential for MVP**. Everything here gets reconsidered after MVP ships based on real user feedback, not assumptions.
 
 ---
 
-## Prioritization Framework
+## Release Strategy
 
-After v1.0 launches, prioritize based on:
+### MVP (Minimum Viable Product)
+Bare minimum to start tracking issues. See PRODUCT_SPEC.md for details.
+- Members-only
+- Machines with name only
+- Basic issue tracking (title, description, severity, status, comments)
+- Anonymous public reporting
+- Simple dashboard
 
-1. **User Requests** - What are Austin Pinball Collective members actually asking for?
-2. **Pain Points** - What's causing the most friction in daily use?
-3. **Impact** - What delivers the most value for the least effort?
-4. **Delight Factor** - What would make users love it vs. just use it?
+### MVP+ (Immediate Next Set)
+Polish and usability improvements that make it practical for daily use.
+**These are "obviously next" features.**
 
-**Don't build based on:**
-- ❌ What you THINK users will want
-- ❌ What's technically interesting
-- ❌ What other tools have
-- ❌ What's easy to build
+### 1.0 (Full-Featured Single-Tenant)
+Complete vision with notifications, integrations, advanced roles.
+**Major features that round out the experience.**
 
----
-
-## v2.0 Features (Post-Launch Enhancements)
-
-### Tier 1: High Impact, Likely Essential
-
-**These are "obviously next" based on expected usage:**
-
-#### 📸 Photo Attachments
-**Problem:** Text descriptions don't always capture the issue clearly
-**Solution:** Allow uploading 1-3 photos per issue
-**Scope:**
-- Upload on issue creation and comments
-- Display in issue timeline
-- Supabase Storage integration
-- File type validation (JPEG, PNG, HEIC)
-- Max 5MB per file
-**Effort:** Medium (2-3 days)
-**Dependencies:** None
-
-#### 📧 Email Notifications
-**Problem:** Members don't know when they're assigned or when issues update
-**Solution:** Send email on key events
-**Scope:**
-- Notify on assignment
-- Notify on status change (if assigned or reporter)
-- Notify on new comments (if participating)
-- Unsubscribe option per notification type
-- Use Supabase Edge Functions + Resend/SendGrid
-**Effort:** Medium (3-4 days)
-**Dependencies:** None
-
-#### 🔍 Enhanced Search
-**Problem:** Basic machine search isn't enough for large fleets
-**Solution:** Full-text search across issues and machines
-**Scope:**
-- Search issue titles and descriptions
-- Search machine names, manufacturers, models
-- Fuzzy matching
-- Search results page
-- Use PostgreSQL full-text search
-**Effort:** Small (2 days)
-**Dependencies:** None
-
-#### 📊 Basic Analytics
-**Problem:** No visibility into resolution times, common problems, active users
-**Solution:** Simple dashboard with key metrics
-**Scope:**
-- Average resolution time per severity
-- Top 5 machines by issue count
-- Issues resolved this week/month
-- Most active members
-- Use Drizzle aggregation queries
-**Effort:** Medium (3-4 days)
-**Dependencies:** Need historical data from v1.0
-
-#### 🔖 Saved Filters
-**Problem:** Members repeatedly apply the same filters
-**Solution:** Save and name filter combinations
-**Scope:**
-- Save current filter state
-- Name it (e.g., "Critical Open Issues")
-- Quick access to saved filters
-- Personal to each user
-**Effort:** Small (2 days)
-**Dependencies:** None
+### 2.0 (Multi-Tenant)
+Support multiple organizations with data isolation.
+**Platform expansion.**
 
 ---
 
-### Tier 2: Medium Impact, Nice to Have
+## MVP+ Features (Immediate Next Set)
 
-**These add polish and convenience:**
+These make MVP practical for daily use:
 
-#### 🎨 Rich Text Editor
-**Problem:** Plain text limits formatting (bold, lists, links)
-**Solution:** Markdown editor with preview
-**Scope:**
-- Markdown editor for descriptions/comments
-- Live preview
-- Basic formatting toolbar
-- Use library like react-markdown
-**Effort:** Small (2 days)
-**Dependencies:** None
+### High Priority
 
-#### 📱 PWA (Progressive Web App)
-**Problem:** Members want quick access from home screen
-**Solution:** Add PWA manifest and service worker
-**Scope:**
-- Install prompt
-- Offline access to cached data
-- Push notifications (if enabled)
-- App icon
-**Effort:** Medium (3-4 days)
-**Dependencies:** Service worker complexity
+**QR Codes for Machines**
+- Problem: Reporting issues requires navigating to form
+- Solution: QR codes on machines link directly to issue reporting for that machine
+- Scope: Generate QR code per machine, print/display on machine, scan → pre-filled form
+- Effort: Small (1-2 days)
+- Impact: Dramatically improves public reporting UX
 
-#### 🏷️ Issue Labels/Tags
-**Problem:** Issues need categorization beyond severity (electrical, mechanical, cosmetic)
-**Solution:** Custom labels
-**Scope:**
-- Admin can create labels (name, color)
-- Apply multiple labels per issue
-- Filter by label
-- Suggest labels based on machine type
-**Effort:** Medium (3 days)
-**Dependencies:** None
+**Machine Details**
+- Problem: Name alone isn't enough as fleet grows
+- Solution: Add manufacturer, year, model, location
+- Scope: Add fields to machine model, update forms and display
+- Effort: Small (1-2 days)
+- Impact: Better machine identification
 
-#### ⏱️ Time Tracking
-**Problem:** Want to know how long repairs take
-**Solution:** Log time spent on issues
-**Scope:**
-- "Start work" / "Stop work" button
-- Manual time entry
-- Show total time in issue timeline
-- Report: time per machine, per member
-**Effort:** Medium (3-4 days)
-**Dependencies:** None
+**Machine Photos**
+- Problem: Multiple machines with similar names
+- Solution: Upload photo for each machine
+- Scope: Supabase Storage, image upload form, display on machine page
+- Effort: Small (2 days)
+- Impact: Visual identification
 
-#### 🔔 In-App Notifications
-**Problem:** Email notifications can be missed
-**Solution:** Notification bell in nav
-**Scope:**
-- Badge count for unread
-- Notification list
-- Mark as read
+**Issue Photos**
+- Problem: Text descriptions don't always capture the issue clearly
+- Solution: Allow photo uploads on issues
+- Scope: 1-3 photos per issue, Supabase Storage, display in timeline
+- Effort: Medium (2-3 days)
+- Impact: Clarity for complex issues
+
+**Machine Search**
+- Problem: Finding machines in a large list is tedious
+- Solution: Search/filter machine list by name, manufacturer, location
+- Scope: Search input, filter logic, highlighted results
+- Effort: Small (1 day)
+- Impact: Usability as fleet grows
+
+### Medium Priority
+
+**Machine Ownership & Notifications**
+- Problem: Machine owners want to know about issues with their machines
+- Solution: Assign owner to machine, notify on new issues
+- Scope: owner_id field, notification to owner on issue creation
+- Effort: Medium (depends on notification system)
+- Impact: Proactive issue awareness
+
+**Public Landing Page**
+- Problem: Public can't see what issues exist before reporting
+- Solution: Read-only public page showing recent issues per machine
+- Scope: Public route, issue list (title, severity, status only), no comments visible
+- Effort: Small (1-2 days)
+- Impact: Transparency, reduces duplicate reports
+
+**Guest Accounts**
+- Problem: Public reporters can't track their reports
+- Solution: Self-service guest account creation, can view their submitted issues
+- Scope: Guest role, self-signup, filter issues by "reported by me"
+- Effort: Small (1-2 days)
+- Impact: Better engagement with public reporters
+
+**Email Capture on Public Reports**
+- Problem: Can't follow up with anonymous reporters
+- Solution: Optional email field on public report form
+- Scope: Store email, display to members (don't require account)
+- Effort: Trivial (<1 day)
+- Impact: Follow-up capability
+
+**Recent Issues Per Machine**
+- Problem: Machine page doesn't show issue history
+- Solution: Show last 5 issues on machine detail page
+- Scope: Query recent resolved issues, display below open issues
+- Effort: Trivial (<1 day)
+- Impact: Context for recurring problems
+
+### Polish
+
+**Issue Priority Field**
+- Problem: Severity alone might not be enough for prioritization
+- Solution: Add optional priority field (low/medium/high)
+- Scope: Add field, update forms, filter by priority
+- Effort: Small (1 day)
+- Impact: Better prioritization if severity isn't sufficient
+
+**Better Mobile UX**
+- Problem: Members repair on-site using phones
+- Solution: Mobile-optimized layouts, larger touch targets, simplified nav
+- Effort: Medium (ongoing)
+- Impact: On-site usability
+
+---
+
+## 1.0 Features (Full-Featured Single-Tenant)
+
+Major features that complete the vision:
+
+### Notifications
+
+**Email Notifications**
+- Assignments (you've been assigned)
+- Status changes (issues you reported or are assigned to)
+- New comments (issues you're participating in)
+- Configurable per-user preferences
+- Effort: Medium (3-4 days)
+- Dependency: Email service (Resend, SendGrid)
+
+**In-App Notifications**
+- Notification bell with unread count
+- List of recent notifications
 - Link to relevant issue
-- Supabase Realtime for instant updates
-**Effort:** Medium (3 days)
-**Dependencies:** Real-time infrastructure
+- Mark as read
+- Effort: Medium (3 days)
+- Dependency: Real-time updates (optional)
 
-#### 📅 Maintenance Schedules
-**Problem:** Preventive maintenance is ad-hoc
-**Solution:** Schedule recurring tasks per machine
-**Scope:**
-- Create maintenance task template
-- Set recurrence (weekly, monthly)
-- Auto-create issues on schedule
-- Mark as maintenance vs. repair
-**Effort:** Large (5-7 days)
-**Dependencies:** Cron job infrastructure
+### Roles & Permissions
+
+**Guest Role**
+- Can report issues
+- Can view their own reports
+- Read-only for everything else
+- Effort: Small (role checking in queries)
+
+**Member Role**
+- Full access to issue management
+- Can manage machines
+- Can assign issues
+- (Current default role)
+
+**Admin Role**
+- User management (promote guest → member)
+- System settings
+- Can delete machines/issues
+- Effort: Medium (admin UI needed)
+
+### Integration
+
+**OPDB Integration (Open Pinball Database)**
+- Problem: Manual machine data entry is tedious
+- Solution: Search OPDB, import machine details (name, manufacturer, year, etc.)
+- Scope: OPDB API integration, search UI, import flow
+- Effort: Medium (3-4 days)
+- Impact: Faster machine setup
+
+**Social Login**
+- Google OAuth
+- GitHub OAuth
+- Easier onboarding
+- Effort: Small (1-2 days with Supabase)
+
+### Machine Management
+
+**Locations**
+- Problem: Machines move between venues
+- Solution: Location model, assign machines to locations
+- Scope: Locations table, assign location to machine, filter by location
+- Effort: Medium (2-3 days)
+
+**Machine Notes**
+- Tournament setup notes
+- Known issues (non-blocking quirks)
+- Maintenance history/notes
+- Effort: Small (2 days)
+
+**Self-Service Guest Accounts**
+- Public users can create guest accounts
+- Email verification
+- Upgrade to member (admin approval)
+- Effort: Medium (signup flow + verification)
+
+### Issue Management (1.0+)
+
+**Custom Issue Statuses**
+- Beyond new/in_progress/resolved
+- Examples: needs_parts, waiting_for_approval, deferred
+- Admin can configure
+- Effort: Medium (3 days)
+
+**Saved Filters**
+- Save current filter combination
+- Name it (e.g., "Critical Open Issues")
+- Quick access dropdown
+- Personal to each user
+- Effort: Small (2 days)
+
+**Bulk Operations**
+- Select multiple issues
+- Bulk status change
+- Bulk assign
+- Bulk archive
+- Effort: Medium (3 days)
+
+**Issue Labels/Tags**
+- Categorize beyond severity (electrical, mechanical, cosmetic, software)
+- Apply multiple labels
+- Filter by label
+- Admin manages label list
+- Effort: Medium (3-4 days)
 
 ---
 
-### Tier 3: Low Priority, Future Exploration
+## 2.0+ Features (Long-Term Vision)
 
-**These are interesting but not proven needs:**
+### Multi-Tenancy
 
-#### 🤝 Public Issue Tracking
-**Problem:** Players want to see issue status
-**Solution:** Public issue list (read-only)
-**Scope:**
-- Public page showing open issues per machine
-- Status updates visible
-- Comments hidden (privacy)
-- Optional: QR codes on machines link to issue list
-**Effort:** Medium (3 days)
-**Dependencies:** Privacy review
-
-#### 🔗 Third-Party Integrations
-**Problem:** Want to integrate with other tools
-**Solution:** Webhooks or API
-**Scope:**
-- Webhook on issue create/update/resolve
-- REST API for external tools
-- API authentication
-- Rate limiting
-**Effort:** Large (7+ days)
-**Dependencies:** API design, documentation
-
-#### 📦 Parts Inventory
-**Problem:** Don't know which parts are in stock
-**Solution:** Simple inventory tracking
-**Scope:**
-- Part catalog (name, quantity, location)
-- Link parts to machines
-- Link parts to issues
-- Alert when low stock
-**Effort:** Large (7+ days)
-**Dependencies:** Significant scope expansion
-
-#### 🤖 AI Features
-**Problem:** Repetitive issue triage
-**Solution:** AI-assisted categorization
-**Scope:**
-- Suggest severity based on description
-- Suggest machine based on description
-- Auto-summarize long issues
-- Detect duplicate issues
-**Effort:** Large (varies, ongoing)
-**Dependencies:** OpenAI API, cost considerations
-
-#### 🌐 Multi-Organization Support
-**Problem:** Other pinball arcades want to use PinPoint
-**Solution:** Add organization scoping back
-**Scope:**
-- Organization model
-- Org-level RLS policies
+**Multiple Organizations**
+- Each org has isolated data
+- Org-scoped RLS policies
 - Org switching UI
-- Invite system
-- This is essentially PinPoint v3.0
-**Effort:** Massive (20+ days, architectural shift)
-**Dependencies:** Product-market fit validation
+- Billing/subscriptions (if SaaS)
+- Effort: Large (10+ days, architectural shift)
+- Dependency: Validated demand from other arcades
 
-#### 📲 Native Mobile Apps
-**Problem:** PWA limitations on iOS
-**Solution:** React Native apps
-**Scope:**
-- iOS and Android apps
-- Offline support
-- Push notifications
-- App store distribution
-**Effort:** Massive (30+ days, new expertise)
-**Dependencies:** Proven web app success
+### Advanced Features
+
+**Analytics & Reporting (2.0+)**
+- Average resolution time by severity
+- Top machines by issue count
+- Most active members
+- Issue trends over time
+- Export to CSV
+- Effort: Medium (4-5 days)
+
+**Webhooks & API**
+- Webhook on issue create/update/resolve
+- REST API for external integrations
+- API authentication & rate limiting
+- Documentation
+- Effort: Large (7+ days)
+
+**Parts Inventory**
+- Track parts in stock
+- Link parts to machines
+- Alert on low stock
+- Parts used per issue
+- Effort: Large (10+ days)
+
+**AI Features**
+- Auto-suggest severity based on description
+- Detect duplicate issues
+- Summarize long issue descriptions
+- Suggest machine based on problem description
+- Effort: Variable (ongoing, cost considerations)
 
 ---
 
-## Feature Ideas Inbox
+## Features Explicitly Not Building
 
-**Unsorted ideas that need more thought:**
+**Removed Based on Feedback:**
+- ❌ SLA tracking - Not a helpdesk tool
+- ❌ SMS notifications - Email is sufficient
+- ❌ Time tracking - Not needed for hobby repairs
+- ❌ Recurring maintenance schedules - Will add if users request it
 
-- [ ] Issue dependencies (block on other issues)
-- [ ] Machine grouping (zones, areas)
+**Not Prioritized:**
+- ❌ Native mobile apps - PWA is sufficient
+- ❌ Offline support - Online-first is fine
+- ❌ Video uploads - Photos are enough
+- ❌ Forums/discussion boards - Stay focused
+- ❌ Social features - Not a social network
+- ❌ Event management - Use dedicated tools
+- ❌ White labeling - Not a SaaS yet
+
+---
+
+## Unsorted Ideas Inbox
+
+**Needs More Thought:**
+- [ ] Issue dependencies (blocking issues)
+- [ ] Machine grouping (zones, areas in arcade)
 - [ ] Custom fields per machine type
-- [ ] Issue templates ("Flipper not working", "Display issue")
-- [ ] Bulk operations (reassign multiple issues)
-- [ ] Issue duplication
-- [ ] Export reports to PDF/CSV
-- [ ] Dark mode (or respect system preference)
-- [ ] User activity feed
+- [ ] Issue templates (common problems)
+- [ ] Issue duplication (copy issue as template)
+- [ ] Export issue list to PDF
+- [ ] Dark mode toggle
+- [ ] User activity feed (who did what)
 - [ ] @mentions in comments
-- [ ] Issue voting (let members upvote important issues)
-- [ ] Machine QR codes for quick reporting
-- [ ] Slack/Discord integration
-- [ ] SMS notifications for critical issues
-- [ ] Role-based permissions (viewer, tech, admin)
-- [ ] Issue SLA tracking
-- [ ] Automatic assignment based on machine type
-- [ ] Machine maintenance logs (separate from issues)
+- [ ] Issue voting (upvote important issues)
+- [ ] Machine manuals storage/links
 - [ ] Integration with PinballMap API
 - [ ] Issue resolution knowledge base
-- [ ] Machine manual storage/links
 - [ ] Gamification (badges for resolving issues)
 - [ ] Multi-language support
-- [ ] Accessibility audit and improvements
-- [ ] Custom issue statuses beyond new/in-progress/resolved
 
 ---
 
-## Anti-Roadmap (Things We're NOT Building)
+## Decision Framework
 
-**Features that sound good but don't align with mission:**
-
-- ❌ **Social Features** - Not building a social network
-- ❌ **Forums/Discussion Boards** - Stay focused on issue tracking
-- ❌ **Event Management** - Use dedicated event tools
-- ❌ **Member Management** - Supabase handles this
-- ❌ **Billing/Payments** - Not a commercial tool (yet)
-- ❌ **CMS Features** - Not a content platform
-- ❌ **Custom Workflows** - Keep it simple
-- ❌ **White Labeling** - Not a SaaS product (yet)
-
----
-
-## Launch Strategy (Post-v1.0)
-
-### Phase 1: Stabilization (Weeks 1-2)
-**Goal:** Fix critical bugs, gather feedback
-
-- Monitor usage patterns
-- Fix P0 bugs immediately
-- Collect user feedback via form or interviews
-- Review analytics (if implemented)
-- Assess which v2 features are actually requested
-
-### Phase 2: Polish (Weeks 3-4)
-**Goal:** Improve UX based on real usage
-
-- Fix most painful UX issues
-- Improve mobile experience if needed
-- Add small quality-of-life features
-- Improve error messages based on support requests
-
-### Phase 3: v2 Planning (Week 5)
-**Goal:** Data-driven roadmap for v2.0
-
-- Review V2_ROADMAP.md
-- Interview 3-5 active users
-- Prioritize features based on actual requests
-- Estimate effort for top 5 features
-- Decide: v2 enhancements OR multi-org expansion
-
-### Phase 4: v2 Development (Weeks 6+)
-**Goal:** Ship most impactful features
-
-- Build top 3-5 features from Tier 1
-- Maintain same discipline (DISCIPLINE.md still applies)
-- Ship incrementally (feature flags if needed)
-- Continue gathering feedback
-
----
-
-## Decision Framework (Post-v1.0)
-
-### Before Building ANY v2 Feature:
+Before building ANY feature, ask:
 
 1. **Has a user explicitly requested it?**
-   - Bonus points if multiple users asked
-   - Extra bonus if they explained the pain point
-
 2. **Can you measure the impact?**
-   - How will you know if it's successful?
-   - What metric improves?
-
 3. **What's the effort/impact ratio?**
-   - High impact + low effort = build now
-   - High impact + high effort = consider
-   - Low impact + low effort = maybe
-   - Low impact + high effort = defer
-
 4. **Does it align with core mission?**
-   - Issue tracking for pinball machines
-   - If it's a tangent, reconsider
 
-### Example Analysis:
+**Example:**
 
-**Feature: Photo Attachments**
-1. ✅ Users: "Hard to describe electrical issues in text"
-2. ✅ Measure: % of issues with photos, clarity improvement
-3. ✅ Effort/Impact: Medium effort, high impact
+**Feature: QR Codes**
+1. ✅ Users: "It's hard to report issues, need easier way"
+2. ✅ Measure: % of reports via QR vs manual
+3. ✅ Effort/Impact: Low effort, high impact
 4. ✅ Mission: Directly improves issue reporting
 
-**Decision: BUILD**
+**Decision: BUILD (MVP+)**
 
-**Feature: Gamification/Badges**
-1. ❌ Users: No one asked for this
-2. ❓ Measure: Unclear what success looks like
+**Feature: Gamification**
+1. ❌ Users: No one asked
+2. ❓ Measure: Unclear success metric
 3. ❌ Effort/Impact: Medium effort, unclear impact
-4. ❓ Mission: Tangential to issue tracking
+4. ❓ Mission: Tangential
 
-**Decision: DEFER**
+**Decision: DEFER (Unsorted)**
 
 ---
 
-## Monthly Roadmap Review
+## Prioritization After MVP Ships
+
+### Week 1-2: Stabilization
+- Fix critical bugs
+- Gather user feedback
+- Monitor usage patterns
+
+### Week 3-4: MVP+ Planning
+- Interview 3-5 active users
+- Prioritize MVP+ features based on feedback
+- Estimate effort for top 5 features
+
+### Month 2: MVP+ Development
+- Ship top 3-5 MVP+ features
+- QR codes (likely highest priority)
+- Machine/issue photos
+- Machine details
+
+### Month 3+: 1.0 Planning
+- Assess which 1.0 features users actually want
+- Email notifications (likely high priority)
+- Saved filters
+- OPDB integration
+
+---
+
+## Success Metrics
+
+### MVP Success
+- Austin Pinball Collective using it daily
+- Issues tracked start to finish
+- Public reports coming in
+
+### MVP+ Success
+- QR codes deployed on all machines
+- Photo attachments improve clarity
+- Machine search used regularly
+
+### 1.0 Success
+- Email notifications keep members engaged
+- OPDB integration saves time
+- Guest accounts enable public engagement
+
+### 2.0 Success
+- Other arcades requesting access
+- Validated willingness to pay (if SaaS)
+- Multi-org architecture scales well
+
+---
+
+## Long-Term Vision Scenarios
+
+### Scenario 1: Focused Tool
+- Stay single-org
+- Deep customization for Austin Pinball Collective
+- Open source for other arcades to self-host
+- Community-driven development
+
+### Scenario 2: Multi-Tenant SaaS
+- Expand to other pinball arcades
+- Standardized feature set
+- Paid tiers (Free/Pro/Enterprise)
+- Support infrastructure
+
+### Scenario 3: Platform
+- API-first approach
+- Ecosystem of integrations
+- Parts supplier partnerships
+- Service provider network
+
+**Don't decide now. Let MVP usage guide you.**
+
+---
+
+## Monthly Review
 
 **First Monday of each month:**
 
 1. Review what shipped last month
-2. Gather user feedback from last month
-3. Re-prioritize this roadmap based on data
-4. Move 1-2 features from Tier 2/3 to Tier 1 (or vice versa)
-5. Archive ideas that are no longer relevant
+2. Gather user feedback
+3. Re-prioritize this roadmap
+4. Move features between MVP+/1.0+/2.0+ based on data
+5. Archive ideas no longer relevant
 6. Add new ideas to Inbox
 
 **Keep it fresh, keep it real.**
 
 ---
 
-## Success Metrics (v2.0+)
-
-### Usage Metrics
-- Daily active members
-- Issues created per week
-- Average time to resolution
-- Issues resolved per member
-- Mobile vs. desktop usage
-
-### Feature Adoption
-- % of issues with photos (if implemented)
-- Notification open rate (if implemented)
-- Saved filters created (if implemented)
-- Search usage (if implemented)
-
-### Quality Metrics
-- User-reported bugs per week (trending down?)
-- Support requests per week
-- Net Promoter Score (NPS) - would you recommend?
-
----
-
-## Expansion Considerations (v3.0+)
-
-**If PinPoint succeeds beyond Austin Pinball Collective:**
-
-### Multi-Organization SaaS
-- Organization onboarding flow
-- Billing/subscriptions (Stripe)
-- Organization-scoped RLS policies
-- Custom domains per org
-- User limits per plan
-
-### Freemium Model
-**Free Tier:**
-- 1 organization
-- 3 users
-- 10 machines
-- Basic features
-
-**Pro Tier ($X/month):**
-- Unlimited users
-- Unlimited machines
-- Photo attachments
-- Email notifications
-- Analytics
-- Priority support
-
-**Enterprise Tier (Custom):**
-- Multiple organizations
-- API access
-- SSO
-- Custom integrations
-- Dedicated support
-
-**Note:** Only consider this if:
-- ✅ Austin Pinball Collective loves it
-- ✅ Other arcades are asking for it
-- ✅ You want to run a SaaS business
-- ✅ You've validated willingness to pay
-
----
-
-## The Long-Term Vision
-
-**Where could PinPoint go?**
-
-### Scenario 1: Focused Tool
-- Stay single-org
-- Deep integration with Austin Pinball Collective workflows
-- Custom features for their specific needs
-- Open source for other arcades to self-host
-
-### Scenario 2: Multi-Tenant SaaS
-- Expand to other pinball arcades
-- Standardized feature set
-- Paid plans
-- Support multiple organizations
-
-### Scenario 3: Platform
-- API-first approach
-- Integrate with pinball industry tools
-- Parts suppliers integration
-- Service provider network
-- Marketplace for pinball services
-
-**Don't decide now. Let v1.0 usage guide you.**
-
----
-
-## Graduation Criteria
-
-**When to move features from this roadmap to active development:**
-
-1. ✅ v1.0 is stable (no critical bugs)
-2. ✅ Feature has been requested by 3+ users
-3. ✅ Feature aligns with core mission
-4. ✅ You have capacity to build and maintain it
-5. ✅ Impact justifies effort
-
-**Update this roadmap quarterly based on reality, not assumptions.**
-
----
-
-**Remember:** This is a parking lot, not a commitment. Build what users actually need, not what you think they might need.
+**Remember**: This is a parking lot, not a commitment. Build what users actually need, not what you think they might need.

@@ -5,7 +5,7 @@
 
 ## The Prime Directive
 
-> **Ship v1.0 before perfecting any single feature.**
+> **Ship MVP before perfecting any single feature.**
 
 Everything in this document exists to help you resist the urge to over-engineer, over-optimize, and over-complicate.
 
@@ -23,7 +23,7 @@ Everything in this document exists to help you resist the urge to over-engineer,
    - ✅ Yes → Proceed to question 3
    - ❌ No → Add to V2_ROADMAP.md and move on
 
-3. **Would v1.0 be useless without it?**
+3. **Would MVP be useless without it?**
    - ✅ Yes → Implement it
    - ❌ No → Add to V2_ROADMAP.md and move on
 
@@ -32,12 +32,12 @@ Everything in this document exists to help you resist the urge to over-engineer,
 | Feature Request | Q1 | Q2 | Q3 | Decision |
 |----------------|----|----|----|----|
 | Issue comments | ✅ | ✅ | ✅ | **IMPLEMENT** (in spec, required) |
-| Email notifications | ❌ | ❌ | ❌ | **V2** (not in spec) |
-| Rich text editor | ❌ | ❌ | ❌ | **V2** (plain text works) |
+| Email notifications | ❌ | ❌ | ❌ | **MVP+/1.0** (not in MVP spec) |
+| Rich text editor | ❌ | ❌ | ❌ | **1.0+** (plain text works) |
 | Issue filtering | ✅ | ✅ | ✅ | **IMPLEMENT** (in spec) |
-| Saved filters | ❌ | ❌ | ❌ | **V2** (can re-apply manually) |
-| File attachments | ❌ | ❌ | ❌ | **V2** (text description works) |
-| Password reset | ✅ | ✅ | ✅ | **IMPLEMENT** (auth is useless without it) |
+| Saved filters | ❌ | ❌ | ❌ | **1.0+** (can re-apply manually) |
+| Photo attachments | ❌ | ❌ | ❌ | **MVP+** (text works initially) |
+| Password reset | ✅ | ✅ | ✅ | **IMPLEMENT** (auth useless without it) |
 
 ---
 
@@ -67,9 +67,9 @@ Everything in this document exists to help you resist the urge to over-engineer,
 - ✅ DONE: Form submits, creates issue, shows in list, validates required fields
 - ❌ NOT REQUIRED: Auto-save draft, duplicate detection, AI title suggestions
 
-**Machine Photos:**
-- ✅ DONE: Can upload image, shows on machine page, validates file type
-- ❌ NOT REQUIRED: Image cropping, filters, multiple photos, gallery view
+**Machine Registry:**
+- ✅ DONE (MVP): Can create machine with name, shows in list
+- ❌ NOT REQUIRED (MVP): Manufacturer, model, photos (those are MVP+)
 
 ---
 
@@ -78,7 +78,7 @@ Everything in this document exists to help you resist the urge to over-engineer,
 ### When You Find Yourself Saying:
 
 **"What if someone..."**
-- STOP. That's v2 thinking. Does it affect the Austin Pinball Collective TODAY?
+- STOP. That's future thinking. Does it affect Austin Pinball Collective TODAY?
 
 **"I should probably..."**
 - STOP. Is it in PRODUCT_SPEC.md? No? Then you shouldn't.
@@ -87,7 +87,7 @@ Everything in this document exists to help you resist the urge to over-engineer,
 - STOP. Cool isn't done. Ship first, cool later.
 
 **"I'm just going to quickly refactor..."**
-- STOP. Does the current code work? Yes? Then refactor in v2.
+- STOP. Does the current code work? Yes? Then refactor later.
 
 **"I need to add tests for..."**
 - STOP. Do you have a test for the happy path? Yes? Ship it. Add more tests if bugs appear.
@@ -112,51 +112,26 @@ echo "- [ ] Email notifications for issue updates" >> V2_ROADMAP.md
 
 ### 🚨 Red Flags You're Over-Engineering:
 
-- [ ] You're building infrastructure for "future organizations" (single tenant only!)
+- [ ] You're building for "future organizations" (single tenant only until 2.0!)
 - [ ] You're creating abstractions with only one use case
-- [ ] You're writing custom solutions when standard libraries exist
+- [ ] You're writing custom solutions when libraries exist
 - [ ] You're solving problems that don't exist yet
 - [ ] You're refactoring working code to make it "better"
 - [ ] You're adding features "just in case"
 - [ ] You're designing for scale you don't have
-- [ ] You're creating complex permission systems (just use `is_member` boolean)
+- [ ] You're creating complex permission systems (just use `role` field)
 - [ ] You're adding caching before measuring performance
 - [ ] You're building admin panels for data you could query manually
 
 ### ✅ Green Flags You're On Track:
 
-- [ ] You're using Supabase/Drizzle/tRPC as designed (no custom wrappers)
+- [ ] You're using Supabase/Drizzle as designed (no custom wrappers)
 - [ ] You're copying code when abstraction isn't obvious
 - [ ] You're writing Server Actions directly in route files
-- [ ] You're querying the database directly in Server Components
+- [ ] You're querying database directly in Server Components
 - [ ] You're using plain text instead of rich text editors
-- [ ] You're using HTML forms instead of complex form libraries
-- [ ] You're manually testing instead of writing 500 unit tests
-
----
-
-## The Daily Standup (With Yourself)
-
-### Every Coding Session, Ask:
-
-1. **What am I building today?**
-   - Is it in PRODUCT_SPEC.md?
-
-2. **Why am I building it?**
-   - Which of the 5 core features does it enable?
-
-3. **How will I know it's done?**
-   - What's the minimum viable version?
-
-4. **What am I NOT building today?**
-   - What v2 ideas am I parking?
-
-**Example:**
-
-> **Today:** Implementing issue filtering
-> **Why:** Core feature #3 requires filtering by status, severity, machine
-> **Done When:** Can apply filters, see filtered results, clear filters
-> **NOT Doing:** Saved filters, complex queries, URL state persistence
+- [ ] You're using HTML forms with progressive enhancement
+- [ ] You're manually testing before writing 500 unit tests
 
 ---
 
@@ -167,66 +142,32 @@ echo "- [ ] Email notifications for issue updates" >> V2_ROADMAP.md
 **When an idea strikes:**
 1. Write it in V2_ROADMAP.md
 2. Add a quick note why it's valuable
-3. Forget about it until v1.0 ships
+3. Forget about it until MVP ships
 
 **Example entries:**
 
 ```markdown
-## V2 Feature Ideas
+## MVP+ Feature Ideas
 
-### High Priority (Post-Launch)
-- [ ] Email notifications - Members want updates when assigned
-- [ ] Photo attachments - Helps visualize issues
-- [ ] Mobile app - Members work on-site
+### High Priority (Post-MVP)
+- [ ] QR codes - Makes issue reporting effortless
+- [ ] Machine photos - Visual identification
+- [ ] Issue photos - Better problem clarity
 
-### Medium Priority
-- [ ] Saved filters - Frequent users repeat same filters
-- [ ] Dashboard customization - Different roles want different views
-- [ ] Bulk operations - Archive multiple resolved issues at once
+### 1.0 Features
+- [ ] Email notifications - Keep members informed
+- [ ] OPDB integration - Faster machine setup
+- [ ] Saved filters - Frequent workflows
 
-### Low Priority
-- [ ] Analytics - Track resolution times, common issues
-- [ ] Integration with parts suppliers
-- [ ] AI-assisted issue categorization
+### 2.0 Features
+- [ ] Multi-tenancy - Support other arcades
+- [ ] Analytics - Track patterns
 ```
 
-**Review quarterly:**
-- Move items from v2 backlog to active development
+**Review monthly:**
+- Move items based on user feedback
 - Delete ideas that no longer make sense
-- Reprioritize based on real user feedback
-
----
-
-## The Feature Flag Strategy (For v2)
-
-When you inevitably need to build features incrementally:
-
-### Don't Build Complex Feature Flags (v1.0)
-
-- ❌ No feature flag service
-- ❌ No environment variables for features
-- ❌ No user-based feature rollouts
-
-### Simple Approach:
-
-**Use git branches:**
-```bash
-# Work on v2 feature in branch
-git checkout -b feature/email-notifications
-
-# Ship v1.0 from main
-git checkout main
-git push origin main
-
-# Continue v2 work after v1.0 launches
-git checkout feature/email-notifications
-```
-
-**Or use comments in code:**
-```typescript
-// V2: Add email notification here
-// See V2_ROADMAP.md for spec
-```
+- Reprioritize based on real usage
 
 ---
 
@@ -238,43 +179,26 @@ git checkout feature/email-notifications
 
 **❌ Wrong (Horizontal Slicing):**
 ```
-Week 1: Build all database tables
-Week 2: Build all API routes
-Week 3: Build all UI components
-Week 4: Wire it all together
+Session 1: Build all database tables
+Session 2: Build all API routes
+Session 3: Build all UI components
+Session 4: Wire it all together
 ```
-→ Nothing works until week 4
+→ Nothing works until session 4
 
 **✅ Right (Vertical Slicing):**
 ```
-Week 1: Issue creation (DB + API + UI) - WORKS
-Week 2: Issue viewing (DB + API + UI) - WORKS
-Week 3: Issue editing (DB + API + UI) - WORKS
-Week 4: Issue filtering (DB + API + UI) - WORKS
+Session 1: Issue creation (DB + Action + UI) - WORKS
+Session 2: Issue viewing (DB + Action + UI) - WORKS
+Session 3: Issue editing (DB + Action + UI) - WORKS
+Session 4: Issue filtering (DB + Action + UI) - WORKS
 ```
-→ Something works every week
+→ Something works every session
 
 **Each feature should be:**
 - Deployable independently
 - Testable in isolation
 - Usable by itself (even if basic)
-
-**Example: Issue Tracking**
-
-**Sprint 1 (Deliverable):**
-- ✅ Create issue
-- ✅ View issue
-- ✅ Basic info only (title, description, machine)
-
-**Sprint 2 (Deliverable):**
-- ✅ Add comments
-- ✅ Change status
-
-**Sprint 3 (Deliverable):**
-- ✅ Assign issues
-- ✅ Filter by status
-
-Each sprint delivers VALUE, not just code.
 
 ---
 
@@ -310,20 +234,20 @@ npm test -- issue-creation
 git commit -m "refactor: simplify issue creation"
 ```
 
-**Never refactor without tests** (integration or E2E minimum)
+**Never refactor without tests** (integration or E2E minimum).
 
 ---
 
 ## The Technology Temptation
 
-### ❌ Don't Add New Tech To v1.0
+### ❌ Don't Add New Tech To MVP
 
 You have a proven stack:
-- Next.js 15
+- Next.js 16
 - React 19
 - Supabase
 - Drizzle
-- tRPC
+- tRPC (minimal)
 - shadcn/ui
 - Tailwind v4
 
@@ -333,15 +257,14 @@ You have a proven stack:
 |------------|-------------------|---------------|
 | Zustand/Redux | "Need global state" | Server Components + URL state is enough |
 | Tanstack Query | "Better data fetching" | Server Components already handle this |
-| Zod forms library | "Better validation" | HTML + Server Actions is simpler |
-| Prisma | "Better than Drizzle" | You already know Drizzle |
-| tRPC alternatives | "Heard about X" | tRPC works fine |
+| React Hook Form | "Better validation" | HTML + Server Actions is simpler |
+| Prisma | "Better than Drizzle" | You already chose Drizzle |
 | CSS-in-JS | "Better styling" | Tailwind is working |
 | Storybook | "Component docs" | Build features first |
 
 ### When You Can Add New Tech:
 
-- ✅ After v1.0 ships
+- ✅ After MVP ships
 - ✅ When current solution is demonstrably failing
 - ✅ When you have time to learn properly
 - ✅ When the value is clear and immediate
@@ -353,9 +276,9 @@ You have a proven stack:
 ### You Have a Fixed Complexity Budget. Spend Wisely.
 
 **High Complexity (Save For Critical Features):**
-- Auth flows (already done with Supabase)
-- Real-time updates (if needed)
-- File uploads (keep simple)
+- Auth flows (Supabase handles this)
+- Real-time updates (not needed for MVP)
+- File uploads (MVP+ only)
 
 **Medium Complexity:**
 - Filtering/search
@@ -371,7 +294,7 @@ You have a proven stack:
 1. Am I over-engineering?
 2. Is there a simpler approach?
 3. Can I use a library instead of building?
-4. Can I defer this to v2?
+4. Can I defer this to MVP+ or later?
 
 ---
 
@@ -391,7 +314,8 @@ You have a proven stack:
 **Good Enough ✅:**
 - HTML form
 - Title + description (plain text)
-- Machine dropdown
+- Machine dropdown (required)
+- Severity dropdown
 - Submit button
 - Show errors if validation fails
 
@@ -404,48 +328,45 @@ You have a proven stack:
 - Charts and graphs
 - Saved views
 - Export to PDF
-- Email digests
 
 **Good Enough ✅:**
 - Static layout
 - "My Issues" list
 - "Recent Issues" list
-- Simple counts
+- Simple counts (open issues, unplayable machines)
 - Links to filtered views
 
 ---
 
-## The Accountability System
+## Spare-Time Development Realities
 
-### How to Stay Disciplined
+### Accept These Truths:
 
-**1. Public Commitment (Optional)**
-Post in Discord/Slack:
-> "Shipping PinPoint v1.0 by [DATE]. Only building: user auth, machines, issues, public reporting, dashboard. Everything else is v2."
+1. **Development is intermittent** - You might code for 2 hours tonight, then nothing for a week. That's okay.
+2. **Context switching is expensive** - Write notes for future-you ("TODO: next session, add filtering")
+3. **Momentum matters** - Finish features quickly while you have context
+4. **Perfect is impossible** - Good enough is the only viable standard for passion projects
+5. **Energy varies** - Some sessions for hard problems, some for easy wins
 
-**2. Weekly Reviews**
-Every Friday:
-- [ ] Did I ship vertical slices?
-- [ ] Did I add to v2 backlog instead of v1?
-- [ ] Did I finish features or start too many?
-- [ ] Am I on track for 4-week timeline?
+### Make It Work For You:
 
-**3. Scope Check**
-Before every PR:
-```markdown
-## Feature: [Name]
+**High-energy sessions:**
+- Tackle complex features (auth, filtering, timeline)
+- Make architectural decisions
+- Write tests for critical paths
 
-**Which core feature does this enable?** [1-5]
-**Is this the minimum viable version?** [Yes/No]
-**What did I defer to v2?** [List]
-**Is it done enough?** [5-point checklist]
+**Low-energy sessions:**
+- Polish UI
+- Fix small bugs
+- Update documentation
+- Add seed data
+
+**Write notes for yourself:**
+```typescript
+// TODO: [@your-name next session]
+// This works but needs error handling for when machine doesn't exist
+// Test case: try creating issue with invalid machine_id
 ```
-
-**4. Deploy Often**
-Deploy to staging every Friday, even if incomplete.
-- Seeing it live reveals what's actually important
-- Creates urgency to finish features
-- Prevents "almost done" syndrome
 
 ---
 
@@ -453,12 +374,12 @@ Deploy to staging every Friday, even if incomplete.
 
 ### Embrace These Realities:
 
-1. **v1.0 will be imperfect** - That's okay, v2 will fix it
-2. **Users will request features you skipped** - That validates v2 priorities
-3. **You'll cringe at your own code** - Ship it anyway, refactor in v2
+1. **MVP will be imperfect** - That's okay, MVP+ will improve it
+2. **Users will request features you skipped** - That validates roadmap priorities
+3. **You'll cringe at your own code** - Ship it anyway, refactor later
 4. **There will be bugs** - Fix critical ones, defer minor ones
-5. **Someone will complain about UX** - Improve in v2 based on feedback
-6. **You'll want to rebuild it "the right way"** - Resist until v1 ships
+5. **Someone will complain about UX** - Improve based on feedback
+6. **You'll want to rebuild it "the right way"** - Resist until MVP ships
 
 ### Success Looks Like:
 
@@ -486,13 +407,13 @@ Ask yourself:
 
 | Current Approach | Simplified Approach |
 |------------------|---------------------|
-| User role management UI | Hardcode member list in database |
-| Email notification system | Send manual emails via Supabase dashboard |
+| User role management UI | Manually update roles in Supabase Studio |
+| Email notification system | Send manual emails if needed (1.0 feature) |
 | Analytics dashboard | Run SQL queries manually |
 | Complex filtering UI | Start with 3 basic filters only |
 | Settings page | Hardcode settings in config file |
 
-**Remember:** You can always add these later. AFTER v1.0 ships.
+**Remember:** You can always add these later. AFTER MVP ships.
 
 ---
 
@@ -500,22 +421,21 @@ Ask yourself:
 
 ### You Win When:
 
-1. ✅ PRODUCT_SPEC.md features all work
+1. ✅ PRODUCT_SPEC.md MVP features all work
 2. ✅ Austin Pinball Collective is actively using it
 3. ✅ Critical paths have tests
 4. ✅ It's deployed to production
 5. ✅ No P0 security issues
 
-**That's it.** Everything else is v2.
+**That's it.** Everything else is MVP+/1.0/2.0.
 
-### Celebrate and Move to v2:
+### After MVP Ships:
 
-After v1.0 ships:
-1. Take a week off
+1. Celebrate! (Take a break)
 2. Collect user feedback
 3. Review V2_ROADMAP.md
-4. Prioritize based on actual usage (not assumptions)
-5. Build v2 with same discipline
+4. Prioritize MVP+ features based on actual usage
+5. Build MVP+ with same discipline
 
 ---
 
@@ -530,7 +450,7 @@ Print this and put it next to your monitor:
 │ Before adding ANY feature:             │
 │ □ Is it in PRODUCT_SPEC.md?           │
 │ □ Is it required to work?             │
-│ □ Would v1 be useless without it?     │
+│ □ Would MVP be useless without it?    │
 │                                        │
 │ If not 3/3 → V2_ROADMAP.md            │
 ├────────────────────────────────────────┤
@@ -550,10 +470,10 @@ Print this and put it next to your monitor:
 │                                        │
 │ → Write it in V2_ROADMAP.md           │
 ├────────────────────────────────────────┤
-│ Ship v1.0 before perfecting v1.0      │
+│ Ship MVP before perfecting MVP         │
 └────────────────────────────────────────┘
 ```
 
 ---
 
-**Final Word:** Discipline is choosing what NOT to build. Ship v1.0, learn from reality, build v2 smarter.
+**Final Word:** Discipline is choosing what NOT to build. Ship MVP, learn from reality, build MVP+ smarter. This is a passion project - make it joyful, not stressful.
