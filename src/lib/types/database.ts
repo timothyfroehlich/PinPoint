@@ -7,7 +7,7 @@
  */
 
 import type { InferSelectModel, InferInsertModel } from "drizzle-orm";
-import {
+import type {
   userProfiles,
   machines,
   issues,

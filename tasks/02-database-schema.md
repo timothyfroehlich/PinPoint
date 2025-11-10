@@ -85,61 +85,77 @@ Drizzle ORM setup and complete schema definition with database trigger for auto-
 ## Key Decisions
 
 ### 1. Supabase CLI Local Development
+
 **Decision**: Use local Supabase via Docker (`supabase start`) instead of connecting to remote Supabase instance.
 **Rationale**: Faster development iteration, no network latency, free tier limits avoided.
 
 ### 2. Database Trigger via seed.sql
+
 **Decision**: Place `handle_new_user()` trigger in `supabase/seed.sql` instead of Drizzle migration.
 **Rationale**:
+
 - Runs automatically on `supabase db reset` (local development)
 - Fits Supabase CLI workflow perfectly
 - `CREATE OR REPLACE` is idempotent (safe to re-run)
 
 ### 3. Push Workflow Only (No Migrations)
+
 **Decision**: Use `drizzle-kit push` for pre-beta, defer `generate` + `migrate` to production.
 **Rationale**:
+
 - Pre-beta has zero users, can blow away data anytime
 - Faster iteration (no migration file management)
 - Migration workflow documented in Task 11 for MVP launch
 
 ### 4. Cross-Schema Foreign Key Constraint
+
 **Decision**: Handle `user_profiles.id → auth.users.id` FK constraint in `seed.sql`, not Drizzle schema.
 **Rationale**:
+
 - Drizzle doesn't support cross-schema references (public.user_profiles → auth.users)
 - Added FK constraint manually via `ALTER TABLE` in seed.sql
 - Documented in schema comments for clarity
 
 ### 5. TypeScript Strictest Config Compliance
+
 **Decision**: Use bracket notation `process.env["DATABASE_URL"]` instead of dot notation.
 **Rationale**:
+
 - `@tsconfig/strictest` requires bracket notation for index signatures
 - Prevents TypeScript error TS4111
 
 ## Problems Encountered
 
 ### 1. Cross-Schema Reference Error
+
 **Problem**: Initial schema used `sql` template literal to reference `auth.users(id)`, causing TypeScript error.
 **Solution**: Removed Drizzle reference, added FK constraint in `seed.sql` manually.
 
 ### 2. TypeScript Index Signature Access
+
 **Problem**: `process.env.DATABASE_URL` failed with TS4111 error.
 **Solution**: Changed to bracket notation `process.env["DATABASE_URL"]`.
 
 ## Lessons Learned
 
 ### 1. Supabase Seed Files Are Powerful
+
 Seed files run automatically on `supabase db reset`, making them perfect for:
+
 - Database triggers (AFTER INSERT on auth.users)
 - Cross-schema foreign key constraints
 - Initial data seeding (future use)
 
 ### 2. Drizzle Has Schema Limitations
+
 Drizzle can't reference tables outside the `public` schema (like Supabase's `auth.users`). Workarounds:
+
 - Document in comments
 - Add constraint manually via seed.sql
 - Keep schema simple, handle edge cases in SQL
 
 ### 3. Push vs Migrations Trade-off
+
 - **Push**: Fast, destructive, perfect for pre-beta greenfield
 - **Migrations**: Safe, version-controlled, required for production
 - Transition happens when you have data you can't lose
@@ -147,6 +163,7 @@ Drizzle can't reference tables outside the `public` schema (like Supabase's `aut
 ## Updates for CLAUDE.md
 
 **For Task 3 (Supabase Auth) agent:**
+
 - Database schema is ready (4 tables: user_profiles, machines, issues, issue_comments)
 - Auto-profile creation trigger is in `supabase/seed.sql`
 - Use `npm run db:push` to sync schema to local Supabase
@@ -154,6 +171,7 @@ Drizzle can't reference tables outside the `public` schema (like Supabase's `aut
 - Types available at `~/lib/types` (UserProfile, Machine, Issue, IssueComment)
 
 **For future agents:**
+
 - All database access via `import { db } from "~/server/db"`
 - Schema uses snake_case (database convention)
 - Convert to camelCase at application boundaries
