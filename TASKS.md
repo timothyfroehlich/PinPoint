@@ -44,9 +44,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI) → PR 5 (
 - [ ] Create initial Next.js app structure (manual setup or `npx create-next-app@latest`)
 
 #### Build & Dev Tools
-- [ ] Install cross-env (`npm install -D cross-env`) - cross-platform env vars
-- [ ] Install npm-run-all (`npm install -D npm-run-all`) - run multiple scripts
-- [ ] Install concurrently (`npm install -D concurrently`) - parallel dev processes
+- [ ] Install cross-env (`npm install -D cross-env`) - only if developing cross-platform (Windows + Mac/Linux)
 
 #### TypeScript Configuration
 - [ ] Create `tsconfig.base.json` (shared configuration)
@@ -74,69 +72,39 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI) → PR 5 (
 - [ ] Create `.prettierignore` file
 - [ ] Install eslint-config-prettier (`npm install -D eslint-config-prettier`)
 
-#### ShellCheck for Scripts
-- [ ] Install shellcheck locally (optional: `brew install shellcheck` or apt)
-- [ ] Create `.shellcheckrc` configuration file
-- [ ] Create `scripts/` directory for bash scripts
-- [ ] Add shellcheck validation to CI
-
-#### Security Tools
-- [ ] Install security scanning tools (will be used in CI)
-  - gitleaks (secret scanning)
-  - trufflehog (secret detection)
-  - npm audit (dependency vulnerabilities)
-- [ ] Create security check scripts in `scripts/`:
-  - [ ] `check-security-deps.sh` (check for known vulnerable dependencies)
-  - [ ] `check-file-security.sh` (check for sensitive file patterns)
-  - [ ] `check-npm-audit.sh` (wrapper for npm audit with proper exit codes)
-  - [ ] `check-auth-safety.cjs` (validate Supabase SSR patterns)
-- [ ] Make scripts executable (`chmod +x scripts/*.sh`)
+#### Security Tools (Minimal)
+- [ ] Create `scripts/` directory
+- [ ] Add gitleaks to pre-commit hook (secret scanning)
+  - Installed in CI, not locally
+  - Prevents committing API keys, passwords
 
 #### Git Hooks (Husky + lint-staged)
 - [ ] Install Husky (`npm install -D husky`)
 - [ ] Initialize Husky (`npx husky install`)
 - [ ] Install lint-staged (`npm install -D lint-staged`)
 - [ ] Create `.husky/pre-commit` hook
-  - Run lint-staged (format, lint, typecheck staged files)
-  - Run security checks on staged files (gitleaks protect --staged)
-- [ ] Create `.husky/pre-push` hook (optional)
-  - Run full test suite before push
+  - Run lint-staged (format + lint staged files only)
 - [ ] Add prepare script to package.json (`"prepare": "husky"`)
 - [ ] Configure lint-staged in package.json
 
-#### GitHub Actions - Core CI
+#### GitHub Actions (Minimal)
 - [ ] Create `.github/workflows/` directory
-- [ ] Create `.github/actions/node-setup/` (reusable action)
-  - Cache npm dependencies
-  - Set up Node.js
-  - Install dependencies
 - [ ] Create `.github/workflows/ci.yml`
+  - Node.js setup with dependency caching
   - Typecheck job (`npm run typecheck`)
-  - Lint job with SARIF output (`npm run lint:sarif`)
+  - Lint job (`npm run lint`)
   - Format check job (`npm run format`)
   - Build job (`npm run build`)
-  - Test workflow triggers on push and pull_request
+  - Test job (`npm test`)
+  - gitleaks scan (secret detection)
+  - npm audit (dependency vulnerabilities)
+  - Triggers on push and pull_request to main
 
-#### GitHub Actions - Static Analysis
-- [ ] Create `.github/workflows/static-analysis.yml`
-  - ESLint with SARIF upload (GitHub Code Scanning)
-  - Prettier formatting check
-  - ShellCheck for bash scripts with SARIF
-  - actionlint for workflow validation
-  - reviewdog annotations for PR comments
-- [ ] Create `scripts/shellcheck-to-sarif.cjs` (convert ShellCheck JSON to SARIF)
-
-#### GitHub Actions - Security
-- [ ] Add security-audit job to static-analysis.yml
-  - Install gitleaks, trufflehog, ripgrep, jq
-  - Run `npm run security:check` script
-  - Check dependencies, files, auth patterns, npm audit
-
-#### GitHub Actions - CodeQL (optional but recommended)
-- [ ] Create `.github/workflows/codeql.yml`
-  - JavaScript/TypeScript analysis
-  - Automated security scanning
-  - Upload results to GitHub Security tab
+#### GitHub Actions - CodeQL (free security scanning)
+- [ ] Enable CodeQL in GitHub Security settings
+  - Automated JavaScript/TypeScript analysis
+  - Zero configuration needed
+  - Or create `.github/workflows/codeql.yml` for custom config
 
 #### PostCSS Configuration
 - [ ] Install PostCSS (`npm install -D postcss`)
@@ -157,43 +125,29 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI) → PR 5 (
 - [ ] Create `.env.local` (gitignored)
 - [ ] Add `.gitignore` entries for env files
 
-#### Package.json Scripts
-**Primary Commands:**
-- [ ] `dev` - Start Next.js dev server with turbo
+#### Package.json Scripts (Simplified)
+**Essential Scripts:**
+- [ ] `dev` - Start Next.js dev server
 - [ ] `build` - Build for production
 - [ ] `start` - Start production server
-- [ ] `typecheck` - Run TypeScript type checking (main + config files)
+- [ ] `typecheck` - Run TypeScript type checking (all tsconfig files)
 - [ ] `lint` - Run ESLint
 - [ ] `lint:fix` - Auto-fix ESLint issues
-- [ ] `lint:sarif` - Generate ESLint SARIF output for GitHub Code Scanning
 - [ ] `format` - Check Prettier formatting
-- [ ] `format:write` - Auto-format with Prettier
+- [ ] `format:fix` - Auto-format with Prettier
+- [ ] `test` - Run Vitest tests
+- [ ] `test:watch` - Vitest watch mode
 - [ ] `prepare` - Husky install (runs on npm install)
-
-**Security Commands:**
-- [ ] `security:check` - Run all security checks (parallel)
-- [ ] `security:deps` - Check for vulnerable dependencies
-- [ ] `security:files` - Check for sensitive file patterns
-- [ ] `security:auth` - Validate Supabase SSR usage patterns
-- [ ] `security:audit` - Run npm audit with proper thresholds
-
-**Development Commands:**
-- [ ] `dev:full` - Run dev server + typecheck in parallel (concurrently)
-- [ ] `dev:typecheck` - TypeScript watch mode
-- [ ] `fix` - Run lint:fix and format:write sequentially
 
 ### Verification
 - [ ] `npm run dev` starts development server
 - [ ] `npm run build` completes without errors
 - [ ] `npm run typecheck` passes (all tsconfig files)
 - [ ] `npm run lint` passes
-- [ ] `npm run lint:sarif` generates SARIF file
 - [ ] `npm run format` passes
-- [ ] `npm run security:check` passes
-- [ ] GitHub Actions workflows run successfully (ci.yml, static-analysis.yml)
-- [ ] Pre-commit hook runs on commit (lint-staged + security)
-- [ ] CodeQL analysis completes (if enabled)
-- [ ] reviewdog annotations appear on PRs
+- [ ] GitHub Actions CI workflow passes
+- [ ] Pre-commit hook runs on commit (lint-staged)
+- [ ] gitleaks scan passes in CI
 
 ---
 
@@ -382,53 +336,23 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI) → PR 5 (
   - Schema application helpers
 - [ ] Write example integration test (database query)
 
-#### Playwright E2E Setup
+#### Playwright E2E Setup (Simplified)
 - [ ] Install Playwright (`npm install -D @playwright/test`)
 - [ ] Initialize Playwright (`npx playwright install`)
 - [ ] Create `playwright.config.ts`
   - Configure base URL
-  - Set up test projects (chromium, firefox, webkit, auth-setup, chromium-auth)
-  - Configure retries and timeouts
-  - Configure use.trace, screenshot, video options
-- [ ] Create `e2e/` directory structure
-  - [ ] `fixtures/` (Playwright fixtures)
-  - [ ] `smoke/` (smoke tests)
-  - [ ] `auth/` (authentication setup tests)
+  - Single chromium project (keep it simple)
+  - Basic retries and timeouts
+- [ ] Create `e2e/` directory
+  - [ ] `smoke/` subdirectory for smoke tests
 - [ ] Write example smoke test (home page loads)
-- [ ] Write auth setup test (for authenticated test project)
+- [ ] Add `smoke` script to package.json
 
-#### E2E Database Snapshots (optional but recommended)
-- [ ] Create `scripts/e2e-snapshot-create.sh`
-  - Create database snapshot before E2E tests
-  - Speeds up test runs by restoring known state
-- [ ] Create `scripts/e2e-snapshot-restore.sh`
-  - Restore database to snapshot state
-  - Use in Playwright globalSetup
-- [ ] Add scripts to package.json:
-  - [ ] `e2e:snapshot:create`
-  - [ ] `e2e:snapshot:restore`
-
-#### Enhanced Test Scripts
-- [ ] Add cross-platform E2E scripts to package.json:
-  - [ ] `smoke` - Quick smoke tests (chromium only, unauthenticated)
-  - [ ] `e2e` - Full E2E suite (guest + authenticated flows)
-  - [ ] `e2e:guest` - Unauthenticated flows only
-  - [ ] `e2e:smoke` - Authenticated smoke tests
-- [ ] Use cross-env for PORT and BASE_URL configuration
-- [ ] Configure PLAYWRIGHT_REUSE=1 for faster dev iteration
-
-#### GitHub Actions Update
-- [ ] Add test job to `.github/workflows/ci.yml`
-  - Run unit/integration tests (`npm test`)
-  - Upload coverage reports (optional)
-- [ ] Create `.github/workflows/tests.yml`
-  - Separate workflow for comprehensive testing
-  - Matrix strategy for parallel test execution
-- [ ] Add E2E test job to `.github/workflows/ci.yml`
+#### GitHub Actions - E2E Tests
+- [ ] Add E2E job to `.github/workflows/ci.yml`
   - Install Playwright browsers
   - Run smoke tests (`npm run smoke`)
-  - Upload Playwright traces on failure
-  - Upload test results
+  - Upload Playwright trace on failure
 
 ### Verification
 - [ ] `npm test` runs and passes
