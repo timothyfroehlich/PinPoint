@@ -18,23 +18,27 @@
 ### Frontend
 
 **Next.js 16 (App Router)**
+
 - React 19 Server Components as default
 - Server Actions for mutations
 - Streaming with Suspense
 - Static generation for public pages
 
 **React Architecture**
+
 - Server Components for data fetching and layout
 - Client Components only for: forms with interactivity, user interactions
 - React Compiler enabled for automatic optimization
 - `use client` directive isolated to leaf components
 
 **Styling**
+
 - **Tailwind CSS v4** - CSS-based configuration
 - **shadcn/ui** - Server Component compatible
 - **Material Design 3 colors** - From `globals.css`
 
 **State Management**
+
 - Server state via React cache() and Server Components
 - Client state via useState/useReducer (minimal)
 - No global state management libraries
@@ -42,17 +46,20 @@
 ### Backend
 
 **Supabase**
+
 - Authentication (email/password for MVP)
 - PostgreSQL database
 - File storage (for avatars, machine photos in MVP+)
 - **No real-time subscriptions** (MVP doesn't need it)
 
 **Drizzle ORM**
+
 - Type-safe queries
 - Schema in `src/server/db/schema/`
 - Direct queries in Server Components
 
 **tRPC (Minimal Use)**
+
 - Only for client-side mutations where Server Actions don't fit
 - Protected procedures require authenticated user
 - Keep router surface area small
@@ -159,8 +166,8 @@ CREATE INDEX idx_issue_comments_issue_id ON issue_comments(issue_id);
 class IssueRepository {
   async findByMachine(machineId: string): Promise<Issue[]> {
     return await db.query.issues.findMany({
-      where: eq(issues.machineId, machineId)
-    })
+      where: eq(issues.machineId, machineId),
+    });
   }
 }
 
@@ -168,18 +175,19 @@ class IssueRepository {
 class IssueService {
   constructor(private repo: IssueRepository) {}
   async getIssuesForMachine(machineId: string): Promise<Issue[]> {
-    return await this.repo.findByMachine(machineId)
+    return await this.repo.findByMachine(machineId);
   }
 }
 
 // Controller
 export async function getIssues(machineId: string) {
-  const service = new IssueService(new IssueRepository())
-  return await service.getIssuesForMachine(machineId)
+  const service = new IssueService(new IssueRepository());
+  return await service.getIssuesForMachine(machineId);
 }
 ```
 
 **Problems:**
+
 - 3 files to understand one query
 - Just passing data through layers
 - Testing requires mocking all layers
@@ -202,6 +210,7 @@ export default async function MachinePage({ params }: { params: { id: string } }
 ```
 
 **Benefits:**
+
 - 1 file to understand
 - Colocated with usage
 - Drizzle provides type safety
@@ -211,6 +220,7 @@ export default async function MachinePage({ params }: { params: { id: string } }
 ### When You WOULD Need Layers
 
 Add abstractions when you have:
+
 - Multiple clients (web app + mobile app + API)
 - Complex business logic (multi-step transactions, saga patterns)
 - Multiple databases (read/write splitting, sharding)
@@ -273,32 +283,34 @@ export default async function ProtectedPage() {
 ### Server Action
 
 ```typescript
-'use server'
+"use server";
 
-import { revalidatePath } from 'next/cache'
-import { createClient } from '~/lib/supabase/server'
+import { revalidatePath } from "next/cache";
+import { createClient } from "~/lib/supabase/server";
 
 export async function createIssue(formData: FormData) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
-    throw new Error('Unauthorized')
+    throw new Error("Unauthorized");
   }
 
-  const title = formData.get('title') as string
-  const machineId = formData.get('machineId') as string
+  const title = formData.get("title") as string;
+  const machineId = formData.get("machineId") as string;
 
   await db.insert(issues).values({
     title,
     machineId,
     reportedBy: user.id,
-    severity: 'playable',  // default
-    status: 'new',
-  })
+    severity: "playable", // default
+    status: "new",
+  });
 
-  revalidatePath('/issues')
-  redirect('/issues')
+  revalidatePath("/issues");
+  redirect("/issues");
 }
 ```
 
@@ -306,18 +318,18 @@ export async function createIssue(formData: FormData) {
 
 ```typescript
 // middleware.ts
-import { type NextRequest } from 'next/server'
-import { updateSession } from '~/lib/supabase/middleware'
+import { type NextRequest } from "next/server";
+import { updateSession } from "~/lib/supabase/middleware";
 
 export async function middleware(request: NextRequest) {
-  return await updateSession(request)
+  return await updateSession(request);
 }
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
-}
+};
 ```
 
 ---
@@ -390,17 +402,17 @@ export function IssueForm({ machines }: { machines: Machine[] }) {
 
 ```typescript
 // src/server/db/schema/machines.ts
-import { pgTable, uuid, text, timestamp } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, timestamp } from "drizzle-orm/pg-core";
 
-export const machines = pgTable('machines', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  name: text('name').notNull(),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-})
+export const machines = pgTable("machines", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
 
-export type Machine = typeof machines.$inferSelect
-export type NewMachine = typeof machines.$inferInsert
+export type Machine = typeof machines.$inferSelect;
+export type NewMachine = typeof machines.$inferInsert;
 ```
 
 ### Application Types
@@ -409,24 +421,24 @@ export type NewMachine = typeof machines.$inferInsert
 // src/lib/types/models.ts
 
 export interface Issue {
-  id: string
-  machineId: string
-  title: string
-  description: string | null
-  status: 'new' | 'in_progress' | 'resolved'
-  severity: 'minor' | 'playable' | 'unplayable'
-  reportedBy: string | null
-  assignedTo: string | null
-  resolvedAt: Date | null
-  createdAt: Date
-  updatedAt: Date
+  id: string;
+  machineId: string;
+  title: string;
+  description: string | null;
+  status: "new" | "in_progress" | "resolved";
+  severity: "minor" | "playable" | "unplayable";
+  reportedBy: string | null;
+  assignedTo: string | null;
+  resolvedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface IssueWithRelations extends Issue {
-  machine: Machine
-  reportedByUser?: UserProfile | null
-  assignedToUser?: UserProfile | null
-  comments: IssueComment[]
+  machine: Machine;
+  reportedByUser?: UserProfile | null;
+  assignedToUser?: UserProfile | null;
+  comments: IssueComment[];
 }
 ```
 
@@ -437,6 +449,7 @@ export interface IssueWithRelations extends Issue {
 ### Two Separate Supabase Projects
 
 **Preview Environment:**
+
 - URL: `preview.pinpoint.dev` (example)
 - Supabase project: `pinpoint-preview`
 - Database: Test/seed data
@@ -444,6 +457,7 @@ export interface IssueWithRelations extends Issue {
 - Can be reset/rebuilt anytime
 
 **Production Environment:**
+
 - URL: `pinpoint.dev` (example)
 - Supabase project: `pinpoint-prod`
 - Database: Real member data
@@ -551,6 +565,7 @@ npm run e2e
 ## Security Checklist
 
 ### Authentication
+
 - ✅ Supabase middleware for session refresh
 - ✅ Server Components check auth before rendering
 - ✅ Server Actions validate user auth
@@ -558,17 +573,20 @@ npm run e2e
 - ✅ Password reset flow implemented
 
 ### Input Validation
+
 - ✅ Zod schemas for form validation
 - ✅ Server-side validation in Server Actions
 - ✅ SQL injection prevented by Drizzle parameterization
 - ✅ XSS prevented by React escaping
 
 ### Authorization
+
 - ✅ Role checking (guest/member/admin)
 - ✅ Protected routes redirect to login
 - ✅ File upload validation (type, size) in MVP+
 
 ### Not Needed for Single-Tenant
+
 - ❌ No RLS policies (single tenant)
 - ❌ No CSRF tokens (Server Actions handle this)
 - ❌ No organization scoping
@@ -577,16 +595,16 @@ npm run e2e
 
 ## Tech Stack Decisions
 
-| Date | Decision | Rationale |
-|------|----------|-----------|
-| 2025-11-10 | Next.js 16 | Use latest stable release |
-| 2025-11-10 | No real-time subscriptions | MVP doesn't need it |
-| 2025-11-10 | No DAL/Repository layers | Server Components + Drizzle is sufficient |
-| 2025-11-10 | Issues always per-machine | Aligns with reality, simplifies schema |
-| 2025-11-10 | Severity: minor/playable/unplayable | Clear, player-centric language |
-| 2025-11-10 | Role: guest/member/admin | Simple, extensible permission model |
-| 2025-11-10 | Two Supabase projects | Preview/prod separation |
-| 2025-11-10 | Drizzle push (no migrations) | Direct schema updates during development |
+| Date       | Decision                            | Rationale                                 |
+| ---------- | ----------------------------------- | ----------------------------------------- |
+| 2025-11-10 | Next.js 16                          | Use latest stable release                 |
+| 2025-11-10 | No real-time subscriptions          | MVP doesn't need it                       |
+| 2025-11-10 | No DAL/Repository layers            | Server Components + Drizzle is sufficient |
+| 2025-11-10 | Issues always per-machine           | Aligns with reality, simplifies schema    |
+| 2025-11-10 | Severity: minor/playable/unplayable | Clear, player-centric language            |
+| 2025-11-10 | Role: guest/member/admin            | Simple, extensible permission model       |
+| 2025-11-10 | Two Supabase projects               | Preview/prod separation                   |
+| 2025-11-10 | Drizzle push (no migrations)        | Direct schema updates during development  |
 
 ---
 

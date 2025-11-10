@@ -120,7 +120,7 @@ const mockDbClient = vi.mockObject(
       posts: { findFirst: async () => null },
     },
   },
-  { spy: true },
+  { spy: true }
 ); // Keeps original behavior, adds spy capabilities
 ```
 
@@ -138,7 +138,7 @@ vi.mock("@/lib/db", async (importOriginal) => {
   >("@electric-sql/pglite");
   const { drizzle } =
     await vi.importActual<typeof import("drizzle-orm/pglite")>(
-      "drizzle-orm/pglite",
+      "drizzle-orm/pglite"
     );
 
   const client = new PGlite();
@@ -227,7 +227,7 @@ vi.stubGlobal(
   "fetch",
   vi.fn().mockResolvedValue({
     json: () => Promise.resolve({ data: "mocked" }),
-  }),
+  })
 );
 
 // Cleanup in teardown

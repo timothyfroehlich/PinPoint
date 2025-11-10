@@ -11,25 +11,31 @@ Major improvements to component management and customization for modern React de
 PinPoint adopting shadcn/ui during RSC Migration Phase 1A while transitioning from Material UI.
 
 **Integration points:**
+
 - Server Components by default
-- Tailwind v4 compatible  
+- Tailwind v4 compatible
 - Material UI replacement during transition
 
 ## 2025 Updates
 
 **Universal Registry Items (July 2025)**
+
 - Local file support for component management
 
-**Enhanced Calendar Components (July 2025)**  
+**Enhanced Calendar Components (July 2025)**
+
 - Improved date components for issue handling
 
 **Radix UI Improvements (June 2025)**
+
 - Better accessibility patterns
 
 **Tailwind v4 Integration (Feb 2025)**
+
 - CSS architecture alignment
 
 **Blocks System (Jan 2025)**
+
 - Pre-built component patterns
 
 ---
@@ -41,13 +47,14 @@ PinPoint adopting shadcn/ui during RSC Migration Phase 1A while transitioning fr
 ```bash
 # NEW: Pre-built component compositions
 npx shadcn@latest add block dashboard-01
-npx shadcn@latest add block authentication-01  
+npx shadcn@latest add block authentication-01
 npx shadcn@latest add block sidebar-01
 ```
 
 **Perfect for PinPoint:**
+
 - **Dashboard blocks**: Issue management interfaces
-- **Authentication blocks**: User management patterns  
+- **Authentication blocks**: User management patterns
 - **Data table blocks**: Machine inventory displays
 - **Form blocks**: Issue creation and editing
 
@@ -60,6 +67,7 @@ npx shadcn@latest add custom-issue-card --registry local
 ```
 
 **Benefits for PinPoint:**
+
 - **Custom components**: PinPoint-specific issue management components
 - **Local registry**: Private component library for organization patterns
 - **Version control**: Better tracking of component customizations
@@ -80,11 +88,12 @@ npx shadcn init --force         # Reinitialize configuration
 ### **Essential Components for PinPoint**
 
 #### **Data Display**
+
 ```tsx
 // Perfect for issue management
-import { Badge } from "~/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card"
-import { Table, TableBody, TableCell, TableRow } from "~/components/ui/table"
+import { Badge } from "~/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Table, TableBody, TableCell, TableRow } from "~/components/ui/table";
 
 export function IssueCard({ issue }: { issue: Issue }) {
   return (
@@ -92,7 +101,9 @@ export function IssueCard({ issue }: { issue: Issue }) {
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           {issue.title}
-          <Badge variant={issue.priority === 'high' ? 'destructive' : 'secondary'}>
+          <Badge
+            variant={issue.priority === "high" ? "destructive" : "secondary"}
+          >
             {issue.priority}
           </Badge>
         </CardTitle>
@@ -101,17 +112,24 @@ export function IssueCard({ issue }: { issue: Issue }) {
         <p className="text-muted-foreground">{issue.description}</p>
       </CardContent>
     </Card>
-  )
+  );
 }
 ```
 
 #### **Forms & Input**
+
 ```tsx
 // Server Actions integration
-import { Button } from "~/components/ui/button"
-import { Input } from "~/components/ui/input"
-import { Textarea } from "~/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select"
+import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
+import { Textarea } from "~/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 
 export function CreateIssueForm() {
   return (
@@ -130,15 +148,16 @@ export function CreateIssueForm() {
       </Select>
       <Button type="submit">Create Issue</Button>
     </form>
-  )
+  );
 }
 ```
 
 #### **Navigation & Layout**
+
 ```tsx
 // Server Component navigation
-import { Separator } from "~/components/ui/separator"
-import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar"
+import { Separator } from "~/components/ui/separator";
+import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 
 export async function ServerNavigation({ user }: { user: User }) {
   return (
@@ -156,7 +175,7 @@ export async function ServerNavigation({ user }: { user: User }) {
       <Separator />
       {/* Navigation items */}
     </nav>
-  )
+  );
 }
 ```
 
@@ -166,40 +185,38 @@ export async function ServerNavigation({ user }: { user: User }) {
 
 ### **Component Mapping Strategy**
 
-| Material UI Component | shadcn/ui Replacement | Migration Notes |
-| --------------------- | ---------------------- | --------------- |
-| `Button` | `Button` | Direct replacement with variant props |
-| `Card` | `Card` + subcomponents | More composable structure |
-| `TextField` | `Input` + `Label` | Form composition pattern |
-| `Select` | `Select` + subcomponents | Radix UI based, better a11y |
-| `Dialog` | `Dialog` + subcomponents | More flexible composition |
-| `AppBar` | Custom with `Card` | Server Component based |
-| `DataGrid` | `Table` + custom logic | Lighter weight, more control |
+| Material UI Component | shadcn/ui Replacement    | Migration Notes                       |
+| --------------------- | ------------------------ | ------------------------------------- |
+| `Button`              | `Button`                 | Direct replacement with variant props |
+| `Card`                | `Card` + subcomponents   | More composable structure             |
+| `TextField`           | `Input` + `Label`        | Form composition pattern              |
+| `Select`              | `Select` + subcomponents | Radix UI based, better a11y           |
+| `Dialog`              | `Dialog` + subcomponents | More flexible composition             |
+| `AppBar`              | Custom with `Card`       | Server Component based                |
+| `DataGrid`            | `Table` + custom logic   | Lighter weight, more control          |
 
 ### **Gradual Migration Pattern**
 
 ```tsx
 // Phase 1: Coexistence
-import { Button as MuiButton } from "@mui/material"
-import { Button as ShadcnButton } from "~/components/ui/button"
+import { Button as MuiButton } from "@mui/material";
+import { Button as ShadcnButton } from "~/components/ui/button";
 
 export function TransitionComponent() {
   return (
     <div className="space-y-4">
       {/* Existing MUI components continue working */}
       <MuiButton variant="contained">Legacy Button</MuiButton>
-      
+
       {/* New development uses shadcn/ui */}
       <ShadcnButton variant="default">New Button</ShadcnButton>
     </div>
-  )
+  );
 }
 
 // Phase 2: Full replacement
 export function ModernComponent() {
-  return (
-    <ShadcnButton variant="default">Fully Migrated</ShadcnButton>
-  )
+  return <ShadcnButton variant="default">Fully Migrated</ShadcnButton>;
 }
 ```
 
@@ -242,14 +259,14 @@ Total: ~55KB
 @layer base {
   :root {
     /* PinPoint brand colors */
-    --primary: 214 84% 56%;        /* PinPoint blue */
+    --primary: 214 84% 56%; /* PinPoint blue */
     --primary-foreground: 0 0% 98%;
-    
+
     /* Issue status colors */
-    --success: 142 76% 36%;        /* Green for resolved */
-    --destructive: 0 84% 60%;      /* Red for critical */
-    --warning: 38 92% 50%;         /* Orange for pending */
-    
+    --success: 142 76% 36%; /* Green for resolved */
+    --destructive: 0 84% 60%; /* Red for critical */
+    --warning: 38 92% 50%; /* Orange for pending */
+
     /* Component-specific */
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
@@ -263,7 +280,7 @@ Total: ~55KB
 
 ```tsx
 // Custom variant creation
-import { cva, type VariantProps } from "class-variance-authority"
+import { cva, type VariantProps } from "class-variance-authority";
 
 const issueStatusVariants = cva(
   "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
@@ -271,23 +288,23 @@ const issueStatusVariants = cva(
     variants: {
       status: {
         open: "bg-blue-50 text-blue-700 border border-blue-200",
-        "in-progress": "bg-yellow-50 text-yellow-700 border border-yellow-200", 
+        "in-progress": "bg-yellow-50 text-yellow-700 border border-yellow-200",
         resolved: "bg-green-50 text-green-700 border border-green-200",
         closed: "bg-gray-50 text-gray-700 border border-gray-200",
-      }
-    }
+      },
+    },
   }
-)
+);
 
-export function IssueStatusBadge({ 
-  status, 
-  ...props 
+export function IssueStatusBadge({
+  status,
+  ...props
 }: VariantProps<typeof issueStatusVariants> & React.ComponentProps<"span">) {
   return (
     <span className={issueStatusVariants({ status })} {...props}>
       {status}
     </span>
-  )
+  );
 }
 ```
 
@@ -303,7 +320,7 @@ export function IssueStatusBadge({
 
 # Add essential components for issue management
 npx shadcn@latest add badge
-npx shadcn@latest add table  
+npx shadcn@latest add table
 npx shadcn@latest add select
 npx shadcn@latest add dialog
 npx shadcn@latest add form
@@ -314,17 +331,17 @@ npx shadcn@latest add toast
 
 ```tsx
 // Server Components + shadcn/ui pattern
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card"
-import { Badge } from "~/components/ui/badge"
-import { getIssuesForOrg } from "~/lib/dal/issues"
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Badge } from "~/components/ui/badge";
+import { getIssuesForOrg } from "~/lib/dal/issues";
 
-export default async function IssuesPage({ 
-  params 
-}: { 
-  params: { orgId: string } 
+export default async function IssuesPage({
+  params,
+}: {
+  params: { orgId: string };
 }) {
-  const issues = await getIssuesForOrg(params.orgId) // DAL function
-  
+  const issues = await getIssuesForOrg(params.orgId); // DAL function
+
   return (
     <div className="grid gap-4">
       {issues.map((issue) => (
@@ -341,7 +358,7 @@ export default async function IssuesPage({
         </Card>
       ))}
     </div>
-  )
+  );
 }
 ```
 
@@ -349,33 +366,38 @@ export default async function IssuesPage({
 
 ```tsx
 // Server Actions + shadcn/ui forms
-import { Button } from "~/components/ui/button"
-import { Input } from "~/components/ui/input"
-import { Label } from "~/components/ui/label"
-import { createIssueAction } from "~/lib/actions/issue-actions"
+import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import { createIssueAction } from "~/lib/actions/issue-actions";
 
 export function CreateIssueForm() {
   return (
     <form action={createIssueAction} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="title">Issue Title</Label>
-        <Input id="title" name="title" placeholder="Describe the issue" required />
+        <Input
+          id="title"
+          name="title"
+          placeholder="Describe the issue"
+          required
+        />
       </div>
-      
+
       <div className="space-y-2">
         <Label htmlFor="description">Description</Label>
-        <Textarea 
-          id="description" 
-          name="description" 
+        <Textarea
+          id="description"
+          name="description"
           placeholder="Additional details..."
         />
       </div>
-      
+
       <Button type="submit" className="w-full">
         Create Issue
       </Button>
     </form>
-  )
+  );
 }
 ```
 
@@ -427,30 +449,30 @@ export function IssueListServer({ issues }: { issues: Issue[] }) {
         <IssueCard key={issue.id} issue={issue} />
       ))}
     </div>
-  )
+  );
 }
 
 // Client Island (specific interactivity)
-"use client"
+("use client");
 export function IssueSearchClient() {
-  const [search, setSearch] = useState("")
+  const [search, setSearch] = useState("");
   return (
-    <Input 
+    <Input
       value={search}
       onChange={(e) => setSearch(e.target.value)}
       placeholder="Search issues..."
     />
-  )
+  );
 }
 
 // Hybrid composition
 export default function IssuesPage() {
   return (
     <div>
-      <IssueSearchClient />      {/* Client island */}
-      <IssueListServer />        {/* Server rendered */}
+      <IssueSearchClient /> {/* Client island */}
+      <IssueListServer /> {/* Server rendered */}
     </div>
-  )
+  );
 }
 ```
 
@@ -482,7 +504,7 @@ export default function IssuesPage() {
 
 **Status:** Active development, weekly updates throughout 2025  
 **Priority:** CRITICAL for PinPoint's RSC Migration success  
-**Migration timeline:** Phase 1A foundation → Phase 1B data integration → Phase 1C forms  
+**Migration timeline:** Phase 1A foundation → Phase 1B data integration → Phase 1C forms
 
 ---
 

@@ -32,6 +32,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 ```
 
 **Deferred to MVP+:**
+
 - Error boundaries & loading states
 - Accessibility testing (shadcn/ui provides base a11y)
 - Machine edit/delete (create-only for MVP)
@@ -47,6 +48,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 ### Tasks
 
 #### Project Initialization
+
 - [ ] Initialize npm project (`npm init`)
 - [ ] Set `"type": "module"` in package.json
 - [ ] Install Next.js 16 (`npm install next@latest react@latest react-dom@latest`)
@@ -55,6 +57,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Create initial Next.js app structure (manual setup or `npx create-next-app@latest`)
 
 #### TypeScript Configuration
+
 - [ ] Create `tsconfig.base.json` (shared configuration)
   - Path aliases (`~/` and `@/` → `./src/*`)
 - [ ] Create `tsconfig.json` (main app config)
@@ -69,6 +72,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Verify all TypeScript compilation works
 
 #### Linting & Formatting
+
 - [ ] Install ESLint packages
   - `npm install -D eslint @typescript-eslint/eslint-plugin @typescript-eslint/parser eslint-config-next`
 - [ ] Configure ESLint for Next.js + TypeScript
@@ -79,16 +83,19 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Install eslint-config-prettier (`npm install -D eslint-config-prettier`)
 
 #### ShellCheck & ActionLint
+
 - [ ] Install shellcheck locally (`brew install shellcheck` on Mac, or via apt)
 - [ ] Create `.shellcheckrc` configuration file
 - [ ] Create `scripts/` directory for bash scripts
 - [ ] Install actionlint for workflow validation
 
 #### Security Tools
+
 - [ ] Add gitleaks to CI (secret scanning)
   - Prevents committing API keys, passwords
 
 #### Git Hooks (Husky + lint-staged)
+
 - [ ] Install Husky (`npm install -D husky`)
 - [ ] Initialize Husky (`npx husky install`)
 - [ ] Install lint-staged (`npm install -D lint-staged`)
@@ -98,6 +105,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Configure lint-staged in package.json
 
 #### GitHub Actions
+
 - [ ] Create `.github/workflows/` directory
 - [ ] Create `.github/workflows/ci.yml`
   - Node.js setup with dependency caching
@@ -113,17 +121,20 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - Triggers on push and pull_request to main
 
 #### GitHub Actions - CodeQL (optional)
+
 - [ ] Enable CodeQL in GitHub Security settings
   - Automated JavaScript/TypeScript analysis
   - Zero configuration needed
   - Or create `.github/workflows/codeql.yml` for custom config
 
 #### PostCSS Configuration
+
 - [ ] Install PostCSS (`npm install -D postcss`)
 - [ ] Create `postcss.config.mjs`
   - Configure for Tailwind CSS v4
 
 #### Directory Structure
+
 - [ ] Create `src/app/` (Next.js App Router)
   - [ ] `layout.tsx` (root layout)
   - [ ] `page.tsx` (home page)
@@ -133,12 +144,15 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Create `src/lib/types/` (shared TypeScript types)
 
 #### Environment Files
+
 - [ ] Create `.env.example` template
 - [ ] Create `.env.local` (gitignored)
 - [ ] Add `.gitignore` entries for env files
 
 #### Package.json Scripts
+
 **Essential Scripts:**
+
 - [ ] `dev` - Start Next.js dev server
 - [ ] `build` - Build for production
 - [ ] `start` - Start production server
@@ -156,6 +170,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - Runs all quality gates locally (including coverage check)
 
 ### Verification
+
 - [ ] `npm run dev` starts development server
 - [ ] `npm run build` completes without errors
 - [ ] `npm run typecheck` passes (main + tests)
@@ -179,6 +194,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 ### Tasks
 
 #### Drizzle ORM Setup
+
 - [ ] Install Drizzle (`npm install drizzle-orm`)
 - [ ] Install Drizzle Kit (`npm install -D drizzle-kit`)
 - [ ] Install PostgreSQL driver (`npm install postgres`)
@@ -186,6 +202,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Create `src/server/db/index.ts` (database instance)
 
 #### Database Schema
+
 - [ ] Create `src/server/db/schema.ts`
 - [ ] Define `user_profiles` table (NOT `users`)
   - id (uuid, primary key, references auth.users(id) ON DELETE CASCADE)
@@ -223,6 +240,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Add Drizzle relations definitions
 
 #### Database Trigger (Auto-Profile Creation)
+
 - [ ] Create `handle_new_user()` function
   - Auto-creates user_profiles record on signup
   - Copies name from Supabase auth.users metadata
@@ -233,12 +251,14 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Document trigger in schema comments
 
 #### Package.json Scripts
+
 - [ ] Add package.json scripts:
   - [ ] `db:generate` - Generate Drizzle migrations
   - [ ] `db:push` - Push schema to database
   - [ ] `db:studio` - Open Drizzle Studio
 
 ### Verification
+
 - [ ] `npx drizzle-kit generate` works without errors
 - [ ] Schema types are available for import
 - [ ] TypeScript compilation includes schema types
@@ -256,6 +276,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 ### Tasks
 
 #### Supabase Setup
+
 - [ ] Install Supabase packages (`npm install @supabase/supabase-js @supabase/ssr`)
 - [ ] Create Supabase projects (preview & production via Supabase dashboard)
 - [ ] Add Supabase env vars to `.env.example`
@@ -264,6 +285,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Add Supabase credentials to `.env.local`
 
 #### Supabase SSR Client
+
 - [ ] Create `src/lib/supabase/server.ts` (SSR client wrapper)
   - Implement createClient() with cookie handlers
   - Follow CORE-SSR-001 pattern (getAll/setAll cookies)
@@ -277,6 +299,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - Redirect to home after successful auth
 
 #### Schema Deployment
+
 - [ ] Apply schema to Supabase preview project
   - Use `npx drizzle-kit push` or SQL import
 - [ ] Execute trigger creation SQL in Supabase SQL editor
@@ -285,6 +308,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Test trigger: Sign up new user, verify profile auto-created
 
 ### Verification
+
 - [ ] Middleware runs without errors
 - [ ] Auth callback route responds (test with curl)
 - [ ] Can connect to Supabase database
@@ -303,6 +327,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 ### Tasks
 
 #### Tailwind CSS v4
+
 - [ ] Install Tailwind CSS v4 (`npm install tailwindcss@next`)
 - [ ] Create CSS-based Tailwind config in `src/app/globals.css`
   - Use `@import "tailwindcss"` directive
@@ -315,6 +340,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Verify Tailwind works in development
 
 #### shadcn/ui Setup
+
 - [ ] Install shadcn/ui CLI dependencies
 - [ ] Initialize shadcn/ui (`npx shadcn@latest init`)
   - Configure for Next.js App Router
@@ -335,6 +361,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - [ ] `avatar` (for navigation later)
 
 #### Simple Landing Page
+
 - [ ] Create `src/app/page.tsx` (replace default)
   - Clean, simple design
   - "PinPoint" heading
@@ -348,6 +375,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Verify localhost:3000 shows landing page
 
 ### Verification
+
 - [ ] Tailwind classes work in components
 - [ ] Material Design 3 colors apply correctly
 - [ ] shadcn components render with styles
@@ -367,6 +395,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 ### Tasks
 
 #### Vitest Setup
+
 - [ ] Install Vitest (`npm install -D vitest @vitest/ui @vitest/coverage-v8`)
 - [ ] Install React Testing Library (`npm install -D @testing-library/react @testing-library/jest-dom @testing-library/user-event`)
 - [ ] Create `vitest.config.ts`
@@ -385,6 +414,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - [ ] `test:coverage` - Run tests with coverage report
 
 #### PGlite Integration Testing
+
 - [ ] Install PGlite (`npm install -D @electric-sql/pglite`)
 - [ ] Create `src/test/setup/` directory
 - [ ] Create worker-scoped PGlite instance setup (CORE-TEST-001)
@@ -395,6 +425,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Write example integration test (database query)
 
 #### Playwright E2E Setup (Simplified)
+
 - [ ] Install Playwright (`npm install -D @playwright/test`)
 - [ ] Initialize Playwright (`npx playwright install`)
 - [ ] Create `playwright.config.ts`
@@ -407,6 +438,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Add `smoke` script to package.json
 
 #### Code Coverage Enforcement
+
 - [ ] Add coverage check to `.github/workflows/ci.yml`
   - Run `npm run test:coverage` in CI
   - Fail build if coverage below 80%
@@ -414,12 +446,14 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Add coverage badge to README (optional, after first run)
 
 #### GitHub Actions - E2E Tests
+
 - [ ] Add E2E job to `.github/workflows/ci.yml`
   - Install Playwright browsers
   - Run smoke tests (`npm run smoke`)
   - Upload Playwright trace on failure
 
 ### Verification
+
 - [ ] `npm test` runs and passes
 - [ ] `npm run test:coverage` generates coverage report
 - [ ] Coverage thresholds enforce 80% minimum
@@ -440,6 +474,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 ### Tasks
 
 #### Authentication Pages
+
 - [ ] Create `src/app/(auth)/` route group
 - [ ] Create `src/app/(auth)/layout.tsx` (auth pages layout)
 - [ ] Create `src/app/(auth)/login/page.tsx`
@@ -461,6 +496,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - Wire Sign In button to /auth/login
 
 #### Protected Routes Pattern
+
 - [ ] Create auth guard helper in `src/lib/auth.ts`
   - Check user in Server Component
   - Redirect to login if unauthenticated
@@ -475,6 +511,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - Protected route pattern
 
 #### Tests
+
 - [ ] Unit tests for validation schemas
 - [ ] Integration tests for auth actions
 - [ ] E2E test for signup flow
@@ -482,6 +519,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] E2E test for protected route redirect
 
 ### Verification
+
 - [ ] Can sign up with new account
 - [ ] User profile auto-created (trigger works)
 - [ ] Can log in with credentials
@@ -502,12 +540,14 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 ### Tasks
 
 #### Navigation Component
+
 - [ ] Create `src/components/layout/navigation.tsx` (Server Component)
   - Fetch auth user in component
   - Conditional rendering based on auth state
   - Use Material Design 3 colors from globals.css
 
 #### Unauthenticated Navigation
+
 - [ ] Unauthenticated state shows:
   - "PinPoint" logo/text (links to /)
   - Sign In button (links to /auth/login)
@@ -515,6 +555,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - Use `bg-surface` and `border-outline-variant`
 
 #### Authenticated Navigation
+
 - [ ] Authenticated state shows:
   - "PinPoint" logo/text (links to /dashboard)
   - Quick Links section (center):
@@ -528,6 +569,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - Use `bg-primary-container` with `text-on-primary-container`
 
 #### User Menu Component
+
 - [ ] Create `src/components/layout/user-menu-client.tsx` (Client Component)
   - Use shadcn DropdownMenu
   - Avatar trigger with ChevronDown icon
@@ -538,6 +580,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
     - Sign Out (LogOutIcon, text-error) - form with logout Server Action
 
 #### Root Layout Integration
+
 - [ ] Update `src/app/layout.tsx`
   - Import Navigation component
   - Place above main content
@@ -546,18 +589,21 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - `npm install lucide-react`
 
 #### Pattern Documentation
+
 - [ ] Update `docs/PATTERNS.md`
   - Navigation auth state pattern
   - Server Component + Client Component composition
   - User menu dropdown pattern
 
 #### Tests
+
 - [ ] Integration test: Navigation renders correctly for unauthenticated user
 - [ ] Integration test: Navigation renders correctly for authenticated user
 - [ ] E2E test: User menu dropdown works
 - [ ] E2E test: Logout from user menu works
 
 ### Verification
+
 - [ ] Unauthenticated users see Sign In/Sign Up buttons
 - [ ] Authenticated users see quick links and user menu
 - [ ] User avatar displays with initials fallback
@@ -578,6 +624,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 ### Tasks
 
 #### Machine List Page
+
 - [ ] Create `src/app/machines/page.tsx`
 - [ ] Add auth guard (protected route)
 - [ ] Implement direct Drizzle query (Server Component)
@@ -591,6 +638,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Style with shadcn components
 
 #### Machine Status Derivation Logic
+
 - [ ] Create `src/lib/machines/status.ts`
   - `deriveMachineStatus(issues)` helper function
   - Logic:
@@ -604,6 +652,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - Operational: Green/success
 
 #### Create Machine Form
+
 - [ ] Create `src/app/machines/actions.ts`
 - [ ] Create Server Action for machine creation
   - Zod validation schema (name required, min 1 char) (CORE-SEC-002)
@@ -620,6 +669,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Update `docs/PATTERNS.md` with Server Action pattern
 
 #### Machine Detail Page
+
 - [ ] Create `src/app/machines/[machineId]/page.tsx`
 - [ ] Add auth guard
 - [ ] Query machine by ID (direct Drizzle)
@@ -633,6 +683,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - Show severity, status, title
 
 #### Tests
+
 - [ ] Unit tests for validation schemas
 - [ ] Unit tests for status derivation logic
 - [ ] Integration tests for machine queries
@@ -642,6 +693,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] E2E test for create machine flow
 
 ### Verification
+
 - [ ] Can view list of machines
 - [ ] Machine status reflects open issues correctly
 - [ ] Can create new machine
@@ -664,6 +716,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 ### Tasks
 
 #### Issue List Page
+
 - [ ] Create `src/app/machines/[machineId]/issues/page.tsx`
 - [ ] Add auth guard
 - [ ] Query issues for machine with relations
@@ -678,6 +731,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - Filter by assignee (dropdown of members)
 
 #### Create Issue Form
+
 - [ ] Create `src/app/machines/[machineId]/issues/actions.ts`
 - [ ] Create Server Action for issue creation
   - Validate machineId is present (CORE-ARCH-004)
@@ -695,6 +749,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Update `docs/PATTERNS.md` with issues-per-machine pattern
 
 #### Issue Detail Page
+
 - [ ] Create `src/app/issues/[issueId]/page.tsx`
 - [ ] Add auth guard
 - [ ] Query issue with relations (machine, reporter, assignee)
@@ -713,6 +768,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Add assign to user action (dropdown)
 
 #### Issue Update Actions
+
 - [ ] Create `src/app/issues/[issueId]/actions.ts`
 - [ ] Update status action (Zod validation, auth check)
   - Create timeline event: "Status changed from {old} to {new}"
@@ -724,6 +780,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - Create timeline event: "Marked as resolved"
 
 #### Timeline System Events
+
 - [ ] Create `src/lib/timeline/events.ts`
   - `createTimelineEvent(issueId, content)` helper
   - Inserts issue_comment with `is_system: true`
@@ -733,6 +790,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - Regular comments styled normally
 
 #### Tests
+
 - [ ] Unit tests for issue validation schemas
 - [ ] Integration tests for issue queries
 - [ ] Integration tests for issue mutations
@@ -744,6 +802,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - Try to insert issue without machine_id (should fail)
 
 ### Verification
+
 - [ ] Can view issues for a machine
 - [ ] Can create new issue for machine
 - [ ] Can view issue details
@@ -767,6 +826,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 ### Tasks
 
 #### Public Reporting Page
+
 - [ ] Create `src/app/report/page.tsx` (public route, no auth guard)
 - [ ] Query all machines (public can see machine list)
 - [ ] Display simple form:
@@ -780,6 +840,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - Severity descriptions: "Minor (cosmetic)", "Playable (but needs attention)", "Unplayable (machine is down)"
 
 #### Public Reporting Server Action
+
 - [ ] Create `src/app/report/actions.ts`
 - [ ] Create Server Action for anonymous reporting
   - Zod validation (machine_id, title required, severity enum) (CORE-SEC-002)
@@ -791,6 +852,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Add rate limiting consideration (document for future if abused)
 
 #### Confirmation Page
+
 - [ ] Create `src/app/report/success/page.tsx`
 - [ ] Display confirmation message
   - "Thank you for reporting this issue!"
@@ -798,10 +860,12 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - Link back to report another issue
 
 #### Navigation Update
+
 - [ ] Add "Report Issue" link to unauthenticated navigation
   - Place next to Sign In/Sign Up buttons
 
 #### Tests
+
 - [ ] Integration test for anonymous issue creation
 - [ ] Integration test: Anonymous issues have NULL reported_by
 - [ ] Integration test: Anonymous issues appear in member issue lists
@@ -812,6 +876,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Verify anonymous issues appear in authenticated views
 
 ### Verification
+
 - [ ] Unauthenticated users can access /report
 - [ ] Can select machine from dropdown
 - [ ] Can submit issue without login
@@ -831,6 +896,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 ### Tasks
 
 #### Comments Display
+
 - [ ] Update `src/app/issues/[issueId]/page.tsx`
 - [ ] Query comments for issue (with author relation)
   - Filter for `is_system: false` (regular comments only)
@@ -843,6 +909,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Order comments by created_at asc (chronological)
 
 #### Add Comment Form
+
 - [ ] Update `src/app/issues/[issueId]/actions.ts`
 - [ ] Create Server Action for adding comments
   - Zod validation (content required, min length 1) (CORE-SEC-002)
@@ -857,6 +924,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Display validation errors
 
 #### Tests
+
 - [ ] Unit tests for comment validation
 - [ ] Integration tests for comment queries
 - [ ] Integration tests for comment creation
@@ -865,6 +933,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] E2E test for add comment flow
 
 ### Verification
+
 - [ ] Can view comments on issue
 - [ ] Can add new comment
 - [ ] Comments display with author and timestamp
@@ -884,6 +953,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 ### Tasks
 
 #### Dashboard Page
+
 - [ ] Create/update `src/app/dashboard/page.tsx`
 - [ ] Add auth guard (protected route)
 - [ ] Query data:
@@ -896,6 +966,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
     - Issues assigned to me count
 
 #### Dashboard Layout
+
 - [ ] Create card-based layout with shadcn Card
 - [ ] Section: "Issues Assigned to Me"
   - List of assigned issues
@@ -918,18 +989,21 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
     - Issues assigned to me count
 
 #### Navigation Updates
+
 - [ ] Update `src/components/layout/navigation.tsx`
   - "PinPoint" logo links to /dashboard for authenticated users
 - [ ] Update login redirect to go to /dashboard
 - [ ] Update signup redirect to go to /dashboard
 
 #### Pattern Documentation
+
 - [ ] Update `docs/PATTERNS.md`
   - Dashboard query patterns
   - Card layout patterns
   - Stats calculation patterns
 
 #### Tests
+
 - [ ] Integration tests for dashboard queries
 - [ ] Integration test: Assigned issues query returns correct issues
 - [ ] Integration test: Unplayable machines query correct
@@ -941,6 +1015,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - See stats
 
 ### Verification
+
 - [ ] Dashboard displays after login
 - [ ] Assigned issues show correctly
 - [ ] Recently reported issues show correctly
@@ -962,6 +1037,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 ### Tasks
 
 #### Password Reset Request Page
+
 - [ ] Create `src/app/(auth)/forgot-password/page.tsx`
 - [ ] Create form with email input
   - Progressive enhancement
@@ -974,6 +1050,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Add "Forgot password?" link to login page
 
 #### Password Reset Confirmation Page
+
 - [ ] Create `src/app/(auth)/reset-password/page.tsx`
 - [ ] Create form for new password
   - Password input (with confirmation)
@@ -985,12 +1062,14 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - Handle errors (expired link, invalid token)
 
 #### Email Configuration
+
 - [ ] Configure Supabase email templates (in Supabase dashboard)
   - Password reset email template
   - Set redirect URL to app's reset password page
 - [ ] Test email delivery in preview environment
 
 #### Tests
+
 - [ ] Integration test: Password reset request creates email
 - [ ] Integration test: Password update succeeds with valid token
 - [ ] E2E test: Full password reset flow
@@ -1000,6 +1079,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - Login with new password
 
 ### Verification
+
 - [ ] Can request password reset from login page
 - [ ] Reset email is sent (check inbox or Supabase logs)
 - [ ] Reset link redirects to reset password page
@@ -1019,6 +1099,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 ### Tasks
 
 #### README.md
+
 - [ ] Update `README.md` with comprehensive setup guide
   - Project description: "Issue tracking for pinball machines at Austin Pinball Collective"
   - Core value proposition
@@ -1040,6 +1121,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - Deployment instructions (Vercel + Supabase)
 
 #### Environment Variables Documentation
+
 - [ ] Update `.env.example` with ALL required variables
   - Supabase URL and keys
   - Database URL
@@ -1047,6 +1129,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - Include example values (non-sensitive)
 
 #### Development Guide (Optional but Recommended)
+
 - [ ] Create `docs/DEVELOPMENT.md`
   - Development workflow overview
   - How to run tests (`npm test`, `npm run smoke`)
@@ -1059,6 +1142,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - PR workflow and quality gates
 
 #### Copilot Instructions Refresh
+
 - [ ] Review and update `.github/copilot-instructions.md` and files in `.github/instructions/`
   - Promote any repeated patterns (seen ≥2 times in code) into `docs/PATTERNS.md` first
   - If repetition is confirmed for domains (e.g., Machines, Issues, Timeline), add focused instruction files
@@ -1069,6 +1153,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
   - Open a follow-up issue to periodically revisit instruction accuracy as features evolve
 
 ### Verification
+
 - [ ] Friend can clone repo and follow README to get app running
 - [ ] All environment variables documented in `.env.example`
 - [ ] Development commands work as documented
@@ -1081,6 +1166,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 ## MVP Completion Criteria
 
 **MVP is complete when:**
+
 - [ ] All PR 1-11 tasks completed and merged
   - PRs 1-5: Foundation (project, schema, Supabase, UI, testing)
   - PRs 6-9.5: Features (auth, navigation, machines, issues, public reporting, comments, dashboard)
@@ -1105,6 +1191,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - [ ] Core value proposition achieved: "Log issues with pinball machines, track work, and resolve them"
 
 **What's NOT in MVP (deferred to MVP+):**
+
 - Error boundaries and loading skeletons (polish)
 - Accessibility audit (shadcn/ui provides base a11y)
 - Machine edit/delete (create-only is sufficient)
@@ -1121,6 +1208,7 @@ PR 1 (Foundation) → PR 2 (Schema) → PR 3 (Supabase) → PR 4 (UI + Landing) 
 - **GitHub Issues**: Convert each PR section to a GitHub issue with tasks as checklist
 
 **Reference**:
+
 - Feature details: `docs/PRODUCT_SPEC.md`
 - Architecture: `docs/TECH_SPEC.md`
 - Patterns: `docs/PATTERNS.md`

@@ -15,6 +15,7 @@ Enable the Austin Pinball Collective to efficiently log, track, and resolve pinb
 ## Core Value Proposition
 
 A focused issue tracking system for pinball machines that:
+
 - Takes 30 seconds to report an issue
 - Shows maintenance staff what needs attention
 - Maintains complete issue history per machine
@@ -25,15 +26,19 @@ A focused issue tracking system for pinball machines that:
 ## Release Strategy
 
 ### MVP (Minimum Viable Product)
+
 The absolute bare minimum to start tracking issues. Members-only, basic features.
 
 ### MVP+ (Immediate Next Set)
+
 Polish and usability improvements that make it practical for daily use.
 
 ### 1.0 (First Major Release)
+
 Full-featured single-tenant application with notifications, integrations, and advanced roles.
 
 ### 2.0 (Multi-Tenant)
+
 Support multiple organizations with full data isolation.
 
 ---
@@ -43,18 +48,21 @@ Support multiple organizations with full data isolation.
 ### 1. User Accounts & Authentication
 
 **Included:**
+
 - Email/password sign-up and login via Supabase Auth
 - Basic profile (name, email, avatar)
 - Password reset flow
 - Single role: **Member** (full access)
 
 **Not Included:**
+
 - ❌ Guest role (MVP+)
 - ❌ Admin role (1.0)
 - ❌ Social login (1.0)
 - ❌ Self-service sign-up (MVP+ for guests)
 
 **Done When:**
+
 - [ ] Members can sign up with email
 - [ ] Members can log in
 - [ ] Members can reset password
@@ -65,12 +73,14 @@ Support multiple organizations with full data isolation.
 ### 2. Machine Registry
 
 **Included:**
+
 - Machine with **name only**
 - List of all machines
 - Machine detail page showing its issues
 - Machine status derived from open issues (operational/needs service/unplayable)
 
 **Not Included:**
+
 - ❌ Manufacturer, year, model, location (MVP+)
 - ❌ Machine photos (MVP+)
 - ❌ Machine search (MVP+)
@@ -79,6 +89,7 @@ Support multiple organizations with full data isolation.
 - ❌ QR codes (MVP+)
 
 **Done When:**
+
 - [ ] Can create a machine with name
 - [ ] Can view machine detail page
 - [ ] Can see all machines in a list
@@ -92,6 +103,7 @@ Support multiple organizations with full data isolation.
 ### 3. Issue Tracking & Resolution
 
 **Included:**
+
 - Create issue with: title, description, machine (required), severity
 - **Severity levels:** `minor` | `playable` | `unplayable`
   - **minor**: Cosmetic or very minor issues (e.g., light out)
@@ -105,6 +117,7 @@ Support multiple organizations with full data isolation.
 - Issue detail page
 
 **Not Included:**
+
 - ❌ Priority field (MVP+ if needed)
 - ❌ Issue photos (MVP+)
 - ❌ Custom statuses (1.0+)
@@ -116,6 +129,7 @@ Support multiple organizations with full data isolation.
 - ❌ Email notifications (1.0)
 
 **Done When:**
+
 - [ ] Can create an issue for a machine
 - [ ] Can view issue detail with full timeline
 - [ ] Can change status (new/in_progress/resolved)
@@ -129,12 +143,14 @@ Support multiple organizations with full data isolation.
 ### 4. Public Issue Reporting
 
 **Included:**
+
 - Public-facing form to report issues (no login required)
 - Requires: machine selection, title, description, severity
 - Shows submission confirmation
 - Anonymous submissions (no email capture)
 
 **Not Included:**
+
 - ❌ Email capture for follow-up (MVP+)
 - ❌ Guest account creation (MVP+)
 - ❌ Public issue browsing (MVP+)
@@ -143,6 +159,7 @@ Support multiple organizations with full data isolation.
 - ❌ CAPTCHA (add if abused)
 
 **Done When:**
+
 - [ ] Public form accessible without login
 - [ ] Can select machine, severity, and submit issue
 - [ ] Issue appears in member dashboard
@@ -153,6 +170,7 @@ Support multiple organizations with full data isolation.
 ### 5. Dashboard & Lists
 
 **Included:**
+
 - Member dashboard showing:
   - Issues assigned to me
   - Recently reported issues
@@ -162,6 +180,7 @@ Support multiple organizations with full data isolation.
 - Machine list (simple, no search yet)
 
 **Not Included:**
+
 - ❌ Public landing page (MVP+)
 - ❌ Customizable dashboard (2.0+)
 - ❌ Analytics/charts (2.0+)
@@ -170,6 +189,7 @@ Support multiple organizations with full data isolation.
 - ❌ Activity feed (1.0+)
 
 **Done When:**
+
 - [ ] Dashboard shows key issue views
 - [ ] Shows basic stats
 - [ ] Issue list is filterable
@@ -182,6 +202,7 @@ Support multiple organizations with full data isolation.
 These make MVP practical for daily use:
 
 ### Usability Enhancements
+
 - **Machine model info**: Manufacturer, year, model, location
 - **Machine search**: Find machines quickly as fleet grows
 - **Machine photos**: Identify machines visually
@@ -190,12 +211,14 @@ These make MVP practical for daily use:
 - **QR codes**: Generate QR codes for machines, link directly to issue reporting
 
 ### User Experience
+
 - **Public landing page**: Show recent issues per machine (read-only)
 - **Guest accounts**: Self-service guest sign-up for public reporters
 - **Email capture**: Optional email on public reports for follow-up
 - **Recent issues per machine**: Show last 5 issues on machine page
 
 ### Polish
+
 - **Machine search**: Filter/search machine list
 - **Better mobile UX**: Optimized layouts for on-site repairs
 - **Issue priority**: Add priority field if severity isn't enough
@@ -207,24 +230,29 @@ These make MVP practical for daily use:
 Major features that complete the vision:
 
 ### Notifications
+
 - **Email notifications**: Assignments, status changes, comments
 - **In-app notifications**: Notification bell with unread count
 
 ### Roles & Permissions
+
 - **Guest role**: Can only report issues (read-only otherwise)
 - **Member role**: Can manage issues, machines, assignments
 - **Admin role**: Can manage users, roles, system settings
 
 ### Integration
+
 - **OPDB integration**: Pull machine data from OPDB (Open Pinball Database)
 - **Social login**: Google, GitHub for easier onboarding
 
 ### Machine Management
+
 - **Locations**: Track which location each machine is at
 - **Machine notes**: Tournament setup notes, known issues, maintenance history
 - **Self-service guest accounts**: Public users can create guest accounts
 
 ### Issue Management
+
 - **Custom issue statuses**: Beyond new/in_progress/resolved (1.0+)
 - **Saved filters**: Save and name common filter combinations (1.0+)
 - **Bulk operations**: Archive multiple resolved issues (1.0+)
@@ -235,12 +263,14 @@ Major features that complete the vision:
 ## 2.0+ Scope (Long-Term Vision)
 
 ### Multi-Tenancy
+
 - Support multiple organizations
 - Organization-scoped data isolation
 - Organization switching
 - Billing/subscriptions if SaaS
 
 ### Advanced Features
+
 - **Analytics**: Resolution times, common problems, active users (2.0+)
 - **Third-party integrations**: Webhooks, API access
 - **Parts inventory**: Track parts and link to machines
@@ -253,6 +283,7 @@ Major features that complete the vision:
 **Things we're NOT building:**
 
 ### Not Applicable
+
 - ❌ SLA tracking - Not a helpdesk tool
 - ❌ SMS notifications - Email is sufficient
 - ❌ Time tracking - Not needed for hobby repairs
@@ -261,6 +292,7 @@ Major features that complete the vision:
 - ❌ Event management - Use dedicated tools
 
 ### Not Prioritized
+
 - Mobile native apps (PWA is sufficient)
 - Offline support (online-first is fine)
 - Video uploads (photos are enough)
@@ -281,15 +313,15 @@ If not 3/3 yes → **It goes in MVP+ or later.**
 
 **Examples:**
 
-| Feature | Include? | Why? |
-|---------|----------|------|
-| Issue comments | ✅ MVP | Core feature #3 explicitly includes it |
-| Issue photos | ❌ MVP+ | Text descriptions work for MVP |
-| Machine name | ✅ MVP | Can't track without identifying machines |
-| Machine model | ❌ MVP+ | Name is sufficient initially |
-| Email notifications | ❌ 1.0 | Nice to have, not required for tracking |
-| QR codes | ❌ MVP+ | Makes reporting easier but not essential |
-| Saved filters | ❌ 1.0+ | Can re-apply filters manually |
+| Feature             | Include? | Why?                                     |
+| ------------------- | -------- | ---------------------------------------- |
+| Issue comments      | ✅ MVP   | Core feature #3 explicitly includes it   |
+| Issue photos        | ❌ MVP+  | Text descriptions work for MVP           |
+| Machine name        | ✅ MVP   | Can't track without identifying machines |
+| Machine model       | ❌ MVP+  | Name is sufficient initially             |
+| Email notifications | ❌ 1.0   | Nice to have, not required for tracking  |
+| QR codes            | ❌ MVP+  | Makes reporting easier but not essential |
+| Saved filters       | ❌ 1.0+  | Can re-apply filters manually            |
 
 ---
 
@@ -304,6 +336,7 @@ A feature is "done" when:
 5. ✅ **No security holes** - Input validation, auth checks in place
 
 A feature is **NOT** "done" when:
+
 - Every edge case is handled
 - It has perfect UX polish
 - Test coverage is 100%
@@ -316,6 +349,7 @@ A feature is **NOT** "done" when:
 ## Success Metrics
 
 ### MVP Success
+
 - ✅ Austin Pinball Collective members are using it
 - ✅ Issues are being created and resolved
 - ✅ Anonymous public reports are coming in
@@ -323,12 +357,14 @@ A feature is **NOT** "done" when:
 - ✅ Core workflows work reliably
 
 ### MVP+ Success
+
 - ✅ Members prefer PinPoint over existing methods
 - ✅ QR codes deployed on machines
 - ✅ Photo attachments improve issue clarity
 - ✅ Machine search helps find machines quickly
 
 ### 1.0 Success
+
 - ✅ Email notifications keep members informed
 - ✅ Guest users can self-serve
 - ✅ OPDB integration reduces manual data entry
@@ -341,12 +377,14 @@ A feature is **NOT** "done" when:
 **Two Supabase Projects:**
 
 ### Preview Environment
+
 - Database with test/seed data
 - Safe for experimentation
 - Used for development and staging
 - Can be reset/rebuilt freely
 
 ### Production Environment
+
 - Real member data
 - Strict change control
 - Backups configured
@@ -358,16 +396,16 @@ A feature is **NOT** "done" when:
 
 ## Decisions Log
 
-| Date | Question | Decision | Rationale |
-|------|----------|----------|-----------|
-| 2025-11-10 | Support multiple orgs? | 2.0 | Single tenant simplifies architecture |
-| 2025-11-10 | Issue severity levels? | minor/playable/unplayable | Clear, player-centric language |
-| 2025-11-10 | Issues per-machine always? | Yes | Aligns with reality, simplifies queries |
-| 2025-11-10 | Email notifications? | 1.0 | Important but not required for MVP |
-| 2025-11-10 | Photo attachments? | MVP+ | Adds clarity but text works initially |
-| 2025-11-10 | QR codes? | MVP+ | High impact but not blocking |
-| 2025-11-10 | Machine model info? | MVP+ | Name is sufficient to start |
-| 2025-11-10 | Next.js version? | 16 (latest) | Use latest stable release |
+| Date       | Question                   | Decision                  | Rationale                               |
+| ---------- | -------------------------- | ------------------------- | --------------------------------------- |
+| 2025-11-10 | Support multiple orgs?     | 2.0                       | Single tenant simplifies architecture   |
+| 2025-11-10 | Issue severity levels?     | minor/playable/unplayable | Clear, player-centric language          |
+| 2025-11-10 | Issues per-machine always? | Yes                       | Aligns with reality, simplifies queries |
+| 2025-11-10 | Email notifications?       | 1.0                       | Important but not required for MVP      |
+| 2025-11-10 | Photo attachments?         | MVP+                      | Adds clarity but text works initially   |
+| 2025-11-10 | QR codes?                  | MVP+                      | High impact but not blocking            |
+| 2025-11-10 | Machine model info?        | MVP+                      | Name is sufficient to start             |
+| 2025-11-10 | Next.js version?           | 16 (latest)               | Use latest stable release               |
 
 ---
 

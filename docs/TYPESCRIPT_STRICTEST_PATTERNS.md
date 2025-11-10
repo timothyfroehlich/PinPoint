@@ -164,7 +164,7 @@ export default async function ProtectedPage() {
 
 ```typescript
 // ✅ Safe Server Action with auth
-"use server"
+"use server";
 export async function updateProfile(formData: FormData) {
   const supabase = await createClient();
   const {
@@ -191,9 +191,7 @@ export async function updateProfile(formData: FormData) {
 
 ```typescript
 // ✅ Explicit return types prevent inference errors
-export async function getIssuesForMachine(
-  machineId: string,
-): Promise<Issue[]> {
+export async function getIssuesForMachine(machineId: string): Promise<Issue[]> {
   if (!machineId) {
     throw new Error("Machine ID required");
   }
@@ -284,7 +282,7 @@ export default async function MachineIssuesPage({
 
 ```typescript
 // ✅ Safe FormData handling with Zod
-"use server"
+"use server";
 import { z } from "zod";
 
 const createIssueSchema = z.object({
@@ -316,6 +314,7 @@ export async function createIssueAction(formData: FormData) {
 **Key Remember**: In @tsconfig/strictest mode, TypeScript catches potential runtime errors at compile time. Embrace the errors—they're preventing bugs.
 
 **Cross-References:**
+
 - Non-negotiables: `docs/NON_NEGOTIABLES.md`
 - Tech stack reference: `docs/tech-updates/INDEX.md`
 - Testing patterns: `docs/TESTING_PLAN.md`

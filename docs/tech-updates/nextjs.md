@@ -16,15 +16,15 @@ _Server Components, Server Actions, and critical caching changes for full-stack 
 
 ```typescript
 // BEFORE Next.js 15: fetch was cached by default
-const data = await fetch("https://api.example.com/posts") // ✅ Cached automatically
+const data = await fetch("https://api.example.com/posts"); // ✅ Cached automatically
 
-// AFTER Next.js 15: fetch is uncached by default  
-const data = await fetch("https://api.example.com/posts") // ❌ Not cached!
+// AFTER Next.js 15: fetch is uncached by default
+const data = await fetch("https://api.example.com/posts"); // ❌ Not cached!
 
 // REQUIRED: Explicit caching for performance
 const data = await fetch("https://api.example.com/posts", {
-  cache: "force-cache" // ✅ Must specify to cache
-})
+  cache: "force-cache", // ✅ Must specify to cache
+});
 ```
 
 ### **PinPoint Migration Impact**
@@ -37,18 +37,18 @@ export async function getIssuesForOrg(organizationId: string) {
   // Add explicit caching for frequently accessed data
   const response = await fetch(`/api/issues?org=${organizationId}`, {
     cache: "force-cache",
-    next: { revalidate: 60 } // Cache for 60 seconds
-  })
-  return response.json()
+    next: { revalidate: 60 }, // Cache for 60 seconds
+  });
+  return response.json();
 }
 
 // Or use React 19 cache() for request-level memoization
-import { cache } from "react"
+import { cache } from "react";
 export const getIssuesForOrg = cache(async (organizationId: string) => {
   return await db.query.issues.findMany({
-    where: eq(issues.organizationId, organizationId)
-  })
-})
+    where: eq(issues.organizationId, organizationId),
+  });
+});
 ```
 
 ### **New APIs in Next.js 15.5+**
@@ -75,13 +75,13 @@ import { unstable_after } from "next/server"
 
 export async function createIssueAction(formData: FormData) {
   const issue = await createIssue(formData)
-  
+
   // Run after response is sent to user
   unstable_after(async () => {
     await sendNotificationEmail(issue)
     await updateAnalytics(issue)
   })
-  
+
   redirect(`/issues/${issue.id}`)
 }
 ```
@@ -129,7 +129,7 @@ async function createPost(formData: FormData) {
 **Request-Level Caching with React 19 cache()**
 
 - **DO:** Use React 19's `cache()` API for request-level memoization
-- **DON'T:** Rely on client-side caching libraries for server data  
+- **DON'T:** Rely on client-side caching libraries for server data
 - **Migration Benefit:** Request-level memoization prevents duplicate DB queries
 
 **Streaming & Suspense Integration**

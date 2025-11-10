@@ -84,7 +84,6 @@ createClient(); // ✅ Client utils
 - **pgmq:** Postgres message queues for background tasks
 - **Declarative Schemas:** Version-controlled database structure
 
-
 ## SSR Package Migration Workflow
 
 ### Phase 1: Package Migration
@@ -228,7 +227,7 @@ supabase.channel("changes").on(
     schema: "public",
     table: "posts",
   },
-  callback,
+  callback
 );
 ```
 

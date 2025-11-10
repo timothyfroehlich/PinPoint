@@ -9,6 +9,7 @@ Tim is vibecoding this app by himself to learn about website design and experime
 ## Critical Context Files
 
 Read these immediately before starting work:
+
 - **`docs/NON_NEGOTIABLES.md`** - Forbidden patterns and critical constraints
 - **`docs/PATTERNS.md`** - Project-specific code patterns (MUST reference when coding)
 - **`docs/TYPESCRIPT_STRICTEST_PATTERNS.md`** - Type safety patterns
@@ -20,12 +21,14 @@ Read these immediately before starting work:
 ## Project Context
 
 ### Status
+
 - **Phase**: Greenfield rewrite (v2), pre-beta
 - **Users**: Zero production users
 - **Development**: Solo passion project, high risk tolerance for breaking changes
 - **Core Value**: "Allow the Austin Pinball Collective to log issues with pinball machines, track work and resolve them."
 
 ### Technology Stack
+
 - **Frontend**: Next.js 16, React 19 Server Components, shadcn/ui, Tailwind CSS v4
 - **Backend**: Drizzle ORM, PostgreSQL via Supabase
 - **Authentication**: Supabase SSR (no RLS for single-tenant)
@@ -33,6 +36,7 @@ Read these immediately before starting work:
 - **Language**: TypeScript with strictest configuration
 
 ### Architecture Type
+
 **Single-Tenant**: One organization (Austin Pinball Collective), no multi-tenant complexity, no organization scoping required, no RLS policies.
 
 ## Critical Constraints
@@ -57,34 +61,40 @@ Read these immediately before starting work:
 ## Architecture Directives
 
 ### Server-First Principles
+
 - **Default**: Server Components for all new development
 - **Client Islands**: Minimal "use client" for specific interactivity only
 - **Data Flow**: Server Components → Drizzle → PostgreSQL (direct queries, no DAL/repository layers)
 - **Mutations**: Server Actions with progressive enhancement
 
 ### Direct Database Queries
+
 - **Do**: Query Drizzle directly in Server Components and Server Actions
 - **Don't**: Create DAL/repository/service layers (premature abstraction)
 - **Why**: Single-tenant simplicity, follow the Rule of Three
 
 ### UI Framework
+
 - **New Development**: shadcn/ui + Tailwind CSS v4 only
 - **CSS**: Material Design 3 colors from globals.css
 
 ## Development Guidelines
 
 ### Command Recommendations
-| Avoid | Prefer | Reason |
-| ----- | ------ | ------ |
-| `npm test 2>&1` | `npm test` | Vitest treats redirection as test filters |
-| `find` | `rg --files`, `fd` | Safer/faster search |
+
+| Avoid           | Prefer             | Reason                                    |
+| --------------- | ------------------ | ----------------------------------------- |
+| `npm test 2>&1` | `npm test`         | Vitest treats redirection as test filters |
+| `find`          | `rg --files`, `fd` | Safer/faster search                       |
 
 ### Available Commands
+
 - **Testing**: `npm test`, `npm run test:watch`, `npm run smoke`
 - **Development**: `npm run dev`, `npm run build`, `npm run lint`, `npm run typecheck`
 - **Components**: `npx shadcn@latest add [component]`
 
 ### Project Structure
+
 - **Source**: `src/app` (App Router), `src/components`, `src/lib`, `src/server`
 - **Tests**: `src/test` (unit/integration), `e2e/` (Playwright)
 - **Docs**: `docs/` (specs), `docs/tech-updates/` (tech reference)
@@ -92,17 +102,20 @@ Read these immediately before starting work:
 ## Coding Standards
 
 ### TypeScript
+
 - **Strictest configuration**: No `any`, no non-null `!`, no unsafe `as`
 - **Explicit return types**: Required for public functions
 - **Path aliases**: Use `~/` instead of relative imports
 
 ### Naming Conventions
+
 - **Components**: PascalCase files (`IssueCard.tsx`)
 - **Client Components**: Use `"use client"` directive at top
 - **Hooks**: `useThing.ts`
 - **Utilities**: kebab-case or snake_case files
 
 ### Database
+
 - **Schema**: snake_case for all table/column names
 - **Boundary**: Convert to camelCase at application boundaries
 - **Types**: Keep snake_case DB types separate from camelCase app types
@@ -112,6 +125,7 @@ Read these immediately before starting work:
 **IMPORTANT**: When implementing features, always reference `docs/PATTERNS.md` for established patterns.
 
 **Contributing New Patterns**:
+
 - **When**: You implement the same approach 2+ times
 - **What**: Add it to `docs/PATTERNS.md` with a working code example
 - **Why**: Future agents need to follow the same conventions
@@ -124,6 +138,7 @@ Read these immediately before starting work:
 **Philosophy**: Confidence, not perfection.
 
 **The Testing Pyramid**:
+
 ```
         /\
        /E2E\      ← 5-10 tests (critical flows only)
@@ -135,12 +150,14 @@ Read these immediately before starting work:
 ```
 
 **Distribution & Targets**:
+
 - **70% Unit Tests** (~70-100 tests) - Pure functions, utilities, validation
 - **25% Integration Tests** (~25-35 tests) - Database queries with worker-scoped PGlite
 - **5% E2E Tests** (5-6 tests) - Critical user journeys only (Playwright)
 - **Total Target**: ~100-150 tests (not thousands)
 
 **Key Constraints**:
+
 - Worker-scoped PGlite only (per-test instances cause lockups)
 - No testing Server Components directly (use E2E instead)
 - Test behavior, not implementation details
@@ -150,6 +167,7 @@ Read these immediately before starting work:
 ## Scope Creep Prevention
 
 ### The Scope Firewall (3 Questions)
+
 1. Does this solve a problem we have RIGHT NOW?
 2. Does this block a user from achieving the core value proposition?
 3. Can we ship MVP without this?
@@ -157,6 +175,7 @@ Read these immediately before starting work:
 If answers are No/No/Yes → defer to `docs/V2_ROADMAP.md`
 
 ### The "Done Enough" Standard
+
 1. Does it work for the happy path?
 2. Does it handle the most common error case?
 3. Is it tested with at least one test?

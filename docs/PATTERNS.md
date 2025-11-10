@@ -38,6 +38,7 @@ export default async function MachineIssuesPage({
 ```
 
 **Key points**:
+
 - Query directly in Server Component, no intermediate layers
 - Use `with` for relations instead of separate queries
 - Select specific columns for related data to avoid over-fetching
@@ -86,6 +87,7 @@ export async function createIssueAction(formData: FormData) {
 ```
 
 **Key points**:
+
 - Always use Zod for validation (CORE-SEC-002)
 - Mark functions with `"use server"`
 - Call `revalidatePath()` after mutations
@@ -140,6 +142,7 @@ export async function updateProfileAction(formData: FormData) {
 ```
 
 **Key points**:
+
 - Always call `auth.getUser()` immediately after creating client (CORE-SSR-002)
 - Use `redirect()` for unauthenticated users
 - Never skip auth checks in protected routes (CORE-SEC-001)
@@ -178,6 +181,7 @@ src/
 ```
 
 **Conventions**:
+
 - Server Actions co-located with routes in `actions.ts` files
 - Domain components in `src/components/` (default to Server Components)
 - Client Components have `"use client"` at top, or `-client.tsx` suffix
@@ -191,21 +195,30 @@ src/
 ### Issues Always Require Machine
 
 **Schema Enforcement** (already in place):
+
 ```typescript
 // src/server/db/schema.ts
-export const issues = pgTable("issues", {
-  // ...
-  machineId: uuid("machine_id")
-    .notNull()
-    .references(() => machines.id, { onDelete: "cascade" }),
-  // ...
-}, (table) => ({
-  // CHECK constraint ensures machineId is never null
-  machineRequired: check("machine_required", sql`${table.machineId} IS NOT NULL`),
-}));
+export const issues = pgTable(
+  "issues",
+  {
+    // ...
+    machineId: uuid("machine_id")
+      .notNull()
+      .references(() => machines.id, { onDelete: "cascade" }),
+    // ...
+  },
+  (table) => ({
+    // CHECK constraint ensures machineId is never null
+    machineRequired: check(
+      "machine_required",
+      sql`${table.machineId} IS NOT NULL`
+    ),
+  })
+);
 ```
 
 **Application Pattern**:
+
 ```typescript
 // Issue forms MUST include machineId
 const createIssueSchema = z.object({
@@ -216,6 +229,7 @@ const createIssueSchema = z.object({
 ```
 
 **Key points**:
+
 - Every issue must have exactly one machine (CORE-ARCH-004)
 - Schema enforces with CHECK constraint
 - Never create issue forms without machine selector
@@ -245,7 +259,7 @@ export type Issue = {
 
 // Convert at query boundaries
 const dbIssues = await db.query.issues.findMany();
-const appIssues: Issue[] = dbIssues.map(issue => ({
+const appIssues: Issue[] = dbIssues.map((issue) => ({
   id: issue.id,
   machineId: issue.machine_id,
   createdAt: issue.created_at,
@@ -253,6 +267,7 @@ const appIssues: Issue[] = dbIssues.map(issue => ({
 ```
 
 **Key points**:
+
 - DB schema uses snake_case (CORE-TS-004)
 - Application code uses camelCase (CORE-TS-003)
 - Convert at boundaries, not throughout the codebase
@@ -275,6 +290,7 @@ type Severity = "minor" | "playable" | "unplayable";
 ```
 
 **Key points**:
+
 - Use player-centric language, not technical terms
 - Three levels only: minor, playable, unplayable
 - Never use: low/medium/high, critical, or other severity names
@@ -320,6 +336,7 @@ function SubmitButton() {
 ```
 
 **Key points**:
+
 - Forms must work without JavaScript (CORE-ARCH-002)
 - Use Server Actions with `<form action={...}>`
 - Enhance with Client Components for loading states (optional)
@@ -336,23 +353,39 @@ export type Result<T, C extends string = string> =
   | { ok: true; value: T }
   | { ok: false; code: C; message: string };
 export const ok = <T>(value: T) => ({ ok: true as const, value });
-export const err = <C extends string>(code: C, message: string) => ({ ok: false as const, code, message });
+export const err = <C extends string>(code: C, message: string) => ({
+  ok: false as const,
+  code,
+  message,
+});
 ```
 
 ```typescript
 // src/lib/flash.ts (minimal helper for Post‑Redirect‑Get)
 import { cookies } from "next/headers";
 const KEY = "flash";
-export type Flash = { type: "success" | "error"; message: string; fields?: Record<string, string> };
+export type Flash = {
+  type: "success" | "error";
+  message: string;
+  fields?: Record<string, string>;
+};
 export function setFlash(f: Flash): void {
-  cookies().set(KEY, JSON.stringify(f), { httpOnly: true, sameSite: "lax", path: "/" });
+  cookies().set(KEY, JSON.stringify(f), {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+  });
 }
 export function readAndClearFlash(): Flash | null {
   const c = cookies();
   const raw = c.get(KEY)?.value;
   if (!raw) return null;
   c.set(KEY, "", { path: "/", maxAge: 0 });
-  try { return JSON.parse(raw) as Flash; } catch { return null; }
+  try {
+    return JSON.parse(raw) as Flash;
+  } catch {
+    return null;
+  }
 }
 ```
 
@@ -374,11 +407,18 @@ const schema = z.object({
   description: z.string().trim().optional(),
 });
 
-export type CreateIssueResult = Result<{ id: string }, "AUTH" | "VALIDATION" | "DB">;
+export type CreateIssueResult = Result<
+  { id: string },
+  "AUTH" | "VALIDATION" | "DB"
+>;
 
-export async function createIssue(formData: FormData): Promise<CreateIssueResult> {
+export async function createIssue(
+  formData: FormData
+): Promise<CreateIssueResult> {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) {
     setFlash({ type: "error", message: "You must be signed in." });
     return err("AUTH", "Unauthenticated");
@@ -426,10 +466,18 @@ export default function NewIssuePage() {
   const flash = readAndClearFlash();
   return (
     <div>
-      {flash && <p className={flash.type === "error" ? "text-red-600" : "text-green-700"}>{flash.message}</p>}
+      {flash && (
+        <p
+          className={flash.type === "error" ? "text-red-600" : "text-green-700"}
+        >
+          {flash.message}
+        </p>
+      )}
       <form action={createIssue}>
         <input name="title" required />
-        <select name="machineId" required>{/* options */}</select>
+        <select name="machineId" required>
+          {/* options */}
+        </select>
         <select name="severity" defaultValue="playable">
           <option value="minor">Minor</option>
           <option value="playable">Playable</option>
@@ -443,6 +491,7 @@ export default function NewIssuePage() {
 ```
 
 **Key points**:
+
 - Validate all inputs with Zod; never trust `FormData` (CORE-SEC-002)
 - Authenticate at the boundary using Supabase SSR (CORE-SSR-002)
 - Return a typed `Result` instead of throwing; set a flash and use PRG
@@ -450,23 +499,27 @@ export default function NewIssuePage() {
 - Keep actions co-located in route `actions.ts`; no DAL layer (CORE-ARCH-003)
 
 **Testing**:
+
 - Unit test the Zod schema and any small helpers
 - Integration test the action against PGlite (worker-scoped); do not spin per‑test instances
 
 ## Adding New Patterns
 
 **When to add a pattern**:
+
 1. You've implemented the same approach 2+ times
 2. It's specific to PinPoint (not general Next.js/React knowledge)
 3. Future agents would benefit from seeing the example
 
 **How to add**:
+
 1. Create a new section with clear heading
 2. Include working code example
 3. List 2-3 key points about why this pattern
 4. Keep it concise - patterns, not tutorials
 
 **What NOT to add**:
+
 - General TypeScript/React patterns (use TYPESCRIPT_STRICTEST_PATTERNS.md)
 - Library-specific patterns (use Context7 for current library docs)
 - One-off solutions that won't be repeated

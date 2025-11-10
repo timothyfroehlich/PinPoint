@@ -133,7 +133,7 @@ export const users = pgTable("users", {
   firstName: text("first_name"),
   lastName: text("last_name"),
   fullName: text("full_name").generatedAlwaysAs(
-    sql`${users.firstName} || ' ' || ${users.lastName}`,
+    sql`${users.firstName} || ' ' || ${users.lastName}`
   ),
 });
 ```
