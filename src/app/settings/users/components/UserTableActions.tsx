@@ -67,7 +67,12 @@ export function UserTableActions({
         resendState.message ?? `Invitation resent to ${user.email}`,
       );
     } else if (resendState?.success === false) {
-      toast.error(resendState.error ?? "Failed to resend invitation");
+      const normalizedError = resendState.error.trim();
+      toast.error(
+        normalizedError && normalizedError.length > 0
+          ? normalizedError
+          : "Failed to resend invitation",
+      );
     }
   }, [resendState, user.email]);
 
@@ -117,8 +122,8 @@ export function UserTableActions({
             onSelect={(e) => {
               e.preventDefault(); // Prevent dropdown from closing
               const formData = new FormData();
-              formData.set("invitationId", user.invitationId ?? "");
-              void resendAction(formData);
+              formData.set("invitationId", user.invitationId);
+              resendAction(formData);
             }}
             disabled={isResending}
           >

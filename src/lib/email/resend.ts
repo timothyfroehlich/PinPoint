@@ -5,11 +5,22 @@
  * Uses Resend for reliable email delivery with Next.js optimization.
  */
 
-import { Resend } from 'resend';
-import { env } from '~/env';
+import "server-only";
 
-// Initialize Resend client
-const resend = new Resend(env.RESEND_API_KEY);
+import { Resend } from "resend";
+import { env } from "~/env";
+
+type ResendClient = InstanceType<typeof Resend>;
+
+let resendClient: ResendClient | null = null;
+
+const getResendClient = (): ResendClient | null => {
+  if (!env.RESEND_API_KEY) {
+    return null;
+  }
+  resendClient ??= new Resend(env.RESEND_API_KEY);
+  return resendClient;
+};
 
 /**
  * Email send result
@@ -52,19 +63,27 @@ export async function sendInvitationEmail(
     personalMessage,
   } = params;
 
+  const client = getResendClient();
+  if (!client) {
+    return {
+      success: false,
+      error: "Email delivery is not configured. Set RESEND_API_KEY.",
+    };
+  }
+
   // Construct invitation acceptance URL
   const acceptUrl = `${env.NEXT_PUBLIC_BASE_URL}/auth/accept-invitation/${token}`;
 
   // Format expiration date
-  const expiresFormatted = expiresAt.toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
+  const expiresFormatted = expiresAt.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
   });
 
   try {
-    const { data, error } = await resend.emails.send({
+    const response = await client.emails.send({
       from: `${env.INVITATION_FROM_NAME} <${env.INVITATION_FROM_EMAIL}>`,
       to,
       subject: `You've been invited to join ${organizationName} on PinPoint`,
@@ -86,23 +105,24 @@ export async function sendInvitationEmail(
       }),
     });
 
-    if (error) {
-      console.error('Resend email send error:', error);
+    if (response.error) {
+      console.error("Resend email send error:", response.error);
       return {
         success: false,
-        error: error.message || 'Unknown email error',
+        error: response.error.message || "Unknown email error",
       };
     }
 
     return {
       success: true,
-      messageId: data?.id,
+      messageId: response.data.id,
     };
   } catch (error) {
-    console.error('Email send exception:', error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error("Email send exception:", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: errorMessage,
     };
   }
 }

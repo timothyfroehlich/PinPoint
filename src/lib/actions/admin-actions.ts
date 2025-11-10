@@ -256,11 +256,20 @@ export async function inviteUserAction(
     revalidateTag("admin", "max");
     revalidateTag("users", "max");
 
+    const normalizedName = user.name?.trim();
+    const normalizedEmail = user.email.trim();
+    const inviterName =
+      (normalizedName && normalizedName.length > 0
+        ? normalizedName
+        : normalizedEmail && normalizedEmail.length > 0
+          ? normalizedEmail
+          : null) ?? "A team member";
+
     // Send invitation email (with plain token, not hash)
     const emailResult = await sendInvitationEmail({
       to: validation.data.email,
       organizationName: organization.name,
-      inviterName: user.name || user.email || "A team member",
+      inviterName,
       roleName,
       token, // Plain token for email link
       expiresAt,
@@ -270,9 +279,10 @@ export async function inviteUserAction(
     if (!emailResult.success) {
       // Log error but don't fail the invitation
       // User is already created, admin can resend later
+      const emailError = emailResult.error ?? "Unknown error";
       console.error("Invitation email failed:", {
         email: validation.data.email,
-        error: emailResult.error,
+        error: emailError,
         invitationId: invitation.id,
       });
 
@@ -283,19 +293,19 @@ export async function inviteUserAction(
         action: ACTIVITY_ACTIONS.INVITATION_SENT,
         entity: ACTIVITY_ENTITIES.USER,
         entityId: userId,
-        details: `Invitation created for ${validation.data.email} but email delivery failed: ${emailResult.error}`,
+        details: `Invitation created for ${validation.data.email} but email delivery failed: ${emailError}`,
         severity: "error",
       });
 
       return actionError(
-        `User invited but email could not be sent. Error: ${emailResult.error}. Please contact the user directly or try resending the invitation.`,
+        `User invited but email could not be sent. Error: ${emailError}. Please contact the user directly or try resending the invitation.`,
       );
     }
 
     // Background processing
     runAfterResponse(async () => {
       console.log(
-        `User invitation sent successfully to ${validation.data.email} by ${user.email}`,
+        `User invitation sent successfully to ${validation.data.email} by ${inviterName}`,
         {
           userId,
           membershipId: newMembership.id,
@@ -702,11 +712,20 @@ export async function resendInvitationAction(
     revalidateTag("admin", "max");
     revalidateTag("invitations", "max");
 
+    const normalizedName = user.name?.trim();
+    const normalizedEmail = user.email.trim();
+    const inviterName =
+      (normalizedName && normalizedName.length > 0
+        ? normalizedName
+        : normalizedEmail && normalizedEmail.length > 0
+          ? normalizedEmail
+          : null) ?? "A team member";
+
     // Send new invitation email (with plain token, not hash)
     const emailResult = await sendInvitationEmail({
       to: invitation.email,
       organizationName: organization.name,
-      inviterName: user.name || user.email || "A team member",
+      inviterName,
       roleName: invitation.role.name,
       token, // Plain token for email link
       expiresAt,
@@ -714,9 +733,10 @@ export async function resendInvitationAction(
 
     if (!emailResult.success) {
       // Log error but report partial success since token was regenerated
+      const emailError = emailResult.error ?? "Unknown error";
       console.error("Resend invitation email failed:", {
         email: invitation.email,
-        error: emailResult.error,
+        error: emailError,
         invitationId: invitation.id,
       });
 
@@ -727,25 +747,22 @@ export async function resendInvitationAction(
         action: ACTIVITY_ACTIONS.INVITATION_SENT,
         entity: ACTIVITY_ENTITIES.USER,
         entityId: invitation.id,
-        details: `Invitation token regenerated for ${invitation.email} but email delivery failed: ${emailResult.error}`,
+        details: `Invitation token regenerated for ${invitation.email} but email delivery failed: ${emailError}`,
         severity: "error",
       });
 
       return actionError(
-        `Invitation updated but email could not be sent. Error: ${emailResult.error}. Please contact the user directly.`,
+        `Invitation updated but email could not be sent. Error: ${emailError}. Please contact the user directly.`,
       );
     }
 
     // Background processing
     runAfterResponse(async () => {
-      console.log(
-        `Invitation resent successfully to ${invitation.email} by ${user.email}`,
-        {
-          invitationId: invitation.id,
-          organizationId,
-          messageId: emailResult.messageId,
-        },
-      );
+      console.log(`Invitation resent successfully to ${invitation.email} by ${inviterName}`, {
+        invitationId: invitation.id,
+        organizationId,
+        messageId: emailResult.messageId,
+      });
 
       // Log the successful activity
       await logActivity({

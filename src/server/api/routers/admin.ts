@@ -903,9 +903,7 @@ export const adminRouter = createTRPCRouter({
 
     // Set enabled permissions to true
     rolePerms.forEach((rp) => {
-      if (rp.permission) {
-        permissionMap[rp.permission.name] = true;
-      }
+      permissionMap[rp.permission.name] = true;
     });
 
     return permissionMap;

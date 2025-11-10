@@ -303,11 +303,12 @@ describe('PublicPermissionsSettings', () => {
 
       // Confirm dialog if shown
       await waitFor(() => {
-        const confirmButton = screen.queryByRole('button', { name: /confirm/i });
-        if (confirmButton) {
-          user.click(confirmButton);
-        }
+        expect(
+          screen.queryByRole('button', { name: /confirm/i }),
+        ).toBeTruthy();
       });
+      const confirmButton = screen.getByRole('button', { name: /confirm/i });
+      await user.click(confirmButton);
 
       // Wait for save button to be enabled and click it
       await waitFor(() => {
@@ -468,7 +469,8 @@ describe('PublicPermissionsSettings', () => {
       });
 
       // Clean up - resolve the pending mutation
-      resolveMutation!();
+      expect(resolveMutation).toBeDefined();
+      resolveMutation?.();
     });
   });
 

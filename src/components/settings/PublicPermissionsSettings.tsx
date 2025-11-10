@@ -34,14 +34,14 @@ import {
 import { toast } from 'sonner';
 
 // Permission metadata
-type PermissionMetadata = {
+interface PermissionMetadata {
   id: string;
   label: string;
   description: string;
   category: 'Issues' | 'Machines' | 'Locations' | 'Attachments';
   riskLevel: 'low' | 'moderate' | 'high';
   dependencies?: string[];
-};
+}
 
 const PERMISSION_METADATA: PermissionMetadata[] = [
   // Issues
@@ -96,14 +96,14 @@ const PERMISSION_METADATA: PermissionMetadata[] = [
 
 type PermissionState = Record<string, boolean>;
 
-type ConfirmationDialog = {
+interface ConfirmationDialog {
   open: boolean;
   title: string;
   description: string;
   onConfirm: () => void;
-};
+}
 
-export function PublicPermissionsSettings() {
+export function PublicPermissionsSettings(): JSX.Element {
   const utils = api.useUtils();
 
   // Fetch current permissions
@@ -121,7 +121,7 @@ export function PublicPermissionsSettings() {
     open: false,
     title: '',
     description: '',
-    onConfirm: () => {},
+    onConfirm: () => undefined,
   });
 
   // Update mutation
@@ -153,7 +153,7 @@ export function PublicPermissionsSettings() {
     setHasChanges(changed);
   }, [permissions, currentPermissions]);
 
-  const handleToggle = (permissionId: string, enabled: boolean) => {
+  const handleToggle = (permissionId: string, enabled: boolean): void => {
     const metadata = PERMISSION_METADATA.find((p) => p.id === permissionId);
 
     // High-risk permissions require confirmation
@@ -164,7 +164,7 @@ export function PublicPermissionsSettings() {
         description: `Are you sure you want to enable this permission? This allows anyone to ${metadata.description.toLowerCase()}.`,
         onConfirm: () => {
           applyPermissionChange(permissionId, enabled);
-          setConfirmDialog({ ...confirmDialog, open: false });
+          setConfirmDialog((prev) => ({ ...prev, open: false }));
         },
       });
       return;
@@ -185,7 +185,7 @@ export function PublicPermissionsSettings() {
           description: `Disabling this will also disable: ${dependentLabels}`,
           onConfirm: () => {
             applyPermissionChange(permissionId, enabled);
-            setConfirmDialog({ ...confirmDialog, open: false });
+            setConfirmDialog((prev) => ({ ...prev, open: false }));
           },
         });
         return;
@@ -195,7 +195,10 @@ export function PublicPermissionsSettings() {
     applyPermissionChange(permissionId, enabled);
   };
 
-  const applyPermissionChange = (permissionId: string, enabled: boolean) => {
+  const applyPermissionChange = (
+    permissionId: string,
+    enabled: boolean,
+  ): void => {
     const metadata = PERMISSION_METADATA.find((p) => p.id === permissionId);
     const newPermissions = { ...permissions };
 
@@ -229,7 +232,7 @@ export function PublicPermissionsSettings() {
     ).map((p) => p.id);
   };
 
-  const handleSave = async () => {
+  const savePermissions = async (): Promise<void> => {
     try {
       await updateMutation.mutateAsync({ permissions });
     } catch (error) {
@@ -238,10 +241,17 @@ export function PublicPermissionsSettings() {
     }
   };
 
-  const handleDiscard = () => {
+  const handleSaveClick = (): void => {
+    void savePermissions();
+  };
+
+  const handleDiscard = (): void => {
     if (currentPermissions) {
       setPermissions(currentPermissions);
     }
+  };
+  const handleRetry = (): void => {
+    void refetch();
   };
 
   // Loading state
@@ -262,7 +272,7 @@ export function PublicPermissionsSettings() {
         <CardContent className="py-8">
           <div className="text-center">
             <p className="text-destructive mb-4">Failed to load permissions</p>
-            <Button onClick={() => refetch()} variant="outline">
+            <Button onClick={handleRetry} variant="outline">
               Retry
             </Button>
           </div>
@@ -358,7 +368,9 @@ export function PublicPermissionsSettings() {
                       <Switch
                         id={perm.id}
                         checked={isEnabled}
-                        onCheckedChange={(checked) => handleToggle(perm.id, checked)}
+                        onCheckedChange={(checked) => {
+                          handleToggle(perm.id, checked);
+                        }}
                         aria-label={perm.label}
                       />
                     </div>
@@ -378,7 +390,7 @@ export function PublicPermissionsSettings() {
             Discard
           </Button>
           <Button
-            onClick={handleSave}
+            onClick={handleSaveClick}
             disabled={!hasChanges || updateMutation.isPending}
           >
             {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
@@ -389,7 +401,9 @@ export function PublicPermissionsSettings() {
       {/* Confirmation Dialog */}
       <AlertDialog
         open={confirmDialog.open}
-        onOpenChange={(open) => setConfirmDialog({ ...confirmDialog, open })}
+        onOpenChange={(open) => {
+          setConfirmDialog((prev) => ({ ...prev, open }));
+        }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>

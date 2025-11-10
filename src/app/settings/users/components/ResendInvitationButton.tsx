@@ -33,7 +33,12 @@ export function ResendInvitationButton({
     if (state?.success) {
       toast.success(state.message ?? `Invitation resent to ${email}`);
     } else if (state?.success === false) {
-      toast.error(state.error ?? "Failed to resend invitation");
+      const normalizedError = state.error.trim();
+      toast.error(
+        normalizedError && normalizedError.length > 0
+          ? normalizedError
+          : "Failed to resend invitation",
+      );
     }
   }, [state, email]);
 

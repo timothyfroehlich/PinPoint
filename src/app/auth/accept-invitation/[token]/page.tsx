@@ -6,10 +6,14 @@
  */
 
 import { redirect } from "next/navigation";
-import { and, eq } from "drizzle-orm";
-import { db } from "~/lib/dal/shared";
-import { invitations, users } from "~/server/db/schema";
 import { hashToken, isValidTokenFormat } from "~/lib/utils/invitation-tokens";
+import {
+  findPendingInvitationByTokenHash,
+  findUserByEmailAddress,
+  markInvitationAccepted,
+  markInvitationExpired,
+  verifyUserEmail,
+} from "~/lib/services/invitations";
 import {
   Card,
   CardContent,
@@ -41,27 +45,7 @@ export default async function AcceptInvitationPage({
 
   try {
     // Find invitation by token hash
-    const invitation = await db.query.invitations.findFirst({
-      where: and(
-        eq(invitations.token, tokenHash),
-        eq(invitations.status, "pending"),
-      ),
-      with: {
-        organization: {
-          columns: {
-            id: true,
-            name: true,
-            subdomain: true,
-          },
-        },
-        role: {
-          columns: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-    });
+    const invitation = await findPendingInvitationByTokenHash(tokenHash);
 
     if (!invitation) {
       return (
@@ -71,27 +55,15 @@ export default async function AcceptInvitationPage({
 
     // Check if invitation has expired
     const now = new Date();
-    if (invitation.expires_at < now) {
-      // Update status to expired
-      await db
-        .update(invitations)
-        .set({ status: "expired", updated_at: new Date() })
-        .where(eq(invitations.id, invitation.id));
-
+    if (invitation.expiresAt < now) {
+      await markInvitationExpired(invitation.id);
       return <ExpiredInvitationError invitation={invitation} />;
     }
 
     // Check if user exists and is verified
-    const existingUser = await db.query.users.findFirst({
-      where: eq(users.email, invitation.email),
-      columns: {
-        id: true,
-        email: true,
-        email_verified: true,
-      },
-    });
+    const existingUser = await findUserByEmailAddress(invitation.email);
 
-    if (existingUser?.email_verified) {
+    if (existingUser?.emailVerified) {
       // Existing verified user - auto-accept and redirect
       await acceptInvitation(invitation.id, existingUser.id);
 
@@ -130,22 +102,10 @@ async function acceptInvitation(
   invitationId: string,
   userId: string,
 ): Promise<void> {
-  await db
-    .update(invitations)
-    .set({
-      status: "accepted",
-      updated_at: new Date(),
-    })
-    .where(eq(invitations.id, invitationId));
-
-  // Mark user email as verified
-  await db
-    .update(users)
-    .set({
-      email_verified: new Date(),
-      updated_at: new Date(),
-    })
-    .where(eq(users.id, userId));
+  await Promise.all([
+    markInvitationAccepted(invitationId),
+    verifyUserEmail(userId),
+  ]);
 }
 
 /**
@@ -166,17 +126,17 @@ function AcceptInvitationFlow({
     role: {
       name: string;
     };
-    expires_at: Date;
+    expiresAt: Date;
   };
   existingUser?: {
     id: string;
     email: string | null;
-    email_verified: Date | null;
+    emailVerified: Date | null;
   } | null | undefined;
   token: string;
 }): React.JSX.Element {
   const isNewUser = !existingUser;
-  const expiresFormatted = invitation.expires_at.toLocaleDateString("en-US", {
+  const expiresFormatted = invitation.expiresAt.toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
     month: "long",

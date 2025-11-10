@@ -14,18 +14,13 @@ const mockSend = vi.fn();
 
 // Mock the Resend package
 vi.mock('resend', () => {
+  class MockResend {
+    emails = {
+      send: mockSend,
+    };
+  }
   return {
-    Resend: class MockResend {
-      constructor(_apiKey?: string) {
-        // Constructor can accept api key but we ignore it in tests
-      }
-
-      get emails() {
-        return {
-          send: mockSend,
-        };
-      }
-    },
+    Resend: MockResend,
   };
 });
 
