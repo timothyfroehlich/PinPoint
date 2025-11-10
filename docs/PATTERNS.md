@@ -326,6 +326,133 @@ function SubmitButton() {
 
 ---
 
+## Safe Server Action
+
+### Auth + Zod + Result + PRG
+
+```typescript
+// src/lib/result.ts
+export type Result<T, C extends string = string> =
+  | { ok: true; value: T }
+  | { ok: false; code: C; message: string };
+export const ok = <T>(value: T) => ({ ok: true as const, value });
+export const err = <C extends string>(code: C, message: string) => ({ ok: false as const, code, message });
+```
+
+```typescript
+// src/lib/flash.ts (minimal helper for Post‑Redirect‑Get)
+import { cookies } from "next/headers";
+const KEY = "flash";
+export type Flash = { type: "success" | "error"; message: string; fields?: Record<string, string> };
+export function setFlash(f: Flash): void {
+  cookies().set(KEY, JSON.stringify(f), { httpOnly: true, sameSite: "lax", path: "/" });
+}
+export function readAndClearFlash(): Flash | null {
+  const c = cookies();
+  const raw = c.get(KEY)?.value;
+  if (!raw) return null;
+  c.set(KEY, "", { path: "/", maxAge: 0 });
+  try { return JSON.parse(raw) as Flash; } catch { return null; }
+}
+```
+
+```typescript
+// src/app/issues/actions.ts
+"use server";
+import { z } from "zod";
+import { revalidatePath } from "next/cache";
+import { db } from "~/server/db";
+import { issues } from "~/server/db/schema";
+import { createClient } from "~/lib/supabase/server";
+import { ok, err, type Result } from "~/lib/result";
+import { setFlash } from "~/lib/flash";
+
+const schema = z.object({
+  title: z.string().trim().min(1, "Title required"),
+  machineId: z.string().uuid("Invalid machine"),
+  severity: z.enum(["minor", "playable", "unplayable"]),
+  description: z.string().trim().optional(),
+});
+
+export type CreateIssueResult = Result<{ id: string }, "AUTH" | "VALIDATION" | "DB">;
+
+export async function createIssue(formData: FormData): Promise<CreateIssueResult> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    setFlash({ type: "error", message: "You must be signed in." });
+    return err("AUTH", "Unauthenticated");
+  }
+
+  const parsed = schema.safeParse({
+    title: formData.get("title"),
+    machineId: formData.get("machineId"),
+    severity: formData.get("severity"),
+    description: formData.get("description") ?? undefined,
+  });
+  if (!parsed.success) {
+    setFlash({ type: "error", message: "Please fix the highlighted fields." });
+    return err("VALIDATION", "Invalid input");
+  }
+
+  try {
+    const [row] = await db
+      .insert(issues)
+      .values({
+        title: parsed.data.title,
+        description: parsed.data.description ?? null,
+        machine_id: parsed.data.machineId,
+        severity: parsed.data.severity,
+        // created_by: user.id, // include if present in schema
+      })
+      .returning({ id: issues.id });
+
+    revalidatePath("/issues");
+    setFlash({ type: "success", message: "Issue created." });
+    return ok({ id: row.id });
+  } catch {
+    setFlash({ type: "error", message: "Could not create issue. Try again." });
+    return err("DB", "Insert failed");
+  }
+}
+```
+
+```tsx
+// src/app/issues/new/page.tsx (works with or without JS)
+import { createIssue } from "~/app/issues/actions";
+import { readAndClearFlash } from "~/lib/flash";
+
+export default function NewIssuePage() {
+  const flash = readAndClearFlash();
+  return (
+    <div>
+      {flash && <p className={flash.type === "error" ? "text-red-600" : "text-green-700"}>{flash.message}</p>}
+      <form action={createIssue}>
+        <input name="title" required />
+        <select name="machineId" required>{/* options */}</select>
+        <select name="severity" defaultValue="playable">
+          <option value="minor">Minor</option>
+          <option value="playable">Playable</option>
+          <option value="unplayable">Unplayable</option>
+        </select>
+        <button type="submit">Create Issue</button>
+      </form>
+    </div>
+  );
+}
+```
+
+**Key points**:
+- Validate all inputs with Zod; never trust `FormData` (CORE-SEC-002)
+- Authenticate at the boundary using Supabase SSR (CORE-SSR-002)
+- Return a typed `Result` instead of throwing; set a flash and use PRG
+- Call `revalidatePath()` after successful mutations
+- Keep actions co-located in route `actions.ts`; no DAL layer (CORE-ARCH-003)
+
+**Testing**:
+- Unit test the Zod schema and any small helpers
+- Integration test the action against PGlite (worker-scoped); do not spin per‑test instances
+
 ## Adding New Patterns
 
 **When to add a pattern**:
