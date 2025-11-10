@@ -17,12 +17,13 @@
 2) Keep DB types (snake_case) in schema; convert to camelCase at boundaries
 3) Use Supabase SSR wrapper `~/lib/supabase/server`, call `auth.getUser()` immediately
 4) Ensure Next.js middleware for Supabase SSR token refresh is present
-5) Wrap server data access with React 19 `cache()` to prevent duplicate queries
-6) Use `~/` path aliases, avoid deep relative imports
-7) Never use `any`, non‑null `!`, or unsafe `as`; write proper type guards
-8) Default to Server Components, minimal Client Components
-9) Forms work without JavaScript (progressive enhancement)
-10) No migration files (pre-beta, schema changes via direct modification)
+5) Use database trigger for auto-profile creation (OAuth-proof, atomic)
+6) Wrap server data access with React 19 `cache()` to prevent duplicate queries
+7) Use `~/` path aliases, avoid deep relative imports
+8) Never use `any`, non‑null `!`, or unsafe `as`; write proper type guards
+9) Default to Server Components, minimal Client Components
+10) Forms work without JavaScript (progressive enhancement)
+11) No migration files (pre-beta, schema changes via direct modification)
 
 ---
 
@@ -97,6 +98,12 @@
 - **Why:** Altering it breaks authentication
 - **Do:** Return response object as‑is from middleware
 - **Don't:** Mutate or rewrap the response
+
+**CORE-SSR-006:** Use database trigger for auto-profile creation
+- **Severity:** Critical
+- **Why:** OAuth-proof (works for Google/GitHub login), atomic transaction, Supabase best practice
+- **Do:** Create `handle_new_user()` trigger on `auth.users` table (AFTER INSERT)
+- **Don't:** Create user profiles manually in signup Server Actions (won't work for OAuth)
 
 ---
 

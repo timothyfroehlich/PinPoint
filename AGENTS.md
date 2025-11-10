@@ -121,11 +121,31 @@ Read these immediately before starting work:
 
 ## Testing Strategy
 
-- **Unit tests**: Pure functions, utilities
-- **Integration tests**: Database queries with worker-scoped PGlite
-- **E2E tests**: Only 5 critical user journeys (Playwright)
-- **Target**: ~100-150 total tests (70% unit, 25% integration, 5% E2E)
-- **Authority**: `docs/TESTING_PLAN.md` for detailed patterns
+**Philosophy**: Confidence, not perfection.
+
+**The Testing Pyramid**:
+```
+        /\
+       /E2E\      ← 5-10 tests (critical flows only)
+      /------\
+     /  Intg  \   ← 25-35 tests (DB + auth)
+    /----------\
+   /    Unit    \ ← 70-100 tests (pure logic)
+  /--------------\
+```
+
+**Distribution & Targets**:
+- **70% Unit Tests** (~70-100 tests) - Pure functions, utilities, validation
+- **25% Integration Tests** (~25-35 tests) - Database queries with worker-scoped PGlite
+- **5% E2E Tests** (5-6 tests) - Critical user journeys only (Playwright)
+- **Total Target**: ~100-150 tests (not thousands)
+
+**Key Constraints**:
+- Worker-scoped PGlite only (per-test instances cause lockups)
+- No testing Server Components directly (use E2E instead)
+- Test behavior, not implementation details
+
+**Authority**: `docs/TESTING_PLAN.md` for detailed patterns, examples, and anti-patterns
 
 ## Scope Creep Prevention
 
