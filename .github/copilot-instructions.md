@@ -47,12 +47,13 @@ Referencing `TASKS.md` PR order:
 
 ## Copilot Review Priorities
 
-1. Security & Data Integrity: Input validation, single-tenant assumptions honored, issue-machine relationship enforced.
-2. Server-First Compliance: Avoid unnecessary `"use client"`.
-3. Type Safety: No forbidden escapes; proper narrowing.
-4. Progressive Enhancement: `<form action={serverAction}>` patterns validated.
-5. Memory Safety & Test Patterns: Worker-scoped DB setup; no per-test instances.
-6. Domain Consistency: Issue severity vocabulary and one-machine rule.
+1. **GitHub Staging Files**: Any files in `.github-staging/` directory MUST be manually reviewed before moving to `.github/`. Never automatically move or activate these files. See `.github-staging/README.md` for review process.
+2. Security & Data Integrity: Input validation, single-tenant assumptions honored, issue-machine relationship enforced.
+3. Server-First Compliance: Avoid unnecessary `"use client"`.
+4. Type Safety: No forbidden escapes; proper narrowing.
+5. Progressive Enhancement: `<form action={serverAction}>` patterns validated.
+6. Memory Safety & Test Patterns: Worker-scoped DB setup; no per-test instances.
+7. Domain Consistency: Issue severity vocabulary and one-machine rule.
 
 ## Preferred Implementation Examples
 

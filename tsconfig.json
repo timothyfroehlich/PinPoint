@@ -26,7 +26,7 @@
     ".next",
     "out",
     "dist",
-    "archived",
+    ".archived_v1",
     "**/*.test.ts",
     "**/*.test.tsx",
     "**/*.spec.ts",

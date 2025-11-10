@@ -12,7 +12,7 @@ export default [
       "node_modules/**",
       "out/**",
       "dist/**",
-      "archived/**",
+      ".archived_v1/**",
       "*.config.js",
       "*.config.mjs",
       "*.config.ts",

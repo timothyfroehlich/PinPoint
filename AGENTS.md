@@ -18,6 +18,80 @@ Read these immediately before starting work:
 - **`docs/TESTING_PLAN.md`** - Testing strategy and patterns
 - **`package.json`** - Available scripts, dependencies, configuration
 
+## Archived v1 Codebase (`.archived_v1/`)
+
+The `.archived_v1/` directory contains the complete production multi-tenant PinPoint v1 application (version 0.2). This is **reference material only** - do not copy code directly from it.
+
+### What's in the Archive
+
+- **Complete Next.js 16 app** - Pages Router with tRPC API layer
+- **Multi-tenant architecture** - Organization scoping, RLS policies, complex auth flows
+- **617-line ESLint config** - 5 custom rules, multiple security plugins, architectural enforcement
+- **Comprehensive testing** - Vitest, Playwright, PGlite, RLS tests
+- **Production patterns** - Error boundaries, loading states, structured logging
+- **96 package.json scripts** - Database management, security scanning, multi-environment support
+
+### How to Use the Archive
+
+**✅ DO:**
+
+- Look at it for **inspiration** - "How did v1 solve this problem?"
+- Compare **patterns** - "Should we use a similar approach?"
+- Learn from **decisions** - "Why did v1 evolve this complexity?"
+- Reference **configurations** - "What ESLint rules did they add and why?"
+- Understand **what problems you'll eventually face** - "When should we add security plugins?"
+
+**❌ DON'T:**
+
+- Copy code blindly - v1 is multi-tenant, v2 is single-tenant
+- Add v1's complexity prematurely - those patterns evolved from real pain points
+- Implement v1's abstraction layers - DAL, tRPC, service layers aren't needed yet
+- Port v1's custom ESLint rules - wait until you see the same violation 3+ times
+- Replicate v1's 96 scripts - add scripts when you actually need them
+
+### Key Differences v1 → v2
+
+| Aspect          | v1 (Archived)               | v2 (Current)                                |
+| --------------- | --------------------------- | ------------------------------------------- |
+| **Tenancy**     | Multi-tenant with RLS       | Single-tenant, no RLS                       |
+| **API Layer**   | tRPC procedures             | Direct Drizzle in Server Components/Actions |
+| **Data Access** | DAL + repository pattern    | Direct queries (Rule of Three)              |
+| **Auth**        | Supabase SSR + RLS policies | Supabase SSR only                           |
+| **Router**      | Pages Router                | App Router                                  |
+| **Testing**     | 150+ tests with RLS         | Building progressively (PR 5)               |
+| **ESLint**      | 617 lines, 5 custom rules   | 20 high-value rules (grows as needed)       |
+| **Complexity**  | Production-ready enterprise | MVP greenfield simplicity                   |
+
+### Example: ESLint Evolution
+
+**v1 has:**
+
+- Custom rule: `no-duplicate-auth-resolution` (catches calling getUser() twice)
+- Custom rule: `no-missing-cache-wrapper` (enforces React cache() on fetchers)
+- Security plugins detecting eval(), SQL injection, XSS patterns
+- Architectural boundary rules preventing DAL cross-imports
+
+**v2 starts with:**
+
+- Core type safety (no any, explicit return types)
+- Promise handling (prevents fire-and-forget bugs)
+- Unused imports cleanup
+
+**When to add v1's rules to v2:** After you've encountered the problem 3+ times and established the pattern to enforce.
+
+### Using Archive for Decision Making
+
+When facing a decision, ask:
+
+1. **Did v1 solve this?** Look in archive for reference
+2. **Why did v1 do it that way?** Understand the context (multi-tenant, production scale)
+3. **Do we need that complexity now?** Usually no - MVP first, complexity later
+4. **What's the v2 equivalent?** Adapt for single-tenant, simpler architecture
+
+**Example:** v1 has a `createOrganizationContext()` function that wraps every data access. We don't need that in v2 because we're single-tenant - just query Drizzle directly.
+
+**Remember:** The archive shows you what PinPoint **becomes** at production scale with multiple tenants. Start simple and evolve toward that complexity only when real needs demand it.
+
 ## Project Context
 
 ### Status
