@@ -1,217 +1,101 @@
-# GitHub Copilot Instructions - Documentation
+# PinPoint v2 – Copilot Instruction System Documentation
 
-This document explains the Copilot instruction setup for the PinPoint repository.
+This file documents how repository + pattern-specific instructions guide AI assistance for the single-tenant v2 rewrite.
 
-## Overview
-
-GitHub Copilot uses instruction files to provide context-aware guidance when generating code, reviewing pull requests, and answering questions. This repository uses a hierarchical instruction system following [GitHub's best practices](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions).
+## Goals
+- Provide concise, actionable constraints to keep generation aligned with sources-of-truth.
+- Reflect SINGLE-TENANT simplification (no organization scoping / RLS).
+- Encourage server-first, progressive enhancement, strict typing, and domain clarity.
 
 ## File Structure
-
 ```
 .github/
-├── copilot-instructions.md          # Repository-wide instructions
-├── COPILOT_INSTRUCTIONS.md          # This documentation file
-└── instructions/
-    ├── testing.instructions.md      # Test-related files
-    ├── database.instructions.md     # Database layer files
-    ├── auth.instructions.md         # Authentication files
-    ├── components.instructions.md   # React components
-    ├── api-routes.instructions.md   # API routes and tRPC
-    └── server-actions.instructions.md # Server Actions
+  copilot-instructions.md          # Global repository guidance (summary & priorities)
+  COPILOT_INSTRUCTIONS.md          # (this) meta documentation
+  instructions/
+    components.instructions.md     # Server vs Client component rules
+    auth.instructions.md           # Supabase SSR auth & middleware
+    database.instructions.md       # Drizzle schema & data access rules
+    server-actions.instructions.md # Mutation patterns & validation
+    testing.instructions.md        # Memory safety & test pyramid
 ```
+(We intentionally exclude domain-specific instruction files at greenfield start; domain patterns will graduate into `docs/PATTERNS.md`.)
 
-## How It Works
+## Instruction Hierarchy Merge Order
+1. Organization-level (none currently)
+2. Repository-wide: `.github/copilot-instructions.md`
+3. Pattern-specific: matching `.github/instructions/*.instructions.md`
 
-### Repository-Wide Instructions
+## Source of Truth References (Never Duplicate Entire Content)
+- `docs/NON_NEGOTIABLES.md` – forbidden patterns & critical constraints
+- `AGENTS.md` – contextual project directives
+- `docs/PATTERNS.md` – evolving implementation patterns
+- `docs/TYPESCRIPT_STRICTEST_PATTERNS.md` – strict TS techniques
+- `docs/TESTING_PLAN.md` – test distribution & memory safety
+- `docs/TECH_SPEC.md` – single-tenant architecture definition
+- `TASKS.md` – active PR sequencing
 
-The main `.github/copilot-instructions.md` file provides:
+## Major Differences vs Archived v1
+| Topic | v1 Archived | v2 Greenfield |
+|-------|-------------|---------------|
+| Tenancy | Multi-tenant + RLS | Single-tenant, no RLS |
+| Data Layer | tRPC + Drizzle | Direct Drizzle + Server Actions |
+| Auth | Supabase SSR + org context | Supabase SSR only (simpler) |
+| Testing | pgTAP + RLS focus | Worker-scoped PGlite + Vitest + Playwright |
+| Instruction Scope | Many domain-specific patterns | Lean, foundational patterns |
 
-- Project overview and technology stack
-- Critical architectural patterns
-- Development commands reference
-- Code quality standards
-- Links to comprehensive documentation
+## Pattern-Specific File Purposes
+- `components.instructions.md`: Enforce server-first defaults, minimal client islands, Tailwind + shadcn/ui usage.
+- `auth.instructions.md`: Supabase SSR client creation order, middleware refresh, avoidance of deprecated helpers.
+- `database.instructions.md`: Schema lock, direct queries, snake_case schema rules, no migrations.
+- `server-actions.instructions.md`: Validation with Zod, explicit return types, progressive enhancement forms.
+- `testing.instructions.md`: Test pyramid, memory safety (worker-scoped DB), avoiding per-test DB instances.
 
-This file is automatically loaded by Copilot for all operations in the repository.
-
-### Pattern-Specific Instructions
-
-Files in `.github/instructions/` use YAML frontmatter to target specific file patterns:
-
-```markdown
----
-applyTo: "src/app/**/*.tsx,src/components/**/*.tsx"
----
-
-# Component Development Instructions
-
-...
-```
-
-When working on files matching the `applyTo` pattern, Copilot will merge both the repository-wide instructions and the pattern-specific instructions.
-
-## Pattern Mappings
-
-| Instruction File                 | Applies To                                                                         | Coverage                              |
-| -------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------- |
-| `testing.instructions.md`        | `**/*.test.ts`, `**/*.spec.ts`, `e2e/**/*.ts`, `src/test/**/*.ts`                  | Test files, test helpers, E2E tests   |
-| `database.instructions.md`       | `src/server/db/**/*.ts`, `**/*dal*.ts`, `**/*schema*.ts`                           | Database layer, DAL functions, schema |
-| `auth.instructions.md`           | `**/*auth*.ts`, `**/middleware.ts`, `app/auth/**/*.ts`, `src/lib/supabase/**/*.ts` | Authentication, Supabase integration  |
-| `components.instructions.md`     | `src/app/**/*.tsx`, `src/components/**/*.tsx`                                      | Server Components, Client Components  |
-| `api-routes.instructions.md`     | `src/app/api/**/*.ts`, `src/server/api/**/*.ts`                                    | API routes, tRPC routers              |
-| `server-actions.instructions.md` | `src/lib/actions/**/*.ts`, `**/*actions*.ts`                                       | Server Actions                        |
-
-## Instruction Hierarchy
-
-When Copilot generates code or provides guidance, it merges instructions in this order:
-
-1. **Organization-level instructions** (if configured at org level)
-2. **Repository-wide instructions** (`.github/copilot-instructions.md`)
-3. **Pattern-specific instructions** (matching `.github/instructions/*.instructions.md`)
-
-This allows for:
-
-- General principles to apply everywhere
-- Specialized guidance for specific file types
-- Overriding of general rules with specific patterns
-
-## Key Patterns Covered
-
-### Security Patterns
-
-- Multi-tenant organization scoping (CRITICAL)
-- SQL injection prevention
-- Authentication and authorization
-- RLS (Row-Level Security) enforcement
-
-### Architecture Patterns
-
-- Server-First development (Server Components by default)
-- Type safety boundaries (DB types vs Application types)
-- Import patterns (`~/` aliases)
-- Error handling and structured errors
-
-### Testing Patterns
-
-- Memory-safe test patterns (worker-scoped PGlite)
-- Test type selection (Unit, Integration, E2E, RLS)
-- Hardcoded test IDs (SEED_TEST_IDS)
-- Mock patterns and fixtures
-
-### Code Quality
-
-- TypeScript strictest mode compliance
-- No escape hatches (`any`, `!`, unsafe `as`)
-- Proper null safety and type guards
-- Explicit return types
-
-## Maintaining Instructions
-
-### When to Update
-
+## Updating Instructions
 Update instructions when:
+- A pattern appears ≥2 times (add to `docs/PATTERNS.md`, then reference from instruction file)
+- Source-of-truth docs change materially
+- A new forbidden pattern emerges (add to `NON_NEGOTIABLES.md`, then reference)
 
-- New architectural patterns are established
-- Critical security patterns change
-- New forbidden patterns are identified
-- Testing strategies evolve
-- New file patterns are introduced
+### Update Checklist
+1. Confirm change belongs in docs vs instruction file.
+2. Amend source-of-truth first (e.g., `NON_NEGOTIABLES.md`).
+3. Adjust or add concise guidance to relevant instruction file.
+4. Ensure no duplication of entire lists; link instead.
+5. Date-stamp the update in modified file footer.
 
-### Update Process
+## Verification Workflow
+1. Open a target file (e.g., `src/app/page.tsx`).
+2. Request Copilot completion; confirm server-first suggestions (no premature client code).
+3. For a Server Action file, ensure suggested code includes validation + explicit return types.
+4. For test files, ensure use of worker-scoped PGlite pattern and absence of per-test DB instantiation.
+5. If divergence occurs, refine the relevant instruction file with clearer examples.
 
-1. **Identify the scope**: Determine if the change affects:
-   - Repository-wide patterns → Update `.github/copilot-instructions.md`
-   - Specific file patterns → Update or create `.github/instructions/*.instructions.md`
+## Anti-Goals
+- Duplicating large doc sections (causes drift)
+- Enforcing premature abstractions (DAL, service layers)
+- Reintroducing multi-tenant patterns not needed in v2
 
-2. **Maintain consistency**: Ensure instructions align with:
-   - `/docs/CORE/NON_NEGOTIABLES.md` (single source of truth for critical patterns)
-   - `/docs/CORE/TYPESCRIPT_STRICTEST_PATTERNS.md`
-   - `/docs/CORE/TESTING_GUIDE.md`
+## Example Merge Scenario
+Editing `src/app/machines/page.tsx` → Copilot merges:
+1. Global instructions (server-first, domain constraints).
+2. `components.instructions.md` (server vs client, import patterns).
+Result: Suggestions should produce a Server Component querying Drizzle directly, using shadcn/ui primitives, with strict typing.
 
-3. **Test the changes**: After updating:
-   - Ask Copilot to generate code matching the pattern
-   - Verify it follows the updated instructions
-   - Check that existing patterns still work
+## Known Future Additions (Placeholders)
+- Issue workflow patterns (creation, severity, resolution) – will promote once ≥2 implementations exist.
+- Commenting pattern for issue threads – same promotion rule.
 
-4. **Document updates**: Update this file if the structure changes or new patterns are added
+## Troubleshooting
+| Symptom | Potential Cause | Resolution |
+|---------|-----------------|-----------|
+| Copilot suggests org scoping | Residual model memory from archived content | Reinforce single-tenant note in global file; regenerate completion |
+| Copilot adds tRPC router | Archived instructions influence | Remove tRPC references & retry; ensure active files omit router terms |
+| Suggests migration files | Misinterpret schema lock | Add clarifying example of direct schema edit pattern |
+| Per-test DB setup suggested | Missing explicit memory safety example | Strengthen example in `testing.instructions.md` |
 
-### Best Practices
-
-1. **Keep it concise**: Instructions should be actionable and specific
-2. **Show examples**: Use ✅ correct and ❌ wrong patterns
-3. **Reference documentation**: Link to comprehensive docs for details
-4. **Avoid duplication**: Don't repeat `/docs/CORE/NON_NEGOTIABLES.md` content
-5. **Use consistent formatting**: Follow the established markdown structure
-
-## Example Usage
-
-### Code Generation
-
-When creating a new React component in `src/components/`:
-
-- Copilot loads repository-wide instructions
-- Copilot loads `components.instructions.md` (pattern match)
-- Generated code follows Server Component patterns
-- Organization context is properly handled
-
-### Code Review
-
-When reviewing a PR with database changes:
-
-- Copilot applies repository-wide security checks
-- Copilot applies `database.instructions.md` patterns
-- Validates organization scoping in queries
-- Checks for SQL injection patterns
-
-### Chat and Debugging
-
-When asking Copilot for help:
-
-- Context from all relevant instruction files is available
-- Copilot can reference pattern-specific guidance
-- Links to documentation are provided
-
-## Verification
-
-To verify the instructions are working:
-
-1. **Test pattern matching**:
-
-   ```bash
-   # Check what files match each pattern
-   echo "Testing components pattern:"
-   fd . src/app -e tsx | head -5
-   ```
-
-2. **Ask Copilot**:
-   - "Show me how to create a Server Component that fetches issues"
-   - "What are the authentication patterns I should follow?"
-   - "How should I write an integration test for a tRPC router?"
-
-3. **Review generated code**:
-   - Does it use `~/` imports?
-   - Does it include organization scoping?
-   - Does it follow type safety patterns?
-
-## Resources
-
-- [GitHub Copilot Custom Instructions Docs](https://docs.github.com/en/copilot/how-tos/configure-custom-instructions/add-repository-instructions)
-- [Best Practices for Copilot Coding Agent](https://docs.github.com/en/copilot/tutorials/coding-agent/get-the-best-results)
-- [PinPoint NON_NEGOTIABLES.md](/docs/CORE/NON_NEGOTIABLES.md)
-- [PinPoint AGENTS.md](/AGENTS.md)
-
-## Contributing
-
-When adding new patterns or architectural decisions:
-
-1. Update `/docs/CORE/NON_NEGOTIABLES.md` first (source of truth)
-2. Add pattern-specific instructions to `.github/instructions/`
-3. Update `.github/copilot-instructions.md` if needed
-4. Update this documentation if structure changes
-5. Test with Copilot to verify effectiveness
+## Escalation
+If ambiguity persists after refining instructions: open a short design note in `docs/tech-updates/` summarizing decision and link from instructions.
 
 ---
-
-**Last Updated**: 2025-11-04  
-**Maintained By**: PinPoint Development Team
+Last Updated: 2025-11-09

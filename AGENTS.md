@@ -1,142 +1,194 @@
-# PinPoint Agent Guidelines & Repository Overview
+# PinPoint Agent Guidelines
 
-## ✅ Critical Context Files
-The following files contain critical context and should be read immediately:
-- `docs/CORE/NON_NEGOTIABLES.md` - Forbidden patterns and critical constraints
-- `docs/CORE/TYPESCRIPT_STRICTEST_PATTERNS.md` - Type safety patterns
-- `package.json` - Available scripts, dependencies, and project configuration
-- `docs/CORE/TESTING_GUIDE.md` - Testing guidelines and patterns
+## About the User
 
-## 🚨 CRITICAL CONSTRAINTS
+The user's name is Tim and his GitHub account is "timothyfroehlich".
+
+Tim is vibecoding this app by himself to learn about website design and experiment with agentic coding. Tim has never coded in Java/TypeScript before. When a decision is needed, the agent should provide some explanation about the options, pros and cons. Review comments on GitHub PRs can be assumed to have been written by coding agents. Their comments must be taken as suggestions and with a grain of salt. Don't assume that the agent who wrote the comment had the full context to fully understand the problem.
+
+## Critical Context Files
+
+Read these immediately before starting work:
+- **`docs/NON_NEGOTIABLES.md`** - Forbidden patterns and critical constraints
+- **`docs/PATTERNS.md`** - Project-specific code patterns (MUST reference when coding)
+- **`docs/TYPESCRIPT_STRICTEST_PATTERNS.md`** - Type safety patterns
+- **`docs/PRODUCT_SPEC.md`** - What we're building (MVP/MVP+/1.0/2.0)
+- **`docs/TECH_SPEC.md`** - Single-tenant architecture specification
+- **`docs/TESTING_PLAN.md`** - Testing strategy and patterns
+- **`package.json`** - Available scripts, dependencies, configuration
+
+## Project Context
+
+### Status
+- **Phase**: Greenfield rewrite (v2), pre-beta
+- **Users**: Zero production users
+- **Development**: Solo passion project, high risk tolerance for breaking changes
+- **Core Value**: "Allow the Austin Pinball Collective to log issues with pinball machines, track work and resolve them."
+
+### Technology Stack
+- **Frontend**: Next.js 16, React 19 Server Components, shadcn/ui, Tailwind CSS v4
+- **Backend**: Drizzle ORM, PostgreSQL via Supabase
+- **Authentication**: Supabase SSR (no RLS for single-tenant)
+- **Testing**: Vitest, Playwright, worker-scoped PGlite
+- **Language**: TypeScript with strictest configuration
+
+### Architecture Type
+**Single-Tenant**: One organization (Austin Pinball Collective), no multi-tenant complexity, no organization scoping required, no RLS policies.
+
+## Critical Constraints
 
 ### Non-Negotiable Patterns
 
-- **Memory safety**: Use worker-scoped PGlite instances (per-test instances cause system lockups)
+- **Memory safety**: Worker-scoped PGlite instances only (per-test instances cause system lockups)
 - **No migration files**: Pre-beta has zero users, schema changes via direct modification only
-- **No Vitest redirection**: Commands like `npm test 2>&1` break test execution
 - **Schema lock**: Code adapts to schema, never modify schema to fix TypeScript errors
-- **Organization scoping**: All queries must include organizationId for security
 - **Server-first**: Default to Server Components, minimal Client Components
-- **shadcn/ui only**: No new MUI components, use shadcn/ui for all new development
-- **Material Design 3 colors only**: All colors must come from the Material 3 color system in globals.css
+- **shadcn/ui only**: No MUI components for new development
+- **Issues always per-machine**: Every issue must have exactly one machine (CHECK constraint)
+- **Severity naming**: `minor` | `playable` | `unplayable` (player-centric language)
+- **Progressive enhancement**: Forms must work without JavaScript
 
 ### Library Knowledge Gap
 
-- **Training Cutoff**: January 2025, current date September 2025 - 8+ months behind
+- **Training Cutoff**: January 2025, current date November 2025 - 10 months behind
 - **Required Libraries**: Drizzle, Supabase, Next.js, shadcn/ui, Server Components, Server Actions, Vitest
-- **Process**: Research current patterns before implementation
+- **Process**: Use Context7 (`resolve-library-id` → `get-library-docs`) before implementation
 
-## 📍 PROJECT CONTEXT
-
-### Project Status
-- Pre-beta phase, zero production users
-- Solo development, high risk tolerance for breaking changes
-- Core features and navigation still being decided
-
-### Technology Stack
-- **Frontend**: Next.js 15, React 19 with Server Components, shadcn/ui, Tailwind CSS v4
-- **Backend**: tRPC, Drizzle ORM, PostgreSQL via Supabase
-- **Authentication**: Supabase SSR with RLS (Row-Level Security)
-- **Testing**: Vitest, Playwright, pgTAP for RLS testing
-- **Language**: TypeScript with strictest configuration
-
-## 🏗️ ARCHITECTURE DIRECTIVES
+## Architecture Directives
 
 ### Server-First Principles
 - **Default**: Server Components for all new development
 - **Client Islands**: Minimal "use client" for specific interactivity only
-- **Hybrid**: Server shell + Client islands for complex interactions
-- **Data Flow**: Server Components → DAL → Drizzle → PostgreSQL
+- **Data Flow**: Server Components → Drizzle → PostgreSQL (direct queries, no DAL/repository layers)
 - **Mutations**: Server Actions with progressive enhancement
 
-### UI Framework Strategy
-- **New Development**: shadcn/ui + Tailwind CSS only
-- **Existing Code**: MUI components continue working during transition
-- **Migration**: Component-by-component replacement when convenient
-- **CSS**: Layer isolation enables MUI/Tailwind coexistence
+### Direct Database Queries
+- **Do**: Query Drizzle directly in Server Components and Server Actions
+- **Don't**: Create DAL/repository/service layers (premature abstraction)
+- **Why**: Single-tenant simplicity, follow the Rule of Three
 
-### Schema & Data Lock-In
-- **Schema is immutable**: Code adapts to schema, never modify schema for TypeScript errors
-- **Seed data locked**: SEED_TEST_IDS finalized for predictable testing
-- **Development approach**: Fix imports, add required fields, use correct property names
-- **No migrations**: Pre-beta has zero users, no migration files allowed
+### UI Framework
+- **New Development**: shadcn/ui + Tailwind CSS v4 only
+- **CSS**: Material Design 3 colors from globals.css
 
-## 🛠️ DEVELOPMENT RULES
+## Development Guidelines
 
 ### Command Recommendations
-| Consider Avoiding | Prefer | Reason |
-| ----------------- | ------ | ------ |
+| Avoid | Prefer | Reason |
+| ----- | ------ | ------ |
 | `npm test 2>&1` | `npm test` | Vitest treats redirection as test filters |
 | `find` | `rg --files`, `fd` | Safer/faster search |
-| `require()` | ES module `import` | Project is type: "module" (ESM) |
 
 ### Available Commands
-- **Testing**: `npm test`, `npm run test:watch`, `npm run test:rls`, `npm run smoke`
-- **Development**: `npm run dev`, `npm run build`, `npm run lint`, `npm run type-check`
+- **Testing**: `npm test`, `npm run test:watch`, `npm run smoke`
+- **Development**: `npm run dev`, `npm run build`, `npm run lint`, `npm run typecheck`
 - **Components**: `npx shadcn@latest add [component]`
 
-### Seed Data Pattern
-**Critical**: Use hardcoded SEED_TEST_IDS for predictable debugging
-- `SEED_TEST_IDS.ORGANIZATIONS.primary` → "test-org-pinpoint"
-- `SEED_TEST_IDS.USERS.ADMIN` → "test-user-tim"
-- `SEED_TEST_IDS.MOCK_PATTERNS.MACHINE` → "mock-machine-1"
+### Project Structure
+- **Source**: `src/app` (App Router), `src/components`, `src/lib`, `src/server`
+- **Tests**: `src/test` (unit/integration), `e2e/` (Playwright)
+- **Docs**: `docs/` (specs), `docs/tech-updates/` (tech reference)
 
-## 📚 PROJECT STRUCTURE & MODULES
+## Coding Standards
 
-- **Source**: `src/app` (Next.js App Router), `src/components` (client/server UI), `src/lib`, `src/hooks`, `src/server`, `src/utils`, `src/types`
-- **Tests**: unit/integration in `src/test`, Playwright E2E in `e2e/`, SQL/RLS tests in `supabase/tests`
-- **Data & Infra**: `supabase/` (config, seeds, RLS, tests), Drizzle configs in `drizzle.config.*.ts`, helper scripts in `scripts/`, static assets in `public/`
+### TypeScript
+- **Strictest configuration**: No `any`, no non-null `!`, no unsafe `as`
+- **Explicit return types**: Required for public functions
+- **Path aliases**: Use `~/` instead of relative imports
 
-## 🔨 BUILD, TEST, AND DEVELOPMENT
+### Naming Conventions
+- **Components**: PascalCase files (`IssueCard.tsx`)
+- **Client Components**: Use `"use client"` directive at top
+- **Hooks**: `useThing.ts`
+- **Utilities**: kebab-case or snake_case files
 
-- `npm run dev`: Start Next.js dev server (use `dev:full` to include typecheck)
-- `npm run build` / `npm start`: Production build and server
-- `npm run typecheck`: Strict TypeScript checks
-- `npm test`: Vitest unit/integration suite. `npm run test:watch` for TDD
-- `npm run smoke`: Quick Playwright smoke E2E. `npm run test:ci` runs unit + RLS + smoke
-- **Database**: `npm run db:push:local` (apply schema via Drizzle push), `npm run db:generate-types` (Supabase types), `npm run db:studio` (schema explorer), `npm run db:reset` (reset local dev DB)
+### Database
+- **Schema**: snake_case for all table/column names
+- **Boundary**: Convert to camelCase at application boundaries
+- **Types**: Keep snake_case DB types separate from camelCase app types
 
-## ✍️ CODING STYLE & NAMING
+## Pattern Discovery & Documentation
 
-- **Formatting**: Prettier; run `npm run format:write`. Lint: ESLint via `npm run lint`
-- **TypeScript everywhere**: prefer explicit types on public APIs
-- **Application code**: must follow TypeScript Strictest settings
-- **Components**: PascalCase files (e.g., `ProfilePictureUpload.tsx`). Client-only pieces may use `-client.tsx` or live under a `client/` folder with `"use client"`
-- **Hooks**: `useThing.ts`. Utilities/constants: kebab-case or snake_case files; booleans prefixed `is/has`
+**IMPORTANT**: When implementing features, always reference `docs/PATTERNS.md` for established patterns.
 
-## 🧪 TESTING GUIDELINES
+**Contributing New Patterns**:
+- **When**: You implement the same approach 2+ times
+- **What**: Add it to `docs/PATTERNS.md` with a working code example
+- **Why**: Future agents need to follow the same conventions
+- **How**: Keep examples concise, focus on PinPoint-specific patterns (not general Next.js knowledge)
 
-- **Frameworks**: Vitest (+ Testing Library), Playwright, and SQL/RLS tests
-- **Naming**: `*.test.ts(x)` for unit/integration, `*.e2e.test.ts`/`*.spec.ts` under `e2e/`, SQL tests in `supabase/tests/rls/*.test.sql`
-- **Coverage**: services, server actions, and RLS-critical paths. Use helpers under `src/test/**`
-- **Authority**: `docs/CORE/TESTING_GUIDE.md` for test type selection, naming, placement, and templates
+**Example**: If you create two Server Actions with similar structure, add that pattern to PATTERNS.md so the third one follows the same approach.
 
-## 📝 COMMIT & PULL REQUESTS
+## Testing Strategy
 
-- **Commits**: Conventional style where practical (`feat:`, `fix:`, `chore:`, `build:`), optional scope, reference issues/PRs
-- **PRs**: clear description, linked issue, screenshots for UI, notes for DB schema/seed changes, and steps to verify
-- **Before pushing**: `npm run typecheck && npm test && npm run smoke && npm run lint`
-- **Drizzle workflow**: use `db:push:*`; do not add new SQL files under `supabase/migrations/` (initial snapshot is retained)
+**Philosophy**: Confidence, not perfection.
 
-## 🔐 SECURITY & CONFIGURATION
+**The Testing Pyramid**:
+```
+        /\
+       /E2E\      ← 5-10 tests (critical flows only)
+      /------\
+     /  Intg  \   ← 25-35 tests (DB + auth)
+    /----------\
+   /    Unit    \ ← 70-100 tests (pure logic)
+  /--------------\
+```
 
-- **Env**: copy `.env.example` to `.env.local` or `npm run env:pull`. Never commit secrets
-- **Supabase**: `npm run sb:reset` to bootstrap local; `sb:volumes:clean` is destructive
-- **Hooks**: Husky + lint-staged format on commit; optional `npm run pre-commit:gitleaks` for secret scanning
+**Distribution & Targets**:
+- **70% Unit Tests** (~70-100 tests) - Pure functions, utilities, validation
+- **25% Integration Tests** (~25-35 tests) - Database queries with worker-scoped PGlite
+- **5% E2E Tests** (5-6 tests) - Critical user journeys only (Playwright)
+- **Total Target**: ~100-150 tests (not thousands)
 
-## 📖 ESSENTIAL DOCUMENTATION
+**Key Constraints**:
+- Worker-scoped PGlite only (per-test instances cause lockups)
+- No testing Server Components directly (use E2E instead)
+- Test behavior, not implementation details
 
-- **NON_NEGOTIABLES.md** - Critical patterns and forbidden practices (MUST READ)
-- **TARGET_ARCHITECTURE.md** - Architectural authority for all decisions
-- **TESTING_GUIDE.md** - Test types and standards
-- **TYPE_INVENTORY.md** - Type system reference and import patterns
+**Authority**: `docs/TESTING_PLAN.md` for detailed patterns, examples, and anti-patterns
 
-## ⚡ QUALITY GATES
+## Scope Creep Prevention
+
+### The Scope Firewall (3 Questions)
+1. Does this solve a problem we have RIGHT NOW?
+2. Does this block a user from achieving the core value proposition?
+3. Can we ship MVP without this?
+
+If answers are No/No/Yes → defer to `docs/V2_ROADMAP.md`
+
+### The "Done Enough" Standard
+1. Does it work for the happy path?
+2. Does it handle the most common error case?
+3. Is it tested with at least one test?
+4. Is it secure (input validation, auth checks)?
+5. Is the code readable by someone else?
+
+If all Yes → ship it. Perfect is the enemy of done.
+
+## Essential Documentation
+
+- **`docs/NON_NEGOTIABLES.md`** - Critical patterns and forbidden practices
+- **`docs/PATTERNS.md`** - Project-specific code patterns (living document)
+- **`docs/PRODUCT_SPEC.md`** - Feature specifications (MVP/MVP+/1.0/2.0)
+- **`docs/TECH_SPEC.md`** - Single-tenant architecture
+- **`docs/TESTING_PLAN.md`** - Testing strategy and patterns
+- **`docs/V2_ROADMAP.md`** - Deferred features parking lot
+- **`docs/TYPESCRIPT_STRICTEST_PATTERNS.md`** - Practical TypeScript patterns
+- **`docs/tech-updates/INDEX.md`** - Tech stack reference
+
+## Commit Guidelines
+
+- **Style**: Conventional commits (`feat:`, `fix:`, `chore:`)
+- **Before pushing**: `npm run pre-flight` (runs typecheck, test, smoke, lint, format)
+- **PRs**: Clear description, screenshots for UI changes
+- **No migrations**: Schema changes via direct modification only
+
+## Quality Gates
 
 - All tests pass before commits
-- Pre-commit hooks (husky + shellcheck)
+- Pre-commit hooks (Husky + lint-staged)
 - Server-first principles for new development
-- Organization scoping in all multi-tenant queries
-- SEED_TEST_IDS for predictable testing
+- Progressive enhancement (forms work without JS)
+- Input validation with Zod for all user inputs
 
-**USAGE**: This serves as the central agent context for PinPoint development. Read and follow all critical constraints, especially those in NON_NEGOTIABLES.md.
+**Usage**: This file provides essential context for AI agents working on PinPoint. Follow all constraints in `docs/NON_NEGOTIABLES.md`.

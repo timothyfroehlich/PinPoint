@@ -1,210 +1,135 @@
-# PinPoint - GitHub Copilot Instructions
+# PinPoint v2 – GitHub Copilot Repository Instructions
 
-## Project Overview
+> Source of truth lives in: `docs/NON_NEGOTIABLES.md`, `docs/PATTERNS.md`, `docs/TYPESCRIPT_STRICTEST_PATTERNS.md`, `docs/PRODUCT_SPEC.md`, `docs/TECH_SPEC.md`, `docs/TESTING_PLAN.md`, plus root `AGENTS.md` and active tasks in `TASKS.md`. Do NOT duplicate full lists of forbidden patterns here—reference them.
 
-PinPoint is a pre-beta multi-tenant React Server Components application for pinball machine issue tracking. The codebase follows strict architectural patterns for security, performance, and maintainability.
+## Phase & Context
+- Phase: Greenfield rewrite (v2) – single-tenant (Austin Pinball Collective) – pre-beta
+- Users: 0 production users (high refactor tolerance, emphasize velocity + clarity)
+- Core Value: Enable logging issues for pinball machines, tracking work, resolving them.
+- Single-Tenant Impact: No organization scoping, no RLS, no multi-tenant isolation layers. Keep architecture lean.
 
-**Phase**: Pre-beta, solo development, zero production users  
-**Schema**: LOCKED - code adapts to schema, never modify schema files  
-**Quality Bar**: All tests and lints must pass before committing
+## Architectural Pillars
+1. Server-First: Prefer React Server Components. Client islands only for real interactivity (events, browser APIs, dynamic state).
+2. Direct Data Access: Use Drizzle directly from Server Components & Server Actions. Avoid DAL/service abstractions until Rule of Three is met.
+3. Progressive Enhancement: Forms must submit without JavaScript; enhance with client code optionally.
+4. Strict TypeScript: Follow strictest patterns (no `any`, non-null `!`, unsafe `as`). Use narrow types + guards.
+5. Schema Lock: Modify schema files directly (no migration files this phase). Never alter schema solely to appease TS errors.
+6. Memory Safety: Worker-scoped PGlite for integration tests; NEVER per-test DB instantiation.
+7. Consistent Domain Rules: Every issue belongs to exactly one machine (CHECK constraint). Severity uses `minor | playable | unplayable`.
+8. UI Constraints: shadcn/ui + Tailwind CSS v4 + Material Design 3 color tokens in `globals.css`.
 
-## Technology Stack
+## What Changed From Archived (v1)
+- Dropped multi-tenant & RLS concerns (remove orgId scoping logic from generation / reviews).
+- Removed tRPC layer; now direct Drizzle + Server Actions.
+- Simplified auth: Supabase SSR only; no RLS policies or pgTAP tests.
+- Domain focus narrowed to machines + issues + comments (later navigation, auth pages, etc per `TASKS.md`).
 
-- **Frontend**: Next.js 15, React 19 with Server Components, shadcn/ui, Tailwind CSS v4
-- **Backend**: tRPC, Drizzle ORM, PostgreSQL via Supabase
-- **Authentication**: Supabase SSR with RLS (Row-Level Security)
-- **Testing**: Vitest, Playwright, pgTAP for RLS testing
-- **Language**: TypeScript with @tsconfig/strictest configuration
-- **Path Aliases**: Use `~/` for all imports (maps to `src/`)
+## Forward-Looking (PR Sequence Guidance)
+Referencing `TASKS.md` PR order:
+- PR1 Foundation: Bootstrapping configs (TS, lint, format, CI). Copilot suggestions should not introduce app logic prematurely.
+- PR2 Schema: Favor clear Drizzle definitions + relations; no premature indexes unless justified.
+- PR3 Auth: Generate SSR Supabase helpers (`createClient` with immediate `auth.getUser()`). Avoid client-side auth hacks.
+- PR4 UI + Landing: Server Component landing page; minimal client code.
+- PR5 Testing: Ensure test helpers follow memory safety guideline.
+Subsequent PRs extend domain logic—keep suggestions incremental, referencing existing patterns.
 
-## Critical Review Requirements
+## Critical Patterns (Summaries – Full Detail in Docs)
+- Forbidden Patterns: See `docs/NON_NEGOTIABLES.md` (includes memory safety, schema mutation via migrations, unsafe TS escapes, non-progressive forms, introducing MUI, etc.).
+- Type Boundaries: Keep snake_case in database layer; convert at boundary if/when needed—do not over-engineer conversions early.
+- Server Actions: Use explicit return types; integrate validation (Zod) with smallest viable schemas.
+- Testing Distribution: Aim eventually for pyramid described in `TESTING_PLAN.md`; early phase can start with minimal unit + one integration seed.
 
-### 🔴 MANDATORY: Reference Architecture Documentation
+## Copilot Review Priorities
+1. Security & Data Integrity: Input validation, single-tenant assumptions honored, issue-machine relationship enforced.
+2. Server-First Compliance: Avoid unnecessary `"use client"`.
+3. Type Safety: No forbidden escapes; proper narrowing.
+4. Progressive Enhancement: `<form action={serverAction}>` patterns validated.
+5. Memory Safety & Test Patterns: Worker-scoped DB setup; no per-test instances.
+6. Domain Consistency: Issue severity vocabulary and one-machine rule.
 
-When performing code review, apply ALL checks from the project's core documentation:
+## Preferred Implementation Examples
+(See pattern-specific instruction files for scoped detail.)
 
-- `/docs/CORE/NON_NEGOTIABLES.md` - Critical patterns and forbidden practices
-- `/docs/CORE/TYPESCRIPT_STRICTEST_PATTERNS.md` - Type safety requirements
-- `/AGENTS.md` - Project-specific development constraints
+### Minimal Server Component
+```tsx
+// src/app/page.tsx
+export default async function Landing() {
+  return (
+    <main className="flex min-h-dvh items-center justify-center p-6">
+      <section className="space-y-4 text-center">
+        <h1 className="text-3xl font-semibold">PinPoint</h1>
+        <p className="text-sm text-muted-foreground">Track pinball machine issues fast.</p>
+      </section>
+    </main>
+  );
+}
+```
 
-### 🔴 CRITICAL Architecture Violations (Block Merge)
+### Server Action With Validation
+```ts
+// src/app/machines/actions.ts
+"use server";
+import { z } from "zod";
+import { db } from "~/server/db";
+import { machines } from "~/server/db/schema";
 
-Focus heavily on these patterns that can cause production failures:
+const createMachineSchema = z.object({ name: z.string().min(1) });
+export type CreateMachineInput = z.infer<typeof createMachineSchema>;
 
-1. **Multi-Tenant Security**: ALL database queries MUST include `organizationId` filtering
-2. **Authentication**: Server-side auth MUST use `~/lib/supabase/server`, never direct imports
-3. **Type Safety**: No `any`, `!`, or unsafe `as` - flag as CRITICAL violations
-4. **SQL Security**: Raw string interpolation in SQL is FORBIDDEN
-5. **Schema Lock**: Code adapts to schema, NEVER modify schema files
+export async function createMachine(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  const raw = { name: formData.get("name") };
+  const parsed = createMachineSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: "Invalid name" };
+  await db.insert(machines).values({ name: parsed.data.name });
+  return { ok: true };
+}
+```
 
-### 🟠 HIGH Priority Issues
+### Integration Test Memory Safety Snippet
+```ts
+// src/test/setup/worker-db.ts
+import { createWorkerDb } from "~/test/helpers/worker"; // pattern wrapper
+export const workerDb = await createWorkerDb(); // one per worker, not per test
+```
 
-- Unnecessary Client Components (default to Server Components)
-- Missing organization context in Server Components
-- Performance: Server data access MUST use React 19 `cache()`
-- Import patterns: Use `~/` aliases, no deep relative imports
+## Auth Essentials
+- SSR only: `src/lib/supabase/server.ts` wrapper creates client and immediately calls `auth.getUser()`.
+- Middleware handles token refresh; do not mutate the response object.
+- Auth pages use Server Components + forms posting to Server Actions.
 
-### Review Focus Areas
+## UI & Styling
+- Tailwind CSS v4 using `@import "tailwindcss"` & `@config` in `globals.css`.
+- Material Design 3 colors stored as CSS variables; prefer semantic tokens (`--color-primary-container`).
+- Use shadcn/ui primitives; never introduce MUI.
 
-1. **Security First**: Multi-tenant isolation, RLS compliance, authentication patterns
-2. **Server-First Architecture**: Prefer Server Components, minimal client-side code
-3. **Type Safety**: Strict TypeScript compliance, proper type boundaries
-4. **Performance**: Caching, query optimization, connection management
-5. **Testing**: Proper test types per `/docs/CORE/TESTING_GUIDE.md`
+## Testing Guidance (Condensed)
+- Unit: Pure logic (status derivation, validation).
+- Integration: Drizzle queries + Server Actions using worker-scoped PGlite.
+- E2E: Playwright for full flows (landing load, auth, machine creation) after foundational PRs.
+- Avoid testing Server Components directly—validate via E2E.
 
-## Code Quality Standards
+## Commit & Quality Gates
+Run (or ensure CI runs) before pushing:
+```bash
+npm run typecheck
+npm run lint
+npm run test
+npm run format
+```
+(Use eventual `preflight` script when added.) Conventional commit messages.
 
-- Follow `/docs/CORE/NON_NEGOTIABLES.md` Quick Start Checklist
-- Use Material Design 3 colors only (no custom purple tints)
-- shadcn/ui for new UI components (no new MUI components)
-- Database: snake_case schema, camelCase application code
+## Copilot Should Avoid Generating
+- Organization scoping logic (obsolete in v2 single-tenant).
+- tRPC routers / multi-tenant context wrappers.
+- RLS policy tests / pgTAP usage.
+- DAL/service abstraction layers prematurely.
+- Client components where static server rendering suffices.
 
-## Error Handling
+## Escalation / Uncertainty Handling
+If Copilot cannot infer a pattern: reference the canonical docs first; prefer asking for clarification only when a direct pattern is absent and Rule of Three not met.
 
-- Use structured error types (ValidationError, AuthorizationError, DatabaseError)
-- No stack traces or internal details exposed to clients
-- Security-first error messaging for authentication failures
+## Evolution Notes
+As features stabilize (Machines CRUD, Issues workflow, Comments), patterns that repeat (≥2 implementations) MUST be documented in `docs/PATTERNS.md` before introducing abstractions.
 
-## Memory Safety & Testing
-
-- **CRITICAL**: Use worker-scoped PGlite instances (per-test instances cause system lockups)
-- **FORBIDDEN**: New SQL migration files in `supabase/migrations/` (pre-beta constraint)
-- **REQUIRED**: Use SEED_TEST_IDS constants for predictable test data
-- **FORBIDDEN**: Vitest redirection (`npm test 2>&1` breaks test execution)
-
-## Forbidden Patterns
-
-> **All forbidden patterns are documented in [`/docs/CORE/NON_NEGOTIABLES.md`](../docs/CORE/NON_NEGOTIABLES.md). This is the single source of truth. Do not maintain duplicate lists—always refer to the canonical documentation.**
-
-### Key Forbidden Patterns (see NON_NEGOTIABLES.md for complete list)
-
-- **Memory Safety**: Per-test PGlite instances (causes system lockups)
-- **Schema Changes**: No modifications to locked schema files
-- **SQL Injection**: Raw string interpolation (`sql.raw(\`SET var = '${value}'\`)`)
-- **TypeScript Defeats**: No `any`, `!`, or unsafe `as` - use proper type guards
-- **Deep Imports**: Use `~/` aliases instead of `../../../`
-- **Migration Files**: No new files in `supabase/migrations/` (pre-beta constraint)
-- **Vitest Redirection**: Commands like `npm test 2>&1` break execution
-- **New MUI Components**: Use shadcn/ui for all new UI development
-- **Unscoped Queries**: ALL database queries MUST filter by organizationId
-
-## Development Commands
-
-### Testing
-
-- `npm test` - Run all tests (Vitest)
-- `npm run test:brief` - Concise output
-- `npm run test:watch` - Watch mode for TDD
-- `npm run test:rls` - Run RLS policy tests (pgTAP)
-- `npm run test-file <path>` - Test single file
-
-### Development
-
-- `npm run dev` - Start dev server
-- `npm run build` - Production build
-- `npm run typecheck` - TypeScript validation
-- `npm run lint` - ESLint check
-- `npm run format:write` - Format code with Prettier
-- `npm run validate-file <path>` - Fast validation of single file
-
-### Database
-
-- `npm run db:push:local` - Push schema changes (Drizzle)
-- `npm run db:seed:local:sb` - Seed local database
-- `npm run db:reset` - Reset local database
-- `npm run db:studio` - Open database explorer
-
-## Review Priority Guidelines
-
-- **🔴 CRITICAL**: Multi-tenant security, authentication patterns, forbidden SQL patterns
-- **🟠 HIGH**: Server Component usage, performance patterns, type safety
-- **🟡 MEDIUM**: Code organization, import patterns, testing compliance
-- **🟢 LOW**: Style consistency, documentation improvements
-
-**Review Authority**: All review decisions must align with the comprehensive patterns documented in `/docs/CORE/NON_NEGOTIABLES.md`.
-
-## Pattern-Specific Instructions
-
-Additional scoped instructions are available in `.github/instructions/`:
-
-- `testing.instructions.md` - Test architecture and patterns
-- `database.instructions.md` - Database layer and RLS patterns
-- `auth.instructions.md` - Authentication and Supabase SSR
-- `components.instructions.md` - Server/Client Component patterns
-- `api-routes.instructions.md` - API routes and tRPC routers
-- `server-actions.instructions.md` - Server Actions patterns
-
-## Key Documentation References
-
-**MUST READ** before making changes:
-
-- `/docs/CORE/NON_NEGOTIABLES.md` - Critical patterns and constraints
-- `/docs/CORE/TYPESCRIPT_STRICTEST_PATTERNS.md` - Type safety patterns
-- `/docs/CORE/TESTING_GUIDE.md` - Test type selection and standards
-- `/AGENTS.md` - Project context and development rules
-
-## Architecture Principles
-
-### Server-First Development
-
-- **Default**: Server Components for all new pages and layouts
-- **Client Components**: Only for interactivity (event handlers, hooks, browser APIs)
-- **Hybrid Pattern**: Server Component shell with Client Component islands
-
-### Multi-Tenant Security
-
-- **CRITICAL**: Every database query MUST filter by `organizationId`
-- **RLS Enforcement**: Use Row-Level Security policies for defense in depth
-- **Organization Context**: Server Components must receive org context via props
-- **Global Pages**: Root domain pages must NOT perform org-scoped queries
-
-### Type Safety
-
-- **Strictest Mode**: `@tsconfig/strictest` configuration enforced
-- **No Escapes**: Never use `any`, `!`, or unsafe `as`
-- **Type Boundaries**: Keep `Db.*` types in DB layer, convert to camelCase at boundary
-- **Shared Types**: Import from `~/lib/types`, never duplicate type definitions
-
-### Authentication
-
-- **SSR Pattern**: Use `~/lib/supabase/server` createClient()
-- **Immediate Check**: Call `auth.getUser()` right after creating client
-- **Middleware**: Required for token refresh in SSR
-- **OAuth**: Maintain `/auth/callback/route.ts` for OAuth flows
-
-### Testing Strategy
-
-- **Unit Tests**: Pure functions, utilities, validation logic
-- **Integration Tests**: Database operations, tRPC procedures, Server Actions
-- **E2E Tests**: Full user workflows with Playwright
-- **RLS Tests**: pgTAP tests in `supabase/tests/rls/`
-- **Memory Safety**: Worker-scoped PGlite (NOT per-test instances)
-- **Test Data**: Use SEED_TEST_IDS constants for predictable testing
-
-## Code Style
-
-- **Imports**: Always use `~/` path aliases, never deep relative imports
-- **Components**: PascalCase files, `-client.tsx` suffix for client-only
-- **Formatting**: Prettier (run `npm run format:write`)
-- **Linting**: ESLint with max 220 warnings during migration
-- **Comments**: Match existing style, explain complex logic only
-
-## Commit Guidelines
-
-Before committing:
-
-1. Run `npm run typecheck` - Must pass
-2. Run `npm test` - All tests must pass
-3. Run `npm run lint` - Check for errors
-4. Run `npm run format:write` - Format code
-
-**Commit Style**: Conventional commits preferred (`feat:`, `fix:`, `chore:`)
-
-## Getting Help
-
-When uncertain about patterns:
-
-1. Check relevant documentation in `/docs/CORE/`
-2. Search codebase for similar patterns
-3. Review pattern-specific instruction files in `.github/instructions/`
-4. Consult `AGENTS.md` for project constraints
+---
+Last Updated: 2025-11-09 (v2 greenfield start)

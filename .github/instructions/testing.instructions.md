@@ -1,63 +1,72 @@
 ---
-applyTo: "**/*.test.ts,**/*.spec.ts,e2e/**/*.ts,src/test/**/*.ts"
+applyTo: "**/*.test.ts,**/*.test.tsx,**/*.spec.ts,**/*.spec.tsx,e2e/**/*.ts,src/test/**/*.ts"
 ---
 
-# Testing Review Instructions
+# Testing Instructions (Memory Safety & Pyramid)
 
-## Test Architecture Requirements
+## Pyramid Targets (Long-Term)
+- ~70% Unit (pure logic: validation, status derivation)
+- ~25% Integration (Drizzle + Server Actions with worker-scoped PGlite)
+- ~5% E2E (Playwright critical flows)
 
-When reviewing test code, enforce patterns from `/docs/CORE/TESTING_GUIDE.md`:
+Early phase: start lean; add breadth only after core flows exist.
 
-### Test Type Selection (CORE-TEST-001)
+## Memory Safety (CRITICAL)
+- One PGlite instance per worker (NOT per test).
+- Forbidden: creating DB instance inside `beforeEach` or every test.
 
-- **Unit Tests**: Pure functions, utilities, validation logic
-- **Integration Tests**: Database interactions, tRPC procedures, Server Actions
-- **E2E Tests**: Full user workflows, Server Component validation
-- **RLS Tests**: Row-Level Security policy validation via pgTAP
+### Worker-Scoped Example
+```ts
+// src/test/setup/worker-db.ts
+import { createWorkerDb } from "~/test/helpers/worker";
+export const workerDb = await createWorkerDb(); // single instance for suite / worker
+```
 
-### Required Patterns
+### Integration Test Pattern
+```ts
+import { workerDb } from "~/test/setup/worker-db";
+import { db } from "~/server/db";
+import { machines } from "~/server/db/schema";
+import { describe, it, expect } from "vitest";
 
-- Use SEED_TEST_IDS constants for predictable test data
-- Worker-scoped PGlite instances (NOT per-test instances)
-- Seed-based mocks and fixtures
-- Auth setup utilities from `/src/test/helpers/`
+describe("machines", () => {
+  it("inserts machine", async () => {
+    await db.insert(machines).values({ name: "Medieval Madness" });
+    const rows = await db.select().from(machines);
+    expect(rows.some(r => r.name === "Medieval Madness")).toBe(true);
+  });
+});
+```
 
-### Forbidden Patterns (CRITICAL)
+## Unit Test Guidance
+- Test pure utilities (e.g., `deriveMachineStatus`).
+- Avoid mocking Drizzle; prefer direct logic tests.
 
-- **Memory Safety Violation**: Per-test database instances (`createSeededTestDatabase()` in `beforeEach()`)
-- **System Impact**: Multiple PGlite instances cause 1-2GB+ memory usage and system lockups
-- **Hardcoded Test IDs**: Use SEED_TEST_IDS instead of `nanoid()` or random generation
-- **Mixing RLS Tracks**: Don't mix pgTAP RLS tests with PGlite application tests
+## E2E Guidance
+- Use Playwright for landing page load, auth flow, machine creation.
+- Keep traces for failures; minimal retries.
 
-### Testing Memory Safety
+## Forbidden Patterns
+- Per-test PGlite instantiation.
+- Redirecting test runner output (`npm test 2>&1`) causing filter issues.
+- Attempting to directly unit test async Server Components (use E2E instead).
 
-- **Required Pattern**: `import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db"`
-- **Single Instance**: One PGlite instance per worker, not per test
-- **Transaction Isolation**: Use `withIsolatedTest` for test isolation
-- **Performance**: Sub-100ms unit tests, <5s integration test suites
+## Data & Determinism
+- Prefer deterministic inputs (avoid random IDs unless logic demands uniqueness).
+- If seeding helpers introduced later, document them in `docs/PATTERNS.md` first.
 
-### Seed Architecture Compliance
+## Copilot Should Suggest
+- Clear separation of unit vs integration test intent.
+- Worker-scoped DB usage.
+- Simple assertion patterns (`expect(value).toBe(...)`).
 
-- **Hardcoded IDs**: Use `SEED_TEST_IDS.ORGANIZATIONS.primary` and `.competitor`
-- **Cross-Org Testing**: Test data isolation between organizations
-- **Predictable Data**: No random generation in tests for debugging reliability
-- **Mock Contexts**: Use `createMockAdminContext()` patterns from helpers
+## Copilot Should NOT Suggest
+- RLS/organization isolation tests.
+- pgTAP usage.
+- Complex fixture factories before repetition occurs.
 
-### Server Component Testing (CORE-TEST-002)
+## Coverage
+- Eventually enforce coverage (e.g., ≥80%) in CI; early phase tolerant while scaffolding.
 
-- **Integration Concern**: Async Server Components are integration concerns
-- **E2E Validation**: Use Playwright for end-to-end Server Component validation
-- **No Unit Testing**: Don't unit test async Server Components directly
-
-### Test Structure Requirements
-
-- Follow naming conventions: `*.test.ts(x)` for unit/integration
-- Use `*.e2e.test.ts` under `e2e/` directory
-- SQL tests in `supabase/tests/rls/*.test.sql`
-- Leverage templates from `src/test/templates/`
-
-### Vitest Safety
-
-- **FORBIDDEN**: Redirection commands (`npm test 2>&1`, `vitest >>`)
-- **Cause**: Vitest interprets redirection as test name filters
-- **Required**: Use `npm run test:brief`, `npm run test:verbose` for output control
+---
+Last Updated: 2025-11-09

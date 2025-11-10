@@ -1,55 +1,97 @@
 ---
-applyTo: "**/*auth*.ts,**/middleware.ts,app/auth/**/*.ts,src/lib/supabase/**/*.ts"
+applyTo: "**/*auth*.ts,**/middleware.ts,src/lib/supabase/**/*.ts,src/app/(auth)/**/*.ts"
 ---
 
-# Authentication Layer Review Instructions
+# Authentication Instructions (Supabase SSR, Single-Tenant)
 
-## Supabase SSR Patterns
+## Core Objectives
+- Provide SSR auth using Supabase without multi-tenant org logic.
+- Ensure immediate user resolution after client creation.
+- Guarantee progressive enhancement for login/signup forms.
 
-When reviewing authentication code, strictly enforce:
+## Required Patterns
+1. `createClient()` wrapper in `src/lib/supabase/server.ts` handles cookies & returns a Supabase client.
+2. Immediately call `supabase.auth.getUser()` after creating the client (do not insert logic between).
+3. Middleware (`middleware.ts`) manages token refresh; do **not** mutate the response object body.
+4. OAuth callback route (`src/app/auth/callback/route.ts`) redirects on success.
+5. Use Server Actions for mutations (login, signup, logout) with Zod validation.
 
-### Required Patterns (CORE-SSR-001 through CORE-SSR-005)
+## Example SSR Client Wrapper
+```ts
+// src/lib/supabase/server.ts
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 
-- MUST use `~/lib/supabase/server` createClient(), never direct supabase-js imports
-- MUST call `supabase.auth.getUser()` immediately after creating SSR client
-- MUST use getAll()/setAll() cookie contract, never individual cookie operations
-- MUST preserve Next.js middleware for token refresh
-- MUST maintain `/auth/callback/route.ts` for OAuth flows
+export async function createClient() {
+  const cookieStore = cookies();
+  const client = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () => cookieStore.getAll(),
+        setAll: (pairs) => pairs.forEach(p => cookieStore.set(p.name, p.value, p.options)),
+      },
+    }
+  );
+  await client.auth.getUser(); // REQUIRED immediate call
+  return client;
+}
+```
 
-### Forbidden Patterns
+## Login Server Action Pattern
+```ts
+// src/app/(auth)/actions.ts
+"use server";
+import { z } from "zod";
+import { createClient } from "~/lib/supabase/server";
+import { redirect } from "next/navigation";
 
-- Direct imports from `@supabase/supabase-js` on server-side
-- Modifying Supabase response object
-- Logic between client creation and `getUser()` call
-- Deprecated `@supabase/auth-helpers-nextjs` imports
+const loginSchema = z.object({ email: z.string().email(), password: z.string().min(8) });
+export async function login(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  const raw = { email: formData.get("email"), password: formData.get("password") };
+  const parsed = loginSchema.safeParse(raw);
+  if (!parsed.success) return { ok: false, error: "Invalid credentials" };
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword(parsed.data);
+  if (error) return { ok: false, error: "Auth failed" };
+  redirect("/dashboard");
+}
+```
 
-### Context Resolution
+## Forbidden Patterns
+- Direct use of `@supabase/supabase-js` in Server Components (use wrapper).
+- Introducing organization scoping or RLS logic.
+- Performing side-effect logic between `createClient()` and `auth.getUser()`.
+- Using deprecated helper packages (e.g., auth-helpers-nextjs).
 
-- Server Components MUST use `requireAuthContext()` or `getServerAuthContext()`
-- Organization context required unless in global/root pages
-- Proper error boundaries for authentication failures
+## Forms & Progressive Enhancement
+- Render forms as plain HTML with `<form action={serverAction}>`.
+- Client enhancements (validation hints) optional; core submit must work without JS.
 
-### Global Context Clarification
+## Middleware Essentials
+- Implement refresh token logic only; avoid injecting custom response bodies.
+- Keep middleware small—delegate business logic to Server Actions.
 
-- Pages/routes rendered at the root domain (no subdomain) operate in global context
-- These must not invoke org-scoped fetchers or attempt org membership resolution
-- Org-scoped functions must assert presence of `organizationId` and fail loudly if absent
+## Logout Pattern
+```ts
+export async function logout(): Promise<void> {
+  "use server";
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  redirect("/");
+}
+```
 
-### Session Management
+## Testing Guidance (Auth)
+- Integration: test login/signup Server Actions with worker-scoped DB & mocked Supabase if needed.
+- E2E: Use Playwright to drive actual form submission flows.
+- Avoid unit tests for SSR client wrapper complexity—treat as integration boundary.
 
-- Use structured error types for authentication failures
-- Security-first error messaging (no information disclosure)
-- Proper session cleanup and token refresh handling
+## Copilot Should Not Suggest
+- Multi-tenant permission checks.
+- RLS policy enforcement code.
+- tRPC procedures.
 
-### Server Component Authentication
-
-- MUST receive organization context unless in global context
-- Pass/derive `organizationId` for Server Components via context/props
-- Bind RLS at the boundary for proper multi-tenant isolation
-
-### API Protection (CORE-SEC-002)
-
-- Use protected procedures in tRPC routers
-- Mask errors to prevent information disclosure
-- Never expose sensitive routes as public
-- Validate permissions at API boundaries
+---
+Last Updated: 2025-11-09
