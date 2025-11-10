@@ -5,10 +5,9 @@
     "esbenp.prettier-vscode",
     "usernamehw.errorlens",
 
-    // TypeScript & Next.js Development  
+    // TypeScript & Next.js Development
     "bradlc.vscode-tailwindcss",
     "formulahendry.auto-rename-tag",
-
 
     // Code Quality & Security
     "ms-vscode.vscode-json",
@@ -16,13 +15,13 @@
 
     // Database & API Development (for Supabase/Drizzle)
     "ms-ossdata.vscode-postgresql",
-    
+
     // React & Component Development
     "dsznajder.es7-react-js-snippets",
-    
+
     // Markdown & Documentation
     "yzhang.markdown-all-in-one",
-    
+
     // Testing Integration (for Vitest/Playwright)
     "ms-playwright.playwright"
   ],

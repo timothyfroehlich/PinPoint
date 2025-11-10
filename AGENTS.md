@@ -9,6 +9,7 @@ Tim is vibecoding this app by himself to learn about website design and experime
 ## Critical Context Files
 
 Read these immediately before starting work:
+
 - **`docs/NON_NEGOTIABLES.md`** - Forbidden patterns and critical constraints
 - **`docs/PATTERNS.md`** - Project-specific code patterns (MUST reference when coding)
 - **`docs/TYPESCRIPT_STRICTEST_PATTERNS.md`** - Type safety patterns
@@ -17,15 +18,91 @@ Read these immediately before starting work:
 - **`docs/TESTING_PLAN.md`** - Testing strategy and patterns
 - **`package.json`** - Available scripts, dependencies, configuration
 
+## Archived v1 Codebase (`.archived_v1/`)
+
+The `.archived_v1/` directory contains the complete production multi-tenant PinPoint v1 application (version 0.2). This is **reference material only** - do not copy code directly from it.
+
+### What's in the Archive
+
+- **Complete Next.js 16 app** - Pages Router with tRPC API layer
+- **Multi-tenant architecture** - Organization scoping, RLS policies, complex auth flows
+- **617-line ESLint config** - 5 custom rules, multiple security plugins, architectural enforcement
+- **Comprehensive testing** - Vitest, Playwright, PGlite, RLS tests
+- **Production patterns** - Error boundaries, loading states, structured logging
+- **96 package.json scripts** - Database management, security scanning, multi-environment support
+
+### How to Use the Archive
+
+**✅ DO:**
+
+- Look at it for **inspiration** - "How did v1 solve this problem?"
+- Compare **patterns** - "Should we use a similar approach?"
+- Learn from **decisions** - "Why did v1 evolve this complexity?"
+- Reference **configurations** - "What ESLint rules did they add and why?"
+- Understand **what problems you'll eventually face** - "When should we add security plugins?"
+
+**❌ DON'T:**
+
+- Copy code blindly - v1 is multi-tenant, v2 is single-tenant
+- Add v1's complexity prematurely - those patterns evolved from real pain points
+- Implement v1's abstraction layers - DAL, tRPC, service layers aren't needed yet
+- Port v1's custom ESLint rules - wait until you see the same violation 3+ times
+- Replicate v1's 96 scripts - add scripts when you actually need them
+
+### Key Differences v1 → v2
+
+| Aspect          | v1 (Archived)               | v2 (Current)                                |
+| --------------- | --------------------------- | ------------------------------------------- |
+| **Tenancy**     | Multi-tenant with RLS       | Single-tenant, no RLS                       |
+| **API Layer**   | tRPC procedures             | Direct Drizzle in Server Components/Actions |
+| **Data Access** | DAL + repository pattern    | Direct queries (Rule of Three)              |
+| **Auth**        | Supabase SSR + RLS policies | Supabase SSR only                           |
+| **Router**      | Pages Router                | App Router                                  |
+| **Testing**     | 150+ tests with RLS         | Building progressively (PR 5)               |
+| **ESLint**      | 617 lines, 5 custom rules   | 20 high-value rules (grows as needed)       |
+| **Complexity**  | Production-ready enterprise | MVP greenfield simplicity                   |
+
+### Example: ESLint Evolution
+
+**v1 has:**
+
+- Custom rule: `no-duplicate-auth-resolution` (catches calling getUser() twice)
+- Custom rule: `no-missing-cache-wrapper` (enforces React cache() on fetchers)
+- Security plugins detecting eval(), SQL injection, XSS patterns
+- Architectural boundary rules preventing DAL cross-imports
+
+**v2 starts with:**
+
+- Core type safety (no any, explicit return types)
+- Promise handling (prevents fire-and-forget bugs)
+- Unused imports cleanup
+
+**When to add v1's rules to v2:** After you've encountered the problem 3+ times and established the pattern to enforce.
+
+### Using Archive for Decision Making
+
+When facing a decision, ask:
+
+1. **Did v1 solve this?** Look in archive for reference
+2. **Why did v1 do it that way?** Understand the context (multi-tenant, production scale)
+3. **Do we need that complexity now?** Usually no - MVP first, complexity later
+4. **What's the v2 equivalent?** Adapt for single-tenant, simpler architecture
+
+**Example:** v1 has a `createOrganizationContext()` function that wraps every data access. We don't need that in v2 because we're single-tenant - just query Drizzle directly.
+
+**Remember:** The archive shows you what PinPoint **becomes** at production scale with multiple tenants. Start simple and evolve toward that complexity only when real needs demand it.
+
 ## Project Context
 
 ### Status
+
 - **Phase**: Greenfield rewrite (v2), pre-beta
 - **Users**: Zero production users
 - **Development**: Solo passion project, high risk tolerance for breaking changes
 - **Core Value**: "Allow the Austin Pinball Collective to log issues with pinball machines, track work and resolve them."
 
 ### Technology Stack
+
 - **Frontend**: Next.js 16, React 19 Server Components, shadcn/ui, Tailwind CSS v4
 - **Backend**: Drizzle ORM, PostgreSQL via Supabase
 - **Authentication**: Supabase SSR (no RLS for single-tenant)
@@ -33,6 +110,7 @@ Read these immediately before starting work:
 - **Language**: TypeScript with strictest configuration
 
 ### Architecture Type
+
 **Single-Tenant**: One organization (Austin Pinball Collective), no multi-tenant complexity, no organization scoping required, no RLS policies.
 
 ## Critical Constraints
@@ -57,34 +135,40 @@ Read these immediately before starting work:
 ## Architecture Directives
 
 ### Server-First Principles
+
 - **Default**: Server Components for all new development
 - **Client Islands**: Minimal "use client" for specific interactivity only
 - **Data Flow**: Server Components → Drizzle → PostgreSQL (direct queries, no DAL/repository layers)
 - **Mutations**: Server Actions with progressive enhancement
 
 ### Direct Database Queries
+
 - **Do**: Query Drizzle directly in Server Components and Server Actions
 - **Don't**: Create DAL/repository/service layers (premature abstraction)
 - **Why**: Single-tenant simplicity, follow the Rule of Three
 
 ### UI Framework
+
 - **New Development**: shadcn/ui + Tailwind CSS v4 only
 - **CSS**: Material Design 3 colors from globals.css
 
 ## Development Guidelines
 
 ### Command Recommendations
-| Avoid | Prefer | Reason |
-| ----- | ------ | ------ |
-| `npm test 2>&1` | `npm test` | Vitest treats redirection as test filters |
-| `find` | `rg --files`, `fd` | Safer/faster search |
+
+| Avoid           | Prefer             | Reason                                    |
+| --------------- | ------------------ | ----------------------------------------- |
+| `npm test 2>&1` | `npm test`         | Vitest treats redirection as test filters |
+| `find`          | `rg --files`, `fd` | Safer/faster search                       |
 
 ### Available Commands
+
 - **Testing**: `npm test`, `npm run test:watch`, `npm run smoke`
 - **Development**: `npm run dev`, `npm run build`, `npm run lint`, `npm run typecheck`
 - **Components**: `npx shadcn@latest add [component]`
 
 ### Project Structure
+
 - **Source**: `src/app` (App Router), `src/components`, `src/lib`, `src/server`
 - **Tests**: `src/test` (unit/integration), `e2e/` (Playwright)
 - **Docs**: `docs/` (specs), `docs/tech-updates/` (tech reference)
@@ -92,17 +176,20 @@ Read these immediately before starting work:
 ## Coding Standards
 
 ### TypeScript
+
 - **Strictest configuration**: No `any`, no non-null `!`, no unsafe `as`
 - **Explicit return types**: Required for public functions
 - **Path aliases**: Use `~/` instead of relative imports
 
 ### Naming Conventions
+
 - **Components**: PascalCase files (`IssueCard.tsx`)
 - **Client Components**: Use `"use client"` directive at top
 - **Hooks**: `useThing.ts`
 - **Utilities**: kebab-case or snake_case files
 
 ### Database
+
 - **Schema**: snake_case for all table/column names
 - **Boundary**: Convert to camelCase at application boundaries
 - **Types**: Keep snake_case DB types separate from camelCase app types
@@ -112,6 +199,7 @@ Read these immediately before starting work:
 **IMPORTANT**: When implementing features, always reference `docs/PATTERNS.md` for established patterns.
 
 **Contributing New Patterns**:
+
 - **When**: You implement the same approach 2+ times
 - **What**: Add it to `docs/PATTERNS.md` with a working code example
 - **Why**: Future agents need to follow the same conventions
@@ -124,6 +212,7 @@ Read these immediately before starting work:
 **Philosophy**: Confidence, not perfection.
 
 **The Testing Pyramid**:
+
 ```
         /\
        /E2E\      ← 5-10 tests (critical flows only)
@@ -135,12 +224,14 @@ Read these immediately before starting work:
 ```
 
 **Distribution & Targets**:
+
 - **70% Unit Tests** (~70-100 tests) - Pure functions, utilities, validation
 - **25% Integration Tests** (~25-35 tests) - Database queries with worker-scoped PGlite
 - **5% E2E Tests** (5-6 tests) - Critical user journeys only (Playwright)
 - **Total Target**: ~100-150 tests (not thousands)
 
 **Key Constraints**:
+
 - Worker-scoped PGlite only (per-test instances cause lockups)
 - No testing Server Components directly (use E2E instead)
 - Test behavior, not implementation details
@@ -150,6 +241,7 @@ Read these immediately before starting work:
 ## Scope Creep Prevention
 
 ### The Scope Firewall (3 Questions)
+
 1. Does this solve a problem we have RIGHT NOW?
 2. Does this block a user from achieving the core value proposition?
 3. Can we ship MVP without this?
@@ -157,6 +249,7 @@ Read these immediately before starting work:
 If answers are No/No/Yes → defer to `docs/V2_ROADMAP.md`
 
 ### The "Done Enough" Standard
+
 1. Does it work for the happy path?
 2. Does it handle the most common error case?
 3. Is it tested with at least one test?

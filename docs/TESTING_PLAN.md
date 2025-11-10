@@ -8,12 +8,14 @@
 **Goal**: Confidence, not perfection.
 
 **Priorities**:
+
 1. ✅ Critical user journeys work
 2. ✅ Data integrity maintained
 3. ✅ Security boundaries enforced
 4. ✅ No regressions on core features
 
 **Anti-Goals**:
+
 - ❌ 100% code coverage
 - ❌ Testing every edge case
 - ❌ Complex E2E test infrastructure
@@ -38,6 +40,7 @@
 ```
 
 **Distribution Goal:**
+
 - **70% Unit Tests** - Pure functions, utilities, validation
 - **25% Integration Tests** - Database queries, Server Actions
 - **5% E2E Tests** - Critical user journeys only
@@ -51,6 +54,7 @@
 ### 1. Unit Tests (Vitest)
 
 **What to Test:**
+
 - ✅ Pure utility functions
 - ✅ Validation schemas (Zod)
 - ✅ Data transformations (snake_case ↔ camelCase)
@@ -58,6 +62,7 @@
 - ✅ Helper functions
 
 **What NOT to Test:**
+
 - ❌ React components (integration test the behavior instead)
 - ❌ Database queries (integration test)
 - ❌ API routes (integration test)
@@ -66,23 +71,23 @@
 
 ```typescript
 // lib/utils/format-date.test.ts
-import { describe, it, expect } from 'vitest'
-import { formatIssueDate } from './format-date'
+import { describe, it, expect } from "vitest";
+import { formatIssueDate } from "./format-date";
 
-describe('formatIssueDate', () => {
-  it('formats recent dates as relative time', () => {
-    const now = new Date()
-    const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000)
+describe("formatIssueDate", () => {
+  it("formats recent dates as relative time", () => {
+    const now = new Date();
+    const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
 
-    expect(formatIssueDate(twoHoursAgo)).toBe('2 hours ago')
-  })
+    expect(formatIssueDate(twoHoursAgo)).toBe("2 hours ago");
+  });
 
-  it('formats old dates as absolute date', () => {
-    const lastYear = new Date('2024-01-15')
+  it("formats old dates as absolute date", () => {
+    const lastYear = new Date("2024-01-15");
 
-    expect(formatIssueDate(lastYear)).toBe('Jan 15, 2024')
-  })
-})
+    expect(formatIssueDate(lastYear)).toBe("Jan 15, 2024");
+  });
+});
 ```
 
 **Target: ~70 unit tests**
@@ -92,12 +97,14 @@ describe('formatIssueDate', () => {
 ### 2. Integration Tests (Vitest + PGlite)
 
 **What to Test:**
+
 - ✅ Server Actions (create, update, delete)
 - ✅ Database queries (complex joins, filtering)
 - ✅ Authentication flows
 - ✅ Data validation + database constraints
 
 **What NOT to Test:**
+
 - ❌ Database internals (trust Drizzle)
 - ❌ Supabase Auth internals (trust Supabase)
 - ❌ UI rendering (E2E or visual testing)
@@ -106,62 +113,65 @@ describe('formatIssueDate', () => {
 
 ```typescript
 // tests/integration/setup.ts
-import { PGlite } from '@electric-sql/pglite'
-import { drizzle } from 'drizzle-orm/pglite'
-import { beforeAll, afterAll } from 'vitest'
+import { PGlite } from "@electric-sql/pglite";
+import { drizzle } from "drizzle-orm/pglite";
+import { beforeAll, afterAll } from "vitest";
 
 // Worker-scoped instance (NOT per-test!)
-let testDb: ReturnType<typeof drizzle>
+let testDb: ReturnType<typeof drizzle>;
 
 beforeAll(async () => {
-  const pglite = new PGlite()
-  testDb = drizzle(pglite)
+  const pglite = new PGlite();
+  testDb = drizzle(pglite);
 
   // Apply schema
-  await pglite.exec(await readFile('./schema.sql', 'utf-8'))
-})
+  await pglite.exec(await readFile("./schema.sql", "utf-8"));
+});
 
-export { testDb }
+export { testDb };
 ```
 
 **Example:**
 
 ```typescript
 // app/issues/actions.test.ts
-import { describe, it, expect, beforeEach } from 'vitest'
-import { testDb } from '~/tests/integration/setup'
-import { createIssue } from './actions'
-import { issues, machines } from '~/server/db/schema'
+import { describe, it, expect, beforeEach } from "vitest";
+import { testDb } from "~/tests/integration/setup";
+import { createIssue } from "./actions";
+import { issues, machines } from "~/server/db/schema";
 
-describe('createIssue', () => {
+describe("createIssue", () => {
   beforeEach(async () => {
     // Clean slate for each test
-    await testDb.delete(issues)
-  })
+    await testDb.delete(issues);
+  });
 
-  it('creates issue for valid machine', async () => {
-    const machine = await testDb.insert(machines).values({
-      name: 'Twilight Zone',
-    }).returning()
+  it("creates issue for valid machine", async () => {
+    const machine = await testDb
+      .insert(machines)
+      .values({
+        name: "Twilight Zone",
+      })
+      .returning();
 
-    const formData = new FormData()
-    formData.set('title', 'Broken flipper')
-    formData.set('machineId', machine[0].id)
+    const formData = new FormData();
+    formData.set("title", "Broken flipper");
+    formData.set("machineId", machine[0].id);
 
-    await createIssue(formData)
+    await createIssue(formData);
 
-    const allIssues = await testDb.query.issues.findMany()
-    expect(allIssues).toHaveLength(1)
-    expect(allIssues[0].title).toBe('Broken flipper')
-  })
+    const allIssues = await testDb.query.issues.findMany();
+    expect(allIssues).toHaveLength(1);
+    expect(allIssues[0].title).toBe("Broken flipper");
+  });
 
-  it('validates required fields', async () => {
-    const formData = new FormData()
+  it("validates required fields", async () => {
+    const formData = new FormData();
     // Missing title
 
-    await expect(createIssue(formData)).rejects.toThrow()
-  })
-})
+    await expect(createIssue(formData)).rejects.toThrow();
+  });
+});
 ```
 
 **Target: ~40 integration tests**
@@ -211,27 +221,28 @@ describe('createIssue', () => {
 
 ```typescript
 // e2e/issue-reporting.spec.ts
-import { test, expect } from '@playwright/test'
+import { test, expect } from "@playwright/test";
 
-test('public user can report issue', async ({ page }) => {
-  await page.goto('/report-issue')
+test("public user can report issue", async ({ page }) => {
+  await page.goto("/report-issue");
 
   // Select machine
-  await page.selectOption('[name="machineId"]', 'twilight-zone')
+  await page.selectOption('[name="machineId"]', "twilight-zone");
 
   // Fill form
-  await page.fill('[name="title"]', 'Left flipper not working')
-  await page.fill('[name="description"]', 'No response when pressing button')
+  await page.fill('[name="title"]', "Left flipper not working");
+  await page.fill('[name="description"]', "No response when pressing button");
 
   // Submit
-  await page.click('button[type="submit"]')
+  await page.click('button[type="submit"]');
 
   // Confirmation
-  await expect(page.locator('text=Issue reported successfully')).toBeVisible()
-})
+  await expect(page.locator("text=Issue reported successfully")).toBeVisible();
+});
 ```
 
 **Setup Strategy (Avoid Complexity):**
+
 - Use shared authenticated state for member tests
 - Reset DB before E2E run (not between tests)
 - Use `data-testid` sparingly (prefer semantic selectors)
@@ -280,27 +291,33 @@ tests/
 ### ❌ Skip These (Not Worth It Yet)
 
 **Visual Regression Testing**
+
 - Manual QA is sufficient for v1.0
 - Add if UI bugs become frequent
 
 **Performance Testing**
+
 - Premature for single-org app
 - Add if users complain about speed
 
 **Accessibility Testing**
+
 - Use semantic HTML and shadcn/ui (accessible by default)
 - Manual screen reader testing before launch
 - Automated a11y tests in v2
 
 **Browser Compatibility**
+
 - Modern browsers only (Chrome, Firefox, Safari, Edge)
 - No IE11, no old mobile browsers
 
 **Mobile App Testing**
+
 - Just mobile web browsers (responsive design)
 - No native apps in v1.0
 
 **Stress/Load Testing**
+
 - Single org won't generate enough load
 - Add if scaling to more orgs
 
@@ -374,6 +391,7 @@ INSERT INTO user_profiles (id, name, is_member) VALUES
 ```
 
 **Principles:**
+
 - ✅ Hardcoded IDs for predictable testing
 - ✅ Minimal data set (3-5 machines, 2 users)
 - ✅ Representative of real data
@@ -382,13 +400,16 @@ INSERT INTO user_profiles (id, name, is_member) VALUES
 ### Test Isolation
 
 **Unit Tests:**
+
 - Pure functions, no state needed
 
 **Integration Tests:**
+
 - Reset tables between tests (`beforeEach`)
 - Worker-scoped DB (one instance for all tests)
 
 **E2E Tests:**
+
 - Reset DB once before entire suite
 - Tests should not depend on order
 - Use unique titles/names per test
@@ -400,12 +421,14 @@ INSERT INTO user_profiles (id, name, is_member) VALUES
 **Overall:** 80% for critical paths
 
 **By Layer:**
+
 - Server Actions: 90%+ (critical for data integrity)
 - Utilities: 90%+ (pure functions are easy to test)
 - Components: 20%+ (E2E tests cover these)
 - Database queries: 60%+ (integration tests)
 
 **Don't Aim for 100%:**
+
 - Diminishing returns after 80%
 - Tests become brittle
 - Maintenance burden increases
@@ -417,67 +440,67 @@ INSERT INTO user_profiles (id, name, is_member) VALUES
 ### Testing Server Actions
 
 ```typescript
-import { mockSupabaseAuth } from '~/tests/mocks/supabase'
+import { mockSupabaseAuth } from "~/tests/mocks/supabase";
 
-describe('updateIssueStatus', () => {
-  it('requires authentication', async () => {
-    mockSupabaseAuth(null) // No user
+describe("updateIssueStatus", () => {
+  it("requires authentication", async () => {
+    mockSupabaseAuth(null); // No user
 
-    await expect(
-      updateIssueStatus('issue-id', 'resolved')
-    ).rejects.toThrow('Unauthorized')
-  })
+    await expect(updateIssueStatus("issue-id", "resolved")).rejects.toThrow(
+      "Unauthorized"
+    );
+  });
 
-  it('updates status and creates timeline entry', async () => {
-    mockSupabaseAuth({ id: 'user-id' })
+  it("updates status and creates timeline entry", async () => {
+    mockSupabaseAuth({ id: "user-id" });
 
-    await updateIssueStatus('issue-id', 'resolved')
+    await updateIssueStatus("issue-id", "resolved");
 
     const issue = await testDb.query.issues.findFirst({
-      where: eq(issues.id, 'issue-id')
-    })
+      where: eq(issues.id, "issue-id"),
+    });
 
-    expect(issue.status).toBe('resolved')
+    expect(issue.status).toBe("resolved");
 
     const comments = await testDb.query.issueComments.findMany({
-      where: eq(issueComments.issueId, 'issue-id')
-    })
+      where: eq(issueComments.issueId, "issue-id"),
+    });
 
     expect(comments).toContainEqual(
       expect.objectContaining({
         isSystem: true,
-        content: expect.stringContaining('resolved')
+        content: expect.stringContaining("resolved"),
       })
-    )
-  })
-})
+    );
+  });
+});
 ```
 
 ### Testing Forms with Validation
 
 ```typescript
-import { createIssueSchema } from '~/lib/schemas/issue'
+import { createIssueSchema } from "~/lib/schemas/issue";
 
-describe('createIssueSchema', () => {
-  it('requires title', () => {
+describe("createIssueSchema", () => {
+  it("requires title", () => {
     const result = createIssueSchema.safeParse({
-      machineId: 'machine-id',
+      machineId: "machine-id",
       // title missing
-    })
+    });
 
-    expect(result.success).toBe(false)
-  })
+    expect(result.success).toBe(false);
+  });
 
-  it('accepts valid issue data', () => {
+  it("accepts valid issue data", () => {
     const result = createIssueSchema.safeParse({
-      title: 'Broken flipper',
-      machineId: 'machine-id',
-      severity: 'high',
-    })
+      title: "Broken flipper",
+      machineId: "machine-id",
+      severity: "high",
+    });
 
-    expect(result.success).toBe(true)
-  })
-})
+    expect(result.success).toBe(true);
+  });
+});
 ```
 
 ---
@@ -510,61 +533,65 @@ npx playwright test --debug issue-reporting
 ## Testing Anti-Patterns to Avoid
 
 ❌ **Testing implementation details**
+
 ```typescript
 // Bad
-expect(component.state.count).toBe(5)
+expect(component.state.count).toBe(5);
 
 // Good
-expect(screen.getByText('Count: 5')).toBeInTheDocument()
+expect(screen.getByText("Count: 5")).toBeInTheDocument();
 ```
 
 ❌ **Per-test database instances**
+
 ```typescript
 // Bad (causes system lockups)
 beforeEach(() => {
-  db = new PGlite() // ❌ Don't do this
-})
+  db = new PGlite(); // ❌ Don't do this
+});
 
 // Good (worker-scoped)
 beforeAll(() => {
-  db = new PGlite() // ✅ Once per worker
-})
+  db = new PGlite(); // ✅ Once per worker
+});
 ```
 
 ❌ **Testing every possible edge case**
+
 ```typescript
 // Bad (diminishing returns)
-it('handles 0')
-it('handles -1')
-it('handles -999999')
-it('handles MAX_SAFE_INTEGER + 1')
+it("handles 0");
+it("handles -1");
+it("handles -999999");
+it("handles MAX_SAFE_INTEGER + 1");
 
 // Good (representative cases)
-it('handles positive numbers')
-it('handles negative numbers')
-it('handles zero')
+it("handles positive numbers");
+it("handles negative numbers");
+it("handles zero");
 ```
 
 ❌ **Complex test setup that obscures intent**
+
 ```typescript
 // Bad
 beforeEach(async () => {
-  await setupComplexScenario()
-  await seedMultipleMachines()
-  await createTestUsers()
-  await generateIssues()
+  await setupComplexScenario();
+  await seedMultipleMachines();
+  await createTestUsers();
+  await generateIssues();
   // ... 50 lines later
-})
+});
 
 // Good
-it('filters issues by status', async () => {
+it("filters issues by status", async () => {
   await testDb.insert(issues).values([
-    { title: 'Open', status: 'new' },
-    { title: 'Closed', status: 'resolved' },
-  ])
+    { title: "Open", status: "new" },
+    { title: "Closed", status: "resolved" },
+  ]);
 
   // Test is self-contained and clear
-})
+});
 ```
 
 ---
@@ -572,22 +599,26 @@ it('filters issues by status', async () => {
 ## Success Metrics
 
 **Test Suite Health:**
+
 - ✅ All tests pass before merge
 - ✅ Test suite runs in <60 seconds
 - ✅ Tests are deterministic (no flakes)
 - ✅ Coverage at 80% for critical paths
 
 **Development Velocity:**
+
 - ✅ Tests catch bugs before production
 - ✅ Tests don't slow down feature development
 - ✅ Refactoring is safe (tests pass or fail clearly)
 
 **When to Add More Tests:**
+
 - Bug found in production → Add regression test
 - Complex feature → Add integration test
 - Critical user journey → Add E2E test
 
 **When NOT to Add Tests:**
+
 - "We should have better coverage" → Only if it prevents real bugs
 - "Let's test this just in case" → Only if failure would be catastrophic
 - "CI coverage check is failing" → Don't game metrics, test what matters
@@ -597,11 +628,13 @@ it('filters issues by status', async () => {
 ## Test Maintenance
 
 **Monthly Review:**
+
 - Remove flaky tests (fix or delete)
 - Remove obsolete tests (for removed features)
 - Update fixtures if schema changes
 
 **Red Flags:**
+
 - Tests frequently break on refactors (testing implementation)
 - Tests are slow (>60s total)
 - Tests are flaky (random failures)

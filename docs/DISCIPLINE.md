@@ -29,15 +29,15 @@ Everything in this document exists to help you resist the urge to over-engineer,
 
 **Example Decisions:**
 
-| Feature Request | Q1 | Q2 | Q3 | Decision |
-|----------------|----|----|----|----|
-| Issue comments | ✅ | ✅ | ✅ | **IMPLEMENT** (in spec, required) |
-| Email notifications | ❌ | ❌ | ❌ | **MVP+/1.0** (not in MVP spec) |
-| Rich text editor | ❌ | ❌ | ❌ | **1.0+** (plain text works) |
-| Issue filtering | ✅ | ✅ | ✅ | **IMPLEMENT** (in spec) |
-| Saved filters | ❌ | ❌ | ❌ | **1.0+** (can re-apply manually) |
-| Photo attachments | ❌ | ❌ | ❌ | **MVP+** (text works initially) |
-| Password reset | ✅ | ✅ | ✅ | **IMPLEMENT** (auth useless without it) |
+| Feature Request     | Q1  | Q2  | Q3  | Decision                                |
+| ------------------- | --- | --- | --- | --------------------------------------- |
+| Issue comments      | ✅  | ✅  | ✅  | **IMPLEMENT** (in spec, required)       |
+| Email notifications | ❌  | ❌  | ❌  | **MVP+/1.0** (not in MVP spec)          |
+| Rich text editor    | ❌  | ❌  | ❌  | **1.0+** (plain text works)             |
+| Issue filtering     | ✅  | ✅  | ✅  | **IMPLEMENT** (in spec)                 |
+| Saved filters       | ❌  | ❌  | ❌  | **1.0+** (can re-apply manually)        |
+| Photo attachments   | ❌  | ❌  | ❌  | **MVP+** (text works initially)         |
+| Password reset      | ✅  | ✅  | ✅  | **IMPLEMENT** (auth useless without it) |
 
 ---
 
@@ -64,10 +64,12 @@ Everything in this document exists to help you resist the urge to over-engineer,
 **Examples:**
 
 **Issue Creation Form:**
+
 - ✅ DONE: Form submits, creates issue, shows in list, validates required fields
 - ❌ NOT REQUIRED: Auto-save draft, duplicate detection, AI title suggestions
 
 **Machine Registry:**
+
 - ✅ DONE (MVP): Can create machine with name, shows in list
 - ❌ NOT REQUIRED (MVP): Manufacturer, model, photos (those are MVP+)
 
@@ -78,21 +80,27 @@ Everything in this document exists to help you resist the urge to over-engineer,
 ### When You Find Yourself Saying:
 
 **"What if someone..."**
+
 - STOP. That's future thinking. Does it affect Austin Pinball Collective TODAY?
 
 **"I should probably..."**
+
 - STOP. Is it in PRODUCT_SPEC.md? No? Then you shouldn't.
 
 **"This would be cool if..."**
+
 - STOP. Cool isn't done. Ship first, cool later.
 
 **"I'm just going to quickly refactor..."**
+
 - STOP. Does the current code work? Yes? Then refactor later.
 
 **"I need to add tests for..."**
+
 - STOP. Do you have a test for the happy path? Yes? Ship it. Add more tests if bugs appear.
 
 **"Let me add this abstraction because we might..."**
+
 - STOP. YAGNI (You Aren't Gonna Need It). Build abstractions when you have 3 use cases, not before.
 
 ### Redirect to V2_ROADMAP.md
@@ -140,6 +148,7 @@ echo "- [ ] Email notifications for issue updates" >> V2_ROADMAP.md
 ### How to Use V2_ROADMAP.md
 
 **When an idea strikes:**
+
 1. Write it in V2_ROADMAP.md
 2. Add a quick note why it's valuable
 3. Forget about it until MVP ships
@@ -150,21 +159,25 @@ echo "- [ ] Email notifications for issue updates" >> V2_ROADMAP.md
 ## MVP+ Feature Ideas
 
 ### High Priority (Post-MVP)
+
 - [ ] QR codes - Makes issue reporting effortless
 - [ ] Machine photos - Visual identification
 - [ ] Issue photos - Better problem clarity
 
 ### 1.0 Features
+
 - [ ] Email notifications - Keep members informed
 - [ ] OPDB integration - Faster machine setup
 - [ ] Saved filters - Frequent workflows
 
 ### 2.0 Features
+
 - [ ] Multi-tenancy - Support other arcades
 - [ ] Analytics - Track patterns
 ```
 
 **Review monthly:**
+
 - Move items based on user feedback
 - Delete ideas that no longer make sense
 - Reprioritize based on real usage
@@ -178,24 +191,29 @@ echo "- [ ] Email notifications for issue updates" >> V2_ROADMAP.md
 **Rule: Finish vertically, not horizontally.**
 
 **❌ Wrong (Horizontal Slicing):**
+
 ```
 Session 1: Build all database tables
 Session 2: Build all API routes
 Session 3: Build all UI components
 Session 4: Wire it all together
 ```
+
 → Nothing works until session 4
 
 **✅ Right (Vertical Slicing):**
+
 ```
 Session 1: Issue creation (DB + Action + UI) - WORKS
 Session 2: Issue viewing (DB + Action + UI) - WORKS
 Session 3: Issue editing (DB + Action + UI) - WORKS
 Session 4: Issue filtering (DB + Action + UI) - WORKS
 ```
+
 → Something works every session
 
 **Each feature should be:**
+
 - Deployable independently
 - Testable in isolation
 - Usable by itself (even if basic)
@@ -243,6 +261,7 @@ git commit -m "refactor: simplify issue creation"
 ### ❌ Don't Add New Tech To MVP
 
 You have a proven stack:
+
 - Next.js 16
 - React 19
 - Supabase
@@ -253,14 +272,14 @@ You have a proven stack:
 
 **Temptations to Resist:**
 
-| Temptation | Why It's Tempting | Why to Resist |
-|------------|-------------------|---------------|
-| Zustand/Redux | "Need global state" | Server Components + URL state is enough |
-| Tanstack Query | "Better data fetching" | Server Components already handle this |
-| React Hook Form | "Better validation" | HTML + Server Actions is simpler |
-| Prisma | "Better than Drizzle" | You already chose Drizzle |
-| CSS-in-JS | "Better styling" | Tailwind is working |
-| Storybook | "Component docs" | Build features first |
+| Temptation      | Why It's Tempting      | Why to Resist                           |
+| --------------- | ---------------------- | --------------------------------------- |
+| Zustand/Redux   | "Need global state"    | Server Components + URL state is enough |
+| Tanstack Query  | "Better data fetching" | Server Components already handle this   |
+| React Hook Form | "Better validation"    | HTML + Server Actions is simpler        |
+| Prisma          | "Better than Drizzle"  | You already chose Drizzle               |
+| CSS-in-JS       | "Better styling"       | Tailwind is working                     |
+| Storybook       | "Component docs"       | Build features first                    |
 
 ### When You Can Add New Tech:
 
@@ -276,21 +295,25 @@ You have a proven stack:
 ### You Have a Fixed Complexity Budget. Spend Wisely.
 
 **High Complexity (Save For Critical Features):**
+
 - Auth flows (Supabase handles this)
 - Real-time updates (not needed for MVP)
 - File uploads (MVP+ only)
 
 **Medium Complexity:**
+
 - Filtering/search
 - Form validation
 - Timeline generation
 
 **Low Complexity (Should Be Easy):**
+
 - CRUD operations
 - Lists and detail views
 - Static pages
 
 **If something feels high complexity, ask:**
+
 1. Am I over-engineering?
 2. Is there a simpler approach?
 3. Can I use a library instead of building?
@@ -303,6 +326,7 @@ You have a proven stack:
 ### Issue Creation
 
 **Over-Engineered ❌:**
+
 - Auto-save drafts
 - Duplicate detection
 - AI title suggestions
@@ -312,6 +336,7 @@ You have a proven stack:
 - Custom templates
 
 **Good Enough ✅:**
+
 - HTML form
 - Title + description (plain text)
 - Machine dropdown (required)
@@ -322,6 +347,7 @@ You have a proven stack:
 ### Dashboard
 
 **Over-Engineered ❌:**
+
 - Customizable widgets
 - Drag-and-drop layout
 - Real-time updates
@@ -330,6 +356,7 @@ You have a proven stack:
 - Export to PDF
 
 **Good Enough ✅:**
+
 - Static layout
 - "My Issues" list
 - "Recent Issues" list
@@ -351,17 +378,20 @@ You have a proven stack:
 ### Make It Work For You:
 
 **High-energy sessions:**
+
 - Tackle complex features (auth, filtering, timeline)
 - Make architectural decisions
 - Write tests for critical paths
 
 **Low-energy sessions:**
+
 - Polish UI
 - Fix small bugs
 - Update documentation
 - Add seed data
 
 **Write notes for yourself:**
+
 ```typescript
 // TODO: [@your-name next session]
 // This works but needs error handling for when machine doesn't exist
@@ -398,6 +428,7 @@ You have a proven stack:
 **STOP. Review PRODUCT_SPEC.md.**
 
 Ask yourself:
+
 1. What's the ABSOLUTE minimum to call this feature "done"?
 2. What can I delete right now?
 3. What can I hardcode instead of making configurable?
@@ -405,13 +436,13 @@ Ask yourself:
 
 **Example Simplifications:**
 
-| Current Approach | Simplified Approach |
-|------------------|---------------------|
-| User role management UI | Manually update roles in Supabase Studio |
+| Current Approach          | Simplified Approach                        |
+| ------------------------- | ------------------------------------------ |
+| User role management UI   | Manually update roles in Supabase Studio   |
 | Email notification system | Send manual emails if needed (1.0 feature) |
-| Analytics dashboard | Run SQL queries manually |
-| Complex filtering UI | Start with 3 basic filters only |
-| Settings page | Hardcode settings in config file |
+| Analytics dashboard       | Run SQL queries manually                   |
+| Complex filtering UI      | Start with 3 basic filters only            |
+| Settings page             | Hardcode settings in config file           |
 
 **Remember:** You can always add these later. AFTER MVP ships.
 

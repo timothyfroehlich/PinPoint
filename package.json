@@ -1,0 +1,68 @@
+{
+  "name": "pinpoint",
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Pinball machine issue tracking for Austin Pinball Collective",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "format": "prettier --check \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
+    "format:fix": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
+    "test": "echo \"Tests will be configured in PR 5\" && exit 0",
+    "test:watch": "echo \"Tests will be configured in PR 5\" && exit 0",
+    "test:coverage": "echo \"Tests will be configured in PR 5\" && exit 0",
+    "smoke": "echo \"E2E tests will be configured in PR 5\" && exit 0",
+    "preflight": "npm run typecheck && npm test && npm run smoke && npm run lint && npm run format",
+    "prepare": "husky"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/timothyfroehlich/PinPoint"
+  },
+  "keywords": [
+    "pinball",
+    "issue-tracking",
+    "nextjs"
+  ],
+  "author": "Tim Froehlich",
+  "license": "SEE LICENSE IN LICENSE",
+  "dependencies": {
+    "next": "^16.0.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
+    "@eslint/js": "^9.39.1",
+    "@tailwindcss/postcss": "^4.1.17",
+    "@tsconfig/strictest": "^2.0.7",
+    "@types/node": "^24.10.0",
+    "@types/react": "^19.2.2",
+    "@typescript-eslint/eslint-plugin": "^8.46.3",
+    "@typescript-eslint/parser": "^8.46.3",
+    "eslint": "^9.39.1",
+    "eslint-config-next": "^16.0.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-promise": "^7.2.1",
+    "eslint-plugin-unused-imports": "^4.3.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.6",
+    "postcss": "^8.5.6",
+    "prettier": "^3.6.2",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.9.3"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{js,jsx,json,css,md}": [
+      "prettier --write"
+    ]
+  }
+}

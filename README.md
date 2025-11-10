@@ -34,7 +34,7 @@ The system is architected as a multi-tenant SaaS platform, allowing multiple org
 Technology stack:
 
 - **Framework:** [Next.js 15](https://nextjs.org/) with React Server Components
-- **Language:** [TypeScript](https://www.typescriptlang.org/) (strictest configuration)  
+- **Language:** [TypeScript](https://www.typescriptlang.org/) (strictest configuration)
 - **Runtime:** [React 19](https://react.dev/)
 - **Components:** [shadcn/ui](https://ui.shadcn.com/) (primary), [Material UI](https://mui.com/) (transition)
 - **Styling:** [Tailwind CSS v4](https://tailwindcss.com/)
@@ -46,11 +46,13 @@ Technology stack:
 ### Current Development Phase
 
 **React Server Components Migration:**
+
 - Status: Phase 1A Foundation nearly complete
 - Next: Data Access Layer (DAL) implementation
 - Approach: Complete rewrite from client-heavy MUI to server-first RSC
 
 **Test System:**
+
 - Status: Archive complete, standards consolidated
 - Next: Expand coverage across Unit, Integration, E2E, RLS, Schema
 - Approach: Follow CORE testing guide; use templates/helpers where useful
@@ -80,6 +82,7 @@ For detailed evolution plans, see [`RSC_MIGRATION/`](./RSC_MIGRATION/) and the C
 **Target:** Server Components with shadcn/ui + Drizzle
 
 **Migration Strategy:**
+
 - Server Components by default, Client Components for interactivity only
 - MUI and shadcn/ui coexist during transition
 - Complete rewrite approach rather than incremental migration
@@ -183,6 +186,7 @@ This repository includes comprehensive GitHub Copilot instructions to help you f
   - Testing strategies
 
 When you use GitHub Copilot in this repository, it will automatically provide context-aware suggestions based on the file you're working on. The instructions emphasize:
+
 - Multi-tenant security (organization scoping)
 - Server-first architecture
 - TypeScript strictest patterns

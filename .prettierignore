@@ -1,0 +1,32 @@
+# Build outputs
+.next
+out
+dist
+build
+
+# Dependencies
+node_modules
+
+# Generated files
+*.tsbuildinfo
+next-env.d.ts
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Archived content
+archived/
+.archived_v1/
+
+# Package lock files
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Coverage reports
+coverage/
+.nyc_output/
