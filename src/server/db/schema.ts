@@ -15,7 +15,7 @@ import {
  * Auto-created via database trigger (see supabase/seed.sql).
  *
  * Note: Drizzle doesn't support cross-schema references, so the FK constraint
- * is created by Drizzle Kit when pushing the schema (user_profiles.id -> auth.users.id).
+ * is created manually in supabase/seed.sql (user_profiles.id -> auth.users.id).
  */
 export const userProfiles = pgTable("user_profiles", {
   id: uuid("id").primaryKey(),
