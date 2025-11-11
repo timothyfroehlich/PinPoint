@@ -79,13 +79,7 @@ export const issues = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => ({
-    // CHECK constraint: every issue must have a machine
-    machineRequired: check(
-      "machine_required",
-      sql`${table.machineId} IS NOT NULL`
-    ),
-  })
+  // No additional table-level constraints needed; machineId is already NOT NULL.
 );
 
 /**
