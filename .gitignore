@@ -39,6 +39,7 @@ logs/
 !.env
 !.env.example
 !.env.test
+!.env.ci
 *.key
 *.p12
 *.pfx

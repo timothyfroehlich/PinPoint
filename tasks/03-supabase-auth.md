@@ -83,6 +83,7 @@ Supabase client, middleware, auth callback, and schema deployment to live Supaba
 - **Missing explicit return types**: ESLint errors on middleware.ts and auth callback route. Fixed by adding `Promise<NextResponse>` return types.
 - **Prettier formatting issues**: Pre-commit hook failing due to .claude/settings.local.json formatting. Fixed with `npm run format:fix`.
 - **Drizzle Kit pooler error**: Got "Cannot read properties of undefined" error when trying to use drizzle-kit push with preview Supabase. Switched to Supabase MCP server for reliable deployment.
+- **CI build failure**: GitHub Actions build failing with "TypeError: Invalid URL" when evaluating `/api/test-setup/route` at build time. The route imports `db` which requires DATABASE_URL. Fixed by creating `.env.ci` with dummy credentials (checked into git) that can be sourced in CI workflows. This provides a clean, maintainable solution for CI environment variables.
 
 ## Lessons Learned
 
@@ -95,6 +96,7 @@ Supabase client, middleware, auth callback, and schema deployment to live Supaba
 - **Minimal test output preserves context**: --silent and --no-color flags significantly reduce context spam when running multiple commands.
 - **Vitest needs proper env loading**: Must use `loadEnv` from `vite` in vitest.config.ts to make .env.local variables available to integration tests.
 - **ESLint test file configuration requires explicit tsconfig**: Test files need languageOptions override to use tsconfig.tests.json instead of main tsconfig.json.
+- **CI builds need environment variables**: Next.js 16 evaluates API routes during build to collect page data. Routes that import database connections need dummy env vars in CI even if they're dynamic routes. Solution: Create `.env.ci` (checked into git) with dummy credentials and source it in CI workflows. This is cleaner than inline env vars in workflow files and helps web-based agents.
 
 ## Updates for CLAUDE.md
 
