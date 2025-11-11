@@ -2,11 +2,11 @@
 
 _Server Components, Server Actions, and critical caching changes for full-stack architecture_
 
-## 🚨 CRITICAL BREAKING CHANGES (Next.js 15.x - 2025)
+## 🚨 CRITICAL BREAKING CHANGES (Next.js 16 - 2025)
 
 ### **Caching Defaults Completely Changed**
 
-**BREAKING:** Next.js 15 fundamentally changed caching behavior - **defaults are now UNCACHED**:
+**BREAKING:** Next.js 16 (since 15) fundamentally changed caching behavior - **defaults are now UNCACHED**:
 
 - **fetch requests** now default to `cache: "no-store"` (uncached)
 - **GET Route Handlers** now default to uncached behavior
@@ -15,10 +15,10 @@ _Server Components, Server Actions, and critical caching changes for full-stack 
 **Migration Impact:** Previous aggressive caching is GONE. Explicit cache configuration now required for performance.
 
 ```typescript
-// BEFORE Next.js 15: fetch was cached by default
+// BEFORE Next.js 16 (v14 and earlier): fetch was cached by default
 const data = await fetch("https://api.example.com/posts"); // ✅ Cached automatically
 
-// AFTER Next.js 15: fetch is uncached by default
+// AFTER Next.js 16 (since 15): fetch is uncached by default
 const data = await fetch("https://api.example.com/posts"); // ❌ Not cached!
 
 // REQUIRED: Explicit caching for performance
@@ -51,7 +51,7 @@ export const getIssuesForOrg = cache(async (organizationId: string) => {
 });
 ```
 
-### **New APIs in Next.js 15.5+**
+### **New APIs in Next.js 16**
 
 **Form Component & unstable_after API**
 

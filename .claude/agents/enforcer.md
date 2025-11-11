@@ -332,7 +332,7 @@ color: red
 
 - **Modern Drizzle Patterns**: Relational queries, type inference, performance optimization
 - **Supabase SSR Integration**: Server Component auth, Server Action patterns
-- **Next.js 15 Compliance**: App Router patterns, Server Actions, React 19 features
+- **Next.js 16 Compliance**: App Router patterns, Server Actions, React 19 features
 - **Testing Architecture**: Dual-track testing, worker-scoped patterns, hardcoded IDs
 
 ### Security Boundary Analysis

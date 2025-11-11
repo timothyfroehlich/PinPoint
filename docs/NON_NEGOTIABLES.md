@@ -149,7 +149,7 @@
 **CORE-PERF-002:** Use explicit fetch caching
 
 - **Severity:** Required
-- **Why:** Next.js 15 defaults to uncached
+- **Why:** Next.js 16 (since 15) defaults to uncached
 - **Do:** Add `cache: "force-cache"` or appropriate options to fetch()
 - **Don't:** Rely on implicit caching defaults
 
@@ -225,7 +225,7 @@
 - **Response mutation**: Don't modify Supabase response object
 - **TypeScript safety defeats**: No `any`, non‑null `!`, or unsafe `as`
 - **Deep relative imports**: Use `~/` aliases
-- **Uncached fetch()**: Next.js 15 requires explicit caching
+- **Uncached fetch()**: Next.js 16 (since 15) requires explicit caching
 - **Tailwind v4 misconfiguration**: No `tailwind.config.js` (use CSS-based config)
 - **Client Component overuse**: Default to Server Components
 - **SQL injection**: No raw string interpolation in SQL

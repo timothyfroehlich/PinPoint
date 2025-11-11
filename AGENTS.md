@@ -106,6 +106,7 @@ When facing a decision, ask:
 - **Frontend**: Next.js 16, React 19 Server Components, shadcn/ui, Tailwind CSS v4
 - **Backend**: Drizzle ORM, PostgreSQL via Supabase
 - **Authentication**: Supabase SSR (no RLS for single-tenant)
+  - **Note**: Use `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (new format: `sb_publishable_xxx`). Legacy `ANON_KEY` deprecated by July 2026.
 - **Testing**: Vitest, Playwright, worker-scoped PGlite
 - **Language**: TypeScript with strictest configuration
 
@@ -163,9 +164,30 @@ When facing a decision, ask:
 
 ### Available Commands
 
-- **Testing**: `npm test`, `npm run test:watch`, `npm run smoke`
+- **Testing**: `npm test` (unit tests), `npm run test:integration` (Supabase tests), `npm run test:watch`, `npm run smoke` (E2E)
 - **Development**: `npm run dev`, `npm run build`, `npm run lint`, `npm run typecheck`
+- **Quality Gate**: `npm run preflight` (runs all checks before commits)
 - **Components**: `npx shadcn@latest add [component]`
+
+### Testing Requirements
+
+**Integration Tests Requiring Supabase:**
+
+- **Location**: All integration tests requiring Supabase MUST be in `src/test/integration/supabase/`
+- **Naming**: Files must end with `.test.ts` or `.test.tsx`
+- **Purpose**: Easy filtering - integration tests can be skipped if Supabase isn't running
+- **Commands**:
+  - `npm test` - Runs unit tests only (excludes integration folder)
+  - `npm run test:integration` - Runs integration tests only (requires `supabase start`)
+  - `npm run preflight` - Runs both unit and integration tests
+
+**Preflight Script:**
+
+- **Purpose**: Comprehensive pre-commit validation (run before all commits)
+- **Behavior**: Fail-fast (stops on first error)
+- **Stage 1 (parallel)**: `typecheck`, `lint`, `format`, `test` (unit tests)
+- **Stage 2 (parallel, after stage 1)**: `build`, `test:integration`
+- **Output**: Minimal (`--silent` flags to avoid context spam)
 
 ### Project Structure
 

@@ -133,7 +133,7 @@ export default [
     },
   },
   {
-    // Relaxed rules for test files
+    // Test files use different tsconfig
     files: [
       "**/*.test.ts",
       "**/*.test.tsx",
@@ -142,6 +142,13 @@ export default [
       "src/test/**/*",
       "e2e/**/*",
     ],
+    languageOptions: {
+      parser: typescriptParser,
+      parserOptions: {
+        project: "./tsconfig.tests.json",
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
     rules: {
       // Allow any in tests for mocking
       "@typescript-eslint/no-explicit-any": "off",

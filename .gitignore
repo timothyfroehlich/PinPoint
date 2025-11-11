@@ -73,6 +73,17 @@ node_modules/
 /e2e/fixtures/*.dump
 /e2e/.auth/user.json
 
+# Supabase
+supabase/.temp/
+supabase/.branches/
+
+# Archived v1 test artifacts and build caches
+# (should have been ignored in v1, preventing future similar issues)
+.archived_v1/**/.next/
+.archived_v1/**/coverage/
+.archived_v1/**/.cache/
+.archived_v1/**/*.tsbuildinfo
+
 
 # Git worktrees and Claude Code worktree management
 .claude/worktrees/

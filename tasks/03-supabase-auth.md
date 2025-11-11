@@ -1,6 +1,6 @@
 # Task 3: Supabase SSR Authentication
 
-**Status**: ⏳ PENDING
+**Status**: 🚧 IN PROGRESS
 **Branch**: `setup/supabase-auth`
 **Dependencies**: Task 2 (Database Schema)
 
@@ -21,24 +21,24 @@ Supabase client, middleware, auth callback, and schema deployment to live Supaba
 
 ### Supabase Setup
 
-- [ ] Install Supabase packages (`npm install @supabase/supabase-js @supabase/ssr`)
+- [x] Install Supabase packages (`npm install @supabase/supabase-js @supabase/ssr`)
 - [ ] Create Supabase projects (preview & production via Supabase dashboard)
-- [ ] Add Supabase env vars to `.env.example`
+- [x] Add Supabase env vars to `.env.example`
   - NEXT_PUBLIC_SUPABASE_URL
-  - NEXT_PUBLIC_SUPABASE_ANON_KEY
+  - NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 - [ ] Add Supabase credentials to `.env.local`
 
 ### Supabase SSR Client
 
-- [ ] Create `src/lib/supabase/server.ts` (SSR client wrapper)
+- [x] Create `src/lib/supabase/server.ts` (SSR client wrapper)
   - Implement createClient() with cookie handlers
   - Follow CORE-SSR-001 pattern (getAll/setAll cookies)
   - Call auth.getUser() immediately after client creation (CORE-SSR-002)
-- [ ] Create Next.js middleware (`middleware.ts`)
+- [x] Create Next.js middleware (`middleware.ts`)
   - Token refresh logic
   - Follow Supabase SSR middleware pattern
   - Don't modify response object (CORE-SSR-005)
-- [ ] Create auth callback route (`src/app/auth/callback/route.ts`)
+- [x] Create auth callback route (`src/app/auth/callback/route.ts`)
   - Handle OAuth callback
   - Redirect to home after successful auth
 
@@ -53,16 +53,21 @@ Supabase client, middleware, auth callback, and schema deployment to live Supaba
 
 ## Key Decisions
 
-_To be filled during task execution_
+- Use NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (new format) instead of legacy ANON key. Docs and env example updated accordingly.
+- SSR client and middleware follow Supabase SSR cookie contract (getAll/setAll). Middleware triggers token refresh with `auth.getUser()` and does not mutate response body.
+- Env access uses explicit runtime guards (no non-null `!`). Missing vars throw with clear messages, aligning with strict TypeScript patterns.
+- Added a minimal `/auth/auth-code-error` page to avoid 404 when callback fails.
 
 ## Problems Encountered
 
-_To be filled during task execution_
+- Type narrowing around Next `cookies()` signature varied in local typings; resolved by awaiting `cookies()` in SSR client to satisfy the workspace type definition.
 
 ## Lessons Learned
 
-_To be filled during task execution_
+- Prefer explicit runtime checks for env variables over non-null assertions to stay within strict TypeScript rules and surface config issues early.
+- The Supabase SSR pattern requires calling `auth.getUser()` in middleware to proactively refresh tokens and avoid intermittent sign-outs.
 
 ## Updates for CLAUDE.md
 
-_To be filled after completion - what future agents need to know_
+- Establish pattern: Use `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; treat legacy anon key as deprecated.
+- Middleware and SSR client patterns are in place; reuse these for future auth-dependent routes.

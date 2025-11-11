@@ -33,7 +33,7 @@ The system is architected as a multi-tenant SaaS platform, allowing multiple org
 
 Technology stack:
 
-- **Framework:** [Next.js 15](https://nextjs.org/) with React Server Components
+- **Framework:** [Next.js 16](https://nextjs.org/) with React Server Components
 - **Language:** [TypeScript](https://www.typescriptlang.org/) (strictest configuration)
 - **Runtime:** [React 19](https://react.dev/)
 - **Components:** [shadcn/ui](https://ui.shadcn.com/) (primary), [Material UI](https://mui.com/) (transition)
