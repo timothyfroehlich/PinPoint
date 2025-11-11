@@ -5,6 +5,12 @@ const nextConfig: NextConfig = {
   typescript: {
     tsconfigPath: "./tsconfig.json",
   },
+  turbopack: {
+    resolveAlias: {
+      "~/*": "./src/*",
+      "@/*": "./src/*",
+    },
+  },
 };
 
 export default nextConfig;
