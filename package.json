@@ -16,6 +16,8 @@
     "test:watch": "echo \"Tests will be configured in PR 5\" && exit 0",
     "test:coverage": "echo \"Tests will be configured in PR 5\" && exit 0",
     "smoke": "echo \"E2E tests will be configured in PR 5\" && exit 0",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
     "preflight": "npm run typecheck && npm test && npm run smoke && npm run lint && npm run format",
     "prepare": "husky"
   },
@@ -31,7 +33,9 @@
   "author": "Tim Froehlich",
   "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
+    "drizzle-orm": "^0.44.7",
     "next": "^16.0.1",
+    "postgres": "^3.4.7",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
@@ -44,6 +48,7 @@
     "@types/react": "^19.2.2",
     "@typescript-eslint/eslint-plugin": "^8.46.3",
     "@typescript-eslint/parser": "^8.46.3",
+    "drizzle-kit": "^0.31.6",
     "eslint": "^9.39.1",
     "eslint-config-next": "^16.0.1",
     "eslint-config-prettier": "^10.1.8",

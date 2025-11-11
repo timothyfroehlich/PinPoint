@@ -32,6 +32,9 @@ export default [
         project: "./tsconfig.json",
         tsconfigRootDir: import.meta.dirname,
       },
+      globals: {
+        process: "readonly",
+      },
     },
     rules: {
       // TypeScript recommended rules
