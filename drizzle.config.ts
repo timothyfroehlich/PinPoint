@@ -11,12 +11,16 @@ if (!databaseUrl) {
   );
 }
 
+// Use DIRECT_URL for migrations (bypasses connection pooler)
+// Connection poolers don't support all PostgreSQL commands needed for migrations
+const directUrl = process.env.DIRECT_URL || databaseUrl;
+
 export default defineConfig({
   schema: "./src/server/db/schema.ts",
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
-    url: databaseUrl,
+    url: directUrl,
   },
   // Limit introspection to our app tables only
   // Prevents Drizzle Kit from parsing Supabase system tables

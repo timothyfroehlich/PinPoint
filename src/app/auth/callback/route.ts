@@ -3,6 +3,15 @@ import { NextResponse } from "next/server";
 import { type NextRequest } from "next/server";
 
 /**
+ * Validates that a redirect URL is safe (internal to the application)
+ * Prevents open redirect vulnerabilities
+ */
+function isInternalUrl(url: string): boolean {
+  // Allow paths starting with / but not //
+  return url.startsWith("/") && !url.startsWith("//");
+}
+
+/**
  * Auth callback route for OAuth flows (Google, GitHub, etc.)
  *
  * Required for CORE-SSR-004 compliance
@@ -18,7 +27,10 @@ import { type NextRequest } from "next/server";
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/";
+  const nextParam = searchParams.get("next") ?? "/";
+
+  // Validate redirect URL to prevent open redirect attacks
+  const next = isInternalUrl(nextParam) ? nextParam : "/";
 
   if (code) {
     const supabase = await createClient();
