@@ -1,12 +1,5 @@
-import { relations, sql } from "drizzle-orm";
-import {
-  pgTable,
-  uuid,
-  text,
-  timestamp,
-  boolean,
-  check,
-} from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
+import { pgTable, uuid, text, timestamp, boolean } from "drizzle-orm/pg-core";
 
 /**
  * User Profiles Table
@@ -78,7 +71,7 @@ export const issues = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
-  },
+  }
   // No additional table-level constraints needed; machineId is already NOT NULL.
 );
 
