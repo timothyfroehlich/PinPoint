@@ -12,13 +12,15 @@
     "lint:fix": "eslint src/ --fix",
     "format": "prettier --check \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
     "format:fix": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
-    "test": "echo \"Tests will be configured in PR 5\" && exit 0",
-    "test:watch": "echo \"Tests will be configured in PR 5\" && exit 0",
-    "test:coverage": "echo \"Tests will be configured in PR 5\" && exit 0",
+    "test": "vitest run --exclude 'src/test/integration/**' --silent --no-color",
+    "test:integration": "vitest run src/test/integration --silent --no-color",
+    "test:watch": "vitest watch --exclude 'src/test/integration/**'",
+    "test:coverage": "vitest run --coverage --exclude 'src/test/integration/**'",
     "smoke": "echo \"E2E tests will be configured in PR 5\" && exit 0",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "preflight": "npm run typecheck && npm test && npm run smoke && npm run lint && npm run format",
+    "db:seed": "node --env-file=.env.local -e 'require(\"child_process\").execSync(\"psql \" + process.env.DATABASE_URL + \" -f supabase/seed.sql\", {stdio: \"inherit\"})'",
+    "preflight": "npm-run-all --silent --parallel typecheck lint format test --sequential --parallel build test:integration",
     "prepare": "husky"
   },
   "repository": {
@@ -33,6 +35,9 @@
   "author": "Tim Froehlich",
   "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
+    "@next/env": "^16.0.1",
+    "@supabase/ssr": "^0.7.0",
+    "@supabase/supabase-js": "^2.81.0",
     "drizzle-orm": "^0.44.7",
     "next": "^16.0.1",
     "postgres": "^3.4.7",
@@ -48,6 +53,7 @@
     "@types/react": "^19.2.2",
     "@typescript-eslint/eslint-plugin": "^8.46.3",
     "@typescript-eslint/parser": "^8.46.3",
+    "@vitest/ui": "^4.0.8",
     "drizzle-kit": "^0.31.6",
     "eslint": "^9.39.1",
     "eslint-config-next": "^16.0.1",
@@ -56,10 +62,12 @@
     "eslint-plugin-unused-imports": "^4.3.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.6",
+    "npm-run-all": "^4.1.5",
     "postcss": "^8.5.6",
     "prettier": "^3.6.2",
     "tailwindcss": "^4.0.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.8"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

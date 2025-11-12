@@ -16,6 +16,27 @@
 - **@docs/TYPESCRIPT_STRICTEST_PATTERNS.md** - Type safety patterns
 - **@package.json** - Available scripts, dependencies, and project configuration
 
+### GitHub Workflow Changes (Web Only)
+
+**CRITICAL**: When running in Claude Code web (https://claude.ai/code/), you **CANNOT** push changes to `.github/workflows/` files directly. GitHub Apps are blocked from modifying workflow files without special permissions.
+
+**Detection**: Check `CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE=cloud_default` to determine if you're in web mode.
+
+**Process for Workflow Changes:**
+
+1. Make changes to `.github-staging/workflows/*.yml` instead
+2. Commit and push `.github-staging/` changes (allowed by GitHub)
+3. Document the changes in commit message
+4. User reviews and manually activates: `cp -r .github-staging/workflows .github/`
+
+**Note**: This restriction does NOT apply to:
+
+- Claude Code CLI (local installation)
+- Other files in `.github/` like `dependabot.yml` or instruction files
+- Regular source code files
+
+See `.github-staging/README.md` for full review process.
+
 ## Claude Code Command Guidance
 
 ### Safe Command Alternatives
