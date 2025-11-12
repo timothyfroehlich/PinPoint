@@ -202,7 +202,7 @@ export function mockCreateClient(user: User | null = null) {
  * ```
  */
 export function mockNextCookies(
-  initialCookies: Array<{ name: string; value: string }> = []
+  initialCookies: { name: string; value: string }[] = []
 ) {
   return vi.fn(() =>
     Promise.resolve({
