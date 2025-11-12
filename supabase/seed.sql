@@ -173,3 +173,147 @@ BEGIN
     RAISE NOTICE 'guest@test.com (password: TestPassword123) - Guest role';
   END IF;
 END $$;
+
+-- ============================================================================
+-- Test Machines and Issues for Local Development
+-- ============================================================================
+-- Note: Sample data to demonstrate machine status derivation
+-- - Operational machine (no open issues)
+-- - Needs Service machine (playable/minor issues)
+-- - Unplayable machine (at least one unplayable issue)
+
+DO $$
+DECLARE
+  machine_operational_id uuid;
+  machine_needs_service_id uuid;
+  machine_unplayable_id uuid;
+  member_user_id uuid;
+BEGIN
+  -- Only seed test data in local/test environments
+  IF current_setting('app.environment', true) IS NULL OR
+     current_setting('app.environment', true) != 'production' THEN
+
+    -- Get member user ID for issue assignments
+    SELECT id INTO member_user_id FROM public.user_profiles WHERE role = 'member' LIMIT 1;
+
+    -- Machine 1: Operational (no open issues, but has resolved issue)
+    INSERT INTO public.machines (id, name, created_at, updated_at)
+    VALUES (
+      gen_random_uuid(),
+      'Medieval Madness',
+      NOW() - INTERVAL '30 days',
+      NOW() - INTERVAL '30 days'
+    ) RETURNING id INTO machine_operational_id;
+
+    -- Resolved issue for operational machine
+    IF machine_operational_id IS NOT NULL THEN
+      INSERT INTO public.issues (
+        id, machine_id, title, description, status, severity,
+        reported_by, resolved_at, created_at, updated_at
+      ) VALUES (
+        gen_random_uuid(),
+        machine_operational_id,
+        'Left flipper weak',
+        'Left flipper was not as strong as the right flipper. Adjusted EOS switch.',
+        'resolved',
+        'playable',
+        member_user_id,
+        NOW() - INTERVAL '5 days',
+        NOW() - INTERVAL '10 days',
+        NOW() - INTERVAL '5 days'
+      );
+    END IF;
+
+    -- Machine 2: Needs Service (playable and minor issues, no unplayable)
+    INSERT INTO public.machines (id, name, created_at, updated_at)
+    VALUES (
+      gen_random_uuid(),
+      'Attack from Mars',
+      NOW() - INTERVAL '45 days',
+      NOW() - INTERVAL '1 day'
+    ) RETURNING id INTO machine_needs_service_id;
+
+    -- Playable issue for needs_service machine
+    IF machine_needs_service_id IS NOT NULL THEN
+      INSERT INTO public.issues (
+        id, machine_id, title, description, status, severity,
+        reported_by, created_at, updated_at
+      ) VALUES (
+        gen_random_uuid(),
+        machine_needs_service_id,
+        'Saucer sometimes does not register',
+        'The flying saucer occasionally fails to register a hit. Playable but annoying.',
+        'new',
+        'playable',
+        member_user_id,
+        NOW() - INTERVAL '2 days',
+        NOW() - INTERVAL '2 days'
+      );
+
+      -- Minor issue for needs_service machine
+      INSERT INTO public.issues (
+        id, machine_id, title, description, status, severity,
+        reported_by, created_at, updated_at
+      ) VALUES (
+        gen_random_uuid(),
+        machine_needs_service_id,
+        'Martian decal peeling',
+        'The martian decal on the playfield is starting to peel at the corner.',
+        'new',
+        'minor',
+        member_user_id,
+        NOW() - INTERVAL '1 day',
+        NOW() - INTERVAL '1 day'
+      );
+    END IF;
+
+    -- Machine 3: Unplayable (has at least one unplayable issue)
+    INSERT INTO public.machines (id, name, created_at, updated_at)
+    VALUES (
+      gen_random_uuid(),
+      'The Addams Family',
+      NOW() - INTERVAL '60 days',
+      NOW()
+    ) RETURNING id INTO machine_unplayable_id;
+
+    -- Unplayable issue
+    IF machine_unplayable_id IS NOT NULL THEN
+      INSERT INTO public.issues (
+        id, machine_id, title, description, status, severity,
+        reported_by, assigned_to, created_at, updated_at
+      ) VALUES (
+        gen_random_uuid(),
+        machine_unplayable_id,
+        'Right flipper not working',
+        'Right flipper does not respond at all. Machine is unplayable.',
+        'in_progress',
+        'unplayable',
+        member_user_id,
+        member_user_id,
+        NOW() - INTERVAL '3 hours',
+        NOW() - INTERVAL '1 hour'
+      );
+
+      -- Also has a minor issue
+      INSERT INTO public.issues (
+        id, machine_id, title, description, status, severity,
+        reported_by, created_at, updated_at
+      ) VALUES (
+        gen_random_uuid(),
+        machine_unplayable_id,
+        'Missing Thing magnet cover',
+        'The plastic cover for the Thing magnet is missing.',
+        'new',
+        'minor',
+        member_user_id,
+        NOW() - INTERVAL '1 day',
+        NOW() - INTERVAL '1 day'
+      );
+    END IF;
+
+    RAISE NOTICE 'Test machines and issues created successfully!';
+    RAISE NOTICE '1. Medieval Madness - Operational (no open issues)';
+    RAISE NOTICE '2. Attack from Mars - Needs Service (playable + minor issues)';
+    RAISE NOTICE '3. The Addams Family - Unplayable (right flipper broken)';
+  END IF;
+END $$;

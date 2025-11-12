@@ -506,6 +506,172 @@ export default async function NewIssuePage() {
 - Unit test the Zod schema and any small helpers
 - Integration test the action against PGlite (worker-scoped); do not spin per‑test instances
 
+## Machine Status Derivation
+
+### Deriving Machine Status from Issues
+
+Machine operational status is derived from associated open issues, not stored in the database.
+
+```typescript
+// src/lib/machines/status.ts
+export type MachineStatus = "unplayable" | "needs_service" | "operational";
+
+export type IssueForStatus = {
+  status: "new" | "in_progress" | "resolved";
+  severity: "minor" | "playable" | "unplayable";
+};
+
+/**
+ * Derive machine status from its issues
+ *
+ * Logic:
+ * - `unplayable`: At least one unplayable issue that's not resolved
+ * - `needs_service`: At least one playable/minor issue that's not resolved
+ * - `operational`: No open issues
+ */
+export function deriveMachineStatus(issues: IssueForStatus[]): MachineStatus {
+  // Filter to only open issues (not resolved)
+  const openIssues = issues.filter((issue) => issue.status !== "resolved");
+
+  if (openIssues.length === 0) {
+    return "operational";
+  }
+
+  const hasUnplayable = openIssues.some(
+    (issue) => issue.severity === "unplayable"
+  );
+  if (hasUnplayable) {
+    return "unplayable";
+  }
+
+  return "needs_service";
+}
+```
+
+**Usage in Server Component**:
+
+```typescript
+// src/app/machines/page.tsx
+import { deriveMachineStatus } from "~/lib/machines/status";
+
+export default async function MachinesPage() {
+  const machines = await db.query.machines.findMany({
+    with: {
+      issues: {
+        columns: { status: true, severity: true },
+      },
+    },
+  });
+
+  const machinesWithStatus = machines.map((machine) => ({
+    ...machine,
+    status: deriveMachineStatus(machine.issues),
+  }));
+
+  return <MachineList machines={machinesWithStatus} />;
+}
+```
+
+**Key points**:
+
+- Status is derived, not stored (single source of truth)
+- Only open issues (not resolved) affect status
+- Hierarchy: unplayable > needs_service > operational
+- Helper functions for labels and styling separate from logic
+
+---
+
+## Machine CRUD Patterns
+
+### Create Machine Server Action
+
+```typescript
+// src/app/machines/schemas.ts
+import { z } from "zod";
+
+export const createMachineSchema = z.object({
+  name: z
+    .string()
+    .min(1, "Machine name is required")
+    .max(100, "Machine name must be less than 100 characters")
+    .trim(),
+});
+```
+
+```typescript
+// src/app/machines/actions.ts
+"use server";
+
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { createClient } from "~/lib/supabase/server";
+import { db } from "~/server/db";
+import { machines } from "~/server/db/schema";
+import { createMachineSchema } from "./schemas";
+import { setFlash } from "~/lib/flash";
+import type { Result } from "~/lib/result";
+
+export async function createMachineAction(
+  formData: FormData
+): Promise<Result<{ machineId: string }>> {
+  // Auth check (CORE-SEC-001)
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      success: false,
+      error: "Unauthorized. Please log in.",
+    };
+  }
+
+  // Validate input (CORE-SEC-002)
+  const validation = createMachineSchema.safeParse({
+    name: formData.get("name"),
+  });
+
+  if (!validation.success) {
+    return {
+      success: false,
+      error: validation.error.errors[0]?.message ?? "Invalid input",
+    };
+  }
+
+  const { name } = validation.data;
+
+  try {
+    // Insert machine (direct Drizzle query)
+    const [machine] = await db.insert(machines).values({ name }).returning();
+
+    // Set success flash and revalidate
+    await setFlash({
+      type: "success",
+      message: `Machine "${name}" created successfully`,
+    });
+    revalidatePath("/machines");
+
+    // Redirect to machine detail page
+    redirect(`/machines/${machine.id}`);
+  } catch (error) {
+    return {
+      success: false,
+      error: "Failed to create machine. Please try again.",
+    };
+  }
+}
+```
+
+**Key points**:
+
+- Separate Zod schemas from Server Actions (Next.js requirement)
+- Always validate and authenticate before mutations
+- Use flash messages + redirect for Post-Redirect-Get pattern
+- Revalidate affected paths after mutations
+
+---
+
 ## Adding New Patterns
 
 **When to add a pattern**:
