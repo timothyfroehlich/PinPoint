@@ -25,6 +25,7 @@ export default defineConfig(({ mode }) => {
           "src/**/*.test.{ts,tsx}",
           "src/test/**",
           "src/app/**", // Server Components tested via E2E
+          "src/components/ui/**", // shadcn/ui library components
           "**/*.d.ts",
           "**/types.ts",
           "**/*.config.{ts,js}",
