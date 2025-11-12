@@ -86,7 +86,22 @@ Top navigation bar with user menu, logo, auth state handling, and quick links fo
 
 ## Key Decisions
 
-_To be filled during task execution_
+1. **Navigation Placement**: Full-width navigation bar at top of all pages except auth pages (which have their own centered layout)
+2. **Auth Redirect**: Authenticated users are redirected from `/` to `/dashboard` automatically
+3. **Placeholder Routes**: Created placeholder pages for `/issues`, `/issues/new`, and `/machines` (will 404 → now show "Coming Soon" pages)
+4. **Mobile Quick Links**:
+   - Issues and Report Issue always visible (icon-only on mobile, text shown on sm+)
+   - Machines hidden on mobile (only visible on sm+ screens)
+   - User info (name/email) hidden on mobile in dropdown trigger
+5. **User Data Source**: Using `user.user_metadata` for user name (consistent with dashboard pattern)
+6. **Auth Pages Exclusion**: Auth pages use `(auth)` route group with own layout, so Navigation automatically excluded
+
+## Mobile UX - Needs Review
+
+**TODO**: Review mobile navigation behavior for additional quick links as they're added:
+
+- Current: Issues (always visible), Report Issue (always visible), Machines (hidden on mobile)
+- Question: Should we add a mobile menu/hamburger for additional links in the future, or continue hiding less critical links on mobile?
 
 ## Problems Encountered
 

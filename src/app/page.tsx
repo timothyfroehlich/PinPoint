@@ -1,10 +1,21 @@
 import type React from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { CircleDot } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { createClient } from "~/lib/supabase/server";
 
-export default function HomePage(): React.JSX.Element {
+export default async function HomePage(): Promise<React.JSX.Element> {
+  // Redirect authenticated users to dashboard
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user) {
+    redirect("/dashboard");
+  }
   return (
     <main className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-2xl border-outline-variant bg-surface shadow-2xl">
