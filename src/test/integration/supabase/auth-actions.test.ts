@@ -1,0 +1,236 @@
+import { describe, it, expect, beforeAll } from "vitest";
+import { createClient } from "@supabase/supabase-js";
+import { signupSchema, loginSchema } from "~/app/(auth)/schemas";
+
+/**
+ * Integration tests for authentication actions
+ *
+ * These tests validate auth actions against a real Supabase instance.
+ * Requires Supabase to be running (supabase start).
+ *
+ * Note: We test the validation schemas and expected behavior patterns,
+ * not the full Server Actions (which require Next.js runtime with cookies).
+ */
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error("Missing Supabase env vars for integration tests");
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+describe("Authentication Integration Tests", () => {
+  beforeAll(() => {
+    // Ensure we're in a test environment
+    expect(supabaseUrl).toContain("127.0.0.1");
+  });
+
+  describe("Signup flow", () => {
+    it("should validate signup input before calling Supabase", () => {
+      // Valid input
+      const validResult = signupSchema.safeParse({
+        name: "Test User",
+        email: "test@example.com",
+        password: "SecurePass123",
+      });
+      expect(validResult.success).toBe(true);
+
+      // Invalid input - password too short
+      const invalidResult = signupSchema.safeParse({
+        name: "Test User",
+        email: "test@example.com",
+        password: "short",
+      });
+      expect(invalidResult.success).toBe(false);
+    });
+
+    it("should create a new user with Supabase", async () => {
+      const testEmail = `test-${Date.now()}@example.com`;
+
+      const { data, error } = await supabase.auth.signUp({
+        email: testEmail,
+        password: "TestPassword123",
+        options: {
+          data: {
+            name: "Integration Test User",
+          },
+        },
+      });
+
+      expect(error).toBeNull();
+      expect(data.user).toBeDefined();
+      expect(data.user?.email).toBe(testEmail);
+
+      // Cleanup
+      if (data.user) {
+        await supabase.auth.admin.deleteUser(data.user.id);
+      }
+    });
+
+    it("should reject duplicate email", async () => {
+      const testEmail = `duplicate-${Date.now()}@example.com`;
+
+      // Create first user
+      const { data: firstData } = await supabase.auth.signUp({
+        email: testEmail,
+        password: "TestPassword123",
+        options: {
+          data: {
+            name: "First User",
+          },
+        },
+      });
+
+      // Try to create second user with same email
+      const { error: duplicateError } = await supabase.auth.signUp({
+        email: testEmail,
+        password: "DifferentPassword456",
+        options: {
+          data: {
+            name: "Second User",
+          },
+        },
+      });
+
+      expect(duplicateError).toBeDefined();
+      expect(duplicateError?.message).toContain("already registered");
+
+      // Cleanup
+      if (firstData.user) {
+        await supabase.auth.admin.deleteUser(firstData.user.id);
+      }
+    });
+  });
+
+  describe("Login flow", () => {
+    it("should validate login input before calling Supabase", () => {
+      // Valid input
+      const validResult = loginSchema.safeParse({
+        email: "user@example.com",
+        password: "password123",
+        rememberMe: true,
+      });
+      expect(validResult.success).toBe(true);
+
+      // Invalid input - bad email format
+      const invalidResult = loginSchema.safeParse({
+        email: "not-an-email",
+        password: "password123",
+      });
+      expect(invalidResult.success).toBe(false);
+    });
+
+    it("should authenticate existing user", async () => {
+      const testEmail = `login-test-${Date.now()}@example.com`;
+
+      // Create user first
+      const { data: signupData } = await supabase.auth.signUp({
+        email: testEmail,
+        password: "TestPassword123",
+        options: {
+          data: {
+            name: "Login Test User",
+          },
+        },
+      });
+
+      expect(signupData.user).toBeDefined();
+
+      // Now try to log in
+      const { data: loginData, error: loginError } =
+        await supabase.auth.signInWithPassword({
+          email: testEmail,
+          password: "TestPassword123",
+        });
+
+      expect(loginError).toBeNull();
+      expect(loginData.user).toBeDefined();
+      expect(loginData.user?.email).toBe(testEmail);
+
+      // Cleanup
+      if (signupData.user) {
+        await supabase.auth.admin.deleteUser(signupData.user.id);
+      }
+    });
+
+    it("should reject wrong password", async () => {
+      const testEmail = `wrong-pass-${Date.now()}@example.com`;
+
+      // Create user
+      const { data: signupData } = await supabase.auth.signUp({
+        email: testEmail,
+        password: "CorrectPassword123",
+        options: {
+          data: {
+            name: "Wrong Password Test",
+          },
+        },
+      });
+
+      // Try to log in with wrong password
+      const { error: loginError } = await supabase.auth.signInWithPassword({
+        email: testEmail,
+        password: "WrongPassword456",
+      });
+
+      expect(loginError).toBeDefined();
+      expect(loginError?.message).toContain("Invalid");
+
+      // Cleanup
+      if (signupData.user) {
+        await supabase.auth.admin.deleteUser(signupData.user.id);
+      }
+    });
+
+    it("should reject non-existent email", async () => {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: "nonexistent@example.com",
+        password: "AnyPassword123",
+      });
+
+      expect(error).toBeDefined();
+      expect(error?.message).toContain("Invalid");
+    });
+  });
+
+  describe("Logout flow", () => {
+    it("should sign out authenticated user", async () => {
+      const testEmail = `logout-test-${Date.now()}@example.com`;
+
+      // Create and login user
+      await supabase.auth.signUp({
+        email: testEmail,
+        password: "TestPassword123",
+        options: {
+          data: {
+            name: "Logout Test User",
+          },
+        },
+      });
+
+      const { data: loginData } = await supabase.auth.signInWithPassword({
+        email: testEmail,
+        password: "TestPassword123",
+      });
+
+      expect(loginData.user).toBeDefined();
+
+      // Sign out
+      const { error: signOutError } = await supabase.auth.signOut();
+      expect(signOutError).toBeNull();
+
+      // Verify user is signed out
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      expect(user).toBeNull();
+
+      // Cleanup (may need admin client since we're signed out)
+      if (loginData.user) {
+        await supabase.auth.admin.deleteUser(loginData.user.id);
+      }
+    });
+  });
+});

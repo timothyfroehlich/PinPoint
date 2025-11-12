@@ -369,18 +369,21 @@ export type Flash = {
   message: string;
   fields?: Record<string, string>;
 };
-export function setFlash(f: Flash): void {
-  cookies().set(KEY, JSON.stringify(f), {
+export async function setFlash(f: Flash): Promise<void> {
+  const c = await cookies();
+  c.set(KEY, JSON.stringify(f), {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
+    maxAge: 60, // Auto-expire after 60 seconds
   });
 }
-export function readAndClearFlash(): Flash | null {
-  const c = cookies();
+export async function readFlash(): Promise<Flash | null> {
+  const c = await cookies();
   const raw = c.get(KEY)?.value;
   if (!raw) return null;
-  c.set(KEY, "", { path: "/", maxAge: 0 });
+  // Note: Cannot clear in Server Components (Next.js restriction)
+  // Flash auto-expires via maxAge set when created
   try {
     return JSON.parse(raw) as Flash;
   } catch {
@@ -460,10 +463,10 @@ export async function createIssue(
 ```tsx
 // src/app/issues/new/page.tsx (works with or without JS)
 import { createIssue } from "~/app/issues/actions";
-import { readAndClearFlash } from "~/lib/flash";
+import { readFlash } from "~/lib/flash";
 
-export default function NewIssuePage() {
-  const flash = readAndClearFlash();
+export default async function NewIssuePage() {
+  const flash = await readFlash();
   return (
     <div>
       {flash && (

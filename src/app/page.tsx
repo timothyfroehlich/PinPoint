@@ -33,7 +33,7 @@ export default function HomePage(): React.JSX.Element {
               size="lg"
               className="bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container transition-colors"
             >
-              <Link href="/auth/signup">Sign Up</Link>
+              <Link href="/signup">Sign Up</Link>
             </Button>
             <Button
               asChild
@@ -41,7 +41,7 @@ export default function HomePage(): React.JSX.Element {
               variant="outline"
               className="border-outline text-primary hover:bg-surface-variant transition-colors"
             >
-              <Link href="/auth/login">Sign In</Link>
+              <Link href="/login">Sign In</Link>
             </Button>
           </div>
 
