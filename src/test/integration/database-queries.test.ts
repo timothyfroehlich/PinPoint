@@ -62,7 +62,10 @@ describe("Database Queries (PGlite)", () => {
 
       // Create machine first
       const testMachine = createTestMachine({ name: "Twilight Zone" });
-      const [machine] = await db.insert(machines).values(testMachine).returning();
+      const [machine] = await db
+        .insert(machines)
+        .values(testMachine)
+        .returning();
 
       // Create issue for that machine
       const testIssue = createTestIssue(machine.id, {
@@ -109,7 +112,10 @@ describe("Database Queries (PGlite)", () => {
 
       // Create machine with issue
       const testMachine = createTestMachine();
-      const [machine] = await db.insert(machines).values(testMachine).returning();
+      const [machine] = await db
+        .insert(machines)
+        .values(testMachine)
+        .returning();
 
       const testIssue = createTestIssue(machine.id);
       await db.insert(issues).values(testIssue);
@@ -153,7 +159,10 @@ describe("Database Queries (PGlite)", () => {
 
       // Create machine
       const testMachine = createTestMachine();
-      const [machine] = await db.insert(machines).values(testMachine).returning();
+      const [machine] = await db
+        .insert(machines)
+        .values(testMachine)
+        .returning();
 
       // Create issue reported by user
       const testIssue = createTestIssue(machine.id, {

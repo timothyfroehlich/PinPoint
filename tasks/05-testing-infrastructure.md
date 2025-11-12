@@ -83,6 +83,7 @@ Vitest, PGlite, Playwright setup with example tests and code coverage enforcemen
 ## Summary
 
 **What Was Built:**
+
 - ✅ Vitest with v8 coverage (80% thresholds enforced)
 - ✅ Worker-scoped PGlite for integration tests
 - ✅ Test helpers: factories, mocks, setup utilities
@@ -96,6 +97,7 @@ Vitest, PGlite, Playwright setup with example tests and code coverage enforcemen
 - ✅ Comprehensive test documentation (`src/test/README.md`)
 
 **Test Scripts Available:**
+
 ```bash
 npm test                  # Unit tests (fast)
 npm run test:integration  # Supabase integration tests (requires supabase start)
@@ -104,6 +106,7 @@ npm run smoke            # Playwright E2E smoke tests
 ```
 
 **Key Files Created:**
+
 - `vitest.config.ts` - Coverage config with 80% thresholds
 - `playwright.config.ts` - Minimal E2E config
 - `src/test/setup/pglite.ts` - Worker-scoped PGlite instance
@@ -118,6 +121,7 @@ npm run smoke            # Playwright E2E smoke tests
 See `tasks/05-testing-infrastructure-decisions.md` for comprehensive v1 vs v2 comparison.
 
 **Major Decisions:**
+
 1. **PGlite as Primary**: Worker-scoped PGlite for all integration tests (simpler than v1)
 2. **80% Coverage Enforced**: Strict from day 1 (v1 was opt-in, led to debt)
 3. **Centralized Tests**: All tests in `src/test/` (v1 was co-located)
@@ -140,21 +144,23 @@ See `tasks/05-testing-infrastructure-decisions.md` for comprehensive v1 vs v2 co
 
 ## v1 vs v2 Comparison
 
-| Aspect | v1 (Multi-Tenant) | v2 (Single-Tenant) | Result |
-|--------|------------------|-------------------|--------|
-| Database Tests | Real Supabase + RLS | PGlite primary | ✅ Simpler |
-| Test Scripts | 96 total | 8 total | ✅ Cleaner |
-| E2E Tests | 12+ (subdomains, auth) | 3 (landing page) | ✅ Minimal |
-| Coverage | Opt-in | 80% enforced | ✅ Stricter |
-| Organization | Co-located | Centralized | ✅ Clearer |
+| Aspect         | v1 (Multi-Tenant)      | v2 (Single-Tenant) | Result      |
+| -------------- | ---------------------- | ------------------ | ----------- |
+| Database Tests | Real Supabase + RLS    | PGlite primary     | ✅ Simpler  |
+| Test Scripts   | 96 total               | 8 total            | ✅ Cleaner  |
+| E2E Tests      | 12+ (subdomains, auth) | 3 (landing page)   | ✅ Minimal  |
+| Coverage       | Opt-in                 | 80% enforced       | ✅ Stricter |
+| Organization   | Co-located             | Centralized        | ✅ Clearer  |
 
 **Justified Simplifications:**
+
 - No RLS testing (single-tenant)
 - No organization mocking (no multi-tenancy)
 - No subdomain E2E tests (no custom domains)
 - No parallel test orchestration (suite <10s)
 
 **Borrowed from v1:**
+
 - Worker-scoped PGlite pattern
 - Separate slow Supabase tests
 - Test data factories
@@ -173,6 +179,7 @@ See `tasks/05-testing-infrastructure-decisions.md` for comprehensive v1 vs v2 co
 7. **GitHub workflow changes** - Must stage in `.github-staging/workflows/` first
 
 **Testing Patterns:**
+
 ```typescript
 // Integration test with PGlite
 import { setupTestDb, getTestDb } from "~/test/setup/pglite";
@@ -191,6 +198,7 @@ describe("My Feature", () => {
 ```
 
 **Next Tasks:**
+
 - Task 6 (Auth): Will need Server Action tests with PGlite
 - Task 7 (Machines): Add CRUD integration tests
 - Task 8 (Issues): Add timeline event tests

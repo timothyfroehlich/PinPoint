@@ -28,6 +28,7 @@ Test pure functions, utilities, and validation logic without external dependenci
 **Run**: `npm test` (included by default)
 
 **Examples**:
+
 - Utility functions
 - Zod schemas
 - Type guards
@@ -40,12 +41,14 @@ Test database queries and Server Actions using **PGlite** (worker-scoped).
 **Run**: `npm test` (included by default)
 
 **Key Points**:
+
 - Use worker-scoped PGlite (CORE-TEST-001)
 - Import `setupTestDb()` from `~/test/setup/pglite`
 - Auto-cleanup after each test
 - No real Supabase required
 
 **Example**:
+
 ```typescript
 import { setupTestDb, getTestDb } from "~/test/setup/pglite";
 import { createTestMachine } from "~/test/helpers/factories";
@@ -69,12 +72,14 @@ Tests that require a **real Supabase instance** (authentication, SSR, etc.).
 **Run**: `npm run test:integration` (requires `supabase start`)
 
 **Key Points**:
+
 - Requires local Supabase running
 - Tests real auth flows
 - Verifies schema applied correctly
 - Tests SSR client behavior
 
 **When to Use**:
+
 - Supabase Auth flows
 - SSR client creation
 - Schema verification
@@ -151,11 +156,13 @@ describe("My Feature", () => {
 Target: **80% coverage** for critical paths
 
 **Covered**:
+
 - Server Actions (integration tests with PGlite)
 - Utilities (unit tests)
 - Database queries (integration tests with PGlite)
 
 **Not Covered** (tested via E2E):
+
 - Server Components (`src/app/**`)
 - Client Components (basic interactivity)
 
@@ -164,6 +171,7 @@ Target: **80% coverage** for critical paths
 ## Anti-Patterns
 
 ❌ **Don't create per-test PGlite instances** (causes lockups)
+
 ```typescript
 // Bad
 beforeEach(() => {
@@ -172,6 +180,7 @@ beforeEach(() => {
 ```
 
 ❌ **Don't test implementation details**
+
 ```typescript
 // Bad - tests internal state
 expect(component.state.value).toBe(5);
@@ -181,6 +190,7 @@ expect(screen.getByText("5")).toBeInTheDocument();
 ```
 
 ❌ **Don't skip cleanup**
+
 ```typescript
 // Bad - leaves dirty state
 it("test", async () => {

@@ -7,24 +7,26 @@
 
 ### Architecture Complexity
 
-| Aspect | v1 (Archived, Multi-Tenant) | v2 (Current, Single-Tenant) | Decision Rationale |
-|--------|----------------------------|----------------------------|-------------------|
-| **Database Testing** | Real Supabase + PGlite for mocks | PGlite (worker-scoped) primary, Supabase for integration | **Simpler**: v2 doesn't need multi-tenant RLS testing |
-| **Test Organization** | Mixed unit/integration in src/ | Separated: `unit/`, `integration/`, `integration/supabase/` | **Clearer**: Explicit separation by test type |
-| **Setup Files** | `nextjs-mocks.ts`, `organization-mocks.ts` | `pglite.ts`, `mocks.ts`, `factories.ts` | **Domain-focused**: v1 needed org mocking for multi-tenancy |
-| **Coverage** | Opt-in (`COVERAGE=true`) | Always enforced (80% thresholds) | **Strict v2**: Pre-beta needs discipline, not flexibility |
+| Aspect                | v1 (Archived, Multi-Tenant)                | v2 (Current, Single-Tenant)                                 | Decision Rationale                                          |
+| --------------------- | ------------------------------------------ | ----------------------------------------------------------- | ----------------------------------------------------------- |
+| **Database Testing**  | Real Supabase + PGlite for mocks           | PGlite (worker-scoped) primary, Supabase for integration    | **Simpler**: v2 doesn't need multi-tenant RLS testing       |
+| **Test Organization** | Mixed unit/integration in src/             | Separated: `unit/`, `integration/`, `integration/supabase/` | **Clearer**: Explicit separation by test type               |
+| **Setup Files**       | `nextjs-mocks.ts`, `organization-mocks.ts` | `pglite.ts`, `mocks.ts`, `factories.ts`                     | **Domain-focused**: v1 needed org mocking for multi-tenancy |
+| **Coverage**          | Opt-in (`COVERAGE=true`)                   | Always enforced (80% thresholds)                            | **Strict v2**: Pre-beta needs discipline, not flexibility   |
 
 ### Key Differences
 
 #### 1. **Database Testing Strategy**
 
 **v1 Approach:**
+
 - Real Supabase for RLS policy testing
 - PGlite as secondary for isolated tests
 - Heavy mocking of organization context
 - RLS tests in separate `supabase/tests/` directory
 
 **v2 Approach:**
+
 ```typescript
 // Worker-scoped PGlite primary
 export async function getTestDb() {
@@ -38,6 +40,7 @@ export async function getTestDb() {
 ```
 
 **Why v2 is Simpler:**
+
 - No RLS policies to test (single-tenant)
 - No organization scoping required
 - Direct queries without permission checks
@@ -50,6 +53,7 @@ export async function getTestDb() {
 #### 2. **Test Script Complexity**
 
 **v1 Scripts (96 total):**
+
 ```json
 {
   "test": "vitest run --reporter=dot",
@@ -63,6 +67,7 @@ export async function getTestDb() {
 ```
 
 **v2 Scripts (simplified):**
+
 ```json
 {
   "test": "vitest run --exclude 'src/test/integration/**'",
@@ -73,6 +78,7 @@ export async function getTestDb() {
 ```
 
 **Why v2 is Simpler:**
+
 - No RLS-specific test suite
 - No multi-environment E2E (dev/prod)
 - No custom port juggling
@@ -85,6 +91,7 @@ export async function getTestDb() {
 #### 3. **E2E Test Scope**
 
 **v1 E2E Tests (from glob):**
+
 - `auth-redirect.e2e.test.ts`
 - `smoke-tests-auth.e2e.test.ts`
 - `pre-beta-user-testing-auth.e2e.test.ts`
@@ -92,9 +99,11 @@ export async function getTestDb() {
 - `apc-alias-host-behavior.e2e.test.ts`
 
 **v2 E2E Tests:**
+
 - `e2e/smoke/landing-page.spec.ts` (3 tests)
 
 **Why v2 is Minimal:**
+
 - No multi-tenancy = no subdomain routing tests
 - No custom domains = no host behavior tests
 - Pre-beta = landing page is entire public surface
@@ -108,6 +117,7 @@ export async function getTestDb() {
 #### 4. **Coverage Configuration**
 
 **v1 Coverage:**
+
 ```typescript
 coverage: {
   enabled: enableCoverage, // Opt-in via COVERAGE=true
@@ -119,6 +129,7 @@ coverage: {
 ```
 
 **v2 Coverage:**
+
 ```typescript
 coverage: {
   provider: "v8",
@@ -135,6 +146,7 @@ coverage: {
 ```
 
 **Why v2 is Stricter:**
+
 - Pre-beta needs discipline: 80% coverage or fail CI
 - No opt-in/opt-out: coverage always checked
 - Explicit exclusions documented (Server Components)
@@ -148,6 +160,7 @@ coverage: {
 #### 5. **Test Organization**
 
 **v1 Structure:**
+
 ```
 src/
   lib/
@@ -162,6 +175,7 @@ src/
 ```
 
 **v2 Structure:**
+
 ```
 src/
   test/
@@ -173,6 +187,7 @@ src/
 ```
 
 **Why v2 Centralizes:**
+
 - Easier to find all tests in one place
 - Clear separation by test type
 - No mixing test files with implementation
@@ -186,15 +201,19 @@ src/
 ### What v2 Borrowed from v1
 
 #### 1. **Worker-Scoped PGlite Pattern**
+
 v1 discovered per-test PGlite instances cause lockups. v2 codified this as CORE-TEST-001.
 
 #### 2. **Test Data Factories**
+
 v1 had inline test data. v2 extracted to `factories.ts` based on v1's lessons.
 
 #### 3. **Separate Supabase Integration Tests**
+
 v1 learned real Supabase tests are slow. v2 isolates them from the start.
 
 #### 4. **Coverage Exclusions**
+
 v1 excluded e2e, scripts, configs. v2 adds `src/app/**` (Server Components) exclusion.
 
 ---
@@ -202,13 +221,16 @@ v1 excluded e2e, scripts, configs. v2 adds `src/app/**` (Server Components) excl
 ### What v2 Intentionally Skipped (For Now)
 
 #### 1. **Complex E2E Setup**
+
 **v1 had:**
+
 - Custom port management (`PLAYWRIGHT_PORT=49210`)
 - Reuse flags (`PLAYWRIGHT_REUSE=1`)
 - Multiple projects (chromium, auth-setup, chromium-auth)
 - Prod-specific tests
 
 **v2 starts with:**
+
 - Default port (3000)
 - Single chromium project
 - Dev-only tests
@@ -220,11 +242,14 @@ v1 excluded e2e, scripts, configs. v2 adds `src/app/**` (Server Components) excl
 ---
 
 #### 2. **Vitest UI / Coverage UI**
+
 **v1 had:**
+
 - `@vitest/ui` installed but rarely used
 - Coverage reports uploaded to Codecov
 
 **v2 has:**
+
 - `@vitest/ui` installed (in package.json)
 - Coverage reports in CI artifacts
 - No external coverage service
@@ -236,11 +261,14 @@ v1 excluded e2e, scripts, configs. v2 adds `src/app/**` (Server Components) excl
 ---
 
 #### 3. **Multi-Project Vitest Config**
+
 **v1 tried:**
+
 - Separate unit/integration/e2e projects in Vitest
 - Reverted to single project (per v1 comment: "back to single-project setup while we fix CI issues")
 
 **v2 uses:**
+
 - Single Vitest project
 - Separation via directory exclusion (`--exclude 'src/test/integration/**'`)
 
@@ -252,34 +280,37 @@ v1 excluded e2e, scripts, configs. v2 adds `src/app/**` (Server Components) excl
 
 ### Decision Matrix
 
-| Feature | v1 | v2 | Decision |
-|---------|----|----|----------|
-| PGlite worker-scoped | ✅ | ✅ | **Keep** - Proven pattern |
-| Real Supabase tests | ✅ Primary | ✅ Isolated | **Adapt** - Only for auth |
-| RLS testing | ✅ Required | ❌ N/A | **Remove** - Single-tenant |
-| Organization mocking | ✅ Complex | ❌ N/A | **Remove** - Single-tenant |
-| Coverage thresholds | ❌ Opt-in | ✅ Enforced | **Strict** - Pre-beta discipline |
-| Test co-location | ✅ Mixed | ❌ Centralized | **Centralize** - Clarity |
-| E2E complexity | ✅ Production-ready | ❌ Minimal | **Defer** - MVP first |
-| Test scripts | 96 total | 8 total | **Simplify** - Add when needed |
+| Feature              | v1                  | v2             | Decision                         |
+| -------------------- | ------------------- | -------------- | -------------------------------- |
+| PGlite worker-scoped | ✅                  | ✅             | **Keep** - Proven pattern        |
+| Real Supabase tests  | ✅ Primary          | ✅ Isolated    | **Adapt** - Only for auth        |
+| RLS testing          | ✅ Required         | ❌ N/A         | **Remove** - Single-tenant       |
+| Organization mocking | ✅ Complex          | ❌ N/A         | **Remove** - Single-tenant       |
+| Coverage thresholds  | ❌ Opt-in           | ✅ Enforced    | **Strict** - Pre-beta discipline |
+| Test co-location     | ✅ Mixed            | ❌ Centralized | **Centralize** - Clarity         |
+| E2E complexity       | ✅ Production-ready | ❌ Minimal     | **Defer** - MVP first            |
+| Test scripts         | 96 total            | 8 total        | **Simplify** - Add when needed   |
 
 ---
 
 ### Justification Summary
 
 **v2 is simpler because:**
+
 1. **Single-tenant** removes entire categories of tests (RLS, org scoping, subdomains)
 2. **Pre-beta** has zero users, can afford strict coverage from day 1
 3. **Greenfield** can start with best practices, not accumulate debt
 4. **Rule of Three** prevents premature abstraction (scripts, config complexity)
 
 **v2 learned from v1:**
+
 1. Worker-scoped PGlite prevents lockups
 2. Separate slow tests (Supabase) from fast tests (PGlite)
 3. Coverage opt-in leads to "we'll add tests later"
 4. E2E tests for non-existent features waste time
 
 **v2 will evolve toward v1 when:**
+
 1. Test suite >60 seconds → Add parallel execution
 2. Port conflicts in CI → Add custom port management
 3. Multi-tenant required → Add organization mocking back
@@ -307,26 +338,31 @@ v2 Now (MVP)          v1 Equivalent (Production)
 ## Key Decisions
 
 ### 1. PGlite as Primary Test Database
+
 - **Decision**: Use worker-scoped PGlite for all integration tests except Supabase-specific flows
 - **Why**: Single-tenant doesn't need RLS testing, PGlite is faster and simpler
 - **Trade-off**: Won't catch Supabase-specific issues, but those are isolated to auth
 
 ### 2. Coverage Thresholds (80%) Enforced
+
 - **Decision**: Fail CI if coverage <80% (lines, functions, branches, statements)
 - **Why**: Pre-beta is perfect time to enforce discipline
 - **Trade-off**: May slow initial development, but prevents debt
 
 ### 3. Separate Supabase Integration Tests
+
 - **Decision**: `src/test/integration/supabase/` for tests requiring real Supabase
 - **Why**: Isolate slow tests, run with `npm run test:integration`
 - **Trade-off**: Extra directory, but clear intent
 
 ### 4. Minimal Playwright Config
+
 - **Decision**: Single chromium project, basic retries, auto-start dev server
 - **Why**: v1 complexity came from production needs we don't have yet
 - **Trade-off**: May need to add complexity later (port management, parallel projects)
 
 ### 5. Test Centralization
+
 - **Decision**: All tests in `src/test/`, not co-located with implementation
 - **Why**: Clearer organization for greenfield, easier to find all tests
 - **Trade-off**: Longer import paths, but better discoverability
@@ -336,18 +372,21 @@ v2 Now (MVP)          v1 Equivalent (Production)
 ## Problems Encountered
 
 ### 1. Coverage Failing at 0%
+
 **Problem**: Coverage enforcement immediately failed (0% < 80%)
 **Root Cause**: Only have example tests, no real implementation tested
 **Solution**: This is expected and correct! Infrastructure is working
 **Lesson**: Coverage config is correctly excluding test files and app directory
 
 ### 2. GitHub Workflows Cannot Be Modified
+
 **Problem**: Claude Code web cannot push to `.github/workflows/`
 **Root Cause**: GitHub App security restrictions
 **Solution**: Stage changes in `.github-staging/workflows/`, document review process
 **Lesson**: Always check CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE before modifying workflows
 
 ### 3. Integration Test Exclusion
+
 **Problem**: `npm test` excludes `src/test/integration/**` but couldn't run them separately
 **Root Cause**: Needed separate script for integration tests
 **Solution**: Added `test:integration` script for explicit integration test runs
@@ -358,26 +397,31 @@ v2 Now (MVP)          v1 Equivalent (Production)
 ## Lessons Learned
 
 ### 1. Start Strict, Relax Later
+
 - v1 had opt-in coverage, led to debt
 - v2 enforces 80% from day 1
 - Can lower later if too painful, but debt harder to fix retroactively
 
 ### 2. Separate Test Types Early
+
 - v1 mixed unit/integration/e2e
 - v2 clearly separates by directory
 - Makes it obvious which tests require external dependencies
 
 ### 3. Worker-Scoped PGlite is Critical
+
 - v1 discovered per-test instances cause lockups
 - v2 codifies as CORE-TEST-001 from the start
 - Non-negotiable pattern for memory safety
 
 ### 4. Minimal E2E Until Features Exist
+
 - v1 had pre-built E2E tests
 - v2 starts with 3 landing page tests, will add 4 more as features build
 - Don't test features that don't exist yet
 
 ### 5. Rule of Three for Test Infrastructure
+
 - v1 has 96 scripts because they evolved from real pain
 - v2 starts with 8 scripts, will add when needed
 - Example: No parallel execution until test suite >60s
@@ -416,6 +460,7 @@ For agents working on subsequent tasks:
 **Target**: 80% (enforced in CI)
 
 **When coverage fails**:
+
 1. Check what's not covered: `npm run test:coverage`
 2. Prioritize: Server Actions > utilities > data transformations
 3. Skip: Server Components (E2E tested), shadcn components (library code)
