@@ -16,6 +16,7 @@
     "test:integration": "vitest run src/test/integration --silent --no-color",
     "test:watch": "vitest watch --exclude 'src/test/integration/**'",
     "test:coverage": "vitest run --coverage --exclude 'src/test/integration/**'",
+    "test:generate-schema": "drizzle-kit generate --dialect=postgresql --schema=./src/server/db/schema.ts --out=src/test/setup/migrations",
     "smoke": "playwright test e2e/smoke",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
