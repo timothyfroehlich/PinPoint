@@ -46,10 +46,7 @@ export function createMockSession(user: User): Session {
 /**
  * Mock AuthError for testing error cases
  */
-export function createMockAuthError(
-  message: string,
-  status = 400
-): AuthError {
+export function createMockAuthError(message: string, status = 400): AuthError {
   return {
     name: "AuthApiError",
     message,
@@ -209,9 +206,7 @@ export function mockNextCookies(
       getAll: vi.fn(() => initialCookies),
       set: vi.fn(),
       delete: vi.fn(),
-      get: vi.fn((name: string) =>
-        initialCookies.find((c) => c.name === name)
-      ),
+      get: vi.fn((name: string) => initialCookies.find((c) => c.name === name)),
     })
   );
 }
