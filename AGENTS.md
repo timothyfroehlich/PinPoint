@@ -306,4 +306,38 @@ If all Yes → ship it. Perfect is the enemy of done.
 - Progressive enhancement (forms work without JS)
 - Input validation with Zod for all user inputs
 
+## Production Bug Testing (TDD Required)
+
+**Critical**: When a bug is discovered in preview/production deployments that wasn't caught by tests, follow TDD:
+
+### RED-GREEN-REFACTOR Process
+
+1. **RED - Write failing test**
+   - Reproduce the bug locally
+   - Write a test that fails due to the bug
+   - Verify the test actually fails (don't skip this!)
+   - Commit the failing test
+
+2. **GREEN - Fix the bug**
+   - Make minimal changes to make the test pass
+   - Verify the test now passes
+   - Verify original bug is fixed in deployment preview
+
+3. **REFACTOR - Clean up if needed**
+   - Improve code quality without changing behavior
+   - Ensure tests still pass
+   - Document pattern in `docs/NON_NEGOTIABLES.md` if it's a common mistake
+
+**Examples**:
+
+- Cookie modification in Server Components → Add unit test verifying readFlash() doesn't call cookies.set()
+- Type errors in production → Add integration test for that code path
+- Runtime errors on specific routes → Add E2E test for that route
+
+**Exceptions** - Skip TDD only if:
+
+- Bug is environment-specific (e.g., deployment platform configuration)
+- Test would be flaky or unreliable
+- Already covered by existing tests (test just needs to be fixed)
+
 **Usage**: This file provides essential context for AI agents working on PinPoint. Follow all constraints in `docs/NON_NEGOTIABLES.md`.

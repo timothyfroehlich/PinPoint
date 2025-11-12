@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { signupAction } from "~/app/(auth)/actions";
-import { readAndClearFlash } from "~/lib/flash";
+import { readFlash } from "~/lib/flash";
 import { createClient } from "~/lib/supabase/server";
 import { SignupForm } from "./signup-form";
 
@@ -26,7 +26,7 @@ export default async function SignupPage(): Promise<React.JSX.Element> {
   }
 
   // Read flash message (if any)
-  const flash = await readAndClearFlash();
+  const flash = await readFlash();
 
   /**
    * Server action wrapper for progressive enhancement

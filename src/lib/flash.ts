@@ -47,15 +47,18 @@ export async function setFlash(flash: Flash): Promise<void> {
 }
 
 /**
- * Read and clear flash message from cookies
+ * Read flash message from cookies
  *
  * Call this in Server Components to display flash messages.
- * The message is automatically deleted after reading.
+ * The message auto-expires after 60 seconds (set when created).
+ *
+ * Note: Cannot clear cookies in Server Components (Next.js restriction).
+ * Flash messages expire automatically via maxAge.
  *
  * @example
  * ```tsx
  * export default function NewIssuePage() {
- *   const flash = readAndClearFlash();
+ *   const flash = await readFlash();
  *   return (
  *     <div>
  *       {flash && <Alert type={flash.type}>{flash.message}</Alert>}
@@ -65,19 +68,13 @@ export async function setFlash(flash: Flash): Promise<void> {
  * }
  * ```
  */
-export async function readAndClearFlash(): Promise<Flash | null> {
+export async function readFlash(): Promise<Flash | null> {
   const cookieStore = await cookies();
   const raw = cookieStore.get(FLASH_COOKIE_KEY)?.value;
 
   if (!raw) {
     return null;
   }
-
-  // Clear the flash message
-  cookieStore.set(FLASH_COOKIE_KEY, "", {
-    path: "/",
-    maxAge: 0,
-  });
 
   try {
     return JSON.parse(raw) as Flash;

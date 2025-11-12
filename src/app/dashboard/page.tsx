@@ -4,7 +4,7 @@ import { createClient } from "~/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { logoutAction } from "~/app/(auth)/actions";
-import { readAndClearFlash } from "~/lib/flash";
+import { readFlash } from "~/lib/flash";
 import { UserCircle, Mail } from "lucide-react";
 
 /**
@@ -27,7 +27,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
   }
 
   // Read flash message (if any)
-  const flash = await readAndClearFlash();
+  const flash = await readFlash();
 
   // Get user metadata
   const name = user.user_metadata["name"] as string | undefined;

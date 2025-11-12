@@ -6,7 +6,7 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { loginAction } from "~/app/(auth)/actions";
-import { readAndClearFlash } from "~/lib/flash";
+import { readFlash } from "~/lib/flash";
 import { createClient } from "~/lib/supabase/server";
 
 /**
@@ -27,7 +27,7 @@ export default async function LoginPage(): Promise<React.JSX.Element> {
   }
 
   // Read flash message (if any)
-  const flash = await readAndClearFlash();
+  const flash = await readFlash();
 
   /**
    * Client action wrapper for progressive enhancement
