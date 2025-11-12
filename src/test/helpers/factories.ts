@@ -5,6 +5,7 @@
  * Override specific fields as needed for your test cases.
  */
 
+import { randomUUID } from "node:crypto";
 import type { InferInsertModel } from "drizzle-orm";
 import type {
   userProfiles,
@@ -20,7 +21,7 @@ export function createTestUser(
   overrides?: Partial<InferInsertModel<typeof userProfiles>>
 ): InferInsertModel<typeof userProfiles> {
   return {
-    id: overrides?.id ?? crypto.randomUUID(),
+    id: overrides?.id ?? randomUUID(),
     name: overrides?.name ?? "Test User",
     avatarUrl: overrides?.avatarUrl ?? null,
     role: overrides?.role ?? "member",
@@ -36,7 +37,7 @@ export function createTestMachine(
   overrides?: Partial<InferInsertModel<typeof machines>>
 ): InferInsertModel<typeof machines> {
   return {
-    id: overrides?.id ?? crypto.randomUUID(),
+    id: overrides?.id ?? randomUUID(),
     name: overrides?.name ?? "Test Machine",
     createdAt: overrides?.createdAt ?? new Date(),
     updatedAt: overrides?.updatedAt ?? new Date(),
@@ -51,7 +52,7 @@ export function createTestIssue(
   overrides?: Partial<InferInsertModel<typeof issues>>
 ): InferInsertModel<typeof issues> {
   return {
-    id: overrides?.id ?? crypto.randomUUID(),
+    id: overrides?.id ?? randomUUID(),
     machineId,
     title: overrides?.title ?? "Test Issue",
     description: overrides?.description ?? "Test description",
@@ -73,7 +74,7 @@ export function createTestComment(
   overrides?: Partial<InferInsertModel<typeof issueComments>>
 ): InferInsertModel<typeof issueComments> {
   return {
-    id: overrides?.id ?? crypto.randomUUID(),
+    id: overrides?.id ?? randomUUID(),
     issueId,
     authorId: overrides?.authorId ?? null,
     content: overrides?.content ?? "Test comment",

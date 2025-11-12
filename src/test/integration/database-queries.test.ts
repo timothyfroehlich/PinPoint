@@ -5,6 +5,7 @@
  * These tests verify database operations without requiring a real Supabase instance.
  */
 
+import { randomUUID } from "node:crypto";
 import { describe, it, expect } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
@@ -36,7 +37,7 @@ describe("Database Queries (PGlite)", () => {
 
     it("should find machine by id", async () => {
       const db = await getTestDb();
-      const machineId = crypto.randomUUID();
+      const machineId = randomUUID();
       const testMachine = createTestMachine({
         id: machineId,
         name: "Medieval Madness",
@@ -44,11 +45,13 @@ describe("Database Queries (PGlite)", () => {
 
       await db.insert(machines).values(testMachine);
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const result = await db.query.machines.findFirst({
         where: eq(machines.id, machineId),
       });
 
       expect(result).toBeDefined();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect(result?.name).toBe("Medieval Madness");
     });
   });
@@ -69,6 +72,7 @@ describe("Database Queries (PGlite)", () => {
       await db.insert(issues).values(testIssue);
 
       // Query with relation
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const result = await db.query.issues.findFirst({
         where: eq(issues.machineId, machine.id),
         with: {
@@ -77,8 +81,11 @@ describe("Database Queries (PGlite)", () => {
       });
 
       expect(result).toBeDefined();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect(result?.title).toBe("Broken flipper");
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect(result?.severity).toBe("unplayable");
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect(result?.machine.name).toBe("Twilight Zone");
     });
 
@@ -156,6 +163,7 @@ describe("Database Queries (PGlite)", () => {
       await db.insert(issues).values(testIssue);
 
       // Query with relation
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const result = await db.query.issues.findFirst({
         where: eq(issues.reportedBy, user.id),
         with: {
@@ -164,6 +172,7 @@ describe("Database Queries (PGlite)", () => {
       });
 
       expect(result).toBeDefined();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect(result?.reportedByUser?.name).toBe("Reporter User");
     });
   });
