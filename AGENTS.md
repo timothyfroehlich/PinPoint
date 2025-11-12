@@ -166,7 +166,7 @@ When facing a decision, ask:
 
 - **Testing**: `npm test` (unit tests), `npm run test:integration` (Supabase tests), `npm run test:watch`, `npm run smoke` (E2E)
 - **Development**: `npm run dev`, `npm run build`, `npm run lint`, `npm run typecheck`
-- **Quality Gate**: `npm run preflight` (runs all checks before commits)
+- **Quality Gate**: `npm run preflight` (comprehensive validation - REQUIRED before pushing)
 - **Components**: `npx shadcn@latest add [component]`
 
 ### Testing Requirements
@@ -294,7 +294,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 ## Commit Guidelines
 
 - **Style**: Conventional commits (`feat:`, `fix:`, `chore:`)
-- **Before pushing**: `npm run pre-flight` (runs typecheck, test, smoke, lint, format)
+- **Before pushing**: ALWAYS run `npm run preflight` (runs typecheck, lint, format, test, build, test:integration)
 - **PRs**: Clear description, screenshots for UI changes
 - **No migrations**: Schema changes via direct modification only
 
