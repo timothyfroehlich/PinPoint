@@ -81,7 +81,12 @@ jobs:
         run: npm ci
 
       - name: Build application
-        run: npm run build
+        run: |
+          # Load CI environment variables for build-time evaluation
+          set -a
+          source .env.ci
+          set +a
+          npm run build
 
   test:
     name: Unit & Integration Tests
