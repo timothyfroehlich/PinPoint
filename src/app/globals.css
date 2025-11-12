@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
-/* Material Design 3 Color System */
+/* Material Design 3 Color System - Tailwind v4 */
 @theme {
-  /* Primary Colors */
+  /* Primary Colors - becomes bg-primary, text-primary, etc. */
   --color-primary: #6750a4;
   --color-on-primary: #ffffff;
   --color-primary-container: #eaddff;
@@ -26,19 +26,17 @@
   --color-error-container: #f9dedc;
   --color-on-error-container: #410e0b;
 
-  /* Background & Surface Colors */
-  --color-background: #fffbfe;
-  --color-on-background: #1c1b1f;
+  /* Surface Colors */
   --color-surface: #fffbfe;
   --color-on-surface: #1c1b1f;
   --color-surface-variant: #e7e0ec;
   --color-on-surface-variant: #49454f;
+  --color-surface-dim: #ded8e1;
+  --color-surface-bright: #fffbfe;
 
-  /* Outline & Shadow Colors */
+  /* Outline Colors */
   --color-outline: #79747e;
   --color-outline-variant: #cac4d0;
-  --color-shadow: #000000;
-  --color-scrim: #000000;
 
   /* Inverse Colors */
   --color-inverse-surface: #313033;
@@ -72,19 +70,17 @@
     --color-error-container: #8c1d18;
     --color-on-error-container: #f9dedc;
 
-    /* Background & Surface Colors - Dark */
-    --color-background: #1c1b1f;
-    --color-on-background: #e6e1e5;
+    /* Surface Colors - Dark */
     --color-surface: #1c1b1f;
     --color-on-surface: #e6e1e5;
     --color-surface-variant: #49454f;
     --color-on-surface-variant: #cac4d0;
+    --color-surface-dim: #1c1b1f;
+    --color-surface-bright: #3b383e;
 
-    /* Outline & Shadow Colors - Dark */
+    /* Outline Colors - Dark */
     --color-outline: #938f99;
     --color-outline-variant: #49454f;
-    --color-shadow: #000000;
-    --color-scrim: #000000;
 
     /* Inverse Colors - Dark */
     --color-inverse-surface: #e6e1e5;
@@ -116,11 +112,15 @@ body {
     Arial,
     sans-serif;
   line-height: 1.6;
-  background-color: var(--color-background);
-  color: var(--color-on-background);
+  background: linear-gradient(
+    135deg,
+    var(--color-surface-bright) 0%,
+    var(--color-surface-variant) 100%
+  );
+  color: var(--color-on-surface);
 }
 
 main {
   min-height: 100vh;
-  padding: 2rem;
+  padding: 1rem;
 }
