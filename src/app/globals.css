@@ -1,5 +1,94 @@
 @import "tailwindcss";
 
+/* Material Design 3 Color System - Tailwind v4 */
+@theme {
+  /* Primary Colors - becomes bg-primary, text-primary, etc. */
+  --color-primary: #6750a4;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #eaddff;
+  --color-on-primary-container: #21005d;
+
+  /* Secondary Colors */
+  --color-secondary: #625b71;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #e8def8;
+  --color-on-secondary-container: #1d192b;
+
+  /* Tertiary Colors */
+  --color-tertiary: #7d5260;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #ffd8e4;
+  --color-on-tertiary-container: #31111d;
+
+  /* Error Colors */
+  --color-error: #b3261e;
+  --color-on-error: #ffffff;
+  --color-error-container: #f9dedc;
+  --color-on-error-container: #410e0b;
+
+  /* Surface Colors */
+  --color-surface: #fffbfe;
+  --color-on-surface: #1c1b1f;
+  --color-surface-variant: #e7e0ec;
+  --color-on-surface-variant: #49454f;
+  --color-surface-dim: #ded8e1;
+  --color-surface-bright: #fffbfe;
+
+  /* Outline Colors */
+  --color-outline: #79747e;
+  --color-outline-variant: #cac4d0;
+
+  /* Inverse Colors */
+  --color-inverse-surface: #313033;
+  --color-inverse-on-surface: #f4eff4;
+  --color-inverse-primary: #d0bcff;
+}
+
+@media (prefers-color-scheme: dark) {
+  @theme {
+    /* Primary Colors - Dark */
+    --color-primary: #d0bcff;
+    --color-on-primary: #381e72;
+    --color-primary-container: #4f378b;
+    --color-on-primary-container: #eaddff;
+
+    /* Secondary Colors - Dark */
+    --color-secondary: #ccc2dc;
+    --color-on-secondary: #332d41;
+    --color-secondary-container: #4a4458;
+    --color-on-secondary-container: #e8def8;
+
+    /* Tertiary Colors - Dark */
+    --color-tertiary: #efb8c8;
+    --color-on-tertiary: #492532;
+    --color-tertiary-container: #633b48;
+    --color-on-tertiary-container: #ffd8e4;
+
+    /* Error Colors - Dark */
+    --color-error: #f2b8b5;
+    --color-on-error: #601410;
+    --color-error-container: #8c1d18;
+    --color-on-error-container: #f9dedc;
+
+    /* Surface Colors - Dark */
+    --color-surface: #1c1b1f;
+    --color-on-surface: #e6e1e5;
+    --color-surface-variant: #49454f;
+    --color-on-surface-variant: #cac4d0;
+    --color-surface-dim: #1c1b1f;
+    --color-surface-bright: #3b383e;
+
+    /* Outline Colors - Dark */
+    --color-outline: #938f99;
+    --color-outline-variant: #49454f;
+
+    /* Inverse Colors - Dark */
+    --color-inverse-surface: #e6e1e5;
+    --color-inverse-on-surface: #313033;
+    --color-inverse-primary: #6750a4;
+  }
+}
+
 * {
   box-sizing: border-box;
   padding: 0;
@@ -23,9 +112,15 @@ body {
     Arial,
     sans-serif;
   line-height: 1.6;
+  background: linear-gradient(
+    135deg,
+    var(--color-surface-bright) 0%,
+    var(--color-surface-variant) 100%
+  );
+  color: var(--color-on-surface);
 }
 
 main {
   min-height: 100vh;
-  padding: 2rem;
+  padding: 1rem;
 }
