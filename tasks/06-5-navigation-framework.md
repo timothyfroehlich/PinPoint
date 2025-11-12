@@ -88,7 +88,7 @@ Top navigation bar with user menu, logo, auth state handling, and quick links fo
 
 1. **Navigation Placement**: Full-width navigation bar at top of all pages except auth pages (which have their own centered layout)
 2. **Auth Redirect**: Authenticated users are redirected from `/` to `/dashboard` automatically
-3. **Placeholder Routes**: Created placeholder pages for `/issues`, `/issues/new`, and `/machines` (will 404 → now show "Coming Soon" pages)
+3. **Placeholder Routes**: Now show "Coming Soon" placeholder pages for `/issues`, `/issues/new`, and `/machines` (previously would 404)
 4. **Mobile Quick Links**:
    - Issues and Report Issue always visible (icon-only on mobile, text shown on sm+)
    - Machines hidden on mobile (only visible on sm+ screens)

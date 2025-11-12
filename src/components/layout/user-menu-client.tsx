@@ -32,6 +32,7 @@ export function UserMenu({
   // Get user initials for avatar fallback
   const initials = userName
     .split(" ")
+    .filter((n) => n.length > 0) // Filter out empty strings
     .map((n) => n[0])
     .join("")
     .toUpperCase()
@@ -39,7 +40,10 @@ export function UserMenu({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-primary hover:text-on-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+      <DropdownMenuTrigger
+        aria-label="User menu"
+        className="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-primary hover:text-on-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+      >
         <div className="flex items-center gap-3">
           <div className="hidden sm:block text-right">
             <p className="text-sm font-medium text-on-primary-container">

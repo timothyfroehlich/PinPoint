@@ -4,6 +4,7 @@ import { CircleDot, AlertTriangle, Plus, Wrench } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { Button } from "~/components/ui/button";
 import { UserMenu } from "./user-menu-client";
+import { cn } from "~/lib/utils";
 
 /**
  * Navigation Component (Server Component)
@@ -21,11 +22,10 @@ export async function Navigation(): Promise<React.JSX.Element> {
 
   return (
     <nav
-      className={`w-full border-b ${
-        user
-          ? "bg-primary-container border-outline-variant"
-          : "bg-surface border-outline-variant"
-      }`}
+      className={cn(
+        "w-full border-b border-outline-variant",
+        user ? "bg-primary-container" : "bg-surface"
+      )}
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
@@ -35,11 +35,17 @@ export async function Navigation(): Promise<React.JSX.Element> {
             className="flex items-center gap-2 hover:opacity-80 transition-opacity"
           >
             <CircleDot
-              className={`size-6 ${user ? "text-on-primary-container" : "text-primary"}`}
+              className={cn(
+                "size-6",
+                user ? "text-on-primary-container" : "text-primary"
+              )}
               strokeWidth={2.5}
             />
             <span
-              className={`text-xl font-bold ${user ? "text-on-primary-container" : "text-primary"}`}
+              className={cn(
+                "text-xl font-bold",
+                user ? "text-on-primary-container" : "text-primary"
+              )}
             >
               PinPoint
             </span>
@@ -55,6 +61,7 @@ export async function Navigation(): Promise<React.JSX.Element> {
                   variant="ghost"
                   size="sm"
                   className="text-on-primary-container hover:bg-primary hover:text-on-primary"
+                  aria-label="View Issues"
                 >
                   <Link href="/issues" className="flex items-center gap-2">
                     <AlertTriangle className="size-4" />
@@ -66,6 +73,7 @@ export async function Navigation(): Promise<React.JSX.Element> {
                   variant="ghost"
                   size="sm"
                   className="text-on-primary-container hover:bg-primary hover:text-on-primary"
+                  aria-label="Report Issue"
                 >
                   <Link href="/issues/new" className="flex items-center gap-2">
                     <Plus className="size-4" />
@@ -77,6 +85,7 @@ export async function Navigation(): Promise<React.JSX.Element> {
                   variant="ghost"
                   size="sm"
                   className="text-on-primary-container hover:bg-primary hover:text-on-primary hidden sm:flex"
+                  aria-label="View Machines"
                 >
                   <Link href="/machines" className="flex items-center gap-2">
                     <Wrench className="size-4" />
