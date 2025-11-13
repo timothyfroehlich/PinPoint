@@ -108,9 +108,7 @@ test.describe("Navigation", () => {
 
     // Click on user menu trigger (avatar with chevron)
     const nav = page.locator("nav");
-    const userMenuTrigger = nav.locator("button:has(svg)").filter({
-      has: page.locator('text="Member User"'),
-    });
+    const userMenuTrigger = nav.getByRole("button", { name: /User menu/i });
     await userMenuTrigger.click();
 
     // Menu items should be visible
@@ -135,9 +133,7 @@ test.describe("Navigation", () => {
 
     // Open user menu
     const nav = page.locator("nav");
-    const userMenuTrigger = nav.locator("button:has(svg)").filter({
-      has: page.locator('text="Member User"'),
-    });
+    const userMenuTrigger = nav.getByRole("button", { name: /User menu/i });
     await userMenuTrigger.click();
 
     // Click Sign Out
@@ -155,12 +151,13 @@ test.describe("Navigation", () => {
     page,
   }) => {
     // When unauthenticated, logo should link to /
-    await page.goto("/login");
+    await page.goto("/");
     const nav = page.locator("nav");
     const logoLink = nav.getByRole("link", { name: /PinPoint/i });
     await expect(logoLink).toHaveAttribute("href", "/");
 
     // Login
+    await page.goto("/login");
     await page.getByLabel("Email").fill("member@test.com");
     await page.getByLabel("Password").fill("TestPassword123");
     await page.getByRole("button", { name: "Sign In" }).click();

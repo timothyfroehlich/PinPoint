@@ -147,6 +147,39 @@ export async function updateProfileAction(formData: FormData) {
 - Use `redirect()` for unauthenticated users
 - Never skip auth checks in protected routes (CORE-SEC-001)
 
+### Protected Route Pattern (Server Component)
+
+When a route requires authentication, use this pattern at the top of the page component:
+
+```typescript
+// src/app/issues/page.tsx (or any protected route)
+import type React from "react";
+import { redirect } from "next/navigation";
+import { createClient } from "~/lib/supabase/server";
+
+export default async function ProtectedPage(): Promise<React.JSX.Element> {
+  // Auth guard
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  // User is guaranteed to be authenticated here
+  return <div>Protected content</div>;
+}
+```
+
+**Key points**:
+
+- Check auth at the very start of the component (before any other logic)
+- Use `redirect("/login")` to send unauthenticated users to login page
+- After the guard, `user` is guaranteed to exist (type narrowing)
+- This pattern reached Rule of Three (used in `/issues`, `/issues/new`, `/machines`)
+
 ---
 
 ## File Organization
