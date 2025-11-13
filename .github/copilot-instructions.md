@@ -54,6 +54,7 @@ Referencing `TASKS.md` PR order:
 5. Progressive Enhancement: `<form action={serverAction}>` patterns validated.
 6. Memory Safety & Test Patterns: Worker-scoped DB setup; no per-test instances.
 7. Domain Consistency: Issue severity vocabulary and one-machine rule.
+8. **E2E Test Quality**: Follow `docs/E2E_BEST_PRACTICES.md` - semantic selectors (role + name), no hard-coded delays, independent tests, descriptive names, reusable actions extracted. Validate critical user journeys only, avoid testing implementation details or edge cases.
 
 ## Preferred Implementation Examples
 
@@ -125,6 +126,7 @@ export const workerDb = await createWorkerDb(); // one per worker, not per test
 - Unit: Pure logic (status derivation, validation).
 - Integration: Drizzle queries + Server Actions using worker-scoped PGlite.
 - E2E: Playwright for full flows (landing load, auth, machine creation) after foundational PRs.
+  - **Authority**: `docs/E2E_BEST_PRACTICES.md` - Follow selector strategy, test organization, and anti-patterns guide
 - Avoid testing Server Components directly—validate via E2E.
 
 ## Commit & Quality Gates

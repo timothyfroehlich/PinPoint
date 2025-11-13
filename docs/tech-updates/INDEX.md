@@ -30,6 +30,7 @@ These files contain migration context from previous codebase iterations. When re
 ### **Testing**
 
 - **[vitest.md](./vitest.md)** - Modern ES module mocking, integration testing
+- **[../E2E_BEST_PRACTICES.md](../E2E_BEST_PRACTICES.md)** - Playwright E2E testing patterns and best practices
 
 ## Key Patterns
 

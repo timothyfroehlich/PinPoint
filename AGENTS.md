@@ -16,6 +16,7 @@ Read these immediately before starting work:
 - **`docs/PRODUCT_SPEC.md`** - What we're building (MVP/MVP+/1.0/2.0)
 - **`docs/TECH_SPEC.md`** - Single-tenant architecture specification
 - **`docs/TESTING_PLAN.md`** - Testing strategy and patterns
+- **`docs/E2E_BEST_PRACTICES.md`** - E2E testing patterns with Playwright
 - **`package.json`** - Available scripts, dependencies, configuration
 
 ## Archived v1 Codebase (`.archived_v1/`)
@@ -258,7 +259,7 @@ When facing a decision, ask:
 - No testing Server Components directly (use E2E instead)
 - Test behavior, not implementation details
 
-**Authority**: `docs/TESTING_PLAN.md` for detailed patterns, examples, and anti-patterns
+**Authority**: `docs/TESTING_PLAN.md` for detailed patterns, examples, and anti-patterns. See `docs/E2E_BEST_PRACTICES.md` for E2E-specific guidance (selector strategy, test organization, debugging).
 
 ## Scope Creep Prevention
 
@@ -287,6 +288,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 - **`docs/PRODUCT_SPEC.md`** - Feature specifications (MVP/MVP+/1.0/2.0)
 - **`docs/TECH_SPEC.md`** - Single-tenant architecture
 - **`docs/TESTING_PLAN.md`** - Testing strategy and patterns
+- **`docs/E2E_BEST_PRACTICES.md`** - E2E testing patterns with Playwright
 - **`docs/V2_ROADMAP.md`** - Deferred features parking lot
 - **`docs/TYPESCRIPT_STRICTEST_PATTERNS.md`** - Practical TypeScript patterns
 - **`docs/tech-updates/INDEX.md`** - Tech stack reference
