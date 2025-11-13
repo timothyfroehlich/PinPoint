@@ -179,18 +179,18 @@ This repository includes comprehensive GitHub Copilot instructions to help you f
 - **Repository-wide guidance**: `.github/copilot-instructions.md`
 - **Pattern-specific instructions**: `.github/instructions/*.instructions.md`
   - Component development (Server/Client Components)
-  - API routes and tRPC routers
-  - Server Actions
-  - Database layer and RLS
-  - Authentication patterns
-  - Testing strategies
+  - Server Actions with progressive enhancement
+  - Database access with Drizzle ORM
+  - Authentication patterns (Supabase SSR)
+  - Testing strategies (memory-safe patterns)
 
 When you use GitHub Copilot in this repository, it will automatically provide context-aware suggestions based on the file you're working on. The instructions emphasize:
 
-- Multi-tenant security (organization scoping)
-- Server-first architecture
+- Single-tenant architecture (v2 simplification)
+- Server-first with React Server Components
+- Direct database access (no DAL/tRPC layers)
 - TypeScript strictest patterns
-- Memory-safe testing patterns
+- Memory-safe testing with worker-scoped PGlite
 
 For details, see [`.github/COPILOT_INSTRUCTIONS.md`](./.github/COPILOT_INSTRUCTIONS.md).
 
