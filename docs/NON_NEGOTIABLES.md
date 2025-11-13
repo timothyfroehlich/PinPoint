@@ -239,7 +239,7 @@
 - **Supabase SSR misuse**: No wrapper, wrong cookie contract, logic before `getUser()`
 - **Missing auth callback**: OAuth flows require callback route
 - **Response mutation**: Don't modify Supabase response object
-- **TypeScript safety defeats**: No `any`, non‑null `!`, or unsafe `as`
+- **TypeScript safety defeats**: No `any`, non-null `!`, or unsafe `as`
 - **Deep relative imports**: Use `~/` aliases
 - **Uncached fetch()**: Next.js 16 (since 15) requires explicit caching
 - **Tailwind v4 misconfiguration**: No `tailwind.config.js` (use CSS-based config)
@@ -250,6 +250,7 @@
 - **Infrastructure fighting TypeScript**: Complex patterns generating `exactOptionalPropertyTypes` violations indicate wrong complexity level
 - **Inline Server Action wrappers**: Don't wrap Server Actions in inline async functions in forms
 - **Forms in dropdown menus**: Don't use `<form>` inside `DropdownMenuItem` (dropdown closes before submission completes)
+- **Playwright arbitrary waits**: No `page.waitForTimeout()` in tests; assert on real UI state (add `data-testid` hooks if needed)
 
 ---
 

@@ -6,7 +6,10 @@
 
 import { test, expect } from "@playwright/test";
 
-test.describe("Navigation", () => {
+import { loginAs } from "../support/actions";
+import { seededMember } from "../support/constants";
+
+test.describe.serial("Navigation", () => {
   test("unauthenticated navigation - show Sign In and Sign Up buttons", async ({
     page,
   }) => {
@@ -17,7 +20,7 @@ test.describe("Navigation", () => {
     await expect(page.getByText("PinPoint").first()).toBeVisible();
 
     // Verify Sign In and Sign Up buttons are visible
-    const nav = page.locator("nav");
+    const nav = page.getByRole("navigation");
     await expect(nav.getByRole("link", { name: "Sign In" })).toBeVisible();
     await expect(nav.getByRole("link", { name: "Sign Up" })).toBeVisible();
 
@@ -30,16 +33,10 @@ test.describe("Navigation", () => {
     page,
   }) => {
     // Login first
-    await page.goto("/login");
-    await page.getByLabel("Email").fill("member@test.com");
-    await page.getByLabel("Password").fill("TestPassword123");
-    await page.getByRole("button", { name: "Sign In" }).click();
-
-    // Wait for dashboard to load
-    await expect(page).toHaveURL("/dashboard");
+    await loginAs(page);
 
     // Verify navigation shows PinPoint logo
-    const nav = page.locator("nav");
+    const nav = page.getByRole("navigation");
     await expect(nav.getByText("PinPoint").first()).toBeVisible();
 
     // Verify quick links are visible
@@ -47,8 +44,8 @@ test.describe("Navigation", () => {
     await expect(nav.getByRole("link", { name: /Report/i })).toBeVisible();
 
     // Verify user info is visible (name and email)
-    await expect(nav.getByText("Member User")).toBeVisible();
-    await expect(nav.getByText("member@test.com")).toBeVisible();
+    await expect(nav.getByText(seededMember.name)).toBeVisible();
+    await expect(nav.getByText(seededMember.email)).toBeVisible();
 
     // Verify Sign In/Sign Up buttons are NOT visible
     await expect(nav.getByRole("link", { name: "Sign In" })).not.toBeVisible();
@@ -59,15 +56,9 @@ test.describe("Navigation", () => {
     page,
   }) => {
     // Login first
-    await page.goto("/login");
-    await page.getByLabel("Email").fill("member@test.com");
-    await page.getByLabel("Password").fill("TestPassword123");
-    await page.getByRole("button", { name: "Sign In" }).click();
+    await loginAs(page);
 
-    // Wait for dashboard
-    await expect(page).toHaveURL("/dashboard");
-
-    const nav = page.locator("nav");
+    const nav = page.getByRole("navigation");
 
     // Click Issues link
     await nav.getByRole("link", { name: /Issues/i }).click();
@@ -95,49 +86,41 @@ test.describe("Navigation", () => {
 
   test("user menu dropdown - open and close menu", async ({ page }) => {
     // Login first
-    await page.goto("/login");
-    await page.getByLabel("Email").fill("member@test.com");
-    await page.getByLabel("Password").fill("TestPassword123");
-    await page.getByRole("button", { name: "Sign In" }).click();
+    await loginAs(page);
 
-    // Wait for dashboard
-    await expect(page).toHaveURL("/dashboard");
+    const profileItem = page.getByRole("menuitem", { name: "Profile" });
+    const settingsItem = page.getByRole("menuitem", { name: "Settings" });
+    const signOutItem = page.getByRole("menuitem", { name: "Sign Out" });
 
     // User menu should not be open initially
-    await expect(page.getByText("Profile")).not.toBeVisible();
+    await expect(profileItem).toHaveCount(0);
 
     // Click on user menu trigger (avatar with chevron)
-    const nav = page.locator("nav");
+    const nav = page.getByRole("navigation");
     const userMenuTrigger = nav.getByRole("button", { name: /User menu/i });
     await userMenuTrigger.click();
 
     // Menu items should be visible
-    await expect(page.getByText("Profile")).toBeVisible();
-    await expect(page.getByText("Settings")).toBeVisible();
-    await expect(page.getByText("Sign Out")).toBeVisible();
+    await expect(profileItem.first()).toBeVisible();
+    await expect(settingsItem.first()).toBeVisible();
+    await expect(signOutItem.first()).toBeVisible();
 
-    // Click away to close menu
-    await page.locator("main").click();
-    await expect(page.getByText("Profile")).not.toBeVisible();
+    // Click away (Escape closes Radix dropdown)
+    await page.keyboard.press("Escape");
+    await expect(profileItem).toHaveCount(0);
   });
 
   test("logout from user menu - sign out and redirect", async ({ page }) => {
     // Login first
-    await page.goto("/login");
-    await page.getByLabel("Email").fill("member@test.com");
-    await page.getByLabel("Password").fill("TestPassword123");
-    await page.getByRole("button", { name: "Sign In" }).click();
-
-    // Wait for dashboard
-    await expect(page).toHaveURL("/dashboard");
+    await loginAs(page);
 
     // Open user menu
-    const nav = page.locator("nav");
+    const nav = page.getByRole("navigation");
     const userMenuTrigger = nav.getByRole("button", { name: /User menu/i });
     await userMenuTrigger.click();
 
     // Click Sign Out
-    await page.getByRole("button", { name: "Sign Out" }).click();
+    await page.getByRole("menuitem", { name: "Sign Out" }).click();
 
     // Should redirect to home page
     await expect(page).toHaveURL("/");
@@ -152,18 +135,12 @@ test.describe("Navigation", () => {
   }) => {
     // When unauthenticated, logo should link to /
     await page.goto("/");
-    const nav = page.locator("nav");
+    const nav = page.getByRole("navigation");
     const logoLink = nav.getByRole("link", { name: /PinPoint/i });
     await expect(logoLink).toHaveAttribute("href", "/");
 
     // Login
-    await page.goto("/login");
-    await page.getByLabel("Email").fill("member@test.com");
-    await page.getByLabel("Password").fill("TestPassword123");
-    await page.getByRole("button", { name: "Sign In" }).click();
-
-    // Wait for dashboard
-    await expect(page).toHaveURL("/dashboard");
+    await loginAs(page);
 
     // When authenticated, logo should link to /dashboard
     const authenticatedLogoLink = nav.getByRole("link", { name: /PinPoint/i });
@@ -178,13 +155,7 @@ test.describe("Navigation", () => {
     page,
   }) => {
     // Login first
-    await page.goto("/login");
-    await page.getByLabel("Email").fill("member@test.com");
-    await page.getByLabel("Password").fill("TestPassword123");
-    await page.getByRole("button", { name: "Sign In" }).click();
-
-    // Wait for dashboard
-    await expect(page).toHaveURL("/dashboard");
+    await loginAs(page);
 
     // Try to navigate to home page
     await page.goto("/");
@@ -207,9 +178,7 @@ test.describe("Navigation", () => {
     await expect(loginNav).not.toBeVisible();
 
     // Complete login
-    await page.getByLabel("Email").fill("member@test.com");
-    await page.getByLabel("Password").fill("TestPassword123");
-    await page.getByRole("button", { name: "Sign In" }).click();
+    await loginAs(page);
 
     // Dashboard should have navigation
     await expect(page).toHaveURL("/dashboard");

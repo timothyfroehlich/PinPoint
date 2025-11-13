@@ -185,7 +185,7 @@ export async function logoutAction(): Promise<void> {
     if (error) {
       await setFlash({
         type: "error",
-        message: "Failed to sign out",
+        message: error.message,
       });
     } else {
       await setFlash({
@@ -193,10 +193,10 @@ export async function logoutAction(): Promise<void> {
         message: "Signed out successfully",
       });
     }
-  } catch (error) {
+  } catch (cause) {
     await setFlash({
       type: "error",
-      message: "Something went wrong",
+      message: cause instanceof Error ? cause.message : "Something went wrong",
     });
   } finally {
     // Always redirect to home after logout attempt

@@ -72,7 +72,7 @@ export function PasswordStrength({
   const widthPercentage = ((strength.score + 1) / 5) * 100;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-testid="password-strength">
       {/* Strength bar */}
       <div className="flex items-center gap-2">
         <div className="flex-1 h-2 bg-surface-variant rounded-full overflow-hidden">
@@ -81,14 +81,20 @@ export function PasswordStrength({
             style={{ width: `${widthPercentage}%` }}
           />
         </div>
-        <span className="text-xs font-medium text-on-surface-variant min-w-16">
+        <span
+          className="text-xs font-medium text-on-surface-variant min-w-16"
+          data-testid="password-strength-label"
+        >
           {label}
         </span>
       </div>
 
       {/* Feedback */}
       {strength.feedback.length > 0 && (
-        <ul className="text-xs text-on-surface-variant space-y-1">
+        <ul
+          className="text-xs text-on-surface-variant space-y-1"
+          data-testid="password-strength-feedback"
+        >
           {strength.feedback.map((message, i) => (
             <li key={i}>• {message}</li>
           ))}

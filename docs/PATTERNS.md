@@ -539,6 +539,30 @@ export default async function NewIssuePage() {
 - Unit test the Zod schema and any small helpers
 - Integration test the action against PGlite (worker-scoped); do not spin per‑test instances
 
+## Playwright E2E Tests
+
+### Login Helper + Landmark-Scoped Locators
+
+```typescript
+// e2e/smoke/navigation.spec.ts
+import { loginAs } from "../support/actions";
+import { seededMember } from "../support/constants";
+
+test("authenticated navigation", async ({ page }) => {
+  await loginAs(page); // UI login via shared helper (fills form + waits for dashboard)
+
+  const nav = page.getByRole("navigation");
+  await expect(nav.getByRole("link", { name: /Issues/i })).toBeVisible();
+  await expect(nav.getByText(seededMember.name)).toBeVisible();
+});
+```
+
+**Key points**:
+
+- Keep reusable flows under `e2e/support/` (e.g., `loginAs`, seeded credentials) so tests stay focused on assertions, not setup.
+- Scope locators to landmarks (`getByRole("navigation")`, `getByRole("main")`) to avoid strict-mode collisions when the same text appears elsewhere.
+- When tests share authenticated state (same seeded user), wrap the suite with `test.describe.serial` to keep runs deterministic across workers.
+
 ## Adding New Patterns
 
 **When to add a pattern**:
