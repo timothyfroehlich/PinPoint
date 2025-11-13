@@ -110,7 +110,6 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                 action={async () => {
                   "use server";
                   await logoutAction();
-                  redirect("/");
                 }}
               >
                 <button

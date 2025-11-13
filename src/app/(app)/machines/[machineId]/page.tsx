@@ -26,7 +26,7 @@ import { readFlash } from "~/lib/flash";
 export default async function MachineDetailPage({
   params,
 }: {
-  params: { machineId: string };
+  params: Promise<{ machineId: string }>;
 }): Promise<React.JSX.Element> {
   // Auth guard - check if user is authenticated (CORE-SSR-002)
   const supabase = await createClient();
@@ -41,9 +41,12 @@ export default async function MachineDetailPage({
   // Read flash message (if any)
   const flash = await readFlash();
 
+  // Await params (Next.js 15+ requirement)
+  const { machineId } = await params;
+
   // Query machine with issues (direct Drizzle query - no DAL)
   const machine = await db.query.machines.findFirst({
-    where: eq(machines.id, params.machineId),
+    where: eq(machines.id, machineId),
     with: {
       issues: {
         columns: {

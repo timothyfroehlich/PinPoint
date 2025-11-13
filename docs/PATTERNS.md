@@ -642,11 +642,8 @@ import { db } from "~/server/db";
 import { machines } from "~/server/db/schema";
 import { createMachineSchema } from "./schemas";
 import { setFlash } from "~/lib/flash";
-import type { Result } from "~/lib/result";
 
-export async function createMachineAction(
-  formData: FormData
-): Promise<Result<{ machineId: string }>> {
+export async function createMachineAction(formData: FormData): Promise<void> {
   // Auth check (CORE-SEC-001)
   const supabase = await createClient();
   const {
@@ -654,10 +651,8 @@ export async function createMachineAction(
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return {
-      success: false,
-      error: "Unauthorized. Please log in.",
-    };
+    await setFlash({ type: "error", message: "Unauthorized. Please log in." });
+    redirect("/login");
   }
 
   // Validate input (CORE-SEC-002)
@@ -666,10 +661,12 @@ export async function createMachineAction(
   });
 
   if (!validation.success) {
-    return {
-      success: false,
-      error: validation.error.errors[0]?.message ?? "Invalid input",
-    };
+    const firstError = validation.error.issues[0];
+    await setFlash({
+      type: "error",
+      message: firstError?.message ?? "Invalid input",
+    });
+    redirect("/machines/new");
   }
 
   const { name } = validation.data;
@@ -677,6 +674,7 @@ export async function createMachineAction(
   try {
     // Insert machine (direct Drizzle query)
     const [machine] = await db.insert(machines).values({ name }).returning();
+    if (!machine) throw new Error("Machine creation failed");
 
     // Set success flash and revalidate
     await setFlash({
@@ -685,13 +683,14 @@ export async function createMachineAction(
     });
     revalidatePath("/machines");
 
-    // Redirect to machine detail page
+    // Redirect to machine detail page (throws, exits function)
     redirect(`/machines/${machine.id}`);
-  } catch (error) {
-    return {
-      success: false,
-      error: "Failed to create machine. Please try again.",
-    };
+  } catch {
+    await setFlash({
+      type: "error",
+      message: "Failed to create machine. Please try again.",
+    });
+    redirect("/machines/new");
   }
 }
 ```
