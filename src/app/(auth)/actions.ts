@@ -5,6 +5,7 @@ import { createClient } from "~/lib/supabase/server";
 import { type Result, ok, err } from "~/lib/result";
 import { setFlash } from "~/lib/flash";
 import { loginSchema, signupSchema } from "./schemas";
+import { log } from "~/lib/logger";
 
 /**
  * Result Types
@@ -41,6 +42,10 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
 
   if (!parsed.success) {
     const firstError = parsed.error.issues[0];
+    log.warn(
+      { errors: parsed.error.issues, action: "login" },
+      "Login validation failed"
+    );
     await setFlash({
       type: "error",
       message: firstError?.message ?? "Invalid input",
@@ -63,15 +68,25 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
       password,
     });
 
-    // Check for authentication error
-    // Supabase types guarantee user exists if no error
-    if (error) {
+    // Defensive check - Supabase types guarantee user exists if no error,
+    // but we check both for safety
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (error || !data.user) {
+      log.warn(
+        { email, error: error?.message, action: "login" },
+        "Login authentication failed"
+      );
       await setFlash({
         type: "error",
         message: "Invalid email or password",
       });
-      return err("AUTH", error.message);
+      return err("AUTH", error?.message ?? "Authentication failed");
     }
+
+    log.info(
+      { userId: data.user.id, email: data.user.email, action: "login" },
+      "User logged in successfully"
+    );
 
     await setFlash({
       type: "success",
@@ -81,6 +96,14 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
     // Return success (redirect happens in page component)
     return ok({ userId: data.user.id });
   } catch (error) {
+    log.error(
+      {
+        error: error instanceof Error ? error.message : "Unknown",
+        stack: error instanceof Error ? error.stack : undefined,
+        action: "login",
+      },
+      "Login server error"
+    );
     await setFlash({
       type: "error",
       message: "Something went wrong. Please try again.",
@@ -108,6 +131,10 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
 
   if (!parsed.success) {
     const firstError = parsed.error.issues[0];
+    log.warn(
+      { errors: parsed.error.issues, action: "signup" },
+      "Signup validation failed"
+    );
     await setFlash({
       type: "error",
       message: firstError?.message ?? "Please check your input",
@@ -134,6 +161,10 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
     if (error) {
       // Check for duplicate email
       if (error.message.includes("already registered")) {
+        log.warn(
+          { email, error: error.message, action: "signup" },
+          "Signup failed: email already registered"
+        );
         await setFlash({
           type: "error",
           message: "An account with this email already exists",
@@ -141,6 +172,10 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
         return err("EMAIL_TAKEN", error.message);
       }
 
+      log.error(
+        { email, error: error.message, action: "signup" },
+        "Signup failed: Supabase error"
+      );
       await setFlash({
         type: "error",
         message: error.message,
@@ -149,12 +184,18 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
     }
 
     if (!data.user) {
+      log.error({ email, action: "signup" }, "Signup failed: no user returned");
       await setFlash({
         type: "error",
         message: "Failed to create account",
       });
       return err("SERVER", "No user returned");
     }
+
+    log.info(
+      { userId: data.user.id, email: data.user.email, action: "signup" },
+      "User signed up successfully"
+    );
 
     await setFlash({
       type: "success",
@@ -164,6 +205,14 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
     // Return success (redirect happens in page component)
     return ok({ userId: data.user.id });
   } catch (error) {
+    log.error(
+      {
+        error: error instanceof Error ? error.message : "Unknown",
+        stack: error instanceof Error ? error.stack : undefined,
+        action: "signup",
+      },
+      "Signup server error"
+    );
     await setFlash({
       type: "error",
       message: "Something went wrong. Please try again.",
@@ -180,9 +229,19 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
 export async function logoutAction(): Promise<void> {
   try {
     const supabase = await createClient();
+
+    // Get user before signing out for logging
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     const { error } = await supabase.auth.signOut();
 
     if (error) {
+      log.error(
+        { userId: user?.id, error: error.message, action: "logout" },
+        "Logout failed"
+      );
       await setFlash({
         type: "error",
         message: "Failed to sign out",
@@ -190,14 +249,27 @@ export async function logoutAction(): Promise<void> {
       return; // Early exit without redirect
     }
 
+    log.info(
+      { userId: user?.id, action: "logout" },
+      "User logged out successfully"
+    );
+
     await setFlash({
       type: "success",
       message: "Signed out successfully",
     });
-  } catch {
+  } catch (cause) {
+    log.error(
+      {
+        error: cause instanceof Error ? cause.message : "Unknown",
+        stack: cause instanceof Error ? cause.stack : undefined,
+        action: "logout",
+      },
+      "Logout server error"
+    );
     await setFlash({
       type: "error",
-      message: "Something went wrong",
+      message: cause instanceof Error ? cause.message : "Something went wrong",
     });
   } finally {
     // Always redirect to home after logout attempt
