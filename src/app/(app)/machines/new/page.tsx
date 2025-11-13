@@ -7,7 +7,7 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { ArrowLeft } from "lucide-react";
-import { createMachineAction } from "~/app/machines/actions";
+import { createMachineAction } from "~/app/(app)/machines/actions";
 
 /**
  * Create Machine Page (Protected Route)

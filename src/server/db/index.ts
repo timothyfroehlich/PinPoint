@@ -8,8 +8,11 @@ if (!process.env["DATABASE_URL"]) {
   );
 }
 
+// Strip surrounding quotes if present (handles both single and double quotes)
+const databaseUrl = process.env["DATABASE_URL"].replace(/^["']|["']$/g, "");
+
 // Create postgres connection
-const queryClient = postgres(process.env["DATABASE_URL"]);
+const queryClient = postgres(databaseUrl);
 
 // Create Drizzle instance with schema
 export const db = drizzle(queryClient, { schema });

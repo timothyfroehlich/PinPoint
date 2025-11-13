@@ -11,7 +11,7 @@ import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { machines, issues } from "~/server/db/schema";
 import { createTestMachine, createTestIssue } from "~/test/helpers/factories";
 import { deriveMachineStatus } from "~/lib/machines/status";
-import { createMachineSchema } from "~/app/machines/schemas";
+import { createMachineSchema } from "~/app/(app)/machines/schemas";
 
 describe("Machine CRUD Operations (PGlite)", () => {
   // Set up worker-scoped PGlite and auto-cleanup after each test
