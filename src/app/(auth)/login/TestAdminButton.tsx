@@ -12,14 +12,21 @@ import { Button } from "~/components/ui/button";
 export function TestAdminButton(): React.JSX.Element {
   function handleTestAdminLogin(): void {
     // Find the form fields
-    const emailInput = document.getElementById("email") as HTMLInputElement;
-    const passwordInput = document.getElementById(
-      "password",
-    ) as HTMLInputElement;
-    const form = emailInput?.closest("form");
+    const emailInput = document.getElementById("email");
+    const passwordInput = document.getElementById("password");
 
-    if (!emailInput || !passwordInput || !form) {
-      console.error("Could not find login form fields");
+    if (
+      !emailInput ||
+      !passwordInput ||
+      !(emailInput instanceof HTMLInputElement) ||
+      !(passwordInput instanceof HTMLInputElement)
+    ) {
+      // Form fields not found or not the right type
+      return;
+    }
+
+    const form = emailInput.closest("form");
+    if (!form) {
       return;
     }
 
