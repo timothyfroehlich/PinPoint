@@ -644,9 +644,7 @@ import { createMachineSchema } from "./schemas";
 import { setFlash } from "~/lib/flash";
 import type { Result } from "~/lib/result";
 
-export async function createMachineAction(
-  formData: FormData
-): Promise<Result<{ machineId: string }>> {
+export async function createMachineAction(formData: FormData): Promise<void> {
   // Auth check (CORE-SEC-001)
   const supabase = await createClient();
   const {
@@ -654,10 +652,11 @@ export async function createMachineAction(
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return {
-      success: false,
-      error: "Unauthorized. Please log in.",
-    };
+    await setFlash({
+      type: "error",
+      message: "Unauthorized. Please log in.",
+    });
+    redirect("/login");
   }
 
   // Validate input (CORE-SEC-002)
@@ -666,10 +665,11 @@ export async function createMachineAction(
   });
 
   if (!validation.success) {
-    return {
-      success: false,
-      error: validation.error.errors[0]?.message ?? "Invalid input",
-    };
+    await setFlash({
+      type: "error",
+      message: validation.error.errors[0]?.message ?? "Invalid input",
+    });
+    redirect("/machines/new");
   }
 
   const { name } = validation.data;
@@ -685,13 +685,14 @@ export async function createMachineAction(
     });
     revalidatePath("/machines");
 
-    // Redirect to machine detail page
+    // Redirect to machine detail page (redirect throws to exit function)
     redirect(`/machines/${machine.id}`);
   } catch (error) {
-    return {
-      success: false,
-      error: "Failed to create machine. Please try again.",
-    };
+    await setFlash({
+      type: "error",
+      message: "Failed to create machine. Please try again.",
+    });
+    redirect("/machines/new");
   }
 }
 ```
