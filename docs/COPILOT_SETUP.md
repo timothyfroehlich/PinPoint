@@ -52,13 +52,13 @@ When you edit a file matching these patterns, Copilot automatically merges:
 
 ### Pattern Mapping
 
-| File Pattern                                                                                   | Instruction File                 | Purpose                                                           |
-| ---------------------------------------------------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------- |
-| `**/*auth*.ts`<br>`**/middleware.ts`<br>`src/lib/supabase/**/*.ts`<br>`src/app/(auth)/**/*.ts` | `auth.instructions.md`           | Authentication patterns, Supabase SSR client creation, middleware |
-| `src/app/**/*.tsx`<br>`src/components/**/*.tsx`                                                | `components.instructions.md`     | Server vs Client components, UI patterns, imports                 |
-| `src/server/db/**/*.ts`                                                                        | `database.instructions.md`       | Schema rules, Drizzle queries, data access                        |
-| `**/*actions*.ts`<br>`src/app/**/actions.ts`                                                   | `server-actions.instructions.md` | Server Actions, validation, mutations                             |
-| `**/*.test.ts`<br>`**/*.test.tsx`<br>`e2e/**/*.ts`                                             | `testing.instructions.md`        | Test patterns, memory safety, PGlite usage                        |
+| File Pattern                                                                                                  | Instruction File                 | Purpose                                                           |
+| ------------------------------------------------------------------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------- |
+| `**/*auth*.ts`<br>`**/middleware.ts`<br>`src/lib/supabase/**/*.ts`<br>`src/app/(auth)/**/*.ts`                | `auth.instructions.md`           | Authentication patterns, Supabase SSR client creation, middleware |
+| `src/app/**/*.tsx`<br>`src/components/**/*.tsx`                                                               | `components.instructions.md`     | Server vs Client components, UI patterns, imports                 |
+| `src/server/db/**/*.ts`<br>`src/server/db/schema.ts`                                                          | `database.instructions.md`       | Schema rules, Drizzle queries, data access                        |
+| `**/*actions*.ts`<br>`src/app/**/actions.ts`<br>`src/lib/actions/**/*.ts`                                     | `server-actions.instructions.md` | Server Actions, validation, mutations                             |
+| `**/*.test.ts`<br>`**/*.test.tsx`<br>`**/*.spec.ts`<br>`**/*.spec.tsx`<br>`e2e/**/*.ts`<br>`src/test/**/*.ts` | `testing.instructions.md`        | Test patterns, memory safety, PGlite usage                        |
 
 ## Key Principles
 
@@ -215,8 +215,8 @@ As features stabilize, patterns graduate to `docs/PATTERNS.md` and get reference
 
 ## Additional Resources
 
-- [`.github/COPILOT_INSTRUCTIONS.md`](./.github/COPILOT_INSTRUCTIONS.md) - Meta documentation
-- [`.github/copilot-instructions.md`](./.github/copilot-instructions.md) - Main instructions
+- [`.github/COPILOT_INSTRUCTIONS.md`](../.github/COPILOT_INSTRUCTIONS.md) - Meta documentation
+- [`.github/copilot-instructions.md`](../.github/copilot-instructions.md) - Main instructions
 - [GitHub Copilot Documentation](https://docs.github.com/en/copilot)
 - [Best Practices Guide](https://gh.io/copilot-coding-agent-tips)
 
