@@ -6,13 +6,16 @@
 
 import { test, expect } from "@playwright/test";
 
+import { loginAs } from "../support/actions";
+import { seededMember } from "../support/constants";
+
 test.describe("Authentication", () => {
   test("signup flow - create new account and access dashboard", async ({
     page,
   }) => {
     // Navigate to signup page
     await page.goto("/");
-    await page.getByRole("link", { name: "Sign Up" }).click();
+    await page.getByRole("main").getByRole("link", { name: "Sign Up" }).click();
 
     // Verify we're on the signup page
     await expect(page).toHaveURL("/signup");
@@ -38,18 +41,20 @@ test.describe("Authentication", () => {
     await expect(
       page.getByRole("heading", { name: "Dashboard" })
     ).toBeVisible();
-    await expect(page.getByText("E2E Test User")).toBeVisible();
-    await expect(page.getByText(testEmail)).toBeVisible();
+    await expect(
+      page.getByRole("main").getByText("E2E Test User")
+    ).toBeVisible();
+    await expect(page.getByRole("main").getByText(testEmail)).toBeVisible();
   });
 
   test("login flow - sign in with existing account", async ({ page }) => {
     // Use test user created by seed.sql
-    const testEmail = "member@test.com";
-    const testPassword = "TestPassword123";
+    const testEmail = seededMember.email;
+    const testPassword = seededMember.password;
 
     // Navigate to login page
     await page.goto("/");
-    await page.getByRole("link", { name: "Sign In" }).click();
+    await page.getByRole("main").getByRole("link", { name: "Sign In" }).click();
 
     // Verify we're on the login page
     await expect(page).toHaveURL("/login");
@@ -73,8 +78,10 @@ test.describe("Authentication", () => {
     await expect(
       page.getByRole("heading", { name: "Dashboard" })
     ).toBeVisible();
-    await expect(page.getByText("Member User")).toBeVisible();
-    await expect(page.getByText(testEmail)).toBeVisible();
+    await expect(
+      page.getByRole("main").getByText(seededMember.name)
+    ).toBeVisible();
+    await expect(page.getByRole("main").getByText(testEmail)).toBeVisible();
   });
 
   test("login flow - reject invalid credentials", async ({ page }) => {
@@ -82,7 +89,7 @@ test.describe("Authentication", () => {
     await page.goto("/login");
 
     // Fill out login form with wrong password
-    await page.getByLabel("Email").fill("member@test.com");
+    await page.getByLabel("Email").fill(seededMember.email);
     await page.getByLabel("Password").fill("WrongPassword123");
 
     // Submit form
@@ -106,16 +113,7 @@ test.describe("Authentication", () => {
 
   test("logout flow - sign out and verify redirect", async ({ page }) => {
     // Login first
-    await page.goto("/login");
-    await page.getByLabel("Email").fill("member@test.com");
-    await page.getByLabel("Password").fill("TestPassword123");
-    await page.getByRole("button", { name: "Sign In" }).click();
-
-    // Wait for dashboard to load
-    await expect(page).toHaveURL("/dashboard");
-    await expect(
-      page.getByRole("heading", { name: "Dashboard" })
-    ).toBeVisible();
+    await loginAs(page);
 
     // Click sign out button
     await page.getByRole("button", { name: "Sign Out" }).click();
@@ -156,18 +154,9 @@ test.describe("Authentication", () => {
     // Type a weak password
     await page.getByLabel("Password").fill("password");
 
-    // Wait for password strength indicator to appear
-    // (Client component needs time to load zxcvbn and calculate)
-    await page.waitForTimeout(500);
-
-    // Should show strength indicator (checking for common weak password feedback)
-    const pageContent = await page.content();
-    const hasStrengthIndicator =
-      pageContent.includes("Too weak") ||
-      pageContent.includes("Weak") ||
-      pageContent.includes("Fair");
-
-    expect(hasStrengthIndicator).toBe(true);
+    const strengthLabel = page.getByTestId("password-strength-label");
+    await expect(strengthLabel).toBeVisible();
+    await expect(strengthLabel).toHaveText(/Too weak|Weak|Fair|Good|Strong/);
   });
 
   test("link navigation - switch between login and signup", async ({
@@ -198,13 +187,7 @@ test.describe("Authentication", () => {
     page,
   }) => {
     // Login
-    await page.goto("/login");
-    await page.getByLabel("Email").fill("member@test.com");
-    await page.getByLabel("Password").fill("TestPassword123");
-    await page.getByRole("button", { name: "Sign In" }).click();
-
-    // Wait for dashboard
-    await expect(page).toHaveURL("/dashboard");
+    await loginAs(page);
 
     // Refresh the page
     await page.reload();
@@ -214,6 +197,8 @@ test.describe("Authentication", () => {
     await expect(
       page.getByRole("heading", { name: "Dashboard" })
     ).toBeVisible();
-    await expect(page.getByText("Member User")).toBeVisible();
+    await expect(
+      page.getByRole("main").getByText(seededMember.name)
+    ).toBeVisible();
   });
 });

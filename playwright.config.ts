@@ -12,6 +12,12 @@ export default defineConfig({
   // Run tests in files in parallel
   fullyParallel: true,
 
+  // Short, developer-friendly timeouts
+  timeout: 10 * 1000, // 10s per test
+  expect: {
+    timeout: 2 * 1000, // 2s for expect()
+  },
+
   // Fail the build on CI if you accidentally left test.only in the source code
   forbidOnly: !!process.env.CI,
 
@@ -21,8 +27,10 @@ export default defineConfig({
   // Opt out of parallel tests on CI
   workers: process.env.CI ? 1 : undefined,
 
-  // Reporter to use
-  reporter: "html",
+  // Reporters: print progress locally; keep CI quiet; never block on HTML
+  reporter: process.env.CI
+    ? [["dot"], ["html", { open: "never" }]]
+    : [["list"], ["html", { open: "never" }]],
 
   // Shared settings for all the projects below
   use: {
@@ -34,6 +42,10 @@ export default defineConfig({
 
     // Screenshot on failure
     screenshot: "only-on-failure",
+
+    // Keep interactions snappy during dev
+    actionTimeout: 5 * 1000,
+    navigationTimeout: 8 * 1000,
   },
 
   // Configure projects for major browsers
@@ -50,5 +62,12 @@ export default defineConfig({
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000, // 2 minutes
+
+    // Show server output for debugging (critical for diagnosing startup failures)
+    stdout: "pipe",
+    stderr: "pipe",
+
+    // Ignore HTTPS errors for local development
+    ignoreHTTPSErrors: true,
   },
 });

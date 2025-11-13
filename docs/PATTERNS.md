@@ -147,6 +147,39 @@ export async function updateProfileAction(formData: FormData) {
 - Use `redirect()` for unauthenticated users
 - Never skip auth checks in protected routes (CORE-SEC-001)
 
+### Protected Route Pattern (Server Component)
+
+When a route requires authentication, use this pattern at the top of the page component:
+
+```typescript
+// src/app/issues/page.tsx (or any protected route)
+import type React from "react";
+import { redirect } from "next/navigation";
+import { createClient } from "~/lib/supabase/server";
+
+export default async function ProtectedPage(): Promise<React.JSX.Element> {
+  // Auth guard
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  // User is guaranteed to be authenticated here
+  return <div>Protected content</div>;
+}
+```
+
+**Key points**:
+
+- Check auth at the very start of the component (before any other logic)
+- Use `redirect("/login")` to send unauthenticated users to login page
+- After the guard, `user` is guaranteed to exist (type narrowing)
+- This pattern reached Rule of Three (used in `/issues`, `/issues/new`, `/machines`)
+
 ---
 
 ## File Organization
@@ -505,6 +538,30 @@ export default async function NewIssuePage() {
 
 - Unit test the Zod schema and any small helpers
 - Integration test the action against PGlite (worker-scoped); do not spin per‑test instances
+
+## Playwright E2E Tests
+
+### Login Helper + Landmark-Scoped Locators
+
+```typescript
+// e2e/smoke/navigation.spec.ts
+import { loginAs } from "../support/actions";
+import { seededMember } from "../support/constants";
+
+test("authenticated navigation", async ({ page }) => {
+  await loginAs(page); // UI login via shared helper (fills form + waits for dashboard)
+
+  const nav = page.getByRole("navigation");
+  await expect(nav.getByRole("link", { name: /Issues/i })).toBeVisible();
+  await expect(nav.getByText(seededMember.name)).toBeVisible();
+});
+```
+
+**Key points**:
+
+- Keep reusable flows under `e2e/support/` (e.g., `loginAs`, seeded credentials) so tests stay focused on assertions, not setup.
+- Scope locators to landmarks (`getByRole("navigation")`, `getByRole("main")`) to avoid strict-mode collisions when the same text appears elsewhere.
+- When tests share authenticated state (same seeded user), wrap the suite with `test.describe.serial` to keep runs deterministic across workers.
 
 ## Adding New Patterns
 

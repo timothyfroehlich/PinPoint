@@ -20,8 +20,6 @@ export type SignupResult = Result<
   "VALIDATION" | "EMAIL_TAKEN" | "SERVER"
 >;
 
-export type LogoutResult = Result<void, "SERVER">;
-
 /**
  * Login Action
  *
@@ -177,8 +175,9 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
  * Logout Action
  *
  * Signs out the current user and clears their session.
+ * Used in forms, so returns void (redirect happens in finally block).
  */
-export async function logoutAction(): Promise<LogoutResult> {
+export async function logoutAction(): Promise<void> {
   try {
     const supabase = await createClient();
     const { error } = await supabase.auth.signOut();
@@ -186,23 +185,19 @@ export async function logoutAction(): Promise<LogoutResult> {
     if (error) {
       await setFlash({
         type: "error",
-        message: "Failed to sign out",
+        message: error.message,
       });
-      return err("SERVER", error.message);
+    } else {
+      await setFlash({
+        type: "success",
+        message: "Signed out successfully",
+      });
     }
-
-    await setFlash({
-      type: "success",
-      message: "Signed out successfully",
-    });
-
-    return ok(undefined);
-  } catch (error) {
+  } catch (cause) {
     await setFlash({
       type: "error",
-      message: "Something went wrong",
+      message: cause instanceof Error ? cause.message : "Something went wrong",
     });
-    return err("SERVER", error instanceof Error ? error.message : "Unknown");
   } finally {
     // Always redirect to home after logout attempt
     redirect("/");
