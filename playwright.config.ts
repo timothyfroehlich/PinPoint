@@ -50,5 +50,12 @@ export default defineConfig({
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000, // 2 minutes
+
+    // Show server output for debugging (critical for diagnosing startup failures)
+    stdout: "pipe",
+    stderr: "pipe",
+
+    // Ignore HTTPS errors for local development
+    ignoreHTTPSErrors: true,
   },
 });

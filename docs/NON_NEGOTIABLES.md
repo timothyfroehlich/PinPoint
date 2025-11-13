@@ -210,6 +210,22 @@
 - **Do:** Enforce `machine_id` foreign key with CHECK constraint
 - **Don't:** Allow issues without machines
 
+**CORE-ARCH-005:** Direct Server Action references in forms
+
+- **Severity:** Critical
+- **Why:** Inline wrappers break Next.js form submission handling
+- **Do:** Use Server Actions directly: `<form action={serverAction}>`
+- **Don't:** Wrap in inline async functions: `action={async () => { await serverAction(); }}`
+- **Rationale:** Next.js serializes Server Actions automatically; wrappers create client-side functions that can't be serialized
+
+**CORE-ARCH-006:** Server Actions in dropdown menus
+
+- **Severity:** Critical
+- **Why:** Forms inside dropdowns get unmounted before submission completes
+- **Do:** Use `onSelect` event: `<DropdownMenuItem onSelect={async () => { await serverAction(); }}>`
+- **Don't:** Use form submission inside `DropdownMenuItem`
+- **Rationale:** Radix UI dropdowns auto-close and unmount content, causing "Form submission canceled because the form is not connected" errors
+
 ---
 
 ## Forbidden Patterns
@@ -232,6 +248,8 @@
 - **Over-abstraction**: Don't create layers for single use cases (Rule of Three)
 - **Enterprise patterns in pre-beta**: No complex error hierarchies or monitoring before scale demands it
 - **Infrastructure fighting TypeScript**: Complex patterns generating `exactOptionalPropertyTypes` violations indicate wrong complexity level
+- **Inline Server Action wrappers**: Don't wrap Server Actions in inline async functions in forms
+- **Forms in dropdown menus**: Don't use `<form>` inside `DropdownMenuItem` (dropdown closes before submission completes)
 
 ---
 

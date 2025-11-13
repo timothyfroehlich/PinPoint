@@ -2,7 +2,6 @@ import type React from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Button } from "~/components/ui/button";
 import { logoutAction } from "~/app/(auth)/actions";
 import { readFlash } from "~/lib/flash";
 import { UserCircle, Mail } from "lucide-react";
@@ -107,19 +106,13 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
 
             <div className="flex flex-col gap-2">
               {/* Logout button */}
-              <form
-                action={async () => {
-                  "use server";
-                  await logoutAction();
-                }}
-              >
-                <Button
+              <form action={logoutAction}>
+                <button
                   type="submit"
-                  variant="outline"
-                  className="w-full border-outline text-on-surface hover:bg-surface-variant"
+                  className="w-full rounded-md border border-outline px-4 py-2 text-sm font-medium text-on-surface hover:bg-surface-variant transition-colors"
                 >
                   Sign Out
-                </Button>
+                </button>
               </form>
             </div>
           </div>

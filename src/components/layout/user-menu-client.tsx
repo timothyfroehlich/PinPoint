@@ -84,20 +84,15 @@ export function UserMenu({
         <DropdownMenuSeparator className="bg-outline-variant" />
 
         {/* Sign Out */}
-        <DropdownMenuItem asChild>
-          <form
-            action={async () => {
-              await logoutAction();
-            }}
-          >
-            <button
-              type="submit"
-              className="flex w-full items-center text-error hover:text-error focus:text-error cursor-pointer"
-            >
-              <LogOut className="mr-2 size-4" />
-              <span>Sign Out</span>
-            </button>
-          </form>
+        <DropdownMenuItem
+          className="text-error hover:text-error focus:text-error cursor-pointer"
+          onSelect={async (event) => {
+            event.preventDefault();
+            await logoutAction();
+          }}
+        >
+          <LogOut className="mr-2 size-4" />
+          <span>Sign Out</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
