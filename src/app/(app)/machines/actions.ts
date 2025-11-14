@@ -79,14 +79,6 @@ export async function createMachineAction(formData: FormData): Promise<void> {
     redirect("/machines/new");
   }
 
-  if (!machine) {
-    await setFlash({
-      type: "error",
-      message: "Failed to create machine. Please try again.",
-    });
-    redirect("/machines/new");
-  }
-
   // Set success flash message
   await setFlash({
     type: "success",
