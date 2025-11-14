@@ -210,7 +210,7 @@ export default async function MachineDetailPage({
               </div>
             </CardHeader>
             <CardContent>
-              {machine.issues.length === 0 ? (
+              {openIssues.length === 0 ? (
                 // Empty state
                 <div className="py-12 text-center">
                   <p className="text-lg text-on-surface-variant mb-2">
@@ -223,7 +223,7 @@ export default async function MachineDetailPage({
               ) : (
                 // Issues list (placeholder UI ready for Task 8)
                 <div className="space-y-3">
-                  {machine.issues.map((issue) => (
+                  {openIssues.map((issue) => (
                     <div
                       key={issue.id}
                       data-testid="issue-card"
