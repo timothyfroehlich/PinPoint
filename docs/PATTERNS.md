@@ -42,6 +42,7 @@ export async function logoutAction(): Promise<void> {
 ```
 
 **Key points**:
+
 - `finally` block guarantees redirect on all paths
 - Flash messages persist across redirect via secure session cookie
 - No return value needed; `redirect()` throws internally
@@ -110,10 +111,7 @@ export async function createMachineAction(formData: FormData): Promise<void> {
 
   try {
     // Insert machine (direct Drizzle query)
-    const [machine] = await db
-      .insert(machines)
-      .values({ name })
-      .returning();
+    const [machine] = await db.insert(machines).values({ name }).returning();
 
     if (!machine) throw new Error("Machine creation failed");
 
@@ -242,7 +240,9 @@ test("authenticated navigation", async ({ page }) => {
   await loginAs(page, "user@example.com", "password");
 
   // Scope locators to landmarks to avoid strict-mode collisions
-  await expect(page.getByRole("navigation").getByText("Dashboard")).toBeVisible();
+  await expect(
+    page.getByRole("navigation").getByText("Dashboard")
+  ).toBeVisible();
   await expect(page.getByRole("main").getByText("Profile")).toBeVisible();
 });
 ```
