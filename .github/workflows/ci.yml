@@ -47,12 +47,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: "npm"
 
       - name: Restore node_modules
-        uses: actions/cache@v4
+        id: cache-restore
+        uses: actions/cache/restore@v4
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies (if cache miss)
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        run: npm ci
 
       - name: Run type checking
         run: npm run typecheck
@@ -69,12 +75,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: "npm"
 
       - name: Restore node_modules
-        uses: actions/cache@v4
+        id: cache-restore
+        uses: actions/cache/restore@v4
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies (if cache miss)
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        run: npm ci
 
       - name: Run linting
         run: npm run lint
@@ -91,12 +103,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: "npm"
 
       - name: Restore node_modules
-        uses: actions/cache@v4
+        id: cache-restore
+        uses: actions/cache/restore@v4
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies (if cache miss)
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        run: npm ci
 
       - name: Check formatting
         run: npm run format
@@ -113,12 +131,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: "npm"
 
       - name: Restore node_modules
-        uses: actions/cache@v4
+        id: cache-restore
+        uses: actions/cache/restore@v4
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies (if cache miss)
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        run: npm ci
 
       - name: Build application
         run: |
@@ -140,12 +164,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: "npm"
 
       - name: Restore node_modules
-        uses: actions/cache@v4
+        id: cache-restore
+        uses: actions/cache/restore@v4
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies (if cache miss)
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        run: npm ci
 
       - name: Run unit tests
         run: npm test -- --reporter=verbose
@@ -162,12 +192,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: "npm"
 
       - name: Restore node_modules
-        uses: actions/cache@v4
+        id: cache-restore
+        uses: actions/cache/restore@v4
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies (if cache miss)
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        run: npm ci
 
       - name: Run integration tests
         run: npm run test:integration -- --reporter=verbose
@@ -184,12 +220,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: "npm"
 
       - name: Restore node_modules
-        uses: actions/cache@v4
+        id: cache-restore
+        uses: actions/cache/restore@v4
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies (if cache miss)
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        run: npm ci
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
@@ -240,12 +282,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: "npm"
 
       - name: Restore node_modules
-        uses: actions/cache@v4
+        id: cache-restore
+        uses: actions/cache/restore@v4
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies (if cache miss)
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        run: npm ci
 
       - name: Run npm audit
         run: npm audit --audit-level=high
