@@ -38,24 +38,33 @@ export default defineConfig(({ mode }) => {
       // Project-based test suites
       projects: [
         {
-          name: "unit",
-          testMatch: ["src/**/*.test.ts", "src/**/*.test.tsx"],
-          exclude: ["src/test/integration/**"],
+          extends: true,
+          test: {
+            name: "unit",
+            include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+            exclude: ["src/test/integration/**"],
+          },
         },
         {
-          name: "integration",
-          testMatch: [
-            "src/test/integration/**/*.test.ts",
-            "src/test/integration/**/*.test.tsx",
-          ],
-          exclude: ["src/test/integration/supabase/**"],
+          extends: true,
+          test: {
+            name: "integration",
+            include: [
+              "src/test/integration/**/*.test.ts",
+              "src/test/integration/**/*.test.tsx",
+            ],
+            exclude: ["src/test/integration/supabase/**"],
+          },
         },
         {
-          name: "integration-supabase",
-          testMatch: [
-            "src/test/integration/supabase/**/*.test.ts",
-            "src/test/integration/supabase/**/*.test.tsx",
-          ],
+          extends: true,
+          test: {
+            name: "integration-supabase",
+            include: [
+              "src/test/integration/supabase/**/*.test.ts",
+              "src/test/integration/supabase/**/*.test.tsx",
+            ],
+          },
         },
       ],
     },
