@@ -54,8 +54,7 @@ The workflow includes the following jobs:
 - **Integration Tests** - `npm run test:integration` (depends on setup)
 - **E2E Tests (Smoke)** - `npm run smoke` (depends on setup + build)
   - Installs Playwright browsers
-  - Starts dev server with dummy environment variables
-  - Runs smoke tests
+  - Sources `.env.ci` before running smoke tests so Playwright's built-in `webServer` command launches Next.js with the right config
   - Uploads Playwright report on failure
 
 ### Security Scans (Independent)

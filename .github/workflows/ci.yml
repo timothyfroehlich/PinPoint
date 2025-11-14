@@ -236,17 +236,12 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Start development server
+      - name: Run E2E tests
         run: |
           set -a
           source .env.ci
           set +a
-          npm run dev &
-          echo "Waiting for dev server..."
-          timeout 60 bash -c 'until curl -f http://localhost:3000 > /dev/null 2>&1; do sleep 2; done' || exit 1
-
-      - name: Run E2E tests
-        run: npm run smoke
+          npm run smoke
 
       - name: Upload Playwright report
         if: failure()
