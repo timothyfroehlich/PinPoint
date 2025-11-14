@@ -117,12 +117,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
 
             <div className="flex flex-col gap-2">
               {/* Logout button */}
-              <form
-                action={async () => {
-                  "use server";
-                  await logoutAction();
-                }}
-              >
+              <form action={logoutAction}>
                 <button
                   type="submit"
                   className="w-full rounded-md border border-outline px-4 py-2 text-sm font-medium text-on-surface hover:bg-surface-variant transition-colors"
