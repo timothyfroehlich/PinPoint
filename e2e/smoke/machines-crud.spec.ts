@@ -168,8 +168,8 @@ test.describe("Machines CRUD", () => {
     expect(actualCardCount).toBeGreaterThan(0); // Ensure we have issues to display
 
     // Verify specific seed issues are listed
-    await expect(page.getByText("Right flipper not working")).toBeVisible();
-    await expect(page.getByText("Missing Thing magnet cover")).toBeVisible();
+    await expect(page.getByText("Ball stuck in Thing's box")).toBeVisible();
+    await expect(page.getByText("Bear Kick opto not working")).toBeVisible();
   });
 
   test("should show empty state for machine with no issues", async ({
