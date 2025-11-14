@@ -1,6 +1,6 @@
 # E2E Testing Best Practices
 
-**Last Updated**: 2025-11-12  
+**Last Updated**: 2025-11-12
 **Status**: ACTIVE - Authoritative guide for Playwright E2E tests
 
 ## Philosophy
@@ -394,7 +394,7 @@ export default defineConfig({
 });
 ```
 
-**Local Development**: Parallel for speed.  
+**Local Development**: Parallel for speed.
 **CI**: Serial to avoid Supabase rate limits.
 
 ### Reuse Authentication State

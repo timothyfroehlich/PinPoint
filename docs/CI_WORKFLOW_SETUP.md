@@ -34,21 +34,34 @@ The workflow file is available locally at:
 
 The workflow includes the following jobs:
 
-### Quality Checks
+### Setup & Caching
+
+- **Setup Dependencies** - Installs npm packages and caches node_modules for other jobs
+
+### Quality Checks (Parallel, depends on setup)
 
 - **TypeScript Type Check** - `npm run typecheck`
 - **ESLint** - `npm run lint`
 - **Prettier Format Check** - `npm run format`
-- **Build** - `npm run build`
 
-### Testing
+### Build (Sequential, after quality checks)
 
-- **Unit & Integration Tests** - `npm test`
+- **Build** - `npm run build` (depends on typecheck, lint, format passing)
 
-### Security Scans
+### Testing (Parallel for unit/integration, sequential for E2E)
 
-- **Gitleaks** - Secret detection in git history
-- **npm audit** - Dependency vulnerability checking (high severity only)
+- **Unit Tests** - `npm test` (depends on setup)
+- **Integration Tests** - `npm run test:integration` (depends on setup)
+- **E2E Tests (Smoke)** - `npm run smoke` (depends on setup + build)
+  - Installs Playwright browsers
+  - Starts dev server with dummy environment variables
+  - Runs smoke tests
+  - Uploads Playwright report on failure
+
+### Security Scans (Independent)
+
+- **Gitleaks** - Secret detection in git history (no dependencies)
+- **npm audit** - Dependency vulnerability checking (depends on setup)
 
 ### Triggers
 
@@ -57,7 +70,34 @@ The workflow includes the following jobs:
 
 ### Node.js Version
 
-- **Node 22** with npm caching enabled
+- **Node 22** with npm caching and node_modules caching for efficiency
+
+## Performance Optimizations
+
+### Dependency Caching Strategy
+
+The workflow uses a two-level caching approach:
+
+1. **npm cache** - Caches downloaded packages from npm registry (via `actions/setup-node`)
+2. **node_modules cache** - Caches installed dependencies for direct reuse (via `actions/cache`)
+
+This reduces `npm ci` time from ~30s to ~5s for dependent jobs.
+
+### Job Orchestration
+
+- **Parallel execution**: Quality checks (typecheck, lint, format) and unit/integration tests run concurrently
+- **Sequential gates**: Build job waits for quality checks to pass first
+- **E2E optimization**: Smoke tests only run after successful build
+
+### Concurrency Control
+
+Workflow runs are automatically cancelled when new commits are pushed to the same branch, preventing wasted CI minutes on outdated code.
+
+## Artifacts & Debugging
+
+- **Playwright Reports**: Automatically uploaded on E2E test failures (retained for 7 days)
+- **Test Output**: Verbose reporter enabled for easier debugging
+- **Failure Analysis**: Check the "Artifacts" section in failed workflow runs
 
 ## Verification
 
