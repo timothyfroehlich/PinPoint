@@ -213,6 +213,17 @@ jobs:
           npm run test:integration -- --reporter=verbose
 
   test-e2e:
+    # ==============================================================================
+    # E2E Test Job
+    #
+    # CI/CD Synchronization:
+    #   IMPORTANT: The core logic for this job is managed by the script at
+    #   `scripts/run-e2e-with-supabase.sh`. That script is the single source
+    #   of truth for setting up the test environment.
+    #
+    #   If you modify this job, you MUST ensure it remains synchronized with
+    #   the logic in the script.
+    # ==============================================================================
     name: E2E Tests (Smoke)
     runs-on: ubuntu-latest
     needs: [setup, build]
@@ -242,62 +253,6 @@ jobs:
         with:
           version: latest
 
-      - name: Start Supabase
-        run: |
-          echo "🚀 Starting local Supabase stack..."
-          supabase start -x "studio,realtime,storage-api,edge-runtime,logflare,vector,imgproxy,supavisor,postgres-meta,mailpit"
-          echo "⏳ Waiting for Supabase services to be ready..."
-          for i in $(seq 1 30); do
-            if curl -s --fail "http://localhost:54321/health" > /dev/null 2>&1; then
-              echo "✅ Supabase API server is ready!"
-              break
-            fi
-            echo "🔄 Services not ready yet, waiting... (attempt $i/30)"
-            sleep 2
-          done
-          supabase status
-
-      - name: Export Supabase Env
-        run: |
-          echo "🔧 Exporting Supabase environment variables..."
-          supabase status -o env >> "$GITHUB_ENV"
-
-      - name: Map Supabase env for Next.js
-        run: |
-          set -e
-          echo "🔧 Mapping Supabase CLI env to Next.js expected variables"
-          [[ -n "$API_URL" ]] || { echo "❌ API_URL not set by Supabase CLI"; exit 1; }
-          [[ -n "$ANON_KEY" ]] || { echo "❌ ANON_KEY (publishable) not set by Supabase CLI"; exit 1; }
-          [[ -n "$SERVICE_ROLE_KEY" ]] || { echo "❌ SERVICE_ROLE_KEY (secret) not set by Supabase CLI"; exit 1; }
-          [[ -n "$DB_URL" ]] || { echo "❌ DB_URL not set by Supabase CLI"; exit 1; }
-          CLEAN_API_URL="${API_URL%/}"
-          CLEAN_API_URL="${CLEAN_API_URL%\"}"
-          CLEAN_API_URL="${CLEAN_API_URL#\"}"
-          CLEAN_API_URL="${CLEAN_API_URL//[[:space:]]/}"
-          ANON_KEY_CLEAN="${ANON_KEY%\"}"
-          ANON_KEY_CLEAN="${ANON_KEY_CLEAN#\"}"
-          ANON_KEY_CLEAN="${ANON_KEY_CLEAN//[[:space:]]/}"
-          SERVICE_ROLE_KEY_CLEAN="${SERVICE_ROLE_KEY%\"}"
-          SERVICE_ROLE_KEY_CLEAN="${SERVICE_ROLE_KEY_CLEAN#\"}"
-          SERVICE_ROLE_KEY_CLEAN="${SERVICE_ROLE_KEY_CLEAN//[[:space:]]/}"
-          DB_PORT=$(echo "$DB_URL" | grep -o '5[0-9][0-9][0-9][0-9]' | head -1)
-          if [ -z "$DB_PORT" ]; then
-            DB_PORT="54322"
-          fi
-          DB_HOST="127.0.0.1"
-          DB_NAME="postgres"
-          RECONSTRUCTED_DB_URL="postgresql://postgres:postgres@${DB_HOST}:${DB_PORT}/${DB_NAME}"
-          {
-            echo "NEXT_PUBLIC_SUPABASE_URL=$CLEAN_API_URL"
-            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$ANON_KEY_CLEAN"
-            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY_CLEAN"
-            echo "DATABASE_URL=$RECONSTRUCTED_DB_URL"
-          } >> "$GITHUB_ENV"
-          echo "✅ Environment mapping complete."
-
-      - name: Seed Database
-        run: npm run db:seed-users
-
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         id: playwright-cache
@@ -311,8 +266,11 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
 
-      - name: Run E2E tests
-        run: npm run smoke
+      - name: Make E2E script executable
+        run: chmod +x ./scripts/run-e2e-with-supabase.sh
+
+      - name: Run E2E Test Script
+        run: ./scripts/run-e2e-with-supabase.sh
 
       - name: Upload Playwright report
         if: failure()
