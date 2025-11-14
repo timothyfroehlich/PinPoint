@@ -10,8 +10,6 @@ export default defineConfig(({ mode }) => {
     test: {
       globals: true,
       environment: "node",
-      include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
-      exclude: ["node_modules", ".next", "out"],
       env: {
         ...env,
         // Ensure DATABASE_URL is available for integration tests
@@ -37,6 +35,29 @@ export default defineConfig(({ mode }) => {
           statements: 80,
         },
       },
+      // Project-based test suites
+      projects: [
+        {
+          name: "unit",
+          testMatch: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+          exclude: ["src/test/integration/**"],
+        },
+        {
+          name: "integration",
+          testMatch: [
+            "src/test/integration/**/*.test.ts",
+            "src/test/integration/**/*.test.tsx",
+          ],
+          exclude: ["src/test/integration/supabase/**"],
+        },
+        {
+          name: "integration-supabase",
+          testMatch: [
+            "src/test/integration/supabase/**/*.test.ts",
+            "src/test/integration/supabase/**/*.test.tsx",
+          ],
+        },
+      ],
     },
     resolve: {
       alias: {

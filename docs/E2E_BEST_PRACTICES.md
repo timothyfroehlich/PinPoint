@@ -1,6 +1,6 @@
 # E2E Testing Best Practices
 
-**Last Updated**: 2025-11-12  
+**Last Updated**: 2025-11-12
 **Status**: ACTIVE - Authoritative guide for Playwright E2E tests
 
 ## Philosophy
@@ -181,9 +181,15 @@ await page.click('button[type="submit"]');
 expect(page.url()).toBe("/dashboard"); // Race condition!
 
 // ✅ Good - explicit expectation with built-in retry
+import { DEFAULT_NAVIGATION_TIMEOUT } from "~/e2e/support/constants";
+
 await page.getByRole("button", { name: "Submit" }).click();
-await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
+await expect(page).toHaveURL("/dashboard", {
+  timeout: DEFAULT_NAVIGATION_TIMEOUT,
+});
 ```
+
+> Subsequent snippets assume `DEFAULT_NAVIGATION_TIMEOUT` is imported from `~/e2e/support/constants`.
 
 **Playwright auto-waits** for most actions, but use `expect()` for state verification.
 
@@ -192,7 +198,9 @@ await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
 ```typescript
 // ✅ Good - wait for navigation after form submit
 await page.getByRole("button", { name: "Sign In" }).click();
-await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
+await expect(page).toHaveURL("/dashboard", {
+  timeout: DEFAULT_NAVIGATION_TIMEOUT,
+});
 
 // ✅ Good - wait for API response before asserting
 await page.getByRole("button", { name: "Create Machine" }).click();
@@ -293,7 +301,7 @@ export async function loginAs(
   await page.getByLabel("Email").fill(credentials.email);
   await page.getByLabel("Password").fill(credentials.password);
   await page.getByRole("button", { name: "Sign In" }).click();
-  await page.waitForURL("/dashboard", { timeout: 10000 });
+  await page.waitForURL("/dashboard", { timeout: DEFAULT_NAVIGATION_TIMEOUT });
 }
 
 export async function createIssue(
@@ -427,17 +435,20 @@ test("debug test", async ({ page }) => {
 
 ## Performance Optimization
 
-### Parallel Execution (Default)
+### Parallel Execution
 
 ```typescript
 // playwright.config.ts
 export default defineConfig({
-  workers: process.env.CI ? 1 : undefined, // CI: serial, local: parallel
+  // Run tests in parallel locally, but serially in CI
+  fullyParallel: !process.env.CI,
+  // Opt out of parallel tests on CI
+  workers: process.env.CI ? 1 : undefined,
 });
 ```
 
-**Local Development**: Parallel for speed.  
-**CI**: Serial to avoid Supabase rate limits.
+**Local Development**: Parallel for speed.
+**CI**: Serial to avoid Supabase rate limits and ensure stability.
 
 ### Reuse Authentication State
 
