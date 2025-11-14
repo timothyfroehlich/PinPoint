@@ -44,7 +44,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
           </p>
         </CardHeader>
 
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6" data-testid="dashboard-content">
           {/* Flash message */}
           {flash && (
             <div
@@ -61,7 +61,10 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
 
           {/* User info */}
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-on-surface">
+            <h2
+              className="text-lg font-semibold text-on-surface"
+              data-testid="dashboard-welcome"
+            >
               Your Profile
             </h2>
 
@@ -72,7 +75,10 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                   <UserCircle className="size-5 text-on-surface-variant" />
                   <div>
                     <p className="text-xs text-on-surface-variant">Name</p>
-                    <p className="text-sm font-medium text-on-surface">
+                    <p
+                      className="text-sm font-medium text-on-surface"
+                      data-testid="dashboard-user-name"
+                    >
                       {name}
                     </p>
                   </div>
@@ -84,7 +90,12 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                 <Mail className="size-5 text-on-surface-variant" />
                 <div>
                   <p className="text-xs text-on-surface-variant">Email</p>
-                  <p className="text-sm font-medium text-on-surface">{email}</p>
+                  <p
+                    className="text-sm font-medium text-on-surface"
+                    data-testid="dashboard-user-email"
+                  >
+                    {email}
+                  </p>
                 </div>
               </div>
 

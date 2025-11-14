@@ -8,6 +8,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { ArrowLeft } from "lucide-react";
 import { createMachineAction } from "~/app/(app)/machines/actions";
+import { readFlash } from "~/lib/flash";
 
 /**
  * Create Machine Page (Protected Route)
@@ -25,6 +26,9 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
   if (!user) {
     redirect("/login");
   }
+
+  // Read flash message (for form errors)
+  const flash = await readFlash();
 
   return (
     <main className="min-h-screen bg-surface">
@@ -63,6 +67,19 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {/* Flash message */}
+            {flash && (
+              <div
+                className={`mb-6 rounded-md border p-4 ${
+                  flash.type === "error"
+                    ? "border-error bg-error/10 text-error"
+                    : "border-primary bg-primary/10 text-primary"
+                }`}
+              >
+                <p className="text-sm font-medium">{flash.message}</p>
+              </div>
+            )}
+
             <form action={createMachineAction} className="space-y-6">
               {/* Machine Name */}
               <div className="space-y-2">

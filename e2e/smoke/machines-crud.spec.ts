@@ -93,7 +93,9 @@ test.describe("Machines CRUD", () => {
     ).toBeVisible();
 
     // Verify status is "Operational" (no issues yet)
-    await expect(page.getByText("Operational")).toBeVisible();
+    await expect(page.getByTestId("machine-status-badge")).toHaveText(
+      "Operational"
+    );
   });
 
   test("should validate required machine name", async ({ page }) => {
@@ -147,14 +149,25 @@ test.describe("Machines CRUD", () => {
       page.getByRole("heading", { name: "The Addams Family" })
     ).toBeVisible();
 
-    // Verify status badge
+    // Verify status badge matches severity
     await expect(page.getByText("Unplayable")).toBeVisible();
 
-    // Verify open issues count
-    await expect(page.getByText(/Open Issues/i)).toBeVisible();
-    await expect(page.getByText("2")).toBeVisible(); // Has 2 open issues
+    // Verify open issues count section is visible
+    await expect(page.getByTestId("detail-open-issues")).toBeVisible();
+    await expect(page.getByTestId("detail-open-issues-count")).toBeVisible();
 
-    // Verify issues are listed
+    // Dynamic count verification: count visible issue cards and verify matches displayed count
+    const issueCards = page.getByTestId("issue-card");
+    const displayedCountText = await page
+      .getByTestId("detail-open-issues-count")
+      .textContent();
+    const displayedCount = Number(displayedCountText);
+    const actualCardCount = await issueCards.count();
+
+    expect(actualCardCount).toBe(displayedCount);
+    expect(actualCardCount).toBeGreaterThan(0); // Ensure we have issues to display
+
+    // Verify specific seed issues are listed
     await expect(page.getByText("Right flipper not working")).toBeVisible();
     await expect(page.getByText("Missing Thing magnet cover")).toBeVisible();
   });
@@ -173,7 +186,9 @@ test.describe("Machines CRUD", () => {
 
     // Should show empty state for issues
     await expect(page.getByText("No issues reported yet")).toBeVisible();
-    await expect(page.getByText("0")).toBeVisible(); // Open Issues: 0
+    await expect(page.getByTestId("detail-open-issues-count")).toContainText(
+      "0"
+    );
   });
 
   test("should navigate back to machines list from detail page", async ({

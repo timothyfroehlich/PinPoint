@@ -12,7 +12,7 @@ test.describe("Authentication", () => {
   }) => {
     // Navigate to signup page
     await page.goto("/");
-    await page.getByRole("link", { name: "Sign Up" }).click();
+    await page.getByTestId("hero-signup").click();
 
     // Verify we're on the signup page
     await expect(page).toHaveURL("/signup");
@@ -38,8 +38,8 @@ test.describe("Authentication", () => {
     await expect(
       page.getByRole("heading", { name: "Dashboard" })
     ).toBeVisible();
-    await expect(page.getByText("E2E Test User")).toBeVisible();
-    await expect(page.getByText(testEmail)).toBeVisible();
+    await expect(page.getByTestId("dashboard-user-name")).toBeVisible();
+    await expect(page.getByTestId("dashboard-user-email")).toBeVisible();
   });
 
   test("login flow - sign in with existing account", async ({ page }) => {
@@ -49,7 +49,7 @@ test.describe("Authentication", () => {
 
     // Navigate to login page
     await page.goto("/");
-    await page.getByRole("link", { name: "Sign In" }).click();
+    await page.getByTestId("hero-signin").click();
 
     // Verify we're on the login page
     await expect(page).toHaveURL("/login");
@@ -73,8 +73,8 @@ test.describe("Authentication", () => {
     await expect(
       page.getByRole("heading", { name: "Dashboard" })
     ).toBeVisible();
-    await expect(page.getByText("Member User")).toBeVisible();
-    await expect(page.getByText(testEmail)).toBeVisible();
+    await expect(page.getByTestId("dashboard-user-name")).toBeVisible();
+    await expect(page.getByTestId("dashboard-user-email")).toBeVisible();
   });
 
   test("login flow - reject invalid credentials", async ({ page }) => {
@@ -214,6 +214,6 @@ test.describe("Authentication", () => {
     await expect(
       page.getByRole("heading", { name: "Dashboard" })
     ).toBeVisible();
-    await expect(page.getByText("Member User")).toBeVisible();
+    await expect(page.getByTestId("user-menu-name")).toBeVisible();
   });
 });

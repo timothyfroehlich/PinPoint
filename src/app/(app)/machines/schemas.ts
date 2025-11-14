@@ -16,9 +16,9 @@ import { z } from "zod";
 export const createMachineSchema = z.object({
   name: z
     .string()
+    .trim()
     .min(1, "Machine name is required")
-    .max(100, "Machine name must be less than 100 characters")
-    .trim(),
+    .max(100, "Machine name must be less than 100 characters"),
 });
 
 export type CreateMachineInput = z.infer<typeof createMachineSchema>;

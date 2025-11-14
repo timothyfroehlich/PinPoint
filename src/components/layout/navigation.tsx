@@ -110,6 +110,7 @@ export async function Navigation(): Promise<React.JSX.Element> {
                 variant="ghost"
                 size="sm"
                 className="text-on-surface hover:bg-surface-variant"
+                data-testid="nav-signin"
               >
                 <Link href="/login">Sign In</Link>
               </Button>
@@ -117,6 +118,7 @@ export async function Navigation(): Promise<React.JSX.Element> {
                 asChild
                 size="sm"
                 className="bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container"
+                data-testid="nav-signup"
               >
                 <Link href="/signup">Sign Up</Link>
               </Button>

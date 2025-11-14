@@ -23,6 +23,7 @@
     "db:seed": "node --env-file=.env.local -e 'require(\"child_process\").execSync(\"psql \" + process.env.DATABASE_URL + \" -f supabase/seed.sql\", {stdio: \"inherit\"})'",
     "db:seed-users": "node --env-file=.env.local supabase/seed-users.mjs",
     "preflight": "npm-run-all --silent --parallel typecheck lint format test --sequential --parallel build test:integration smoke",
+    "supa:ci": "bash scripts/supa-ci.sh",
     "prepare": "husky"
   },
   "repository": {

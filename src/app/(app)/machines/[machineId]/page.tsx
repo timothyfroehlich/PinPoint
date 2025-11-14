@@ -95,6 +95,7 @@ export default async function MachineDetailPage({
                     {machine.name}
                   </h1>
                   <Badge
+                    data-testid="machine-status-badge"
                     className={`${getMachineStatusStyles(machineStatus)} border px-3 py-1 text-sm font-semibold`}
                   >
                     {getMachineStatusLabel(machineStatus)}
@@ -146,11 +147,14 @@ export default async function MachineDetailPage({
                 </div>
 
                 {/* Open Issues Count */}
-                <div>
+                <div data-testid="detail-open-issues">
                   <p className="text-xs text-on-surface-variant mb-1">
                     Open Issues
                   </p>
-                  <p className="text-lg font-semibold text-on-surface">
+                  <p
+                    className="text-lg font-semibold text-on-surface"
+                    data-testid="detail-open-issues-count"
+                  >
                     {openIssues.length}
                   </p>
                 </div>
@@ -222,6 +226,7 @@ export default async function MachineDetailPage({
                   {machine.issues.map((issue) => (
                     <div
                       key={issue.id}
+                      data-testid="issue-card"
                       className="flex items-center justify-between p-4 rounded-lg border border-outline-variant bg-surface-variant"
                     >
                       <div className="flex-1">

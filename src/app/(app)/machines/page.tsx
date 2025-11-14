@@ -123,7 +123,10 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
                     <div className="space-y-2">
                       {/* Issue count */}
                       <div className="flex items-center gap-2 text-sm">
-                        <span className="text-on-surface-variant">
+                        <span
+                          className="text-on-surface-variant"
+                          data-testid="machine-open-issues-label"
+                        >
                           Open Issues:
                         </span>
                         <span
@@ -132,6 +135,7 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
                               ? "text-on-surface"
                               : "text-on-surface-variant"
                           }`}
+                          data-testid={`machine-open-issues-count-${machine.id}`}
                         >
                           {machine.openIssuesCount}
                         </span>

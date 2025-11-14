@@ -87,15 +87,25 @@ await expect(page.getByText(seededMember.name)).toBeVisible();
 
 **Why**: Reflects user-visible content. Fails if UX copy changes (good forcing function).
 
-### 3. Test IDs (ACCEPTABLE for complex components)
+### 3. Test IDs (RECOMMENDED for repeated elements)
 
 ```typescript
-// ⚠️ Use sparingly - only when role/text is ambiguous
-await page.getByTestId("issue-card-123");
-await page.getByTestId("machine-selector");
+// ✅ Recommended when elements appear multiple times
+await page.getByTestId("machine-status-badge");
+await page.getByTestId("issue-card");
+await page.getByTestId("detail-open-issues-count");
 ```
 
-**Why**: Explicit intent, but not user-facing. Add `data-testid` only when needed.
+**Why**: Prevents Playwright strict mode violations when text/role appears multiple times on page. Explicit, stable, and prevents brittle selectors.
+
+**When to Add During Implementation**:
+
+- **Status badges** that appear in multiple places (header + detail card)
+- **Counts/numbers** that may appear in multiple contexts (0, dates, totals)
+- **Repeated components** (issue cards, machine cards, list items)
+- **Any text** that could plausibly appear twice on the same page
+
+**Best Practice**: Add `data-testid` proactively during implementation when you know an element might not be unique. This is cheaper than fixing strict mode violations later.
 
 ### 4. CSS Selectors (LAST RESORT)
 
@@ -110,6 +120,38 @@ await page.locator("#user-dropdown");
 ---
 
 ## Writing Robust Tests
+
+### Pattern: Dynamic Counting (Resilient to Data Changes)
+
+When testing lists or counts, avoid hardcoding expected values. Instead, verify the UI matches reality:
+
+```typescript
+// ❌ Bad - breaks if seed data changes or user adds test data
+await expect(page.getByTestId("open-issues-count")).toContainText("4");
+
+// ✅ Good - count visible elements and verify UI matches
+const issueCards = page.getByTestId("issue-card");
+const displayedCountText = await page
+  .getByTestId("open-issues-count")
+  .textContent();
+const displayedCount = Number(displayedCountText);
+const actualCardCount = await issueCards.count();
+
+expect(actualCardCount).toBe(displayedCount); // UI is consistent
+expect(actualCardCount).toBeGreaterThan(0); // Has data to display
+```
+
+**Why**: Tests remain stable even when:
+
+- Seed data changes
+- Manual testing adds records
+- Database state varies between runs
+
+**Use this pattern for**:
+
+- Issue counts, machine lists, comment threads
+- Any collection where exact count may vary
+- Before/after verification (create action → verify count incremented)
 
 ### Pattern: Arrange-Act-Assert
 
