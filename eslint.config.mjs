@@ -34,6 +34,11 @@ export default [
       },
       globals: {
         process: "readonly",
+        // Browser globals for client components
+        document: "readonly",
+        window: "readonly",
+        navigator: "readonly",
+        console: "readonly",
       },
     },
     rules: {
