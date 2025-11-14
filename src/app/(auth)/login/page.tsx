@@ -8,6 +8,7 @@ import { Label } from "~/components/ui/label";
 import { loginAction } from "~/app/(auth)/actions";
 import { readFlash } from "~/lib/flash";
 import { createClient } from "~/lib/supabase/server";
+import { TestAdminButton } from "./TestAdminButton";
 
 /**
  * Login Page
@@ -128,6 +129,9 @@ export default async function LoginPage(): Promise<React.JSX.Element> {
             Sign In
           </Button>
         </form>
+
+        {/* Test Admin Login Button */}
+        <TestAdminButton />
 
         {/* Signup link */}
         <div className="text-center text-sm text-on-surface-variant">
