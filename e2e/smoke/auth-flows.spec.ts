@@ -158,7 +158,9 @@ test.describe("Authentication", () => {
 
     // Wait for password strength indicator to appear
     // (Client component needs time to load zxcvbn and calculate)
-    await page.waitForTimeout(500);
+    await expect(
+      page.locator('[class*="password-strength"]').or(page.getByText(/weak|fair|good/i))
+    ).toBeVisible({ timeout: 2000 });
 
     // Should show strength indicator (checking for common weak password feedback)
     const pageContent = await page.content();
