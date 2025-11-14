@@ -206,7 +206,11 @@ jobs:
         run: npm ci
 
       - name: Run integration tests
-        run: npm run test:integration -- --reporter=verbose
+        run: |
+          set -a
+          source .env.ci
+          set +a
+          npm run test:integration -- --reporter=verbose
 
   test-e2e:
     name: E2E Tests (Smoke)
@@ -232,6 +236,12 @@ jobs:
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium

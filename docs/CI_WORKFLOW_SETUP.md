@@ -52,8 +52,10 @@ The workflow includes the following jobs:
 
 - **Unit Tests** - `npm test` (depends on setup)
 - **Integration Tests** - `npm run test:integration` (depends on setup)
+  - Sources `.env.ci` before running to provide Supabase + database env vars
 - **E2E Tests (Smoke)** - `npm run smoke` (depends on setup + build)
   - Installs Playwright browsers
+  - Caches `~/.cache/ms-playwright` to avoid repeated downloads
   - Sources `.env.ci` before running smoke tests so Playwright's built-in `webServer` command launches Next.js with the right config
   - Uploads Playwright report on failure
 

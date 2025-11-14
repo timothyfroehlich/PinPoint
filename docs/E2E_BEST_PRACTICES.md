@@ -139,9 +139,15 @@ await page.click('button[type="submit"]');
 expect(page.url()).toBe("/dashboard"); // Race condition!
 
 // ✅ Good - explicit expectation with built-in retry
+import { DEFAULT_NAVIGATION_TIMEOUT } from "~/e2e/support/constants";
+
 await page.getByRole("button", { name: "Submit" }).click();
-await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
+await expect(page).toHaveURL("/dashboard", {
+  timeout: DEFAULT_NAVIGATION_TIMEOUT,
+});
 ```
+
+> Subsequent snippets assume `DEFAULT_NAVIGATION_TIMEOUT` is imported from `~/e2e/support/constants`.
 
 **Playwright auto-waits** for most actions, but use `expect()` for state verification.
 
@@ -150,7 +156,9 @@ await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
 ```typescript
 // ✅ Good - wait for navigation after form submit
 await page.getByRole("button", { name: "Sign In" }).click();
-await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
+await expect(page).toHaveURL("/dashboard", {
+  timeout: DEFAULT_NAVIGATION_TIMEOUT,
+});
 
 // ✅ Good - wait for API response before asserting
 await page.getByRole("button", { name: "Create Machine" }).click();
@@ -251,7 +259,7 @@ export async function loginAs(
   await page.getByLabel("Email").fill(credentials.email);
   await page.getByLabel("Password").fill(credentials.password);
   await page.getByRole("button", { name: "Sign In" }).click();
-  await page.waitForURL("/dashboard", { timeout: 10000 });
+  await page.waitForURL("/dashboard", { timeout: DEFAULT_NAVIGATION_TIMEOUT });
 }
 
 export async function createIssue(
