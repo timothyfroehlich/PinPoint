@@ -393,17 +393,20 @@ test("debug test", async ({ page }) => {
 
 ## Performance Optimization
 
-### Parallel Execution (Default)
+### Parallel Execution
 
 ```typescript
 // playwright.config.ts
 export default defineConfig({
-  workers: process.env.CI ? 1 : undefined, // CI: serial, local: parallel
+  // Run tests in parallel locally, but serially in CI
+  fullyParallel: !process.env.CI,
+  // Opt out of parallel tests on CI
+  workers: process.env.CI ? 1 : undefined,
 });
 ```
 
 **Local Development**: Parallel for speed.
-**CI**: Serial to avoid Supabase rate limits.
+**CI**: Serial to avoid Supabase rate limits and ensure stability.
 
 ### Reuse Authentication State
 

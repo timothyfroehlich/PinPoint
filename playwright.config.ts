@@ -10,7 +10,7 @@ export default defineConfig({
   testDir: "./e2e",
 
   // Run tests in files in parallel
-  fullyParallel: true,
+  fullyParallel: !process.env.CI,
 
   // Short, developer-friendly timeouts
   timeout: 10 * 1000, // 10s per test
