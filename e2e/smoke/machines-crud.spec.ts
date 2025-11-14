@@ -116,7 +116,9 @@ test.describe("Machines CRUD", () => {
     // Should stay on the same page (HTML5 validation or server validation)
     // The form should either show HTML5 validation or stay on the page
     // Wait for the form heading to remain visible, indicating we're still on the page
-    await expect(page.getByRole("heading", { name: "Add New Machine" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Add New Machine" })
+    ).toBeVisible();
     await expect(page).toHaveURL("/machines/new");
   });
 

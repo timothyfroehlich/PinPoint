@@ -61,33 +61,30 @@ export async function createMachineAction(formData: FormData): Promise<void> {
   const { name } = validation.data;
 
   // Insert machine (direct Drizzle query - no DAL)
-  let machine;
   try {
-    const [result] = await db
+    const [machine] = await db
       .insert(machines)
       .values({
         name,
       })
       .returning();
-    machine = result;
+
+    if (!machine) throw new Error("Machine creation failed");
+
+    // Set success flash message and revalidate
+    await setFlash({
+      type: "success",
+      message: `Machine "${name}" created successfully`,
+    });
+    revalidatePath("/machines");
+
+    // Redirect to machine detail page (throws to exit function)
+    redirect(`/machines/${machine.id}`);
   } catch {
-    // Database insert failed
     await setFlash({
       type: "error",
       message: "Failed to create machine. Please try again.",
     });
     redirect("/machines/new");
   }
-
-  // Set success flash message
-  await setFlash({
-    type: "success",
-    message: `Machine "${name}" created successfully`,
-  });
-
-  // Revalidate machines list
-  revalidatePath("/machines");
-
-  // Redirect to machine detail page (throws - must be outside try/catch)
-  redirect(`/machines/${machine.id}`);
 }
