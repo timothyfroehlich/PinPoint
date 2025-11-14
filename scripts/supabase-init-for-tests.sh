@@ -46,6 +46,17 @@ export SUPABASE_SERVICE_ROLE_KEY="${SECRET_KEY}"
 export DATABASE_URL="${DB_URL}"
 export DIRECT_URL="${DB_URL}"
 
+if [ ! -f .env.local ]; then
+  echo "📝 Creating temporary .env.local for test scripts..."
+  cat > .env.local <<EOF
+NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}
+SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+DATABASE_URL=${DATABASE_URL}
+DIRECT_URL=${DIRECT_URL}
+EOF
+fi
+
 echo "📦 Applying database schema with Drizzle (db:push)..."
 npm run db:push
 
@@ -56,4 +67,3 @@ echo "🌱 Seeding test users..."
 npm run db:seed-users
 
 echo "✅ Supabase initialization for tests completed."
-

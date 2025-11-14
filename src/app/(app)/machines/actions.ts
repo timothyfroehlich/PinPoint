@@ -70,7 +70,7 @@ export async function createMachineAction(formData: FormData): Promise<void> {
       })
       .returning();
     machine = result;
-  } catch (error) {
+  } catch {
     // Database insert failed
     await setFlash({
       type: "error",

@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { createClient } from "@supabase/supabase-js";
-import { signupSchema, loginSchema } from "~/app/(auth)/schemas";
 
 /**
  * Integration tests for authentication actions
@@ -8,8 +7,8 @@ import { signupSchema, loginSchema } from "~/app/(auth)/schemas";
  * These tests validate auth actions against a real Supabase instance.
  * Requires Supabase to be running (supabase start).
  *
- * Note: We test the validation schemas and expected behavior patterns,
- * not the full Server Actions (which require Next.js runtime with cookies).
+ * Note: Validation schemas are covered by unit tests; this file focuses on
+ * Supabase behavior (auth flows) against a real instance.
  */
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -28,24 +27,6 @@ describe("Authentication Integration Tests", () => {
   });
 
   describe("Signup flow", () => {
-    it("should validate signup input before calling Supabase", () => {
-      // Valid input
-      const validResult = signupSchema.safeParse({
-        name: "Test User",
-        email: "test@example.com",
-        password: "SecurePass123",
-      });
-      expect(validResult.success).toBe(true);
-
-      // Invalid input - password too short
-      const invalidResult = signupSchema.safeParse({
-        name: "Test User",
-        email: "test@example.com",
-        password: "short",
-      });
-      expect(invalidResult.success).toBe(false);
-    });
-
     it("should create a new user with Supabase", async () => {
       const testEmail = `test-${Date.now()}@example.com`;
 
@@ -105,23 +86,6 @@ describe("Authentication Integration Tests", () => {
   });
 
   describe("Login flow", () => {
-    it("should validate login input before calling Supabase", () => {
-      // Valid input
-      const validResult = loginSchema.safeParse({
-        email: "user@example.com",
-        password: "password123",
-        rememberMe: true,
-      });
-      expect(validResult.success).toBe(true);
-
-      // Invalid input - bad email format
-      const invalidResult = loginSchema.safeParse({
-        email: "not-an-email",
-        password: "password123",
-      });
-      expect(invalidResult.success).toBe(false);
-    });
-
     it("should authenticate existing user", async () => {
       const testEmail = `login-test-${Date.now()}@example.com`;
 
