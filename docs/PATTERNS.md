@@ -694,8 +694,6 @@ describe("deriveMachineStatus", () => {
 
 ---
 
----
-
 ## Logging
 
 ### Structured Logging in Server Actions

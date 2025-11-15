@@ -269,7 +269,7 @@ export async function logoutAction(): Promise<void> {
     );
     await setFlash({
       type: "error",
-      message: cause instanceof Error ? cause.message : "Something went wrong",
+      message: "Something went wrong",
     });
   } finally {
     // Always redirect to home after logout attempt

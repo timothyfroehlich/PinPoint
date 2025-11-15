@@ -15,6 +15,18 @@ import { machines } from "~/server/db/schema";
 import { createMachineSchema } from "./schemas";
 import { setFlash } from "~/lib/flash";
 
+const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
+
+const isNextRedirectError = (error: unknown): error is { digest: string } => {
+  if (typeof error !== "object" || error === null || !("digest" in error)) {
+    return false;
+  }
+
+  const { digest } = error as { digest?: unknown };
+  return (
+    typeof digest === "string" && digest.startsWith(NEXT_REDIRECT_DIGEST_PREFIX)
+  );
+};
 /**
  * Create Machine Action
  *
@@ -69,7 +81,9 @@ export async function createMachineAction(formData: FormData): Promise<void> {
       })
       .returning();
 
-    if (!machine) throw new Error("Machine creation failed");
+    if (!machine) {
+      throw new Error("Machine creation failed");
+    }
 
     // Set success flash message and revalidate
     await setFlash({
@@ -80,7 +94,12 @@ export async function createMachineAction(formData: FormData): Promise<void> {
 
     // Redirect to machine detail page (throws to exit function)
     redirect(`/machines/${machine.id}`);
-  } catch {
+  } catch (error) {
+    if (isNextRedirectError(error)) {
+      throw error;
+    }
+
+    console.error("createMachineAction failed", error);
     await setFlash({
       type: "error",
       message: "Failed to create machine. Please try again.",
