@@ -27,7 +27,6 @@ const isNextRedirectError = (error: unknown): error is { digest: string } => {
     typeof digest === "string" && digest.startsWith(NEXT_REDIRECT_DIGEST_PREFIX)
   );
 };
-
 /**
  * Create Machine Action
  *
