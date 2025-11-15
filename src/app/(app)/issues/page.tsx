@@ -4,7 +4,7 @@ import Link from "next/link";
 import { AlertTriangle, Plus } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { issues, machines, userProfiles } from "~/server/db/schema";
+import { issues, machines } from "~/server/db/schema";
 import { eq, and, desc, isNull } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
@@ -174,9 +174,7 @@ export default async function IssuesPage({
                           {issue.title}
                         </CardTitle>
                         <div className="flex flex-wrap items-center gap-2 text-sm text-on-surface-variant">
-                          <span>
-                            {issue.machine?.name ?? "Unknown Machine"}
-                          </span>
+                          <span>{issue.machine.name}</span>
                           <span>•</span>
                           <span>
                             Reported by{" "}
@@ -220,7 +218,8 @@ export default async function IssuesPage({
                       </div>
                     </div>
                   </CardHeader>
-                  {(issue.description || issue.assignedToUser) && (
+                  {(issue.description != null ||
+                    issue.assignedToUser != null) && (
                     <CardContent>
                       {issue.description && (
                         <p className="text-sm text-on-surface-variant line-clamp-2 mb-2">

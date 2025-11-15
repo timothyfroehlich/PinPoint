@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowLeft, Clock } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { issues, userProfiles } from "~/server/db/schema";
+import { issues } from "~/server/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { readFlash } from "~/lib/flash";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";

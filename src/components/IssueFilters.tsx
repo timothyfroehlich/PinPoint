@@ -1,12 +1,13 @@
 "use client";
 
+import type React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "~/components/ui/button";
 
 interface IssueFiltersProps {
-  machines: Array<{ id: string; name: string }>;
-  users: Array<{ id: string; name: string }>;
+  machines: { id: string; name: string }[];
+  users: { id: string; name: string }[];
 }
 
 /**
@@ -15,7 +16,10 @@ interface IssueFiltersProps {
  * Provides filtering dropdowns for issues list page.
  * Updates URL search params to filter issues server-side.
  */
-export function IssueFilters({ machines, users }: IssueFiltersProps) {
+export function IssueFilters({
+  machines,
+  users,
+}: IssueFiltersProps): React.JSX.Element {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -26,7 +30,7 @@ export function IssueFilters({ machines, users }: IssueFiltersProps) {
 
   const hasFilters = machineId || status || severity || assignedTo;
 
-  const updateFilter = (key: string, value: string) => {
+  const updateFilter = (key: string, value: string): void => {
     const params = new URLSearchParams(searchParams.toString());
     if (value) {
       params.set(key, value);

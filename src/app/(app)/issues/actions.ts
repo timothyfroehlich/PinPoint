@@ -351,7 +351,7 @@ export async function assignIssueAction(formData: FormData): Promise<void> {
   // Validate input
   const rawData = {
     issueId: formData.get("issueId"),
-    assignedTo: formData.get("assignedTo") || null,
+    assignedTo: formData.get("assignedTo") ?? null,
   };
 
   const validation = assignIssueSchema.safeParse(rawData);

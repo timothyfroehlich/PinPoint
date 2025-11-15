@@ -25,7 +25,7 @@ export const createIssueSchema = z.object({
   description: z.string().trim().optional(),
   machineId: z.string().uuid("Invalid machine ID"),
   severity: z.enum(["minor", "playable", "unplayable"], {
-    errorMap: () => ({ message: "Invalid severity level" }),
+    message: "Invalid severity level",
   }),
 });
 
@@ -35,7 +35,7 @@ export const createIssueSchema = z.object({
 export const updateIssueStatusSchema = z.object({
   issueId: z.string().uuid("Invalid issue ID"),
   status: z.enum(["new", "in_progress", "resolved"], {
-    errorMap: () => ({ message: "Invalid status" }),
+    message: "Invalid status",
   }),
 });
 
@@ -45,7 +45,7 @@ export const updateIssueStatusSchema = z.object({
 export const updateIssueSeveritySchema = z.object({
   issueId: z.string().uuid("Invalid issue ID"),
   severity: z.enum(["minor", "playable", "unplayable"], {
-    errorMap: () => ({ message: "Invalid severity level" }),
+    message: "Invalid severity level",
   }),
 });
 

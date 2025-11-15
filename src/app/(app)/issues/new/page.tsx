@@ -96,7 +96,9 @@ export default async function NewIssuePage({
                 </Label>
                 <Select
                   name="machineId"
-                  defaultValue={prefilledMachineId}
+                  {...(prefilledMachineId && {
+                    defaultValue: prefilledMachineId,
+                  })}
                   required
                 >
                   <SelectTrigger className="border-outline-variant bg-surface text-on-surface">
