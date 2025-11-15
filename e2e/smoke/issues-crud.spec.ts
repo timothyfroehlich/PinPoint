@@ -7,7 +7,6 @@
 
 import { test, expect, type Page } from "@playwright/test";
 import { loginAs } from "../support/actions";
-import { TEST_USERS } from "../support/constants";
 
 async function selectFirstMachine(page: Page): Promise<void> {
   const option = page.locator("#machineId option").nth(1);
@@ -22,7 +21,7 @@ async function selectFirstMachine(page: Page): Promise<void> {
 test.describe("Issues System", () => {
   test.beforeEach(async ({ page }) => {
     // Login as member before each test
-    await loginAs(page, TEST_USERS.member.email, TEST_USERS.member.password);
+    await loginAs(page);
   });
 
   test.describe("Issue Creation Flow", () => {

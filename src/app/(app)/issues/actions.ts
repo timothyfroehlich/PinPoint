@@ -12,7 +12,7 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { issues } from "~/server/db/schema";
+import { issues, userProfiles } from "~/server/db/schema";
 import { setFlash } from "~/lib/flash";
 import { createTimelineEvent } from "~/lib/timeline/events";
 import { log } from "~/lib/logger";
@@ -413,7 +413,7 @@ export async function assignIssueAction(formData: FormData): Promise<void> {
     let assigneeName = "Unassigned";
     if (assignedTo) {
       const assignee = await db.query.userProfiles.findFirst({
-        where: eq(issues.id, assignedTo),
+        where: eq(userProfiles.id, assignedTo),
         columns: { name: true },
       });
       assigneeName = assignee?.name ?? "Unknown User";
