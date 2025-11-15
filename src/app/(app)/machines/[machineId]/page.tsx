@@ -199,67 +199,54 @@ export default async function MachineDetailPage({
                 <CardTitle className="text-2xl text-on-surface">
                   Issues
                 </CardTitle>
-                <Link href={`/issues/new?machineId=${machine.id}`}>
-                  <Button className="bg-primary text-on-primary hover:bg-primary/90">
-                    <Plus className="mr-2 size-4" />
-                    Report Issue
-                  </Button>
-                </Link>
+                <Button
+                  disabled
+                  className="bg-primary text-on-primary hover:bg-primary/90"
+                  title="Issue creation will be available in Task 8"
+                >
+                  <Plus className="mr-2 size-4" />
+                  Report Issue
+                </Button>
               </div>
             </CardHeader>
             <CardContent>
-              {machine.issues.length === 0 ? (
+              {openIssues.length === 0 ? (
                 // Empty state
                 <div className="py-12 text-center">
-                  <p className="text-lg text-on-surface-variant mb-4">
+                  <p className="text-lg text-on-surface-variant mb-2">
                     No issues reported yet
                   </p>
-                  <Link href={`/issues/new?machineId=${machine.id}`}>
-                    <Button className="bg-primary text-on-primary hover:bg-primary/90">
-                      <Plus className="mr-2 size-4" />
-                      Report First Issue
-                    </Button>
-                  </Link>
+                  <p className="text-sm text-on-surface-variant">
+                    Issues will be available in Task 8
+                  </p>
                 </div>
               ) : (
-                // Issues list
+                // Issues list (placeholder UI ready for Task 8)
                 <div className="space-y-3">
-                  {machine.issues.map((issue) => (
-                    <Link key={issue.id} href={`/issues/${issue.id}`}>
-                      <div
-                        data-testid="issue-card"
-                        className="flex items-center justify-between p-4 rounded-lg border border-outline-variant bg-surface-variant hover:border-primary transition-colors cursor-pointer"
-                      >
-                        <div className="flex-1">
-                          <h3 className="font-medium text-on-surface">
-                            {issue.title}
-                          </h3>
-                          <div className="mt-1 flex items-center gap-3 text-xs text-on-surface-variant">
-                            <span>
-                              {new Date(issue.createdAt).toLocaleDateString()}
-                            </span>
-                            <Badge variant="outline" className="text-xs">
-                              {issue.severity}
-                            </Badge>
-                            <Badge variant="outline" className="text-xs">
-                              {issue.status}
-                            </Badge>
-                          </div>
+                  {openIssues.map((issue) => (
+                    <div
+                      key={issue.id}
+                      data-testid="issue-card"
+                      className="flex items-center justify-between p-4 rounded-lg border border-outline-variant bg-surface-variant"
+                    >
+                      <div className="flex-1">
+                        <h3 className="font-medium text-on-surface">
+                          {issue.title}
+                        </h3>
+                        <div className="mt-1 flex items-center gap-3 text-xs text-on-surface-variant">
+                          <span>
+                            {new Date(issue.createdAt).toLocaleDateString()}
+                          </span>
+                          <Badge variant="outline" className="text-xs">
+                            {issue.severity}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {issue.status}
+                          </Badge>
                         </div>
                       </div>
-                    </Link>
+                    </div>
                   ))}
-                  {/* View all issues link */}
-                  <div className="pt-4 text-center">
-                    <Link href={`/issues?machineId=${machine.id}`}>
-                      <Button
-                        variant="outline"
-                        className="border-outline-variant text-on-surface"
-                      >
-                        View All Issues for {machine.name}
-                      </Button>
-                    </Link>
-                  </div>
                 </div>
               )}
             </CardContent>

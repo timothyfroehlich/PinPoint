@@ -1,6 +1,9 @@
 import pino from "pino";
-import { mkdir } from "fs/promises";
+import { mkdirSync } from "fs";
 import { join } from "path";
+
+const LOG_LEVEL = process.env["LOG_LEVEL"] ?? "info";
+const DEFAULT_LOG_ROOT = join(process.cwd(), "logs");
 
 /**
  * Creates a timestamped directory name in format: YYYY-MM-DD_HH-mm-ss
@@ -16,34 +19,38 @@ function getTimestampedDir(): string {
 }
 
 /**
- * Initialize log directory for this session
- * Creates logs/YYYY-MM-DD_HH-mm-ss/ directory
+ * Attempt to create a session-specific log directory.
+ * Falls back to undefined when the filesystem is read-only (e.g., Vercel serverless).
  */
-async function initLogDir(): Promise<string> {
-  const logsBaseDir = join(process.cwd(), "logs");
-  const sessionDir = join(logsBaseDir, getTimestampedDir());
-
-  await mkdir(sessionDir, { recursive: true });
-
-  return sessionDir;
+function tryCreateSessionDirectory(): string | undefined {
+  const baseDir = process.env["PINPOINT_LOG_DIR"] ?? DEFAULT_LOG_ROOT;
+  try {
+    mkdirSync(baseDir, { recursive: true });
+    const sessionDir = join(baseDir, getTimestampedDir());
+    mkdirSync(sessionDir, { recursive: true });
+    return sessionDir;
+  } catch (error) {
+    console.warn(
+      "[logger] Falling back to stdout-only logging (could not create log directory).",
+      error instanceof Error ? error.message : error
+    );
+    return undefined;
+  }
 }
 
 /**
  * Create pino logger instance with:
- * - Timestamped directory per server restart
- * - File rotation at 10MB
+ * - Timestamped directory per server restart (when filesystem is writable)
  * - Structured JSON logs
- * - Console output in development
+ * - Console output in development or when file logging is unavailable
  */
-async function createLogger(): Promise<pino.Logger> {
-  const logDir = await initLogDir();
-  const logFile = join(logDir, "app.log");
-
+function createLogger(): pino.Logger {
+  const sessionDir = tryCreateSessionDirectory();
+  const logFile = sessionDir ? join(sessionDir, "app.log") : undefined;
   const isDevelopment = process.env.NODE_ENV === "development";
 
-  // Base logger configuration
   const baseConfig: pino.LoggerOptions = {
-    level: process.env["LOG_LEVEL"] ?? "info",
+    level: LOG_LEVEL,
     formatters: {
       level: (label: string) => {
         return { level: label };
@@ -52,68 +59,51 @@ async function createLogger(): Promise<pino.Logger> {
     timestamp: pino.stdTimeFunctions.isoTime,
   };
 
-  // In development, log to both file and console
-  if (isDevelopment) {
-    // Create file destination
-    const fileDestination = pino.destination({
-      dest: logFile,
-      sync: false, // Async for better performance
-      mkdir: true,
+  const streams: pino.StreamEntry[] = [];
+
+  if (logFile) {
+    streams.push({
+      stream: pino.destination({
+        dest: logFile,
+        sync: false,
+        mkdir: true,
+      }),
     });
-
-    // Create multistream with file and console (simple stdout)
-    const streams: pino.StreamEntry[] = [
-      { stream: fileDestination },
-      { stream: process.stdout }, // Simple console output
-    ];
-
-    return pino(baseConfig, pino.multistream(streams));
   }
 
-  // Production: file only with rotation
-  const fileDestination = pino.destination({
-    dest: logFile,
-    sync: false,
-    mkdir: true,
-  });
+  if (!logFile || isDevelopment) {
+    streams.push({ stream: process.stdout });
+  }
 
-  return pino(baseConfig, fileDestination);
+  if (streams.length === 0) {
+    return pino(baseConfig);
+  }
+
+  if (streams.length === 1) {
+    return pino(baseConfig, streams[0]!.stream);
+  }
+
+  return pino(baseConfig, pino.multistream(streams));
 }
 
-/**
- * Singleton logger instance
- */
 let loggerInstance: pino.Logger | null = null;
 
-/**
- * Get or initialize the logger instance
- * Call this once at app startup
- */
-export async function getLogger(): Promise<pino.Logger> {
-  loggerInstance ??= await createLogger();
+function getOrCreateLogger(): pino.Logger {
+  loggerInstance ??= createLogger();
   return loggerInstance;
 }
 
-/**
- * Get the logger instance (synchronous)
- * Use this after the logger has been initialized
- * @throws Error if logger not initialized
- */
-export function logger(): pino.Logger {
-  if (!loggerInstance) {
-    throw new Error(
-      "Logger not initialized. Call getLogger() first at app startup."
-    );
-  }
-  return loggerInstance;
+export function getLogger(): pino.Logger {
+  return getOrCreateLogger();
 }
 
-/**
- * Type-safe logger methods for convenience
- */
 export const log = {
-  info: (obj: object | string, msg?: string) => logger().info(obj, msg),
-  error: (obj: object | string, msg?: string) => logger().error(obj, msg),
-  warn: (obj: object | string, msg?: string) => logger().warn(obj, msg),
-  debug: (obj: object | string, msg?: string) => logger().debug(obj, msg),
+  info: (obj: object | string, msg?: string) =>
+    getOrCreateLogger().info(obj, msg),
+  error: (obj: object | string, msg?: string) =>
+    getOrCreateLogger().error(obj, msg),
+  warn: (obj: object | string, msg?: string) =>
+    getOrCreateLogger().warn(obj, msg),
+  debug: (obj: object | string, msg?: string) =>
+    getOrCreateLogger().debug(obj, msg),
 };

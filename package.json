@@ -57,7 +57,6 @@
     "lucide-react": "^0.553.0",
     "next": "^16.0.1",
     "pino": "^10.1.0",
-    "pino-roll": "^4.0.0",
     "postgres": "^3.4.7",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

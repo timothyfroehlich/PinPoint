@@ -6,10 +6,10 @@
 
 PinPoint uses **pino** for structured JSON logging with the following features:
 
-- **Timestamped sessions**: Each server restart creates a new `logs/YYYY-MM-DD_HH-mm-ss/` directory
+- **Timestamped sessions**: Each server restart creates a new `logs/YYYY-MM-DD_HH-mm-ss/` directory when the filesystem is writable
 - **Structured JSON**: All logs are JSON objects (one per line) for easy parsing
 - **Dual output**: Logs to both file and console in development
-- **Production-ready**: File-only logging in production for performance
+- **Production-ready**: File-only logging in production when possible, automatic stdout fallback on read-only platforms (Vercel, serverless)
 
 ## Log Directory Structure
 
@@ -55,10 +55,11 @@ Logs are structured JSON objects with the following fields:
 Additional fields provide context:
 
 - `userId`: User ID for auth-related logs
-- `email`: User email
 - `action`: Action being performed (e.g., "login", "signup")
 - `error`: Error message if applicable
 - `stack`: Stack trace for errors
+
+> 🔒 **PII guard**: Never log email addresses or other PII. Prefer user IDs or anonymized identifiers.
 
 ## Usage
 
@@ -75,7 +76,7 @@ import { log } from "~/lib/logger";
 log.info({ userId: "123", action: "login" }, "User logged in successfully");
 
 // Warning log
-log.warn({ email: "user@example.com" }, "Login attempt failed");
+log.warn({ action: "login" }, "Login attempt failed");
 
 // Error log
 log.error(
@@ -93,9 +94,10 @@ log.debug({ query: "SELECT * FROM users" }, "Database query executed");
 
 ### Best Practices
 
-1. **Always include context**: Add relevant fields (userId, email, action, etc.)
-2. **Keep messages concise**: The context object holds the details
-3. **Use appropriate log levels**:
+1. **Always include context**: Add relevant fields (userId, action, identifiers)
+2. **Never log PII**: Do not log email addresses or unredacted personal data
+3. **Keep messages concise**: The context object holds the details
+4. **Use appropriate log levels**:
    - `info`: Normal operations (login, signup, data access)
    - `warn`: Recoverable issues (validation failures, auth failures)
    - `error`: Serious problems (server errors, exceptions)
@@ -161,7 +163,8 @@ find logs/ -name "*.log" -exec grep '"level":"error"' {} \;
 Logs are organized by session (server restart) rather than time-based rotation:
 
 - **New directory per restart**: Keeps logs cleanly separated
-- **No automatic cleanup**: Old logs remain for historical analysis
+- **Writable-only**: File logging only occurs when the filesystem allows it; otherwise logs stream to stdout
+- **Custom location**: Override with `PINPOINT_LOG_DIR=/tmp/pinpoint-logs` if needed
 - **Manual cleanup**: Delete old session directories as needed
 
 ```bash
@@ -173,23 +176,7 @@ find logs/ -type d -mtime +7 -exec rm -rf {} \;
 
 ### Logger Initialization
 
-The logger is initialized in `instrumentation.ts` when the server starts:
-
-```typescript
-import { getLogger } from "~/lib/logger";
-
-export async function register() {
-  if (process.env["NEXT_RUNTIME"] === "nodejs") {
-    const logger = await getLogger();
-    logger.info(
-      {
-        /* context */
-      },
-      "PinPoint server starting"
-    );
-  }
-}
-```
+The logger initializes lazily the first time you call `log.info()` (or any log method). If you need to eagerly warm it up (for example, inside a custom bootstrap script), call `getLogger()` once on the server.
 
 ### Logger Module
 
@@ -197,9 +184,8 @@ Location: `src/lib/logger.ts`
 
 Key functions:
 
-- `getLogger()`: Initialize and return singleton logger (async)
-- `logger()`: Get existing logger instance (sync, throws if not initialized)
-- `log.info()`, `log.warn()`, `log.error()`, `log.debug()`: Convenience methods
+- `getLogger()`: Initialize (if needed) and return the singleton logger
+- `log.info()`, `log.warn()`, `log.error()`, `log.debug()`: Convenience methods that lazily initialize the logger
 
 ### Server Actions
 
@@ -215,8 +201,8 @@ Auth actions in `src/app/(auth)/actions.ts` include logging for:
 ### Logs not appearing
 
 1. Check if the server is running in Node.js runtime (not Edge)
-2. Verify `instrumentation.ts` is being loaded
-3. Check that the logger was initialized: `logs/` directory should exist
+2. Call `getLogger()` manually during startup if you need early initialization
+3. Check that the logger wrote to `logs/` or stdout depending on environment
 
 ### Console output not showing in development
 

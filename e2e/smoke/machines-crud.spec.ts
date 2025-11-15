@@ -7,6 +7,8 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Machines CRUD", () => {
+  test.describe.configure({ mode: "serial" });
+
   // Login before each test (required for protected routes)
   test.beforeEach(async ({ page }) => {
     await page.goto("/login");
@@ -226,7 +228,7 @@ test.describe("Machines CRUD", () => {
     await page.goto("/dashboard");
     const logoutButton = page.getByRole("button", { name: /Sign Out/i });
     if (await logoutButton.isVisible()) {
-      await logoutButton.click();
+      await Promise.all([page.waitForURL("/"), logoutButton.click()]);
     }
 
     // Try to access machines page without authentication

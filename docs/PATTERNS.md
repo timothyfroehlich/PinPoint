@@ -584,6 +584,254 @@ export default async function MachinesPage() {
 
 ---
 
+## Testing Patterns
+
+### Playwright E2E Tests
+
+#### Login Helper + Landmark-Scoped Locators
+
+```typescript
+// e2e/support/actions.ts
+export async function loginAs(page: Page, email: string, password: string) {
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(password);
+  await page.getByRole("button", { name: "Sign In" }).click();
+  await expect(page).toHaveURL("/dashboard");
+}
+```
+
+```typescript
+// e2e/smoke/navigation.spec.ts
+import { loginAs } from "../support/actions";
+import { TEST_USERS } from "../support/constants";
+
+test("authenticated navigation", async ({ page }) => {
+  await loginAs(page, TEST_USERS.member.email, TEST_USERS.member.password);
+
+  // Scope locators to landmarks to avoid strict-mode collisions
+  const nav = page.getByRole("navigation");
+  await expect(nav.getByRole("link", { name: /Machines/i })).toBeVisible();
+  await expect(nav.getByText(TEST_USERS.member.name)).toBeVisible();
+});
+```
+
+**Key points**:
+
+- Keep reusable flows in `e2e/support/actions.ts`
+- Scope locators to landmarks (`getByRole("navigation")`, `getByRole("main")`) to avoid collisions
+- Use constants for test data in `e2e/support/constants.ts`
+- When tests share state, use `test.describe.serial` for deterministic execution
+- Prefer semantic locators (`getByRole`, `getByLabel`) over test IDs
+
+### Integration Tests with PGlite
+
+```typescript
+// src/test/integration/machines.test.ts
+import { describe, it, expect } from "vitest";
+import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { machines } from "~/server/db/schema";
+
+describe("Machine CRUD Operations (PGlite)", () => {
+  // Set up worker-scoped PGlite and auto-cleanup after each test
+  setupTestDb();
+
+  it("should create a machine", async () => {
+    const db = await getTestDb();
+
+    const [machine] = await db
+      .insert(machines)
+      .values({ name: "Test Machine" })
+      .returning();
+
+    expect(machine).toBeDefined();
+    expect(machine.name).toBe("Test Machine");
+  });
+});
+```
+
+**Key points**:
+
+- Use worker-scoped PGlite (CORE-TEST-001)
+- Never create per-test instances (causes system lockups)
+- Use `setupTestDb()` helper for automatic cleanup
+- Test database operations, not Server Components
+- Integration tests in `src/test/integration/`
+
+### Unit Tests
+
+```typescript
+// src/lib/machines/status.test.ts
+import { describe, it, expect } from "vitest";
+import { deriveMachineStatus, type IssueForStatus } from "./status";
+
+describe("deriveMachineStatus", () => {
+  it("returns operational when no issues", () => {
+    expect(deriveMachineStatus([])).toBe("operational");
+  });
+
+  it("returns unplayable when has unplayable issue", () => {
+    const issues: IssueForStatus[] = [
+      { status: "new", severity: "unplayable" },
+    ];
+    expect(deriveMachineStatus(issues)).toBe("unplayable");
+  });
+
+  it("ignores resolved issues", () => {
+    const issues: IssueForStatus[] = [
+      { status: "resolved", severity: "unplayable" },
+    ];
+    expect(deriveMachineStatus(issues)).toBe("operational");
+  });
+});
+```
+
+**Key points**:
+
+- Test pure functions in unit tests
+- Test edge cases (empty arrays, resolved issues, etc.)
+- Keep tests focused and readable
+- Unit tests in same directory as source (e.g., `status.test.ts` next to `status.ts`)
+
+---
+
+## Logging
+
+### Structured Logging in Server Actions
+
+```typescript
+// src/app/(auth)/actions.ts
+"use server";
+
+import { log } from "~/lib/logger";
+import { createClient } from "~/lib/supabase/server";
+
+export async function loginAction(formData: FormData): Promise<LoginResult> {
+  // Validate input
+  const parsed = loginSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+  });
+
+  if (!parsed.success) {
+    log.warn(
+      { errors: parsed.error.issues, action: "login" },
+      "Login validation failed"
+    );
+    return err("VALIDATION", "Invalid input");
+  }
+
+  const { email, password } = parsed.data;
+
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error || !data.user) {
+      log.warn(
+        { action: "login", error: error?.message },
+        "Login authentication failed"
+      );
+      return err("AUTH", error?.message ?? "Authentication failed");
+    }
+
+    log.info(
+      { userId: data.user.id, action: "login" },
+      "User logged in successfully"
+    );
+
+    return ok({ userId: data.user.id });
+  } catch (error) {
+    log.error(
+      {
+        error: error instanceof Error ? error.message : "Unknown",
+        stack: error instanceof Error ? error.stack : undefined,
+        action: "login",
+      },
+      "Login server error"
+    );
+    return err("SERVER", error instanceof Error ? error.message : "Unknown");
+  }
+}
+```
+
+**Key points**:
+
+- Use `log.info()` for successful operations
+- Use `log.warn()` for recoverable errors (validation, auth failures)
+- Use `log.error()` for server errors with stack traces
+- Always include context fields (`userId`, `action`, etc.) but never log PII
+- Keep message concise; details go in the context object
+
+**Log format**:
+
+```json
+{
+  "level": "info",
+  "time": "2025-11-13T03:19:13.061Z",
+  "msg": "User logged in successfully",
+  "userId": "abc123",
+  "email": "user@example.com",
+  "action": "login"
+}
+```
+
+**Testing**:
+
+- Unit tests don't need to verify logging (implementation detail)
+- E2E tests can check for log files if critical
+
+---
+
+## Adding New Patterns
+
+**When to add a pattern**:
+
+1. You've implemented the same approach 2+ times (Rule of Three)
+2. It's specific to PinPoint (not general Next.js/React knowledge)
+3. Future agents would benefit from seeing the example
+4. It's non-obvious or requires context to understand
+
+**How to add**:
+
+1. Create a new section with clear heading
+2. Include minimal, working code example
+3. List 2-3 key points explaining why this pattern
+4. Reference relevant CORE rules (e.g., `CORE-SEC-001`)
+5. Keep it concise - patterns, not tutorials
+
+**What NOT to add**:
+
+- General TypeScript/React patterns (use `TYPESCRIPT_STRICTEST_PATTERNS.md`)
+- Library-specific patterns (use Context7 for current library docs)
+- One-off solutions that won't be repeated
+- Implementation details that are already in the code
+
+**Template**:
+
+````markdown
+### Pattern Name
+
+Brief description of when to use this pattern.
+
+```typescript
+// Minimal working example
+```
+````
+
+**Key points**:
+
+- Point 1 about why this matters
+- Point 2 about gotchas or non-obvious behavior
+- Reference to CORE rule if applicable (e.g., CORE-SEC-001)
+
+```
+
+```
+
 ## Issues Per Machine
 
 ### Issue Creation with Machine Requirement
