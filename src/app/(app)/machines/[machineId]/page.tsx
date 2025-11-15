@@ -195,18 +195,32 @@ export default async function MachineDetailPage({
           {/* Issues Section */}
           <Card className="border-outline-variant">
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <CardTitle className="text-2xl text-on-surface">
                   Issues
                 </CardTitle>
-                <Button
-                  disabled
-                  className="bg-primary text-on-primary hover:bg-primary/90"
-                  title="Issue creation will be available in Task 8"
-                >
-                  <Plus className="mr-2 size-4" />
-                  Report Issue
-                </Button>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <Button
+                    className="bg-primary text-on-primary hover:bg-primary/90"
+                    asChild
+                  >
+                    <Link href={`/issues/new?machineId=${machine.id}`}>
+                      <Plus className="mr-2 size-4" />
+                      Report Issue
+                    </Link>
+                  </Button>
+                  {machine.issues.length > 0 ? (
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="border-outline-variant text-on-surface"
+                    >
+                      <Link href={`/issues?machineId=${machine.id}`}>
+                        View All Issues for {machine.name}
+                      </Link>
+                    </Button>
+                  ) : null}
+                </div>
               </div>
             </CardHeader>
             <CardContent>

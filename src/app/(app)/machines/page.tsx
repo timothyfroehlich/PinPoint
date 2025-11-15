@@ -74,12 +74,15 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
                 Manage pinball machines and view their status
               </p>
             </div>
-            <Link href="/machines/new">
-              <Button className="bg-primary text-on-primary hover:bg-primary/90">
+            <Button
+              asChild
+              className="bg-primary text-on-primary hover:bg-primary/90"
+            >
+              <Link href="/machines/new">
                 <Plus className="mr-2 size-4" />
                 Add Machine
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </div>
         </div>
       </div>
@@ -105,7 +108,11 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
           // Machine grid (responsive: 1 col on mobile, 2 on tablet, 3 on desktop)
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {machinesWithStatus.map((machine) => (
-              <Link key={machine.id} href={`/machines/${machine.id}`}>
+              <Link
+                key={machine.id}
+                data-testid="machine-card"
+                href={`/machines/${machine.id}`}
+              >
                 <Card className="h-full border-outline-variant hover:border-primary transition-colors cursor-pointer">
                   <CardHeader>
                     <div className="flex items-start justify-between gap-2">

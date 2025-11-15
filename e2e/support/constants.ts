@@ -5,3 +5,7 @@ export const seededMember = {
 };
 
 export const DEFAULT_NAVIGATION_TIMEOUT = 10_000;
+
+export const TEST_USERS = {
+  member: seededMember,
+};

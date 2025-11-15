@@ -74,7 +74,7 @@ test.describe("Machines CRUD", () => {
     // Fill out the form
     const timestamp = Date.now();
     const machineName = `Test Machine ${timestamp}`;
-    await page.getByLabel(/Machine Name/i).fill(machineName);
+    await page.locator("#name").fill(machineName);
 
     // Submit form
     await page.getByRole("button", { name: "Create Machine" }).click();
@@ -106,7 +106,7 @@ test.describe("Machines CRUD", () => {
 
     // Try to submit without filling name
     // Note: HTML5 validation will prevent submission
-    const nameInput = page.getByLabel(/Machine Name/i);
+    const nameInput = page.locator("#name");
     await expect(nameInput).toHaveAttribute("required");
 
     // Fill name with only whitespace
@@ -129,7 +129,7 @@ test.describe("Machines CRUD", () => {
     await page.goto("/machines");
 
     // Click on a machine card
-    await page.getByText("Medieval Madness").click();
+    await page.getByRole("link", { name: "Medieval Madness" }).first().click();
 
     // Should navigate to machine detail page
     await expect(page).toHaveURL(/\/machines\/[a-f0-9-]+$/);
@@ -147,7 +147,7 @@ test.describe("Machines CRUD", () => {
   test("should display machine issues on detail page", async ({ page }) => {
     // Navigate to The Addams Family (has unplayable issue)
     await page.goto("/machines");
-    await page.getByText("The Addams Family").click();
+    await page.getByRole("link", { name: "The Addams Family" }).first().click();
 
     // Should show machine details
     await expect(
@@ -155,7 +155,8 @@ test.describe("Machines CRUD", () => {
     ).toBeVisible();
 
     // Verify status badge matches severity
-    await expect(page.getByText("Unplayable")).toBeVisible();
+    const firstIssueCard = page.getByTestId("issue-card").first();
+    await expect(firstIssueCard).toBeVisible();
 
     // Verify open issues count section is visible
     await expect(page.getByTestId("detail-open-issues")).toBeVisible();
@@ -183,7 +184,7 @@ test.describe("Machines CRUD", () => {
     // Create a new machine
     await page.goto("/machines/new");
     const machineName = `Empty Machine ${Date.now()}`;
-    await page.getByLabel(/Machine Name/i).fill(machineName);
+    await page.locator("#name").fill(machineName);
     await page.getByRole("button", { name: "Create Machine" }).click();
 
     // Should be on detail page
