@@ -47,10 +47,18 @@ export default async function IssuesPage({
   // Build where conditions for filtering
   const conditions = [];
   if (machineId) conditions.push(eq(issues.machineId, machineId));
-  if (status && (status === "new" || status === "in_progress" || status === "resolved")) {
+  if (
+    status &&
+    (status === "new" || status === "in_progress" || status === "resolved")
+  ) {
     conditions.push(eq(issues.status, status));
   }
-  if (severity && (severity === "minor" || severity === "playable" || severity === "unplayable")) {
+  if (
+    severity &&
+    (severity === "minor" ||
+      severity === "playable" ||
+      severity === "unplayable")
+  ) {
     conditions.push(eq(issues.severity, severity));
   }
   if (assignedTo === "unassigned") {
@@ -166,7 +174,9 @@ export default async function IssuesPage({
                           {issue.title}
                         </CardTitle>
                         <div className="flex flex-wrap items-center gap-2 text-sm text-on-surface-variant">
-                          <span>{issue.machine?.name ?? "Unknown Machine"}</span>
+                          <span>
+                            {issue.machine?.name ?? "Unknown Machine"}
+                          </span>
                           <span>•</span>
                           <span>
                             Reported by{" "}

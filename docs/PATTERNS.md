@@ -832,7 +832,9 @@ Issue updates (status, severity, assignment) follow a consistent pattern:
 export async function updateIssueStatusAction(formData: FormData) {
   // 1. Auth check
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) {
     await setFlash({ type: "error", message: "Unauthorized" });
     redirect("/login");
@@ -871,7 +873,10 @@ export async function updateIssueStatusAction(formData: FormData) {
   );
 
   // 6. Log operation
-  log.info({ issueId, oldStatus, newStatus, action: "updateIssueStatus" }, "Issue status updated");
+  log.info(
+    { issueId, oldStatus, newStatus, action: "updateIssueStatus" },
+    "Issue status updated"
+  );
 
   // 7. Flash message + revalidate + redirect
   await setFlash({ type: "success", message: "Issue status updated" });

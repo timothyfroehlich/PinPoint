@@ -277,10 +277,7 @@ export default async function IssueDetailPage({
             <CardContent>
               <form action={assignIssueAction}>
                 <input type="hidden" name="issueId" value={issue.id} />
-                <Select
-                  name="assignedTo"
-                  defaultValue={issue.assignedTo ?? ""}
-                >
+                <Select name="assignedTo" defaultValue={issue.assignedTo ?? ""}>
                   <SelectTrigger className="border-outline-variant bg-surface text-on-surface mb-3">
                     <SelectValue placeholder="Unassigned" />
                   </SelectTrigger>

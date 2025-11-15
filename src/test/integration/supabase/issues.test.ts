@@ -7,7 +7,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
-import { issues, machines, userProfiles, issueComments } from "~/server/db/schema";
+import {
+  issues,
+  machines,
+  userProfiles,
+  issueComments,
+} from "~/server/db/schema";
 
 describe("Issues CRUD Operations (PGlite)", () => {
   // Set up worker-scoped PGlite and auto-cleanup after each test
@@ -342,7 +347,9 @@ describe("Issues CRUD Operations (PGlite)", () => {
       const systemEvent = timeline.find((t) => t.isSystem);
       const userComment = timeline.find((t) => !t.isSystem);
 
-      expect(systemEvent?.content).toBe("Status changed from new to in_progress");
+      expect(systemEvent?.content).toBe(
+        "Status changed from new to in_progress"
+      );
       expect(systemEvent?.authorId).toBeNull();
       expect(userComment?.author?.name).toBe("Test User");
     });

@@ -55,7 +55,9 @@ test.describe("Issues System", () => {
     }) => {
       // Navigate to machines page
       await page.goto("/machines");
-      await expect(page.getByRole("heading", { name: "Machines" })).toBeVisible();
+      await expect(
+        page.getByRole("heading", { name: "Machines" })
+      ).toBeVisible();
 
       // Click on a machine
       await page.getByRole("link").first().click();
@@ -111,10 +113,13 @@ test.describe("Issues System", () => {
 
       // Should have issue cards or empty state
       const emptyState = page.getByText("No issues reported yet");
-      const issueCards = page.getByRole("link").filter({ has: page.getByTestId(/issue-/) });
+      const issueCards = page
+        .getByRole("link")
+        .filter({ has: page.getByTestId(/issue-/) });
 
       // Either empty state or issue cards should be visible
-      const hasContent = (await emptyState.isVisible()) || (await issueCards.count()) > 0;
+      const hasContent =
+        (await emptyState.isVisible()) || (await issueCards.count()) > 0;
       expect(hasContent).toBe(true);
     });
 
@@ -197,7 +202,9 @@ test.describe("Issues System", () => {
       await expect(page.getByText("Playable")).toBeVisible();
 
       // Should show timeline
-      await expect(page.getByRole("heading", { name: "Timeline" })).toBeVisible();
+      await expect(
+        page.getByRole("heading", { name: "Timeline" })
+      ).toBeVisible();
       await expect(page.getByText("Issue created")).toBeVisible();
     });
 
@@ -233,7 +240,9 @@ test.describe("Issues System", () => {
       await page.getByRole("button", { name: "Report Issue" }).click();
 
       // Find severity update form
-      const severitySection = page.locator('text="Update Severity"').locator("..");
+      const severitySection = page
+        .locator('text="Update Severity"')
+        .locator("..");
       await severitySection.getByLabel("Update Severity").click();
       await severitySection.getByRole("option", { name: "Unplayable" }).click();
       await severitySection.getByRole("button", { name: "Update" }).click();
