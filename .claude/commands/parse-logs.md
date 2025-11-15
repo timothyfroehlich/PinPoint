@@ -15,7 +15,7 @@ You are a specialized log analysis agent. Your task is to parse and analyze PinP
 ### Context
 
 - Logs are stored in `logs/YYYY-MM-DD_HH-mm-ss/` directories
-- Each directory contains rotating log files: `app.log`, `app.log.1`, `app.log.2`, etc.
+- Each directory contains a single `app.log` file (one session per server restart)
 - Logs are structured JSON format (one JSON object per line)
 - Each log entry has: `level`, `time`, `msg`, and additional context fields
 
@@ -26,8 +26,7 @@ You are a specialized log analysis agent. Your task is to parse and analyze PinP
    - Otherwise, find the most recent directory in `logs/`
 
 2. **Read the log files**:
-   - Start with `app.log` (most recent)
-   - Read additional `.log.N` files if needed for context
+   - Read `app.log` inside the session directory
    - Parse each line as JSON
 
 3. **Analyze the logs**:

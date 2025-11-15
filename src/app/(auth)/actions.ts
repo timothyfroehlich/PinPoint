@@ -73,7 +73,7 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (error || !data.user) {
       log.warn(
-        { email, error: error?.message, action: "login" },
+        { action: "login", error: error?.message },
         "Login authentication failed"
       );
       await setFlash({
@@ -84,7 +84,7 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
     }
 
     log.info(
-      { userId: data.user.id, email: data.user.email, action: "login" },
+      { userId: data.user.id, action: "login" },
       "User logged in successfully"
     );
 
@@ -162,7 +162,7 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
       // Check for duplicate email
       if (error.message.includes("already registered")) {
         log.warn(
-          { email, error: error.message, action: "signup" },
+          { action: "signup", error: error.message },
           "Signup failed: email already registered"
         );
         await setFlash({
@@ -173,7 +173,7 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
       }
 
       log.error(
-        { email, error: error.message, action: "signup" },
+        { action: "signup", error: error.message },
         "Signup failed: Supabase error"
       );
       await setFlash({
@@ -184,7 +184,7 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
     }
 
     if (!data.user) {
-      log.error({ email, action: "signup" }, "Signup failed: no user returned");
+      log.error({ action: "signup" }, "Signup failed: no user returned");
       await setFlash({
         type: "error",
         message: "Failed to create account",
@@ -193,7 +193,7 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
     }
 
     log.info(
-      { userId: data.user.id, email: data.user.email, action: "signup" },
+      { userId: data.user.id, action: "signup" },
       "User signed up successfully"
     );
 

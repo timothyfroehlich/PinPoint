@@ -731,14 +731,14 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
 
     if (error || !data.user) {
       log.warn(
-        { email, error: error?.message, action: "login" },
+        { action: "login", error: error?.message },
         "Login authentication failed"
       );
       return err("AUTH", error?.message ?? "Authentication failed");
     }
 
     log.info(
-      { userId: data.user.id, email: data.user.email, action: "login" },
+      { userId: data.user.id, action: "login" },
       "User logged in successfully"
     );
 
@@ -762,7 +762,7 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
 - Use `log.info()` for successful operations
 - Use `log.warn()` for recoverable errors (validation, auth failures)
 - Use `log.error()` for server errors with stack traces
-- Always include context fields (`userId`, `email`, `action`, etc.)
+- Always include context fields (`userId`, `action`, etc.) but never log PII
 - Keep message concise; details go in the context object
 
 **Log format**:

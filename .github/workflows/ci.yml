@@ -2,9 +2,13 @@ name: CI
 
 on:
   push:
-    branches: ["main", "claude/**"]
+    branches:
+      - main
+      - claude/**
   pull_request:
-    branches: ["main"]
+    branches:
+      - main
+      - claude/**
 
 # Cancel in-progress runs when a new run is triggered
 concurrency:
