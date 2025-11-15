@@ -1,9 +1,25 @@
 # PinPoint Code Patterns
 
-**Last Updated**: November 10, 2025
+**Last Updated**: November 14, 2025
 **Version**: 2.0 (Greenfield)
 
 **For AI Agents**: This is a living document. When you implement a pattern more than once, add it here so future agents can follow the same approach. Keep examples concise and focused on PinPoint-specific conventions.
+
+---
+
+## Table of Contents
+
+- [Data Fetching](#data-fetching)
+- [Mutations](#mutations)
+- [Authentication](#authentication)
+- [File Organization](#file-organization)
+- [Domain Rules](#domain-rules)
+- [Type Boundaries](#type-boundaries)
+- [Severity Naming](#severity-naming)
+- [Progressive Enhancement](#progressive-enhancement)
+- [Machine Status Derivation](#machine-status-derivation)
+- [Testing Patterns](#testing-patterns)
+- [Adding New Patterns](#adding-new-patterns)
 
 ---
 
@@ -12,86 +28,136 @@
 ### Server Component + Direct Drizzle Query
 
 ```typescript
-// src/app/machines/[machineId]/issues/page.tsx
+// src/app/machines/[machineId]/page.tsx
 import { db } from "~/server/db";
 import { issues } from "~/server/db/schema";
 import { eq, desc } from "drizzle-orm";
 
-export default async function MachineIssuesPage({
+export default async function MachineDetailPage({
   params,
 }: {
-  params: { machineId: string };
+  params: Promise<{ machineId: string }>;
 }) {
+  const { machineId } = await params; // Next.js 16: params is now a Promise
+
   // Direct query in Server Component - no DAL/repository layer
-  const machineIssues = await db.query.issues.findMany({
-    where: eq(issues.machineId, params.machineId),
-    orderBy: desc(issues.createdAt),
+  const machine = await db.query.machines.findFirst({
+    where: eq(machines.id, machineId),
     with: {
-      assignedTo: {
-        columns: { id: true, name: true, email: true },
+      issues: {
+        columns: {
+          id: true,
+          title: true,
+          status: true,
+          severity: true,
+          createdAt: true,
+        },
+        orderBy: desc(issues.createdAt),
       },
     },
   });
 
-  return <IssueList issues={machineIssues} />;
+  return <MachineDetailView machine={machine} />;
 }
 ```
 
 **Key points**:
 
-- Query directly in Server Component, no intermediate layers
+- Query directly in Server Component, no intermediate layers (CORE-ARCH-003)
 - Use `with` for relations instead of separate queries
-- Select specific columns for related data to avoid over-fetching
+- Select specific columns to avoid over-fetching
+- Next.js 16: `params` is a Promise, must `await` before accessing properties
 
 ---
 
 ## Mutations
 
-### Server Action + Zod Validation
+### Server Action + Zod Validation + Redirect
 
 ```typescript
-// src/app/issues/actions.ts
+// src/app/machines/schemas.ts
+import { z } from "zod";
+
+export const createMachineSchema = z.object({
+  name: z
+    .string()
+    .min(1, "Machine name is required")
+    .max(100, "Machine name must be less than 100 characters")
+    .trim(),
+});
+```
+
+```typescript
+// src/app/machines/actions.ts
 "use server";
 
-import { z } from "zod";
-import { db } from "~/server/db";
-import { issues } from "~/server/db/schema";
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { createClient } from "~/lib/supabase/server";
+import { db } from "~/server/db";
+import { machines } from "~/server/db/schema";
+import { createMachineSchema } from "./schemas";
+import { setFlash } from "~/lib/flash";
 
-const createIssueSchema = z.object({
-  title: z.string().min(1, "Title required"),
-  description: z.string().optional(),
-  machineId: z.string().uuid("Invalid machine ID"),
-  severity: z.enum(["minor", "playable", "unplayable"]),
-});
+export async function createMachineAction(formData: FormData): Promise<void> {
+  // 1. Auth check (CORE-SEC-001)
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-export async function createIssueAction(formData: FormData) {
-  // Validate input
-  const rawData = {
-    title: formData.get("title"),
-    description: formData.get("description"),
-    machineId: formData.get("machineId"),
-    severity: formData.get("severity"),
-  };
+  if (!user) {
+    await setFlash({ type: "error", message: "Unauthorized. Please log in." });
+    redirect("/login");
+  }
 
-  const validData = createIssueSchema.parse(rawData);
+  // 2. Validate input (CORE-SEC-002)
+  const validation = createMachineSchema.safeParse({
+    name: formData.get("name"),
+  });
 
-  // Insert and return
-  const [issue] = await db.insert(issues).values(validData).returning();
+  if (!validation.success) {
+    const firstError = validation.error.issues[0];
+    await setFlash({
+      type: "error",
+      message: firstError?.message ?? "Invalid input",
+    });
+    redirect("/machines/new");
+  }
 
-  // Revalidate and redirect
-  revalidatePath("/issues");
-  redirect(`/issues/${issue.id}`);
+  const { name } = validation.data;
+
+  // 3. Database operation
+  try {
+    const [machine] = await db.insert(machines).values({ name }).returning();
+
+    if (!machine) throw new Error("Machine creation failed");
+
+    // 4. Flash + revalidate + redirect on success
+    await setFlash({
+      type: "success",
+      message: `Machine "${name}" created successfully`,
+    });
+    revalidatePath("/machines");
+    redirect(`/machines/${machine.id}`);
+  } catch {
+    await setFlash({
+      type: "error",
+      message: "Failed to create machine. Please try again.",
+    });
+    redirect("/machines/new");
+  }
 }
 ```
 
 **Key points**:
 
-- Always use Zod for validation (CORE-SEC-002)
-- Mark functions with `"use server"`
-- Call `revalidatePath()` after mutations
-- Use `redirect()` for navigation after success
+- Separate Zod schemas from Server Actions (Next.js requirement)
+- Always validate and authenticate before mutations
+- Use flash messages + redirect for Post-Redirect-Get pattern
+- Revalidate affected paths after mutations
+- `redirect()` throws internally to exit the function
+- Return type is `Promise<void>` (not `Result<T>`)
 
 ---
 
@@ -126,14 +192,16 @@ export default async function DashboardPage() {
 
 import { createClient } from "~/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { setFlash } from "~/lib/flash";
 
-export async function updateProfileAction(formData: FormData) {
+export async function updateProfileAction(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
+    await setFlash({ type: "error", message: "Unauthorized" });
     redirect("/login");
   }
 
@@ -147,7 +215,7 @@ export async function updateProfileAction(formData: FormData) {
 - Use `redirect()` for unauthenticated users
 - Never skip auth checks in protected routes (CORE-SEC-001)
 
-### Protected Route Pattern (Server Component)
+### Protected Route Pattern
 
 When a route requires authentication, use this pattern at the top of the page component:
 
@@ -178,7 +246,46 @@ export default async function ProtectedPage(): Promise<React.JSX.Element> {
 - Check auth at the very start of the component (before any other logic)
 - Use `redirect("/login")` to send unauthenticated users to login page
 - After the guard, `user` is guaranteed to exist (type narrowing)
-- This pattern reached Rule of Three (used in `/issues`, `/issues/new`, `/machines`)
+- This pattern reached Rule of Three (used in `/dashboard`, `/issues`, `/machines`)
+
+### Logout Action Pattern
+
+```typescript
+// src/app/(auth)/actions.ts
+export async function logoutAction(): Promise<void> {
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      await setFlash({
+        type: "error",
+        message: "Failed to sign out",
+      });
+      return; // Early exit without redirect
+    }
+
+    await setFlash({
+      type: "success",
+      message: "Signed out successfully",
+    });
+  } catch (error) {
+    await setFlash({
+      type: "error",
+      message: "Something went wrong",
+    });
+  } finally {
+    // Always redirect to home after logout attempt
+    redirect("/");
+  }
+}
+```
+
+**Key points**:
+
+- `finally` block guarantees redirect on all paths
+- Flash messages persist across redirect via secure session cookie
+- No return value needed; `redirect()` throws internally
 
 ---
 
@@ -191,21 +298,31 @@ src/
 ├── app/                          # Next.js App Router
 │   ├── (auth)/                   # Route group for auth pages
 │   │   ├── login/
-│   │   └── signup/
-│   ├── machines/                 # Feature-based routing
-│   │   ├── [machineId]/
-│   │   │   ├── page.tsx         # Server Component
-│   │   │   └── actions.ts       # Server Actions for this route
-│   │   └── page.tsx
+│   │   ├── signup/
+│   │   └── actions.ts            # Auth Server Actions
+│   ├── (app)/                    # Route group for protected pages
+│   │   ├── dashboard/
+│   │   ├── machines/
+│   │   │   ├── [machineId]/
+│   │   │   │   └── page.tsx     # Server Component
+│   │   │   ├── new/page.tsx
+│   │   │   ├── page.tsx
+│   │   │   ├── actions.ts       # Server Actions for this route
+│   │   │   └── schemas.ts       # Zod validation schemas
+│   │   └── issues/
 │   └── layout.tsx
 ├── components/                    # Shared UI components
 │   ├── ui/                       # shadcn/ui components
-│   ├── issue-card.tsx            # Domain components (Server Component)
-│   └── issue-form.tsx            # Client Component ("use client")
+│   ├── layout/                   # Navigation, headers
+│   └── password-strength.tsx     # Domain components
 ├── lib/                          # Shared utilities
 │   ├── supabase/
 │   │   └── server.ts
+│   ├── machines/                 # Domain logic
+│   │   ├── status.ts
+│   │   └── status.test.ts
 │   ├── types/                    # Shared TypeScript types
+│   ├── flash.ts                  # Flash messages
 │   └── utils.ts
 └── server/                       # Server-only code
     └── db/
@@ -216,10 +333,12 @@ src/
 **Conventions**:
 
 - Server Actions co-located with routes in `actions.ts` files
+- Zod schemas in separate `schemas.ts` files (Next.js requirement)
 - Domain components in `src/components/` (default to Server Components)
-- Client Components have `"use client"` at top, or `-client.tsx` suffix
+- Client Components have `"use client"` at top
 - Database schema in `src/server/db/schema.ts`
 - Types in `src/lib/types/`
+- Domain logic in `src/lib/<domain>/` (e.g., `src/lib/machines/status.ts`)
 
 ---
 
@@ -227,27 +346,22 @@ src/
 
 ### Issues Always Require Machine
 
-**Schema Enforcement** (already in place):
+**Schema Enforcement**:
 
 ```typescript
 // src/server/db/schema.ts
-export const issues = pgTable(
-  "issues",
-  {
-    // ...
-    machineId: uuid("machine_id")
-      .notNull()
-      .references(() => machines.id, { onDelete: "cascade" }),
-    // ...
-  },
-  (table) => ({
-    // CHECK constraint ensures machineId is never null
-    machineRequired: check(
-      "machine_required",
-      sql`${table.machineId} IS NOT NULL`
-    ),
-  })
-);
+export const issues = pgTable("issues", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  machineId: uuid("machine_id")
+    .notNull()
+    .references(() => machines.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  severity: text("severity", { enum: ["minor", "playable", "unplayable"] })
+    .notNull()
+    .default("playable"),
+  // ...
+});
+// machineId NOT NULL constraint enforces CORE-ARCH-004
 ```
 
 **Application Pattern**:
@@ -264,7 +378,8 @@ const createIssueSchema = z.object({
 **Key points**:
 
 - Every issue must have exactly one machine (CORE-ARCH-004)
-- Schema enforces with CHECK constraint
+- Schema enforces with `NOT NULL` constraint and foreign key
+- `onDelete: "cascade"` removes issues when machine is deleted
 - Never create issue forms without machine selector
 
 ---
@@ -278,32 +393,31 @@ const createIssueSchema = z.object({
 // src/server/db/schema.ts
 export const issues = pgTable("issues", {
   id: uuid("id").defaultRandom().primaryKey(),
-  machine_id: uuid("machine_id").notNull(),
-  created_at: timestamp("created_at").defaultNow(),
+  machineId: uuid("machine_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 // Application types (camelCase) in lib/types
-// src/lib/types/issue.ts
+// src/lib/types/index.ts
 export type Issue = {
   id: string;
   machineId: string;
   createdAt: Date;
 };
 
-// Convert at query boundaries
+// Drizzle handles conversion automatically in relational queries
 const dbIssues = await db.query.issues.findMany();
-const appIssues: Issue[] = dbIssues.map((issue) => ({
-  id: issue.id,
-  machineId: issue.machine_id,
-  createdAt: issue.created_at,
-}));
+// dbIssues already has camelCase properties due to Drizzle's automatic conversion
 ```
 
 **Key points**:
 
 - DB schema uses snake_case (CORE-TS-004)
 - Application code uses camelCase (CORE-TS-003)
-- Convert at boundaries, not throughout the codebase
+- Drizzle ORM handles conversion automatically in relational queries
+- For raw SQL, convert at boundaries manually
 - Store shared types in `src/lib/types/`
 
 ---
@@ -327,6 +441,7 @@ type Severity = "minor" | "playable" | "unplayable";
 - Use player-centric language, not technical terms
 - Three levels only: minor, playable, unplayable
 - Never use: low/medium/high, critical, or other severity names
+- Defined in schema enum for type safety
 
 ---
 
@@ -336,20 +451,11 @@ type Severity = "minor" | "playable" | "unplayable";
 
 ```typescript
 // Server Action form (works without JS)
-export default function CreateIssueForm() {
+export default async function CreateMachineForm() {
   return (
-    <form action={createIssueAction}>
-      <input name="title" required />
-      <select name="machineId" required>
-        <option value="">Select machine...</option>
-        {/* ... */}
-      </select>
-      <select name="severity" required>
-        <option value="minor">Minor</option>
-        <option value="playable">Playable</option>
-        <option value="unplayable">Unplayable</option>
-      </select>
-      <button type="submit">Create Issue</button>
+    <form action={createMachineAction}>
+      <input name="name" required />
+      <button type="submit">Create Machine</button>
     </form>
   );
 }
@@ -362,7 +468,7 @@ function SubmitButton() {
   const { pending } = useFormStatus();
   return (
     <button type="submit" disabled={pending}>
-      {pending ? "Creating..." : "Create Issue"}
+      {pending ? "Creating..." : "Create Machine"}
     </button>
   );
 }
@@ -371,215 +477,265 @@ function SubmitButton() {
 **Key points**:
 
 - Forms must work without JavaScript (CORE-ARCH-002)
-- Use Server Actions with `<form action={...}>`
+- Use Server Actions with `<form action={serverAction}>`
+- Never wrap Server Actions in inline async functions (breaks serialization)
 - Enhance with Client Components for loading states (optional)
+- Use `useFormStatus()` hook for pending state
 
 ---
 
-## Safe Server Action
+## Machine Status Derivation
 
-### Auth + Zod + Result + PRG
+### Deriving Machine Status from Issues
 
-```typescript
-// src/lib/result.ts
-export type Result<T, C extends string = string> =
-  | { ok: true; value: T }
-  | { ok: false; code: C; message: string };
-export const ok = <T>(value: T) => ({ ok: true as const, value });
-export const err = <C extends string>(code: C, message: string) => ({
-  ok: false as const,
-  code,
-  message,
-});
-```
+Machine operational status is derived from associated open issues, not stored in the database.
 
 ```typescript
-// src/lib/flash.ts (minimal helper for Post‑Redirect‑Get)
-import { cookies } from "next/headers";
-const KEY = "flash";
-export type Flash = {
-  type: "success" | "error";
-  message: string;
-  fields?: Record<string, string>;
-};
-export async function setFlash(f: Flash): Promise<void> {
-  const c = await cookies();
-  c.set(KEY, JSON.stringify(f), {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60, // Auto-expire after 60 seconds
-  });
+// src/lib/machines/status.ts
+export type MachineStatus = "unplayable" | "needs_service" | "operational";
+
+export interface IssueForStatus {
+  status: "new" | "in_progress" | "resolved";
+  severity: "minor" | "playable" | "unplayable";
 }
-export async function readFlash(): Promise<Flash | null> {
-  const c = await cookies();
-  const raw = c.get(KEY)?.value;
-  if (!raw) return null;
-  // Note: Cannot clear in Server Components (Next.js restriction)
-  // Flash auto-expires via maxAge set when created
-  try {
-    return JSON.parse(raw) as Flash;
-  } catch {
-    return null;
-  }
-}
-```
 
-```typescript
-// src/app/issues/actions.ts
-"use server";
-import { z } from "zod";
-import { revalidatePath } from "next/cache";
-import { db } from "~/server/db";
-import { issues } from "~/server/db/schema";
-import { createClient } from "~/lib/supabase/server";
-import { ok, err, type Result } from "~/lib/result";
-import { setFlash } from "~/lib/flash";
+/**
+ * Derive machine status from its issues
+ *
+ * Logic:
+ * - `unplayable`: At least one unplayable issue that's not resolved
+ * - `needs_service`: At least one playable/minor issue that's not resolved
+ * - `operational`: No open issues
+ */
+export function deriveMachineStatus(issues: IssueForStatus[]): MachineStatus {
+  // Filter to only open issues (not resolved)
+  const openIssues = issues.filter((issue) => issue.status !== "resolved");
 
-const schema = z.object({
-  title: z.string().trim().min(1, "Title required"),
-  machineId: z.string().uuid("Invalid machine"),
-  severity: z.enum(["minor", "playable", "unplayable"]),
-  description: z.string().trim().optional(),
-});
-
-export type CreateIssueResult = Result<
-  { id: string },
-  "AUTH" | "VALIDATION" | "DB"
->;
-
-export async function createIssue(
-  formData: FormData
-): Promise<CreateIssueResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    setFlash({ type: "error", message: "You must be signed in." });
-    return err("AUTH", "Unauthenticated");
+  if (openIssues.length === 0) {
+    return "operational";
   }
 
-  const parsed = schema.safeParse({
-    title: formData.get("title"),
-    machineId: formData.get("machineId"),
-    severity: formData.get("severity"),
-    description: formData.get("description") ?? undefined,
-  });
-  if (!parsed.success) {
-    setFlash({ type: "error", message: "Please fix the highlighted fields." });
-    return err("VALIDATION", "Invalid input");
-  }
-
-  try {
-    const [row] = await db
-      .insert(issues)
-      .values({
-        title: parsed.data.title,
-        description: parsed.data.description ?? null,
-        machine_id: parsed.data.machineId,
-        severity: parsed.data.severity,
-        // created_by: user.id, // include if present in schema
-      })
-      .returning({ id: issues.id });
-
-    revalidatePath("/issues");
-    setFlash({ type: "success", message: "Issue created." });
-    return ok({ id: row.id });
-  } catch {
-    setFlash({ type: "error", message: "Could not create issue. Try again." });
-    return err("DB", "Insert failed");
-  }
-}
-```
-
-```tsx
-// src/app/issues/new/page.tsx (works with or without JS)
-import { createIssue } from "~/app/issues/actions";
-import { readFlash } from "~/lib/flash";
-
-export default async function NewIssuePage() {
-  const flash = await readFlash();
-  return (
-    <div>
-      {flash && (
-        <p
-          className={flash.type === "error" ? "text-red-600" : "text-green-700"}
-        >
-          {flash.message}
-        </p>
-      )}
-      <form action={createIssue}>
-        <input name="title" required />
-        <select name="machineId" required>
-          {/* options */}
-        </select>
-        <select name="severity" defaultValue="playable">
-          <option value="minor">Minor</option>
-          <option value="playable">Playable</option>
-          <option value="unplayable">Unplayable</option>
-        </select>
-        <button type="submit">Create Issue</button>
-      </form>
-    </div>
+  const hasUnplayable = openIssues.some(
+    (issue) => issue.severity === "unplayable"
   );
+  if (hasUnplayable) {
+    return "unplayable";
+  }
+
+  return "needs_service";
+}
+
+// Helper functions for UI
+export function getMachineStatusLabel(status: MachineStatus): string {
+  switch (status) {
+    case "operational":
+      return "Operational";
+    case "needs_service":
+      return "Needs Service";
+    case "unplayable":
+      return "Unplayable";
+  }
+}
+
+export function getMachineStatusStyles(status: MachineStatus): string {
+  switch (status) {
+    case "operational":
+      return "bg-green-100 text-green-800 border-green-300";
+    case "needs_service":
+      return "bg-yellow-100 text-yellow-800 border-yellow-300";
+    case "unplayable":
+      return "bg-red-100 text-red-800 border-red-300";
+  }
+}
+```
+
+**Usage in Server Component**:
+
+```typescript
+// src/app/machines/page.tsx
+import { deriveMachineStatus, type IssueForStatus } from "~/lib/machines/status";
+
+export default async function MachinesPage() {
+  const machines = await db.query.machines.findMany({
+    with: {
+      issues: {
+        columns: { status: true, severity: true },
+      },
+    },
+  });
+
+  const machinesWithStatus = machines.map((machine) => ({
+    ...machine,
+    status: deriveMachineStatus(machine.issues as IssueForStatus[]),
+  }));
+
+  return <MachineList machines={machinesWithStatus} />;
 }
 ```
 
 **Key points**:
 
-- Validate all inputs with Zod; never trust `FormData` (CORE-SEC-002)
-- Authenticate at the boundary using Supabase SSR (CORE-SSR-002)
-- Return a typed `Result` instead of throwing; set a flash and use PRG
-- Call `revalidatePath()` after successful mutations
-- Keep actions co-located in route `actions.ts`; no DAL layer (CORE-ARCH-003)
+- Status is derived, not stored (single source of truth)
+- Only open issues (not resolved) affect status
+- Hierarchy: unplayable > needs_service > operational
+- Helper functions for labels and styling separate from logic
+- Query only needed columns (`status`, `severity`) for performance
 
-**Testing**:
+---
 
-- Unit test the Zod schema and any small helpers
-- Integration test the action against PGlite (worker-scoped); do not spin per‑test instances
+## Testing Patterns
 
-## Playwright E2E Tests
+### Playwright E2E Tests
 
-### Login Helper + Landmark-Scoped Locators
+#### Login Helper + Landmark-Scoped Locators
+
+```typescript
+// e2e/support/actions.ts
+export async function loginAs(page: Page, email: string, password: string) {
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(password);
+  await page.getByRole("button", { name: "Sign In" }).click();
+  await expect(page).toHaveURL("/dashboard");
+}
+```
 
 ```typescript
 // e2e/smoke/navigation.spec.ts
 import { loginAs } from "../support/actions";
-import { seededMember } from "../support/constants";
+import { TEST_USERS } from "../support/constants";
 
 test("authenticated navigation", async ({ page }) => {
-  await loginAs(page); // UI login via shared helper (fills form + waits for dashboard)
+  await loginAs(page, TEST_USERS.member.email, TEST_USERS.member.password);
 
+  // Scope locators to landmarks to avoid strict-mode collisions
   const nav = page.getByRole("navigation");
-  await expect(nav.getByRole("link", { name: /Issues/i })).toBeVisible();
-  await expect(nav.getByText(seededMember.name)).toBeVisible();
+  await expect(nav.getByRole("link", { name: /Machines/i })).toBeVisible();
+  await expect(nav.getByText(TEST_USERS.member.name)).toBeVisible();
 });
 ```
 
 **Key points**:
 
-- Keep reusable flows under `e2e/support/` (e.g., `loginAs`, seeded credentials) so tests stay focused on assertions, not setup.
-- Scope locators to landmarks (`getByRole("navigation")`, `getByRole("main")`) to avoid strict-mode collisions when the same text appears elsewhere.
-- When tests share authenticated state (same seeded user), wrap the suite with `test.describe.serial` to keep runs deterministic across workers.
+- Keep reusable flows in `e2e/support/actions.ts`
+- Scope locators to landmarks (`getByRole("navigation")`, `getByRole("main")`) to avoid collisions
+- Use constants for test data in `e2e/support/constants.ts`
+- When tests share state, use `test.describe.serial` for deterministic execution
+- Prefer semantic locators (`getByRole`, `getByLabel`) over test IDs
+
+### Integration Tests with PGlite
+
+```typescript
+// src/test/integration/machines.test.ts
+import { describe, it, expect } from "vitest";
+import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { machines } from "~/server/db/schema";
+
+describe("Machine CRUD Operations (PGlite)", () => {
+  // Set up worker-scoped PGlite and auto-cleanup after each test
+  setupTestDb();
+
+  it("should create a machine", async () => {
+    const db = await getTestDb();
+
+    const [machine] = await db
+      .insert(machines)
+      .values({ name: "Test Machine" })
+      .returning();
+
+    expect(machine).toBeDefined();
+    expect(machine.name).toBe("Test Machine");
+  });
+});
+```
+
+**Key points**:
+
+- Use worker-scoped PGlite (CORE-TEST-001)
+- Never create per-test instances (causes system lockups)
+- Use `setupTestDb()` helper for automatic cleanup
+- Test database operations, not Server Components
+- Integration tests in `src/test/integration/`
+
+### Unit Tests
+
+```typescript
+// src/lib/machines/status.test.ts
+import { describe, it, expect } from "vitest";
+import { deriveMachineStatus, type IssueForStatus } from "./status";
+
+describe("deriveMachineStatus", () => {
+  it("returns operational when no issues", () => {
+    expect(deriveMachineStatus([])).toBe("operational");
+  });
+
+  it("returns unplayable when has unplayable issue", () => {
+    const issues: IssueForStatus[] = [
+      { status: "new", severity: "unplayable" },
+    ];
+    expect(deriveMachineStatus(issues)).toBe("unplayable");
+  });
+
+  it("ignores resolved issues", () => {
+    const issues: IssueForStatus[] = [
+      { status: "resolved", severity: "unplayable" },
+    ];
+    expect(deriveMachineStatus(issues)).toBe("operational");
+  });
+});
+```
+
+**Key points**:
+
+- Test pure functions in unit tests
+- Test edge cases (empty arrays, resolved issues, etc.)
+- Keep tests focused and readable
+- Unit tests in same directory as source (e.g., `status.test.ts` next to `status.ts`)
+
+---
 
 ## Adding New Patterns
 
 **When to add a pattern**:
 
-1. You've implemented the same approach 2+ times
+1. You've implemented the same approach 2+ times (Rule of Three)
 2. It's specific to PinPoint (not general Next.js/React knowledge)
 3. Future agents would benefit from seeing the example
+4. It's non-obvious or requires context to understand
 
 **How to add**:
 
 1. Create a new section with clear heading
-2. Include working code example
-3. List 2-3 key points about why this pattern
-4. Keep it concise - patterns, not tutorials
+2. Include minimal, working code example
+3. List 2-3 key points explaining why this pattern
+4. Reference relevant CORE rules (e.g., `CORE-SEC-001`)
+5. Keep it concise - patterns, not tutorials
 
 **What NOT to add**:
 
-- General TypeScript/React patterns (use TYPESCRIPT_STRICTEST_PATTERNS.md)
+- General TypeScript/React patterns (use `TYPESCRIPT_STRICTEST_PATTERNS.md`)
 - Library-specific patterns (use Context7 for current library docs)
 - One-off solutions that won't be repeated
+- Implementation details that are already in the code
+
+**Template**:
+
+````markdown
+### Pattern Name
+
+Brief description of when to use this pattern.
+
+```typescript
+// Minimal working example
+```
+````
+
+**Key points**:
+
+- Point 1 about why this matters
+- Point 2 about gotchas or non-obvious behavior
+- Reference to CORE rule if applicable (e.g., CORE-SEC-001)
+
+```
+
+```

@@ -43,10 +43,14 @@ export function UserMenu({
       <DropdownMenuTrigger
         aria-label="User menu"
         className="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-primary hover:text-on-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+        data-testid="user-menu-button"
       >
         <div className="flex items-center gap-3">
           <div className="hidden sm:block text-right">
-            <p className="text-sm font-medium text-on-primary-container">
+            <p
+              className="text-sm font-medium text-on-primary-container"
+              data-testid="user-menu-name"
+            >
               {userName}
             </p>
             <p className="text-xs text-on-primary-container/70">{userEmail}</p>

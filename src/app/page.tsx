@@ -46,6 +46,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                 asChild
                 size="lg"
                 className="bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container transition-colors"
+                data-testid="hero-signup"
               >
                 <Link href="/signup">Sign Up</Link>
               </Button>
@@ -54,6 +55,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                 size="lg"
                 variant="outline"
                 className="border-outline text-primary hover:bg-surface-variant transition-colors"
+                data-testid="hero-signin"
               >
                 <Link href="/login">Sign In</Link>
               </Button>

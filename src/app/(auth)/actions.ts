@@ -20,6 +20,8 @@ export type SignupResult = Result<
   "VALIDATION" | "EMAIL_TAKEN" | "SERVER"
 >;
 
+export type LogoutResult = Result<void, "SERVER">;
+
 /**
  * Login Action
  *
@@ -61,15 +63,14 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
       password,
     });
 
-    // Defensive check - Supabase types guarantee user exists if no error,
-    // but we check both for safety
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (error || !data.user) {
+    // Check for authentication error
+    // Supabase types guarantee user exists if no error
+    if (error) {
       await setFlash({
         type: "error",
         message: "Invalid email or password",
       });
-      return err("AUTH", error?.message ?? "Authentication failed");
+      return err("AUTH", error.message);
     }
 
     await setFlash({
@@ -175,7 +176,6 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
  * Logout Action
  *
  * Signs out the current user and clears their session.
- * Used in forms, so returns void (redirect happens in finally block).
  */
 export async function logoutAction(): Promise<void> {
   try {
@@ -185,18 +185,19 @@ export async function logoutAction(): Promise<void> {
     if (error) {
       await setFlash({
         type: "error",
-        message: error.message,
+        message: "Failed to sign out",
       });
-    } else {
-      await setFlash({
-        type: "success",
-        message: "Signed out successfully",
-      });
+      return; // Early exit without redirect
     }
-  } catch (cause) {
+
+    await setFlash({
+      type: "success",
+      message: "Signed out successfully",
+    });
+  } catch {
     await setFlash({
       type: "error",
-      message: cause instanceof Error ? cause.message : "Something went wrong",
+      message: "Something went wrong",
     });
   } finally {
     // Always redirect to home after logout attempt

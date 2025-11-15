@@ -55,3 +55,81 @@ COMMENT ON CONSTRAINT user_profiles_id_fkey ON public.user_profiles IS
 -- To create test users, run: npm run db:seed-users
 -- Password for all test users: "TestPassword123"
 -- DO NOT use these in production!
+
+-- ============================================================================
+-- Test Machines and Issues for Local Development
+-- ============================================================================
+
+-- Insert test machines
+INSERT INTO machines (id, name, created_at, updated_at) VALUES
+  ('11111111-1111-1111-1111-111111111111', 'Medieval Madness', NOW(), NOW()),
+  ('22222222-2222-2222-2222-222222222222', 'Attack from Mars', NOW(), NOW()),
+  ('33333333-3333-3333-3333-333333333333', 'The Addams Family', NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;
+
+-- Insert test issues
+-- Machine 1 (Medieval Madness): No issues - will show as "operational"
+-- Machine 2 (Attack from Mars): 1 playable issue - will show as "needs_service"
+-- Machine 3 (The Addams Family): 4 issues with mixed severities - will show as "unplayable" (has unplayable issue)
+
+-- Attack from Mars: 1 playable issue
+INSERT INTO issues (id, machine_id, title, description, status, severity, created_at, updated_at) VALUES
+  (
+    '10000000-0000-0000-0000-000000000001',
+    '22222222-2222-2222-2222-222222222222',
+    'Right flipper feels weak',
+    'The right flipper doesn''t have full strength. Can still play but makes ramp shots difficult.',
+    'new',
+    'playable',
+    NOW() - INTERVAL '2 days',
+    NOW() - INTERVAL '2 days'
+  )
+ON CONFLICT (id) DO NOTHING;
+
+-- The Addams Family: 4 issues with mixed severities
+INSERT INTO issues (id, machine_id, title, description, status, severity, created_at, updated_at) VALUES
+  (
+    '10000000-0000-0000-0000-000000000002',
+    '33333333-3333-3333-3333-333333333333',
+    'Ball stuck in Thing''s box',
+    'Ball gets stuck in the Thing''s box mechanism and won''t eject. Game cannot continue.',
+    'new',
+    'unplayable',
+    NOW() - INTERVAL '1 day',
+    NOW() - INTERVAL '1 day'
+  ),
+  (
+    '10000000-0000-0000-0000-000000000003',
+    '33333333-3333-3333-3333-333333333333',
+    'Bookcase not registering hits',
+    'The bookcase target isn''t registering when hit. Playable but can''t start multiball.',
+    'in_progress',
+    'playable',
+    NOW() - INTERVAL '3 days',
+    NOW() - INTERVAL '1 day'
+  ),
+  (
+    '10000000-0000-0000-0000-000000000004',
+    '33333333-3333-3333-3333-333333333333',
+    'Dim GI lighting on left side',
+    'General illumination bulbs on left side are dim. Doesn''t affect gameplay.',
+    'new',
+    'minor',
+    NOW() - INTERVAL '5 days',
+    NOW() - INTERVAL '5 days'
+  ),
+  (
+    '10000000-0000-0000-0000-000000000005',
+    '33333333-3333-3333-3333-333333333333',
+    'Bear Kick opto not working',
+    'Bear Kick feature not detecting ball. Can play but feature is unavailable.',
+    'new',
+    'playable',
+    NOW() - INTERVAL '1 week',
+    NOW() - INTERVAL '1 week'
+  )
+ON CONFLICT (id) DO NOTHING;
+
+-- Add helpful comments
+COMMENT ON TABLE machines IS 'Pinball machines in the collection. Status is derived from open issues, not stored.';
+COMMENT ON TABLE issues IS 'Issues reported for pinball machines. Every issue must have exactly one machine (machine_id NOT NULL).';
