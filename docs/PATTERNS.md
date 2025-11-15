@@ -18,6 +18,7 @@
 - [Severity Naming](#severity-naming)
 - [Progressive Enhancement](#progressive-enhancement)
 - [Machine Status Derivation](#machine-status-derivation)
+- [Issues Per Machine](#issues-per-machine)
 - [Testing Patterns](#testing-patterns)
 - [Adding New Patterns](#adding-new-patterns)
 
@@ -580,6 +581,314 @@ export default async function MachinesPage() {
 - Hierarchy: unplayable > needs_service > operational
 - Helper functions for labels and styling separate from logic
 - Query only needed columns (`status`, `severity`) for performance
+
+---
+
+## Issues Per Machine
+
+### Issue Creation with Machine Requirement
+
+Issues always require a machine (CORE-ARCH-004). Issue creation forms can pre-fill the machine from URL params.
+
+```typescript
+// src/app/(app)/issues/new/page.tsx
+export default async function NewIssuePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ machineId?: string }>;
+}) {
+  const params = await searchParams;
+  const prefilledMachineId = params.machineId;
+
+  // Fetch machines for dropdown
+  const allMachines = await db.query.machines.findMany({
+    orderBy: desc(machines.name),
+    columns: { id: true, name: true },
+  });
+
+  return (
+    <form action={createIssueAction}>
+      <Select name="machineId" defaultValue={prefilledMachineId} required>
+        <SelectTrigger>
+          <SelectValue placeholder="Select a machine" />
+        </SelectTrigger>
+        <SelectContent>
+          {allMachines.map((machine) => (
+            <SelectItem key={machine.id} value={machine.id}>
+              {machine.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {/* Other fields... */}
+    </form>
+  );
+}
+```
+
+**Machine page links to pre-filled form:**
+
+```typescript
+// Link from machine detail page
+<Link href={`/issues/new?machineId=${machine.id}`}>
+  <Button>Report Issue</Button>
+</Link>
+```
+
+**Key points**:
+
+- Machine selector always required in issue creation form
+- Use URL param `?machineId=xxx` to pre-fill from machine pages
+- Zod schema validates `machineId` is a valid UUID
+- Database enforces `NOT NULL` constraint on `machine_id` column
+
+### Timeline Events
+
+System events track changes to issues. They're stored as `issue_comments` with `is_system: true`.
+
+```typescript
+// src/lib/timeline/events.ts
+export async function createTimelineEvent(
+  issueId: string,
+  content: string
+): Promise<void> {
+  await db.insert(issueComments).values({
+    issueId,
+    content,
+    isSystem: true,
+    authorId: null, // System events have no author
+  });
+}
+```
+
+**Usage in Server Actions:**
+
+```typescript
+// src/app/(app)/issues/actions.ts
+export async function updateIssueStatusAction(formData: FormData) {
+  // ... auth and validation
+
+  // Update status
+  await db
+    .update(issues)
+    .set({ status: newStatus })
+    .where(eq(issues.id, issueId));
+
+  // Create timeline event
+  await createTimelineEvent(
+    issueId,
+    `Status changed from ${oldStatus} to ${newStatus}`
+  );
+
+  // ... flash message and redirect
+}
+```
+
+**Timeline display (different styles for events vs comments):**
+
+```typescript
+// System event - single line
+{comment.isSystem ? (
+  <div className="flex items-center gap-2 text-sm text-on-surface-variant">
+    <Clock className="size-3" />
+    <span>{comment.content}</span>
+    <span className="text-xs">{new Date(comment.createdAt).toLocaleString()}</span>
+  </div>
+) : (
+  // Regular comment - box with author and time
+  <Card className="border-outline-variant bg-surface-container">
+    <CardHeader className="pb-2">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold">{comment.author?.name}</div>
+        <div className="text-xs text-on-surface-variant">
+          {new Date(comment.createdAt).toLocaleString()}
+        </div>
+      </div>
+    </CardHeader>
+    <CardContent>
+      <p className="text-sm whitespace-pre-wrap">{comment.content}</p>
+    </CardContent>
+  </Card>
+)}
+```
+
+**Key points**:
+
+- System events: `isSystem: true`, `authorId: null`, single-line display
+- Regular comments: `isSystem: false`, `authorId` set, box display with author
+- Create timeline events for: issue creation, status changes, severity changes, assignments
+- Events are ordered chronologically in timeline display
+
+### Server-Side Filtering with URL Search Params
+
+Issue lists support filtering via URL search params. Filters are applied server-side, making them bookmarkable.
+
+```typescript
+// src/app/(app)/issues/page.tsx
+export default async function IssuesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    machineId?: string;
+    status?: string;
+    severity?: string;
+    assignedTo?: string;
+  }>;
+}) {
+  const params = await searchParams;
+  const { machineId, status, severity, assignedTo } = params;
+
+  // Build where conditions
+  const conditions = [];
+  if (machineId) conditions.push(eq(issues.machineId, machineId));
+  if (status) conditions.push(eq(issues.status, status));
+  if (severity) conditions.push(eq(issues.severity, severity));
+  if (assignedTo === "unassigned") {
+    conditions.push(isNull(issues.assignedTo));
+  } else if (assignedTo) {
+    conditions.push(eq(issues.assignedTo, assignedTo));
+  }
+
+  // Query with filters
+  const allIssues = await db.query.issues.findMany({
+    where: conditions.length > 0 ? and(...conditions) : undefined,
+    orderBy: desc(issues.createdAt),
+    with: {
+      machine: { columns: { id: true, name: true } },
+      reportedByUser: { columns: { id: true, name: true } },
+      assignedToUser: { columns: { id: true, name: true } },
+    },
+  });
+
+  // Pass filter data to Client Component
+  return (
+    <main>
+      <IssueFilters machines={allMachines} users={allUsers} />
+      {/* Issue list */}
+    </main>
+  );
+}
+```
+
+**Client Component for filter UI:**
+
+```typescript
+// src/components/IssueFilters.tsx
+"use client";
+
+import { useRouter, useSearchParams } from "next/navigation";
+
+export function IssueFilters({ machines, users }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const updateFilter = (key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) {
+      params.set(key, value);
+    } else {
+      params.delete(key);
+    }
+    router.push(`/issues?${params.toString()}`);
+  };
+
+  return (
+    <div>
+      <select onChange={(e) => updateFilter("status", e.target.value)}>
+        <option value="">All Statuses</option>
+        <option value="new">New</option>
+        <option value="in_progress">In Progress</option>
+        <option value="resolved">Resolved</option>
+      </select>
+      {/* Other filters... */}
+    </div>
+  );
+}
+```
+
+**Machine page links to filtered issues:**
+
+```typescript
+// Link to issues filtered by machine
+<Link href={`/issues?machineId=${machine.id}`}>
+  <Button>View All Issues for {machine.name}</Button>
+</Link>
+```
+
+**Key points**:
+
+- Server Components read URL search params and filter queries
+- Client Component provides interactive filter UI with `useRouter` and `useSearchParams`
+- Filters are bookmarkable (URL-based, not client state)
+- Use `and()` from drizzle-orm to combine multiple filter conditions
+- Special handling for "unassigned" filter (use `isNull()`)
+
+### Issue Update Actions Pattern
+
+Issue updates (status, severity, assignment) follow a consistent pattern:
+
+```typescript
+// src/app/(app)/issues/actions.ts
+export async function updateIssueStatusAction(formData: FormData) {
+  // 1. Auth check
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    await setFlash({ type: "error", message: "Unauthorized" });
+    redirect("/login");
+  }
+
+  // 2. Validate input
+  const validation = updateIssueStatusSchema.safeParse({
+    issueId: formData.get("issueId"),
+    status: formData.get("status"),
+  });
+  if (!validation.success) {
+    await setFlash({ type: "error", message: "Invalid input" });
+    redirect("/issues");
+  }
+
+  // 3. Get current issue (for old value and machineId)
+  const currentIssue = await db.query.issues.findFirst({
+    where: eq(issues.id, issueId),
+    columns: { status: true, machineId: true },
+  });
+  if (!currentIssue) {
+    await setFlash({ type: "error", message: "Issue not found" });
+    redirect("/issues");
+  }
+
+  // 4. Update database
+  await db
+    .update(issues)
+    .set({ status: newStatus, updatedAt: new Date() })
+    .where(eq(issues.id, issueId));
+
+  // 5. Create timeline event
+  await createTimelineEvent(
+    issueId,
+    `Status changed from ${currentIssue.status} to ${newStatus}`
+  );
+
+  // 6. Log operation
+  log.info({ issueId, oldStatus, newStatus, action: "updateIssueStatus" }, "Issue status updated");
+
+  // 7. Flash message + revalidate + redirect
+  await setFlash({ type: "success", message: "Issue status updated" });
+  revalidatePath(`/issues/${issueId}`);
+  revalidatePath("/issues");
+  revalidatePath(`/machines/${currentIssue.machineId}`);
+  redirect(`/issues/${issueId}`);
+}
+```
+
+**Key points**:
+
+- All update actions follow same 7-step pattern
+- Fetch current issue to get old value for timeline event
+- Revalidate all affected paths (issue detail, issues list, machine page)
+- Timeline events describe what changed ("Status changed from X to Y")
+- Use structured logging for all operations
 
 ---
 
