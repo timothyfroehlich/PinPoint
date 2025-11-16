@@ -14,3 +14,5 @@ export type {
   IssueStatus,
   IssueSeverity,
 } from "./database";
+
+export type { IssueCommentWithAuthor, IssueWithAllRelations } from "./issue";
