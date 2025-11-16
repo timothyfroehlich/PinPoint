@@ -1,5 +1,19 @@
 import { relations } from "drizzle-orm";
-import { pgTable, uuid, text, timestamp, boolean } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  uuid,
+  text,
+  timestamp,
+  boolean,
+  pgSchema,
+} from "drizzle-orm/pg-core";
+
+const authSchema = pgSchema("auth");
+
+export const authUsers = authSchema.table("users", {
+  id: uuid("id").primaryKey(),
+  email: text("email").notNull(),
+});
 
 /**
  * User Profiles Table

@@ -63,3 +63,11 @@ export const assignIssueSchema = z.object({
   issueId: uuidish,
   assignedTo: uuidish.nullable(),
 });
+
+/**
+ * Schema for adding a new comment
+ */
+export const addCommentSchema = z.object({
+  issueId: uuidish,
+  comment: z.string().min(1, "Comment cannot be empty"),
+});

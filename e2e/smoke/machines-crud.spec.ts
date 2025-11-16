@@ -5,6 +5,16 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { cleanupTestEntities, extractIdFromUrl } from "../support/cleanup";
+
+const createdMachineIds = new Set<string>();
+
+const rememberMachineId = (url: string): void => {
+  const machineId = extractIdFromUrl(url);
+  if (machineId) {
+    createdMachineIds.add(machineId);
+  }
+};
 
 test.describe("Machines CRUD", () => {
   test.describe.configure({ mode: "serial" });
@@ -16,6 +26,16 @@ test.describe("Machines CRUD", () => {
     await page.getByLabel("Password").fill("TestPassword123");
     await page.getByRole("button", { name: "Sign In" }).click();
     await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
+  });
+
+  test.afterEach(async ({ request }) => {
+    if (!createdMachineIds.size) {
+      return;
+    }
+    await cleanupTestEntities(request, {
+      machineIds: Array.from(createdMachineIds),
+    });
+    createdMachineIds.clear();
   });
 
   test("should display machine list page", async ({ page }) => {
@@ -83,6 +103,8 @@ test.describe("Machines CRUD", () => {
     await expect(page).toHaveURL(/\/machines\/[a-f0-9-]+$/, {
       timeout: 10000,
     });
+
+    rememberMachineId(page.url());
 
     // Verify success flash message
     await expect(
@@ -195,6 +217,8 @@ test.describe("Machines CRUD", () => {
     await expect(page.getByTestId("detail-open-issues-count")).toContainText(
       "0"
     );
+
+    rememberMachineId(page.url());
   });
 
   test("should navigate back to machines list from detail page", async ({

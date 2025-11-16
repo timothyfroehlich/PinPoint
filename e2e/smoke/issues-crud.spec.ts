@@ -7,6 +7,7 @@
 
 import { test, expect, type Page } from "@playwright/test";
 import { loginAs } from "../support/actions";
+import { cleanupTestEntities, extractIdFromUrl } from "../support/cleanup";
 
 async function selectFirstMachine(page: Page): Promise<void> {
   const option = page.locator("#machineId option").nth(1);
@@ -18,10 +19,29 @@ async function selectFirstMachine(page: Page): Promise<void> {
   await page.locator("#machineId").selectOption(value);
 }
 
+const createdIssueIds = new Set<string>();
+
+const rememberIssueId = (page: Page): void => {
+  const issueId = extractIdFromUrl(page.url());
+  if (issueId) {
+    createdIssueIds.add(issueId);
+  }
+};
+
 test.describe("Issues System", () => {
   test.beforeEach(async ({ page }) => {
     // Login as member before each test
     await loginAs(page);
+  });
+
+  test.afterEach(async ({ request }) => {
+    if (!createdIssueIds.size) {
+      return;
+    }
+    await cleanupTestEntities(request, {
+      issueIds: Array.from(createdIssueIds),
+    });
+    createdIssueIds.clear();
   });
 
   test.describe("Issue Creation Flow", () => {
@@ -58,6 +78,8 @@ test.describe("Issues System", () => {
 
       // Check timeline shows "Issue created" event
       await expect(page.getByText("Issue created")).toBeVisible();
+
+      rememberIssueId(page);
     });
 
     test("should create an issue from machine page with pre-filled machine", async ({
@@ -99,6 +121,8 @@ test.describe("Issues System", () => {
       await expect(
         page.getByRole("heading", { name: "Display flickering" })
       ).toBeVisible();
+
+      rememberIssueId(page);
     });
 
     test("should show validation error for missing title", async ({ page }) => {
@@ -201,6 +225,8 @@ test.describe("Issues System", () => {
         page.getByRole("heading", { name: "Test Issue for Details" })
       ).toBeVisible();
 
+      rememberIssueId(page);
+
       // Should show metadata
       await expect(page.getByText(/Machine:/)).toBeVisible();
       await expect(page.getByText(/Reported by:/)).toBeVisible();
@@ -219,78 +245,61 @@ test.describe("Issues System", () => {
       await expect(page.getByText("Issue created")).toBeVisible();
     });
 
-    test("should update issue status", async ({ page }) => {
-      // Create an issue
+    test("should support timeline comments, status, and assignee updates", async ({
+      page,
+    }) => {
       await page.goto("/issues/new");
       await selectFirstMachine(page);
-      await page.getByLabel("Issue Title *").fill("Issue for Status Update");
+      const issueTitle = `Timeline Issue ${Date.now()}`;
+      await page.getByLabel("Issue Title *").fill(issueTitle);
       await page.getByRole("button", { name: "Report Issue" }).click();
 
-      // On detail page, find status update form
-      const statusSection = page.locator('text="Update Status"').locator("..");
-      await statusSection
-        .getByLabel("Update Status")
-        .selectOption("in_progress");
-      await statusSection.getByRole("button", { name: "Update" }).click();
+      await expect(
+        page.getByRole("heading", { name: issueTitle })
+      ).toBeVisible();
+      rememberIssueId(page);
 
-      // Page should refresh/redirect
+      const commentText = `Operator note ${Date.now()}`;
+      await page.getByPlaceholder("Leave a comment...").fill(commentText);
+      await page.getByRole("button", { name: "Add comment" }).click();
+      await expect(page.getByText("Comment added")).toBeVisible();
+      await expect(page.getByText(commentText)).toBeVisible();
+
+      await page.getByTestId("issue-status-select").click();
+      await page.getByTestId("status-option-in_progress").click();
       await expect(page.getByTestId("issue-status-badge")).toHaveText(
         /In Progress/i
       );
-
-      // Timeline should show status change event
       await expect(
         page.getByText(/Status changed from new to in_progress/)
       ).toBeVisible();
-    });
 
-    test("should update issue severity", async ({ page }) => {
-      // Create an issue
-      await page.goto("/issues/new");
-      await selectFirstMachine(page);
-      await page.getByLabel("Issue Title *").fill("Issue for Severity Update");
-      await page.getByRole("button", { name: "Report Issue" }).click();
-
-      // Find severity update form
-      const severitySection = page
-        .locator('text="Update Severity"')
-        .locator("..");
-      await severitySection
-        .locator("#issue-severity-select")
-        .selectOption("unplayable");
-      await severitySection.getByRole("button", { name: "Update" }).click();
-
-      // Verify update
+      await page.getByTestId("issue-severity-select").click();
+      await page.getByTestId("severity-option-unplayable").click();
       await expect(page.getByTestId("issue-severity-badge")).toHaveText(
         /Unplayable/i
       );
       await expect(
         page.getByText(/Severity changed from playable to unplayable/)
       ).toBeVisible();
-    });
 
-    test("should assign issue to user", async ({ page }) => {
-      // Create an issue
-      await page.goto("/issues/new");
-      await selectFirstMachine(page);
-      await page.getByLabel("Issue Title *").fill("Issue for Assignment");
-      await page.getByRole("button", { name: "Report Issue" }).click();
+      await page.getByTestId("assignee-picker-trigger").click();
+      await page.getByTestId("assignee-search-input").fill("member");
+      await page
+        .getByTestId(/assignee-option-/)
+        .first()
+        .click();
+      await expect(page.getByTestId("assignee-picker-trigger")).toContainText(
+        "Member User"
+      );
+      await expect(page.getByText(/Assigned to Member User/)).toBeVisible();
 
-      // Find assignment form
-      const assignSection = page.locator('text="Assign Issue"').locator("..");
-
-      // Select a user (first non-empty option)
-      const options = await assignSection.locator("option").allTextContents();
-      if (options.length > 1) {
-        await assignSection
-          .locator("#issue-assign-select")
-          .selectOption({ index: 1 });
-        await assignSection.getByRole("button", { name: "Update" }).click();
-
-        // Verify assignment
-        await expect(page.getByText(/Assigned to:/)).toBeVisible();
-        await expect(page.getByText(/Assigned to .+/)).toBeVisible();
-      }
+      await page.getByTestId("assignee-picker-trigger").click();
+      await page.getByTestId("assignee-option-unassigned").click();
+      await expect(page.getByTestId("assignee-picker-trigger")).toContainText(
+        "Unassigned"
+      );
+      await expect(page.getByText(/Unassigned/)).toBeVisible();
     });
   });
 

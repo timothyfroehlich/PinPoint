@@ -12,7 +12,7 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { issues, userProfiles } from "~/server/db/schema";
+import { issues, userProfiles, issueComments } from "~/server/db/schema";
 import { setFlash } from "~/lib/flash";
 import { createTimelineEvent } from "~/lib/timeline/events";
 import { log } from "~/lib/logger";
@@ -21,9 +21,13 @@ import {
   updateIssueStatusSchema,
   updateIssueSeveritySchema,
   assignIssueSchema,
+  addCommentSchema,
 } from "./schemas";
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
+
+const toOptionalString = (value: FormDataEntryValue | null): string | null =>
+  typeof value === "string" ? value : null;
 
 const isNextRedirectError = (error: unknown): error is { digest: string } => {
   if (typeof error !== "object" || error === null || !("digest" in error)) {
@@ -63,10 +67,10 @@ export async function createIssueAction(formData: FormData): Promise<void> {
 
   // Extract and validate form data (CORE-SEC-002)
   const rawData = {
-    title: formData.get("title"),
-    description: formData.get("description"),
-    machineId: formData.get("machineId"),
-    severity: formData.get("severity"),
+    title: toOptionalString(formData.get("title")),
+    description: toOptionalString(formData.get("description")),
+    machineId: toOptionalString(formData.get("machineId")),
+    severity: toOptionalString(formData.get("severity")),
   };
 
   const validation = createIssueSchema.safeParse(rawData);
@@ -169,8 +173,8 @@ export async function updateIssueStatusAction(
 
   // Validate input
   const rawData = {
-    issueId: formData.get("issueId"),
-    status: formData.get("status"),
+    issueId: toOptionalString(formData.get("issueId")),
+    status: toOptionalString(formData.get("status")),
   };
 
   const validation = updateIssueStatusSchema.safeParse(rawData);
@@ -272,8 +276,8 @@ export async function updateIssueSeverityAction(
 
   // Validate input
   const rawData = {
-    issueId: formData.get("issueId"),
-    severity: formData.get("severity"),
+    issueId: toOptionalString(formData.get("issueId")),
+    severity: toOptionalString(formData.get("severity")),
   };
 
   const validation = updateIssueSeveritySchema.safeParse(rawData);
@@ -375,9 +379,11 @@ export async function assignIssueAction(formData: FormData): Promise<void> {
   }
 
   // Validate input
+  const assignedToValue = toOptionalString(formData.get("assignedTo"));
   const rawData = {
-    issueId: formData.get("issueId"),
-    assignedTo: formData.get("assignedTo") ?? null,
+    issueId: toOptionalString(formData.get("issueId")),
+    assignedTo:
+      assignedToValue && assignedToValue.length > 0 ? assignedToValue : null,
   };
 
   const validation = assignIssueSchema.safeParse(rawData);
@@ -465,4 +471,56 @@ export async function assignIssueAction(formData: FormData): Promise<void> {
     });
     redirect(`/issues/${issueId}`);
   }
+}
+
+/**
+ * Adds a comment to an issue.
+ */
+export async function addCommentAction(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    await setFlash({ type: "error", message: "Unauthorized" });
+    redirect("/login");
+  }
+
+  const validation = addCommentSchema.safeParse({
+    issueId: toOptionalString(formData.get("issueId")),
+    comment: toOptionalString(formData.get("comment")),
+  });
+
+  if (!validation.success) {
+    const issueId = toOptionalString(formData.get("issueId")) ?? "";
+    await setFlash({
+      type: "error",
+      message: validation.error.issues[0]?.message ?? "Invalid input",
+    });
+    redirect(`/issues/${issueId}`);
+  }
+
+  const { issueId, comment } = validation.data;
+
+  try {
+    await db.insert(issueComments).values({
+      issueId,
+      authorId: user.id,
+      content: comment,
+    });
+    await setFlash({ type: "success", message: "Comment added" });
+  } catch (error) {
+    log.error(
+      {
+        error: error instanceof Error ? error.message : "Unknown",
+        action: "addComment",
+      },
+      "Failed to add issue comment"
+    );
+    await setFlash({ type: "error", message: "Failed to add comment" });
+  }
+
+  revalidatePath(`/issues/${issueId}`);
+  redirect(`/issues/${issueId}`);
 }
