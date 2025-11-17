@@ -199,14 +199,12 @@ export default async function MachineDetailPage({
                 <CardTitle className="text-2xl text-on-surface">
                   Issues
                 </CardTitle>
-                <Button
-                  disabled
-                  className="bg-primary text-on-primary hover:bg-primary/90"
-                  title="Issue creation will be available in Task 8"
-                >
-                  <Plus className="mr-2 size-4" />
-                  Report Issue
-                </Button>
+                <Link href={`/issues/new?machineId=${machine.id}`}>
+                  <Button className="bg-primary text-on-primary hover:bg-primary/90">
+                    <Plus className="mr-2 size-4" />
+                    Report Issue
+                  </Button>
+                </Link>
               </div>
             </CardHeader>
             <CardContent>
@@ -217,17 +215,18 @@ export default async function MachineDetailPage({
                     No issues reported yet
                   </p>
                   <p className="text-sm text-on-surface-variant">
-                    Issues will be available in Task 8
+                    Click "Report Issue" to create the first issue
                   </p>
                 </div>
               ) : (
-                // Issues list (placeholder UI ready for Task 8)
+                // Issues list
                 <div className="space-y-3">
                   {machine.issues.map((issue) => (
-                    <div
+                    <Link
                       key={issue.id}
+                      href={`/issues/${issue.id}`}
                       data-testid="issue-card"
-                      className="flex items-center justify-between p-4 rounded-lg border border-outline-variant bg-surface-variant"
+                      className="flex items-center justify-between p-4 rounded-lg border border-outline-variant bg-surface-container hover:bg-surface-variant transition-colors block"
                     >
                       <div className="flex-1">
                         <h3 className="font-medium text-on-surface">
@@ -245,7 +244,7 @@ export default async function MachineDetailPage({
                           </Badge>
                         </div>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               )}

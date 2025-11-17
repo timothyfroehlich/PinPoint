@@ -445,6 +445,166 @@ type Severity = "minor" | "playable" | "unplayable";
 
 ---
 
+## Issues Per Machine
+
+### Query Param Pre-filling
+
+```typescript
+// /issues/new page with query param support
+export default async function NewIssuePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ machineId?: string }>;
+}) {
+  const params = await searchParams;
+  const preselectedMachineId = params.machineId;
+
+  return (
+    <Select name="machineId" defaultValue={preselectedMachineId} required>
+      {/* Machine options */}
+    </Select>
+  );
+}
+
+// Link from machine detail page
+<Link href={`/issues/new?machineId=${machine.id}`}>
+  <Button>Report Issue</Button>
+</Link>
+```
+
+**Key points**:
+
+- Single issue creation form at `/issues/new`
+- Machine pre-selected via `machineId` query param
+- Links from machine pages include `?machineId=xxx`
+- Form validates machine is provided (CORE-ARCH-004)
+
+---
+
+## Timeline Events
+
+### System-Generated Events
+
+```typescript
+// src/lib/timeline/events.ts
+export async function createTimelineEvent(
+  issueId: string,
+  content: string
+): Promise<void> {
+  await db.insert(issueComments).values({
+    issueId,
+    content,
+    isSystem: true,
+    authorId: null, // System events have no author
+  });
+}
+
+// Usage in Server Actions
+await updateIssueStatus(issueId, newStatus);
+await createTimelineEvent(
+  issueId,
+  `Status changed from ${oldStatus} to ${newStatus}`
+);
+```
+
+**Timeline Event Types**:
+
+- Status changes: "Status changed from New to In Progress"
+- Severity changes: "Severity changed from Minor to Unplayable"
+- Assignments: "Assigned to [User Name]"
+- Unassignments: "Unassigned"
+- Resolution: "Marked as resolved"
+
+**Display Pattern**:
+
+```typescript
+{comment.isSystem ? (
+  // System event - single line
+  <div className="flex items-center gap-2 text-sm text-on-surface-variant">
+    <AlertTriangle className="size-4" />
+    <span>{comment.content}</span>
+    <span className="text-xs">{date}</span>
+  </div>
+) : (
+  // Regular comment - box with author and date
+  <div className="p-4 rounded-lg bg-surface-variant">
+    <div className="flex items-center justify-between">
+      <UserAvatar user={comment.author} />
+      <span className="text-xs">{date}</span>
+    </div>
+    <p>{comment.content}</p>
+  </div>
+)}
+```
+
+**Key points**:
+
+- System events use `isSystem: true` flag
+- System events have no author (`authorId: null`)
+- Create timeline event after each mutation
+- Display system events as single lines, comments as boxes
+- Use issue_comments table for both types
+
+---
+
+## URL Query Param Filters
+
+### Multi-Select Filters with URL State
+
+```typescript
+// Client Component for filters
+const searchParams = useSearchParams();
+const router = useRouter();
+
+const updateFilters = (key: string, value: string, isMulti: boolean) => {
+  const params = new URLSearchParams(searchParams.toString());
+
+  if (isMulti) {
+    // Toggle value in comma-separated list
+    const current = params.get(key)?.split(",").filter(Boolean) ?? [];
+    const newValues = current.includes(value)
+      ? current.filter((v) => v !== value)
+      : [...current, value];
+
+    if (newValues.length > 0) {
+      params.set(key, newValues.join(","));
+    } else {
+      params.delete(key);
+    }
+  }
+
+  router.push(`?${params.toString()}`);
+};
+
+// Server Component reads filters
+const params = await searchParams;
+const statuses = params.status?.split(",").filter(Boolean) ?? [];
+const conditions: SQL[] = [];
+
+if (statuses.length > 0) {
+  conditions.push(
+    inArray(
+      issues.status,
+      statuses as Array<"new" | "in_progress" | "resolved">
+    )
+  );
+}
+
+const issuesData = await db.query.issues.findMany({
+  where: conditions.length > 0 ? and(...conditions) : undefined,
+});
+```
+
+**Key points**:
+
+- Filters stored in URL query params (shareable, bookmarkable)
+- Multi-select filters use comma-separated values
+- Client Component manages filter UI
+- Server Component reads params and applies filters
+- URL updates trigger page re-render with new data
+
+---
+
 ## Progressive Enhancement
 
 ### Forms That Work Without JavaScript
