@@ -59,7 +59,7 @@ export const machines = pgTable("machines", {
  * Issues Table
  *
  * Issues reported for pinball machines.
- * Every issue MUST have exactly one machine (enforced by CHECK constraint).
+ * Every issue MUST have exactly one machine (enforced by NOT NULL constraint).
  */
 export const issues = pgTable(
   "issues",

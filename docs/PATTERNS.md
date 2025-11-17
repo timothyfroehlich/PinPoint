@@ -384,6 +384,301 @@ const createIssueSchema = z.object({
 
 ---
 
+## Issues CRUD Pattern
+
+### Creating Issues with Required Machine
+
+Issues must always be associated with a machine (CORE-ARCH-004). This pattern shows how to implement issue creation with machine requirement enforcement.
+
+**Schema**:
+
+```typescript
+// src/server/db/schema.ts
+export const issues = pgTable("issues", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  machineId: uuid("machine_id")
+    .notNull() // Enforces machine requirement
+    .references(() => machines.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: text("status", { enum: ["new", "in_progress", "resolved"] })
+    .notNull()
+    .default("new"),
+  severity: text("severity", { enum: ["minor", "playable", "unplayable"] })
+    .notNull()
+    .default("playable"),
+  reportedBy: uuid("reported_by").references(() => userProfiles.id),
+  reporterName: text("reporter_name"), // For anonymous public reporters
+  assignedTo: uuid("assigned_to").references(() => userProfiles.id),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+```
+
+**Validation Schema**:
+
+```typescript
+// src/app/(app)/issues/schemas.ts
+import { z } from "zod";
+
+const uuidish = z
+  .string()
+  .regex(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/);
+
+export const createIssueSchema = z.object({
+  title: z.string().min(1, "Title is required").max(200).trim(),
+  description: z.string().trim().optional(),
+  machineId: uuidish, // Always required (CORE-ARCH-004)
+  severity: z.enum(["minor", "playable", "unplayable"]),
+});
+```
+
+**Server Action**:
+
+```typescript
+// src/app/(app)/issues/actions.ts
+"use server";
+
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { createClient } from "~/lib/supabase/server";
+import { db } from "~/server/db";
+import { issues } from "~/server/db/schema";
+import { createTimelineEvent } from "~/lib/timeline/events";
+import { log } from "~/lib/logger";
+import { setFlash } from "~/lib/flash";
+import { createIssueSchema } from "./schemas";
+
+export async function createIssueAction(formData: FormData): Promise<void> {
+  // 1. Auth check
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    await setFlash({ type: "error", message: "Unauthorized" });
+    redirect("/login");
+  }
+
+  // 2. Validate (including machineId requirement)
+  const validation = createIssueSchema.safeParse({
+    title: formData.get("title"),
+    description: formData.get("description"),
+    machineId: formData.get("machineId"),
+    severity: formData.get("severity"),
+  });
+
+  if (!validation.success) {
+    const firstError = validation.error.issues[0];
+    await setFlash({
+      type: "error",
+      message: firstError?.message ?? "Invalid input",
+    });
+    redirect("/issues/new");
+  }
+
+  const { title, description, machineId, severity } = validation.data;
+
+  // 3. Create issue with required machine
+  try {
+    const [issue] = await db
+      .insert(issues)
+      .values({
+        title,
+        description: description ?? null,
+        machineId, // Required by schema
+        severity,
+        reportedBy: user.id,
+        status: "new",
+      })
+      .returning();
+
+    if (!issue) throw new Error("Issue creation failed");
+
+    // 4. Create timeline event
+    await createTimelineEvent(issue.id, "Issue created");
+
+    log.info(
+      { issueId: issue.id, machineId, userId: user.id, action: "createIssue" },
+      "Issue created successfully"
+    );
+
+    await setFlash({
+      type: "success",
+      message: "Issue reported successfully",
+    });
+    revalidatePath("/issues");
+    revalidatePath(`/machines/${machineId}`);
+    redirect(`/issues/${issue.id}`);
+  } catch (error) {
+    log.error(
+      {
+        error: error instanceof Error ? error.message : "Unknown",
+        machineId,
+        action: "createIssue",
+      },
+      "Failed to create issue"
+    );
+    await setFlash({ type: "error", message: "Failed to create issue" });
+    redirect("/issues/new");
+  }
+}
+```
+
+**Key points**:
+
+- `machineId` always required in schema validation (CORE-ARCH-004)
+- Schema enforces with `.notNull()` constraint on `machine_id` column
+- `onDelete: "cascade"` removes issues when machine deleted
+- Timeline event created on issue creation
+- Revalidate both `/issues` and `/machines/${machineId}` paths
+- Support for anonymous reporters via optional `reporterName` field (public reporting)
+
+### Issue Update Actions with Timeline Events
+
+Issue updates (status, severity, assignment) should create timeline events for audit trail.
+
+**Timeline Helper**:
+
+```typescript
+// src/lib/timeline/events.ts
+import { db } from "~/server/db";
+import { issueComments } from "~/server/db/schema";
+
+/**
+ * Create a system timeline event
+ * @param issueId - ID of the issue
+ * @param content - Event description (e.g., "Status changed from new to in_progress")
+ */
+export async function createTimelineEvent(
+  issueId: string,
+  content: string
+): Promise<void> {
+  await db.insert(issueComments).values({
+    issueId,
+    content,
+    isSystem: true, // Marks as system event, not user comment
+    authorId: null, // System events have no author
+  });
+}
+```
+
+**Update Status Action**:
+
+```typescript
+// src/app/(app)/issues/actions.ts
+export async function updateIssueStatusAction(
+  issueId: string,
+  newStatus: "new" | "in_progress" | "resolved"
+): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    await setFlash({ type: "error", message: "Unauthorized" });
+    redirect("/login");
+  }
+
+  // Get current issue
+  const issue = await db.query.issues.findFirst({
+    where: eq(issues.id, issueId),
+  });
+
+  if (!issue) {
+    await setFlash({ type: "error", message: "Issue not found" });
+    redirect("/issues");
+  }
+
+  // Update status
+  await db
+    .update(issues)
+    .set({
+      status: newStatus,
+      resolvedAt: newStatus === "resolved" ? new Date() : null,
+      updatedAt: new Date(),
+    })
+    .where(eq(issues.id, issueId));
+
+  // Create timeline event
+  await createTimelineEvent(
+    issueId,
+    `Status changed from ${issue.status} to ${newStatus}`
+  );
+
+  log.info(
+    {
+      issueId,
+      oldStatus: issue.status,
+      newStatus,
+      userId: user.id,
+      action: "updateIssueStatus",
+    },
+    "Issue status updated"
+  );
+
+  revalidatePath(`/issues/${issueId}`);
+  revalidatePath("/issues");
+  redirect(`/issues/${issueId}`);
+}
+```
+
+**Key points**:
+
+- Timeline events use `issueComments` table with `isSystem: true`
+- System events have `authorId: null` to distinguish from user comments
+- Include old and new values in timeline message for context
+- Revalidate issue detail and list pages after updates
+- `resolvedAt` timestamp set when status changes to "resolved"
+
+### Displaying Issues with Reporter Attribution
+
+Issues can be reported by authenticated users or anonymously (public reporting). Display logic must handle both cases.
+
+**Query Pattern**:
+
+```typescript
+// Query issues with optional reporter relation
+const issues = await db.query.issues.findMany({
+  with: {
+    machine: {
+      columns: { id: true, name: true },
+    },
+    reportedByUser: {
+      columns: { id: true, name: true },
+    },
+  },
+});
+```
+
+**Display Pattern**:
+
+```typescript
+// Issue list or detail page
+<p>
+  Reported by{" "}
+  {issue.reportedByUser?.name ?? issue.reporterName ?? "Anonymous"}
+</p>
+```
+
+**Key points**:
+
+- Check `reportedByUser` first (authenticated reporter)
+- Fall back to `reporterName` (anonymous with optional name)
+- Default to "Anonymous" if neither present
+- Never display "Unknown" - use "Anonymous" for clarity
+- `reportedBy` is NULL for public/anonymous reports
+- `reporterName` stores optional name from public reporting form
+
+---
+
 ## Type Boundaries
 
 ### Database to Application Type Conversion
