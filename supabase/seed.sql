@@ -91,7 +91,7 @@ INSERT INTO issues (id, machine_id, title, description, status, severity, create
   (
     '10000000-0000-0000-0000-000000000002',
     '33333333-3333-4333-8333-333333333333',
-    'Long Timeline Test Issue (Thing''s Box)',
+    'Ball stuck in Thing''s box',
     'Extended sample issue with many timeline updates so contributors can preview the GitHub-style timeline layout.',
     'new',
     'unplayable',

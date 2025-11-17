@@ -286,20 +286,25 @@ test.describe("Issues System", () => {
       await page.getByTestId("assignee-picker-trigger").click();
       await page.getByTestId("assignee-search-input").fill("member");
       await page
-        .getByTestId(/assignee-option-/)
+        .locator('[aria-label="Assignee options"]')
+        .getByRole("button", { name: /Member User/ })
         .first()
         .click();
       await expect(page.getByTestId("assignee-picker-trigger")).toContainText(
         "Member User"
       );
-      await expect(page.getByText(/Assigned to Member User/)).toBeVisible();
+      await expect(
+        page.locator("div").filter({ hasText: /^Assigned to Member User$/ })
+      ).toBeVisible();
 
       await page.getByTestId("assignee-picker-trigger").click();
       await page.getByTestId("assignee-option-unassigned").click();
       await expect(page.getByTestId("assignee-picker-trigger")).toContainText(
         "Unassigned"
       );
-      await expect(page.getByText(/Unassigned/)).toBeVisible();
+      await expect(
+        page.locator("div").filter({ hasText: /^Unassigned$/ })
+      ).toBeVisible();
     });
   });
 
