@@ -286,7 +286,8 @@ test.describe("Issues System", () => {
       await page.getByTestId("assignee-picker-trigger").click();
       await page.getByTestId("assignee-search-input").fill("member");
       await page
-        .getByTestId(/assignee-option-/)
+        .locator('[aria-label="Assignee options"]')
+        .getByRole("button", { name: /Member User/ })
         .first()
         .click();
       await expect(page.getByTestId("assignee-picker-trigger")).toContainText(
