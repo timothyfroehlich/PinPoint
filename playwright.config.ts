@@ -9,13 +9,17 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
 
+  // Global setup: Reset database before all tests
+  globalSetup: "./e2e/global-setup.ts",
+
   // Run tests in files in parallel
   fullyParallel: !process.env.CI,
 
   // Short, developer-friendly timeouts
   timeout: 10 * 1000, // 10s per test
   expect: {
-    timeout: 2 * 1000, // 2s for expect()
+    // CI machines are slower; give them a longer window before failing
+    timeout: process.env.CI ? 5 * 1000 : 2 * 1000,
   },
 
   // Fail the build on CI if you accidentally left test.only in the source code
