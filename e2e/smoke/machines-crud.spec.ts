@@ -5,6 +5,7 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { loginAs } from "../support/actions";
 import { cleanupTestEntities, extractIdFromUrl } from "../support/cleanup";
 
 const createdMachineIds = new Set<string>();
@@ -21,11 +22,17 @@ test.describe("Machines CRUD", () => {
 
   // Login before each test (required for protected routes)
   test.beforeEach(async ({ page }) => {
-    await page.goto("/login");
-    await page.getByLabel("Email").fill("member@test.com");
-    await page.getByLabel("Password").fill("TestPassword123");
-    await page.getByRole("button", { name: "Sign In" }).click();
-    await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
+    await loginAs(page);
+  });
+
+  test.afterEach(async ({ request }) => {
+    if (!createdMachineIds.size) {
+      return;
+    }
+    await cleanupTestEntities(request, {
+      machineIds: Array.from(createdMachineIds),
+    });
+    createdMachineIds.clear();
   });
 
   test.afterEach(async ({ request }) => {
@@ -125,6 +132,12 @@ test.describe("Machines CRUD", () => {
   test("should validate required machine name", async ({ page }) => {
     // Navigate to create machine page
     await page.goto("/machines/new");
+
+    // Wait for page to load
+    await expect(page).toHaveURL("/machines/new");
+    await expect(
+      page.getByRole("heading", { name: "Add New Machine" })
+    ).toBeVisible();
 
     // Try to submit without filling name
     // Note: HTML5 validation will prevent submission

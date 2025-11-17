@@ -9,6 +9,9 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
 
+  // Global setup: Reset database before all tests
+  globalSetup: "./e2e/global-setup.ts",
+
   // Run tests in files in parallel
   fullyParallel: !process.env.CI,
 
