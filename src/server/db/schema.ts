@@ -77,6 +77,7 @@ export const issues = pgTable(
       .notNull()
       .default("playable"),
     reportedBy: uuid("reported_by").references(() => userProfiles.id),
+    reporterName: text("reporter_name"),
     assignedTo: uuid("assigned_to").references(() => userProfiles.id),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })

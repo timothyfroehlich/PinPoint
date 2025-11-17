@@ -118,6 +118,15 @@ These make MVP practical for daily use:
 - Effort: Trivial (<1 day)
 - Impact: Follow-up capability
 
+**Rate Limiting for Public Reporting**
+
+- Problem: Anonymous reporting could be abused with spam submissions
+- Solution: Implement rate limiting on `/report` endpoint
+- Scope: IP-based rate limiting (e.g., 5 submissions per hour per IP), consider Supabase Edge Functions or Cloudflare rate limiting
+- Effort: Small (1-2 days)
+- Impact: Prevents abuse without hampering legitimate use
+- Status: Deferred until abuse is observed (MVP launched without rate limiting)
+
 **Recent Issues Per Machine**
 
 - Problem: Machine page doesn't show issue history

@@ -156,8 +156,11 @@ export default async function IssueDetailPage({
               {severityCopy[issue.severity]}
             </Badge>
             <p className="text-sm text-on-surface-variant">
-              Opened by {issue.reportedByUser?.name ?? "Unknown"} on{" "}
-              {new Date(issue.createdAt).toLocaleDateString()}
+              Opened by{" "}
+              {issue.reportedByUser?.name ??
+                issue.reporterName ??
+                "Anonymous"}{" "}
+              on {new Date(issue.createdAt).toLocaleDateString()}
             </p>
           </div>
           <div className="mt-4 grid gap-2 text-sm text-on-surface">
@@ -172,7 +175,11 @@ export default async function IssueDetailPage({
             </div>
             <div className="flex flex-wrap gap-1">
               <span className="font-semibold">Reported by:</span>
-              <span>{issue.reportedByUser?.name ?? "Unknown"}</span>
+              <span>
+                {issue.reportedByUser?.name ??
+                  issue.reporterName ??
+                  "Anonymous"}
+              </span>
             </div>
             <div className="flex flex-wrap gap-1 text-on-surface-variant">
               <span className="font-semibold text-on-surface">Reported:</span>

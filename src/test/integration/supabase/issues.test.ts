@@ -396,6 +396,113 @@ describe("Issues CRUD Operations (PGlite)", () => {
     });
   });
 
+  describe("Anonymous Issue Reporting", () => {
+    it("should create an issue without reportedBy (anonymous)", async () => {
+      const db = await getTestDb();
+
+      const [issue] = await db
+        .insert(issues)
+        .values({
+          title: "Anonymous Issue",
+          description: "Reported by public user",
+          machineId: testMachine.id,
+          severity: "playable",
+          reportedBy: null, // Anonymous
+          reporterName: null,
+          status: "new",
+        })
+        .returning();
+
+      expect(issue).toBeDefined();
+      expect(issue.title).toBe("Anonymous Issue");
+      expect(issue.reportedBy).toBeNull();
+      expect(issue.reporterName).toBeNull();
+    });
+
+    it("should create an issue with reporter name (public with name)", async () => {
+      const db = await getTestDb();
+
+      const [issue] = await db
+        .insert(issues)
+        .values({
+          title: "Public Issue with Name",
+          description: "Reported by public user with name",
+          machineId: testMachine.id,
+          severity: "unplayable",
+          reportedBy: null, // No user account
+          reporterName: "John Doe", // But has a name
+          status: "new",
+        })
+        .returning();
+
+      expect(issue).toBeDefined();
+      expect(issue.title).toBe("Public Issue with Name");
+      expect(issue.reportedBy).toBeNull();
+      expect(issue.reporterName).toBe("John Doe");
+    });
+
+    it("should query anonymous issues and show in member issue lists", async () => {
+      const db = await getTestDb();
+
+      // Create both authenticated and anonymous issues
+      await db.insert(issues).values([
+        {
+          title: "Member Issue",
+          machineId: testMachine.id,
+          severity: "minor",
+          reportedBy: testUser.id,
+          status: "new",
+        },
+        {
+          title: "Anonymous Issue",
+          machineId: testMachine.id,
+          severity: "playable",
+          reportedBy: null,
+          reporterName: null,
+          status: "new",
+        },
+        {
+          title: "Public Issue with Name",
+          machineId: testMachine.id,
+          severity: "unplayable",
+          reportedBy: null,
+          reporterName: "Jane Smith",
+          status: "new",
+        },
+      ]);
+
+      // Query all issues (as members would see)
+      const allIssues = await db.query.issues.findMany({
+        where: eq(issues.machineId, testMachine.id),
+        with: {
+          reportedByUser: {
+            columns: { name: true },
+          },
+        },
+      });
+
+      expect(allIssues).toHaveLength(3);
+
+      const memberIssue = allIssues.find((i) => i.title === "Member Issue");
+      const anonIssue = allIssues.find((i) => i.title === "Anonymous Issue");
+      const publicIssue = allIssues.find(
+        (i) => i.title === "Public Issue with Name"
+      );
+
+      // Member issue has reportedByUser
+      expect(memberIssue?.reportedByUser?.name).toBe("Test User");
+      expect(memberIssue?.reporterName).toBeUndefined();
+
+      // Anonymous issue has neither
+      expect(anonIssue?.reportedByUser).toBeNull();
+      expect(anonIssue?.reporterName).toBeNull();
+
+      // Public issue has reporterName but no reportedByUser
+      expect(publicIssue?.reportedByUser).toBeNull();
+      expect(publicIssue?.reporterName).toBe("Jane Smith");
+    });
+  });
+
   describe("Cascade Deletion", () => {
     it("should delete issues when machine is deleted", async () => {
       const db = await getTestDb();

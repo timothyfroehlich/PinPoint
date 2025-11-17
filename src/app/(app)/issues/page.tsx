@@ -187,7 +187,9 @@ export default async function IssuesPage({
                           <span>•</span>
                           <span>
                             Reported by{" "}
-                            {issue.reportedByUser?.name ?? "Unknown User"}
+                            {issue.reportedByUser?.name ??
+                              issue.reporterName ??
+                              "Anonymous"}
                           </span>
                           <span>•</span>
                           <span>
