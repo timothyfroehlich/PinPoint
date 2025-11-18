@@ -35,16 +35,6 @@ test.describe("Machines CRUD", () => {
     createdMachineIds.clear();
   });
 
-  test.afterEach(async ({ request }) => {
-    if (!createdMachineIds.size) {
-      return;
-    }
-    await cleanupTestEntities(request, {
-      machineIds: Array.from(createdMachineIds),
-    });
-    createdMachineIds.clear();
-  });
-
   test("should display machine list page", async ({ page }) => {
     // Navigate to machines page
     await page.goto("/machines");
