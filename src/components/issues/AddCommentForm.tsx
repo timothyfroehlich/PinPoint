@@ -16,7 +16,7 @@ export function AddCommentForm({
       <AddCommentSubmitButton />
       <Input
         name="comment"
-        placeholder="Add comment..."
+        placeholder="Leave a comment..."
         required
         minLength={1}
         className="flex-1"

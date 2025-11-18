@@ -64,7 +64,7 @@ export function IssueSidebar({
               </div>
             </div>
 
-            {/* Assignee */}
+            {/* Assignee, Status, Severity */}
             <div>
               <SidebarActions issue={issue} allUsers={allUsers} />
             </div>
@@ -80,20 +80,6 @@ export function IssueSidebar({
             </div>
 
             {/* Created */}
-            <div>
-              <div className="text-xs font-semibold text-on-surface-variant mb-2">
-                Created
-              </div>
-              <div className="text-sm text-on-surface">
-                {new Date(issue.createdAt).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </div>
-            </div>
-
-            {/* Updated (Created again as shown in mockup) */}
             <div>
               <div className="text-xs font-semibold text-on-surface-variant mb-2">
                 Created
