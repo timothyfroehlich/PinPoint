@@ -1,5 +1,5 @@
 import React from "react";
-import { Textarea } from "~/components/ui/textarea";
+import { Input } from "~/components/ui/input";
 import { addCommentAction } from "~/app/(app)/issues/actions";
 import { AddCommentSubmitButton } from "~/components/issues/AddCommentSubmitButton";
 
@@ -11,18 +11,16 @@ export function AddCommentForm({
   issueId,
 }: AddCommentFormProps): React.JSX.Element {
   return (
-    <form action={addCommentAction} className="space-y-3">
+    <form action={addCommentAction} className="flex gap-2">
       <input type="hidden" name="issueId" value={issueId} />
-      <Textarea
+      <AddCommentSubmitButton />
+      <Input
         name="comment"
-        placeholder="Leave a comment..."
+        placeholder="Add comment..."
         required
         minLength={1}
-        className="min-h-32"
+        className="flex-1"
       />
-      <div className="flex justify-end">
-        <AddCommentSubmitButton />
-      </div>
     </form>
   );
 }

@@ -1,7 +1,5 @@
 import type React from "react";
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { issues, userProfiles, authUsers } from "~/server/db/schema";
@@ -106,7 +104,7 @@ export default async function IssueDetailPage({
 
   return (
     <main className="min-h-screen bg-surface py-8">
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto max-w-7xl px-4">
         {/* Flash message */}
         {flash && (
           <div
@@ -120,68 +118,50 @@ export default async function IssueDetailPage({
           </div>
         )}
 
-        {/* Back button */}
-        <Link
-          href="/issues"
-          className="mb-4 inline-flex items-center gap-2 text-sm text-on-surface-variant hover:text-on-surface"
-        >
-          <ArrowLeft className="size-4" />
-          Back to Issues
-        </Link>
-
-        {/* Header */}
-        <div className="mb-4">
-          <h1 className="text-3xl font-bold text-on-surface flex items-center gap-2">
-            {issue.title}
+        {/* Page Title */}
+        <div className="mb-6">
+          <h1 className="text-sm text-on-surface-variant">
+            Professional issue details page
           </h1>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
+        </div>
+
+        {/* Issue Header */}
+        <div className="mb-8">
+          <h2 className="text-4xl font-bold text-on-surface mb-2">
+            {issue.title}
+          </h2>
+          <p className="text-lg text-on-surface-variant mb-3">
+            {issue.machine.name}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm text-on-surface-variant">Status:</span>
             <Badge
               data-testid="issue-status-badge"
-              className={`px-2 py-1 text-sm font-semibold ${
+              className={`px-3 py-1 text-sm font-semibold ${
                 issue.status === "resolved"
                   ? "bg-green-100 text-green-800 border-green-300"
                   : issue.status === "in_progress"
                     ? "bg-blue-100 text-blue-800 border-blue-300"
-                    : "bg-gray-100 text-gray-800 border-gray-300"
+                    : "bg-blue-100 text-blue-800 border-blue-300"
               }`}
             >
               {issue.status === "in_progress"
                 ? "In Progress"
                 : issue.status.charAt(0).toUpperCase() + issue.status.slice(1)}
             </Badge>
+            <span className="text-sm text-on-surface-variant ml-2">
+              Severity:
+            </span>
             <Badge
               data-testid="issue-severity-badge"
-              className={`border px-2 py-1 text-sm font-semibold ${severityClasses[issue.severity]}`}
+              className={`border px-3 py-1 text-sm font-semibold ${severityClasses[issue.severity]}`}
             >
               {severityCopy[issue.severity]}
             </Badge>
-            <p className="text-sm text-on-surface-variant">
-              Opened by {issue.reportedByUser?.name ?? "Unknown"} on{" "}
-              {new Date(issue.createdAt).toLocaleDateString()}
-            </p>
-          </div>
-          <div className="mt-4 grid gap-2 text-sm text-on-surface">
-            <div className="flex flex-wrap gap-1">
-              <span className="font-semibold">Machine:</span>
-              <Link
-                href={`/machines/${issue.machine.id}`}
-                className="text-primary underline-offset-2 hover:underline"
-              >
-                {issue.machine.name}
-              </Link>
-            </div>
-            <div className="flex flex-wrap gap-1">
-              <span className="font-semibold">Reported by:</span>
-              <span>{issue.reportedByUser?.name ?? "Unknown"}</span>
-            </div>
-            <div className="flex flex-wrap gap-1 text-on-surface-variant">
-              <span className="font-semibold text-on-surface">Reported:</span>
-              <span>{new Date(issue.createdAt).toLocaleString()}</span>
-            </div>
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-8">
+        <div className="flex flex-col lg:flex-row gap-6">
           {/* Main Content (Timeline) */}
           <IssueTimeline issue={issue} />
 
