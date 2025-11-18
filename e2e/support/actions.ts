@@ -25,3 +25,21 @@ export async function loginAs(
   await expect(page).toHaveURL("/dashboard");
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
 }
+
+/**
+ * Ensures a test page is authenticated. If not, logs in automatically.
+ * Useful for scenarios where previous tests logged out the session.
+ */
+export async function ensureLoggedIn(
+  page: Page,
+  options?: LoginOptions
+): Promise<void> {
+  await page.goto("/dashboard");
+  const currentUrl = page.url();
+  if (currentUrl.includes("/login")) {
+    await loginAs(page, options);
+    return;
+  }
+
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+}

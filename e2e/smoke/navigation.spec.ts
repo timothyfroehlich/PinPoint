@@ -24,9 +24,9 @@ test.describe.serial("Navigation", () => {
     await expect(nav.getByRole("link", { name: "Sign In" })).toBeVisible();
     await expect(nav.getByRole("link", { name: "Sign Up" })).toBeVisible();
 
-    // Verify quick links are NOT visible
-    await expect(nav.getByRole("link", { name: /Issues/i })).not.toBeVisible();
-    await expect(nav.getByRole("link", { name: /Report/i })).not.toBeVisible();
+    // Verify Report Issue shortcut is available to guests, but other quick links stay hidden
+    await expect(nav.getByRole("link", { name: "Report Issue" })).toBeVisible();
+    await expect(nav.getByRole("link", { name: /Issues/i })).toHaveCount(0);
   });
 
   test("authenticated navigation - show quick links and user menu", async ({
