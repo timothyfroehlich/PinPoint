@@ -34,7 +34,6 @@ test.describe("Public Issue Reporting", () => {
         text: option.text,
       }));
     });
-    console.log("machine options", options);
     await select.selectOption({ label: "Medieval Madness" });
     const issueTitle = `${PUBLIC_PREFIX} ${Date.now()}`;
     await page.getByLabel("Issue Title *").fill(issueTitle);
