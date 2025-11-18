@@ -508,6 +508,7 @@ export async function addCommentAction(formData: FormData): Promise<void> {
       issueId,
       authorId: user.id,
       content: comment,
+      isSystem: false,
     });
     await setFlash({ type: "success", message: "Comment added" });
   } catch (error) {

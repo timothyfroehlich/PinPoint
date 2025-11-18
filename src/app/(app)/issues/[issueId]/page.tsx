@@ -71,8 +71,8 @@ export default async function IssueDetailPage({
           },
         },
         comments: {
-          orderBy: (comments, { desc: orderDesc }) => [
-            orderDesc(comments.createdAt),
+          orderBy: (comments, { asc: orderAsc }) => [
+            orderAsc(comments.createdAt),
           ],
           with: {
             author: {

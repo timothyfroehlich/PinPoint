@@ -69,5 +69,5 @@ export const assignIssueSchema = z.object({
  */
 export const addCommentSchema = z.object({
   issueId: uuidish,
-  comment: z.string().min(1, "Comment cannot be empty"),
+  comment: z.string().trim().min(1, "Comment cannot be empty"),
 });
