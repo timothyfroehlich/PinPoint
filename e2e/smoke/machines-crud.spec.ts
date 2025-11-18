@@ -5,7 +5,7 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { loginAs } from "../support/actions";
+import { ensureLoggedIn } from "../support/actions";
 import { cleanupTestEntities, extractIdFromUrl } from "../support/cleanup";
 
 const createdMachineIds = new Set<string>();
@@ -22,7 +22,7 @@ test.describe("Machines CRUD", () => {
 
   // Login before each test (required for protected routes)
   test.beforeEach(async ({ page }) => {
-    await loginAs(page);
+    await ensureLoggedIn(page);
   });
 
   test.afterEach(async ({ request }) => {
