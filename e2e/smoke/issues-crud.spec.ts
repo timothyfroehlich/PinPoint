@@ -10,13 +10,9 @@ import { loginAs } from "../support/actions";
 import { cleanupTestEntities, extractIdFromUrl } from "../support/cleanup";
 
 async function selectFirstMachine(page: Page): Promise<void> {
-  const option = page.locator("#machineId option").nth(1);
-  await option.waitFor({ state: "attached" });
-  const value = await option.evaluate((node) => {
-    const opt = node as HTMLOptionElement;
-    return opt.value;
-  });
-  await page.locator("#machineId").selectOption(value);
+  // Select "The Addams Family" to avoid contaminating Medieval Madness
+  // which should remain "Operational" for the machines status test
+  await page.locator("#machineId").selectOption({ label: "The Addams Family" });
 }
 
 const createdIssueIds = new Set<string>();
@@ -293,8 +289,9 @@ test.describe("Issues System", () => {
       await expect(page.getByTestId("assignee-picker-trigger")).toContainText(
         "Member User"
       );
+      // Wait for timeline event to appear (use .last() to avoid flash message)
       await expect(
-        page.locator("div").filter({ hasText: /^Assigned to Member User$/ })
+        page.getByText(/^Assigned to Member User$/).last()
       ).toBeVisible();
 
       await page.getByTestId("assignee-picker-trigger").click();
@@ -302,9 +299,8 @@ test.describe("Issues System", () => {
       await expect(page.getByTestId("assignee-picker-trigger")).toContainText(
         "Unassigned"
       );
-      await expect(
-        page.locator("div").filter({ hasText: /^Unassigned$/ })
-      ).toBeVisible();
+      // Wait for timeline event to appear (use .last() to avoid flash message)
+      await expect(page.getByText(/^Unassigned$/).last()).toBeVisible();
     });
   });
 
