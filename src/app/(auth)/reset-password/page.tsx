@@ -5,57 +5,57 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { loginAction } from "~/app/(auth)/actions";
+import { resetPasswordAction } from "~/app/(auth)/actions";
 import { readFlash } from "~/lib/flash";
 import { createClient } from "~/lib/supabase/server";
-import { TestAdminButton } from "./TestAdminButton";
 
 /**
- * Login Page
+ * Reset Password Page
  *
- * Email/password authentication with "Remember Me" option.
+ * Set a new password after clicking the reset link from email.
+ * User must be authenticated via the reset link token.
  * Progressive enhancement - works without JavaScript.
  */
-export default async function LoginPage(): Promise<React.JSX.Element> {
-  // Check if already logged in
+export default async function ResetPasswordPage(): Promise<React.JSX.Element> {
+  // Verify user is authenticated via reset link
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (user) {
-    redirect("/dashboard");
+  // If not authenticated, redirect to forgot password page
+  if (!user) {
+    redirect("/forgot-password");
   }
 
   // Read flash message (if any)
   const flash = await readFlash();
 
   /**
-   * Client action wrapper for progressive enhancement
-   * Handles redirect after successful login
+   * Server action wrapper for progressive enhancement
    */
-  async function handleLogin(formData: FormData): Promise<void> {
+  async function handleResetPassword(formData: FormData): Promise<void> {
     "use server";
 
-    const result = await loginAction(formData);
+    const result = await resetPasswordAction(formData);
 
     if (result.ok) {
-      redirect("/dashboard");
+      // Success - redirect to login
+      redirect("/login");
     }
 
-    // If not ok, flash message was already set
-    // Redirect back to login to show the error
-    redirect("/login");
+    // Error - flash message was already set
+    redirect("/reset-password");
   }
 
   return (
     <Card className="border-outline-variant bg-surface shadow-xl">
       <CardHeader className="space-y-1">
         <CardTitle className="text-2xl font-bold text-on-surface">
-          Sign In
+          Set New Password
         </CardTitle>
         <p className="text-sm text-on-surface-variant">
-          Enter your credentials to access your account
+          Enter your new password below
         </p>
       </CardHeader>
 
@@ -74,58 +74,39 @@ export default async function LoginPage(): Promise<React.JSX.Element> {
           </div>
         )}
 
-        {/* Login form */}
-        <form action={handleLogin} className="space-y-4">
-          {/* Email */}
+        {/* Reset password form */}
+        <form action={handleResetPassword} className="space-y-4">
+          {/* New Password */}
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              placeholder="you@example.com"
-              autoComplete="email"
-              required
-              className="bg-surface-variant"
-            />
-          </div>
-
-          {/* Password */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
-              <Link
-                href="/forgot-password"
-                className="text-sm text-primary hover:underline"
-              >
-                Forgot password?
-              </Link>
-            </div>
+            <Label htmlFor="password">New Password</Label>
             <Input
               id="password"
               name="password"
               type="password"
-              autoComplete="current-password"
+              autoComplete="new-password"
               required
+              minLength={8}
+              maxLength={128}
               className="bg-surface-variant"
             />
+            <p className="text-xs text-on-surface-variant">
+              Must be at least 8 characters
+            </p>
           </div>
 
-          {/* Remember Me */}
-          <div className="flex items-center space-x-2">
-            <input
-              id="rememberMe"
-              name="rememberMe"
-              type="checkbox"
-              className="size-4 rounded border-outline text-primary focus:ring-2 focus:ring-primary"
-              defaultChecked
+          {/* Confirm Password */}
+          <div className="space-y-2">
+            <Label htmlFor="confirmPassword">Confirm Password</Label>
+            <Input
+              id="confirmPassword"
+              name="confirmPassword"
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={8}
+              maxLength={128}
+              className="bg-surface-variant"
             />
-            <Label
-              htmlFor="rememberMe"
-              className="text-sm font-normal cursor-pointer"
-            >
-              Remember me for 60 days
-            </Label>
           </div>
 
           {/* Submit button */}
@@ -134,21 +115,18 @@ export default async function LoginPage(): Promise<React.JSX.Element> {
             className="w-full bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container"
             size="lg"
           >
-            Sign In
+            Update Password
           </Button>
         </form>
 
-        {/* Test Admin Login Button */}
-        <TestAdminButton />
-
-        {/* Signup link */}
+        {/* Back to login link */}
         <div className="text-center text-sm text-on-surface-variant">
-          Don't have an account?{" "}
+          Remember your password?{" "}
           <Link
-            href="/signup"
+            href="/login"
             className="text-primary hover:underline font-medium"
           >
-            Sign up
+            Sign in
           </Link>
         </div>
       </CardContent>

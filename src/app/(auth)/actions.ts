@@ -4,7 +4,12 @@ import { redirect } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
 import { type Result, ok, err } from "~/lib/result";
 import { setFlash } from "~/lib/flash";
-import { loginSchema, signupSchema } from "./schemas";
+import {
+  loginSchema,
+  signupSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+} from "./schemas";
 import { log } from "~/lib/logger";
 
 /**
@@ -22,6 +27,10 @@ export type SignupResult = Result<
 >;
 
 export type LogoutResult = Result<void, "SERVER">;
+
+export type ForgotPasswordResult = Result<void, "VALIDATION" | "SERVER">;
+
+export type ResetPasswordResult = Result<void, "VALIDATION" | "SERVER">;
 
 /**
  * Login Action
@@ -274,5 +283,186 @@ export async function logoutAction(): Promise<void> {
   } finally {
     // Always redirect to home after logout attempt
     redirect("/");
+  }
+}
+
+/**
+ * Forgot Password Action
+ *
+ * Sends a password reset email to the user.
+ * The email contains a link to reset the password.
+ *
+ * @param formData - Form data containing email
+ * @returns ForgotPasswordResult
+ */
+export async function forgotPasswordAction(
+  formData: FormData
+): Promise<ForgotPasswordResult> {
+  // Validate input
+  const parsed = forgotPasswordSchema.safeParse({
+    email: formData.get("email"),
+  });
+
+  if (!parsed.success) {
+    const firstError = parsed.error.issues[0];
+    log.warn(
+      { errors: parsed.error.issues, action: "forgot-password" },
+      "Forgot password validation failed"
+    );
+    await setFlash({
+      type: "error",
+      message: firstError?.message ?? "Invalid email address",
+    });
+    return err("VALIDATION", "Invalid input");
+  }
+
+  const { email } = parsed.data;
+
+  try {
+    const supabase = await createClient();
+
+    // Get redirect URL from environment or construct from request
+    const redirectTo = `${process.env["NEXT_PUBLIC_SITE_URL"] ?? "http://localhost:3000"}/reset-password`;
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo,
+    });
+
+    if (error) {
+      log.error(
+        { action: "forgot-password", error: error.message },
+        "Password reset email failed"
+      );
+      await setFlash({
+        type: "error",
+        message: "Failed to send reset email. Please try again.",
+      });
+      return err("SERVER", error.message);
+    }
+
+    log.info(
+      { email, action: "forgot-password" },
+      "Password reset email sent successfully"
+    );
+
+    // Always show success message even if email doesn't exist
+    // This prevents email enumeration attacks
+    await setFlash({
+      type: "success",
+      message:
+        "If an account exists with that email, you will receive a password reset link shortly.",
+    });
+
+    return ok(undefined);
+  } catch (error) {
+    log.error(
+      {
+        error: error instanceof Error ? error.message : "Unknown",
+        stack: error instanceof Error ? error.stack : undefined,
+        action: "forgot-password",
+      },
+      "Forgot password server error"
+    );
+    await setFlash({
+      type: "error",
+      message: "Something went wrong. Please try again.",
+    });
+    return err("SERVER", error instanceof Error ? error.message : "Unknown");
+  }
+}
+
+/**
+ * Reset Password Action
+ *
+ * Updates the user's password after they click the reset link.
+ * User must be authenticated via the reset link token.
+ *
+ * @param formData - Form data containing new password and confirmation
+ * @returns ResetPasswordResult
+ */
+export async function resetPasswordAction(
+  formData: FormData
+): Promise<ResetPasswordResult> {
+  // Validate input
+  const parsed = resetPasswordSchema.safeParse({
+    password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword"),
+  });
+
+  if (!parsed.success) {
+    const firstError = parsed.error.issues[0];
+    log.warn(
+      { errors: parsed.error.issues, action: "reset-password" },
+      "Reset password validation failed"
+    );
+    await setFlash({
+      type: "error",
+      message: firstError?.message ?? "Invalid input",
+    });
+    return err("VALIDATION", "Invalid input");
+  }
+
+  const { password } = parsed.data;
+
+  try {
+    const supabase = await createClient();
+
+    // Verify user is authenticated (should be authenticated via reset link)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      log.warn({ action: "reset-password" }, "User not authenticated");
+      await setFlash({
+        type: "error",
+        message:
+          "Invalid or expired reset link. Please request a new password reset.",
+      });
+      return err("SERVER", "Not authenticated");
+    }
+
+    // Update password
+    const { error } = await supabase.auth.updateUser({
+      password,
+    });
+
+    if (error) {
+      log.error(
+        { userId: user.id, action: "reset-password", error: error.message },
+        "Password update failed"
+      );
+      await setFlash({
+        type: "error",
+        message: "Failed to update password. Please try again.",
+      });
+      return err("SERVER", error.message);
+    }
+
+    log.info(
+      { userId: user.id, action: "reset-password" },
+      "Password updated successfully"
+    );
+
+    await setFlash({
+      type: "success",
+      message: "Password updated successfully! You can now sign in.",
+    });
+
+    return ok(undefined);
+  } catch (error) {
+    log.error(
+      {
+        error: error instanceof Error ? error.message : "Unknown",
+        stack: error instanceof Error ? error.stack : undefined,
+        action: "reset-password",
+      },
+      "Reset password server error"
+    );
+    await setFlash({
+      type: "error",
+      message: "Something went wrong. Please try again.",
+    });
+    return err("SERVER", error instanceof Error ? error.message : "Unknown");
   }
 }

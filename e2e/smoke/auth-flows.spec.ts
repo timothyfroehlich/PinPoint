@@ -1,10 +1,11 @@
 /**
  * E2E Tests: Authentication Flows
  *
- * Tests signup, login, protected routes, and logout functionality.
+ * Tests signup, login, protected routes, logout, and password reset functionality.
  */
 
 import { test, expect } from "@playwright/test";
+import { getPasswordResetLink, deleteAllMessages } from "../support/inbucket";
 
 test.describe("Authentication", () => {
   test("signup flow - create new account and access dashboard", async ({
@@ -219,5 +220,116 @@ test.describe("Authentication", () => {
       page.getByRole("heading", { name: "Dashboard" })
     ).toBeVisible();
     await expect(page.getByTestId("user-menu-name")).toBeVisible();
+  });
+
+  test("password reset flow - request reset and set new password", async ({
+    page,
+  }) => {
+    const testEmail = `reset-e2e-${Date.now()}@example.com`;
+    const oldPassword = "OldPassword123";
+    const newPassword = "NewPassword456";
+
+    // First, create a test user
+    await page.goto("/signup");
+    await page.getByLabel("Name").fill("Password Reset Test");
+    await page.getByLabel("Email").fill(testEmail);
+    await page.getByLabel("Password").fill(oldPassword);
+    await page.getByRole("button", { name: "Create Account" }).click();
+
+    // Wait for dashboard and sign out
+    await expect(page).toHaveURL("/dashboard");
+    await page.getByRole("button", { name: "Sign Out" }).click();
+    await expect(page).toHaveURL("/");
+
+    // Clean up any existing emails in Inbucket
+    await deleteAllMessages(testEmail);
+
+    // Navigate to login and click "Forgot password?"
+    await page.goto("/login");
+    await page.getByRole("link", { name: "Forgot password?" }).click();
+
+    // Verify we're on forgot password page
+    await expect(page).toHaveURL("/forgot-password");
+    await expect(
+      page.getByRole("heading", { name: "Reset Password" })
+    ).toBeVisible();
+
+    // Request password reset
+    await page.getByLabel("Email").fill(testEmail);
+    await page.getByRole("button", { name: "Send Reset Link" }).click();
+
+    // Should see success message
+    await expect(page).toHaveURL("/forgot-password");
+    await expect(
+      page.getByText(/you will receive a password reset link/i)
+    ).toBeVisible();
+
+    // Get reset link from Inbucket
+    const resetLink = await getPasswordResetLink(testEmail);
+    expect(resetLink).toBeTruthy();
+
+    if (!resetLink) {
+      throw new Error("Failed to get password reset link from Inbucket");
+    }
+
+    // Navigate to reset link
+    await page.goto(resetLink);
+
+    // Verify we're on reset password page
+    await expect(page).toHaveURL(/\/reset-password/);
+    await expect(
+      page.getByRole("heading", { name: "Set New Password" })
+    ).toBeVisible();
+
+    // Set new password
+    await page.getByLabel("New Password").fill(newPassword);
+    await page.getByLabel("Confirm Password").fill(newPassword);
+    await page.getByRole("button", { name: "Update Password" }).click();
+
+    // Should redirect to login with success message
+    await expect(page).toHaveURL("/login");
+    await expect(
+      page.getByText(/password updated successfully/i)
+    ).toBeVisible();
+
+    // Verify can login with new password
+    await page.getByLabel("Email").fill(testEmail);
+    await page.getByLabel("Password").fill(newPassword);
+    await page.getByRole("button", { name: "Sign In" }).click();
+
+    // Should successfully login
+    await expect(page).toHaveURL("/dashboard");
+    await expect(
+      page.getByRole("heading", { name: "Dashboard" })
+    ).toBeVisible();
+
+    // Sign out for cleanup
+    await page.getByRole("button", { name: "Sign Out" }).click();
+
+    // Clean up emails
+    await deleteAllMessages(testEmail);
+  });
+
+  test("password reset - expired/invalid link shows error", async ({
+    page,
+  }) => {
+    // Navigate directly to reset password page without valid token
+    await page.goto("/reset-password");
+
+    // Should redirect to forgot password page (because not authenticated)
+    await expect(page).toHaveURL("/forgot-password");
+  });
+
+  test("forgot password - validates email format", async ({ page }) => {
+    await page.goto("/forgot-password");
+
+    // Try to submit with invalid email
+    await page.getByLabel("Email").fill("not-an-email");
+    await page.getByRole("button", { name: "Send Reset Link" }).click();
+
+    // Browser validation should prevent submission
+    const emailInput = page.getByLabel("Email");
+    await expect(emailInput).toHaveAttribute("type", "email");
+    await expect(emailInput).toHaveAttribute("required");
   });
 });

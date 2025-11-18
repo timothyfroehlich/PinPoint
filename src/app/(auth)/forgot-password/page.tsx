@@ -5,18 +5,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { loginAction } from "~/app/(auth)/actions";
+import { forgotPasswordAction } from "~/app/(auth)/actions";
 import { readFlash } from "~/lib/flash";
 import { createClient } from "~/lib/supabase/server";
-import { TestAdminButton } from "./TestAdminButton";
 
 /**
- * Login Page
+ * Forgot Password Page
  *
- * Email/password authentication with "Remember Me" option.
+ * Request a password reset email.
  * Progressive enhancement - works without JavaScript.
  */
-export default async function LoginPage(): Promise<React.JSX.Element> {
+export default async function ForgotPasswordPage(): Promise<React.JSX.Element> {
   // Check if already logged in
   const supabase = await createClient();
   const {
@@ -31,31 +30,31 @@ export default async function LoginPage(): Promise<React.JSX.Element> {
   const flash = await readFlash();
 
   /**
-   * Client action wrapper for progressive enhancement
-   * Handles redirect after successful login
+   * Server action wrapper for progressive enhancement
    */
-  async function handleLogin(formData: FormData): Promise<void> {
+  async function handleForgotPassword(formData: FormData): Promise<void> {
     "use server";
 
-    const result = await loginAction(formData);
+    const result = await forgotPasswordAction(formData);
 
     if (result.ok) {
-      redirect("/dashboard");
+      // Success - show message and stay on page
+      redirect("/forgot-password");
     }
 
-    // If not ok, flash message was already set
-    // Redirect back to login to show the error
-    redirect("/login");
+    // Error - flash message was already set
+    redirect("/forgot-password");
   }
 
   return (
     <Card className="border-outline-variant bg-surface shadow-xl">
       <CardHeader className="space-y-1">
         <CardTitle className="text-2xl font-bold text-on-surface">
-          Sign In
+          Reset Password
         </CardTitle>
         <p className="text-sm text-on-surface-variant">
-          Enter your credentials to access your account
+          Enter your email address and we'll send you a link to reset your
+          password
         </p>
       </CardHeader>
 
@@ -74,8 +73,8 @@ export default async function LoginPage(): Promise<React.JSX.Element> {
           </div>
         )}
 
-        {/* Login form */}
-        <form action={handleLogin} className="space-y-4">
+        {/* Forgot password form */}
+        <form action={handleForgotPassword} className="space-y-4">
           {/* Email */}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
@@ -90,65 +89,24 @@ export default async function LoginPage(): Promise<React.JSX.Element> {
             />
           </div>
 
-          {/* Password */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
-              <Link
-                href="/forgot-password"
-                className="text-sm text-primary hover:underline"
-              >
-                Forgot password?
-              </Link>
-            </div>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              className="bg-surface-variant"
-            />
-          </div>
-
-          {/* Remember Me */}
-          <div className="flex items-center space-x-2">
-            <input
-              id="rememberMe"
-              name="rememberMe"
-              type="checkbox"
-              className="size-4 rounded border-outline text-primary focus:ring-2 focus:ring-primary"
-              defaultChecked
-            />
-            <Label
-              htmlFor="rememberMe"
-              className="text-sm font-normal cursor-pointer"
-            >
-              Remember me for 60 days
-            </Label>
-          </div>
-
           {/* Submit button */}
           <Button
             type="submit"
             className="w-full bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container"
             size="lg"
           >
-            Sign In
+            Send Reset Link
           </Button>
         </form>
 
-        {/* Test Admin Login Button */}
-        <TestAdminButton />
-
-        {/* Signup link */}
+        {/* Back to login link */}
         <div className="text-center text-sm text-on-surface-variant">
-          Don't have an account?{" "}
+          Remember your password?{" "}
           <Link
-            href="/signup"
+            href="/login"
             className="text-primary hover:underline font-medium"
           >
-            Sign up
+            Sign in
           </Link>
         </div>
       </CardContent>
