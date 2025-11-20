@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createClient } from "~/lib/supabase/server";
 import { type Result, ok, err } from "~/lib/result";
 import { setFlash } from "~/lib/flash";
@@ -321,8 +322,27 @@ export async function forgotPasswordAction(
   try {
     const supabase = await createClient();
 
-    // Get redirect URL from environment or construct from request
-    const redirectTo = `${process.env["NEXT_PUBLIC_SITE_URL"] ?? "http://localhost:3000"}/reset-password`;
+    // Get origin dynamically (dev server can run on 3000 or 3100)
+    const headersList = await headers();
+    const protocol =
+      headersList.get("x-forwarded-proto") ??
+      headersList.get("origin")?.split("://")[0] ??
+      "http";
+    const host =
+      headersList.get("x-forwarded-host") ?? headersList.get("host");
+    const fallback =
+      headersList.get("referer")?.split("/").slice(0, 3).join("/") ??
+      `http://127.0.0.1:${process.env["PORT"] ?? "3000"}`;
+    const origin =
+      process.env["NEXT_PUBLIC_SITE_URL"] ??
+      (host ? `${protocol}://${host}` : fallback);
+    log.info(
+      { action: "forgot-password", origin },
+      "Resolved password reset redirect origin"
+    );
+    const callbackUrl = new URL("/auth/callback", origin);
+    callbackUrl.searchParams.set("next", "/reset-password");
+    const redirectTo = callbackUrl.toString();
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo,

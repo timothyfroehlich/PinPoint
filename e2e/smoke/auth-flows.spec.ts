@@ -225,9 +225,14 @@ test.describe("Authentication", () => {
   test("password reset flow - request reset and set new password", async ({
     page,
   }) => {
+    // Increase timeout for this test - email delivery with exponential backoff can take up to 40s
+    test.setTimeout(40000);
     const testEmail = `reset-e2e-${Date.now()}@example.com`;
     const oldPassword = "OldPassword123";
     const newPassword = "NewPassword456";
+
+    // Clean up any existing emails before starting
+    await deleteAllMessages(testEmail);
 
     // First, create a test user
     await page.goto("/signup");
@@ -264,12 +269,12 @@ test.describe("Authentication", () => {
       page.getByText(/you will receive a password reset link/i)
     ).toBeVisible();
 
-    // Get reset link from Inbucket
+    // Get reset link from Mailpit
     const resetLink = await getPasswordResetLink(testEmail);
     expect(resetLink).toBeTruthy();
 
     if (!resetLink) {
-      throw new Error("Failed to get password reset link from Inbucket");
+      throw new Error("Failed to get password reset link from Mailpit");
     }
 
     // Navigate to reset link

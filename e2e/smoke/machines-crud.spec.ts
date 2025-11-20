@@ -64,15 +64,21 @@ test.describe("Machines CRUD", () => {
     // Verify status badges are displayed
     // Medieval Madness should be Operational (no open issues)
     const medievalCard = page.locator('a:has-text("Medieval Madness")');
-    await expect(medievalCard.getByText("Operational")).toBeVisible();
+    await expect(medievalCard.getByText("Operational")).toBeVisible({
+      timeout: 5000,
+    });
 
     // Attack from Mars should be Needs Service (playable/minor issues)
     const attackCard = page.locator('a:has-text("Attack from Mars")');
-    await expect(attackCard.getByText("Needs Service")).toBeVisible();
+    await expect(attackCard.getByText("Needs Service")).toBeVisible({
+      timeout: 5000,
+    });
 
     // The Addams Family should be Unplayable (broken flipper)
     const addamsCard = page.locator('a:has-text("The Addams Family")');
-    await expect(addamsCard.getByText("Unplayable")).toBeVisible();
+    await expect(addamsCard.getByText("Unplayable")).toBeVisible({
+      timeout: 5000,
+    });
   });
 
   test("should create a new machine", async ({ page }) => {
