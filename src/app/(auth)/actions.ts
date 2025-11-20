@@ -90,7 +90,7 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
 
     await setFlash({
       type: "success",
-      message: "Welcome back!",
+      message: "Signed in successfully",
     });
 
     // Return success (redirect happens in page component)

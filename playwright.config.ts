@@ -15,11 +15,10 @@ export default defineConfig({
   // Run tests in files in parallel
   fullyParallel: !process.env.CI,
 
-  // Short, developer-friendly timeouts
-  timeout: 10 * 1000, // 10s per test
+  // Short, developer-friendly timeouts (prefer fixing flakiness over padding)
+  timeout: 8 * 1000, // 8s per test
   expect: {
-    // CI machines are slower; give them a longer window before failing
-    timeout: process.env.CI ? 5 * 1000 : 2 * 1000,
+    timeout: process.env.CI ? 7 * 1000 : 4 * 1000,
   },
 
   // Fail the build on CI if you accidentally left test.only in the source code
@@ -48,8 +47,8 @@ export default defineConfig({
     screenshot: "only-on-failure",
 
     // Keep interactions snappy during dev
-    actionTimeout: 5 * 1000,
-    navigationTimeout: 8 * 1000,
+    actionTimeout: 4 * 1000,
+    navigationTimeout: 6 * 1000,
   },
 
   // Configure projects for major browsers
@@ -64,7 +63,8 @@ export default defineConfig({
   webServer: {
     command: "PORT=3100 npm run dev",
     url: "http://127.0.0.1:3100",
-    reuseExistingServer: !process.env.CI,
+    // Always start a fresh server to avoid reusing another repo's dev server on the same port
+    reuseExistingServer: false,
     timeout: 120 * 1000, // 2 minutes
 
     // Show server output for debugging (critical for diagnosing startup failures)

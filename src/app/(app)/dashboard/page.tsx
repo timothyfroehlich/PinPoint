@@ -18,6 +18,14 @@ import {
   deriveMachineStatus,
   type IssueForStatus,
 } from "~/lib/machines/status";
+import {
+  getIssueStatusLabel,
+  getIssueSeverityLabel,
+  getIssueStatusStyles,
+  getIssueSeverityStyles,
+  type IssueStatus,
+  type IssueSeverity,
+} from "~/lib/issues/status";
 
 /**
  * Member Dashboard Page (Protected Route)
@@ -145,10 +153,12 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
       <div className="border-b border-outline-variant bg-surface-container">
         <div className="container mx-auto px-4 py-6">
           <div>
-            <h1 className="text-3xl font-bold text-on-surface">Dashboard</h1>
-            <p className="mt-1 text-sm text-on-surface-variant">
-              Welcome back, {userProfile.name}
-            </p>
+            <h1
+              className="text-3xl font-bold text-on-surface"
+              data-testid="dashboard-title"
+            >
+              Dashboard
+            </h1>
           </div>
         </div>
       </div>
@@ -157,7 +167,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
       <div className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Quick Stats Section */}
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-3" data-testid="quick-stats">
             <h2 className="text-xl font-semibold text-on-surface mb-4">
               Quick Stats
             </h2>
@@ -173,7 +183,10 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-on-surface">
+                  <div
+                    className="text-3xl font-bold text-on-surface"
+                    data-testid="stat-open-issues-value"
+                  >
                     {totalOpenIssues}
                   </div>
                 </CardContent>
@@ -190,7 +203,10 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-on-surface">
+                  <div
+                    className="text-3xl font-bold text-on-surface"
+                    data-testid="stat-machines-needing-service-value"
+                  >
                     {machinesNeedingService}
                   </div>
                 </CardContent>
@@ -207,7 +223,10 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-on-surface">
+                  <div
+                    className="text-3xl font-bold text-on-surface"
+                    data-testid="stat-assigned-to-me-value"
+                  >
                     {myIssuesCount}
                   </div>
                 </CardContent>
@@ -230,10 +249,13 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-3" data-testid="assigned-issues-list">
                 {assignedIssues.map((issue) => (
                   <Link key={issue.id} href={`/issues/${issue.id}`}>
-                    <Card className="border-outline-variant hover:border-primary transition-colors cursor-pointer">
+                    <Card
+                      className="border-outline-variant hover:border-primary transition-colors cursor-pointer"
+                      data-testid="assigned-issue-card"
+                    >
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1">
@@ -247,28 +269,21 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                           <div className="flex gap-2">
                             {/* Status Badge */}
                             <Badge
-                              className={`px-2 py-1 text-xs font-semibold ${
-                                issue.status === "in_progress"
-                                  ? "bg-blue-100 text-blue-800 border-blue-300"
-                                  : "bg-gray-100 text-gray-800 border-gray-300"
-                              }`}
+                              className={`px-2 py-1 text-xs font-semibold ${getIssueStatusStyles(
+                                issue.status as IssueStatus
+                              )}`}
                             >
-                              {issue.status === "in_progress"
-                                ? "In Progress"
-                                : "New"}
+                              {getIssueStatusLabel(issue.status as IssueStatus)}
                             </Badge>
                             {/* Severity Badge */}
                             <Badge
-                              className={`px-2 py-1 text-xs font-semibold ${
-                                issue.severity === "unplayable"
-                                  ? "bg-red-100 text-red-800 border-red-300"
-                                  : issue.severity === "playable"
-                                    ? "bg-yellow-100 text-yellow-800 border-yellow-300"
-                                    : "bg-blue-100 text-blue-800 border-blue-300"
-                              }`}
+                              className={`px-2 py-1 text-xs font-semibold ${getIssueSeverityStyles(
+                                issue.severity as IssueSeverity
+                              )}`}
                             >
-                              {issue.severity.charAt(0).toUpperCase() +
-                                issue.severity.slice(1)}
+                              {getIssueSeverityLabel(
+                                issue.severity as IssueSeverity
+                              )}
                             </Badge>
                           </div>
                         </div>
@@ -295,24 +310,27 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-3" data-testid="unplayable-machines-list">
                 {unplayableMachines.map((machine) => (
                   <Link key={machine.id} href={`/machines/${machine.id}`}>
-                    <Card className="border-red-300 bg-red-50 hover:border-red-500 transition-colors cursor-pointer">
+                    <Card
+                      className="border-error bg-error-container hover:border-error transition-colors cursor-pointer"
+                      data-testid="unplayable-machine-card"
+                    >
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1">
-                            <CardTitle className="text-base text-red-900 mb-1">
+                            <CardTitle className="text-base text-on-error-container mb-1">
                               {machine.name}
                             </CardTitle>
-                            <p className="text-xs text-red-700">
+                            <p className="text-xs text-on-error-container">
                               {machine.unplayableIssuesCount} unplayable{" "}
                               {machine.unplayableIssuesCount === 1
                                 ? "issue"
                                 : "issues"}
                             </p>
                           </div>
-                          <XCircle className="size-5 text-red-600" />
+                          <XCircle className="size-5 text-error" />
                         </div>
                       </CardHeader>
                     </Card>
@@ -337,10 +355,16 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div
+                className="grid grid-cols-1 md:grid-cols-2 gap-3"
+                data-testid="recent-issues-list"
+              >
                 {recentIssues.map((issue) => (
                   <Link key={issue.id} href={`/issues/${issue.id}`}>
-                    <Card className="border-outline-variant hover:border-primary transition-colors cursor-pointer h-full">
+                    <Card
+                      className="border-outline-variant hover:border-primary transition-colors cursor-pointer h-full"
+                      data-testid="recent-issue-card"
+                    >
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1">
@@ -361,32 +385,21 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                           <div className="flex flex-col gap-2">
                             {/* Status Badge */}
                             <Badge
-                              className={`px-2 py-1 text-xs font-semibold ${
-                                issue.status === "resolved"
-                                  ? "bg-green-100 text-green-800 border-green-300"
-                                  : issue.status === "in_progress"
-                                    ? "bg-blue-100 text-blue-800 border-blue-300"
-                                    : "bg-gray-100 text-gray-800 border-gray-300"
-                              }`}
+                              className={`px-2 py-1 text-xs font-semibold ${getIssueStatusStyles(
+                                issue.status as IssueStatus
+                              )}`}
                             >
-                              {issue.status === "in_progress"
-                                ? "In Progress"
-                                : issue.status === "resolved"
-                                  ? "Resolved"
-                                  : "New"}
+                              {getIssueStatusLabel(issue.status as IssueStatus)}
                             </Badge>
                             {/* Severity Badge */}
                             <Badge
-                              className={`px-2 py-1 text-xs font-semibold ${
-                                issue.severity === "unplayable"
-                                  ? "bg-red-100 text-red-800 border-red-300"
-                                  : issue.severity === "playable"
-                                    ? "bg-yellow-100 text-yellow-800 border-yellow-300"
-                                    : "bg-blue-100 text-blue-800 border-blue-300"
-                              }`}
+                              className={`px-2 py-1 text-xs font-semibold ${getIssueSeverityStyles(
+                                issue.severity as IssueSeverity
+                              )}`}
                             >
-                              {issue.severity.charAt(0).toUpperCase() +
-                                issue.severity.slice(1)}
+                              {getIssueSeverityLabel(
+                                issue.severity as IssueSeverity
+                              )}
                             </Badge>
                           </div>
                         </div>

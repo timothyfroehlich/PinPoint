@@ -285,7 +285,7 @@ describe("Dashboard Queries (PGlite)", () => {
       const db = await getTestDb();
 
       // Create 4 machines
-      const [machine1, machine2, machine3, machine4] = await db
+      const [machine1, machine2, machine3] = await db
         .insert(machines)
         .values([
           createTestMachine({ name: "Machine 1" }),

@@ -34,12 +34,12 @@ test.describe("Authentication", () => {
     // Should redirect to dashboard after successful signup
     await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
 
-    // Verify dashboard content
+    // Verify dashboard content (quick stats present)
     await expect(
       page.getByRole("heading", { name: "Dashboard" })
     ).toBeVisible();
-    await expect(page.getByTestId("dashboard-user-name")).toBeVisible();
-    await expect(page.getByTestId("dashboard-user-email")).toBeVisible();
+    await expect(page.getByTestId("quick-stats")).toBeVisible();
+    await expect(page.getByTestId("stat-open-issues-value")).toBeVisible();
   });
 
   test("login flow - sign in with existing account", async ({ page }) => {
@@ -69,12 +69,12 @@ test.describe("Authentication", () => {
     // Should redirect to dashboard after successful login
     await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
 
-    // Verify dashboard content
+    // Verify dashboard content (quick stats present)
     await expect(
       page.getByRole("heading", { name: "Dashboard" })
     ).toBeVisible();
-    await expect(page.getByTestId("dashboard-user-name")).toBeVisible();
-    await expect(page.getByTestId("dashboard-user-email")).toBeVisible();
+    await expect(page.getByTestId("quick-stats")).toBeVisible();
+    await expect(page.getByTestId("stat-open-issues-value")).toBeVisible();
   });
 
   test("login flow - reject invalid credentials", async ({ page }) => {
@@ -117,8 +117,9 @@ test.describe("Authentication", () => {
       page.getByRole("heading", { name: "Dashboard" })
     ).toBeVisible();
 
-    // Click sign out button
-    await page.getByRole("button", { name: "Sign Out" }).click();
+    // Open user menu and click sign out
+    await page.getByTestId("user-menu-button").click();
+    await page.getByRole("menuitem", { name: "Sign Out" }).click();
 
     // Should redirect to home page
     await expect(page).toHaveURL("/");

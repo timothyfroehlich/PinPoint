@@ -5,9 +5,26 @@
  * unplayable machines, and quick stats after login.
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { loginAs } from "../support/actions";
-import { seededMember } from "../support/constants";
+
+async function getStatNumber(page: Page, testId: string): Promise<number> {
+  const rawText = await page.getByTestId(testId).innerText();
+  const value = Number.parseInt(rawText.replace(/[^0-9]/g, ""), 10);
+  expect(Number.isNaN(value)).toBe(false);
+  return value;
+}
+
+function ensureCardsOrEmpty(
+  cardsCount: number,
+  emptyStateCount: number,
+  label: string
+): void {
+  expect(cardsCount + emptyStateCount).toBeGreaterThan(0);
+  if (cardsCount === 0 && emptyStateCount === 0) {
+    throw new Error(`${label}: neither cards nor empty state rendered`);
+  }
+}
 
 test.describe.serial("Member Dashboard", () => {
   test("login redirects to dashboard", async ({ page }) => {
@@ -20,30 +37,25 @@ test.describe.serial("Member Dashboard", () => {
     ).toBeVisible();
   });
 
-  test("dashboard displays welcome message with user name", async ({
-    page,
-  }) => {
-    await loginAs(page);
-
-    // Verify welcome message with user's name
-    await expect(
-      page.getByText(`Welcome back, ${seededMember.name}`)
-    ).toBeVisible();
-  });
-
   test("dashboard displays quick stats section", async ({ page }) => {
     await loginAs(page);
 
-    // Verify Quick Stats heading
     await expect(
       page.getByRole("heading", { name: "Quick Stats" })
     ).toBeVisible();
+    const quickStats = page.getByTestId("quick-stats");
+    await expect(quickStats).toBeVisible();
 
-    // Verify all 3 stat cards exist
-    const main = page.getByRole("main");
-    await expect(main.getByText("Open Issues")).toBeVisible();
-    await expect(main.getByText("Machines Needing Service")).toBeVisible();
-    await expect(main.getByText("Assigned to Me")).toBeVisible();
+    const openIssues = await getStatNumber(page, "stat-open-issues-value");
+    const machinesNeedingService = await getStatNumber(
+      page,
+      "stat-machines-needing-service-value"
+    );
+    const assignedToMe = await getStatNumber(page, "stat-assigned-to-me-value");
+
+    expect(openIssues).toBeGreaterThanOrEqual(0);
+    expect(machinesNeedingService).toBeGreaterThanOrEqual(0);
+    expect(assignedToMe).toBeGreaterThanOrEqual(0);
   });
 
   test("dashboard displays assigned issues section", async ({ page }) => {
@@ -55,14 +67,23 @@ test.describe.serial("Member Dashboard", () => {
     ).toBeVisible();
 
     // Section should either show issues or empty state
-    const main = page.getByRole("main");
-    const emptyState = main.getByText("No issues assigned to you");
-    const hasEmptyState = (await emptyState.count()) > 0;
+    const emptyState = page.getByText("No issues assigned to you");
+    const cards = page.getByTestId("assigned-issue-card");
+    const cardsCount = await cards.count();
+    const emptyStateCount = await emptyState.count();
 
-    if (!hasEmptyState) {
-      // If not empty, should have issue cards that are clickable links
-      const issueCards = page.locator('a[href^="/issues/"]').first();
-      await expect(issueCards).toBeVisible();
+    ensureCardsOrEmpty(cardsCount, emptyStateCount, "Assigned issues");
+
+    const assignedCount = await getStatNumber(
+      page,
+      "stat-assigned-to-me-value"
+    );
+    if (assignedCount === 0) {
+      await expect(emptyState).toBeVisible();
+      expect(cardsCount).toBe(0);
+    } else {
+      expect(cardsCount).toBe(assignedCount);
+      await expect(cards.first()).toBeVisible();
     }
   });
 
@@ -75,14 +96,15 @@ test.describe.serial("Member Dashboard", () => {
     ).toBeVisible();
 
     // Section should either show machines or empty state
-    const main = page.getByRole("main");
-    const emptyState = main.getByText("All machines are playable");
-    const hasEmptyState = (await emptyState.count()) > 0;
+    const emptyState = page.getByText("All machines are playable");
+    const machineCards = page.getByTestId("unplayable-machine-card");
+    const cardsCount = await machineCards.count();
+    const emptyStateCount = await emptyState.count();
 
-    if (!hasEmptyState) {
-      // If not empty, should have machine cards that are clickable links
-      const machineCards = page.locator('a[href^="/machines/"]').first();
-      await expect(machineCards).toBeVisible();
+    ensureCardsOrEmpty(cardsCount, emptyStateCount, "Unplayable machines");
+
+    if (cardsCount > 0) {
+      await expect(machineCards.first()).toBeVisible();
     }
   });
 
@@ -97,14 +119,15 @@ test.describe.serial("Member Dashboard", () => {
     ).toBeVisible();
 
     // Section should either show issues or empty state
-    const main = page.getByRole("main");
-    const emptyState = main.getByText("No issues reported yet");
-    const hasEmptyState = (await emptyState.count()) > 0;
+    const emptyState = page.getByText("No issues reported yet");
+    const cards = page.getByTestId("recent-issue-card");
+    const cardsCount = await cards.count();
+    const emptyStateCount = await emptyState.count();
 
-    if (!hasEmptyState) {
-      // If not empty, should have issue cards that are clickable links
-      const issueCards = page.locator('a[href^="/issues/"]');
-      await expect(issueCards.first()).toBeVisible();
+    ensureCardsOrEmpty(cardsCount, emptyStateCount, "Recent issues");
+
+    if (cardsCount > 0) {
+      await expect(cards.first()).toBeVisible();
     }
   });
 
@@ -112,7 +135,7 @@ test.describe.serial("Member Dashboard", () => {
     await loginAs(page);
 
     // Check if there are any issue cards
-    const issueCards = page.locator('a[href^="/issues/"]');
+    const issueCards = page.getByTestId("recent-issue-card");
     const count = await issueCards.count();
 
     if (count > 0) {
@@ -132,7 +155,7 @@ test.describe.serial("Member Dashboard", () => {
     await loginAs(page);
 
     // Check if there are any machine cards (in unplayable section)
-    const machineCards = page.locator('a[href^="/machines/"]');
+    const machineCards = page.getByTestId("unplayable-machine-card");
     const count = await machineCards.count();
 
     if (count > 0) {
@@ -155,9 +178,6 @@ test.describe.serial("Member Dashboard", () => {
     // Dashboard should still be visible and functional
     await expect(
       page.getByRole("heading", { name: "Dashboard" })
-    ).toBeVisible();
-    await expect(
-      page.getByText(`Welcome back, ${seededMember.name}`)
     ).toBeVisible();
 
     // All sections should be visible (stacked vertically on mobile)
