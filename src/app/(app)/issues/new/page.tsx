@@ -52,17 +52,17 @@ export default async function NewIssuePage({
   const flash = await readFlash();
 
   return (
-    <main className="min-h-screen bg-surface py-8">
+    <main className="min-h-screen bg-background py-8">
       <div className="container mx-auto px-4 max-w-2xl">
-        <Card className="border-outline-variant bg-surface shadow-xl">
+        <Card className="shadow-xl">
           <CardHeader className="space-y-3">
             <div className="flex items-center gap-3">
               <Plus className="size-8 text-primary" strokeWidth={2.5} />
-              <CardTitle className="text-3xl font-bold text-on-surface">
+              <CardTitle className="text-3xl font-bold text-foreground">
                 Report Issue
               </CardTitle>
             </div>
-            <p className="text-sm text-on-surface-variant">
+            <p className="text-sm text-muted-foreground">
               Report a new issue with a pinball machine
             </p>
           </CardHeader>
@@ -85,7 +85,7 @@ export default async function NewIssuePage({
             <form action={createIssueAction} className="space-y-6">
               {/* Machine Selector */}
               <div className="space-y-2">
-                <Label htmlFor="machineId" className="text-on-surface">
+                <Label htmlFor="machineId" className="text-foreground">
                   Machine *
                 </Label>
                 <select
@@ -93,7 +93,7 @@ export default async function NewIssuePage({
                   name="machineId"
                   defaultValue={prefilledMachineId ?? allMachines[0]?.id ?? ""}
                   required
-                  className="w-full rounded-md border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
                 >
                   {prefilledMachineId == null && !allMachines.length && (
                     <option value="" disabled>
@@ -106,14 +106,14 @@ export default async function NewIssuePage({
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-on-surface-variant">
+                <p className="text-xs text-muted-foreground">
                   Select the machine with the issue
                 </p>
               </div>
 
               {/* Title */}
               <div className="space-y-2">
-                <Label htmlFor="title" className="text-on-surface">
+                <Label htmlFor="title" className="text-foreground">
                   Issue Title *
                 </Label>
                 <Input
@@ -123,13 +123,13 @@ export default async function NewIssuePage({
                   required
                   maxLength={200}
                   placeholder="Brief description of the issue"
-                  className="border-outline-variant bg-surface text-on-surface"
+                  className="border-input bg-background text-foreground"
                 />
               </div>
 
               {/* Description */}
               <div className="space-y-2">
-                <Label htmlFor="description" className="text-on-surface">
+                <Label htmlFor="description" className="text-foreground">
                   Description
                 </Label>
                 <Textarea
@@ -137,13 +137,13 @@ export default async function NewIssuePage({
                   name="description"
                   rows={4}
                   placeholder="Additional details about the issue (optional)"
-                  className="border-outline-variant bg-surface text-on-surface"
+                  className="border-input bg-background text-foreground"
                 />
               </div>
 
               {/* Severity */}
               <div className="space-y-2">
-                <Label htmlFor="severity" className="text-on-surface">
+                <Label htmlFor="severity" className="text-foreground">
                   Severity *
                 </Label>
                 <select
@@ -151,7 +151,7 @@ export default async function NewIssuePage({
                   name="severity"
                   defaultValue="playable"
                   required
-                  className="w-full rounded-md border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
                 >
                   <option value="minor">
                     Minor (cosmetic, doesn&apos;t affect gameplay)
@@ -163,7 +163,7 @@ export default async function NewIssuePage({
                     Unplayable (machine cannot be played)
                   </option>
                 </select>
-                <p className="text-xs text-on-surface-variant">
+                <p className="text-xs text-muted-foreground">
                   How severely does this issue affect the machine?
                 </p>
               </div>
@@ -180,7 +180,7 @@ export default async function NewIssuePage({
                   asChild
                   type="button"
                   variant="outline"
-                  className="border-outline-variant text-on-surface"
+                  className="border-input text-foreground"
                 >
                   <Link href="/issues">Cancel</Link>
                 </Button>

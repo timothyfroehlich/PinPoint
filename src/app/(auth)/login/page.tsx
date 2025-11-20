@@ -49,12 +49,12 @@ export default async function LoginPage(): Promise<React.JSX.Element> {
   }
 
   return (
-    <Card className="border-outline-variant bg-surface shadow-xl">
+    <Card className="shadow-xl">
       <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold text-on-surface">
+        <CardTitle className="text-2xl font-bold text-foreground">
           Sign In
         </CardTitle>
-        <p className="text-sm text-on-surface-variant">
+        <p className="text-sm text-muted-foreground">
           Enter your credentials to access your account
         </p>
       </CardHeader>
@@ -65,8 +65,8 @@ export default async function LoginPage(): Promise<React.JSX.Element> {
           <div
             className={`rounded-lg px-4 py-3 text-sm ${
               flash.type === "error"
-                ? "bg-error-container text-on-error-container"
-                : "bg-primary-container text-on-primary-container"
+                ? "bg-destructive/10 text-destructive"
+                : "bg-accent text-accent-foreground"
             }`}
             role="alert"
           >
@@ -86,7 +86,7 @@ export default async function LoginPage(): Promise<React.JSX.Element> {
               placeholder="you@example.com"
               autoComplete="email"
               required
-              className="bg-surface-variant"
+              className="bg-muted"
             />
           </div>
 
@@ -99,7 +99,7 @@ export default async function LoginPage(): Promise<React.JSX.Element> {
               type="password"
               autoComplete="current-password"
               required
-              className="bg-surface-variant"
+              className="bg-muted"
             />
           </div>
 
@@ -109,7 +109,7 @@ export default async function LoginPage(): Promise<React.JSX.Element> {
               id="rememberMe"
               name="rememberMe"
               type="checkbox"
-              className="size-4 rounded border-outline text-primary focus:ring-2 focus:ring-primary"
+              className="size-4 rounded border-input text-primary focus:ring-2 focus:ring-primary"
               defaultChecked
             />
             <Label
@@ -123,7 +123,7 @@ export default async function LoginPage(): Promise<React.JSX.Element> {
           {/* Submit button */}
           <Button
             type="submit"
-            className="w-full bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container"
+            className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
             size="lg"
           >
             Sign In
@@ -134,7 +134,7 @@ export default async function LoginPage(): Promise<React.JSX.Element> {
         <TestAdminButton />
 
         {/* Signup link */}
-        <div className="text-center text-sm text-on-surface-variant">
+        <div className="text-center text-sm text-muted-foreground">
           Don't have an account?{" "}
           <Link
             href="/signup"

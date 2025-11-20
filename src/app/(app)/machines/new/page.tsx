@@ -31,26 +31,26 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
   const flash = await readFlash();
 
   return (
-    <main className="min-h-screen bg-surface">
+    <main className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b border-outline-variant bg-surface-container">
+      <div className="border-b border-border bg-muted/40">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center gap-4">
             <Link href="/machines">
               <Button
                 variant="outline"
                 size="sm"
-                className="border-outline text-on-surface hover:bg-surface-variant"
+                className="border-input text-foreground hover:bg-accent"
               >
                 <ArrowLeft className="mr-2 size-4" />
                 Back
               </Button>
             </Link>
             <div>
-              <h1 className="text-3xl font-bold text-on-surface">
+              <h1 className="text-3xl font-bold text-foreground">
                 Add New Machine
               </h1>
-              <p className="mt-1 text-sm text-on-surface-variant">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Create a new pinball machine entry
               </p>
             </div>
@@ -60,9 +60,9 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
 
       {/* Form */}
       <div className="container mx-auto px-4 py-8">
-        <Card className="max-w-2xl border-outline-variant">
+        <Card className="max-w-2xl border-border shadow-sm">
           <CardHeader>
-            <CardTitle className="text-2xl text-on-surface">
+            <CardTitle className="text-2xl text-foreground">
               Machine Details
             </CardTitle>
           </CardHeader>
@@ -83,7 +83,7 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
             <form action={createMachineAction} className="space-y-6">
               {/* Machine Name */}
               <div className="space-y-2">
-                <Label htmlFor="name" className="text-on-surface">
+                <Label htmlFor="name" className="text-foreground">
                   Machine Name *
                 </Label>
                 <Input
@@ -92,10 +92,10 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
                   type="text"
                   required
                   placeholder="e.g., Medieval Madness"
-                  className="border-outline bg-surface text-on-surface placeholder:text-on-surface-variant"
+                  className="border-input bg-background text-foreground placeholder:text-muted-foreground"
                   autoFocus
                 />
-                <p className="text-xs text-on-surface-variant">
+                <p className="text-xs text-muted-foreground">
                   Enter the full name of the pinball machine
                 </p>
               </div>
@@ -112,7 +112,7 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
                   <Button
                     type="button"
                     variant="outline"
-                    className="w-full border-outline text-on-surface hover:bg-surface-variant"
+                    className="w-full border-input text-foreground hover:bg-accent"
                   >
                     Cancel
                   </Button>

@@ -1,0 +1,38 @@
+# Supabase Local Development Configuration Override
+# Secondary Worktree - Port Offset +1000
+
+# Unique project ID for this worktree
+project_id = "pinpoint-secondary"
+
+[api]
+enabled = true
+port = 55321  # Base 54321 + 1000
+
+[db]
+port = 55322  # Base 54322 + 1000
+shadow_port = 55320  # Base 54320 + 1000
+
+[db.pooler]
+enabled = false
+port = 55329  # Base 54329 + 1000
+
+[studio]
+enabled = false
+port = 55323  # Base 54323 + 1000
+
+[inbucket]
+enabled = true
+port = 55324  # Base 54324 + 1000
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3100"
+additional_redirect_urls = ["https://127.0.0.1:3100", "http://127.0.0.1:3100"]
+
+[edge_runtime]
+enabled = false
+inspector_port = 55438  # Base 54438 + 1000
+
+[analytics]
+enabled = false
+port = 55538  # Base 54538 + 1000

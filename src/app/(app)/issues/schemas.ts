@@ -57,6 +57,16 @@ export const updateIssueSeveritySchema = z.object({
 });
 
 /**
+ * Schema for updating issue priority
+ */
+export const updateIssuePrioritySchema = z.object({
+  issueId: uuidish,
+  priority: z.enum(["low", "medium", "high", "critical"], {
+    message: "Invalid priority level",
+  }),
+});
+
+/**
  * Schema for assigning issue to user
  */
 export const assignIssueSchema = z.object({

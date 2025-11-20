@@ -20,6 +20,7 @@ import {
   createIssueSchema,
   updateIssueStatusSchema,
   updateIssueSeveritySchema,
+  updateIssuePrioritySchema,
   assignIssueSchema,
   addCommentSchema,
 } from "./schemas";
@@ -354,6 +355,112 @@ export async function updateIssueSeverityAction(
     await setFlash({
       type: "error",
       message: "Failed to update severity",
+    });
+    redirect(`/issues/${issueId}`);
+  }
+}
+
+/**
+ * Update Issue Priority Action
+ *
+ * Updates issue priority and creates timeline event.
+ *
+ * @param formData - Form data with issueId and priority
+ */
+export async function updateIssuePriorityAction(
+  formData: FormData
+): Promise<void> {
+  // Auth check
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    await setFlash({ type: "error", message: "Unauthorized" });
+    redirect("/login");
+  }
+
+  // Validate input
+  const rawData = {
+    issueId: toOptionalString(formData.get("issueId")),
+    priority: toOptionalString(formData.get("priority")),
+  };
+
+  const validation = updateIssuePrioritySchema.safeParse(rawData);
+  if (!validation.success) {
+    const firstError = validation.error.issues[0];
+    await setFlash({
+      type: "error",
+      message: firstError?.message ?? "Invalid input",
+    });
+    redirect("/issues");
+  }
+
+  const { issueId, priority } = validation.data;
+
+  try {
+    // Get current issue to check old priority
+    const currentIssue = await db.query.issues.findFirst({
+      where: eq(issues.id, issueId),
+      columns: { priority: true, machineId: true },
+    });
+
+    if (!currentIssue) {
+      await setFlash({ type: "error", message: "Issue not found" });
+      redirect("/issues");
+    }
+
+    const oldPriority = currentIssue.priority;
+
+    // Update priority
+    await db
+      .update(issues)
+      .set({
+        priority,
+        updatedAt: new Date(),
+      })
+      .where(eq(issues.id, issueId));
+
+    // Create timeline event
+    await createTimelineEvent(
+      issueId,
+      `Priority changed from ${oldPriority} to ${priority}`
+    );
+
+    log.info(
+      {
+        issueId,
+        oldPriority,
+        newPriority: priority,
+        action: "updateIssuePriority",
+      },
+      "Issue priority updated"
+    );
+
+    await setFlash({
+      type: "success",
+      message: "Issue priority updated",
+    });
+    revalidatePath(`/issues/${issueId}`);
+    revalidatePath("/issues");
+    revalidatePath(`/machines/${currentIssue.machineId}`);
+
+    redirect(`/issues/${issueId}`);
+  } catch (error) {
+    if (isNextRedirectError(error)) {
+      throw error;
+    }
+    log.error(
+      {
+        error: error instanceof Error ? error.message : "Unknown",
+        action: "updateIssuePriority",
+      },
+      "Update issue priority error"
+    );
+    await setFlash({
+      type: "error",
+      message: "Failed to update priority",
     });
     redirect(`/issues/${issueId}`);
   }

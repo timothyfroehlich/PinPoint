@@ -1,7 +1,7 @@
 import type React from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Calendar, Clock } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { issues, userProfiles, authUsers } from "~/server/db/schema";
@@ -10,7 +10,12 @@ import { readFlash } from "~/lib/flash";
 import { Badge } from "~/components/ui/badge";
 import { IssueTimeline } from "~/components/issues/IssueTimeline";
 import { IssueSidebar } from "~/components/issues/IssueSidebar";
-import { type IssueWithAllRelations, type IssueSeverity } from "~/lib/types";
+import { SidebarLayout } from "~/components/layout/SidebarLayout";
+import {
+  type IssueWithAllRelations,
+  type IssueSeverity,
+  type IssuePriority,
+} from "~/lib/types";
 
 const severityCopy: Record<IssueSeverity, string> = {
   minor: "Minor",
@@ -19,9 +24,25 @@ const severityCopy: Record<IssueSeverity, string> = {
 };
 
 const severityClasses: Record<IssueSeverity, string> = {
-  minor: "bg-amber-50 text-amber-900 border-amber-200",
-  playable: "bg-blue-50 text-blue-900 border-blue-200",
-  unplayable: "bg-red-50 text-red-900 border-red-200",
+  minor: "bg-severity-minor text-severity-minor-text border-transparent",
+  playable:
+    "bg-severity-playable text-severity-playable-text border-transparent",
+  unplayable:
+    "bg-severity-unplayable text-severity-unplayable-text border-transparent",
+};
+
+const priorityCopy: Record<IssuePriority, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  critical: "Critical",
+};
+
+const priorityClasses: Record<IssuePriority, string> = {
+  low: "bg-slate-100 text-slate-700 border-transparent",
+  medium: "bg-blue-50 text-blue-700 border-transparent",
+  high: "bg-orange-50 text-orange-700 border-transparent",
+  critical: "bg-red-50 text-red-700 border-transparent",
 };
 
 /**
@@ -105,90 +126,112 @@ export default async function IssueDetailPage({
   const flash = await readFlash();
 
   return (
-    <main className="min-h-screen bg-surface py-8">
-      <div className="container mx-auto px-4">
-        {/* Flash message */}
-        {flash && (
-          <div
-            className={`mb-6 rounded-md border px-4 py-3 text-sm ${
-              flash.type === "error"
-                ? "border-red-300 bg-red-50 text-red-800"
-                : "border-green-300 bg-green-50 text-green-800"
-            }`}
-          >
-            {flash.message}
-          </div>
-        )}
+    <SidebarLayout sidebar={<IssueSidebar issue={issue} allUsers={allUsers} />}>
+      {/* Flash message */}
+      {flash && (
+        <div
+          className={`mb-6 rounded-md border px-4 py-3 text-sm ${
+            flash.type === "error"
+              ? "border-destructive/50 bg-destructive/10 text-destructive"
+              : "border-green-500/50 bg-green-500/10 text-green-700"
+          }`}
+        >
+          {flash.message}
+        </div>
+      )}
 
-        {/* Back button */}
+      {/* Breadcrumbs / Back */}
+      <div className="mb-6">
         <Link
           href="/issues"
-          className="mb-4 inline-flex items-center gap-2 text-sm text-on-surface-variant hover:text-on-surface"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="size-4" />
           Back to Issues
         </Link>
+      </div>
 
-        {/* Header */}
-        <div className="mb-4">
-          <h1 className="text-3xl font-bold text-on-surface flex items-center gap-2">
-            {issue.title}
-          </h1>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <Badge
-              data-testid="issue-status-badge"
-              className={`px-2 py-1 text-sm font-semibold ${
-                issue.status === "resolved"
-                  ? "bg-green-100 text-green-800 border-green-300"
-                  : issue.status === "in_progress"
-                    ? "bg-blue-100 text-blue-800 border-blue-300"
-                    : "bg-gray-100 text-gray-800 border-gray-300"
-              }`}
-            >
-              {issue.status === "in_progress"
-                ? "In Progress"
-                : issue.status.charAt(0).toUpperCase() + issue.status.slice(1)}
-            </Badge>
-            <Badge
-              data-testid="issue-severity-badge"
-              className={`border px-2 py-1 text-sm font-semibold ${severityClasses[issue.severity]}`}
-            >
-              {severityCopy[issue.severity]}
-            </Badge>
-            <p className="text-sm text-on-surface-variant">
-              Opened by {issue.reportedByUser?.name ?? "Unknown"} on{" "}
-              {new Date(issue.createdAt).toLocaleDateString()}
-            </p>
-          </div>
-          <div className="mt-4 grid gap-2 text-sm text-on-surface">
-            <div className="flex flex-wrap gap-1">
-              <span className="font-semibold">Machine:</span>
-              <Link
-                href={`/machines/${issue.machine.id}`}
-                className="text-primary underline-offset-2 hover:underline"
-              >
-                {issue.machine.name}
-              </Link>
-            </div>
-            <div className="flex flex-wrap gap-1">
-              <span className="font-semibold">Reported by:</span>
-              <span>{issue.reportedByUser?.name ?? "Unknown"}</span>
-            </div>
-            <div className="flex flex-wrap gap-1 text-on-surface-variant">
-              <span className="font-semibold text-on-surface">Reported:</span>
-              <span>{new Date(issue.createdAt).toLocaleString()}</span>
-            </div>
-          </div>
+      {/* Header Section */}
+      <div className="mb-8 space-y-4">
+        {/* Game Title (Subtitle) */}
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Link
+            href={`/machines/${issue.machine.id}`}
+            className="text-lg font-medium hover:text-primary transition-colors"
+          >
+            {issue.machine.name}
+          </Link>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-8">
-          {/* Main Content (Timeline) */}
-          <IssueTimeline issue={issue} />
+        {/* Issue Title & Badges */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-3xl font-bold text-foreground tracking-tight">
+                {issue.title}
+              </h1>
 
-          {/* Sticky Sidebar */}
-          <IssueSidebar issue={issue} allUsers={allUsers} />
+              {/* Status Badge */}
+              <Badge
+                variant="outline"
+                className={`px-2.5 py-0.5 text-sm font-medium border-transparent ${
+                  issue.status === "resolved"
+                    ? "bg-status-resolved text-status-resolved-text"
+                    : issue.status === "in_progress"
+                      ? "bg-status-inprogress text-status-inprogress-text"
+                      : "bg-status-new text-status-new-text"
+                }`}
+              >
+                {issue.status === "in_progress"
+                  ? "In Progress"
+                  : issue.status.charAt(0).toUpperCase() +
+                    issue.status.slice(1)}
+              </Badge>
+
+              {/* Severity Badge */}
+              <Badge
+                variant="outline"
+                className={`px-2.5 py-0.5 text-sm font-medium ${severityClasses[issue.severity]}`}
+              >
+                {severityCopy[issue.severity]}
+              </Badge>
+
+              {/* Priority Badge */}
+              <Badge
+                variant="outline"
+                className={`px-2.5 py-0.5 text-sm font-medium ${priorityClasses[issue.priority]}`}
+              >
+                {priorityCopy[issue.priority]}
+              </Badge>
+            </div>
+
+            {/* Meta Info */}
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-foreground">
+                  Reported by:
+                </span>
+                <span>{issue.reportedByUser?.name ?? "Unknown"}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Calendar className="size-4" />
+                <span>
+                  Opened {new Date(issue.createdAt).toLocaleDateString()}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="size-4" />
+                <span>
+                  Updated {new Date(issue.updatedAt).toLocaleDateString()}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    </main>
+
+      {/* Timeline */}
+      <IssueTimeline issue={issue} />
+    </SidebarLayout>
   );
 }

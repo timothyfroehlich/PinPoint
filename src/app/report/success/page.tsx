@@ -6,17 +6,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 
 export default function ReportSuccessPage(): React.JSX.Element {
   return (
-    <main className="min-h-screen bg-surface py-12">
+    <main className="min-h-screen bg-background py-12">
       <div className="container mx-auto max-w-xl px-4">
-        <Card className="border-outline-variant bg-surface shadow-lg text-center space-y-0">
+        <Card className="shadow-lg text-center space-y-0">
           <CardHeader className="space-y-3">
             <CheckCircle className="mx-auto size-10 text-primary" />
-            <CardTitle className="text-3xl text-on-surface">
+            <CardTitle className="text-3xl text-foreground">
               Thank You for Reporting This Issue!
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-on-surface-variant">
+            <p className="text-muted-foreground">
               Our team has been notified and will address it soon. We appreciate
               your help keeping the games running smoothly.
             </p>
@@ -27,7 +27,7 @@ export default function ReportSuccessPage(): React.JSX.Element {
               <Button
                 asChild
                 variant="ghost"
-                className="text-on-surface hover:bg-surface/80"
+                className="text-foreground hover:bg-accent"
               >
                 <Link href="/">Return Home</Link>
               </Button>

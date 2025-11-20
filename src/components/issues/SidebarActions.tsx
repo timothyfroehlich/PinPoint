@@ -13,6 +13,7 @@ import {
 import {
   updateIssueStatusAction,
   updateIssueSeverityAction,
+  updateIssuePriorityAction,
   assignIssueAction,
 } from "~/app/(app)/issues/actions";
 
@@ -32,7 +33,7 @@ export function SidebarActions({
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <Label className="text-xs text-on-surface-variant">Assignee</Label>
+        <Label className="text-xs text-muted-foreground">Assignee</Label>
         <AssigneePicker
           assignedToId={issue.assignedTo ?? null}
           users={allUsers}
@@ -49,7 +50,7 @@ export function SidebarActions({
       </div>
       {/* Update Status */}
       <div className="flex items-center justify-between">
-        <Label className="text-xs text-on-surface-variant">Status</Label>
+        <Label className="text-xs text-muted-foreground">Status</Label>
         <Select
           name="status"
           defaultValue={issue.status}
@@ -85,7 +86,7 @@ export function SidebarActions({
 
       {/* Update Severity */}
       <div className="flex items-center justify-between">
-        <Label className="text-xs text-on-surface-variant">Severity</Label>
+        <Label className="text-xs text-muted-foreground">Severity</Label>
         <Select
           name="severity"
           defaultValue={issue.severity}
@@ -114,6 +115,42 @@ export function SidebarActions({
               data-testid="severity-option-unplayable"
             >
               Unplayable
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Update Priority */}
+      <div className="flex items-center justify-between">
+        <Label className="text-xs text-muted-foreground">Priority</Label>
+        <Select
+          name="priority"
+          defaultValue={issue.priority}
+          onValueChange={(value) => {
+            startTransition(async () => {
+              const formData = new FormData();
+              formData.append("issueId", issue.id);
+              formData.append("priority", value);
+              await updateIssuePriorityAction(formData);
+            });
+          }}
+          disabled={isPending}
+        >
+          <SelectTrigger className="w-full" data-testid="issue-priority-select">
+            <SelectValue placeholder="Select priority" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="low" data-testid="priority-option-low">
+              Low
+            </SelectItem>
+            <SelectItem value="medium" data-testid="priority-option-medium">
+              Medium
+            </SelectItem>
+            <SelectItem value="high" data-testid="priority-option-high">
+              High
+            </SelectItem>
+            <SelectItem value="critical" data-testid="priority-option-critical">
+              Critical
             </SelectItem>
           </SelectContent>
         </Select>

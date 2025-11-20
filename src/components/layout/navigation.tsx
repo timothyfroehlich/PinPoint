@@ -4,7 +4,6 @@ import { CircleDot, AlertTriangle, Plus, Wrench } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { Button } from "~/components/ui/button";
 import { UserMenu } from "./user-menu-client";
-import { cn } from "~/lib/utils";
 
 /**
  * Navigation Component (Server Component)
@@ -21,12 +20,7 @@ export async function Navigation(): Promise<React.JSX.Element> {
   } = await supabase.auth.getUser();
 
   return (
-    <nav
-      className={cn(
-        "w-full border-b border-outline-variant",
-        user ? "bg-primary-container" : "bg-surface"
-      )}
-    >
+    <nav className="w-full border-b border-border bg-background">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
@@ -34,19 +28,10 @@ export async function Navigation(): Promise<React.JSX.Element> {
             href={user ? "/dashboard" : "/"}
             className="flex items-center gap-2 hover:opacity-80 transition-opacity"
           >
-            <CircleDot
-              className={cn(
-                "size-6",
-                user ? "text-on-primary-container" : "text-primary"
-              )}
-              strokeWidth={2.5}
-            />
-            <span
-              className={cn(
-                "text-xl font-bold",
-                user ? "text-on-primary-container" : "text-primary"
-              )}
-            >
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <CircleDot className="size-5" strokeWidth={2.5} />
+            </div>
+            <span className="text-xl font-bold text-foreground tracking-tight">
               PinPoint
             </span>
           </Link>
@@ -60,7 +45,7 @@ export async function Navigation(): Promise<React.JSX.Element> {
                   asChild
                   variant="ghost"
                   size="sm"
-                  className="text-on-primary-container hover:bg-primary hover:text-on-primary"
+                  className="text-muted-foreground hover:text-foreground"
                   aria-label="View Issues"
                 >
                   <Link href="/issues" className="flex items-center gap-2">
@@ -72,7 +57,7 @@ export async function Navigation(): Promise<React.JSX.Element> {
                   asChild
                   variant="ghost"
                   size="sm"
-                  className="text-on-primary-container hover:bg-primary hover:text-on-primary"
+                  className="text-muted-foreground hover:text-foreground"
                   aria-label="Report Issue"
                 >
                   <Link href="/issues/new" className="flex items-center gap-2">
@@ -84,7 +69,7 @@ export async function Navigation(): Promise<React.JSX.Element> {
                   asChild
                   variant="ghost"
                   size="sm"
-                  className="text-on-primary-container hover:bg-primary hover:text-on-primary hidden sm:flex"
+                  className="text-muted-foreground hover:text-foreground hidden sm:flex"
                   aria-label="View Machines"
                 >
                   <Link href="/machines" className="flex items-center gap-2">
@@ -109,7 +94,7 @@ export async function Navigation(): Promise<React.JSX.Element> {
                 asChild
                 variant="ghost"
                 size="sm"
-                className="text-primary hover:bg-primary/10"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <Link href="/report">Report Issue</Link>
               </Button>
@@ -117,7 +102,7 @@ export async function Navigation(): Promise<React.JSX.Element> {
                 asChild
                 variant="ghost"
                 size="sm"
-                className="text-on-surface hover:bg-surface-variant"
+                className="text-muted-foreground hover:text-foreground"
                 data-testid="nav-signin"
               >
                 <Link href="/login">Sign In</Link>
@@ -125,7 +110,7 @@ export async function Navigation(): Promise<React.JSX.Element> {
               <Button
                 asChild
                 size="sm"
-                className="bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
                 data-testid="nav-signup"
               >
                 <Link href="/signup">Sign Up</Link>

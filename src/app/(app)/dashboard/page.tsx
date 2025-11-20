@@ -34,12 +34,12 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
 
   return (
     <main className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-2xl border-outline-variant bg-surface shadow-xl">
+      <Card className="w-full max-w-2xl shadow-xl">
         <CardHeader className="space-y-3">
-          <CardTitle className="text-3xl font-bold text-on-surface">
+          <CardTitle className="text-3xl font-bold text-foreground">
             Dashboard
           </CardTitle>
-          <p className="text-sm text-on-surface-variant">
+          <p className="text-sm text-muted-foreground">
             Welcome to your PinPoint dashboard
           </p>
         </CardHeader>
@@ -50,8 +50,8 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
             <div
               className={`rounded-lg px-4 py-3 text-sm ${
                 flash.type === "error"
-                  ? "bg-error-container text-on-error-container"
-                  : "bg-primary-container text-on-primary-container"
+                  ? "bg-destructive/10 text-destructive"
+                  : "bg-accent text-accent-foreground"
               }`}
               role="alert"
             >
@@ -62,21 +62,21 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
           {/* User info */}
           <div className="space-y-4">
             <h2
-              className="text-lg font-semibold text-on-surface"
+              className="text-lg font-semibold text-foreground"
               data-testid="dashboard-welcome"
             >
               Your Profile
             </h2>
 
-            <div className="space-y-3 bg-surface-variant rounded-lg p-4">
+            <div className="space-y-3 bg-muted/50 rounded-lg p-4">
               {/* Name */}
               {name && (
                 <div className="flex items-center gap-3">
-                  <UserCircle className="size-5 text-on-surface-variant" />
+                  <UserCircle className="size-5 text-muted-foreground" />
                   <div>
-                    <p className="text-xs text-on-surface-variant">Name</p>
+                    <p className="text-xs text-muted-foreground">Name</p>
                     <p
-                      className="text-sm font-medium text-on-surface"
+                      className="text-sm font-medium text-foreground"
                       data-testid="dashboard-user-name"
                     >
                       {name}
@@ -87,11 +87,11 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
 
               {/* Email */}
               <div className="flex items-center gap-3">
-                <Mail className="size-5 text-on-surface-variant" />
+                <Mail className="size-5 text-muted-foreground" />
                 <div>
-                  <p className="text-xs text-on-surface-variant">Email</p>
+                  <p className="text-xs text-muted-foreground">Email</p>
                   <p
-                    className="text-sm font-medium text-on-surface"
+                    className="text-sm font-medium text-foreground"
                     data-testid="dashboard-user-email"
                   >
                     {email}
@@ -100,9 +100,9 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
               </div>
 
               {/* User ID (for debugging) */}
-              <div className="pt-3 border-t border-outline-variant">
-                <p className="text-xs text-on-surface-variant">User ID</p>
-                <p className="text-xs font-mono text-on-surface-variant">
+              <div className="pt-3 border-t border-border">
+                <p className="text-xs text-muted-foreground">User ID</p>
+                <p className="text-xs font-mono text-muted-foreground">
                   {user.id}
                 </p>
               </div>
@@ -111,7 +111,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
 
           {/* Actions */}
           <div className="space-y-3">
-            <h2 className="text-lg font-semibold text-on-surface">
+            <h2 className="text-lg font-semibold text-foreground">
               Quick Actions
             </h2>
 
@@ -120,7 +120,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
               <form action={logoutAction}>
                 <button
                   type="submit"
-                  className="w-full rounded-md border border-outline px-4 py-2 text-sm font-medium text-on-surface hover:bg-surface-variant transition-colors"
+                  className="w-full rounded-md border border-input px-4 py-2 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
                 >
                   Sign Out
                 </button>
@@ -129,8 +129,8 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
           </div>
 
           {/* Info box */}
-          <div className="border-t border-outline-variant pt-6">
-            <p className="text-sm text-on-surface-variant text-center">
+          <div className="border-t border-border pt-6">
+            <p className="text-sm text-muted-foreground text-center">
               This is a protected route. Only authenticated users can access
               this page.
             </p>

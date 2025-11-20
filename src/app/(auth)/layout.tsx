@@ -21,10 +21,10 @@ export default function AuthLayout({
           className="flex items-center justify-center gap-3 mb-8 group"
         >
           <CircleDot
-            className="size-8 text-primary group-hover:text-primary-container transition-colors"
+            className="size-8 text-primary group-hover:text-primary/80 transition-colors"
             strokeWidth={2.5}
           />
-          <h1 className="text-4xl font-bold tracking-tight text-primary group-hover:text-primary-container transition-colors">
+          <h1 className="text-4xl font-bold tracking-tight text-primary group-hover:text-primary/80 transition-colors">
             PinPoint
           </h1>
         </Link>

@@ -63,14 +63,14 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
   });
 
   return (
-    <main className="min-h-screen bg-surface">
+    <main className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b border-outline-variant bg-surface-container">
+      <div className="border-b border-border bg-muted/40">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-on-surface">Machines</h1>
-              <p className="mt-1 text-sm text-on-surface-variant">
+              <h1 className="text-3xl font-bold text-foreground">Machines</h1>
+              <p className="mt-1 text-sm text-muted-foreground">
                 Manage pinball machines and view their status
               </p>
             </div>
@@ -91,9 +91,9 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
       <div className="container mx-auto px-4 py-8">
         {machinesWithStatus.length === 0 ? (
           // Empty state
-          <Card className="border-outline-variant">
+          <Card className="border-border shadow-sm">
             <CardContent className="py-12 text-center">
-              <p className="text-lg text-on-surface-variant mb-4">
+              <p className="text-lg text-muted-foreground mb-4">
                 No machines yet
               </p>
               <Link href="/machines/new">
@@ -113,10 +113,10 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
                 data-testid="machine-card"
                 href={`/machines/${machine.id}`}
               >
-                <Card className="h-full border-outline-variant hover:border-primary transition-colors cursor-pointer">
+                <Card className="h-full border-border hover:border-primary transition-colors cursor-pointer shadow-sm">
                   <CardHeader>
                     <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-xl text-on-surface">
+                      <CardTitle className="text-xl text-foreground">
                         {machine.name}
                       </CardTitle>
                       <Badge
@@ -131,7 +131,7 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
                       {/* Issue count */}
                       <div className="flex items-center gap-2 text-sm">
                         <span
-                          className="text-on-surface-variant"
+                          className="text-muted-foreground"
                           data-testid="machine-open-issues-label"
                         >
                           Open Issues:
@@ -139,8 +139,8 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
                         <span
                           className={`font-semibold ${
                             machine.openIssuesCount > 0
-                              ? "text-on-surface"
-                              : "text-on-surface-variant"
+                              ? "text-foreground"
+                              : "text-muted-foreground"
                           }`}
                           data-testid={`machine-open-issues-count-${machine.id}`}
                         >
@@ -149,7 +149,7 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
                       </div>
 
                       {/* Created date */}
-                      <div className="text-xs text-on-surface-variant">
+                      <div className="text-xs text-muted-foreground">
                         Added {new Date(machine.createdAt).toLocaleDateString()}
                       </div>
                     </div>

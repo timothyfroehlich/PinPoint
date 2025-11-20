@@ -63,10 +63,10 @@ export function getMachineStatusLabel(status: MachineStatus): string {
 export function getMachineStatusStyles(status: MachineStatus): string {
   const styles: Record<MachineStatus, string> = {
     operational:
-      "bg-success-container text-on-success-container border-success",
+      "bg-status-operational text-status-operational-foreground border-status-operational",
     needs_service:
-      "bg-warning-container text-on-warning-container border-warning",
-    unplayable: "bg-error-container text-on-error-container border-error",
+      "bg-warning-container text-on-warning-container border-warning", // Kept for type safety with existing MachineStatus
+    unplayable: "bg-destructive/10 text-destructive border-destructive",
   };
   return styles[status];
 }
