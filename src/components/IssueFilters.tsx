@@ -46,13 +46,13 @@ export function IssueFilters({
       <div className="flex items-center gap-2">
         <label
           htmlFor="issue-filter-machine"
-          className="text-sm text-on-surface-variant"
+          className="text-sm text-muted-foreground"
         >
           Machine:
         </label>
         <select
           id="issue-filter-machine"
-          className="rounded-md border border-outline-variant bg-surface px-3 py-1.5 text-sm text-on-surface"
+          className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
           value={machineId}
           onChange={(e) => updateFilter("machineId", e.target.value)}
         >
@@ -69,13 +69,13 @@ export function IssueFilters({
       <div className="flex items-center gap-2">
         <label
           htmlFor="issue-filter-status"
-          className="text-sm text-on-surface-variant"
+          className="text-sm text-muted-foreground"
         >
           Status:
         </label>
         <select
           id="issue-filter-status"
-          className="rounded-md border border-outline-variant bg-surface px-3 py-1.5 text-sm text-on-surface"
+          className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
           value={status}
           onChange={(e) => updateFilter("status", e.target.value)}
         >
@@ -90,13 +90,13 @@ export function IssueFilters({
       <div className="flex items-center gap-2">
         <label
           htmlFor="issue-filter-severity"
-          className="text-sm text-on-surface-variant"
+          className="text-sm text-muted-foreground"
         >
           Severity:
         </label>
         <select
           id="issue-filter-severity"
-          className="rounded-md border border-outline-variant bg-surface px-3 py-1.5 text-sm text-on-surface"
+          className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
           value={severity}
           onChange={(e) => updateFilter("severity", e.target.value)}
         >
@@ -111,13 +111,13 @@ export function IssueFilters({
       <div className="flex items-center gap-2">
         <label
           htmlFor="issue-filter-assignee"
-          className="text-sm text-on-surface-variant"
+          className="text-sm text-muted-foreground"
         >
           Assignee:
         </label>
         <select
           id="issue-filter-assignee"
-          className="rounded-md border border-outline-variant bg-surface px-3 py-1.5 text-sm text-on-surface"
+          className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground"
           value={assignedTo}
           onChange={(e) => updateFilter("assignedTo", e.target.value)}
         >
@@ -137,7 +137,7 @@ export function IssueFilters({
           asChild
           variant="outline"
           size="sm"
-          className="border-outline-variant text-on-surface"
+          className="border-input text-foreground"
         >
           <Link href="/issues">Clear Filters</Link>
         </Button>

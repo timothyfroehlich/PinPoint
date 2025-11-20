@@ -48,27 +48,27 @@ export function UserMenu({
         <div className="flex items-center gap-3">
           <div className="hidden sm:block text-right">
             <p
-              className="text-sm font-medium text-on-primary-container"
+              className="text-sm font-medium text-primary"
               data-testid="user-menu-name"
             >
               {userName}
             </p>
-            <p className="text-xs text-on-primary-container/70">{userEmail}</p>
+            <p className="text-xs text-muted-foreground">{userEmail}</p>
           </div>
           <Avatar className="size-9 bg-primary text-on-primary">
             <AvatarFallback className="bg-primary text-on-primary font-semibold">
               {initials}
             </AvatarFallback>
           </Avatar>
-          <ChevronDown className="size-4 text-on-primary-container" />
+          <ChevronDown className="size-4 text-muted-foreground" />
         </div>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-56 bg-surface-variant">
+      <DropdownMenuContent align="end" className="w-56 bg-popover">
         {/* Profile - future implementation */}
         <DropdownMenuItem
           disabled
-          className="cursor-not-allowed opacity-50 text-on-surface-variant"
+          className="cursor-not-allowed opacity-50 text-muted-foreground"
         >
           <User className="mr-2 size-4" />
           <span>Profile</span>
@@ -78,7 +78,7 @@ export function UserMenu({
         {/* Settings - future implementation */}
         <DropdownMenuItem
           disabled
-          className="cursor-not-allowed opacity-50 text-on-surface-variant"
+          className="cursor-not-allowed opacity-50 text-muted-foreground"
         >
           <Settings className="mr-2 size-4" />
           <span>Settings</span>

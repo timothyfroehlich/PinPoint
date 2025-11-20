@@ -73,9 +73,9 @@ export default async function MachineDetailPage({
   );
 
   return (
-    <main className="min-h-screen bg-surface">
+    <main className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b border-outline-variant bg-surface-container">
+      <div className="border-b border-border bg-muted/40">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -83,7 +83,7 @@ export default async function MachineDetailPage({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-outline text-on-surface hover:bg-surface-variant"
+                  className="border-input text-foreground hover:bg-accent"
                 >
                   <ArrowLeft className="mr-2 size-4" />
                   Back
@@ -91,7 +91,7 @@ export default async function MachineDetailPage({
               </Link>
               <div>
                 <div className="flex items-center gap-3">
-                  <h1 className="text-3xl font-bold text-on-surface">
+                  <h1 className="text-3xl font-bold text-foreground">
                     {machine.name}
                   </h1>
                   <Badge
@@ -101,7 +101,7 @@ export default async function MachineDetailPage({
                     {getMachineStatusLabel(machineStatus)}
                   </Badge>
                 </div>
-                <p className="mt-1 text-sm text-on-surface-variant">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Machine details and issue tracking
                 </p>
               </div>
@@ -118,8 +118,8 @@ export default async function MachineDetailPage({
             <div
               className={`rounded-lg px-4 py-3 text-sm ${
                 flash.type === "error"
-                  ? "bg-error-container text-on-error-container"
-                  : "bg-primary-container text-on-primary-container"
+                  ? "bg-destructive/10 text-destructive"
+                  : "bg-accent text-accent-foreground"
               }`}
               role="alert"
             >
@@ -128,9 +128,9 @@ export default async function MachineDetailPage({
           )}
 
           {/* Machine Info Card */}
-          <Card className="border-outline-variant">
+          <Card className="border-border shadow-sm">
             <CardHeader>
-              <CardTitle className="text-2xl text-on-surface">
+              <CardTitle className="text-2xl text-foreground">
                 Machine Information
               </CardTitle>
             </CardHeader>
@@ -138,7 +138,7 @@ export default async function MachineDetailPage({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Status */}
                 <div>
-                  <p className="text-xs text-on-surface-variant mb-1">Status</p>
+                  <p className="text-xs text-muted-foreground mb-1">Status</p>
                   <Badge
                     className={`${getMachineStatusStyles(machineStatus)} border px-3 py-1 text-sm font-semibold`}
                   >
@@ -148,11 +148,11 @@ export default async function MachineDetailPage({
 
                 {/* Open Issues Count */}
                 <div data-testid="detail-open-issues">
-                  <p className="text-xs text-on-surface-variant mb-1">
+                  <p className="text-xs text-muted-foreground mb-1">
                     Open Issues
                   </p>
                   <p
-                    className="text-lg font-semibold text-on-surface"
+                    className="text-lg font-semibold text-foreground"
                     data-testid="detail-open-issues-count"
                   >
                     {openIssues.length}
@@ -161,12 +161,12 @@ export default async function MachineDetailPage({
 
                 {/* Created Date */}
                 <div>
-                  <p className="text-xs text-on-surface-variant mb-1">
+                  <p className="text-muted-foreground py-8 text-center">
                     Added Date
                   </p>
                   <div className="flex items-center gap-2">
-                    <Calendar className="size-4 text-on-surface-variant" />
-                    <p className="text-sm text-on-surface">
+                    <Calendar className="size-4 text-muted-foreground" />
+                    <p className="text-sm text-foreground">
                       {new Date(machine.createdAt).toLocaleDateString(
                         undefined,
                         {
@@ -181,10 +181,10 @@ export default async function MachineDetailPage({
 
                 {/* Total Issues */}
                 <div>
-                  <p className="text-xs text-on-surface-variant mb-1">
+                  <p className="text-xs text-muted-foreground mb-1">
                     Total Issues
                   </p>
-                  <p className="text-lg font-semibold text-on-surface">
+                  <p className="text-lg font-semibold text-foreground">
                     {machine.issues.length}
                   </p>
                 </div>
@@ -193,10 +193,10 @@ export default async function MachineDetailPage({
           </Card>
 
           {/* Issues Section */}
-          <Card className="border-outline-variant">
+          <Card className="border-border shadow-sm">
             <CardHeader>
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <CardTitle className="text-2xl text-on-surface">
+                <CardTitle className="text-2xl text-foreground">
                   Issues
                 </CardTitle>
                 <div className="flex flex-col gap-3 sm:flex-row">
@@ -213,7 +213,7 @@ export default async function MachineDetailPage({
                     <Button
                       asChild
                       variant="outline"
-                      className="border-outline-variant text-on-surface"
+                      className="border-border text-foreground"
                     >
                       <Link href={`/issues?machineId=${machine.id}`}>
                         View All Issues for {machine.name}
@@ -227,10 +227,10 @@ export default async function MachineDetailPage({
               {openIssues.length === 0 ? (
                 // Empty state
                 <div className="py-12 text-center">
-                  <p className="text-lg text-on-surface-variant mb-2">
+                  <p className="text-sm text-muted-foreground line-clamp-1">
                     No issues reported yet
                   </p>
-                  <p className="text-sm text-on-surface-variant">
+                  <p className="text-muted-foreground">
                     Issues will be available in Task 8
                   </p>
                 </div>
@@ -241,13 +241,13 @@ export default async function MachineDetailPage({
                     <div
                       key={issue.id}
                       data-testid="issue-card"
-                      className="flex items-center justify-between p-4 rounded-lg border border-outline-variant bg-surface-variant"
+                      className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/50"
                     >
                       <div className="flex-1">
-                        <h3 className="font-medium text-on-surface">
+                        <h3 className="font-medium text-foreground">
                           {issue.title}
                         </h3>
-                        <div className="mt-1 flex items-center gap-3 text-xs text-on-surface-variant">
+                        <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
                           <span>
                             {new Date(issue.createdAt).toLocaleDateString()}
                           </span>

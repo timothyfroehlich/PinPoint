@@ -110,8 +110,8 @@ describe("getMachineStatusStyles", () => {
 
   it("should return correct styles for unplayable status", () => {
     const styles = getMachineStatusStyles("unplayable");
-    expect(styles).toContain("bg-error-container");
-    expect(styles).toContain("text-on-error-container");
+    expect(styles).toContain("bg-destructive/10");
+    expect(styles).toContain("text-destructive");
     expect(styles).toContain("border-error");
   });
 });

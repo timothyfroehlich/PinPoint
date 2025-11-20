@@ -21,7 +21,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
     <>
       <Navigation />
       <main className="flex min-h-screen items-center justify-center p-4">
-        <Card className="w-full max-w-2xl border-outline-variant bg-surface shadow-2xl">
+        <Card className="w-full max-w-2xl shadow-2xl">
           <CardHeader className="space-y-3 text-center pb-8">
             <div className="flex items-center justify-center gap-3">
               <CircleDot className="size-10 text-primary" strokeWidth={2.5} />
@@ -29,13 +29,13 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                 PinPoint
               </h1>
             </div>
-            <p className="text-xl text-on-surface-variant font-medium">
+            <p className="text-xl text-muted-foreground font-medium">
               Pinball Machine Issue Tracking
             </p>
           </CardHeader>
 
           <CardContent className="space-y-8 px-8 pb-8">
-            <p className="text-center text-base leading-relaxed text-on-surface">
+            <p className="text-center text-base leading-relaxed text-foreground">
               Report and track issues with pinball machines at the Austin
               Pinball Collective. Help keep our machines running smoothly for
               everyone to enjoy.
@@ -45,7 +45,7 @@ export default async function HomePage(): Promise<React.JSX.Element> {
               <Button
                 asChild
                 size="lg"
-                className="bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container transition-colors"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
                 data-testid="hero-signup"
               >
                 <Link href="/signup">Sign Up</Link>
@@ -54,15 +54,15 @@ export default async function HomePage(): Promise<React.JSX.Element> {
                 asChild
                 size="lg"
                 variant="outline"
-                className="border-outline text-primary hover:bg-surface-variant transition-colors"
+                className="border-input text-primary hover:bg-accent hover:text-accent-foreground transition-colors"
                 data-testid="hero-signin"
               >
                 <Link href="/login">Sign In</Link>
               </Button>
             </div>
 
-            <div className="border-t border-outline-variant pt-6 text-center space-y-3">
-              <p className="text-sm text-on-surface-variant">
+            <div className="border-t border-border pt-6 text-center space-y-3">
+              <p className="text-sm text-muted-foreground">
                 Want to report an issue without creating an account?
               </p>
               <Button

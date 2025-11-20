@@ -76,6 +76,9 @@ export const issues = pgTable(
     severity: text("severity", { enum: ["minor", "playable", "unplayable"] })
       .notNull()
       .default("playable"),
+    priority: text("priority", { enum: ["low", "medium", "high", "critical"] })
+      .notNull()
+      .default("medium"),
     reportedBy: uuid("reported_by").references(() => userProfiles.id),
     assignedTo: uuid("assigned_to").references(() => userProfiles.id),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),

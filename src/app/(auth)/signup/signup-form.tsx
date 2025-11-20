@@ -33,7 +33,7 @@ export function SignupForm({
           autoComplete="name"
           required
           maxLength={100}
-          className="bg-surface-variant"
+          className="bg-muted"
         />
       </div>
 
@@ -47,7 +47,7 @@ export function SignupForm({
           placeholder="you@example.com"
           autoComplete="email"
           required
-          className="bg-surface-variant"
+          className="bg-muted"
         />
       </div>
 
@@ -62,11 +62,11 @@ export function SignupForm({
           required
           minLength={8}
           maxLength={128}
-          className="bg-surface-variant"
+          className="bg-muted"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <p className="text-xs text-on-surface-variant">Minimum 8 characters</p>
+        <p className="text-xs text-muted-foreground">Minimum 8 characters</p>
 
         {/* Password strength indicator */}
         <PasswordStrength password={password} />
@@ -75,7 +75,7 @@ export function SignupForm({
       {/* Submit button */}
       <Button
         type="submit"
-        className="w-full bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container"
+        className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
         size="lg"
       >
         Create Account

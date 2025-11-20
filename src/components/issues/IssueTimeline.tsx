@@ -15,26 +15,26 @@ export function IssueTimeline({
     <div className="flex-1">
       <div className="space-y-6">
         <div>
-          <h2 className="text-xl font-semibold text-on-surface">Timeline</h2>
-          <p className="text-sm text-on-surface-variant">
+          <h2 className="text-xl font-semibold text-foreground">Timeline</h2>
+          <p className="text-sm text-muted-foreground">
             Latest comments and system updates
           </p>
         </div>
         {/* Original Issue Post */}
-        <Card className="border-outline-variant bg-surface shadow-lg">
-          <CardHeader className="border-b border-outline-variant">
+        <Card className="shadow-sm">
+          <CardHeader className="border-b border-border">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold text-on-surface">
+              <div className="text-sm font-semibold text-foreground">
                 {issue.reportedByUser?.name ?? "Unknown User"}
               </div>
-              <div className="text-xs text-on-surface-variant">
+              <div className="text-xs text-muted-foreground">
                 {new Date(issue.createdAt).toLocaleString()}
               </div>
             </div>
           </CardHeader>
           {issue.description && (
             <CardContent className="pt-4">
-              <p className="text-on-surface whitespace-pre-wrap">
+              <p className="text-foreground whitespace-pre-wrap">
                 {issue.description}
               </p>
             </CardContent>
@@ -45,7 +45,7 @@ export function IssueTimeline({
         {issue.comments.map((comment) => (
           <React.Fragment key={comment.id}>
             {comment.isSystem ? (
-              <div className="flex items-center gap-3 rounded-md border border-dashed border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface-variant">
+              <div className="flex items-center gap-3 rounded-md border border-dashed border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
                 <Clock className="size-4" />
                 <div className="flex flex-col">
                   <span>{comment.content}</span>
@@ -55,19 +55,19 @@ export function IssueTimeline({
                 </div>
               </div>
             ) : (
-              <Card className="border-outline-variant bg-surface shadow-lg">
-                <CardHeader className="border-b border-outline-variant">
+              <Card className="shadow-sm">
+                <CardHeader className="border-b border-border">
                   <div className="flex items-center justify-between">
-                    <div className="text-sm font-semibold text-on-surface">
+                    <div className="text-sm font-semibold text-foreground">
                       {comment.author?.name ?? "Unknown User"}
                     </div>
-                    <div className="text-xs text-on-surface-variant">
+                    <div className="text-xs text-muted-foreground">
                       {new Date(comment.createdAt).toLocaleString()}
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="pt-4">
-                  <p className="text-sm text-on-surface whitespace-pre-wrap">
+                  <p className="text-sm text-foreground whitespace-pre-wrap">
                     {comment.content}
                   </p>
                 </CardContent>
@@ -77,7 +77,7 @@ export function IssueTimeline({
         ))}
 
         {/* Add Comment Form */}
-        <Card className="border-outline-variant bg-surface shadow-lg">
+        <Card className="shadow-sm">
           <CardHeader>
             <CardTitle className="text-lg">Add a comment</CardTitle>
           </CardHeader>

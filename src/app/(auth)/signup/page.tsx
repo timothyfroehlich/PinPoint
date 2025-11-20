@@ -47,12 +47,12 @@ export default async function SignupPage(): Promise<React.JSX.Element> {
   }
 
   return (
-    <Card className="border-outline-variant bg-surface shadow-xl">
+    <Card className="shadow-xl">
       <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold text-on-surface">
+        <CardTitle className="text-2xl font-bold text-foreground">
           Create Account
         </CardTitle>
-        <p className="text-sm text-on-surface-variant">
+        <p className="text-sm text-muted-foreground">
           Join PinPoint to report and track issues
         </p>
       </CardHeader>
@@ -63,8 +63,8 @@ export default async function SignupPage(): Promise<React.JSX.Element> {
           <div
             className={`rounded-lg px-4 py-3 text-sm ${
               flash.type === "error"
-                ? "bg-error-container text-on-error-container"
-                : "bg-primary-container text-on-primary-container"
+                ? "bg-destructive/10 text-destructive"
+                : "bg-accent text-accent-foreground"
             }`}
             role="alert"
           >
@@ -76,7 +76,7 @@ export default async function SignupPage(): Promise<React.JSX.Element> {
         <SignupForm action={handleSignup} />
 
         {/* Login link */}
-        <div className="text-center text-sm text-on-surface-variant">
+        <div className="text-center text-sm text-muted-foreground">
           Already have an account?{" "}
           <Link
             href="/login"
