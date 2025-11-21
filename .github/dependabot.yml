@@ -25,17 +25,16 @@ updates:
         update-types:
           - "major"
     groups:
-      # Group minor and patch updates together
+      # Group minor and patch updates together (major updates are individual PRs)
       minor-patch-updates:
         applies-to: version-updates
         update-types:
           - "minor"
           - "patch"
-      # Group security updates separately for immediate attention
+      # Group minor and patch security updates (major security updates are individual PRs)
       security-updates:
         applies-to: security-updates
         update-types:
-          - "major"
           - "minor"
           - "patch"
     labels:
@@ -65,6 +64,19 @@ updates:
       - duration: 30
         update-types:
           - "major"
+    groups:
+      # Group minor and patch updates together (major updates are individual PRs)
+      minor-patch-updates:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+      # Group minor and patch security updates (major security updates are individual PRs)
+      security-updates:
+        applies-to: security-updates
+        update-types:
+          - "minor"
+          - "patch"
     labels:
       - "dependencies"
       - "github-actions"
