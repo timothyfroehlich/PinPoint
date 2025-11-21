@@ -1,6 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const port = Number(process.env.PORT ?? "3100");
+// Default port matches main worktree (3000)
+// Other worktrees should set PORT in .env.local (3100, 3200, 3300)
+// See AGENTS.md for port allocation table
+const port = Number(process.env.PORT ?? "3000");
 const baseURL = `http://127.0.0.1:${port}`;
 
 /**

@@ -1,4 +1,7 @@
 {
+  // Multi-worktree workspace configuration
+  // Paths are intentionally hardcoded to match scripts/sync-worktrees.sh
+  // This assumes worktrees are created in ~/Code/PinPoint-* directories
   "folders": [
     {
       "path": ".",

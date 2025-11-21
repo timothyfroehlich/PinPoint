@@ -19,7 +19,7 @@ echo "📦 Running npm install in all worktrees..."
 for dir in "${WORKTREES[@]}"; do
   if [ -d "$dir" ]; then
     echo "  → $(basename "$dir")"
-    (cd "$dir" && npm install --silent 2>&1 | grep -v "^npm" || true)
+    (cd "$dir" && npm install --silent 2>&1 | grep -v "^npm")
   fi
 done
 
@@ -29,7 +29,7 @@ echo "🗄️  Regenerating test schemas..."
 for dir in "${WORKTREES[@]}"; do
   if [ -d "$dir" ]; then
     echo "  → $(basename "$dir")"
-    (cd "$dir" && npm run test:generate-schema --silent 2>&1 | grep -v "warn" | grep -v "npm" || true)
+    (cd "$dir" && npm run test:generate-schema --silent 2>&1 | grep -v "warn" | grep -v "npm")
   fi
 done
 
