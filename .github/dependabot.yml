@@ -13,6 +13,17 @@ updates:
       prefix: "chore(deps)"
       prefix-development: "chore(deps)"
       include: "scope"
+    # Cooldown configuration to avoid overwhelming with updates
+    cooldown:
+      # 2 weeks for minor and patch updates
+      - duration: 14
+        update-types:
+          - "minor"
+          - "patch"
+      # 1 month (30 days) for major version updates
+      - duration: 30
+        update-types:
+          - "major"
     groups:
       # Group minor and patch updates together
       minor-patch-updates:
@@ -43,6 +54,17 @@ updates:
       prefix: "chore(deps)"
       prefix-development: "chore(deps)"
       include: "scope"
+    # Cooldown configuration to avoid overwhelming with updates
+    cooldown:
+      # 2 weeks for minor and patch updates
+      - duration: 14
+        update-types:
+          - "minor"
+          - "patch"
+      # 1 month (30 days) for major version updates
+      - duration: 30
+        update-types:
+          - "major"
     labels:
       - "dependencies"
       - "github-actions"
