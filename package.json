@@ -23,8 +23,11 @@
     "db:studio": "drizzle-kit studio",
     "db:seed": "node --env-file=.env.local -e 'require(\"child_process\").execSync(\"psql \" + process.env.DATABASE_URL + \" -f supabase/seed.sql\", {stdio: \"inherit\"})'",
     "db:seed-users": "node --env-file=.env.local supabase/seed-users.mjs",
-    "preflight": "npm-run-all --silent --parallel typecheck lint format test --sequential --parallel build test:integration test:integration:supabase smoke",
+    "db:reset:local": "supabase db reset --yes",
+    "db:prepare:test": "npm-run-all db:reset:local db:push db:seed db:seed-users",
+    "preflight": "npm-run-all --silent --parallel typecheck lint format test --sequential db:prepare:test --parallel build test:integration test:integration:supabase --sequential smoke",
     "supa:ci": "bash scripts/supa-ci.sh",
+    "sync-worktrees": "bash scripts/sync-worktrees.sh",
     "prepare": "husky"
   },
   "repository": {

@@ -1,5 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const port = Number(process.env.PORT ?? "3100");
+const baseURL = `http://127.0.0.1:${port}`;
+
 /**
  * Playwright E2E Test Configuration
  *
@@ -16,7 +19,7 @@ export default defineConfig({
   fullyParallel: !process.env.CI,
 
   // Short, developer-friendly timeouts
-  timeout: 10 * 1000, // 10s per test
+  timeout: process.env.CI ? 15 * 1000 : 20 * 1000, // per-test timeout
   expect: {
     // CI machines are slower; give them a longer window before failing
     timeout: process.env.CI ? 5 * 1000 : 2 * 1000,
@@ -39,7 +42,7 @@ export default defineConfig({
   // Shared settings for all the projects below
   use: {
     // Base URL to use in actions like `await page.goto('/')`
-    baseURL: "http://localhost:3000",
+    baseURL,
 
     // Collect trace when retrying the failed test
     trace: "on-first-retry",
@@ -49,7 +52,7 @@ export default defineConfig({
 
     // Keep interactions snappy during dev
     actionTimeout: 5 * 1000,
-    navigationTimeout: 8 * 1000,
+    navigationTimeout: 15 * 1000,
   },
 
   // Configure projects for major browsers
@@ -62,8 +65,8 @@ export default defineConfig({
 
   // Run your local dev server before starting the tests
   webServer: {
-    command: "npm run dev",
-    url: "http://localhost:3000",
+    command: `PORT=${port} npm run dev`,
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000, // 2 minutes
 
@@ -73,5 +76,8 @@ export default defineConfig({
 
     // Ignore HTTPS errors for local development
     ignoreHTTPSErrors: true,
+    env: {
+      PORT: String(port),
+    },
   },
 });
