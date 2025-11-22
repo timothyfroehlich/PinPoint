@@ -77,12 +77,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const typeParam = searchParams.get("type");
   const nextParam = searchParams.get("next") ?? "/";
 
-  console.log("auth/callback params", {
-    hasCode: Boolean(code),
-    hasTokenHash: Boolean(tokenHash),
-    type: typeParam,
-  });
-
   const forwardedHost = request.headers.get("x-forwarded-host");
   const next = resolveRedirectPath({ nextParam, origin, forwardedHost });
   const isLocalEnv = process.env.NODE_ENV === "development";
@@ -107,26 +101,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const { supabase, pendingCookies } = supabaseClient;
 
   if (code) {
-    console.log("auth/callback handling code", { origin });
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
       const {
-        data: { user },
+        data: { user: _user },
       } = await supabase.auth.getUser();
-      console.log("auth/callback: user after exchange", {
-        hasUser: Boolean(user),
-      });
-      console.log("auth/callback: exchanged code, cookies", {
-        cookieCount: pendingCookies.length,
-        cookies: pendingCookies.map((cookie) => ({
-          name: cookie.name,
-          domain: cookie.options?.domain,
-          sameSite: cookie.options?.sameSite,
-          secure: cookie.options?.secure,
-          path: cookie.options?.path,
-        })),
-      });
       return applyCookies(redirectToTarget(), pendingCookies);
     }
 
@@ -137,7 +117,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const otpType = isValidEmailOtpType(typeParam);
   if (tokenHash && otpType) {
-    console.log("auth/callback handling token hash", { origin });
     const { error } = await supabase.auth.verifyOtp({
       type: otpType,
       token_hash: tokenHash,
@@ -145,14 +124,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     if (!error) {
       const {
-        data: { user },
+        data: { user: _user },
       } = await supabase.auth.getUser();
-      console.log("auth/callback: user after verify", {
-        hasUser: Boolean(user),
-      });
-      console.log("auth/callback: verified otp, cookies", {
-        cookieCount: pendingCookies.length,
-      });
       return applyCookies(redirectToTarget(), pendingCookies);
     }
 
@@ -224,7 +197,6 @@ function applyCookies(
   cookies: { name: string; value: string; options?: CookieOptions }[]
 ): NextResponse {
   cookies.forEach(({ name, value, options }) => {
-    console.log("applyCookies: setting cookie", { name, options });
     if (options) {
       response.cookies.set(name, value, options);
     } else {

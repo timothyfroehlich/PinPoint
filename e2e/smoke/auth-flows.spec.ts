@@ -254,7 +254,7 @@ test.describe("Authentication", () => {
     await page.getByRole("menuitem", { name: "Sign Out" }).click();
     await expect(page).toHaveURL("/");
 
-    // Clean up any existing emails in Inbucket
+    // Clean up any existing emails in Mailpit
     await deleteAllMessages(testEmail);
 
     // Navigate to login and click "Forgot password?"
@@ -308,7 +308,7 @@ test.describe("Authentication", () => {
 
     // Should redirect to dashboard (because session is active) or login
     // We accept either, but in practice it goes to dashboard because user is logged in
-    await expect(page).toHaveURL(/\/dashboard| \/login/);
+    await expect(page).toHaveURL(/\/(dashboard|login)/);
 
     // If we are on dashboard, sign out so we can test the new password
     if (page.url().includes("/dashboard")) {

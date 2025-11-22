@@ -51,23 +51,13 @@ export async function updateSession(
     },
   });
 
-  const allCookies = request.cookies.getAll();
-  console.log(
-    "Middleware: cookies",
-    allCookies.map((c) => c.name)
-  );
-
   // IMPORTANT: DO NOT REMOVE - This refreshes the auth token
   // Without this call, sessions will expire and users will be randomly logged out
   // Trigger token refresh; result unused intentionally
   const {
-    data: { user },
-    error,
+    data: { user: _user },
+    error: _error,
   } = await supabase.auth.getUser();
-  console.log("Middleware: getUser result", {
-    hasUser: !!user,
-    error: error?.message,
-  });
 
   // MVP: No route protection in middleware
   // Auth checks happen in Server Components/Actions as needed
