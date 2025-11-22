@@ -1,4 +1,5 @@
 import type React from "react";
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
@@ -10,46 +11,27 @@ import {
 } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { issues, userProfiles } from "~/server/db/schema";
+import { issues, userProfiles, machines } from "~/server/db/schema";
 import { eq, desc, and, ne, sql } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
-import {
-  deriveMachineStatus,
-  type IssueForStatus,
-} from "~/lib/machines/status";
 import {
   getIssueStatusLabel,
   getIssueSeverityLabel,
   getIssueStatusStyles,
   getIssueSeverityStyles,
-  type IssueStatus,
-  type IssueSeverity,
+  isIssueStatus,
+  isIssueSeverity,
 } from "~/lib/issues/status";
 
 /**
- * Member Dashboard Page (Protected Route)
- *
- * Displays:
- * - Issues assigned to current user
- * - Recently reported issues (last 10)
- * - Unplayable machines (machines with unplayable issues)
- * - Quick stats (total open issues, machines needing service, issues assigned to me)
+ * Cached dashboard data fetcher (CORE-PERF-001)
+ * Wraps all dashboard queries to prevent duplicate execution within a single request
  */
-export default async function DashboardPage(): Promise<React.JSX.Element> {
-  // Auth guard - check if user is authenticated (CORE-SSR-002)
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
+const getDashboardData = cache(async (userId: string) => {
   // Get user profile to get the user's database ID
   const userProfile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
+    where: eq(userProfiles.id, userId),
     columns: {
       id: true,
       name: true,
@@ -57,7 +39,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
   });
 
   if (!userProfile) {
-    redirect("/login");
+    return null;
   }
 
   // Query 1: Issues assigned to current user (with machine relation)
@@ -98,39 +80,22 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
     },
   });
 
-  // Query 3: Machines with unplayable issues
-  const allMachines = await db.query.machines.findMany({
-    with: {
-      issues: {
-        columns: {
-          id: true,
-          status: true,
-          severity: true,
-        },
-      },
-    },
-  });
-
-  // Filter to only unplayable machines (machines with at least one open unplayable issue)
-  const unplayableMachines = allMachines
-    .map((machine) => {
-      const status = deriveMachineStatus(machine.issues as IssueForStatus[]);
-      const unplayableIssuesCount = machine.issues.filter(
-        (issue) =>
-          issue.severity === "unplayable" && issue.status !== "resolved"
-      ).length;
-
-      return {
-        id: machine.id,
-        name: machine.name,
-        status,
-        unplayableIssuesCount,
-      };
+  // Query 3: Unplayable machines (database-level filtering for efficiency - PERF-002)
+  // Get machines with at least one open unplayable issue using JOIN and GROUP BY
+  const unplayableMachines = await db
+    .select({
+      id: machines.id,
+      name: machines.name,
+      unplayableIssuesCount: sql<number>`count(*)::int`,
     })
-    .filter((machine) => machine.status === "unplayable");
+    .from(machines)
+    .innerJoin(issues, eq(issues.machineId, machines.id))
+    .where(
+      and(eq(issues.severity, "unplayable"), ne(issues.status, "resolved"))
+    )
+    .groupBy(machines.id, machines.name);
 
-  // Query 4: Stats calculation
-  // Total open issues count
+  // Query 4: Total open issues count
   const totalOpenIssuesResult = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(issues)
@@ -138,14 +103,61 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
 
   const totalOpenIssues = totalOpenIssuesResult[0]?.count ?? 0;
 
-  // Machines needing service count (machines with at least one open issue)
-  const machinesNeedingService = allMachines.filter((machine) => {
-    const status = deriveMachineStatus(machine.issues as IssueForStatus[]);
-    return status !== "operational";
-  }).length;
+  // Query 5: Machines needing service (machines with at least one open issue)
+  const machinesNeedingServiceResult = await db
+    .selectDistinct({ id: machines.id })
+    .from(machines)
+    .innerJoin(issues, eq(issues.machineId, machines.id))
+    .where(ne(issues.status, "resolved"));
 
-  // Issues assigned to me count
-  const myIssuesCount = assignedIssues.length;
+  const machinesNeedingService = machinesNeedingServiceResult.length;
+
+  return {
+    userProfile,
+    assignedIssues,
+    recentIssues,
+    unplayableMachines,
+    totalOpenIssues,
+    machinesNeedingService,
+    myIssuesCount: assignedIssues.length,
+  };
+});
+
+/**
+ * Member Dashboard Page (Protected Route)
+ *
+ * Displays:
+ * - Issues assigned to current user
+ * - Recently reported issues (last 10)
+ * - Unplayable machines (machines with unplayable issues)
+ * - Quick stats (total open issues, machines needing service, issues assigned to me)
+ */
+export default async function DashboardPage(): Promise<React.JSX.Element> {
+  // Auth guard - check if user is authenticated (CORE-SSR-002)
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  // Fetch all dashboard data with caching
+  const data = await getDashboardData(user.id);
+
+  if (!data) {
+    redirect("/login");
+  }
+
+  const {
+    assignedIssues,
+    recentIssues,
+    unplayableMachines,
+    totalOpenIssues,
+    machinesNeedingService,
+    myIssuesCount,
+  } = data;
 
   return (
     <main className="min-h-screen bg-surface">
@@ -268,23 +280,25 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                           </div>
                           <div className="flex gap-2">
                             {/* Status Badge */}
-                            <Badge
-                              className={`px-2 py-1 text-xs font-semibold ${getIssueStatusStyles(
-                                issue.status as IssueStatus
-                              )}`}
-                            >
-                              {getIssueStatusLabel(issue.status as IssueStatus)}
-                            </Badge>
+                            {isIssueStatus(issue.status) && (
+                              <Badge
+                                className={`px-2 py-1 text-xs font-semibold ${getIssueStatusStyles(
+                                  issue.status
+                                )}`}
+                              >
+                                {getIssueStatusLabel(issue.status)}
+                              </Badge>
+                            )}
                             {/* Severity Badge */}
-                            <Badge
-                              className={`px-2 py-1 text-xs font-semibold ${getIssueSeverityStyles(
-                                issue.severity as IssueSeverity
-                              )}`}
-                            >
-                              {getIssueSeverityLabel(
-                                issue.severity as IssueSeverity
-                              )}
-                            </Badge>
+                            {isIssueSeverity(issue.severity) && (
+                              <Badge
+                                className={`px-2 py-1 text-xs font-semibold ${getIssueSeverityStyles(
+                                  issue.severity
+                                )}`}
+                              >
+                                {getIssueSeverityLabel(issue.severity)}
+                              </Badge>
+                            )}
                           </div>
                         </div>
                       </CardHeader>
@@ -384,23 +398,25 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                           </div>
                           <div className="flex flex-col gap-2">
                             {/* Status Badge */}
-                            <Badge
-                              className={`px-2 py-1 text-xs font-semibold ${getIssueStatusStyles(
-                                issue.status as IssueStatus
-                              )}`}
-                            >
-                              {getIssueStatusLabel(issue.status as IssueStatus)}
-                            </Badge>
+                            {isIssueStatus(issue.status) && (
+                              <Badge
+                                className={`px-2 py-1 text-xs font-semibold ${getIssueStatusStyles(
+                                  issue.status
+                                )}`}
+                              >
+                                {getIssueStatusLabel(issue.status)}
+                              </Badge>
+                            )}
                             {/* Severity Badge */}
-                            <Badge
-                              className={`px-2 py-1 text-xs font-semibold ${getIssueSeverityStyles(
-                                issue.severity as IssueSeverity
-                              )}`}
-                            >
-                              {getIssueSeverityLabel(
-                                issue.severity as IssueSeverity
-                              )}
-                            </Badge>
+                            {isIssueSeverity(issue.severity) && (
+                              <Badge
+                                className={`px-2 py-1 text-xs font-semibold ${getIssueSeverityStyles(
+                                  issue.severity
+                                )}`}
+                              >
+                                {getIssueSeverityLabel(issue.severity)}
+                              </Badge>
+                            )}
                           </div>
                         </div>
                       </CardHeader>

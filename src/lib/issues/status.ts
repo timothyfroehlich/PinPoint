@@ -2,6 +2,28 @@ export type IssueStatus = "new" | "in_progress" | "resolved";
 export type IssueSeverity = "minor" | "playable" | "unplayable";
 
 /**
+ * Type guard for IssueStatus
+ * Validates that a value is a valid issue status
+ */
+export function isIssueStatus(value: unknown): value is IssueStatus {
+  return (
+    typeof value === "string" &&
+    ["new", "in_progress", "resolved"].includes(value)
+  );
+}
+
+/**
+ * Type guard for IssueSeverity
+ * Validates that a value is a valid issue severity
+ */
+export function isIssueSeverity(value: unknown): value is IssueSeverity {
+  return (
+    typeof value === "string" &&
+    ["minor", "playable", "unplayable"].includes(value)
+  );
+}
+
+/**
  * Get display label for issue status
  */
 export function getIssueStatusLabel(status: IssueStatus): string {
