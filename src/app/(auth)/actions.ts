@@ -340,6 +340,8 @@ export async function forgotPasswordAction(
     const allowedOrigins = [
       "http://localhost:3000",
       "http://localhost:3100",
+      "http://localhost:3200",
+      "http://localhost:3300",
       process.env["NEXT_PUBLIC_SITE_URL"],
     ].filter((url): url is string => typeof url === "string");
 
