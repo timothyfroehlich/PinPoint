@@ -71,7 +71,13 @@ additional_redirect_urls = [
   "http://localhost:3000/auth/callback",
   "http://localhost:3100",
   "http://localhost:3100/*",
-  "http://localhost:3100/auth/callback"
+  "http://localhost:3100/auth/callback",
+  "http://localhost:3200",
+  "http://localhost:3200/*",
+  "http://localhost:3200/auth/callback",
+  "http://localhost:3300",
+  "http://localhost:3300/*",
+  "http://localhost:3300/auth/callback"
 ]
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
