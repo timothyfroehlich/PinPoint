@@ -35,7 +35,7 @@ updates:
       - "dependencies"
       - "npm"
 
-  # GitHub Actions with different cooldowns per update type
+  # GitHub Actions with 2-week cooldown
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -47,24 +47,9 @@ updates:
       prefix: "chore(deps)"
       prefix-development: "chore(deps)"
       include: "scope"
-    # Cooldown: 2 weeks for minor/patch, 1 month for major
+    # 2 week cooldown for all GitHub Actions updates
     cooldown:
-      semver-major-days: 30
-      semver-minor-days: 14
-      semver-patch-days: 14
-    groups:
-      # Group minor and patch updates together
-      minor-patch-updates:
-        applies-to: version-updates
-        update-types:
-          - "minor"
-          - "patch"
-      # Group minor and patch security updates
-      security-updates:
-        applies-to: security-updates
-        update-types:
-          - "minor"
-          - "patch"
+      default-days: 14
     labels:
       - "dependencies"
       - "github-actions"
