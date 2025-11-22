@@ -40,9 +40,7 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-    versioning-strategy: increase
     open-pull-requests-limit: 5
-    rebase-strategy: "auto"
     commit-message:
       prefix: "chore(deps)"
       prefix-development: "chore(deps)"
