@@ -15,8 +15,46 @@ import type { EmailOtpType } from "@supabase/supabase-js";
  * Prevents open redirect vulnerabilities
  */
 function isInternalUrl(url: string): boolean {
-  // Allow paths starting with / but not //
+  // Allow paths starting with / but not // (absolute protocol-relative)
   return url.startsWith("/") && !url.startsWith("//");
+}
+
+function resolveRedirectPath(options: {
+  nextParam: string | null;
+  origin: string;
+  forwardedHost: string | null;
+}): string {
+  const { nextParam, origin, forwardedHost } = options;
+  const fallback = "/";
+
+  if (!nextParam) {
+    return fallback;
+  }
+
+  if (isInternalUrl(nextParam)) {
+    return nextParam;
+  }
+
+  // Allow absolute URLs that point to this host only; drop origin to prevent open redirects.
+  try {
+    const originHost = new URL(origin).host;
+    const allowedHosts = new Set([originHost]);
+    if (forwardedHost) {
+      allowedHosts.add(forwardedHost);
+    }
+
+    const parsed = new URL(nextParam, origin);
+    if (allowedHosts.has(parsed.host)) {
+      const normalizedPath = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+      if (isInternalUrl(normalizedPath)) {
+        return normalizedPath;
+      }
+    }
+  } catch {
+    // swallow parse errors and fall through to fallback
+  }
+
+  return fallback;
 }
 
 /**
@@ -45,21 +83,24 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     type: typeParam,
   });
 
-  // Validate redirect URL to prevent open redirect attacks
-  const next = isInternalUrl(nextParam) ? nextParam : "/";
   const forwardedHost = request.headers.get("x-forwarded-host");
+  const next = resolveRedirectPath({ nextParam, origin, forwardedHost });
   const isLocalEnv = process.env.NODE_ENV === "development";
+  const shouldUseLoadingScreen = next === "/reset-password";
+  const redirectPath = shouldUseLoadingScreen
+    ? `/auth/loading?next=${encodeURIComponent(next)}`
+    : next;
 
   const redirectToTarget = (): NextResponse => {
     if (isLocalEnv) {
-      return NextResponse.redirect(`${origin}${next}`);
+      return NextResponse.redirect(`${origin}${redirectPath}`);
     }
 
     if (forwardedHost) {
-      return NextResponse.redirect(`https://${forwardedHost}${next}`);
+      return NextResponse.redirect(`https://${forwardedHost}${redirectPath}`);
     }
 
-    return NextResponse.redirect(`${origin}${next}`);
+    return NextResponse.redirect(`${origin}${redirectPath}`);
   };
 
   const supabaseClient = createSupabaseClient(request);
@@ -183,6 +224,7 @@ function applyCookies(
   cookies: { name: string; value: string; options?: CookieOptions }[]
 ): NextResponse {
   cookies.forEach(({ name, value, options }) => {
+    console.log("applyCookies: setting cookie", { name, options });
     if (options) {
       response.cookies.set(name, value, options);
     } else {

@@ -1,14 +1,20 @@
 /**
  * Mailpit email testing helpers
  *
- * Mailpit is configured in supabase/config.toml on port 54324.
+ * Mailpit is configured in supabase/config.toml and runs on a worktree-specific port.
  * It captures all emails sent by Supabase during local development.
- * (Replaces Inbucket in newer Supabase CLI versions)
+ *
+ * Port Configuration (via MAILPIT_PORT environment variable):
+ * - Main: 54324
+ * - Secondary: 55324
+ * - Review: 56324
+ * - AntiGravity: 57324
  */
 
 /// <reference lib="dom" />
 
-const MAILPIT_URL = "http://127.0.0.1:54324";
+const MAILPIT_PORT = Number(process.env.MAILPIT_PORT ?? "54324");
+const MAILPIT_URL = `http://localhost:${MAILPIT_PORT}`;
 
 interface MailpitMessage {
   ID: string;

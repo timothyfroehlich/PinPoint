@@ -1,5 +1,6 @@
 import type React from "react";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
@@ -16,7 +17,13 @@ import { createClient } from "~/lib/supabase/server";
  * User must be authenticated via the reset link token.
  * Progressive enhancement - works without JavaScript.
  */
-export default async function ResetPasswordPage(): Promise<React.JSX.Element> {
+export default async function ResetPasswordPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ retry?: string }>;
+}): Promise<React.JSX.Element> {
+  const params = await searchParams;
+
   // Verify user is authenticated via reset link
   const supabase = await createClient();
   const {
@@ -25,6 +32,20 @@ export default async function ResetPasswordPage(): Promise<React.JSX.Element> {
 
   // If not authenticated, redirect to forgot password page
   if (!user) {
+    const cookieStore = await cookies();
+    const hasAuthCookie = cookieStore
+      .getAll()
+      .some(
+        (cookie) =>
+          cookie.name.startsWith("sb-") && cookie.name.includes("auth-token")
+      );
+
+    const hasRetried = params.retry === "1";
+
+    if (hasAuthCookie && !hasRetried) {
+      redirect("/auth/loading?next=/reset-password?retry=1");
+    }
+
     redirect("/forgot-password");
   }
 

@@ -872,6 +872,56 @@ export default async function DashboardPage() {
 - Use SQL `count(*)::int` for stats instead of fetching all records
 - All queries in same Server Component - no separate data layer (CORE-ARCH-003)
 
+### E2E: Environment-Aware Email Testing
+
+```typescript
+// e2e/support/mailpit.ts
+const MAILPIT_PORT = Number(process.env.MAILPIT_PORT ?? "54324");
+const MAILPIT_URL = `http://localhost:${MAILPIT_PORT}`;
+
+export async function getPasswordResetLink(
+  email: string
+): Promise<string | null> {
+  // Exponential backoff for email delivery
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const messages = await getMessages(email);
+    const resetEmail = messages.find((msg) =>
+      msg.Subject.toLowerCase().includes("reset")
+    );
+
+    if (resetEmail) {
+      const body = await getMessageBody(resetEmail.ID);
+      const linkRegex = /href="([^"]*\/auth\/v1\/verify[^"]*)"/i;
+      const linkMatch = linkRegex.exec(body.HTML);
+
+      if (linkMatch?.[1]) {
+        return linkMatch[1]
+          .replace(/&amp;/g, "&")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'");
+      }
+    }
+
+    if (attempt < 5) {
+      const waitTime = 500 * Math.pow(2, attempt);
+      await new Promise((resolve) => setTimeout(resolve, waitTime));
+    }
+  }
+
+  return null;
+}
+```
+
+**Key points**:
+
+- Each worktree runs its own Mailpit instance on different ports
+- Use `process.env.MAILPIT_PORT` for dynamic port configuration
+- Default to 54324 for main worktree (see port allocation table in AGENTS.md)
+- Exponential backoff handles email delivery delays (500ms → 16s)
+- HTML entity decoding required for Supabase verification links
+
 ---
 
 ## Adding New Patterns

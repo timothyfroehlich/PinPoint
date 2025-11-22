@@ -122,7 +122,7 @@ Supabase CLI now exposes new-style local keys:
 
 Use `supabase status` to view them. Our scripts expect:
 
-- `NEXT_PUBLIC_SUPABASE_URL` (e.g., `http://127.0.0.1:54321`)
+- `NEXT_PUBLIC_SUPABASE_URL` (e.g., `http://localhost:54321`)
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (publishable key)
 - `SUPABASE_SECRET_KEY` (secret key)
 

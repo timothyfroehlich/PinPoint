@@ -118,6 +118,8 @@ npm run dev      # uses PORT in .env.local
 
 All worktrees can run Supabase + Next.js simultaneously with no port collisions.
 
+**Host consistency:** Keep auth callbacks, Next dev server, Playwright `baseURL`, and Supabase `site_url` on the same host (`localhost`) to avoid cookie host mismatches. When adding new worktrees or updating `.env.local`, stick to `localhost` and only change the ports.
+
 ### Adding a New Worktree
 
 1. `git worktree add ../PinPoint-<Name> -b feature/<name>` from main repo.

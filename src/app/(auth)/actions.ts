@@ -331,15 +331,13 @@ export async function forgotPasswordAction(
     const host = headersList.get("x-forwarded-host") ?? headersList.get("host");
     const fallback =
       headersList.get("referer")?.split("/").slice(0, 3).join("/") ??
-      `http://127.0.0.1:${process.env["PORT"] ?? "3000"}`;
+      `http://localhost:${process.env["PORT"] ?? "3000"}`;
     const origin =
       process.env["NEXT_PUBLIC_SITE_URL"] ??
       (host ? `${protocol}://${host}` : fallback);
 
     // Validate origin against allowlist to prevent host header injection
     const allowedOrigins = [
-      "http://127.0.0.1:3000",
-      "http://127.0.0.1:3100",
       "http://localhost:3000",
       "http://localhost:3100",
       process.env["NEXT_PUBLIC_SITE_URL"],

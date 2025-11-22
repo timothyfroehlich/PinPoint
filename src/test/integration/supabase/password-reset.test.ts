@@ -21,8 +21,8 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 describe("Password Reset Integration Tests", () => {
   beforeAll(() => {
-    // Ensure we're in a test environment
-    expect(supabaseUrl).toContain("127.0.0.1");
+    // Ensure we're in a test environment (Supabase may return 127.0.0.1 or localhost)
+    expect(supabaseUrl).toMatch(/127\.0\.0\.1|localhost/);
   });
 
   describe("Forgot password flow", () => {

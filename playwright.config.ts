@@ -4,7 +4,9 @@ import { defineConfig, devices } from "@playwright/test";
 // Other worktrees should set PORT in .env.local (3100, 3200, 3300)
 // See AGENTS.md for port allocation table
 const port = Number(process.env.PORT ?? "3000");
-const baseURL = `http://127.0.0.1:${port}`;
+// Keep host consistent with Supabase site_url to avoid cookie host mismatches
+const hostname = process.env.PLAYWRIGHT_HOST ?? "localhost";
+const baseURL = `http://${hostname}:${port}`;
 
 /**
  * Playwright E2E Test Configuration
@@ -67,7 +69,7 @@ export default defineConfig({
 
   // Run your local dev server before starting the tests
   webServer: {
-    command: `PORT=${port} npm run dev`,
+    command: `HOSTNAME=${hostname} PORT=${port} npm run dev -- --hostname ${hostname}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000, // 2 minutes
