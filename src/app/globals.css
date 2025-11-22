@@ -12,9 +12,29 @@
   --color-primary-foreground: #ffffff;
   --color-primary-hover: #1d4ed8; /* blue-700 */
 
+<<<<<<< HEAD
   /* Secondary - Slate/Gray */
   --color-secondary: #f1f5f9; /* slate-100 */
   --color-secondary-foreground: #0f172a; /* slate-900 */
+=======
+  /* Success Colors */
+  --color-success: #2e7d32;
+  --color-on-success: #ffffff;
+  --color-success-container: #b8f397;
+  --color-on-success-container: #002105;
+
+  /* Warning Colors */
+  --color-warning: #ef6c00;
+  --color-on-warning: #ffffff;
+  --color-warning-container: #ffe0b2;
+  --color-on-warning-container: #e65100;
+
+  /* Error Colors */
+  --color-error: #b3261e;
+  --color-on-error: #ffffff;
+  --color-error-container: #f9dedc;
+  --color-on-error-container: #410e0b;
+>>>>>>> origin/main
 
   /* Muted */
   --color-muted: #f8fafc; /* slate-50 */
@@ -62,8 +82,65 @@
 
 /* Dark Mode Overrides (Optional for now, keeping it simple/clean) */
 @media (prefers-color-scheme: dark) {
+<<<<<<< HEAD
   /* We are sticking to the light clean theme for now as requested by the mockup,
      but setting up variables for potential dark mode later */
+=======
+  @theme {
+    /* Primary Colors - Dark */
+    --color-primary: #d0bcff;
+    --color-on-primary: #381e72;
+    --color-primary-container: #4f378b;
+    --color-on-primary-container: #eaddff;
+
+    /* Secondary Colors - Dark */
+    --color-secondary: #ccc2dc;
+    --color-on-secondary: #332d41;
+    --color-secondary-container: #4a4458;
+    --color-on-secondary-container: #e8def8;
+
+    /* Tertiary Colors - Dark */
+    --color-tertiary: #efb8c8;
+    --color-on-tertiary: #492532;
+    --color-tertiary-container: #633b48;
+    --color-on-tertiary-container: #ffd8e4;
+
+    /* Success Colors - Dark */
+    --color-success: #4caf50;
+    --color-on-success: #083810;
+    --color-success-container: #1b5e20;
+    --color-on-success-container: #b8f397;
+
+    /* Warning Colors - Dark */
+    --color-warning: #ff9800;
+    --color-on-warning: #3e2723;
+    --color-warning-container: #e65100;
+    --color-on-warning-container: #ffe0b2;
+
+    /* Error Colors - Dark */
+    --color-error: #f2b8b5;
+    --color-on-error: #601410;
+    --color-error-container: #8c1d18;
+    --color-on-error-container: #f9dedc;
+
+    /* Surface Colors - Dark */
+    --color-surface: #1c1b1f;
+    --color-on-surface: #e6e1e5;
+    --color-surface-variant: #49454f;
+    --color-on-surface-variant: #cac4d0;
+    --color-surface-dim: #1c1b1f;
+    --color-surface-bright: #3b383e;
+
+    /* Outline Colors - Dark */
+    --color-outline: #938f99;
+    --color-outline-variant: #49454f;
+
+    /* Inverse Colors - Dark */
+    --color-inverse-surface: #e6e1e5;
+    --color-inverse-on-surface: #313033;
+    --color-inverse-primary: #6750a4;
+  }
+>>>>>>> origin/main
 }
 
 * {

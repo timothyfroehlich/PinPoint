@@ -19,80 +19,6 @@ Read these immediately before starting work:
 - **`docs/E2E_BEST_PRACTICES.md`** - E2E testing patterns with Playwright
 - **`package.json`** - Available scripts, dependencies, configuration
 
-## Archived v1 Codebase (`.archived_v1/`)
-
-The `.archived_v1/` directory contains the complete production multi-tenant PinPoint v1 application (version 0.2). This is **reference material only** - do not copy code directly from it.
-
-### What's in the Archive
-
-- **Complete Next.js 16 app** - Pages Router with tRPC API layer
-- **Multi-tenant architecture** - Organization scoping, RLS policies, complex auth flows
-- **617-line ESLint config** - 5 custom rules, multiple security plugins, architectural enforcement
-- **Comprehensive testing** - Vitest, Playwright, PGlite, RLS tests
-- **Production patterns** - Error boundaries, loading states, structured logging
-- **96 package.json scripts** - Database management, security scanning, multi-environment support
-
-### How to Use the Archive
-
-**✅ DO:**
-
-- Look at it for **inspiration** - "How did v1 solve this problem?"
-- Compare **patterns** - "Should we use a similar approach?"
-- Learn from **decisions** - "Why did v1 evolve this complexity?"
-- Reference **configurations** - "What ESLint rules did they add and why?"
-- Understand **what problems you'll eventually face** - "When should we add security plugins?"
-
-**❌ DON'T:**
-
-- Copy code blindly - v1 is multi-tenant, v2 is single-tenant
-- Add v1's complexity prematurely - those patterns evolved from real pain points
-- Implement v1's abstraction layers - DAL, tRPC, service layers aren't needed yet
-- Port v1's custom ESLint rules - wait until you see the same violation 3+ times
-- Replicate v1's 96 scripts - add scripts when you actually need them
-
-### Key Differences v1 → v2
-
-| Aspect          | v1 (Archived)               | v2 (Current)                                |
-| --------------- | --------------------------- | ------------------------------------------- |
-| **Tenancy**     | Multi-tenant with RLS       | Single-tenant, no RLS                       |
-| **API Layer**   | tRPC procedures             | Direct Drizzle in Server Components/Actions |
-| **Data Access** | DAL + repository pattern    | Direct queries (Rule of Three)              |
-| **Auth**        | Supabase SSR + RLS policies | Supabase SSR only                           |
-| **Router**      | Pages Router                | App Router                                  |
-| **Testing**     | 150+ tests with RLS         | Building progressively (PR 5)               |
-| **ESLint**      | 617 lines, 5 custom rules   | 20 high-value rules (grows as needed)       |
-| **Complexity**  | Production-ready enterprise | MVP greenfield simplicity                   |
-
-### Example: ESLint Evolution
-
-**v1 has:**
-
-- Custom rule: `no-duplicate-auth-resolution` (catches calling getUser() twice)
-- Custom rule: `no-missing-cache-wrapper` (enforces React cache() on fetchers)
-- Security plugins detecting eval(), SQL injection, XSS patterns
-- Architectural boundary rules preventing DAL cross-imports
-
-**v2 starts with:**
-
-- Core type safety (no any, explicit return types)
-- Promise handling (prevents fire-and-forget bugs)
-- Unused imports cleanup
-
-**When to add v1's rules to v2:** After you've encountered the problem 3+ times and established the pattern to enforce.
-
-### Using Archive for Decision Making
-
-When facing a decision, ask:
-
-1. **Did v1 solve this?** Look in archive for reference
-2. **Why did v1 do it that way?** Understand the context (multi-tenant, production scale)
-3. **Do we need that complexity now?** Usually no - MVP first, complexity later
-4. **What's the v2 equivalent?** Adapt for single-tenant, simpler architecture
-
-**Example:** v1 has a `createOrganizationContext()` function that wraps every data access. We don't need that in v2 because we're single-tenant - just query Drizzle directly.
-
-**Remember:** The archive shows you what PinPoint **becomes** at production scale with multiple tenants. Start simple and evolve toward that complexity only when real needs demand it.
-
 ## Project Context
 
 ### Status
@@ -162,6 +88,64 @@ When facing a decision, ask:
 | --------------- | ------------------ | ----------------------------------------- |
 | `npm test 2>&1` | `npm test`         | Vitest treats redirection as test filters |
 | `find`          | `rg --files`, `fd` | Safer/faster search                       |
+
+## Multi-Worktree Development Setup
+
+PinPoint uses parallel git worktrees so multiple assistants can work without stepping on each other. Each worktree runs its own Supabase instance on unique ports; changes to `supabase/config.toml` are kept local via `git update-index --skip-worktree`.
+
+### Port Allocation
+
+| Worktree    | Next.js | Supabase API | PostgreSQL | Shadow DB | Inbucket | project_id           |
+| ----------- | ------- | ------------ | ---------- | --------- | -------- | -------------------- |
+| Main        | 3000    | 54321        | 54322      | 54320     | 54324    | pinpoint             |
+| Secondary   | 3100    | 55321        | 55322      | 55320     | 55324    | pinpoint-secondary   |
+| Review      | 3200    | 56321        | 56322      | 56320     | 56324    | pinpoint-review      |
+| AntiGravity | 3300    | 57321        | 57322      | 57320     | 57324    | pinpoint-antigravity |
+
+### How It Works
+
+- Each non-main worktree edits its own `supabase/config.toml` (ports + `project_id`) and marks it `skip-worktree` so git ignores local changes.
+- `.env.local` (gitignored) holds worktree-specific ports/keys.
+- CI stays on the main config/ports; no CI changes required.
+
+### Starting Development
+
+```bash
+cd ~/Code/PinPoint-Secondary
+supabase start   # uses this worktree's config.toml ports/project_id
+npm run dev      # uses PORT in .env.local
+```
+
+All worktrees can run Supabase + Next.js simultaneously with no port collisions.
+
+### Adding a New Worktree
+
+1. `git worktree add ../PinPoint-<Name> -b feature/<name>` from main repo.
+2. Edit `supabase/config.toml`: bump all Supabase ports by +1000 per slot, set unique `project_id`, update auth `site_url` to the new Next.js port.
+3. Apply skip flag: `git update-index --skip-worktree supabase/config.toml`.
+4. Copy `.env.example` → `.env.local`, set `PORT`, `NEXT_PUBLIC_SUPABASE_URL`, `DATABASE_URL` to the new ports, then run `npm install`.
+
+### Updating Base Config
+
+When `supabase/config.toml` changes in the main worktree, manually refresh others:
+
+```bash
+git update-index --no-skip-worktree supabase/config.toml
+git restore supabase/config.toml   # or pull latest
+# re-apply worktree-specific ports/project_id
+git update-index --skip-worktree supabase/config.toml
+```
+
+### Checking Skip-Worktree Status
+
+- `git ls-files -v supabase/config.toml` → prefix `S` means skip-worktree.
+- Remove skip (before deleting a worktree): `git update-index --no-skip-worktree supabase/config.toml`.
+
+### Troubleshooting
+
+- **Port already in use:** `lsof -i :55321` then `supabase stop` in that worktree.
+- **Git shows config.toml modified:** re-apply skip-worktree.
+- **Supabase keys changed after restart:** run `supabase start`, copy new `PUBLISHABLE_KEY/SERVICE_ROLE_KEY` into `.env.local`.
 
 ### Available Commands
 

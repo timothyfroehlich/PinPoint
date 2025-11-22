@@ -10,8 +10,13 @@ export default function ReportSuccessPage(): React.JSX.Element {
       <div className="container mx-auto max-w-xl px-4">
         <Card className="shadow-lg text-center space-y-0">
           <CardHeader className="space-y-3">
+<<<<<<< HEAD
             <CheckCircle className="mx-auto size-10 text-primary" />
             <CardTitle className="text-3xl text-foreground">
+=======
+            <CheckCircle className="mx-auto size-12 text-primary" />
+            <CardTitle className="text-3xl text-on-surface">
+>>>>>>> origin/main
               Thank You for Reporting This Issue!
             </CardTitle>
           </CardHeader>

@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # npm dependencies
+  # npm dependencies with different cooldowns per update type
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
@@ -13,6 +13,11 @@ updates:
       prefix: "chore(deps)"
       prefix-development: "chore(deps)"
       include: "scope"
+    # Cooldown: 2 weeks for minor/patch, 1 month for major
+    cooldown:
+      semver-major-days: 30
+      semver-minor-days: 14
+      semver-patch-days: 14
     groups:
       # Group minor and patch updates together
       minor-patch-updates:
@@ -20,31 +25,29 @@ updates:
         update-types:
           - "minor"
           - "patch"
-      # Group security updates separately for immediate attention
+      # Group minor and patch security updates
       security-updates:
         applies-to: security-updates
         update-types:
-          - "major"
           - "minor"
           - "patch"
     labels:
       - "dependencies"
       - "npm"
 
-  # GitHub Actions (when workflows are activated)
+  # GitHub Actions with 2-week cooldown
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
-    versioning-strategy: increase
     open-pull-requests-limit: 5
-    rebase-strategy: "auto"
     commit-message:
       prefix: "chore(deps)"
       prefix-development: "chore(deps)"
       include: "scope"
+    # 2 week cooldown for all GitHub Actions updates
+    cooldown:
+      default-days: 14
     labels:
       - "dependencies"
       - "github-actions"
-    reviewers:
-      - "timothyfroehlich"

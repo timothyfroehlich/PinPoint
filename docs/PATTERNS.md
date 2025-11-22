@@ -785,6 +785,95 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
 
 ---
 
+## Dashboard Queries
+
+### Member Dashboard Pattern
+
+```typescript
+// src/app/(app)/dashboard/page.tsx
+import { db } from "~/server/db";
+import { issues, machines, userProfiles } from "~/server/db/schema";
+import { eq, desc, and, ne, sql } from "drizzle-orm";
+import {
+  deriveMachineStatus,
+  type IssueForStatus,
+} from "~/lib/machines/status";
+
+export default async function DashboardPage() {
+  // 1. Auth guard and get user profile
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+
+  const userProfile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, user.id),
+  });
+
+  if (!userProfile) redirect("/login");
+
+  // 2. Query assigned issues (open only)
+  const assignedIssues = await db.query.issues.findMany({
+    where: and(
+      eq(issues.assignedTo, userProfile.id),
+      ne(issues.status, "resolved")
+    ),
+    orderBy: desc(issues.createdAt),
+    limit: 10,
+    with: {
+      machine: { columns: { id: true, name: true } },
+    },
+  });
+
+  // 3. Query recent issues (last 10)
+  const recentIssues = await db.query.issues.findMany({
+    orderBy: desc(issues.createdAt),
+    limit: 10,
+    with: {
+      machine: { columns: { id: true, name: true } },
+      reportedByUser: { columns: { id: true, name: true } },
+    },
+  });
+
+  // 4. Query machines and filter to unplayable
+  const allMachines = await db.query.machines.findMany({
+    with: {
+      issues: { columns: { id: true, status: true, severity: true } },
+    },
+  });
+
+  const unplayableMachines = allMachines
+    .map((machine) => ({
+      ...machine,
+      status: deriveMachineStatus(machine.issues as IssueForStatus[]),
+    }))
+    .filter((machine) => machine.status === "unplayable");
+
+  // 5. Calculate stats with SQL count
+  const totalOpenIssuesResult = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(issues)
+    .where(ne(issues.status, "resolved"));
+
+  const totalOpenIssues = totalOpenIssuesResult[0]?.count ?? 0;
+
+  // Render dashboard with data...
+}
+```
+
+**Key points**:
+
+- Fetch user profile separately to get database ID (Supabase auth user ID matches user_profiles.id)
+- Filter assigned issues to open only (`ne(issues.status, "resolved")`)
+- Use `limit: 10` for recent issues to avoid over-fetching
+- Derive machine status from issues (don't store status in DB)
+- Use SQL `count(*)::int` for stats instead of fetching all records
+- All queries in same Server Component - no separate data layer (CORE-ARCH-003)
+
+---
+
 ## Adding New Patterns
 
 **When to add a pattern**:
