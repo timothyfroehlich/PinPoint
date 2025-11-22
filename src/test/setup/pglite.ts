@@ -47,8 +47,15 @@ export async function getTestDb() {
   );
   const schemaSql = readFileSync(schemaPath, "utf-8");
 
+  // Create auth schema for auth.users table
+  await pgliteInstance.exec("CREATE SCHEMA IF NOT EXISTS auth;");
+
   // Apply schema (create tables and constraints)
   await pgliteInstance.exec(schemaSql);
+
+  const schemaPath1 = join(__dirname, "migrations", "0001_third_joseph.sql");
+  const schemaSql1 = readFileSync(schemaPath1, "utf-8");
+  await pgliteInstance.exec(schemaSql1);
 
   return testDb;
 }

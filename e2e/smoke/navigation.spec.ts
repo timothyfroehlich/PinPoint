@@ -158,7 +158,7 @@ test.describe.serial("Navigation", () => {
     await loginAs(page);
 
     // Try to navigate to home page
-    await page.goto("/");
+    await page.goto("/", { waitUntil: "networkidle" });
 
     // Should automatically redirect to dashboard
     await expect(page).toHaveURL("/dashboard");

@@ -181,6 +181,7 @@ export default async function IssueDetailPage({
                       ? "bg-status-inprogress text-status-inprogress-text"
                       : "bg-status-new text-status-new-text"
                 }`}
+                data-testid="issue-status-badge"
               >
                 {issue.status === "in_progress"
                   ? "In Progress"
@@ -192,6 +193,7 @@ export default async function IssueDetailPage({
               <Badge
                 variant="outline"
                 className={`px-2.5 py-0.5 text-sm font-medium ${severityClasses[issue.severity]}`}
+                data-testid="issue-severity-badge"
               >
                 {severityCopy[issue.severity]}
               </Badge>

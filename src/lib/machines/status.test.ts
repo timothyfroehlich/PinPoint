@@ -96,9 +96,9 @@ describe("getMachineStatusLabel", () => {
 describe("getMachineStatusStyles", () => {
   it("should return correct styles for operational status", () => {
     const styles = getMachineStatusStyles("operational");
-    expect(styles).toContain("bg-success-container");
-    expect(styles).toContain("text-on-success-container");
-    expect(styles).toContain("border-success");
+    expect(styles).toContain("bg-status-operational");
+    expect(styles).toContain("text-status-operational-foreground");
+    expect(styles).toContain("border-status-operational");
   });
 
   it("should return correct styles for needs_service status", () => {
@@ -112,6 +112,6 @@ describe("getMachineStatusStyles", () => {
     const styles = getMachineStatusStyles("unplayable");
     expect(styles).toContain("bg-destructive/10");
     expect(styles).toContain("text-destructive");
-    expect(styles).toContain("border-error");
+    expect(styles).toContain("border-destructive");
   });
 });

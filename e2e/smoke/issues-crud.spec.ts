@@ -224,9 +224,12 @@ test.describe("Issues System", () => {
       rememberIssueId(page);
 
       // Should show metadata
-      await expect(page.getByText(/Machine:/)).toBeVisible();
+      // Machine name is shown as link, not with label "Machine:"
+      await expect(
+        page.getByRole("link", { name: "The Addams Family" })
+      ).toBeVisible();
       await expect(page.getByText(/Reported by:/)).toBeVisible();
-      await expect(page.getByText(/Reported:/)).toBeVisible();
+      await expect(page.getByText(/Opened/)).toBeVisible();
 
       // Should show status and severity badges
       await expect(page.getByTestId("issue-status-badge")).toHaveText(/New/i);
