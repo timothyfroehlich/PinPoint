@@ -100,7 +100,7 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
 
     await setFlash({
       type: "success",
-      message: "Welcome back!",
+      message: "Signed in successfully",
     });
 
     // Return success (redirect happens in page component)
@@ -328,14 +328,35 @@ export async function forgotPasswordAction(
       headersList.get("x-forwarded-proto") ??
       headersList.get("origin")?.split("://")[0] ??
       "http";
-    const host =
-      headersList.get("x-forwarded-host") ?? headersList.get("host");
+    const host = headersList.get("x-forwarded-host") ?? headersList.get("host");
     const fallback =
       headersList.get("referer")?.split("/").slice(0, 3).join("/") ??
       `http://127.0.0.1:${process.env["PORT"] ?? "3000"}`;
     const origin =
       process.env["NEXT_PUBLIC_SITE_URL"] ??
       (host ? `${protocol}://${host}` : fallback);
+
+    // Validate origin against allowlist to prevent host header injection
+    const allowedOrigins = [
+      "http://127.0.0.1:3000",
+      "http://127.0.0.1:3100",
+      "http://localhost:3000",
+      "http://localhost:3100",
+      process.env["NEXT_PUBLIC_SITE_URL"],
+    ].filter((url): url is string => typeof url === "string");
+
+    if (!allowedOrigins.some((allowed) => origin.startsWith(allowed))) {
+      log.warn(
+        { origin, action: "forgot-password" },
+        "Invalid origin detected for password reset"
+      );
+      await setFlash({
+        type: "error",
+        message: "Failed to send reset email. Please try again.",
+      });
+      return err("SERVER", "Invalid origin for password reset");
+    }
+
     log.info(
       { action: "forgot-password", origin },
       "Resolved password reset redirect origin"

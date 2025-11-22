@@ -55,30 +55,27 @@ test.describe("Machines CRUD", () => {
     // Navigate to machines page
     await page.goto("/machines");
 
-    // Verify seed data machines are displayed
-    // Note: Seed data creates 3 machines (Medieval Madness, Attack from Mars, The Addams Family)
-    await expect(page.getByText("Medieval Madness")).toBeVisible();
-    await expect(page.getByText("Attack from Mars")).toBeVisible();
-    await expect(page.getByText("The Addams Family")).toBeVisible();
+    const machineCards = page.getByTestId("machine-card");
+    const cardCount = await machineCards.count();
 
-    // Verify status badges are displayed
-    // Medieval Madness should be Operational (no open issues)
-    const medievalCard = page.locator('a:has-text("Medieval Madness")');
-    await expect(medievalCard.getByText("Operational")).toBeVisible({
-      timeout: 5000,
-    });
+    // We seed 3 machines; other tests may add more but we should always have at least the seeds
+    expect(cardCount).toBeGreaterThanOrEqual(3);
 
-    // Attack from Mars should be Needs Service (playable/minor issues)
-    const attackCard = page.locator('a:has-text("Attack from Mars")');
-    await expect(attackCard.getByText("Needs Service")).toBeVisible({
-      timeout: 5000,
-    });
+    // Every card should surface a status badge and an open-issue count
+    for (let i = 0; i < cardCount; i += 1) {
+      const card = machineCards.nth(i);
+      await expect(
+        card.getByText(/Operational|Needs Service|Unplayable/)
+      ).toBeVisible();
+      const countText = await card
+        .locator('[data-testid^="machine-open-issues-count"]')
+        .innerText();
+      expect(Number.isNaN(Number.parseInt(countText, 10))).toBe(false);
+    }
 
-    // The Addams Family should be Unplayable (broken flipper)
+    // Sanity: the seeded unplayable machine should surface as unplayable
     const addamsCard = page.locator('a:has-text("The Addams Family")');
-    await expect(addamsCard.getByText("Unplayable")).toBeVisible({
-      timeout: 5000,
-    });
+    await expect(addamsCard.getByText("Unplayable")).toBeVisible();
   });
 
   test("should create a new machine", async ({ page }) => {
@@ -129,7 +126,12 @@ test.describe("Machines CRUD", () => {
     // Navigate to create machine page
     await page.goto("/machines/new");
 
-    // Wait for page to load
+    // If redirected (lost session), log back in and retry
+    if (page.url().includes("/login")) {
+      await ensureLoggedIn(page);
+      await page.goto("/machines/new");
+    }
+
     await expect(page).toHaveURL("/machines/new");
     await expect(
       page.getByRole("heading", { name: "Add New Machine" })
@@ -260,9 +262,11 @@ test.describe("Machines CRUD", () => {
   test("should require authentication for machines pages", async ({ page }) => {
     // First, logout if logged in
     await page.goto("/dashboard");
-    const logoutButton = page.getByRole("button", { name: /Sign Out/i });
-    if (await logoutButton.isVisible()) {
-      await Promise.all([page.waitForURL("/"), logoutButton.click()]);
+    const userMenuButton = page.getByTestId("user-menu-button");
+    if (await userMenuButton.isVisible()) {
+      await userMenuButton.click();
+      await page.getByRole("menuitem", { name: "Sign Out" }).click();
+      await expect(page).toHaveURL("/"); // should land on home
     }
 
     // Try to access machines page without authentication

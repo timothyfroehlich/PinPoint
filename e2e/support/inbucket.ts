@@ -13,7 +13,7 @@ const MAILPIT_URL = "http://127.0.0.1:54324";
 interface MailpitMessage {
   ID: string;
   From: { Address: string };
-  To: Array<{ Address: string }>;
+  To: { Address: string }[];
   Subject: string;
   Created: string;
   Size: number;
@@ -22,7 +22,7 @@ interface MailpitMessage {
 
 interface MailpitMessagesResponse {
   total: number;
-  messages: MailpitMessage[];
+  messages?: MailpitMessage[];
 }
 
 interface MailpitMessageBody {
@@ -58,7 +58,7 @@ export async function getMessages(
     const data = (await response.json()) as MailpitMessagesResponse;
 
     // Filter messages for this email address
-    const filtered = data.messages.filter((msg) =>
+    const filtered = (data.messages ?? []).filter((msg) =>
       msg.To.some((recipient) => recipient.Address === email)
     );
 
@@ -85,9 +85,7 @@ export async function getMessageBody(
   const response = await fetch(`${MAILPIT_URL}/api/v1/message/${messageId}`);
 
   if (!response.ok) {
-    throw new Error(
-      `Failed to fetch Mailpit message body: ${response.status}`
-    );
+    throw new Error(`Failed to fetch Mailpit message body: ${response.status}`);
   }
 
   return (await response.json()) as MailpitMessageBody;

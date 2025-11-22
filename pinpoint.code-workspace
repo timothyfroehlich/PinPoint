@@ -1,0 +1,34 @@
+{
+  // Multi-worktree workspace configuration
+  // Paths are intentionally hardcoded to match scripts/sync-worktrees.sh
+  // This assumes worktrees are created in ~/Code/PinPoint-* directories
+  "folders": [
+    {
+      "path": ".",
+      "name": "PinPoint (Main - 3000)"
+    },
+    {
+      "path": "../PinPoint-Secondary",
+      "name": "PinPoint (Secondary - 3100)"
+    },
+    {
+      "path": "../PinPoint-review",
+      "name": "PinPoint (Review - 3200)"
+    },
+    {
+      "path": "../PinPoint-AntiGravity",
+      "name": "PinPoint (AntiGravity - 3300)"
+    }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/.next": true
+    },
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/.next": true,
+      "**/coverage": true
+    }
+  }
+}

@@ -1,7 +1,14 @@
-import { createServerClient } from "@supabase/ssr";
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
+/**
+ * Auth callback route requires direct use of createServerClient with custom cookie handling
+ * to properly set cookies in the response. Standard SSR wrapper cannot be used here.
+ * The `any` types from createServerClient are unavoidable in this context.
+ */
+
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import { type NextRequest } from "next/server";
-import type { EmailOtpType, CookieOptions } from "@supabase/supabase-js";
+import type { EmailOtpType } from "@supabase/supabase-js";
 
 /**
  * Validates that a redirect URL is safe (internal to the application)
@@ -138,7 +145,7 @@ function isValidEmailOtpType(value: string | null): value is EmailOtpType {
 
 function createSupabaseClient(request: NextRequest): {
   supabase: ReturnType<typeof createServerClient>;
-  pendingCookies: Array<{ name: string; value: string; options?: CookieOptions }>;
+  pendingCookies: { name: string; value: string; options?: CookieOptions }[];
 } {
   const supabaseUrl = process.env["NEXT_PUBLIC_SUPABASE_URL"];
   const supabaseKey = process.env["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"];
@@ -149,11 +156,11 @@ function createSupabaseClient(request: NextRequest): {
     );
   }
 
-  const pendingCookies: Array<{
+  const pendingCookies: {
     name: string;
     value: string;
     options?: CookieOptions;
-  }> = [];
+  }[] = [];
 
   const supabase = createServerClient(supabaseUrl, supabaseKey, {
     cookies: {
@@ -173,10 +180,14 @@ function createSupabaseClient(request: NextRequest): {
 
 function applyCookies(
   response: NextResponse,
-  cookies: Array<{ name: string; value: string; options?: CookieOptions }>
+  cookies: { name: string; value: string; options?: CookieOptions }[]
 ): NextResponse {
   cookies.forEach(({ name, value, options }) => {
-    response.cookies.set(name, value, options);
+    if (options) {
+      response.cookies.set(name, value, options);
+    } else {
+      response.cookies.set(name, value);
+    }
   });
   return response;
 }
