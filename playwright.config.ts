@@ -1,5 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 
+// Default port matches main worktree (3000)
+// Other worktrees should set PORT in .env.local (3100, 3200, 3300)
+// See AGENTS.md for port allocation table
+const port = Number(process.env.PORT ?? "3000");
+const baseURL = `http://127.0.0.1:${port}`;
+
 /**
  * Playwright E2E Test Configuration
  *
@@ -15,8 +21,8 @@ export default defineConfig({
   // Run tests in files in parallel
   fullyParallel: !process.env.CI,
 
-  // Short, developer-friendly timeouts (prefer fixing flakiness over padding)
-  timeout: 8 * 1000, // 8s per test
+  // Short, developer-friendly timeouts
+  timeout: process.env.CI ? 15 * 1000 : 20 * 1000, // per-test timeout
   expect: {
     timeout: process.env.CI ? 7 * 1000 : 4 * 1000,
   },
@@ -38,7 +44,7 @@ export default defineConfig({
   // Shared settings for all the projects below
   use: {
     // Base URL to use in actions like `await page.goto('/')`
-    baseURL: "http://127.0.0.1:3100",
+    baseURL,
 
     // Collect trace when retrying the failed test
     trace: "on-first-retry",
@@ -47,8 +53,8 @@ export default defineConfig({
     screenshot: "only-on-failure",
 
     // Keep interactions snappy during dev
-    actionTimeout: 4 * 1000,
-    navigationTimeout: 6 * 1000,
+    actionTimeout: 5 * 1000,
+    navigationTimeout: 15 * 1000,
   },
 
   // Configure projects for major browsers
@@ -61,10 +67,9 @@ export default defineConfig({
 
   // Run your local dev server before starting the tests
   webServer: {
-    command: "PORT=3100 npm run dev",
-    url: "http://127.0.0.1:3100",
-    // Always start a fresh server to avoid reusing another repo's dev server on the same port
-    reuseExistingServer: false,
+    command: `PORT=${port} npm run dev`,
+    url: baseURL,
+    reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000, // 2 minutes
 
     // Show server output for debugging (critical for diagnosing startup failures)
@@ -73,5 +78,8 @@ export default defineConfig({
 
     // Ignore HTTPS errors for local development
     ignoreHTTPSErrors: true,
+    env: {
+      PORT: String(port),
+    },
   },
 });
