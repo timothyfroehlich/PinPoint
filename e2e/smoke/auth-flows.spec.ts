@@ -318,6 +318,9 @@ test.describe("Authentication", () => {
       await page.goto("/login");
     }
 
+    // Ensure we're on the login page before trying to fill the form
+    await expect(page).toHaveURL("/login");
+
     // Verify can login with new password
     await page.getByLabel("Email").fill(testEmail);
     await page.getByLabel("Password").fill(newPassword);
