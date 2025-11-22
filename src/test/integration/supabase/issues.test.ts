@@ -396,6 +396,65 @@ describe("Issues CRUD Operations (PGlite)", () => {
     });
   });
 
+  describe("Anonymous Issue Reporting", () => {
+    it("should create an issue with null reporter", async () => {
+      const db = await getTestDb();
+
+      const [issue] = await db
+        .insert(issues)
+        .values({
+          title: "Public Issue",
+          machineId: testMachine.id,
+          severity: "minor",
+          reportedBy: null,
+        })
+        .returning();
+
+      expect(issue).toBeDefined();
+      expect(issue.reportedBy).toBeNull();
+    });
+
+    it("should include anonymous issues in member issue lists", async () => {
+      const db = await getTestDb();
+
+      await db.insert(issues).values([
+        {
+          title: "Member Issue",
+          machineId: testMachine.id,
+          severity: "playable",
+          reportedBy: testUser.id,
+        },
+        {
+          title: "Anonymous Issue",
+          machineId: testMachine.id,
+          severity: "unplayable",
+          reportedBy: null,
+        },
+      ]);
+
+      const results = await db.query.issues.findMany({
+        where: eq(issues.machineId, testMachine.id),
+        with: {
+          reportedByUser: {
+            columns: { id: true, name: true },
+          },
+        },
+      });
+
+      const anonymous = results.find(
+        (issue) => issue.title === "Anonymous Issue"
+      );
+      const memberIssue = results.find(
+        (issue) => issue.title === "Member Issue"
+      );
+
+      expect(anonymous).toBeDefined();
+      expect(anonymous?.reportedBy).toBeNull();
+      expect(anonymous?.reportedByUser).toBeNull();
+      expect(memberIssue?.reportedByUser?.name).toBe("Test User");
+    });
+  });
+
   describe("Cascade Deletion", () => {
     it("should delete issues when machine is deleted", async () => {
       const db = await getTestDb();
