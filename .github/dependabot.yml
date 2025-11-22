@@ -1,20 +1,21 @@
 version: 2
 updates:
-  # npm dependencies - minor and patch updates (2 week cooldown)
+  # npm dependencies with different cooldowns per update type
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "daily"
     target-branch: "main"
     versioning-strategy: increase
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 5
     rebase-strategy: "auto"
     commit-message:
       prefix: "chore(deps)"
       prefix-development: "chore(deps)"
       include: "scope"
-    # 2 week cooldown for minor and patch updates
+    # Cooldown: 2 weeks for minor/patch, 1 month for major
     cooldown:
+      semver-major-days: 30
       semver-minor-days: 14
       semver-patch-days: 14
     groups:
@@ -34,42 +35,21 @@ updates:
       - "dependencies"
       - "npm"
 
-  # npm dependencies - major updates (1 month cooldown, individual PRs)
-  - package-ecosystem: "npm"
-    directory: "/"
-    schedule:
-      interval: "daily"
-    target-branch: "main"
-    versioning-strategy: increase
-    open-pull-requests-limit: 2
-    rebase-strategy: "auto"
-    commit-message:
-      prefix: "chore(deps)"
-      prefix-development: "chore(deps)"
-      include: "scope"
-    # 1 month cooldown for major version updates
-    cooldown:
-      semver-major-days: 30
-    # No groups defined - major updates create individual PRs
-    labels:
-      - "dependencies"
-      - "npm"
-      - "major-update"
-
-  # GitHub Actions - minor and patch updates (2 week cooldown)
+  # GitHub Actions with different cooldowns per update type
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
     versioning-strategy: increase
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 5
     rebase-strategy: "auto"
     commit-message:
       prefix: "chore(deps)"
       prefix-development: "chore(deps)"
       include: "scope"
-    # 2 week cooldown for minor and patch updates
+    # Cooldown: 2 weeks for minor/patch, 1 month for major
     cooldown:
+      semver-major-days: 30
       semver-minor-days: 14
       semver-patch-days: 14
     groups:
@@ -88,28 +68,3 @@ updates:
     labels:
       - "dependencies"
       - "github-actions"
-    reviewers:
-      - "timothyfroehlich"
-
-  # GitHub Actions - major updates (1 month cooldown, individual PRs)
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    versioning-strategy: increase
-    open-pull-requests-limit: 2
-    rebase-strategy: "auto"
-    commit-message:
-      prefix: "chore(deps)"
-      prefix-development: "chore(deps)"
-      include: "scope"
-    # 1 month cooldown for major version updates
-    cooldown:
-      semver-major-days: 30
-    # No groups defined - major updates create individual PRs
-    labels:
-      - "dependencies"
-      - "github-actions"
-      - "major-update"
-    reviewers:
-      - "timothyfroehlich"
