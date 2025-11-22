@@ -34,7 +34,13 @@ test.describe("Public Issue Reporting", () => {
         text: option.text,
       }));
     });
-    await select.selectOption({ label: "Medieval Madness" });
+
+    // Select first available machine (avoid seed data dependency)
+    const firstMachine = options.find((opt) => opt.value !== "");
+    if (!firstMachine) {
+      throw new Error("No machines available for testing");
+    }
+    await select.selectOption({ value: firstMachine.value });
     const issueTitle = `${PUBLIC_PREFIX} ${Date.now()}`;
     await page.getByLabel("Issue Title *").fill(issueTitle);
     await page

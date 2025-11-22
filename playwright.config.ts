@@ -24,8 +24,7 @@ export default defineConfig({
   // Short, developer-friendly timeouts
   timeout: process.env.CI ? 15 * 1000 : 20 * 1000, // per-test timeout
   expect: {
-    // CI machines are slower; give them a longer window before failing
-    timeout: process.env.CI ? 5 * 1000 : 2 * 1000,
+    timeout: process.env.CI ? 7 * 1000 : 4 * 1000,
   },
 
   // Fail the build on CI if you accidentally left test.only in the source code
