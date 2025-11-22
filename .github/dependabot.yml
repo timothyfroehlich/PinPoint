@@ -1,37 +1,32 @@
 version: 2
 updates:
-  # npm dependencies
+  # npm dependencies - minor and patch updates (2 week cooldown)
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "daily"
     target-branch: "main"
     versioning-strategy: increase
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
     rebase-strategy: "auto"
     commit-message:
       prefix: "chore(deps)"
       prefix-development: "chore(deps)"
       include: "scope"
-    # Cooldown configuration to avoid overwhelming with updates
+    # 2 week cooldown for minor and patch updates
     cooldown:
-      # 2 weeks for minor and patch updates
-      - duration: 14
-        update-types:
-          - "minor"
-          - "patch"
-      # 1 month (30 days) for major version updates
-      - duration: 30
-        update-types:
-          - "major"
+      duration: 14
+      update-types:
+        - "minor"
+        - "patch"
     groups:
-      # Group minor and patch updates together (major updates are individual PRs)
+      # Group minor and patch updates together
       minor-patch-updates:
         applies-to: version-updates
         update-types:
           - "minor"
           - "patch"
-      # Group minor and patch security updates (major security updates are individual PRs)
+      # Group minor and patch security updates
       security-updates:
         applies-to: security-updates
         update-types:
@@ -41,37 +36,56 @@ updates:
       - "dependencies"
       - "npm"
 
-  # GitHub Actions (when workflows are activated)
-  - package-ecosystem: "github-actions"
+  # npm dependencies - major updates (1 month cooldown, individual PRs)
+  - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
+    target-branch: "main"
     versioning-strategy: increase
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 2
     rebase-strategy: "auto"
     commit-message:
       prefix: "chore(deps)"
       prefix-development: "chore(deps)"
       include: "scope"
-    # Cooldown configuration to avoid overwhelming with updates
+    # 1 month cooldown for major version updates
     cooldown:
-      # 2 weeks for minor and patch updates
-      - duration: 14
-        update-types:
-          - "minor"
-          - "patch"
-      # 1 month (30 days) for major version updates
-      - duration: 30
-        update-types:
-          - "major"
+      duration: 30
+      update-types:
+        - "major"
+    # No groups defined - major updates create individual PRs
+    labels:
+      - "dependencies"
+      - "npm"
+      - "major-update"
+
+  # GitHub Actions - minor and patch updates (2 week cooldown)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    versioning-strategy: increase
+    open-pull-requests-limit: 3
+    rebase-strategy: "auto"
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps)"
+      include: "scope"
+    # 2 week cooldown for minor and patch updates
+    cooldown:
+      duration: 14
+      update-types:
+        - "minor"
+        - "patch"
     groups:
-      # Group minor and patch updates together (major updates are individual PRs)
+      # Group minor and patch updates together
       minor-patch-updates:
         applies-to: version-updates
         update-types:
           - "minor"
           - "patch"
-      # Group minor and patch security updates (major security updates are individual PRs)
+      # Group minor and patch security updates
       security-updates:
         applies-to: security-updates
         update-types:
@@ -80,5 +94,30 @@ updates:
     labels:
       - "dependencies"
       - "github-actions"
+    reviewers:
+      - "timothyfroehlich"
+
+  # GitHub Actions - major updates (1 month cooldown, individual PRs)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    versioning-strategy: increase
+    open-pull-requests-limit: 2
+    rebase-strategy: "auto"
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps)"
+      include: "scope"
+    # 1 month cooldown for major version updates
+    cooldown:
+      duration: 30
+      update-types:
+        - "major"
+    # No groups defined - major updates create individual PRs
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "major-update"
     reviewers:
       - "timothyfroehlich"
