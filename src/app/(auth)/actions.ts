@@ -332,9 +332,11 @@ export async function forgotPasswordAction(
     const fallback =
       headersList.get("referer")?.split("/").slice(0, 3).join("/") ??
       `http://localhost:${process.env["PORT"] ?? "3000"}`;
+    const siteUrl = process.env["NEXT_PUBLIC_SITE_URL"];
     const origin =
-      process.env["NEXT_PUBLIC_SITE_URL"] ??
-      (host ? `${protocol}://${host}` : fallback);
+      (typeof siteUrl === "string" && siteUrl.length > 0
+        ? siteUrl
+        : undefined) ?? (host ? `${protocol}://${host}` : fallback);
 
     // Validate origin against allowlist to prevent host header injection
     const allowedOrigins = [
@@ -342,8 +344,8 @@ export async function forgotPasswordAction(
       "http://localhost:3100",
       "http://localhost:3200",
       "http://localhost:3300",
-      process.env["NEXT_PUBLIC_SITE_URL"],
-    ].filter((url): url is string => typeof url === "string");
+      siteUrl,
+    ].filter((url): url is string => typeof url === "string" && url.length > 0);
 
     if (!allowedOrigins.some((allowed) => origin.startsWith(allowed))) {
       log.warn(

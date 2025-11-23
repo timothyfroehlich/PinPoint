@@ -14,12 +14,12 @@ import type { EmailOtpType } from "@supabase/supabase-js";
  * Validates that a redirect URL is safe (internal to the application)
  * Prevents open redirect vulnerabilities
  */
-function isInternalUrl(url: string): boolean {
+export function isInternalUrl(url: string): boolean {
   // Allow paths starting with / but not // (absolute protocol-relative)
   return url.startsWith("/") && !url.startsWith("//");
 }
 
-function resolveRedirectPath(options: {
+export function resolveRedirectPath(options: {
   nextParam: string | null;
   origin: string;
   forwardedHost: string | null;

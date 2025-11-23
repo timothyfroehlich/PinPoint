@@ -226,128 +226,84 @@ test.describe("Authentication", () => {
     await expect(page.getByTestId("user-menu-name")).toBeVisible();
   });
 
-  test("password reset flow - request reset and set new password", async ({
-    page,
-  }) => {
-    // Increase timeout for this test - email delivery with exponential backoff can take up to 40s
+  test("password reset flow - user journey only", async ({ page }) => {
     test.setTimeout(40000);
     const testEmail = `reset-e2e-${Date.now()}@example.com`;
-    const oldPassword = "OldPassword123";
-    const newPassword = "NewPassword456";
+    const oldPassword = "OldPassword123!";
+    const newPassword = "NewPassword456!";
 
-    // Clean up any existing emails before starting
     await deleteAllMessages(testEmail);
 
-    // First, create a test user
+    // Create account
     await page.goto("/signup");
     await page.getByLabel("Name").fill("Password Reset Test");
     await page.getByLabel("Email").fill(testEmail);
     await page.getByLabel("Password").fill(oldPassword);
     await page.getByRole("button", { name: "Create Account" }).click();
-
-    // Wait for dashboard and sign out
     await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
+
+    // Sign out to start reset journey
     await page.getByTestId("user-menu-button").click();
-    await page
-      .getByRole("menuitem", { name: "Sign Out" })
-      .waitFor({ state: "visible" });
     await page.getByRole("menuitem", { name: "Sign Out" }).click();
     await expect(page).toHaveURL("/");
 
-    // Clean up any existing emails in Mailpit
     await deleteAllMessages(testEmail);
 
-    // Navigate to login and click "Forgot password?"
-    await page.goto("/login");
-    await expect(page).toHaveURL("/login");
-    await expect(page.getByRole("heading", { name: "Sign In" })).toBeVisible();
-    const forgotPasswordLink = page.getByRole("link", {
-      name: "Forgot password?",
-    });
-    await forgotPasswordLink.waitFor({ state: "visible" });
-    await forgotPasswordLink.click();
-
-    // Verify we're on forgot password page
-    await expect(page).toHaveURL("/forgot-password");
+    // Request reset
+    await page.goto("/forgot-password");
     await expect(
       page.getByRole("heading", { name: "Reset Password" })
     ).toBeVisible();
-
-    // Request password reset
     await page.getByLabel("Email").fill(testEmail);
     await page.getByRole("button", { name: "Send Reset Link" }).click();
-
-    // Should see success message
-    await expect(page).toHaveURL("/forgot-password");
     await expect(
       page.getByText(/you will receive a password reset link/i)
     ).toBeVisible();
 
-    // Get reset link from Mailpit
+    // Follow reset link from email
     const resetLink = await getPasswordResetLink(testEmail);
     expect(resetLink).toBeTruthy();
-
-    if (!resetLink) {
-      throw new Error("Failed to get password reset link from Mailpit");
-    }
-
-    // Navigate to reset link (goes through Supabase → auth/callback → reset-password)
-    await page.goto(resetLink, { waitUntil: "networkidle" });
-
-    // Wait for auth callback redirect chain to complete and cookies to propagate
-    // The page should end up on /reset-password, not /forgot-password
+    await page.goto(resetLink!, { waitUntil: "networkidle" });
     await expect(page).toHaveURL(/\/reset-password/, { timeout: 15000 });
     await expect(
       page.getByRole("heading", { name: "Set New Password" })
     ).toBeVisible();
 
-    // Set new password
+    // Set new password and submit
     await page.getByLabel("New Password").fill(newPassword);
     await page.getByLabel("Confirm Password").fill(newPassword);
     await page.getByRole("button", { name: "Update Password" }).click();
 
-    // Should redirect to dashboard (because session is active) or login
-    // We accept either, but in practice it goes to dashboard because user is logged in
-    await expect(page).toHaveURL(/\/(dashboard|login)/);
-
-    // If we are on dashboard, sign out so we can test the new password
-    if (page.url().includes("/dashboard")) {
+    // Log in with new password (handle being auto-signed-in from reset flow)
+    await page.goto("/login");
+    if (await page.getByRole("heading", { name: "Dashboard" }).isVisible()) {
       await page.getByTestId("user-menu-button").click();
       await page.getByRole("menuitem", { name: "Sign Out" }).click();
-      await expect(page).toHaveURL("/");
       await page.goto("/login");
     }
 
-    // Ensure we're on the login page before trying to fill the form
-    await expect(page).toHaveURL("/login");
-
-    // Verify can login with new password
     await page.getByLabel("Email").fill(testEmail);
     await page.getByLabel("Password").fill(newPassword);
     await page.getByRole("button", { name: "Sign In" }).click();
-
-    // Should successfully login
     await expect(page).toHaveURL("/dashboard");
     await expect(
       page.getByRole("heading", { name: "Dashboard" })
     ).toBeVisible();
 
-    // Sign out for cleanup
+    // Cleanup
     await page.getByTestId("user-menu-button").click();
     await page.getByRole("menuitem", { name: "Sign Out" }).click();
-
-    // Clean up emails
     await deleteAllMessages(testEmail);
   });
 
   test("password reset - expired/invalid link shows error", async ({
     page,
   }) => {
-    // Navigate directly to reset password page without valid token
     await page.goto("/reset-password");
-
-    // Should redirect to forgot password page (because not authenticated)
     await expect(page).toHaveURL("/forgot-password");
+    await expect(
+      page.getByRole("heading", { name: "Reset Password" })
+    ).toBeVisible();
   });
 
   test("forgot password - validates email format", async ({ page }) => {

@@ -61,6 +61,10 @@ export default async function ResetPasswordPage({
     const result = await resetPasswordAction(formData);
 
     if (result.ok) {
+      // Sign out the user so they can log in with their new password
+      const supabase = await createClient();
+      await supabase.auth.signOut();
+
       // Success - redirect to login
       redirect("/login");
     }
