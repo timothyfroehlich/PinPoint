@@ -11,7 +11,7 @@ Tim is vibecoding this app by himself to learn about website design and experime
 Read these immediately before starting work:
 
 - **`docs/NON_NEGOTIABLES.md`** - Forbidden patterns and critical constraints
-- **`docs/PATTERNS.md`** - Project-specific code patterns (MUST reference when coding)
+- **`docs/PATTERNS.md`** - Index of project-specific code patterns (see `docs/patterns/`)
 - **`docs/TYPESCRIPT_STRICTEST_PATTERNS.md`** - Type safety patterns
 - **`docs/PRODUCT_SPEC.md`** - What we're building (MVP/MVP+/1.0/2.0)
 - **`docs/TECH_SPEC.md`** - Single-tenant architecture specification
@@ -205,12 +205,12 @@ git update-index --skip-worktree supabase/config.toml
 
 ## Pattern Discovery & Documentation
 
-**IMPORTANT**: When implementing features, always reference `docs/PATTERNS.md` for established patterns.
+**IMPORTANT**: When implementing features, always reference `docs/PATTERNS.md` (and its sub-files in `docs/patterns/`) for established patterns.
 
 **Contributing New Patterns**:
 
 - **When**: You implement the same approach 2+ times
-- **What**: Add it to `docs/PATTERNS.md` with a working code example
+- **What**: Add it to a new or existing file in `docs/patterns/` and link it in `docs/PATTERNS.md`
 - **Why**: Future agents need to follow the same conventions
 - **How**: Keep examples concise, focus on PinPoint-specific patterns (not general Next.js knowledge)
 
@@ -270,7 +270,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 ## Essential Documentation
 
 - **`docs/NON_NEGOTIABLES.md`** - Critical patterns and forbidden practices
-- **`docs/PATTERNS.md`** - Project-specific code patterns (living document)
+- **`docs/PATTERNS.md`** - Index of project patterns (living document, see `docs/patterns/`)
 - **`docs/PRODUCT_SPEC.md`** - Feature specifications (MVP/MVP+/1.0/2.0)
 - **`docs/TECH_SPEC.md`** - Single-tenant architecture
 - **`docs/TESTING_PLAN.md`** - Testing strategy and patterns

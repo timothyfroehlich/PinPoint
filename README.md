@@ -2,15 +2,13 @@
 
 [![CI](https://github.com/froeht/PinPoint/actions/workflows/ci.yml/badge.svg)](https://github.com/froeht/PinPoint/actions/workflows/ci.yml)
 
-PinPoint is a full-stack, multi-tenant issue tracking system designed from the ground up to streamline pinball machine and arcade game maintenance. It provides a transparent, high-quality experience for both players and the internal teams responsible for keeping the games running perfectly.
+PinPoint is a specialized issue tracking system built for the Austin Pinball Collective. It streamlines the maintenance of pinball machines by providing a centralized platform for reporting issues, tracking repairs, and managing the game fleet.
 
-## About The Project
+## Core Value Proposition
 
-For many pinball collectives and arcade operators, tracking machine issues is a chaotic process involving text messages, Discord threads, and forgotten sticky notes. This disorganization leads to lost reports, delayed repairs, and frustrated players.
-
-PinPoint solves this by providing a centralized, modern platform for the entire issue lifecycle. It empowers players to easily report problems while giving operators and technicians the tools they need to manage repairs efficiently, track machine history, and ultimately improve uptime. [1]
-
-The system is architected as a multi-tenant SaaS platform, allowing multiple organizations to manage their game fleets in a secure and isolated environment. [1]
+- **For Players**: Easily report issues by scanning a QR code on the machine. View current game status before playing.
+- **For Operators**: Manage the entire fleet, track repair history, and prioritize maintenance tasks.
+- **For the Community**: Improved game uptime and a better player experience.
 
 ### Key Features
 
@@ -33,10 +31,10 @@ The system is architected as a multi-tenant SaaS platform, allowing multiple org
 
 Technology stack:
 
-- **Framework:** [Next.js 16](https://nextjs.org/) with React Server Components
-- **Language:** [TypeScript](https://www.typescriptlang.org/) (strictest configuration)
+- **Framework:** [Next.js 16](https://nextjs.org/) (App Router, React Server Components)
+- **Language:** [TypeScript](https://www.typescriptlang.org/) (Strict configuration)
 - **Runtime:** [React 19](https://react.dev/)
-- **Components:** [shadcn/ui](https://ui.shadcn.com/) (primary), [Material UI](https://mui.com/) (transition)
+- **UI Components:** [shadcn/ui](https://ui.shadcn.com/)
 - **Styling:** [Tailwind CSS v4](https://tailwindcss.com/)
 - **Database:** [PostgreSQL](https://www.postgresql.org/) via [Supabase](https://supabase.com/)
 - **ORM:** [Drizzle ORM](https://orm.drizzle.team/)
@@ -89,134 +87,78 @@ For detailed evolution plans, see [`RSC_MIGRATION/`](./RSC_MIGRATION/) and the C
 
 ## Getting Started
 
-### Quick Start
-
-All development tools are included in `devDependencies` - no global installs required!
-
-```bash
-# 1. Clone and install dependencies
-git clone https://github.com/timothyfroehlich/PinPoint.git
-cd PinPoint
-npm install
-
-# 2. Set up environment variables
-vercel link --project pin-point
-npm run env:pull  # Downloads shared development environment from Vercel
-
-# 3. Start Supabase and initialize database (from root worktree)
-supabase start  # Start shared instance from root directory
-npm run reset:local
-
-# 4. Start development server
-npm run dev
-
-# 5. Validate setup
-npm run check
-
-### Supabase Keys (Local)
-
-Supabase CLI now exposes new-style local keys:
-
-- Publishable (public): `sb_publishable_…`
-- Secret (service role): `sb_secret_…`
-
-Use `supabase status` to view them. Our scripts expect:
-
-- `NEXT_PUBLIC_SUPABASE_URL` (e.g., `http://localhost:54321`)
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (publishable key)
-- `SUPABASE_SECRET_KEY` (secret key)
-
-Notes:
-
-- `scripts/db-reset.sh` auto-detects these for local runs if missing.
-- Dev users are created via `scripts/create-dev-users.ts` and accept both new `sb_secret_*` keys and legacy JWT-style tokens.
-- E2E runs on a dedicated port to avoid conflicts.
-
-See docs/developer-guides/local-supabase-keys.md for details.
-```
-
-Your development server will be running at **http://localhost:49200**
-
-### Development Workflow
-
-**🚀 Modern Development Commands:**
-
-- `npm run dev` - Next.js development server with React Server Components
-- `npm run build` - Production build with Server Components validation
-- `npm run check` - Complete quality validation (typecheck, lint, format, audit)
-- `npm run validate` - Full validation including all tests (pre-commit ready)
-
-**🎨 UI Development (shadcn/ui + Tailwind):**
-
-- `npx shadcn@latest add [component]` - Install shadcn/ui components
-- `npx shadcn@latest add block [block-name]` - Install pre-built component blocks
-- CSS lives in `src/app/globals.css` with layer separation (MUI coexistence)
-
-**🛢️ Database Commands:**
-
-- `supabase start` - Start local Supabase instance (shared across worktrees)
-- `npm run db:reset:local:sb` - Reset database with fresh schema and seed data
-- `npm run db:push:local` - Sync schema changes without reset
-- `npm run db:seed:local:sb` - Seed data only (local Supabase)
-
-**🧪 Testing Commands (Post-Reboot):**
-
-- `npm test` - Unit tests (single baseline test currently active)
-- `npm run test:rls` - pgTAP Row-Level Security policy tests
-- `npm run smoke` - Playwright smoke tests
-
-**Supabase Instance Strategy:**
-
-- **Default**: Start Supabase from root worktree - all worktrees share one instance
-- **Exception**: For major schema changes, stop root instance and start from current worktree
-- **Decision**: Only switch to worktree-specific after explicit confirmation
-- **Ports**: Supabase uses fixed ports (54321, 54322) - only one instance can run at a time
-
-### GitHub Copilot Instructions
-
-This repository includes comprehensive GitHub Copilot instructions to help you follow PinPoint's architectural patterns:
-
-- **Repository-wide guidance**: `.github/copilot-instructions.md`
-- **Pattern-specific instructions**: `.github/instructions/*.instructions.md`
-  - Component development (Server/Client Components)
-  - Server Actions with progressive enhancement
-  - Database access with Drizzle ORM
-  - Authentication patterns (Supabase SSR)
-  - Testing strategies (memory-safe patterns)
-
-When you use GitHub Copilot in this repository, it will automatically provide context-aware suggestions based on the file you're working on. The instructions emphasize:
-
-- Single-tenant architecture (v2 simplification)
-- Server-first with React Server Components
-- Direct database access (no DAL/tRPC layers)
-- TypeScript strictest patterns
-- Memory-safe testing with worker-scoped PGlite
-
-For details, see [`.github/COPILOT_INSTRUCTIONS.md`](./.github/COPILOT_INSTRUCTIONS.md).
-
 ### Prerequisites
 
-**Required Global Installs:**
+- **Node.js 22+** (Required)
+- **npm** or **pnpm**
+- **Supabase Account** (for local development and production)
 
-- **[Vercel CLI](https://vercel.com/cli)** - Essential for environment management (`vercel env pull`)
-- **[Supabase CLI](https://supabase.com/docs/guides/cli)** - Required for local database (`supabase start`)
+### Setup Instructions
 
-```bash
-# Vercel CLI via npm
-npm install -g vercel
+1.  **Clone the repository**
 
-# Supabase CLI via Homebrew (npm global install not supported)
-brew install supabase/tap/supabase
+    ```bash
+    git clone https://github.com/timothyfroehlich/PinPoint.git
+    cd PinPoint
+    ```
 
-# Alternative for Supabase: See https://github.com/supabase/cli#install-the-cli
-```
+2.  **Install dependencies**
 
-**Optional Global Tools** (for convenience - all available via npm scripts):
+    ```bash
+    npm install
+    ```
 
-- **[TypeScript](https://www.typescriptlang.org/)** - Direct `tsc` access (or use `npm run typecheck`)
-- **[ESLint](https://eslint.org/)** - Direct `eslint` access (or use `npm run lint`)
-- **[Prettier](https://prettier.io/)** - Direct `prettier` access (or use `npm run format`)
-- **[Vitest](https://vitest.dev/)** - Direct `vitest` access (or use `npm run test`)
+3.  **Configure Environment Variables**
+    Copy the example environment file:
+
+    ```bash
+    cp .env.example .env.local
+    ```
+
+4.  **Setup Supabase**
+    - Create a new project at [database.new](https://database.new).
+    - Get your project URL and Anon Key from Project Settings > API.
+    - Get your Database URL (Transaction Pooler) from Project Settings > Database.
+    - Update `.env.local` with these values.
+
+5.  **Initialize Database**
+    Push the schema to your Supabase project:
+
+    ```bash
+    npm run db:push
+    ```
+
+    _Note: This uses `drizzle-kit push` which is suitable for prototyping. For production, use migrations._
+
+6.  **Run Development Server**
+    ```bash
+    npm run dev
+    ```
+    Open [http://localhost:3000](http://localhost:3000) to view the app.
+
+### Development Commands
+
+| Command             | Description                          |
+| :------------------ | :----------------------------------- |
+| `npm run dev`       | Start the development server         |
+| `npm run build`     | Build the application for production |
+| `npm run start`     | Start the production build           |
+| `npm run lint`      | Run ESLint                           |
+| `npm run typecheck` | Run TypeScript compiler check        |
+| `npm run format`    | Format code with Prettier            |
+| `npm test`          | Run unit and integration tests       |
+| `npm run smoke`     | Run Playwright smoke tests           |
+
+### Deployment
+
+The easiest way to deploy is using **Vercel** and **Supabase**.
+
+1.  Push your code to a GitHub repository.
+2.  Import the project into Vercel.
+3.  Add the environment variables from your `.env.local` to Vercel Project Settings.
+4.  Deploy!
+
+For detailed development guidelines, see [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md).
 
 ### Troubleshooting
 
