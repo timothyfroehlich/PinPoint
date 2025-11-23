@@ -30,10 +30,18 @@ function tryCreateSessionDirectory(): string | undefined {
     mkdirSync(sessionDir, { recursive: true });
     return sessionDir;
   } catch (error) {
-    console.warn(
-      "[logger] Falling back to stdout-only logging (could not create log directory).",
-      error instanceof Error ? error.message : error
-    );
+    // Silently fall back to stdout in serverless/read-only environments
+    // or if we lack permissions. This is expected behavior in Vercel.
+    const isReadOnly =
+      error instanceof Error &&
+      (error.message.includes("EROFS") || error.message.includes("ENOENT"));
+
+    if (!isReadOnly) {
+      console.warn(
+        "[logger] Falling back to stdout-only logging (could not create log directory).",
+        error instanceof Error ? error.message : error
+      );
+    }
     return undefined;
   }
 }

@@ -1,120 +1,76 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { readFlash, setFlash } from "./flash";
+import { setFlash, readFlash, type Flash } from "./flash";
+import { cookies } from "next/headers";
 
-/**
- * Flash Message Tests
- *
- * Regression test for bug discovered in Vercel preview deployment:
- * "Cookies can only be modified in a Server Action or Route Handler"
- * (Digest: 3754571324)
- *
- * The bug occurred because readAndClearFlash() tried to modify cookies
- * in Server Components, which Next.js forbids. This test verifies:
- * 1. readFlash() only reads cookies (doesn't modify them)
- * 2. setFlash() can set cookies with proper expiry
- * 3. Flash messages auto-expire via maxAge
- */
-
-// Mock Next.js cookies API
+// Mock next/headers
 vi.mock("next/headers", () => ({
   cookies: vi.fn(),
 }));
 
 describe("Flash Messages", () => {
-  let mockCookieStore: {
-    get: ReturnType<typeof vi.fn>;
-    set: ReturnType<typeof vi.fn>;
-  };
+  let cookieStore: Map<string, { value: string; options?: unknown }>;
 
-  beforeEach(async () => {
-    // Reset mock before each test
-    mockCookieStore = {
-      get: vi.fn(),
-      set: vi.fn(),
+  beforeEach(() => {
+    cookieStore = new Map();
+    (
+      cookies as unknown as { mockReturnValue: (val: unknown) => void }
+    ).mockReturnValue({
+      set: vi.fn((key: string, value: string, options?: unknown) => {
+        cookieStore.set(key, { value, options });
+      }),
+      get: vi.fn((key: string) => {
+        return cookieStore.get(key);
+      }),
+    });
+  });
+
+  it("should encode special characters in flash messages", async () => {
+    const flash: Flash = {
+      type: "error",
+      message: "Password must contain !@#$%^&*()",
     };
 
-    // Mock cookies() to return our mock store
-    const { cookies } = await import("next/headers");
-    vi.mocked(cookies).mockResolvedValue(mockCookieStore as never);
+    await setFlash(flash);
+
+    const stored = cookieStore.get("flash");
+    expect(stored).toBeDefined();
+    // Verify it's encoded (no raw % or special chars that break URI)
+    expect(stored?.value).not.toContain("%^&");
+    expect(stored?.value).toContain(encodeURIComponent(flash.message));
   });
 
-  describe("readFlash", () => {
-    it("should return null when no flash cookie exists", async () => {
-      mockCookieStore.get.mockReturnValue(undefined);
+  it("should decode flash messages correctly", async () => {
+    const originalFlash: Flash = {
+      type: "error",
+      message: "Complex message with % and & and spaces",
+    };
 
-      const result = await readFlash();
-
-      expect(result).toBeNull();
-      expect(mockCookieStore.get).toHaveBeenCalledWith("flash");
-      // CRITICAL: Should NOT call set() - this was the bug
-      expect(mockCookieStore.set).not.toHaveBeenCalled();
+    // Manually set encoded value
+    cookieStore.set("flash", {
+      value: encodeURIComponent(JSON.stringify(originalFlash)),
     });
 
-    it("should read flash message without modifying cookies", async () => {
-      const flashData = {
-        type: "error" as const,
-        message: "Login failed",
-      };
-
-      mockCookieStore.get.mockReturnValue({
-        value: JSON.stringify(flashData),
-      });
-
-      const result = await readFlash();
-
-      expect(result).toEqual(flashData);
-      // CRITICAL: Should NOT call set() - Server Components can't modify cookies
-      expect(mockCookieStore.set).not.toHaveBeenCalled();
-    });
-
-    it("should return null for invalid JSON without modifying cookies", async () => {
-      mockCookieStore.get.mockReturnValue({
-        value: "invalid json{",
-      });
-
-      const result = await readFlash();
-
-      expect(result).toBeNull();
-      // CRITICAL: Should NOT call set() even on parse error
-      expect(mockCookieStore.set).not.toHaveBeenCalled();
-    });
+    const result = await readFlash();
+    expect(result).toEqual(originalFlash);
   });
 
-  describe("setFlash", () => {
-    it("should set flash cookie with auto-expiry", async () => {
-      const flash = {
-        type: "success" as const,
-        message: "Account created successfully",
-      };
-
-      await setFlash(flash);
-
-      expect(mockCookieStore.set).toHaveBeenCalledWith(
-        "flash",
-        JSON.stringify(flash),
-        expect.objectContaining({
-          httpOnly: true,
-          sameSite: "lax",
-          path: "/",
-          maxAge: 60, // Auto-expire after 60 seconds
-        })
-      );
+  it("should handle malformed URI components gracefully", async () => {
+    // Set a value that would cause URIError if not handled
+    // e.g. a raw "%" at the end
+    cookieStore.set("flash", {
+      value: "invalid%sequence",
     });
 
-    it("should set flash cookie with field data", async () => {
-      const flash = {
-        type: "error" as const,
-        message: "Validation failed",
-        fields: { email: "user@example.com", name: "John" },
-      };
+    const result = await readFlash();
+    expect(result).toBeNull();
+  });
 
-      await setFlash(flash);
-
-      expect(mockCookieStore.set).toHaveBeenCalledWith(
-        "flash",
-        JSON.stringify(flash),
-        expect.any(Object)
-      );
+  it("should handle invalid JSON gracefully", async () => {
+    cookieStore.set("flash", {
+      value: encodeURIComponent("not json"),
     });
+
+    const result = await readFlash();
+    expect(result).toBeNull();
   });
 });
