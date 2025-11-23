@@ -1,10 +1,11 @@
 /**
  * E2E Tests: Authentication Flows
  *
- * Tests signup, login, protected routes, and logout functionality.
+ * Tests signup, login, protected routes, logout, and password reset functionality.
  */
 
 import { test, expect } from "@playwright/test";
+import { getPasswordResetLink, deleteAllMessages } from "../support/mailpit";
 
 test.describe("Authentication", () => {
   test("signup flow - create new account and access dashboard", async ({
@@ -119,6 +120,9 @@ test.describe("Authentication", () => {
 
     // Open user menu and click sign out
     await page.getByTestId("user-menu-button").click();
+    await page
+      .getByRole("menuitem", { name: "Sign Out" })
+      .waitFor({ state: "visible" });
     await page.getByRole("menuitem", { name: "Sign Out" }).click();
 
     // Should redirect to home page
@@ -220,5 +224,98 @@ test.describe("Authentication", () => {
       page.getByRole("heading", { name: "Dashboard" })
     ).toBeVisible();
     await expect(page.getByTestId("user-menu-name")).toBeVisible();
+  });
+
+  test("password reset flow - user journey only", async ({ page }) => {
+    test.setTimeout(40000);
+    const testEmail = `reset-e2e-${Date.now()}@example.com`;
+    const oldPassword = "OldPassword123!";
+    const newPassword = "NewPassword456!";
+
+    await deleteAllMessages(testEmail);
+
+    // Create account
+    await page.goto("/signup");
+    await page.getByLabel("Name").fill("Password Reset Test");
+    await page.getByLabel("Email").fill(testEmail);
+    await page.getByLabel("Password").fill(oldPassword);
+    await page.getByRole("button", { name: "Create Account" }).click();
+    await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
+
+    // Sign out to start reset journey
+    await page.getByTestId("user-menu-button").click();
+    await page.getByRole("menuitem", { name: "Sign Out" }).click();
+    await expect(page).toHaveURL("/");
+
+    await deleteAllMessages(testEmail);
+
+    // Request reset
+    await page.goto("/forgot-password");
+    await expect(
+      page.getByRole("heading", { name: "Reset Password" })
+    ).toBeVisible();
+    await page.getByLabel("Email").fill(testEmail);
+    await page.getByRole("button", { name: "Send Reset Link" }).click();
+    await expect(
+      page.getByText(/you will receive a password reset link/i)
+    ).toBeVisible();
+
+    // Follow reset link from email
+    const resetLink = await getPasswordResetLink(testEmail);
+    expect(resetLink).toBeTruthy();
+    await page.goto(resetLink!, { waitUntil: "networkidle" });
+    await expect(page).toHaveURL(/\/reset-password/, { timeout: 15000 });
+    await expect(
+      page.getByRole("heading", { name: "Set New Password" })
+    ).toBeVisible();
+
+    // Set new password and submit
+    await page.getByLabel("New Password").fill(newPassword);
+    await page.getByLabel("Confirm Password").fill(newPassword);
+    await page.getByRole("button", { name: "Update Password" }).click();
+
+    // Log in with new password (handle being auto-signed-in from reset flow)
+    await page.goto("/login");
+    if (await page.getByRole("heading", { name: "Dashboard" }).isVisible()) {
+      await page.getByTestId("user-menu-button").click();
+      await page.getByRole("menuitem", { name: "Sign Out" }).click();
+      await page.goto("/login");
+    }
+
+    await page.getByLabel("Email").fill(testEmail);
+    await page.getByLabel("Password").fill(newPassword);
+    await page.getByRole("button", { name: "Sign In" }).click();
+    await expect(page).toHaveURL("/dashboard");
+    await expect(
+      page.getByRole("heading", { name: "Dashboard" })
+    ).toBeVisible();
+
+    // Cleanup
+    await page.getByTestId("user-menu-button").click();
+    await page.getByRole("menuitem", { name: "Sign Out" }).click();
+    await deleteAllMessages(testEmail);
+  });
+
+  test("password reset - expired/invalid link shows error", async ({
+    page,
+  }) => {
+    await page.goto("/reset-password");
+    await expect(page).toHaveURL("/forgot-password");
+    await expect(
+      page.getByRole("heading", { name: "Reset Password" })
+    ).toBeVisible();
+  });
+
+  test("forgot password - validates email format", async ({ page }) => {
+    await page.goto("/forgot-password");
+
+    // Try to submit with invalid email
+    await page.getByLabel("Email").fill("not-an-email");
+    await page.getByRole("button", { name: "Send Reset Link" }).click();
+
+    // Browser validation should prevent submission
+    const emailInput = page.getByLabel("Email");
+    await expect(emailInput).toHaveAttribute("type", "email");
+    await expect(emailInput).toHaveAttribute("required");
   });
 });

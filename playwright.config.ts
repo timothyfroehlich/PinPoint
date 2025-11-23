@@ -4,7 +4,11 @@ import { defineConfig, devices } from "@playwright/test";
 // Other worktrees should set PORT in .env.local (3100, 3200, 3300)
 // See AGENTS.md for port allocation table
 const port = Number(process.env.PORT ?? "3000");
-const baseURL = `http://127.0.0.1:${port}`;
+// Keep host consistent with Supabase site_url to avoid cookie host mismatches
+const hostname = process.env.PLAYWRIGHT_HOST ?? "localhost";
+const baseURL = `http://${hostname}:${port}`;
+const webServerStdout = process.env.PLAYWRIGHT_STDOUT ?? "ignore";
+const webServerStderr = process.env.PLAYWRIGHT_STDERR ?? "pipe";
 
 /**
  * Playwright E2E Test Configuration
@@ -18,8 +22,8 @@ export default defineConfig({
   // Global setup: Reset database before all tests
   globalSetup: "./e2e/global-setup.ts",
 
-  // Run tests in files in parallel
-  fullyParallel: !process.env.CI,
+  // Run tests sequentially for stability (Supabase + Next dev server)
+  fullyParallel: false,
 
   // Short, developer-friendly timeouts
   timeout: process.env.CI ? 15 * 1000 : 20 * 1000, // per-test timeout
@@ -33,8 +37,8 @@ export default defineConfig({
   // Retry on CI only
   retries: process.env.CI ? 2 : 0,
 
-  // Opt out of parallel tests on CI
-  workers: process.env.CI ? 1 : undefined,
+  // Keep a single worker for stability across environments
+  workers: 1,
 
   // Reporters: print progress locally; keep CI quiet; never block on HTML
   reporter: process.env.CI
@@ -67,14 +71,14 @@ export default defineConfig({
 
   // Run your local dev server before starting the tests
   webServer: {
-    command: `PORT=${port} npm run dev`,
+    command: `HOSTNAME=${hostname} PORT=${port} npm run dev -- --hostname ${hostname}`,
     url: baseURL,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 120 * 1000, // 2 minutes
 
-    // Show server output for debugging (critical for diagnosing startup failures)
-    stdout: "pipe",
-    stderr: "pipe",
+    // Default quiet output; override via PLAYWRIGHT_STDOUT/STDERR when debugging
+    stdout: webServerStdout as "pipe" | "ignore" | "inherit",
+    stderr: webServerStderr as "pipe" | "ignore" | "inherit",
 
     // Ignore HTTPS errors for local development
     ignoreHTTPSErrors: true,

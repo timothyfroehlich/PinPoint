@@ -153,6 +153,13 @@ export default [
         project: "./tsconfig.tests.json",
         tsconfigRootDir: import.meta.dirname,
       },
+      globals: {
+        // E2E tests run in Playwright (Node + browser APIs)
+        fetch: "readonly",
+        setTimeout: "readonly",
+        process: "readonly",
+        console: "readonly",
+      },
     },
     rules: {
       // Allow any in tests for mocking

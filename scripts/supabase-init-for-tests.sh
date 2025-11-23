@@ -18,7 +18,7 @@ echo "🛑 Stopping any existing Supabase instances..."
 supabase stop --no-backup || true
 
 echo "🚀 Starting local Supabase stack..."
-supabase start -x "studio,realtime,storage-api,edge-runtime,logflare,vector,imgproxy,supavisor,postgres-meta,mailpit"
+supabase start -x "studio,realtime,storage-api,edge-runtime,logflare,vector,imgproxy,supavisor,postgres-meta"
 
 echo "⏳ Waiting for Supabase Auth service to be ready..."
 for i in $(seq 1 30); do

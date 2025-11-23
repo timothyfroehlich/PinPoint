@@ -314,6 +314,64 @@ vi.mock("@/utils/supabase/client", () => ({
 }));
 ```
 
+## Local Email Testing (Mailpit)
+
+**Status**: Supabase CLI v2.5x+ runs Mailpit for local email testing
+
+### Current Configuration
+
+**Service**: Mailpit v1.22.3 (replaces Inbucket in newer CLI versions)
+**Default Port**: 54324 (configurable per worktree)
+**API**: REST API v1 at `http://localhost:54324/api/v1/`
+**Web UI**: `http://localhost:54324/` (interactive email viewer)
+
+### Config File Format
+
+```toml
+# supabase/config.toml
+[inbucket]  # Section name unchanged for backward compatibility
+enabled = true
+port = 54324
+```
+
+**Note**: Despite the `[inbucket]` section name, Supabase CLI v2.58.5+ runs Mailpit. Config format remains compatible.
+
+### Multi-Worktree Setup
+
+Each worktree should use a unique Mailpit port to avoid conflicts:
+
+| Worktree    | Port  | Environment Variable |
+| ----------- | ----- | -------------------- |
+| Main        | 54324 | `MAILPIT_PORT=54324` |
+| Secondary   | 55324 | `MAILPIT_PORT=55324` |
+| Review      | 56324 | `MAILPIT_PORT=56324` |
+| AntiGravity | 57324 | `MAILPIT_PORT=57324` |
+
+### E2E Testing Pattern
+
+```typescript
+// e2e/support/mailpit.ts
+const MAILPIT_PORT = Number(process.env.MAILPIT_PORT ?? "54324");
+const MAILPIT_URL = `http://localhost:${MAILPIT_PORT}`;
+
+// Fetch messages via REST API
+const response = await fetch(`${MAILPIT_URL}/api/v1/messages`);
+const data = await response.json();
+```
+
+**Key Points**:
+
+- Use `process.env.MAILPIT_PORT` for worktree isolation
+- Mailpit API returns all messages (filter by recipient in application code)
+- DELETE `/api/v1/messages` clears all messages (use for test cleanup)
+- Exponential backoff recommended for email delivery waits
+
+### Password Reset Email Flow
+
+**Supabase sends**: Email with link to `/auth/v1/verify?token_hash=...&type=recovery&redirect_to=...`
+**Link format in HTML**: `href="..."` with HTML entities (`&amp;`, etc.)
+**Required decoding**: Convert `&amp;` → `&`, `&lt;` → `<`, etc.
+
 ## Next Steps
 
 1. **Audit current auth-helpers usage** in project

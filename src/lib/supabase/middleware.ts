@@ -54,7 +54,10 @@ export async function updateSession(
   // IMPORTANT: DO NOT REMOVE - This refreshes the auth token
   // Without this call, sessions will expire and users will be randomly logged out
   // Trigger token refresh; result unused intentionally
-  await supabase.auth.getUser();
+  const {
+    data: { user: _user },
+    error: _error,
+  } = await supabase.auth.getUser();
 
   // MVP: No route protection in middleware
   // Auth checks happen in Server Components/Actions as needed

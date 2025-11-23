@@ -24,6 +24,7 @@
 9. Default to Server Components, minimal Client Components
 10. Forms work without JavaScript (progressive enhancement)
 11. No migration files (pre-beta, schema changes via direct modification)
+12. Keep auth host consistent: use `localhost` everywhere (Supabase site_url, Next dev, Playwright baseURL) to prevent cookie host mismatches
 
 ---
 
