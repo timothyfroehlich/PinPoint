@@ -62,10 +62,10 @@ describe("addCommentAction", () => {
 
     // Setup db mock chain
     const mockValues = vi.fn().mockResolvedValue(undefined);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/unbound-method
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     vi.mocked(db.insert).mockReturnValue({
       values: mockValues,
-    } as any);
+    } as unknown as ReturnType<typeof db.insert>);
   });
 
   it("should successfully add a comment", async () => {
@@ -119,10 +119,10 @@ describe("addCommentAction", () => {
   it("should handle database errors gracefully", async () => {
     // Mock db error
     const mockValues = vi.fn().mockRejectedValue(new Error("DB Error"));
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/unbound-method
+    // eslint-disable-next-line @typescript-eslint/unbound-method
     vi.mocked(db.insert).mockReturnValue({
       values: mockValues,
-    } as any);
+    } as unknown as ReturnType<typeof db.insert>);
 
     const formData = new FormData();
     formData.append("issueId", validUuid);
