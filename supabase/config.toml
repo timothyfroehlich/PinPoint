@@ -101,7 +101,7 @@ enable_confirmations = false
 secure_password_change = false
 max_frequency = "1s"
 otp_length = 6
-otp_expiry = 3600
+otp_expiry = 1800
 
 [auth.sms]
 enable_signup = false
