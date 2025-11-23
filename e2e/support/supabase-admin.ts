@@ -1,0 +1,64 @@
+import { createClient } from "@supabase/supabase-js";
+
+/**
+ * Supabase Admin Client for E2E Tests
+ *
+ * Provides admin-level operations like auto-confirming user emails.
+ * Uses service role key which bypasses RLS and auth restrictions.
+ */
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error(
+    "Missing required environment variables: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY"
+  );
+}
+
+// Create admin client with service role key
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+  },
+});
+
+/**
+ * Auto-confirm a user's email using Supabase Admin API
+ *
+ * This bypasses the email confirmation flow for E2E tests.
+ * The user must already exist (created via signup).
+ *
+ * @param email - Email address of the user to confirm
+ * @throws Error if user not found or confirmation fails
+ */
+export async function confirmUserEmail(email: string): Promise<void> {
+  // Get user by email
+  const { data: users, error: listError } =
+    await supabaseAdmin.auth.admin.listUsers();
+
+  if (listError) {
+    throw new Error(`Failed to list users: ${listError.message}`);
+  }
+
+  const user = users.users.find((u) => u.email === email);
+
+  if (!user) {
+    throw new Error(`User not found: ${email}`);
+  }
+
+  // Update user to confirm email
+  const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+    user.id,
+    {
+      email_confirm: true,
+    }
+  );
+
+  if (updateError) {
+    throw new Error(
+      `Failed to confirm email for ${email}: ${updateError.message}`
+    );
+  }
+}
