@@ -1,6 +1,7 @@
 import { db } from "~/server/db";
 import { issues } from "~/server/db/schema";
 import { eq, and, desc, isNull, type SQL } from "drizzle-orm";
+import { isIssueStatus, isIssueSeverity } from "~/lib/issues/status";
 
 export interface IssueFilters {
   machineId?: string | undefined;
@@ -13,6 +14,8 @@ export interface IssueFilters {
 export async function getIssues(
   filters: IssueFilters
 ): Promise<IssueWithRelations[]> {
+  const { machineId, status, severity, assignedTo } = filters;
+
   // Build where conditions for filtering
   const conditions: SQL[] = [];
 
@@ -20,19 +23,11 @@ export async function getIssues(
     conditions.push(eq(issues.machineId, machineId));
   }
 
-  if (
-    status &&
-    (status === "new" || status === "in_progress" || status === "resolved")
-  ) {
+  if (status && isIssueStatus(status)) {
     conditions.push(eq(issues.status, status));
   }
 
-  if (
-    severity &&
-    (severity === "minor" ||
-      severity === "playable" ||
-      severity === "unplayable")
-  ) {
+  if (severity && isIssueSeverity(severity)) {
     conditions.push(eq(issues.severity, severity));
   }
 
