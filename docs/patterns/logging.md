@@ -77,7 +77,6 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
   "time": "2025-11-13T03:19:13.061Z",
   "msg": "User logged in successfully",
   "userId": "abc123",
-  "email": "user@example.com",
   "action": "login"
 }
 ```
