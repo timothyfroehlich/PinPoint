@@ -41,11 +41,7 @@ export default defineConfig(({ mode }) => {
           extends: true,
           test: {
             name: "unit",
-            include: [
-              "src/**/*.test.ts",
-              "src/**/*.test.tsx",
-              "e2e/**/*.test.ts",
-            ],
+            include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
             exclude: ["src/test/integration/**"],
           },
         },

@@ -1,3 +1,4 @@
+import { type IssueListItem } from "~/lib/types";
 import { db } from "~/server/db";
 import { issues } from "~/server/db/schema";
 import { eq, and, desc, isNull, type SQL } from "drizzle-orm";
@@ -9,10 +10,11 @@ export interface IssueFilters {
   assignedTo?: string | undefined;
 }
 
-
 export async function getIssues(
   filters: IssueFilters
-): Promise<IssueWithRelations[]> {
+): Promise<IssueListItem[]> {
+  const { machineId, status, severity, assignedTo } = filters;
+
   // Build where conditions for filtering
   const conditions: SQL[] = [];
 
