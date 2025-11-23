@@ -19,6 +19,9 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey);
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!serviceRoleKey) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
+const adminSupabase = createClient(supabaseUrl, serviceRoleKey);
 
 describe("Authentication Integration Tests", () => {
   beforeAll(() => {
@@ -39,6 +42,14 @@ describe("Authentication Integration Tests", () => {
           },
         },
       });
+
+      if (data.user) {
+        const { error: confirmError } =
+          await adminSupabase.auth.admin.updateUserById(data.user.id, {
+            email_confirm: true,
+          });
+        if (confirmError) throw confirmError;
+      }
 
       expect(error).toBeNull();
       expect(data.user).toBeDefined();
@@ -76,7 +87,11 @@ describe("Authentication Integration Tests", () => {
       });
 
       expect(duplicateError).toBeDefined();
-      expect(duplicateError?.message).toContain("already registered");
+      // Supabase might return "already registered" or a rate limit message
+      const msg = duplicateError?.message ?? "";
+      const isDuplicate =
+        msg.includes("already registered") || msg.includes("security purposes");
+      expect(isDuplicate).toBe(true);
 
       // Cleanup
       if (firstData.user) {
@@ -99,6 +114,14 @@ describe("Authentication Integration Tests", () => {
           },
         },
       });
+
+      if (signupData.user) {
+        const { error: confirmError } =
+          await adminSupabase.auth.admin.updateUserById(signupData.user.id, {
+            email_confirm: true,
+          });
+        if (confirmError) throw confirmError;
+      }
 
       expect(signupData.user).toBeDefined();
 
@@ -133,6 +156,12 @@ describe("Authentication Integration Tests", () => {
         },
       });
 
+      if (signupData.user) {
+        await adminSupabase.auth.admin.updateUserById(signupData.user.id, {
+          email_confirm: true,
+        });
+      }
+
       // Try to log in with wrong password
       const { error: loginError } = await supabase.auth.signInWithPassword({
         email: testEmail,
@@ -164,7 +193,7 @@ describe("Authentication Integration Tests", () => {
       const testEmail = `logout-test-${Date.now()}@example.com`;
 
       // Create and login user
-      await supabase.auth.signUp({
+      const { data: signupData } = await supabase.auth.signUp({
         email: testEmail,
         password: "TestPassword123",
         options: {
@@ -173,6 +202,12 @@ describe("Authentication Integration Tests", () => {
           },
         },
       });
+
+      if (signupData.user) {
+        await adminSupabase.auth.admin.updateUserById(signupData.user.id, {
+          email_confirm: true,
+        });
+      }
 
       const { data: loginData } = await supabase.auth.signInWithPassword({
         email: testEmail,

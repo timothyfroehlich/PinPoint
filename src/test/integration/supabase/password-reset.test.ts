@@ -18,6 +18,9 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey);
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!serviceRoleKey) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
+const adminSupabase = createClient(supabaseUrl, serviceRoleKey);
 
 describe("Password Reset Integration Tests", () => {
   beforeAll(() => {
@@ -39,6 +42,12 @@ describe("Password Reset Integration Tests", () => {
           },
         },
       });
+
+      if (signupData.user) {
+        await adminSupabase.auth.admin.updateUserById(signupData.user.id, {
+          email_confirm: true,
+        });
+      }
 
       expect(signupData.user).toBeDefined();
 
@@ -76,7 +85,8 @@ describe("Password Reset Integration Tests", () => {
       const newPassword = "NewPassword456";
 
       // Create and login user
-      await supabase.auth.signUp({
+      // Create and login user
+      const { data: signupData } = await supabase.auth.signUp({
         email: testEmail,
         password: oldPassword,
         options: {
@@ -85,6 +95,12 @@ describe("Password Reset Integration Tests", () => {
           },
         },
       });
+
+      if (signupData.user) {
+        await adminSupabase.auth.admin.updateUserById(signupData.user.id, {
+          email_confirm: true,
+        });
+      }
 
       const { data: loginData } = await supabase.auth.signInWithPassword({
         email: testEmail,

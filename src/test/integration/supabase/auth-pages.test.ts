@@ -21,6 +21,9 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey);
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!serviceRoleKey) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
+const adminSupabase = createClient(supabaseUrl, serviceRoleKey);
 
 describe("Auth Pages - Server Component Auth Logic", () => {
   let testUserId: string | null = null;
@@ -53,6 +56,12 @@ describe("Auth Pages - Server Component Auth Logic", () => {
           },
         },
       });
+
+      if (signupData.user) {
+        await adminSupabase.auth.admin.updateUserById(signupData.user.id, {
+          email_confirm: true,
+        });
+      }
 
       expect(signupData.user).toBeDefined();
       testUserId = signupData.user?.id ?? null;
@@ -104,6 +113,12 @@ describe("Auth Pages - Server Component Auth Logic", () => {
           },
         },
       });
+
+      if (signupData.user) {
+        await adminSupabase.auth.admin.updateUserById(signupData.user.id, {
+          email_confirm: true,
+        });
+      }
 
       expect(signupData.user).toBeDefined();
       testUserId = signupData.user?.id ?? null;
