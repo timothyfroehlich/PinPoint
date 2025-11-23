@@ -87,7 +87,11 @@ test.describe.serial("Member Dashboard", () => {
     const recentCardsCount = await recentCards.count();
     const recentEmptyStateCount = await recentEmptyState.count();
 
-    ensureCardsOrEmpty(recentCardsCount, recentEmptyStateCount, "Recent issues");
+    ensureCardsOrEmpty(
+      recentCardsCount,
+      recentEmptyStateCount,
+      "Recent issues"
+    );
   });
 
   test("dashboard issue cards link to issue detail pages", async ({ page }) => {

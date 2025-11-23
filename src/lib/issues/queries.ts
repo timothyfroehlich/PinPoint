@@ -3,10 +3,10 @@ import { issues } from "~/server/db/schema";
 import { eq, and, desc, isNull, type SQL } from "drizzle-orm";
 
 export interface IssueFilters {
-  machineId?: string;
-  status?: string;
-  severity?: string;
-  assignedTo?: string;
+  machineId?: string | undefined;
+  status?: string | undefined;
+  severity?: string | undefined;
+  assignedTo?: string | undefined;
 }
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
