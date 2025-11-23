@@ -58,16 +58,24 @@ describe("Issue Status Utilities", () => {
   describe("getIssueStatusStyles", () => {
     it("should return styles for all statuses", () => {
       expect(getIssueStatusStyles("new")).toContain("bg-surface-variant");
-      expect(getIssueStatusStyles("in_progress")).toContain("bg-primary-container");
-      expect(getIssueStatusStyles("resolved")).toContain("bg-success-container");
+      expect(getIssueStatusStyles("in_progress")).toContain(
+        "bg-primary-container"
+      );
+      expect(getIssueStatusStyles("resolved")).toContain(
+        "bg-success-container"
+      );
     });
   });
 
   describe("getIssueSeverityStyles", () => {
     it("should return styles for all severities", () => {
       expect(getIssueSeverityStyles("minor")).toContain("bg-surface-variant");
-      expect(getIssueSeverityStyles("playable")).toContain("bg-warning-container");
-      expect(getIssueSeverityStyles("unplayable")).toContain("bg-error-container");
+      expect(getIssueSeverityStyles("playable")).toContain(
+        "bg-warning-container"
+      );
+      expect(getIssueSeverityStyles("unplayable")).toContain(
+        "bg-error-container"
+      );
     });
   });
 });

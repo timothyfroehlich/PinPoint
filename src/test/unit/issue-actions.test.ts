@@ -3,7 +3,9 @@ import { addCommentAction } from "~/app/(app)/issues/actions";
 
 // Mock Next.js modules
 vi.mock("next/navigation", () => ({
-  redirect: vi.fn(),
+  redirect: vi.fn(() => {
+    throw new Error("NEXT_REDIRECT");
+  }),
 }));
 
 vi.mock("next/cache", () => ({
@@ -71,7 +73,9 @@ describe("addCommentAction", () => {
     formData.append("issueId", validUuid);
     formData.append("comment", "Test comment");
 
-    await expect(addCommentAction(formData)).resolves.toBeUndefined();
+    // Expect redirect to throw
+    await expect(addCommentAction(formData)).rejects.toThrow("NEXT_REDIRECT");
+
     // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(db.insert).toHaveBeenCalled();
     expect(revalidatePath).toHaveBeenCalledWith(`/issues/${validUuid}`);
@@ -89,7 +93,7 @@ describe("addCommentAction", () => {
     formData.append("issueId", validUuid);
     formData.append("comment", "Test comment");
 
-    await addCommentAction(formData);
+    await expect(addCommentAction(formData)).rejects.toThrow("NEXT_REDIRECT");
 
     expect(setFlash).toHaveBeenCalledWith(
       expect.objectContaining({ type: "error", message: "Unauthorized" })
@@ -102,7 +106,7 @@ describe("addCommentAction", () => {
     formData.append("issueId", validUuid);
     formData.append("comment", ""); // Empty comment
 
-    await addCommentAction(formData);
+    await expect(addCommentAction(formData)).rejects.toThrow("NEXT_REDIRECT");
 
     expect(setFlash).toHaveBeenCalledWith(
       expect.objectContaining({ type: "error" })
@@ -124,7 +128,7 @@ describe("addCommentAction", () => {
     formData.append("issueId", validUuid);
     formData.append("comment", "Test comment");
 
-    await addCommentAction(formData);
+    await expect(addCommentAction(formData)).rejects.toThrow("NEXT_REDIRECT");
 
     expect(setFlash).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -140,7 +144,7 @@ describe("addCommentAction", () => {
     formData.append("issueId", validUuid);
     formData.append("comment", "Test comment");
 
-    await addCommentAction(formData);
+    await expect(addCommentAction(formData)).rejects.toThrow("NEXT_REDIRECT");
 
     expect(setFlash).toHaveBeenCalledWith(
       expect.objectContaining({ type: "success" })

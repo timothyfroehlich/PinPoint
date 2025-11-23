@@ -6,6 +6,13 @@ The user's name is Tim and his GitHub account is "timothyfroehlich".
 
 Tim is vibecoding this app by himself to learn about website design and experiment with agentic coding. Tim has never coded in Java/TypeScript before. When a decision is needed, the agent should provide some explanation about the options, pros and cons. Review comments on GitHub PRs can be assumed to have been written by coding agents. Their comments must be taken as suggestions and with a grain of salt. Don't assume that the agent who wrote the comment had the full context to fully understand the problem.
 
+## CRITICAL: BEFORE SUBMITTING
+
+**ALWAYS run `npm run preflight` before submitting your changes.**
+This script runs type checking, linting, formatting, and tests. Pushing broken code wastes time.
+If you cannot run the full preflight (e.g., due to missing Supabase in your environment), you MUST run:
+`npm run typecheck && npm run lint && npm test && npm run build`
+
 ## Critical Context Files
 
 Read these immediately before starting work:
