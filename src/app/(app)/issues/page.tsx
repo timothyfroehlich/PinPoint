@@ -4,12 +4,13 @@ import Link from "next/link";
 import { AlertTriangle, Plus } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { issues, machines } from "~/server/db/schema";
-import { eq, and, desc, isNull } from "drizzle-orm";
+import { machines } from "~/server/db/schema";
+import { desc } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { IssueFilters } from "~/components/IssueFilters";
+import { getIssues } from "~/lib/issues/queries";
 
 /**
  * Issues List Page (Protected Route)
@@ -44,53 +45,12 @@ export default async function IssuesPage({
   const params = await searchParams;
   const { machineId, status, severity, assignedTo } = params;
 
-  // Build where conditions for filtering
-  const conditions = [];
-  if (machineId) conditions.push(eq(issues.machineId, machineId));
-  if (
-    status &&
-    (status === "new" || status === "in_progress" || status === "resolved")
-  ) {
-    conditions.push(eq(issues.status, status));
-  }
-  if (
-    severity &&
-    (severity === "minor" ||
-      severity === "playable" ||
-      severity === "unplayable")
-  ) {
-    conditions.push(eq(issues.severity, severity));
-  }
-  if (assignedTo === "unassigned") {
-    conditions.push(isNull(issues.assignedTo));
-  } else if (assignedTo) {
-    conditions.push(eq(issues.assignedTo, assignedTo));
-  }
-
   // Query issues with filters
-  const allIssues = await db.query.issues.findMany({
-    where: conditions.length > 0 ? and(...conditions) : undefined,
-    orderBy: desc(issues.createdAt),
-    with: {
-      machine: {
-        columns: {
-          id: true,
-          name: true,
-        },
-      },
-      reportedByUser: {
-        columns: {
-          id: true,
-          name: true,
-        },
-      },
-      assignedToUser: {
-        columns: {
-          id: true,
-          name: true,
-        },
-      },
-    },
+  const allIssues = await getIssues({
+    machineId,
+    status,
+    severity,
+    assignedTo,
   });
 
   // Fetch all machines and users for filter dropdowns

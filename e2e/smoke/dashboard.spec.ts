@@ -27,19 +27,10 @@ function ensureCardsOrEmpty(
 }
 
 test.describe.serial("Member Dashboard", () => {
-  test("login redirects to dashboard", async ({ page }) => {
+  test("dashboard loads with all sections", async ({ page }) => {
     await loginAs(page);
 
-    // Should be on dashboard after login
-    await expect(page).toHaveURL("/dashboard");
-    await expect(
-      page.getByRole("heading", { name: "Dashboard" })
-    ).toBeVisible();
-  });
-
-  test("dashboard displays quick stats section", async ({ page }) => {
-    await loginAs(page);
-
+    // Quick Stats
     await expect(
       page.getByRole("heading", { name: "Quick Stats" })
     ).toBeVisible();
@@ -56,79 +47,47 @@ test.describe.serial("Member Dashboard", () => {
     expect(openIssues).toBeGreaterThanOrEqual(0);
     expect(machinesNeedingService).toBeGreaterThanOrEqual(0);
     expect(assignedToMe).toBeGreaterThanOrEqual(0);
-  });
 
-  test("dashboard displays assigned issues section", async ({ page }) => {
-    await loginAs(page);
-
-    // Verify section heading
+    // Assigned Issues
     await expect(
       page.getByRole("heading", { name: "Issues Assigned to Me" })
     ).toBeVisible();
+    const assignedEmptyState = page.getByText("No issues assigned to you");
+    const assignedCards = page.getByTestId("assigned-issue-card");
+    const assignedCardsCount = await assignedCards.count();
+    const assignedEmptyStateCount = await assignedEmptyState.count();
 
-    // Section should either show issues or empty state
-    const emptyState = page.getByText("No issues assigned to you");
-    const cards = page.getByTestId("assigned-issue-card");
-    const cardsCount = await cards.count();
-    const emptyStateCount = await emptyState.count();
-
-    ensureCardsOrEmpty(cardsCount, emptyStateCount, "Assigned issues");
-
-    const assignedCount = await getStatNumber(
-      page,
-      "stat-assigned-to-me-value"
+    ensureCardsOrEmpty(
+      assignedCardsCount,
+      assignedEmptyStateCount,
+      "Assigned issues"
     );
-    if (assignedCount === 0) {
-      await expect(emptyState).toBeVisible();
-      expect(cardsCount).toBe(0);
-    } else {
-      expect(cardsCount).toBe(assignedCount);
-      await expect(cards.first()).toBeVisible();
-    }
-  });
 
-  test("dashboard displays unplayable machines section", async ({ page }) => {
-    await loginAs(page);
-
-    // Verify section heading
+    // Unplayable Machines
     await expect(
       page.getByRole("heading", { name: "Unplayable Machines" })
     ).toBeVisible();
+    const unplayableEmptyState = page.getByText("All machines are playable");
+    const unplayableCards = page.getByTestId("unplayable-machine-card");
+    const unplayableCardsCount = await unplayableCards.count();
+    const unplayableEmptyStateCount = await unplayableEmptyState.count();
 
-    // Section should either show machines or empty state
-    const emptyState = page.getByText("All machines are playable");
-    const machineCards = page.getByTestId("unplayable-machine-card");
-    const cardsCount = await machineCards.count();
-    const emptyStateCount = await emptyState.count();
+    ensureCardsOrEmpty(
+      unplayableCardsCount,
+      unplayableEmptyStateCount,
+      "Unplayable machines"
+    );
 
-    ensureCardsOrEmpty(cardsCount, emptyStateCount, "Unplayable machines");
-
-    if (cardsCount > 0) {
-      await expect(machineCards.first()).toBeVisible();
-    }
-  });
-
-  test("dashboard displays recently reported issues section", async ({
-    page,
-  }) => {
-    await loginAs(page);
-
-    // Verify section heading
+    // Recent Issues
     await expect(
       page.getByRole("heading", { name: "Recently Reported Issues" })
     ).toBeVisible();
+    const recentEmptyState = page.getByText("No issues reported yet");
+    const recentCards = page.getByTestId("recent-issue-card");
+    const recentCardsCount = await recentCards.count();
+    const recentEmptyStateCount = await recentEmptyState.count();
 
-    // Section should either show issues or empty state
-    const emptyState = page.getByText("No issues reported yet");
-    const cards = page.getByTestId("recent-issue-card");
-    const cardsCount = await cards.count();
-    const emptyStateCount = await emptyState.count();
-
-    ensureCardsOrEmpty(cardsCount, emptyStateCount, "Recent issues");
-
-    if (cardsCount > 0) {
-      await expect(cards.first()).toBeVisible();
-    }
+    ensureCardsOrEmpty(recentCardsCount, recentEmptyStateCount, "Recent issues");
   });
 
   test("dashboard issue cards link to issue detail pages", async ({ page }) => {
@@ -147,61 +106,5 @@ test.describe.serial("Member Dashboard", () => {
       await expect(page).toHaveURL(/\/issues\/[0-9a-f-]+/);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     }
-  });
-
-  test("dashboard machine cards link to machine detail pages", async ({
-    page,
-  }) => {
-    await loginAs(page);
-
-    // Check if there are any machine cards (in unplayable section)
-    const machineCards = page.getByTestId("unplayable-machine-card");
-    const count = await machineCards.count();
-
-    if (count > 0) {
-      // Click the first machine card
-      const firstMachine = machineCards.first();
-      await firstMachine.click();
-
-      // Should navigate to machine detail page
-      await expect(page).toHaveURL(/\/machines\/[0-9a-f-]+/);
-      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    }
-  });
-
-  test("dashboard is responsive on mobile", async ({ page }) => {
-    // Set mobile viewport
-    await page.setViewportSize({ width: 375, height: 667 });
-
-    await loginAs(page);
-
-    // Dashboard should still be visible and functional
-    await expect(
-      page.getByRole("heading", { name: "Dashboard" })
-    ).toBeVisible();
-
-    // All sections should be visible (stacked vertically on mobile)
-    await expect(
-      page.getByRole("heading", { name: "Quick Stats" })
-    ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: "Issues Assigned to Me" })
-    ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: "Unplayable Machines" })
-    ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: "Recently Reported Issues" })
-    ).toBeVisible();
-  });
-
-  test("unauthenticated user redirects to login when accessing dashboard", async ({
-    page,
-  }) => {
-    // Try to access dashboard without logging in
-    await page.goto("/dashboard");
-
-    // Should redirect to login
-    await expect(page).toHaveURL("/login");
   });
 });

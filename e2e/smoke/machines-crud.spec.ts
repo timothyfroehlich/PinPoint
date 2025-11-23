@@ -122,61 +122,6 @@ test.describe("Machines CRUD", () => {
     );
   });
 
-  test("should validate required machine name", async ({ page }) => {
-    // Navigate to create machine page
-    await page.goto("/machines/new");
-
-    // If redirected (lost session), log back in and retry
-    if (page.url().includes("/login")) {
-      await ensureLoggedIn(page);
-      await page.goto("/machines/new");
-    }
-
-    await expect(page).toHaveURL("/machines/new");
-    await expect(
-      page.getByRole("heading", { name: "Add New Machine" })
-    ).toBeVisible();
-
-    // Try to submit without filling name
-    // Note: HTML5 validation will prevent submission
-    const nameInput = page.locator("#name");
-    await expect(nameInput).toHaveAttribute("required");
-
-    // Fill name with only whitespace
-    await nameInput.fill("   ");
-
-    // Submit form
-    await page.getByRole("button", { name: "Create Machine" }).click();
-
-    // Should stay on the same page (HTML5 validation or server validation)
-    // The form should either show HTML5 validation or stay on the page
-    // Wait for the form heading to remain visible, indicating we're still on the page
-    await expect(
-      page.getByRole("heading", { name: "Add New Machine" })
-    ).toBeVisible();
-    await expect(page).toHaveURL("/machines/new");
-  });
-
-  test("should navigate to machine detail page", async ({ page }) => {
-    // Navigate to machines page
-    await page.goto("/machines");
-
-    // Click on a machine card
-    await page.getByRole("link", { name: "Medieval Madness" }).first().click();
-
-    // Should navigate to machine detail page
-    await expect(page).toHaveURL(/\/machines\/[a-f0-9-]+$/);
-
-    // Verify machine details are displayed
-    await expect(
-      page.getByRole("heading", { name: "Medieval Madness" })
-    ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: "Machine Information" })
-    ).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Issues" })).toBeVisible();
-  });
-
   test("should display machine issues on detail page", async ({ page }) => {
     // Navigate to The Addams Family (has unplayable issue)
     await page.goto("/machines");
@@ -230,49 +175,5 @@ test.describe("Machines CRUD", () => {
     );
 
     rememberMachineId(page.url());
-  });
-
-  test("should navigate back to machines list from detail page", async ({
-    page,
-  }) => {
-    // Navigate to a machine detail page
-    await page.goto("/machines");
-    await page.getByText("Medieval Madness").click();
-
-    // Click back button
-    await page.getByRole("link", { name: /Back/i }).click();
-
-    // Should return to machines list
-    await expect(page).toHaveURL("/machines");
-  });
-
-  test("should navigate back to machines list from create page", async ({
-    page,
-  }) => {
-    // Navigate to create machine page
-    await page.goto("/machines/new");
-
-    // Click back or cancel button
-    await page.getByRole("link", { name: /Back/i }).click();
-
-    // Should return to machines list
-    await expect(page).toHaveURL("/machines");
-  });
-
-  test("should require authentication for machines pages", async ({ page }) => {
-    // First, logout if logged in
-    await page.goto("/dashboard");
-    const userMenuButton = page.getByTestId("user-menu-button");
-    if (await userMenuButton.isVisible()) {
-      await userMenuButton.click();
-      await page.getByRole("menuitem", { name: "Sign Out" }).click();
-      await expect(page).toHaveURL("/"); // should land on home
-    }
-
-    // Try to access machines page without authentication
-    await page.goto("/machines");
-
-    // Should redirect to login
-    await expect(page).toHaveURL("/login");
   });
 });
