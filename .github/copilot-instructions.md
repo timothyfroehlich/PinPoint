@@ -58,56 +58,15 @@ Referencing `TASKS.md` PR order:
 
 ## Preferred Implementation Examples
 
-(See pattern-specific instruction files for scoped detail.)
+> **Source of Truth**: See `docs/PATTERNS.md` (and `docs/patterns/*.md`) for detailed coding patterns and examples.
 
-### Minimal Server Component
+Refer to `docs/PATTERNS.md` index for:
 
-```tsx
-// src/app/page.tsx
-export default async function Landing() {
-  return (
-    <main className="flex min-h-dvh items-center justify-center p-6">
-      <section className="space-y-4 text-center">
-        <h1 className="text-3xl font-semibold">PinPoint</h1>
-        <p className="text-sm text-muted-foreground">
-          Track pinball machine issues fast.
-        </p>
-      </section>
-    </main>
-  );
-}
-```
+- Minimal Server Component examples
+- Server Actions with Zod validation
+- Integration Test memory safety patterns
 
-### Server Action With Validation
-
-```ts
-// src/app/machines/actions.ts
-"use server";
-import { z } from "zod";
-import { db } from "~/server/db";
-import { machines } from "~/server/db/schema";
-
-const createMachineSchema = z.object({ name: z.string().min(1) });
-export type CreateMachineInput = z.infer<typeof createMachineSchema>;
-
-export async function createMachine(
-  formData: FormData
-): Promise<{ ok: boolean; error?: string }> {
-  const raw = { name: formData.get("name") };
-  const parsed = createMachineSchema.safeParse(raw);
-  if (!parsed.success) return { ok: false, error: "Invalid name" };
-  await db.insert(machines).values({ name: parsed.data.name });
-  return { ok: true };
-}
-```
-
-### Integration Test Memory Safety Snippet
-
-```ts
-// src/test/setup/worker-db.ts
-import { createWorkerDb } from "~/test/helpers/worker"; // pattern wrapper
-export const workerDb = await createWorkerDb(); // one per worker, not per test
-```
+(See pattern-specific instruction files in `.github/instructions/` for scoped detail.)
 
 ## Auth Essentials
 
@@ -156,7 +115,7 @@ If Copilot cannot infer a pattern: reference the canonical docs first; prefer as
 
 ## Evolution Notes
 
-As features stabilize (Machines CRUD, Issues workflow, Comments), patterns that repeat (≥2 implementations) MUST be documented in `docs/PATTERNS.md` before introducing abstractions.
+As features stabilize (Machines CRUD, Issues workflow, Comments), patterns that repeat (≥2 implementations) MUST be documented in `docs/patterns/` before introducing abstractions.
 
 ---
 

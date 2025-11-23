@@ -22,7 +22,7 @@ This file documents how repository + pattern-specific instructions guide AI assi
     testing.instructions.md        # Memory safety & test pyramid
 ```
 
-(We intentionally exclude domain-specific instruction files at greenfield start; domain patterns will graduate into `docs/PATTERNS.md`.)
+(We intentionally exclude domain-specific instruction files at greenfield start; domain patterns will graduate into `docs/patterns/*.md`.)
 
 ## Instruction Hierarchy Merge Order
 
@@ -34,7 +34,7 @@ This file documents how repository + pattern-specific instructions guide AI assi
 
 - `docs/NON_NEGOTIABLES.md` – forbidden patterns & critical constraints
 - `AGENTS.md` – contextual project directives
-- `docs/PATTERNS.md` – evolving implementation patterns
+- `docs/PATTERNS.md` – **PRIMARY** index for implementation patterns (see `docs/patterns/`)
 - `docs/TYPESCRIPT_STRICTEST_PATTERNS.md` – strict TS techniques
 - `docs/TESTING_PLAN.md` – test distribution & memory safety
 - `docs/TECH_SPEC.md` – single-tenant architecture definition
@@ -62,7 +62,7 @@ This file documents how repository + pattern-specific instructions guide AI assi
 
 Update instructions when:
 
-- A pattern appears ≥2 times (add to `docs/PATTERNS.md`, then reference from instruction file)
+- A pattern appears ≥2 times (add to `docs/patterns/`, link in `docs/PATTERNS.md`, then reference from instruction file)
 - Source-of-truth docs change materially
 - A new forbidden pattern emerges (add to `NON_NEGOTIABLES.md`, then reference)
 
