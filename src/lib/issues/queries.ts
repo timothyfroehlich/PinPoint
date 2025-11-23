@@ -9,10 +9,10 @@ export interface IssueFilters {
   assignedTo?: string | undefined;
 }
 
-// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-export async function getIssues(filters: IssueFilters) {
-  const { machineId, status, severity, assignedTo } = filters;
 
+export async function getIssues(
+  filters: IssueFilters
+): Promise<IssueWithRelations[]> {
   // Build where conditions for filtering
   const conditions: SQL[] = [];
 
