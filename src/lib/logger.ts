@@ -32,9 +32,16 @@ function tryCreateSessionDirectory(): string | undefined {
   } catch (error) {
     // Silently fall back to stdout in serverless/read-only environments
     // or if we lack permissions. This is expected behavior in Vercel.
+    const hasErrorCode = (err: unknown): err is Error & { code: string } =>
+      err instanceof Error && "code" in err && typeof err.code === "string";
+
     const isReadOnly =
       error instanceof Error &&
-      (error.message.includes("EROFS") || error.message.includes("ENOENT"));
+      ((hasErrorCode(error) &&
+        ["EROFS", "EACCES", "EPERM"].includes(error.code)) ||
+        error.message.includes("EROFS") ||
+        error.message.includes("EACCES") ||
+        error.message.includes("EPERM"));
 
     if (!isReadOnly) {
       console.warn(
