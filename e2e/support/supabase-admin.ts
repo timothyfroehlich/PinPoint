@@ -30,6 +30,11 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
  * This bypasses the email confirmation flow for E2E tests.
  * The user must already exist (created via signup).
  *
+ * **Note**: This helper lists all users to find by email, which is inefficient
+ * and won't scale. This is acceptable for E2E tests against local Supabase
+ * with a small number of users. For integration tests where the User object
+ * is available, use the helper in `src/test/helpers/supabase.ts` instead.
+ *
  * @param email - Email address of the user to confirm
  * @throws Error if user not found or confirmation fails
  */

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { createClient } from "@supabase/supabase-js";
+import { confirmTestUserEmail } from "~/test/helpers/supabase";
 
 /**
  * Integration tests for authentication actions
@@ -44,11 +45,7 @@ describe("Authentication Integration Tests", () => {
       });
 
       if (data.user) {
-        const { error: confirmError } =
-          await adminSupabase.auth.admin.updateUserById(data.user.id, {
-            email_confirm: true,
-          });
-        if (confirmError) throw confirmError;
+        await confirmTestUserEmail(adminSupabase, data.user);
       }
 
       expect(error).toBeNull();
@@ -116,11 +113,7 @@ describe("Authentication Integration Tests", () => {
       });
 
       if (signupData.user) {
-        const { error: confirmError } =
-          await adminSupabase.auth.admin.updateUserById(signupData.user.id, {
-            email_confirm: true,
-          });
-        if (confirmError) throw confirmError;
+        await confirmTestUserEmail(adminSupabase, signupData.user);
       }
 
       expect(signupData.user).toBeDefined();
@@ -157,9 +150,7 @@ describe("Authentication Integration Tests", () => {
       });
 
       if (signupData.user) {
-        await adminSupabase.auth.admin.updateUserById(signupData.user.id, {
-          email_confirm: true,
-        });
+        await confirmTestUserEmail(adminSupabase, signupData.user);
       }
 
       // Try to log in with wrong password
@@ -204,9 +195,7 @@ describe("Authentication Integration Tests", () => {
       });
 
       if (signupData.user) {
-        await adminSupabase.auth.admin.updateUserById(signupData.user.id, {
-          email_confirm: true,
-        });
+        await confirmTestUserEmail(adminSupabase, signupData.user);
       }
 
       const { data: loginData } = await supabase.auth.signInWithPassword({

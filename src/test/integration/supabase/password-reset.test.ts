@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { createClient } from "@supabase/supabase-js";
+import { confirmTestUserEmail } from "~/test/helpers/supabase";
 
 /**
  * Integration tests for password reset flow
@@ -44,9 +45,7 @@ describe("Password Reset Integration Tests", () => {
       });
 
       if (signupData.user) {
-        await adminSupabase.auth.admin.updateUserById(signupData.user.id, {
-          email_confirm: true,
-        });
+        await confirmTestUserEmail(adminSupabase, signupData.user);
       }
 
       expect(signupData.user).toBeDefined();
@@ -97,9 +96,7 @@ describe("Password Reset Integration Tests", () => {
       });
 
       if (signupData.user) {
-        await adminSupabase.auth.admin.updateUserById(signupData.user.id, {
-          email_confirm: true,
-        });
+        await confirmTestUserEmail(adminSupabase, signupData.user);
       }
 
       const { data: loginData } = await supabase.auth.signInWithPassword({
