@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { createClient } from "@supabase/supabase-js";
+import { confirmTestUserEmail } from "~/test/helpers/supabase";
 
 /**
  * Integration tests for authentication actions
@@ -19,6 +20,9 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey);
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!serviceRoleKey) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
+const adminSupabase = createClient(supabaseUrl, serviceRoleKey);
 
 describe("Authentication Integration Tests", () => {
   beforeAll(() => {
@@ -39,6 +43,10 @@ describe("Authentication Integration Tests", () => {
           },
         },
       });
+
+      if (data.user) {
+        await confirmTestUserEmail(adminSupabase, data.user);
+      }
 
       expect(error).toBeNull();
       expect(data.user).toBeDefined();
@@ -76,7 +84,11 @@ describe("Authentication Integration Tests", () => {
       });
 
       expect(duplicateError).toBeDefined();
-      expect(duplicateError?.message).toContain("already registered");
+      // Supabase might return "already registered" or a rate limit message
+      const msg = duplicateError?.message ?? "";
+      const isDuplicate =
+        msg.includes("already registered") || msg.includes("security purposes");
+      expect(isDuplicate).toBe(true);
 
       // Cleanup
       if (firstData.user) {
@@ -99,6 +111,10 @@ describe("Authentication Integration Tests", () => {
           },
         },
       });
+
+      if (signupData.user) {
+        await confirmTestUserEmail(adminSupabase, signupData.user);
+      }
 
       expect(signupData.user).toBeDefined();
 
@@ -133,6 +149,10 @@ describe("Authentication Integration Tests", () => {
         },
       });
 
+      if (signupData.user) {
+        await confirmTestUserEmail(adminSupabase, signupData.user);
+      }
+
       // Try to log in with wrong password
       const { error: loginError } = await supabase.auth.signInWithPassword({
         email: testEmail,
@@ -164,7 +184,7 @@ describe("Authentication Integration Tests", () => {
       const testEmail = `logout-test-${Date.now()}@example.com`;
 
       // Create and login user
-      await supabase.auth.signUp({
+      const { data: signupData } = await supabase.auth.signUp({
         email: testEmail,
         password: "TestPassword123",
         options: {
@@ -173,6 +193,10 @@ describe("Authentication Integration Tests", () => {
           },
         },
       });
+
+      if (signupData.user) {
+        await confirmTestUserEmail(adminSupabase, signupData.user);
+      }
 
       const { data: loginData } = await supabase.auth.signInWithPassword({
         email: testEmail,

@@ -38,7 +38,7 @@ const FLASH_COOKIE_KEY = "flash";
  */
 export async function setFlash(flash: Flash): Promise<void> {
   const cookieStore = await cookies();
-  cookieStore.set(FLASH_COOKIE_KEY, JSON.stringify(flash), {
+  cookieStore.set(FLASH_COOKIE_KEY, encodeURIComponent(JSON.stringify(flash)), {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
@@ -77,7 +77,7 @@ export async function readFlash(): Promise<Flash | null> {
   }
 
   try {
-    return JSON.parse(raw) as Flash;
+    return JSON.parse(decodeURIComponent(raw)) as Flash;
   } catch {
     return null;
   }

@@ -24,7 +24,7 @@ export type LoginResult = Result<
 
 export type SignupResult = Result<
   { userId: string },
-  "VALIDATION" | "EMAIL_TAKEN" | "SERVER"
+  "VALIDATION" | "EMAIL_TAKEN" | "SERVER" | "CONFIRMATION_REQUIRED"
 >;
 
 export type LogoutResult = Result<void, "SERVER">;
@@ -200,6 +200,19 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
         message: "Failed to create account",
       });
       return err("SERVER", "No user returned");
+    }
+
+    // Check if email confirmation is required (user created but no session)
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (data.user && !data.session) {
+      log.info(
+        { userId: data.user.id, action: "signup" },
+        "User signed up, confirmation required"
+      );
+      return err(
+        "CONFIRMATION_REQUIRED",
+        "Please check your email to confirm your account"
+      );
     }
 
     log.info(

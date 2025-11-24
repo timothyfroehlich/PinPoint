@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { createClient } from "@supabase/supabase-js";
+import { confirmTestUserEmail } from "~/test/helpers/supabase";
 
 /**
  * Integration tests for password reset flow
@@ -18,6 +19,9 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey);
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!serviceRoleKey) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
+const adminSupabase = createClient(supabaseUrl, serviceRoleKey);
 
 describe("Password Reset Integration Tests", () => {
   beforeAll(() => {
@@ -39,6 +43,10 @@ describe("Password Reset Integration Tests", () => {
           },
         },
       });
+
+      if (signupData.user) {
+        await confirmTestUserEmail(adminSupabase, signupData.user);
+      }
 
       expect(signupData.user).toBeDefined();
 
@@ -76,7 +84,7 @@ describe("Password Reset Integration Tests", () => {
       const newPassword = "NewPassword456";
 
       // Create and login user
-      await supabase.auth.signUp({
+      const { data: signupData } = await supabase.auth.signUp({
         email: testEmail,
         password: oldPassword,
         options: {
@@ -85,6 +93,10 @@ describe("Password Reset Integration Tests", () => {
           },
         },
       });
+
+      if (signupData.user) {
+        await confirmTestUserEmail(adminSupabase, signupData.user);
+      }
 
       const { data: loginData } = await supabase.auth.signInWithPassword({
         email: testEmail,

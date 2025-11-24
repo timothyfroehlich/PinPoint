@@ -6,6 +6,7 @@
 
 import { test, expect } from "@playwright/test";
 import { getPasswordResetLink, deleteAllMessages } from "../support/mailpit";
+import { confirmUserEmail } from "../support/supabase-admin";
 
 test.describe("Authentication", () => {
   test("signup flow - create new account and access dashboard", async ({
@@ -24,15 +25,29 @@ test.describe("Authentication", () => {
     // Fill out signup form
     const timestamp = Date.now();
     const testEmail = `e2e-test-${timestamp}@example.com`;
+    const password = "TestPassword123";
 
     await page.getByLabel("Name").fill("E2E Test User");
     await page.getByLabel("Email").fill(testEmail);
-    await page.getByLabel("Password").fill("TestPassword123");
+    await page.getByLabel("Password").fill(password);
 
     // Submit form
     await page.getByRole("button", { name: "Create Account" }).click();
 
-    // Should redirect to dashboard after successful signup
+    // With email confirmations enabled, user is created but redirected to login
+    // Wait for redirect to confirm user was created
+    await expect(page).toHaveURL("/login", { timeout: 10000 });
+
+    // Auto-confirm the user's email using admin API
+    await confirmUserEmail(testEmail);
+
+    // Now login to establish session
+    await page.goto("/login");
+    await page.getByLabel("Email").fill(testEmail);
+    await page.getByLabel("Password").fill(password);
+    await page.getByRole("button", { name: "Sign In" }).click();
+
+    // Should redirect to dashboard after successful login
     await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
 
     // Verify dashboard content (quick stats present)
@@ -132,6 +147,16 @@ test.describe("Authentication", () => {
     await page.getByLabel("Email").fill(testEmail);
     await page.getByLabel("Password").fill(oldPassword);
     await page.getByRole("button", { name: "Create Account" }).click();
+
+    // With email confirmations enabled, wait for redirect to login
+    await expect(page).toHaveURL("/login", { timeout: 10000 });
+
+    // Auto-confirm and login
+    await confirmUserEmail(testEmail);
+    await page.goto("/login");
+    await page.getByLabel("Email").fill(testEmail);
+    await page.getByLabel("Password").fill(oldPassword);
+    await page.getByRole("button", { name: "Sign In" }).click();
     await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
 
     // Sign out to start reset journey
