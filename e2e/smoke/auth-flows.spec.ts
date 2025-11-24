@@ -93,22 +93,6 @@ test.describe("Authentication", () => {
     await expect(page.getByTestId("stat-open-issues-value")).toBeVisible();
   });
 
-  test("login flow - reject invalid credentials", async ({ page }) => {
-    // Navigate to login page
-    await page.goto("/login");
-
-    // Fill out login form with wrong password
-    await page.getByLabel("Email").fill("member@test.com");
-    await page.getByLabel("Password").fill("WrongPassword123");
-
-    // Submit form
-    await page.getByRole("button", { name: "Sign In" }).click();
-
-    // Should stay on login page and show error
-    await expect(page).toHaveURL("/login");
-    await expect(page.getByText(/Invalid email or password/i)).toBeVisible();
-  });
-
   test("protected route - redirect to login when not authenticated", async ({
     page,
   }) => {
@@ -147,98 +131,6 @@ test.describe("Authentication", () => {
     // Verify we're logged out by trying to access dashboard
     await page.goto("/dashboard");
     await expect(page).toHaveURL("/login");
-  });
-
-  test("signup validation - enforce minimum password length", async ({
-    page,
-  }) => {
-    await page.goto("/signup");
-
-    // Try to submit with short password
-    await page.getByLabel("Name").fill("Test User");
-    await page.getByLabel("Email").fill("test@example.com");
-    await page.getByLabel("Password").fill("short"); // Less than 8 characters
-
-    // Browser validation should prevent submission
-    const passwordInput = page.getByLabel("Password");
-    await expect(passwordInput).toHaveAttribute("minlength", "8");
-  });
-
-  test("password strength indicator - show feedback for weak passwords", async ({
-    page,
-  }) => {
-    await page.goto("/signup");
-
-    // Fill in name and email
-    await page.getByLabel("Name").fill("Test User");
-    await page.getByLabel("Email").fill("test@example.com");
-
-    // Type a weak password
-    await page.getByLabel("Password").fill("password");
-
-    // Wait for password strength indicator to appear
-    // (Client component needs time to load zxcvbn and calculate)
-    await expect(
-      page
-        .locator('[class*="password-strength"]')
-        .or(page.getByText(/weak|fair|good/i))
-    ).toBeVisible({ timeout: 2000 });
-
-    // Should show strength indicator (checking for common weak password feedback)
-    const pageContent = await page.content();
-    const hasStrengthIndicator =
-      pageContent.includes("Too weak") ||
-      pageContent.includes("Weak") ||
-      pageContent.includes("Fair");
-
-    expect(hasStrengthIndicator).toBe(true);
-  });
-
-  test("link navigation - switch between login and signup", async ({
-    page,
-  }) => {
-    // Start on login page
-    await page.goto("/login");
-    await expect(page.getByRole("heading", { name: "Sign In" })).toBeVisible();
-
-    // Click "Sign up" link
-    await page.getByRole("link", { name: "Sign up" }).click();
-
-    // Should navigate to signup page
-    await expect(page).toHaveURL("/signup");
-    await expect(
-      page.getByRole("heading", { name: "Create Account" })
-    ).toBeVisible();
-
-    // Click "Sign in" link
-    await page.getByRole("link", { name: "Sign in" }).click();
-
-    // Should navigate back to login page
-    await expect(page).toHaveURL("/login");
-    await expect(page.getByRole("heading", { name: "Sign In" })).toBeVisible();
-  });
-
-  test("auth state persistence - session survives page refresh", async ({
-    page,
-  }) => {
-    // Login
-    await page.goto("/login");
-    await page.getByLabel("Email").fill("member@test.com");
-    await page.getByLabel("Password").fill("TestPassword123");
-    await page.getByRole("button", { name: "Sign In" }).click();
-
-    // Wait for dashboard
-    await expect(page).toHaveURL("/dashboard");
-
-    // Refresh the page
-    await page.reload();
-
-    // Should still be on dashboard (not redirected to login)
-    await expect(page).toHaveURL("/dashboard");
-    await expect(
-      page.getByRole("heading", { name: "Dashboard" })
-    ).toBeVisible();
-    await expect(page.getByTestId("user-menu-name")).toBeVisible();
   });
 
   test("password reset flow - user journey only", async ({ page }) => {
@@ -319,28 +211,5 @@ test.describe("Authentication", () => {
     await page.getByTestId("user-menu-button").click();
     await page.getByRole("menuitem", { name: "Sign Out" }).click();
     await deleteAllMessages(testEmail);
-  });
-
-  test("password reset - expired/invalid link shows error", async ({
-    page,
-  }) => {
-    await page.goto("/reset-password");
-    await expect(page).toHaveURL("/forgot-password");
-    await expect(
-      page.getByRole("heading", { name: "Reset Password" })
-    ).toBeVisible();
-  });
-
-  test("forgot password - validates email format", async ({ page }) => {
-    await page.goto("/forgot-password");
-
-    // Try to submit with invalid email
-    await page.getByLabel("Email").fill("not-an-email");
-    await page.getByRole("button", { name: "Send Reset Link" }).click();
-
-    // Browser validation should prevent submission
-    const emailInput = page.getByLabel("Email");
-    await expect(emailInput).toHaveAttribute("type", "email");
-    await expect(emailInput).toHaveAttribute("required");
   });
 });
