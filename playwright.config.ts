@@ -1,4 +1,23 @@
 import { defineConfig, devices } from "@playwright/test";
+import { readFileSync } from "fs";
+import { join } from "path";
+
+// Load .env.local BEFORE reading process.env.PORT
+// This ensures PORT from .env.local is available when config is evaluated
+try {
+  const envPath = join(process.cwd(), ".env.local");
+  const envContent = readFileSync(envPath, "utf-8");
+  for (const line of envContent.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const [key, ...valueParts] = trimmed.split("=");
+    if (key && valueParts.length > 0) {
+      process.env[key.trim()] = valueParts.join("=").trim();
+    }
+  }
+} catch {
+  // .env.local not found - use defaults
+}
 
 // Default port matches main worktree (3000)
 // Other worktrees should set PORT in .env.local (3100, 3200, 3300)

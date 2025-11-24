@@ -110,6 +110,10 @@ describe("forgotPasswordAction - Origin Resolution", () => {
   });
 
   it("should use origin header when present", async () => {
+    // Ensure we're not affected by the test runner's PORT env var
+    vi.stubEnv("PORT", "3000");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
+
     // Mock headers to return origin
     vi.mocked(headers).mockReturnValue({
       get: (key: string) => {

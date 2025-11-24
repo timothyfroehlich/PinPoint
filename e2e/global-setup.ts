@@ -1,6 +1,4 @@
 import { execSync } from "child_process";
-import { readFileSync } from "fs";
-import { join } from "path";
 
 /**
  * Playwright Global Setup
@@ -14,25 +12,8 @@ export default async function globalSetup(): Promise<void> {
   // Satisfy @typescript-eslint/require-await
   await Promise.resolve();
 
-  // Load environment variables from .env.local manually
-  try {
-    const envPath = join(process.cwd(), ".env.local");
-    const envContent = readFileSync(envPath, "utf-8");
-    const lines = envContent.split("\n");
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-
-      const [key, ...valueParts] = trimmed.split("=");
-      if (key && valueParts.length > 0) {
-        const value = valueParts.join("=").trim();
-        process.env[key.trim()] = value;
-      }
-    }
-  } catch (error) {
-    console.warn("⚠️ Could not load .env.local file:", error);
-  }
+  // Note: .env.local is now loaded in playwright.config.ts before this runs
+  // All environment variables are already available in process.env
 
   try {
     // Step 1: Reset Supabase database - clears everything

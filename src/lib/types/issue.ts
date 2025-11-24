@@ -7,6 +7,12 @@ export type IssueCommentWithAuthor = Pick<
   author?: Pick<UserProfile, "id" | "name"> | null;
 };
 
+export type IssueListItem = Issue & {
+  machine: Pick<Machine, "id" | "name">;
+  reportedByUser?: Pick<UserProfile, "id" | "name"> | null;
+  assignedToUser?: Pick<UserProfile, "id" | "name"> | null;
+};
+
 export type IssueWithAllRelations = Issue & {
   machine: Pick<Machine, "id" | "name">;
   reportedByUser?: Pick<UserProfile, "id" | "name"> | null;
