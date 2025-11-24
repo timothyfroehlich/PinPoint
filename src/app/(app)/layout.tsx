@@ -1,20 +1,15 @@
 import type React from "react";
-import { Navigation } from "~/components/layout/navigation";
+import { DashboardLayout } from "~/components/layout/DashboardLayout";
 
 /**
  * Layout for authenticated app pages (dashboard, issues, machines, etc.)
  *
- * Includes top navigation bar
+ * Uses the new Sidebar + Dashboard layout structure.
  */
 export default function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }): React.JSX.Element {
-  return (
-    <>
-      <Navigation />
-      {children}
-    </>
-  );
+  return <DashboardLayout>{children}</DashboardLayout>;
 }

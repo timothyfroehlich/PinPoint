@@ -85,8 +85,8 @@ export function AssigneePicker({
       <button
         type="button"
         className={cn(
-          "w-full rounded-md border border-outline-variant bg-surface px-3 py-2 text-left text-sm text-on-surface transition",
-          "hover:bg-surface/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "w-full rounded-md border border-input bg-background px-3 py-2 text-left text-sm text-foreground transition",
+          "hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           isPending && "opacity-70"
         )}
         onClick={() => setIsOpen((prev) => !prev)}
@@ -95,20 +95,20 @@ export function AssigneePicker({
         disabled={isPending}
         data-testid="assignee-picker-trigger"
       >
-        <span className="block text-xs uppercase tracking-wide text-on-surface-variant">
+        <span className="block text-xs uppercase tracking-wide text-muted-foreground">
           Current Assignee
         </span>
-        <span className="block text-sm font-medium text-on-surface">
+        <span className="block text-sm font-medium text-foreground">
           {selectedUser ? selectedUser.name : "Unassigned"}
         </span>
-        <span className="block text-xs text-on-surface-variant">
+        <span className="block text-xs text-muted-foreground">
           {selectedUser?.email ?? "Click to search"}
         </span>
       </button>
 
       {isOpen ? (
         <div
-          className="absolute left-0 right-0 z-20 mt-2 rounded-md border border-outline-variant bg-surface p-3 shadow-xl"
+          className="absolute left-0 right-0 z-20 mt-2 rounded-md border border-border bg-popover p-3 shadow-xl text-popover-foreground"
           role="listbox"
           aria-label="Assignee options"
         >
@@ -116,7 +116,7 @@ export function AssigneePicker({
             ref={inputRef}
             type="text"
             placeholder="Type a name or email"
-            className="w-full rounded-md border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             data-testid="assignee-search-input"
@@ -124,17 +124,17 @@ export function AssigneePicker({
           <div className="mt-3 max-h-56 space-y-1 overflow-y-auto">
             <button
               type="button"
-              className="w-full rounded-md px-3 py-2 text-left text-sm text-on-surface hover:bg-primary/5"
+              className="w-full rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => handleAssign(null)}
               data-testid="assignee-option-unassigned"
             >
               <span className="font-medium">Unassigned</span>
-              <span className="block text-xs text-on-surface-variant">
+              <span className="block text-xs text-muted-foreground">
                 Remove current assignee
               </span>
             </button>
             {filteredUsers.length === 0 ? (
-              <p className="px-3 py-2 text-xs text-on-surface-variant">
+              <p className="px-3 py-2 text-xs text-muted-foreground">
                 No matches found
               </p>
             ) : (
@@ -142,13 +142,13 @@ export function AssigneePicker({
                 <button
                   key={user.id}
                   type="button"
-                  className="w-full rounded-md px-3 py-2 text-left text-sm text-on-surface hover:bg-primary/5"
+                  className="w-full rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-accent hover:text-accent-foreground"
                   onClick={() => handleAssign(user.id)}
                   data-testid={`assignee-option-${user.id}`}
                 >
                   <span className="font-medium">{user.name}</span>
                   {user.email ? (
-                    <span className="block text-xs text-on-surface-variant">
+                    <span className="block text-xs text-muted-foreground">
                       {user.email}
                     </span>
                   ) : null}

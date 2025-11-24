@@ -21,9 +21,11 @@ export function IssueSidebar({
   return (
     <div className="w-full md:w-1/3 lg:w-1/4">
       <div className="sticky top-8 space-y-6">
-        <Card className="border-outline-variant">
+        <Card className="border-border bg-card shadow-none">
           <CardHeader>
-            <CardTitle className="text-base">Details</CardTitle>
+            <CardTitle className="text-base font-semibold text-foreground">
+              Details
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <SidebarActions issue={issue} allUsers={allUsers} />
