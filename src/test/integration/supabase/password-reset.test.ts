@@ -84,7 +84,6 @@ describe("Password Reset Integration Tests", () => {
       const newPassword = "NewPassword456";
 
       // Create and login user
-      // Create and login user
       const { data: signupData } = await supabase.auth.signUp({
         email: testEmail,
         password: oldPassword,
