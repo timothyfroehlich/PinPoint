@@ -1,6 +1,7 @@
 # PinPoint Development Instructions (Gemini and Antigravity)
 
-@AGENTS.md
+ALWAYS START ANY TASK BY READING @AGENTS.md
+ALWAYS DETERMINE IF YOU SHOULD READ ANY OF THE FILES IN `/docs` BEFORE BEGINNING A TASK
 
 ### Mandatory Context7 Usage
 

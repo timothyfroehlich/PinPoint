@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { signupAction } from "~/app/(auth)/actions";
-import { readFlash } from "~/lib/flash";
+import { readFlash, setFlash } from "~/lib/flash";
 import { createClient } from "~/lib/supabase/server";
 import { SignupForm } from "./signup-form";
 
@@ -39,6 +39,14 @@ export default async function SignupPage(): Promise<React.JSX.Element> {
 
     if (result.ok) {
       redirect("/dashboard");
+    }
+
+    if (result.code === "CONFIRMATION_REQUIRED") {
+      await setFlash({
+        type: "success",
+        message: result.message,
+      });
+      redirect("/login");
     }
 
     // If not ok, flash message was already set
