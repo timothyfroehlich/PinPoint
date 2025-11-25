@@ -125,7 +125,7 @@ describe("Auth Actions - Error Path Integration Tests", () => {
       const formData = new FormData();
       formData.set("email", "not-an-email");
 
-      const result = await forgotPasswordAction(formData);
+      const result = await forgotPasswordAction(undefined, formData);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -136,7 +136,7 @@ describe("Auth Actions - Error Path Integration Tests", () => {
     it("should return VALIDATION error for missing email", async () => {
       const formData = new FormData();
 
-      const result = await forgotPasswordAction(formData);
+      const result = await forgotPasswordAction(undefined, formData);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -148,7 +148,7 @@ describe("Auth Actions - Error Path Integration Tests", () => {
       const formData = new FormData();
       formData.set("email", "nonexistent-user-12345@example.com");
 
-      const result = await forgotPasswordAction(formData);
+      const result = await forgotPasswordAction(undefined, formData);
 
       // Should succeed to prevent email enumeration attacks
       expect(result.ok).toBe(true);

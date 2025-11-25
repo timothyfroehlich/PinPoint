@@ -10,6 +10,7 @@ export default defineConfig(({ mode }) => {
     test: {
       globals: true,
       environment: "node",
+      setupFiles: ["./src/test/setup.ts"],
       env: {
         ...env,
         // Ensure DATABASE_URL is available for integration tests
@@ -41,6 +42,7 @@ export default defineConfig(({ mode }) => {
           extends: true,
           test: {
             name: "unit",
+            environment: "jsdom",
             include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
             exclude: ["src/test/integration/**"],
           },

@@ -33,11 +33,6 @@ vi.mock("~/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
 
-// Mock flash messages
-vi.mock("~/lib/flash", () => ({
-  setFlash: vi.fn(),
-}));
-
 // Mock logger
 vi.mock("~/lib/logger", () => ({
   log: {
@@ -50,7 +45,6 @@ vi.mock("~/lib/logger", () => ({
 // Import mocked modules for type safety
 import { headers } from "next/headers";
 import { createClient } from "~/lib/supabase/server";
-import { setFlash } from "~/lib/flash";
 
 interface MockSupabaseClient {
   auth: {
@@ -128,7 +122,7 @@ describe("forgotPasswordAction - Origin Resolution", () => {
     const formData = new FormData();
     formData.set("email", "test@example.com");
 
-    await forgotPasswordAction(formData);
+    await forgotPasswordAction(undefined, formData);
 
     expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
     expectRedirectToContain(mockSupabase, "http://localhost:3000");
@@ -154,7 +148,7 @@ describe("forgotPasswordAction - Origin Resolution", () => {
     const formData = new FormData();
     formData.set("email", "test@example.com");
 
-    await forgotPasswordAction(formData);
+    await forgotPasswordAction(undefined, formData);
 
     expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
     expectRedirectToContain(mockSupabase, "http://localhost:3000");
@@ -174,7 +168,7 @@ describe("forgotPasswordAction - Origin Resolution", () => {
     const formData = new FormData();
     formData.set("email", "test@example.com");
 
-    await forgotPasswordAction(formData);
+    await forgotPasswordAction(undefined, formData);
 
     expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
     expectRedirectToContain(mockSupabase, "https://pinpoint.example.com");
@@ -196,7 +190,7 @@ describe("forgotPasswordAction - Origin Resolution", () => {
     const formData = new FormData();
     formData.set("email", "test@example.com");
 
-    await forgotPasswordAction(formData);
+    await forgotPasswordAction(undefined, formData);
 
     expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
     expectRedirectToContain(mockSupabase, "http://localhost:3100");
@@ -216,7 +210,7 @@ describe("forgotPasswordAction - Origin Resolution", () => {
     const formData = new FormData();
     formData.set("email", "test@example.com");
 
-    await forgotPasswordAction(formData);
+    await forgotPasswordAction(undefined, formData);
 
     expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
     expectRedirectToContain(mockSupabase, "http://localhost:3200");
@@ -251,15 +245,10 @@ describe("forgotPasswordAction - Origin Allowlist Validation", () => {
     const formData = new FormData();
     formData.set("email", "test@example.com");
 
-    const result = await forgotPasswordAction(formData);
+    const result = await forgotPasswordAction(undefined, formData);
 
     expect(result.ok).toBe(true);
     expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
-    expect(setFlash).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "success",
-      })
-    );
   });
 
   it("should accept localhost:3100 (secondary worktree)", async () => {
@@ -268,15 +257,10 @@ describe("forgotPasswordAction - Origin Allowlist Validation", () => {
     const formData = new FormData();
     formData.set("email", "test@example.com");
 
-    const result = await forgotPasswordAction(formData);
+    const result = await forgotPasswordAction(undefined, formData);
 
     expect(result.ok).toBe(true);
     expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
-    expect(setFlash).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "success",
-      })
-    );
   });
 
   it("should accept localhost:3200 (review worktree)", async () => {
@@ -285,15 +269,10 @@ describe("forgotPasswordAction - Origin Allowlist Validation", () => {
     const formData = new FormData();
     formData.set("email", "test@example.com");
 
-    const result = await forgotPasswordAction(formData);
+    const result = await forgotPasswordAction(undefined, formData);
 
     expect(result.ok).toBe(true);
     expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
-    expect(setFlash).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "success",
-      })
-    );
   });
 
   it("should accept localhost:3300 (antigravity worktree)", async () => {
@@ -302,15 +281,10 @@ describe("forgotPasswordAction - Origin Allowlist Validation", () => {
     const formData = new FormData();
     formData.set("email", "test@example.com");
 
-    const result = await forgotPasswordAction(formData);
+    const result = await forgotPasswordAction(undefined, formData);
 
     expect(result.ok).toBe(true);
     expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
-    expect(setFlash).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "success",
-      })
-    );
   });
 
   it("should accept NEXT_PUBLIC_SITE_URL if set", async () => {
@@ -322,15 +296,10 @@ describe("forgotPasswordAction - Origin Allowlist Validation", () => {
     const formData = new FormData();
     formData.set("email", "test@example.com");
 
-    const result = await forgotPasswordAction(formData);
+    const result = await forgotPasswordAction(undefined, formData);
 
     expect(result.ok).toBe(true);
     expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
-    expect(setFlash).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "success",
-      })
-    );
   });
 
   it("should reject unknown origin (security)", async () => {
@@ -356,16 +325,11 @@ describe("forgotPasswordAction - Origin Allowlist Validation", () => {
     const formData = new FormData();
     formData.set("email", "test@example.com");
 
-    const result = await forgotPasswordAction(formData);
+    const result = await forgotPasswordAction(undefined, formData);
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe("SERVER");
     }
-    expect(setFlash).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "error",
-      })
-    );
   });
 });
