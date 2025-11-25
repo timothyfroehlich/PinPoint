@@ -365,10 +365,6 @@ export async function forgotPasswordAction(
         { origin, action: "forgot-password" },
         "Invalid origin detected for password reset"
       );
-      await setFlash({
-        type: "error",
-        message: "Failed to send reset email. Please try again.",
-      });
       return err("SERVER", "Invalid origin for password reset");
     }
 
@@ -389,10 +385,6 @@ export async function forgotPasswordAction(
         { action: "forgot-password", error: error.message },
         "Password reset email failed"
       );
-      await setFlash({
-        type: "error",
-        message: "Failed to send reset email. Please try again.",
-      });
       return err("SERVER", error.message);
     }
 
@@ -403,12 +395,6 @@ export async function forgotPasswordAction(
 
     // Always show success message even if email doesn't exist
     // This prevents email enumeration attacks
-    await setFlash({
-      type: "success",
-      message:
-        "If an account exists with that email, you will receive a password reset link shortly.",
-    });
-
     return ok(undefined);
   } catch (error) {
     log.error(
@@ -419,10 +405,6 @@ export async function forgotPasswordAction(
       },
       "Forgot password server error"
     );
-    await setFlash({
-      type: "error",
-      message: "Something went wrong. Please try again.",
-    });
     return err("SERVER", error instanceof Error ? error.message : "Unknown");
   }
 }

@@ -41,6 +41,7 @@ export default defineConfig(({ mode }) => {
           extends: true,
           test: {
             name: "unit",
+            environment: "jsdom",
             include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
             exclude: ["src/test/integration/**"],
           },
