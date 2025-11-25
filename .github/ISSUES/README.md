@@ -75,30 +75,50 @@ gh issue create --title "[P2] Strengthen Password Reset Origin Validation" \
 gh issue create --title "[P2] Add Runtime Validation for Flash Messages" \
   --body-file .github/ISSUES/p2-3-flash-message-validation.md \
   --label "security,priority: medium,enhancement,good first issue"
+
+# Create Decision issues
+gh issue create --title "[DECISION] MVP Authorization: Collaborative Model" \
+  --body-file .github/ISSUES/decision-mvp-authorization-collaborative.md \
+  --label "decision,documentation,security,good first issue"
+
+# Create Enhancement issues
+gh issue create --title "[ENHANCEMENT] Implement Role-Based Permissions (1.0)" \
+  --body-file .github/ISSUES/enhancement-role-based-permissions.md \
+  --label "enhancement,1.0,security,roles,permissions"
 ```
 
 ## Issue Summary
 
-### P0 - Critical (Production Blockers)
+### P0 - Critical (Production Blockers) - **3 issues**
 | Issue | Effort | Labels |
 |-------|--------|--------|
 | Add Security Headers | 30 min | `security`, `priority: critical`, `good first issue` |
 | Rate Limiting on Public Form | 2-4 hours | `security`, `priority: critical`, `enhancement` |
 | Protect Test API Routes | 30 min | `security`, `priority: critical`, `good first issue` |
 
-### P1 - High Priority (Before Beta)
+### P1 - High Priority (Before Beta) - **3 issues**
 | Issue | Effort | Labels |
 |-------|--------|--------|
-| Clarify Authorization Model | 4-8 hours OR 30 min | `security`, `priority: high`, `decision needed`, `architecture` |
+| ~~Clarify Authorization Model~~ ✅ RESOLVED | ~~30 min~~ | ~~`decision needed`~~ |
 | Login Rate Limiting | 2-3 hours | `security`, `priority: high`, `enhancement` |
 | Signup Rate Limiting | 1-2 hours | `security`, `priority: high`, `enhancement` |
 
-### P2 - Medium Priority (Next Sprint)
+### P2 - Medium Priority (Next Sprint) - **3 issues**
 | Issue | Effort | Labels |
 |-------|--------|--------|
 | Forgot Password Rate Limiting | 1 hour | `security`, `priority: medium`, `enhancement` |
 | Password Reset Origin Validation | 30 min | `security`, `priority: medium`, `refactoring` |
 | Flash Message Validation | 30 min | `security`, `priority: medium`, `enhancement`, `good first issue` |
+
+### Decisions - **1 issue**
+| Issue | Effort | Labels |
+|-------|--------|--------|
+| MVP Authorization: Collaborative Model | 30 min | `decision`, `documentation`, `security`, `good first issue` |
+
+### Future Enhancements (1.0+) - **1 issue**
+| Issue | Effort | Labels |
+|-------|--------|--------|
+| Role-Based Permissions (Guest/Member/Admin) | ~2 weeks | `enhancement`, `1.0`, `security`, `roles`, `permissions` |
 
 ## Labels to Create
 
