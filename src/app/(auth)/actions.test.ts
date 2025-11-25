@@ -122,7 +122,7 @@ describe("forgotPasswordAction - Origin Resolution", () => {
     const formData = new FormData();
     formData.set("email", "test@example.com");
 
-    await forgotPasswordAction(formData);
+    await forgotPasswordAction(undefined, formData);
 
     expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
     expectRedirectToContain(mockSupabase, "http://localhost:3000");
@@ -148,7 +148,7 @@ describe("forgotPasswordAction - Origin Resolution", () => {
     const formData = new FormData();
     formData.set("email", "test@example.com");
 
-    await forgotPasswordAction(formData);
+    await forgotPasswordAction(undefined, formData);
 
     expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
     expectRedirectToContain(mockSupabase, "http://localhost:3000");
@@ -168,7 +168,7 @@ describe("forgotPasswordAction - Origin Resolution", () => {
     const formData = new FormData();
     formData.set("email", "test@example.com");
 
-    await forgotPasswordAction(formData);
+    await forgotPasswordAction(undefined, formData);
 
     expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
     expectRedirectToContain(mockSupabase, "https://pinpoint.example.com");
@@ -190,7 +190,7 @@ describe("forgotPasswordAction - Origin Resolution", () => {
     const formData = new FormData();
     formData.set("email", "test@example.com");
 
-    await forgotPasswordAction(formData);
+    await forgotPasswordAction(undefined, formData);
 
     expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
     expectRedirectToContain(mockSupabase, "http://localhost:3100");
@@ -210,7 +210,7 @@ describe("forgotPasswordAction - Origin Resolution", () => {
     const formData = new FormData();
     formData.set("email", "test@example.com");
 
-    await forgotPasswordAction(formData);
+    await forgotPasswordAction(undefined, formData);
 
     expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
     expectRedirectToContain(mockSupabase, "http://localhost:3200");
@@ -245,7 +245,7 @@ describe("forgotPasswordAction - Origin Allowlist Validation", () => {
     const formData = new FormData();
     formData.set("email", "test@example.com");
 
-    const result = await forgotPasswordAction(formData);
+    const result = await forgotPasswordAction(undefined, formData);
 
     expect(result.ok).toBe(true);
     expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
@@ -257,7 +257,7 @@ describe("forgotPasswordAction - Origin Allowlist Validation", () => {
     const formData = new FormData();
     formData.set("email", "test@example.com");
 
-    const result = await forgotPasswordAction(formData);
+    const result = await forgotPasswordAction(undefined, formData);
 
     expect(result.ok).toBe(true);
     expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
@@ -269,7 +269,7 @@ describe("forgotPasswordAction - Origin Allowlist Validation", () => {
     const formData = new FormData();
     formData.set("email", "test@example.com");
 
-    const result = await forgotPasswordAction(formData);
+    const result = await forgotPasswordAction(undefined, formData);
 
     expect(result.ok).toBe(true);
     expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
@@ -281,7 +281,7 @@ describe("forgotPasswordAction - Origin Allowlist Validation", () => {
     const formData = new FormData();
     formData.set("email", "test@example.com");
 
-    const result = await forgotPasswordAction(formData);
+    const result = await forgotPasswordAction(undefined, formData);
 
     expect(result.ok).toBe(true);
     expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
@@ -296,7 +296,7 @@ describe("forgotPasswordAction - Origin Allowlist Validation", () => {
     const formData = new FormData();
     formData.set("email", "test@example.com");
 
-    const result = await forgotPasswordAction(formData);
+    const result = await forgotPasswordAction(undefined, formData);
 
     expect(result.ok).toBe(true);
     expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
@@ -325,7 +325,7 @@ describe("forgotPasswordAction - Origin Allowlist Validation", () => {
     const formData = new FormData();
     formData.set("email", "test@example.com");
 
-    const result = await forgotPasswordAction(formData);
+    const result = await forgotPasswordAction(undefined, formData);
 
     expect(result.ok).toBe(false);
     if (!result.ok) {

@@ -131,7 +131,10 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
  * @param formData - Form data containing name, email, and password
  * @returns SignupResult with user ID or error
  */
-export async function signupAction(formData: FormData): Promise<SignupResult> {
+export async function signupAction(
+  _prevState: SignupResult | undefined,
+  formData: FormData
+): Promise<SignupResult> {
   // Validate input
   const parsed = signupSchema.safeParse({
     name: formData.get("name"),
@@ -209,10 +212,11 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
         { userId: data.user.id, action: "signup" },
         "User signed up, confirmation required"
       );
-      return err(
-        "CONFIRMATION_REQUIRED",
-        "Please check your email to confirm your account"
-      );
+      await setFlash({
+        type: "success",
+        message: "Please check your email to confirm your account",
+      });
+      redirect("/login");
     }
 
     log.info(
@@ -225,9 +229,22 @@ export async function signupAction(formData: FormData): Promise<SignupResult> {
       message: "Account created successfully!",
     });
 
-    // Return success (redirect happens in page component)
-    return ok({ userId: data.user.id });
+    redirect("/dashboard");
   } catch (error) {
+    // If redirect was thrown, re-throw it
+    if (error instanceof Error && error.message === "NEXT_REDIRECT") {
+      throw error;
+    }
+    // Also check for digest property which Next.js uses
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "digest" in error &&
+      String(error.digest).startsWith("NEXT_REDIRECT")
+    ) {
+      throw error;
+    }
+
     log.error(
       {
         error: error instanceof Error ? error.message : "Unknown",
@@ -310,6 +327,7 @@ export async function logoutAction(): Promise<void> {
  * @returns ForgotPasswordResult
  */
 export async function forgotPasswordAction(
+  _prevState: ForgotPasswordResult | undefined,
   formData: FormData
 ): Promise<ForgotPasswordResult> {
   // Validate input

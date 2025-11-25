@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { ForgotPasswordForm } from "./forgot-password-form";
@@ -22,21 +22,21 @@ describe("ForgotPasswordForm", () => {
   it("should disable button while submitting", async () => {
     const user = userEvent.setup();
     // Mock slow response
-    vi.mocked(actions.forgotPasswordAction).mockImplementation(
-      () =>
-        new Promise((resolve) =>
-          setTimeout(() => resolve({ ok: true, value: undefined }), 100)
-        )
-    );
+    vi.mocked(actions.forgotPasswordAction).mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return { ok: true, value: undefined };
+    });
 
     render(<ForgotPasswordForm />);
 
     await user.type(screen.getByLabelText(/email/i), "test@example.com");
 
-    const button = screen.getByRole("button", { name: /send reset link/i });
-    fireEvent.submit(button.closest("form")!);
+    const button = screen.getByRole<HTMLButtonElement>("button", {
+      name: /send reset link/i,
+    });
+    await user.click(button);
 
-    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(button.disabled).toBe(true);
     expect(screen.getByText(/sending/i)).toBeDefined();
 
     await waitFor(() => {
@@ -54,8 +54,9 @@ describe("ForgotPasswordForm", () => {
 
     render(<ForgotPasswordForm />);
 
+    await user.type(screen.getByLabelText(/email/i), "test@example.com");
     const button = screen.getByRole("button", { name: /send reset link/i });
-    fireEvent.submit(button.closest("form")!);
+    await user.click(button);
 
     await waitFor(() => {
       expect(screen.getByText(/something went wrong/i)).toBeDefined();

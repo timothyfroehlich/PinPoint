@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { SignupForm } from "./signup-form";
@@ -11,10 +11,10 @@ vi.mock("~/app/(auth)/actions", () => ({
 }));
 
 // Mock useRouter
-const pushMock = vi.fn();
+// Not needed as we rely on server action redirect
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
-    push: pushMock,
+    push: vi.fn(),
   }),
 }));
 
@@ -32,12 +32,10 @@ describe("SignupForm", () => {
   it("should disable button while submitting", async () => {
     const user = userEvent.setup();
     // Mock slow response
-    vi.mocked(actions.signupAction).mockImplementation(
-      () =>
-        new Promise((resolve) =>
-          setTimeout(() => resolve({ ok: true, value: { userId: "123" } }), 100)
-        )
-    );
+    vi.mocked(actions.signupAction).mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return { ok: true, value: { userId: "123" } };
+    });
 
     render(<SignupForm />);
 
@@ -45,15 +43,13 @@ describe("SignupForm", () => {
     await user.type(screen.getByLabelText(/email/i), "test@example.com");
     await user.type(screen.getByLabelText(/password/i), "Password123!");
 
-    const button = screen.getByRole("button", { name: /create account/i });
-    fireEvent.submit(button.closest("form")!);
-
-    expect(button.hasAttribute("disabled")).toBe(true);
-    expect(screen.getByText(/creating account/i)).toBeDefined();
-
-    await waitFor(() => {
-      expect(pushMock).toHaveBeenCalledWith("/dashboard");
+    const button = screen.getByRole<HTMLButtonElement>("button", {
+      name: /create account/i,
     });
+    await user.click(button);
+
+    expect(button.disabled).toBe(true);
+    expect(screen.getByText(/creating account/i)).toBeDefined();
   });
 
   it("should display error message on failure", async () => {
@@ -66,8 +62,12 @@ describe("SignupForm", () => {
 
     render(<SignupForm />);
 
+    await user.type(screen.getByLabelText(/name/i), "Test User");
+    await user.type(screen.getByLabelText(/email/i), "test@example.com");
+    await user.type(screen.getByLabelText(/password/i), "Password123!");
+
     const button = screen.getByRole("button", { name: /create account/i });
-    fireEvent.submit(button.closest("form")!);
+    await user.click(button);
 
     await waitFor(() => {
       expect(screen.getByText(/invalid input/i)).toBeDefined();
