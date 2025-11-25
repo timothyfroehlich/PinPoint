@@ -1,27 +1,53 @@
 "use client";
 
-import { useState } from "react";
-import type React from "react";
+import React, { useActionState, useState } from "react";
+import { useFormStatus } from "react-dom";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { PasswordStrength } from "~/components/password-strength";
+import { signupAction } from "~/app/(auth)/actions";
 
-/**
- * Signup Form Client Component
- *
- * Wraps the signup form to add password strength indicator.
- * Progressive enhancement - form still works without JavaScript.
- */
-export function SignupForm({
-  action,
-}: {
-  action: (formData: FormData) => Promise<void>;
-}): React.JSX.Element {
+function SubmitButton(): React.JSX.Element {
+  const { pending } = useFormStatus();
+  return (
+    <Button
+      type="submit"
+      className="w-full bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container"
+      size="lg"
+      disabled={pending}
+    >
+      {pending ? "Creating Account..." : "Create Account"}
+    </Button>
+  );
+}
+
+export function SignupForm(): React.JSX.Element {
+  const [state, formAction] = useActionState(signupAction, undefined);
   const [password, setPassword] = useState("");
 
+  // Map error codes to user-friendly messages
+  let errorMessage: string | null = null;
+  if (state && !state.ok) {
+    if (state.code === "VALIDATION") errorMessage = "Invalid input";
+    else if (state.code === "EMAIL_TAKEN") errorMessage = "Email already taken";
+    else if (state.code === "SERVER")
+      errorMessage = state.message || "Server error occurred";
+    else errorMessage = state.message || "Something went wrong";
+  }
+
   return (
-    <form action={action} className="space-y-4">
+    <form action={formAction} className="space-y-4">
+      {/* Error Message */}
+      {errorMessage && (
+        <div
+          className="rounded-lg bg-error-container px-4 py-3 text-sm text-on-error-container"
+          role="alert"
+        >
+          {errorMessage}
+        </div>
+      )}
+
       {/* Name */}
       <div className="space-y-2">
         <Label htmlFor="name">Name</Label>
@@ -72,14 +98,7 @@ export function SignupForm({
         <PasswordStrength password={password} />
       </div>
 
-      {/* Submit button */}
-      <Button
-        type="submit"
-        className="w-full bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container"
-        size="lg"
-      >
-        Create Account
-      </Button>
+      <SubmitButton />
     </form>
   );
 }
