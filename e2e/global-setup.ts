@@ -17,12 +17,8 @@ export default async function globalSetup(): Promise<void> {
 
   try {
     // Step 1: Reset Supabase database - clears everything
-    const dbUrl = process.env.DATABASE_URL;
-    if (!dbUrl) {
-      throw new Error("DATABASE_URL environment variable is not set");
-    }
-
-    execSync(`supabase db reset --db-url "${dbUrl}" --yes`, {
+    // Use local reset (not --db-url) to avoid TLS connection issues
+    execSync("supabase db reset --yes", {
       stdio: "inherit",
       env: process.env,
     });
