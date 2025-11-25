@@ -91,6 +91,22 @@ Transform the PinPoint UI into a clean, dark-mode interface with a focus on the 
   - [x] Increase margins and padding in Login card.
   - [x] Improve general spacing ("let it breathe").
 
+### Phase 5: Issue Details Refinement (Current)
+
+- [x] **Header Refactor**
+  - [x] Move Machine Name above Issue Title (smaller font).
+  - [x] Move Status and Severity chips to a new line below the title.
+- [x] **Timeline Visuals**
+  - [x] Implement vertical line/circle connector style.
+  - [x] Update timestamps to "x minutes/hours/days ago" with tooltip for exact date.
+  - [x] Format system messages to be one line, including actor.
+- [x] **Sidebar Refactor**
+  - [x] Improve Assignee picker UI.
+  - [x] Ensure all metadata (Reporter, Created, etc.) is in the sidebar.
+- [x] **General Polish**
+  - [x] Apply generous padding (`p-6` or `p-8`) to match Login page.
+  - [x] Ensure "dark version" of the mockup aesthetic.
+
 ## Notes
 
 - **"Half-Broken" Strategy**: We are prioritizing the Login page to be 100% done. The Dashboard and other pages can be in a transitional state during this task.

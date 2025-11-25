@@ -151,8 +151,8 @@ VALUES
   ),
   (
     '10000000-0000-4000-8000-000000000002',
-    NULL,
-    'Severity set to unplayable because balls cannot be freed mid-game.',
+    (SELECT id FROM admin_user),
+    'Severity changed from playable to unplayable',
     true,
     NOW() - INTERVAL '8 days',
     NOW() - INTERVAL '8 days'
@@ -167,7 +167,7 @@ VALUES
   ),
   (
     '10000000-0000-4000-8000-000000000002',
-    NULL,
+    (SELECT id FROM admin_user),
     'Status changed from new to in_progress',
     true,
     NOW() - INTERVAL '6 days',
@@ -183,8 +183,8 @@ VALUES
   ),
   (
     '10000000-0000-4000-8000-000000000002',
-    NULL,
-    'Assigned to Member User for follow-up testing',
+    (SELECT id FROM admin_user),
+    'Assigned to Member User',
     true,
     NOW() - INTERVAL '4 days',
     NOW() - INTERVAL '4 days'
@@ -199,7 +199,7 @@ VALUES
   ),
   (
     '10000000-0000-4000-8000-000000000002',
-    NULL,
+    (SELECT id FROM member_user),
     'Status changed from in_progress to resolved',
     true,
     NOW() - INTERVAL '2 days',
@@ -207,8 +207,8 @@ VALUES
   ),
   (
     '10000000-0000-4000-8000-000000000002',
-    NULL,
-    'Severity changed from unplayable to playable pending weekend monitoring',
+    (SELECT id FROM member_user),
+    'Severity changed from unplayable to playable',
     true,
     NOW() - INTERVAL '36 hours',
     NOW() - INTERVAL '36 hours'

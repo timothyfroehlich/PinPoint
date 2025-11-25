@@ -19,16 +19,42 @@ export function IssueSidebar({
   allUsers,
 }: IssueSidebarProps): React.JSX.Element {
   return (
-    <div className="w-full md:w-1/3 lg:w-1/4">
+    <div className="w-full md:w-80 shrink-0">
       <div className="sticky top-8 space-y-6">
         <Card className="border-border bg-card shadow-none">
-          <CardHeader>
+          <CardHeader className="pb-3 border-b border-border">
             <CardTitle className="text-base font-semibold text-foreground">
               Details
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4 space-y-6">
             <SidebarActions issue={issue} allUsers={allUsers} />
+
+            {/* Additional Metadata */}
+            <div className="space-y-1">
+              <div className="text-sm font-medium text-foreground">
+                Reporter
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="size-6 rounded-full bg-muted flex items-center justify-center text-xs text-muted-foreground">
+                  {issue.reportedByUser?.name.slice(0, 1).toUpperCase() ?? "U"}
+                </div>
+                <span className="text-sm text-muted-foreground">
+                  {issue.reportedByUser?.name ?? "Unknown user"}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="text-sm font-medium text-foreground">Created</div>
+              <div className="text-sm text-muted-foreground">
+                {new Date(issue.createdAt).toLocaleDateString(undefined, {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                })}
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

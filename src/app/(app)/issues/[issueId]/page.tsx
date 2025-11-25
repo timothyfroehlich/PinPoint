@@ -18,12 +18,6 @@ const severityCopy: Record<IssueSeverity, string> = {
   unplayable: "Unplayable",
 };
 
-const severityClasses: Record<IssueSeverity, string> = {
-  minor: "bg-amber-50 text-amber-900 border-amber-200",
-  playable: "bg-blue-50 text-blue-900 border-blue-200",
-  unplayable: "bg-red-50 text-red-900 border-red-200",
-};
-
 /**
  * Issue Detail Page (Protected Route)
  *
@@ -105,7 +99,7 @@ export default async function IssueDetailPage({
   const flash = await readFlash();
 
   return (
-    <div className="min-h-screen bg-background py-8">
+    <div className="min-h-screen bg-background p-8">
       <div className="container mx-auto px-4">
         {/* Flash message */}
         {flash && (
@@ -130,54 +124,52 @@ export default async function IssueDetailPage({
         </Link>
 
         {/* Header */}
-        <div className="mb-4">
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
+        <div className="mb-8">
+          <div className="mb-1">
+            <Link
+              href={`/machines/${issue.machine.id}`}
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {issue.machine.name}
+            </Link>
+          </div>
+          <h1 className="text-3xl font-bold text-foreground mb-4">
             {issue.title}
           </h1>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm font-medium text-foreground mr-1">
+              Status:
+            </span>
             <Badge
               data-testid="issue-status-badge"
-              className={`px-2 py-1 text-sm font-semibold ${
+              className={`px-2.5 py-0.5 text-sm font-medium border ${
                 issue.status === "resolved"
-                  ? "bg-green-500/10 text-green-500 border-green-500/20"
+                  ? "bg-green-500/15 text-green-400 border-green-500/30"
                   : issue.status === "in_progress"
-                    ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
-                    : "bg-muted text-muted-foreground border-border"
+                    ? "bg-blue-500/15 text-blue-400 border-blue-500/30"
+                    : "bg-zinc-800 text-zinc-400 border-zinc-700"
               }`}
             >
               {issue.status === "in_progress"
                 ? "In Progress"
                 : issue.status.charAt(0).toUpperCase() + issue.status.slice(1)}
             </Badge>
+
+            <span className="text-sm font-medium text-foreground ml-2 mr-1">
+              Severity:
+            </span>
             <Badge
               data-testid="issue-severity-badge"
-              className={`border px-2 py-1 text-sm font-semibold ${severityClasses[issue.severity]}`}
+              className={`px-2.5 py-0.5 text-sm font-medium border ${
+                issue.severity === "unplayable"
+                  ? "bg-red-500/15 text-red-400 border-red-500/30"
+                  : issue.severity === "playable"
+                    ? "bg-blue-500/15 text-blue-400 border-blue-500/30"
+                    : "bg-amber-500/15 text-amber-400 border-amber-500/30"
+              }`}
             >
               {severityCopy[issue.severity]}
             </Badge>
-            <p className="text-sm text-muted-foreground">
-              Opened by {issue.reportedByUser?.name ?? "Unknown"} on{" "}
-              {new Date(issue.createdAt).toLocaleDateString()}
-            </p>
-          </div>
-          <div className="mt-4 grid gap-2 text-sm text-foreground">
-            <div className="flex flex-wrap gap-1">
-              <span className="font-semibold">Machine:</span>
-              <Link
-                href={`/machines/${issue.machine.id}`}
-                className="text-primary underline-offset-2 hover:underline"
-              >
-                {issue.machine.name}
-              </Link>
-            </div>
-            <div className="flex flex-wrap gap-1">
-              <span className="font-semibold">Reported by:</span>
-              <span>{issue.reportedByUser?.name ?? "Unknown"}</span>
-            </div>
-            <div className="flex flex-wrap gap-1 text-muted-foreground">
-              <span className="font-semibold text-foreground">Reported:</span>
-              <span>{new Date(issue.createdAt).toLocaleString()}</span>
-            </div>
           </div>
         </div>
 

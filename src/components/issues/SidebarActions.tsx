@@ -32,7 +32,7 @@ export function SidebarActions({
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground">Assignee</Label>
+        <Label className="text-sm font-medium text-foreground">Assignee</Label>
         <AssigneePicker
           assignedToId={issue.assignedTo ?? null}
           users={allUsers}
@@ -48,8 +48,8 @@ export function SidebarActions({
         />
       </div>
       {/* Update Status */}
-      <div className="flex items-center justify-between">
-        <Label className="text-xs text-muted-foreground">Status</Label>
+      <div className="space-y-2">
+        <Label className="text-sm font-medium text-foreground">Status</Label>
         <Select
           name="status"
           defaultValue={issue.status}
@@ -84,8 +84,8 @@ export function SidebarActions({
       </div>
 
       {/* Update Severity */}
-      <div className="flex items-center justify-between">
-        <Label className="text-xs text-muted-foreground">Severity</Label>
+      <div className="space-y-2">
+        <Label className="text-sm font-medium text-foreground">Severity</Label>
         <Select
           name="severity"
           defaultValue={issue.severity}

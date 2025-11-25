@@ -85,7 +85,7 @@ export function AssigneePicker({
       <button
         type="button"
         className={cn(
-          "w-full rounded-md border border-input bg-background px-3 py-2 text-left text-sm text-foreground transition",
+          "flex w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-left text-sm text-foreground transition",
           "hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           isPending && "opacity-70"
         )}
@@ -95,46 +95,60 @@ export function AssigneePicker({
         disabled={isPending}
         data-testid="assignee-picker-trigger"
       >
-        <span className="block text-xs uppercase tracking-wide text-muted-foreground">
-          Current Assignee
-        </span>
-        <span className="block text-sm font-medium text-foreground">
-          {selectedUser ? selectedUser.name : "Unassigned"}
-        </span>
-        <span className="block text-xs text-muted-foreground">
-          {selectedUser?.email ?? "Click to search"}
-        </span>
+        <div className="flex items-center gap-2">
+          <div className="size-6 rounded-full bg-muted flex items-center justify-center text-xs text-muted-foreground">
+            {selectedUser ? selectedUser.name.slice(0, 1).toUpperCase() : "?"}
+          </div>
+          <span className="font-medium">
+            {selectedUser ? selectedUser.name : "Unassigned"}
+          </span>
+        </div>
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 15 15"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          className="size-4 opacity-50"
+        >
+          <path
+            d="M4.93179 5.43179C4.75605 5.60753 4.75605 5.89245 4.93179 6.06819C5.10753 6.24392 5.39245 6.24392 5.56819 6.06819L7.49999 4.13638L9.43179 6.06819C9.60753 6.24392 9.89245 6.24392 10.0682 6.06819C10.2439 5.89245 10.2439 5.60753 10.0682 5.43179L7.81819 3.18179C7.73379 3.0974 7.61933 3.04999 7.49999 3.04999C7.38064 3.04999 7.26618 3.0974 7.18179 3.18179L4.93179 5.43179ZM10.0682 9.56819C10.2439 9.39245 10.2439 9.10753 10.0682 8.93179C9.89245 8.75606 9.60753 8.75606 9.43179 8.93179L7.49999 10.8636L5.56819 8.93179C5.39245 8.75606 5.10753 8.75606 4.93179 8.93179C4.75605 9.10753 4.75605 9.39245 4.93179 9.56819L7.18179 11.8182C7.26618 11.9026 7.38064 11.95 7.49999 11.95C7.61933 11.95 7.73379 11.9026 7.81819 11.8182L10.0682 9.56819Z"
+            fill="currentColor"
+            fillRule="evenodd"
+            clipRule="evenodd"
+          />
+        </svg>
       </button>
 
       {isOpen ? (
         <div
-          className="absolute left-0 right-0 z-20 mt-2 rounded-md border border-border bg-popover p-3 shadow-xl text-popover-foreground"
+          className="absolute left-0 right-0 z-20 mt-2 rounded-md border border-border bg-popover p-2 shadow-xl text-popover-foreground"
           role="listbox"
           aria-label="Assignee options"
         >
           <input
             ref={inputRef}
             type="text"
-            placeholder="Type a name or email"
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            placeholder="Filter users..."
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mb-2"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             data-testid="assignee-search-input"
           />
-          <div className="mt-3 max-h-56 space-y-1 overflow-y-auto">
+          <div className="max-h-56 space-y-1 overflow-y-auto">
             <button
               type="button"
-              className="w-full rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-accent hover:text-accent-foreground"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={() => handleAssign(null)}
               data-testid="assignee-option-unassigned"
             >
+              <div className="size-6 rounded-full bg-muted flex items-center justify-center text-xs text-muted-foreground">
+                ?
+              </div>
               <span className="font-medium">Unassigned</span>
-              <span className="block text-xs text-muted-foreground">
-                Remove current assignee
-              </span>
             </button>
             {filteredUsers.length === 0 ? (
-              <p className="px-3 py-2 text-xs text-muted-foreground">
+              <p className="px-2 py-1.5 text-xs text-muted-foreground">
                 No matches found
               </p>
             ) : (
@@ -142,16 +156,23 @@ export function AssigneePicker({
                 <button
                   key={user.id}
                   type="button"
-                  className="w-full rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-accent hover:text-accent-foreground"
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-foreground hover:bg-accent hover:text-accent-foreground"
                   onClick={() => handleAssign(user.id)}
                   data-testid={`assignee-option-${user.id}`}
                 >
-                  <span className="font-medium">{user.name}</span>
-                  {user.email ? (
-                    <span className="block text-xs text-muted-foreground">
-                      {user.email}
+                  <div className="size-6 rounded-full bg-muted flex items-center justify-center text-xs text-muted-foreground">
+                    {user.name.slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-medium leading-none">
+                      {user.name}
                     </span>
-                  ) : null}
+                    {user.email && (
+                      <span className="text-xs text-muted-foreground">
+                        {user.email}
+                      </span>
+                    )}
+                  </div>
                 </button>
               ))
             )}
