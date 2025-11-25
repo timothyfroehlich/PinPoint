@@ -7,6 +7,7 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { resetPasswordAction } from "~/app/(auth)/actions";
+import { cn } from "~/lib/utils";
 import { readFlash } from "~/lib/flash";
 import { createClient } from "~/lib/supabase/server";
 
@@ -88,11 +89,12 @@ export default async function ResetPasswordPage({
         {/* Flash message */}
         {flash && (
           <div
-            className={`rounded-lg px-4 py-3 text-sm ${
+            className={cn(
+              "rounded-lg px-4 py-3 text-sm",
               flash.type === "error"
                 ? "bg-error-container text-on-error-container"
                 : "bg-primary-container text-on-primary-container"
-            }`}
+            )}
             role="alert"
           >
             {flash.message}

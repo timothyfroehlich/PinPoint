@@ -6,6 +6,7 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { loginAction } from "~/app/(auth)/actions";
+import { cn } from "~/lib/utils";
 import { readFlash } from "~/lib/flash";
 import { createClient } from "~/lib/supabase/server";
 import { TestAdminButton } from "./TestAdminButton";
@@ -49,8 +50,8 @@ export default async function LoginPage(): Promise<React.JSX.Element> {
   }
 
   return (
-    <Card className="border-border bg-card shadow-none">
-      <CardHeader className="space-y-2 !p-6 !pb-2">
+    <Card className="border-border/70 bg-card/90 shadow-lg">
+      <CardHeader className="space-y-2">
         <CardTitle className="text-2xl font-bold text-foreground">
           Sign In
         </CardTitle>
@@ -59,15 +60,16 @@ export default async function LoginPage(): Promise<React.JSX.Element> {
         </p>
       </CardHeader>
 
-      <CardContent className="space-y-6 !p-6 !pt-2">
+      <CardContent className="space-y-6">
         {/* Flash message */}
         {flash && (
           <div
-            className={`rounded-lg px-4 py-3 text-sm ${
+            className={cn(
+              "rounded-lg px-4 py-3 text-sm",
               flash.type === "error"
-                ? "bg-destructive/10 text-destructive border border-destructive/20"
-                : "bg-primary/10 text-primary border border-primary/20"
-            }`}
+                ? "border border-destructive/30 bg-destructive/10 text-destructive"
+                : "border border-primary/30 bg-primary/10 text-primary"
+            )}
             role="alert"
           >
             {flash.message}
@@ -139,7 +141,9 @@ export default async function LoginPage(): Promise<React.JSX.Element> {
         </form>
 
         {/* Test Admin Login Button */}
-        <TestAdminButton />
+        <div className="space-y-2">
+          <TestAdminButton />
+        </div>
 
         {/* Signup link */}
         <div className="text-center text-sm text-muted-foreground">

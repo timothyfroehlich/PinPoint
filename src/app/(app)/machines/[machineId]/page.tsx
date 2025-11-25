@@ -1,5 +1,6 @@
 import type React from "react";
 import { redirect, notFound } from "next/navigation";
+import { cn } from "~/lib/utils";
 import Link from "next/link";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
@@ -96,7 +97,10 @@ export default async function MachineDetailPage({
                   </h1>
                   <Badge
                     data-testid="machine-status-badge"
-                    className={`${getMachineStatusStyles(machineStatus)} border px-3 py-1 text-sm font-semibold`}
+                    className={cn(
+                      getMachineStatusStyles(machineStatus),
+                      "border px-3 py-1 text-sm font-semibold"
+                    )}
                   >
                     {getMachineStatusLabel(machineStatus)}
                   </Badge>
@@ -116,11 +120,12 @@ export default async function MachineDetailPage({
           {/* Flash message */}
           {flash && (
             <div
-              className={`rounded-lg px-4 py-3 text-sm ${
+              className={cn(
+                "rounded-lg px-4 py-3 text-sm",
                 flash.type === "error"
                   ? "bg-error-container text-on-error-container"
                   : "bg-primary-container text-on-primary-container"
-              }`}
+              )}
               role="alert"
             >
               {flash.message}
@@ -140,7 +145,10 @@ export default async function MachineDetailPage({
                 <div>
                   <p className="text-xs text-on-surface-variant mb-1">Status</p>
                   <Badge
-                    className={`${getMachineStatusStyles(machineStatus)} border px-3 py-1 text-sm font-semibold`}
+                    className={cn(
+                      getMachineStatusStyles(machineStatus),
+                      "border px-3 py-1 text-sm font-semibold"
+                    )}
                   >
                     {getMachineStatusLabel(machineStatus)}
                   </Badge>

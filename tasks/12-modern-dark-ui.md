@@ -103,9 +103,18 @@ Transform the PinPoint UI into a clean, dark-mode interface with a focus on the 
 - [x] **Sidebar Refactor**
   - [x] Improve Assignee picker UI.
   - [x] Ensure all metadata (Reporter, Created, etc.) is in the sidebar.
-- [x] **General Polish**
-  - [x] Apply generous padding (`p-6` or `p-8`) to match Login page.
-  - [x] Ensure "dark version" of the mockup aesthetic.
+
+### Phase 6: Visual Polish (Current)
+
+- [ ] **Sidebar Layout**
+  - [ ] Switch to Row Layout (Label left, Value right) for cleaner look.
+  - [ ] Apply to Status, Severity, Assignee, Reporter, Created.
+- [ ] **Header Cleanup**
+  - [ ] Remove redundant "Status:" and "Severity:" text labels.
+  - [ ] Enhance Machine Name typography (breadcrumb style).
+- [ ] **Timeline Polish**
+  - [ ] Align system message dots perfectly with avatar center.
+  - [ ] Style "Add Comment" box (border/background) to frame it better.
 
 ## Notes
 

@@ -2,6 +2,7 @@ import type React from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { cn } from "~/lib/utils";
 import { readFlash } from "~/lib/flash";
 import { createClient } from "~/lib/supabase/server";
 import { ForgotPasswordForm } from "./forgot-password-form";
@@ -42,11 +43,12 @@ export default async function ForgotPasswordPage(): Promise<React.JSX.Element> {
         {/* Flash message */}
         {flash && (
           <div
-            className={`rounded-lg px-4 py-3 text-sm ${
+            className={cn(
+              "rounded-lg px-4 py-3 text-sm",
               flash.type === "error"
                 ? "bg-error-container text-on-error-container"
                 : "bg-primary-container text-on-primary-container"
-            }`}
+            )}
             role="alert"
           >
             {flash.message}

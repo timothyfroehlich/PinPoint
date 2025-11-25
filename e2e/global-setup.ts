@@ -22,7 +22,7 @@ export default async function globalSetup(): Promise<void> {
       throw new Error("DATABASE_URL environment variable is not set");
     }
 
-    execSync(`supabase db reset --db-url "${dbUrl}"`, {
+    execSync(`supabase db reset --db-url "${dbUrl}" --yes`, {
       stdio: "inherit",
       env: process.env,
     });

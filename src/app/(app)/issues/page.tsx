@@ -2,6 +2,7 @@ import type React from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AlertTriangle, Plus } from "lucide-react";
+import { cn } from "~/lib/utils";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { machines } from "~/server/db/schema";
@@ -11,6 +12,10 @@ import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { IssueFilters } from "~/components/IssueFilters";
 import { getIssues } from "~/lib/issues/queries";
+import {
+  getIssueStatusStyles,
+  getIssueSeverityStyles,
+} from "~/lib/issues/status";
 
 /**
  * Issues List Page (Protected Route)
@@ -158,13 +163,10 @@ export default async function IssuesPage({
                       <div className="flex gap-2">
                         {/* Status Badge */}
                         <Badge
-                          className={`px-2 py-1 text-xs font-semibold ${
-                            issue.status === "resolved"
-                              ? "bg-green-100 text-green-800 border-green-300"
-                              : issue.status === "in_progress"
-                                ? "bg-blue-100 text-blue-800 border-blue-300"
-                                : "bg-gray-100 text-gray-800 border-gray-300"
-                          }`}
+                          className={cn(
+                            "px-2 py-1 text-xs font-semibold",
+                            getIssueStatusStyles(issue.status)
+                          )}
                         >
                           {issue.status === "in_progress"
                             ? "In Progress"
@@ -173,13 +175,10 @@ export default async function IssuesPage({
                         </Badge>
                         {/* Severity Badge */}
                         <Badge
-                          className={`px-2 py-1 text-xs font-semibold ${
-                            issue.severity === "unplayable"
-                              ? "bg-red-100 text-red-800 border-red-300"
-                              : issue.severity === "playable"
-                                ? "bg-yellow-100 text-yellow-800 border-yellow-300"
-                                : "bg-blue-100 text-blue-800 border-blue-300"
-                          }`}
+                          className={cn(
+                            "px-2 py-1 text-xs font-semibold",
+                            getIssueSeverityStyles(issue.severity)
+                          )}
                         >
                           {issue.severity.charAt(0).toUpperCase() +
                             issue.severity.slice(1)}

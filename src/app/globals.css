@@ -39,13 +39,48 @@
   --color-input: #2d2d2d;
   --color-ring: #3b82f6;
 
+  /* Extended Surface Palette (MD3-inspired) */
+  --color-surface: #1e1e1e;
+  --color-surface-variant: #2d2d2d;
+  --color-outline: #3e3e3e;
+  --color-outline-variant: #4a4a4a;
+  --color-on-surface: #ffffff;
+  --color-on-surface-variant: #a1a1aa;
+  --color-on-primary: #ffffff;
+  --color-on-secondary: #ffffff;
+  --color-primary-container: #1f3b87;
+  --color-on-primary-container: #dce9ff;
+  --color-secondary-container: #333333;
+  --color-on-secondary-container: #f4f4f5;
+
   /* Radius */
   --radius: 0.5rem;
 }
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  h1 {
+    @apply text-4xl font-extrabold tracking-tight lg:text-5xl;
+  }
+  h2 {
+    @apply text-3xl font-semibold tracking-tight;
+  }
+  h3 {
+    @apply text-2xl font-semibold tracking-tight;
+  }
+  h4 {
+    @apply text-xl font-semibold tracking-tight;
+  }
+  p {
+    @apply leading-7 [&:not(:first-child)]:mt-6;
+  }
+  a {
+    @apply font-medium text-primary underline underline-offset-4;
+  }
 }
 
 html,
@@ -65,11 +100,4 @@ body {
     Arial,
     sans-serif;
   line-height: 1.6;
-  background-color: var(--color-background);
-  color: var(--color-foreground);
-}
-
-main {
-  min-height: 100vh;
-  padding: 1rem;
 }

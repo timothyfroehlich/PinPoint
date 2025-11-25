@@ -229,6 +229,38 @@
 
 ---
 
+## UI & Styling
+
+**CORE-UI-001:** No global resets
+
+- **Severity:** Critical
+- **Why:** Breaks component internals, causes "spooky action at a distance"
+- **Do:** Use Tailwind's built-in Preflight
+- **Don't:** `* { margin: 0; padding: 0; }`
+
+**CORE-UI-002:** No hardcoded spacing in reusable components
+
+- **Severity:** High
+- **Why:** Makes components rigid and hard to compose
+- **Do:** Allow `className` prop to control margins
+- **Don't:** Add `m-4` to the root of a Button or Input component
+
+**CORE-UI-003:** Always use `cn()` for class merging
+
+- **Severity:** Critical
+- **Why:** Ensures parent styles properly override default styles
+- **Do:** `className={cn("default-classes", className)}`
+- **Don't:** `className={`default-classes ${className}`}`
+
+**CORE-UI-004:** No inline styles
+
+- **Severity:** High
+- **Why:** Bypasses the design system, hard to maintain
+- **Do:** Use Tailwind utility classes or CSS variables
+- **Don't:** `style={{ marginTop: '10px' }}` (unless dynamic coordinates)
+
+---
+
 ## Forbidden Patterns
 
 **Never Do These:**

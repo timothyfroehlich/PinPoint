@@ -4,22 +4,23 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
   AlertTriangle,
+  CheckCircle2,
   Clock,
   Wrench,
-  CheckCircle2,
   XCircle,
 } from "lucide-react";
+import { cn } from "~/lib/utils";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { issues, userProfiles, machines } from "~/server/db/schema";
-import { eq, desc, and, ne, sql } from "drizzle-orm";
+import { desc, eq, sql, and, ne } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
 import {
-  getIssueStatusLabel,
-  getIssueSeverityLabel,
   getIssueStatusStyles,
   getIssueSeverityStyles,
+  getIssueStatusLabel,
+  getIssueSeverityLabel,
   isIssueStatus,
   isIssueSeverity,
 } from "~/lib/issues/status";
@@ -170,7 +171,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Total Open Issues */}
             <Card className="border-border bg-card">
-              <CardHeader className="pb-3">
+              <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
                     Open Issues
@@ -190,7 +191,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
 
             {/* Machines Needing Service */}
             <Card className="border-border bg-card">
-              <CardHeader className="pb-3">
+              <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
                     Machines Needing Service
@@ -210,7 +211,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
 
             {/* Issues Assigned to Me */}
             <Card className="border-border bg-card">
-              <CardHeader className="pb-3">
+              <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
                     Assigned to Me
@@ -252,7 +253,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                     className="border-border bg-card hover:border-primary transition-colors cursor-pointer"
                     data-testid="assigned-issue-card"
                   >
-                    <CardHeader className="pb-3">
+                    <CardHeader>
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                           <CardTitle className="text-base text-foreground mb-1">
@@ -266,9 +267,10 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                           {/* Status Badge */}
                           {isIssueStatus(issue.status) && (
                             <Badge
-                              className={`px-2 py-1 text-xs font-semibold ${getIssueStatusStyles(
-                                issue.status
-                              )}`}
+                              className={cn(
+                                "px-2 py-1 text-xs font-semibold",
+                                getIssueStatusStyles(issue.status)
+                              )}
                             >
                               {getIssueStatusLabel(issue.status)}
                             </Badge>
@@ -276,9 +278,10 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                           {/* Severity Badge */}
                           {isIssueSeverity(issue.severity) && (
                             <Badge
-                              className={`px-2 py-1 text-xs font-semibold ${getIssueSeverityStyles(
-                                issue.severity
-                              )}`}
+                              className={cn(
+                                "px-2 py-1 text-xs font-semibold",
+                                getIssueSeverityStyles(issue.severity)
+                              )}
                             >
                               {getIssueSeverityLabel(issue.severity)}
                             </Badge>
@@ -315,7 +318,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                     className="border-destructive/20 bg-destructive/10 hover:border-destructive transition-colors cursor-pointer"
                     data-testid="unplayable-machine-card"
                   >
-                    <CardHeader className="pb-3">
+                    <CardHeader>
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1">
                           <CardTitle className="text-base text-destructive mb-1">
@@ -363,7 +366,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                     className="border-border bg-card hover:border-primary transition-colors cursor-pointer h-full"
                     data-testid="recent-issue-card"
                   >
-                    <CardHeader className="pb-3">
+                    <CardHeader>
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                           <CardTitle className="text-base text-foreground mb-1">
@@ -383,9 +386,10 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                           {/* Status Badge */}
                           {isIssueStatus(issue.status) && (
                             <Badge
-                              className={`px-2 py-1 text-xs font-semibold ${getIssueStatusStyles(
-                                issue.status
-                              )}`}
+                              className={cn(
+                                "px-2 py-1 text-xs font-semibold",
+                                getIssueStatusStyles(issue.status)
+                              )}
                             >
                               {getIssueStatusLabel(issue.status)}
                             </Badge>
@@ -393,9 +397,10 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                           {/* Severity Badge */}
                           {isIssueSeverity(issue.severity) && (
                             <Badge
-                              className={`px-2 py-1 text-xs font-semibold ${getIssueSeverityStyles(
-                                issue.severity
-                              )}`}
+                              className={cn(
+                                "px-2 py-1 text-xs font-semibold",
+                                getIssueSeverityStyles(issue.severity)
+                              )}
                             >
                               {getIssueSeverityLabel(issue.severity)}
                             </Badge>
