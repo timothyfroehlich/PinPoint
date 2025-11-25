@@ -1,8 +1,6 @@
 "use client";
 
-import React from "react";
-
-import { useActionState, useState } from "react";
+import React, { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -33,6 +31,8 @@ export function SignupForm(): React.JSX.Element {
   if (state && !state.ok) {
     if (state.code === "VALIDATION") errorMessage = "Invalid input";
     else if (state.code === "EMAIL_TAKEN") errorMessage = "Email already taken";
+    else if (state.code === "SERVER")
+      errorMessage = state.message || "Server error occurred";
     else errorMessage = state.message || "Something went wrong";
   }
 

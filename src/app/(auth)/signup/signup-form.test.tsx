@@ -21,12 +21,12 @@ vi.mock("next/navigation", () => ({
 describe("SignupForm", () => {
   it("should render form fields", () => {
     render(<SignupForm />);
-    expect(screen.getByLabelText(/name/i)).toBeDefined();
-    expect(screen.getByLabelText(/email/i)).toBeDefined();
-    expect(screen.getByLabelText(/password/i)).toBeDefined();
+    expect(screen.getByLabelText(/name/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /create account/i })
-    ).toBeDefined();
+    ).toBeInTheDocument();
   });
 
   it("should disable button while submitting", async () => {
@@ -48,8 +48,8 @@ describe("SignupForm", () => {
     });
     await user.click(button);
 
-    expect(button.disabled).toBe(true);
-    expect(screen.getByText(/creating account/i)).toBeDefined();
+    expect(button).toBeDisabled();
+    expect(screen.getByText(/creating account/i)).toBeInTheDocument();
   });
 
   it("should display error message on failure", async () => {
@@ -70,7 +70,7 @@ describe("SignupForm", () => {
     await user.click(button);
 
     await waitFor(() => {
-      expect(screen.getByText(/invalid input/i)).toBeDefined();
+      expect(screen.getByText(/invalid input/i)).toBeInTheDocument();
     });
   });
 });

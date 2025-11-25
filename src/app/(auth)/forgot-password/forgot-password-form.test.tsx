@@ -13,10 +13,10 @@ vi.mock("~/app/(auth)/actions", () => ({
 describe("ForgotPasswordForm", () => {
   it("should render form fields", () => {
     render(<ForgotPasswordForm />);
-    expect(screen.getByLabelText(/email/i)).toBeDefined();
+    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /send reset link/i })
-    ).toBeDefined();
+    ).toBeInTheDocument();
   });
 
   it("should disable button while submitting", async () => {
@@ -36,11 +36,11 @@ describe("ForgotPasswordForm", () => {
     });
     await user.click(button);
 
-    expect(button.disabled).toBe(true);
-    expect(screen.getByText(/sending/i)).toBeDefined();
+    expect(button).toBeDisabled();
+    expect(screen.getByText(/sending/i)).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.getByText(/if an account exists/i)).toBeDefined();
+      expect(screen.getByText(/if an account exists/i)).toBeInTheDocument();
     });
   });
 
@@ -59,7 +59,7 @@ describe("ForgotPasswordForm", () => {
     await user.click(button);
 
     await waitFor(() => {
-      expect(screen.getByText(/something went wrong/i)).toBeDefined();
+      expect(screen.getByText(/something went wrong/i)).toBeInTheDocument();
     });
   });
 });

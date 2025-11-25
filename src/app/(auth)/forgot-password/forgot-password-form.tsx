@@ -1,8 +1,6 @@
 "use client";
 
-import React from "react";
-
-import { useActionState } from "react";
+import React, { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -31,7 +29,7 @@ export function ForgotPasswordForm(): React.JSX.Element {
       {/* Message */}
       {state && !state.ok && (
         <div
-          className="rounded-lg px-4 py-3 text-sm bg-error-container text-on-error-container"
+          className="rounded-lg bg-error-container px-4 py-3 text-sm text-on-error-container"
           role="alert"
         >
           {state.message}
