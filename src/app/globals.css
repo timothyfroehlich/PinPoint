@@ -34,6 +34,22 @@
   --color-status-resolved: #22c55e;
   --color-status-unplayable: #ef4444;
 
+  /* Semantic Status Colors (Restored) */
+  --color-success: #22c55e;
+  --color-success-foreground: #ffffff;
+  --color-success-container: #14532d;
+  --color-on-success-container: #dcfce7;
+
+  --color-warning: #eab308;
+  --color-warning-foreground: #ffffff;
+  --color-warning-container: #713f12;
+  --color-on-warning-container: #fef9c3;
+
+  --color-error: #ef4444;
+  --color-error-foreground: #ffffff;
+  --color-error-container: #7f1d1d;
+  --color-on-error-container: #fee2e2;
+
   /* Borders & Inputs */
   --color-border: #3e3e3e;
   --color-input: #2d2d2d;

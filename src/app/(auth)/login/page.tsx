@@ -68,7 +68,7 @@ export default async function LoginPage(): Promise<React.JSX.Element> {
               "rounded-lg px-4 py-3 text-sm",
               flash.type === "error"
                 ? "border border-destructive/30 bg-destructive/10 text-destructive"
-                : "border border-primary/30 bg-primary/10 text-primary"
+                : "border border-success/30 bg-success/10 text-success"
             )}
             role="alert"
           >

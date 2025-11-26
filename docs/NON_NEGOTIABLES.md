@@ -1,6 +1,6 @@
 # PinPoint Non‑Negotiables
 
-**Last Updated**: November 10, 2025
+**Last Updated**: November 25, 2025
 **Version**: 2.0 (Greenfield)
 
 ## Overview
@@ -227,6 +227,14 @@
 - **Don't:** Use form submission inside `DropdownMenuItem`
 - **Rationale:** Radix UI dropdowns auto-close and unmount content, causing "Form submission canceled because the form is not connected" errors
 
+**CORE-ARCH-007:** Use useActionState for form feedback
+
+- **Severity:** Required
+- **Why:** Modern React 19 pattern, simpler than cookie-based flash messages, instant feedback
+- **Do:** Use `useActionState` hook with Server Actions returning state objects
+- **Don't:** Use flash messages (`setFlash`/`readFlash`) for form validation or success feedback
+- **Rationale:** `useActionState` provides instant, state-based feedback without cookies or redirects, aligning with React 19 Server Actions architecture
+
 ---
 
 ## UI & Styling
@@ -283,6 +291,7 @@
 - **Infrastructure fighting TypeScript**: Complex patterns generating `exactOptionalPropertyTypes` violations indicate wrong complexity level
 - **Inline Server Action wrappers**: Don't wrap Server Actions in inline async functions in forms
 - **Forms in dropdown menus**: Don't use `<form>` inside `DropdownMenuItem` (dropdown closes before submission completes)
+- **Flash messages**: Don't use `setFlash()`/`readFlash()` for form feedback (use `useActionState` instead)
 - **Playwright arbitrary waits**: No `page.waitForTimeout()` in tests; assert on real UI state (add `data-testid` hooks if needed)
 
 ---

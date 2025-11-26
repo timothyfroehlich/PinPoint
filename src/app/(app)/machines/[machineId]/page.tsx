@@ -124,7 +124,7 @@ export default async function MachineDetailPage({
                 "rounded-lg px-4 py-3 text-sm",
                 flash.type === "error"
                   ? "bg-error-container text-on-error-container"
-                  : "bg-primary-container text-on-primary-container"
+                  : "bg-success-container text-on-success-container"
               )}
               role="alert"
             >
