@@ -34,6 +34,7 @@ This file documents how repository + pattern-specific instructions guide AI assi
 
 - `docs/NON_NEGOTIABLES.md` – forbidden patterns & critical constraints
 - `AGENTS.md` – contextual project directives
+- `docs/UI_GUIDE.md` – **PRIMARY** source of truth for UI & Styling
 - `docs/PATTERNS.md` – **PRIMARY** index for implementation patterns (see `docs/patterns/`)
 - `docs/TYPESCRIPT_STRICTEST_PATTERNS.md` – strict TS techniques
 - `docs/TESTING_PLAN.md` – test distribution & memory safety

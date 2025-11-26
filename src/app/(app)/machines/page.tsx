@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { Plus } from "lucide-react";
+import { cn } from "~/lib/utils";
 
 /**
  * Machines List Page (Protected Route)
@@ -59,6 +60,7 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
       status,
       openIssuesCount,
       createdAt: machine.createdAt,
+      issues: machine.issues,
     };
   });
 
@@ -120,7 +122,11 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
                         {machine.name}
                       </CardTitle>
                       <Badge
-                        className={`${getMachineStatusStyles(machine.status)} border px-2 py-1 text-xs font-semibold`}
+                        data-testid="machine-status-badge"
+                        className={cn(
+                          getMachineStatusStyles(machine.status),
+                          "border px-2 py-1 text-xs font-semibold"
+                        )}
                       >
                         {getMachineStatusLabel(machine.status)}
                       </Badge>
@@ -137,11 +143,16 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
                           Open Issues:
                         </span>
                         <span
-                          className={`font-semibold ${
-                            machine.openIssuesCount > 0
-                              ? "text-on-surface"
-                              : "text-on-surface-variant"
-                          }`}
+                          className={cn(
+                            "font-semibold",
+                            machine.issues.some(
+                              (i) =>
+                                i.severity === "unplayable" &&
+                                i.status !== "resolved"
+                            )
+                              ? "text-destructive"
+                              : "text-muted-foreground"
+                          )}
                           data-testid={`machine-open-issues-count-${machine.id}`}
                         >
                           {machine.openIssuesCount}

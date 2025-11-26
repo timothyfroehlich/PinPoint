@@ -1,8 +1,113 @@
 import React from "react";
-import { Clock } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { formatDistanceToNow } from "date-fns";
+import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { AddCommentForm } from "~/components/issues/AddCommentForm";
 import { type IssueWithAllRelations } from "~/lib/types";
+import { cn } from "~/lib/utils";
+
+// ----------------------------------------------------------------------
+// Types
+// ----------------------------------------------------------------------
+
+type TimelineEventType = "issue" | "comment" | "system";
+
+interface TimelineEvent {
+  id: string;
+  type: TimelineEventType;
+  author: {
+    name: string;
+    avatarFallback: string;
+  };
+  createdAt: Date;
+  content: string | null;
+}
+
+// ----------------------------------------------------------------------
+// Components
+// ----------------------------------------------------------------------
+
+function TimelineItem({ event }: { event: TimelineEvent }): React.JSX.Element {
+  const isSystem = event.type === "system";
+  const isIssue = event.type === "issue";
+
+  return (
+    <div className="relative flex gap-4">
+      {/* Left: Marker (Fixed width track) */}
+      <div className="flex w-16 flex-none flex-col items-center">
+        {isSystem ? (
+          <div className="relative z-10 flex size-10 items-center justify-center">
+            <div className="size-2.5 rounded-full bg-border ring-4 ring-background" />
+          </div>
+        ) : (
+          <Avatar className="relative z-10 size-10 border border-border/60 ring-4 ring-background">
+            <AvatarFallback className="bg-muted text-xs font-medium text-muted-foreground">
+              {event.author.avatarFallback}
+            </AvatarFallback>
+          </Avatar>
+        )}
+      </div>
+
+      {/* Right: Content */}
+      <div className="flex-1">
+        {isSystem ? (
+          <div className="flex items-center gap-2 py-1 text-xs leading-snug text-muted-foreground">
+            <span className="font-medium text-foreground/80">
+              {event.author.name}
+            </span>
+            <span>{event.content}</span>
+            <span className="text-muted-foreground/40">&bull;</span>
+            <span
+              className="text-[11px] text-muted-foreground/60"
+              title={event.createdAt.toLocaleString()}
+            >
+              {formatDistanceToNow(event.createdAt, { addSuffix: true })}
+            </span>
+          </div>
+        ) : (
+          <div
+            className={cn(
+              "rounded-lg border bg-card p-6 shadow-sm",
+              isIssue && "border-primary/30"
+            )}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex flex-col">
+                  <span className="font-semibold text-foreground">
+                    {event.author.name}
+                  </span>
+                  {isIssue ? (
+                    <span className="text-xs uppercase tracking-wide text-primary">
+                      Initial report
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      {event.type === "comment" ? "commented" : "reported"}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span title={event.createdAt.toLocaleString()}>
+                  {formatDistanceToNow(event.createdAt, { addSuffix: true })}
+                </span>
+              </div>
+            </div>
+            {event.content && (
+              <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+                {event.content}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------
+// Main Component
+// ----------------------------------------------------------------------
 
 interface IssueTimelineProps {
   issue: IssueWithAllRelations;
@@ -11,80 +116,60 @@ interface IssueTimelineProps {
 export function IssueTimeline({
   issue,
 }: IssueTimelineProps): React.JSX.Element {
-  return (
-    <div className="flex-1">
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-xl font-semibold text-on-surface">Timeline</h2>
-          <p className="text-sm text-on-surface-variant">
-            Latest comments and system updates
-          </p>
-        </div>
-        {/* Original Issue Post */}
-        <Card className="border-outline-variant bg-surface shadow-lg">
-          <CardHeader className="border-b border-outline-variant">
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold text-on-surface">
-                {issue.reportedByUser?.name ?? "Unknown User"}
-              </div>
-              <div className="text-xs text-on-surface-variant">
-                {new Date(issue.createdAt).toLocaleString()}
-              </div>
-            </div>
-          </CardHeader>
-          {issue.description && (
-            <CardContent className="pt-4">
-              <p className="text-on-surface whitespace-pre-wrap">
-                {issue.description}
-              </p>
-            </CardContent>
-          )}
-        </Card>
+  // 1. Normalize Issue as the first event
+  const issueEvent: TimelineEvent = {
+    id: `issue-${issue.id}`,
+    type: "issue",
+    author: {
+      name: issue.reportedByUser?.name ?? "Unknown User",
+      avatarFallback:
+        issue.reportedByUser?.name.slice(0, 2).toUpperCase() ?? "U",
+    },
+    createdAt: new Date(issue.createdAt),
+    content: issue.description,
+  };
 
-        {/* Timeline Events */}
-        {issue.comments.map((comment) => (
-          <React.Fragment key={comment.id}>
-            {comment.isSystem ? (
-              <div className="flex items-center gap-3 rounded-md border border-dashed border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface-variant">
-                <Clock className="size-4" />
-                <div className="flex flex-col">
-                  <span>{comment.content}</span>
-                  <span className="text-xs">
-                    {new Date(comment.createdAt).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <Card className="border-outline-variant bg-surface shadow-lg">
-                <CardHeader className="border-b border-outline-variant">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-semibold text-on-surface">
-                      {comment.author?.name ?? "Unknown User"}
-                    </div>
-                    <div className="text-xs text-on-surface-variant">
-                      {new Date(comment.createdAt).toLocaleString()}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-4">
-                  <p className="text-sm text-on-surface whitespace-pre-wrap">
-                    {comment.content}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </React.Fragment>
-        ))}
+  // 2. Normalize Comments
+  const commentEvents: TimelineEvent[] = issue.comments.map((c) => ({
+    id: c.id,
+    type: c.isSystem ? "system" : "comment",
+    author: {
+      name: c.author?.name ?? "System",
+      avatarFallback: c.author?.name.slice(0, 2).toUpperCase() ?? "S",
+    },
+    createdAt: new Date(c.createdAt),
+    content: c.content,
+  }));
+
+  // 3. Combine
+  const allEvents = [issueEvent, ...commentEvents];
+
+  return (
+    <div className="flex-1 space-y-6">
+      <div className="relative">
+        {/* Continuous Vertical Line */}
+        <div className="absolute bottom-0 left-[34px] top-4 w-px -translate-x-1/2 bg-border" />
+
+        {/* Events List */}
+        <div className="relative flex flex-col space-y-6">
+          {allEvents.map((event) => (
+            <TimelineItem key={event.id} event={event} />
+          ))}
+        </div>
 
         {/* Add Comment Form */}
-        <Card className="border-outline-variant bg-surface shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-lg">Add a comment</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <div className="relative mt-8 flex gap-4 pt-2">
+          <div className="flex w-16 flex-none flex-col items-center">
+            <Avatar className="relative z-10 size-10 border border-border/60 ring-4 ring-background">
+              <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
+                ME
+              </AvatarFallback>
+            </Avatar>
+          </div>
+          <div className="flex-1 rounded-lg border bg-card p-6 shadow-sm">
             <AddCommentForm issueId={issue.id} />
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

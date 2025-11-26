@@ -1,6 +1,7 @@
 import type React from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { cn } from "~/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { readFlash } from "~/lib/flash";
 import { createClient } from "~/lib/supabase/server";
@@ -42,11 +43,12 @@ export default async function SignupPage(): Promise<React.JSX.Element> {
         {/* Flash message */}
         {flash && (
           <div
-            className={`rounded-lg px-4 py-3 text-sm ${
+            className={cn(
+              "rounded-lg px-4 py-3 text-sm",
               flash.type === "error"
                 ? "bg-error-container text-on-error-container"
-                : "bg-primary-container text-on-primary-container"
-            }`}
+                : "bg-success-container text-on-success-container"
+            )}
             role="alert"
           >
             {flash.message}

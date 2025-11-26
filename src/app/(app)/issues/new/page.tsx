@@ -13,6 +13,7 @@ import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { Button } from "~/components/ui/button";
 import { createIssueAction } from "../actions";
+import { cn } from "~/lib/utils";
 
 /**
  * Report New Issue Page (Protected Route)
@@ -71,11 +72,12 @@ export default async function NewIssuePage({
             {/* Flash message */}
             {flash && (
               <div
-                className={`mb-6 rounded-md border px-4 py-3 text-sm ${
-                  flash.type === "error"
-                    ? "border-red-300 bg-red-50 text-red-800"
-                    : "border-green-300 bg-green-50 text-green-800"
-                }`}
+                className={cn(
+                  "mb-6 rounded-md border px-4 py-3 text-sm",
+                  flash.type === "success"
+                    ? "border-green-200 bg-green-50 text-green-800 dark:border-green-900/50 dark:bg-green-900/20 dark:text-green-300"
+                    : "border-destructive/20 bg-destructive/10 text-destructive"
+                )}
               >
                 {flash.message}
               </div>

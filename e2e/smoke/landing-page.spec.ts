@@ -18,9 +18,8 @@ test("landing page loads with all key elements", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "PinPoint" })).toBeVisible();
 
   // Verify key navigation elements
-  const nav = page.getByRole("navigation");
-  await expect(nav.getByRole("link", { name: "Sign Up" })).toBeVisible();
-  await expect(nav.getByRole("link", { name: "Sign In" })).toBeVisible();
+  await expect(page.getByTestId("nav-signup")).toBeVisible();
+  await expect(page.getByTestId("nav-signin")).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Report an Issue" })
   ).toBeVisible();

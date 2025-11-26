@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useState, useEffect } from "react";
+import { cn } from "~/lib/utils";
 
 /**
  * Password Strength Indicator
@@ -77,7 +78,7 @@ export function PasswordStrength({
       <div className="flex items-center gap-2">
         <div className="flex-1 h-2 bg-surface-variant rounded-full overflow-hidden">
           <div
-            className={`h-full ${color} transition-all duration-300`}
+            className={cn("h-full transition-all duration-300", color)}
             style={{ width: `${widthPercentage}%` }}
           />
         </div>

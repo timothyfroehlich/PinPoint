@@ -82,10 +82,21 @@ Read these immediately before starting work:
 - **Don't**: Create DAL/repository/service layers (premature abstraction)
 - **Why**: Single-tenant simplicity, follow the Rule of Three
 
-### UI Framework
+### UI Framework & Progressive Enhancement
 
-- **New Development**: shadcn/ui + Tailwind CSS v4 only
-- **CSS**: Material Design 3 colors from globals.css
+- **Stack**: shadcn/ui + Tailwind CSS v4 + Lucide Icons
+- **Styling**:
+  - **Global**: Use `globals.css` for typography and theme variables.
+  - **Local**: Use `className` with `cn()` for component-specific styles.
+  - **Forbidden**: No `style={{ ... }}` props, no hardcoded hex colors (use CSS variables).
+- **Progressive Enhancement**:
+  - **Forms**: Must work without JavaScript. Use `<form action={serverAction}>`.
+  - **Interactivity**: Use CSS-only patterns (`group`, `peer`) where possible.
+  - **Client Components**: Push `use client` down to the leaves (buttons, inputs).
+- **Documentation Hierarchy**:
+  1.  `AGENTS.md` (High-level rules)
+  2.  `docs/UI_GUIDE.md` (The "Goto" manual for all UI work)
+  3.  `docs/ui-patterns/*` (Specific implementation patterns)
 
 ## Development Guidelines
 

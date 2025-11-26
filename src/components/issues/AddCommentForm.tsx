@@ -18,7 +18,7 @@ export function AddCommentForm({
         placeholder="Leave a comment..."
         required
         minLength={1}
-        className="min-h-32"
+        className="min-h-24"
       />
       <div className="flex justify-end">
         <AddCommentSubmitButton />

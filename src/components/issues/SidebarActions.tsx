@@ -30,93 +30,110 @@ export function SidebarActions({
 }: SidebarActionsProps): React.JSX.Element {
   const [isPending, startTransition] = useTransition();
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <Label className="text-xs text-on-surface-variant">Assignee</Label>
-        <AssigneePicker
-          assignedToId={issue.assignedTo ?? null}
-          users={allUsers}
-          isPending={isPending}
-          onAssign={(userId) => {
-            startTransition(async () => {
-              const formData = new FormData();
-              formData.append("issueId", issue.id);
-              formData.append("assignedTo", userId ?? "");
-              await assignIssueAction(formData);
-            });
-          }}
-        />
+    <div className="space-y-5">
+      {/* Assignee */}
+      <div className="grid grid-cols-[110px,1fr] items-center gap-3">
+        <Label className="text-sm text-muted-foreground">Assignee</Label>
+        <div className="min-w-0">
+          <AssigneePicker
+            assignedToId={issue.assignedTo ?? null}
+            users={allUsers}
+            isPending={isPending}
+            onAssign={(userId) => {
+              startTransition(async () => {
+                const formData = new FormData();
+                formData.append("issueId", issue.id);
+                formData.append("assignedTo", userId ?? "");
+                await assignIssueAction(formData);
+              });
+            }}
+          />
+        </div>
       </div>
+
       {/* Update Status */}
-      <div className="flex items-center justify-between">
-        <Label className="text-xs text-on-surface-variant">Status</Label>
-        <Select
-          name="status"
-          defaultValue={issue.status}
-          onValueChange={(value) => {
-            startTransition(async () => {
-              const formData = new FormData();
-              formData.append("issueId", issue.id);
-              formData.append("status", value);
-              await updateIssueStatusAction(formData);
-            });
-          }}
-          disabled={isPending}
-        >
-          <SelectTrigger className="w-full" data-testid="issue-status-select">
-            <SelectValue placeholder="Select status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="new" data-testid="status-option-new">
-              New
-            </SelectItem>
-            <SelectItem
-              value="in_progress"
-              data-testid="status-option-in_progress"
+      <div className="grid grid-cols-[110px,1fr] items-center gap-3">
+        <Label className="text-sm text-muted-foreground">Status</Label>
+        <div className="min-w-0">
+          <Select
+            name="status"
+            defaultValue={issue.status}
+            onValueChange={(value) => {
+              startTransition(async () => {
+                const formData = new FormData();
+                formData.append("issueId", issue.id);
+                formData.append("status", value);
+                await updateIssueStatusAction(formData);
+              });
+            }}
+            disabled={isPending}
+          >
+            <SelectTrigger
+              className="h-10 w-full border-border/70 bg-background"
+              data-testid="issue-status-select"
             >
-              In Progress
-            </SelectItem>
-            <SelectItem value="resolved" data-testid="status-option-resolved">
-              Resolved
-            </SelectItem>
-          </SelectContent>
-        </Select>
+              <SelectValue placeholder="Select status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="new" data-testid="status-option-new">
+                New
+              </SelectItem>
+              <SelectItem
+                value="in_progress"
+                data-testid="status-option-in_progress"
+              >
+                In Progress
+              </SelectItem>
+              <SelectItem value="resolved" data-testid="status-option-resolved">
+                Resolved
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Update Severity */}
-      <div className="flex items-center justify-between">
-        <Label className="text-xs text-on-surface-variant">Severity</Label>
-        <Select
-          name="severity"
-          defaultValue={issue.severity}
-          onValueChange={(value) => {
-            startTransition(async () => {
-              const formData = new FormData();
-              formData.append("issueId", issue.id);
-              formData.append("severity", value);
-              await updateIssueSeverityAction(formData);
-            });
-          }}
-          disabled={isPending}
-        >
-          <SelectTrigger className="w-full" data-testid="issue-severity-select">
-            <SelectValue placeholder="Select severity" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="minor" data-testid="severity-option-minor">
-              Minor
-            </SelectItem>
-            <SelectItem value="playable" data-testid="severity-option-playable">
-              Playable
-            </SelectItem>
-            <SelectItem
-              value="unplayable"
-              data-testid="severity-option-unplayable"
+      <div className="grid grid-cols-[110px,1fr] items-center gap-3">
+        <Label className="text-sm text-muted-foreground">Severity</Label>
+        <div className="min-w-0">
+          <Select
+            name="severity"
+            defaultValue={issue.severity}
+            onValueChange={(value) => {
+              startTransition(async () => {
+                const formData = new FormData();
+                formData.append("issueId", issue.id);
+                formData.append("severity", value);
+                await updateIssueSeverityAction(formData);
+              });
+            }}
+            disabled={isPending}
+          >
+            <SelectTrigger
+              className="h-10 w-full border-border/70 bg-background"
+              data-testid="issue-severity-select"
             >
-              Unplayable
-            </SelectItem>
-          </SelectContent>
-        </Select>
+              <SelectValue placeholder="Select severity" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="minor" data-testid="severity-option-minor">
+                Minor
+              </SelectItem>
+              <SelectItem
+                value="playable"
+                data-testid="severity-option-playable"
+              >
+                Playable
+              </SelectItem>
+              <SelectItem
+                value="unplayable"
+                data-testid="severity-option-unplayable"
+              >
+                Unplayable
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
     </div>
   );

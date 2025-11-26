@@ -8,6 +8,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { ArrowLeft } from "lucide-react";
 import { createMachineAction } from "~/app/(app)/machines/actions";
+import { cn } from "~/lib/utils";
 import { readFlash } from "~/lib/flash";
 
 /**
@@ -70,11 +71,12 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
             {/* Flash message */}
             {flash && (
               <div
-                className={`mb-6 rounded-md border p-4 ${
-                  flash.type === "error"
-                    ? "border-error bg-error/10 text-error"
-                    : "border-primary bg-primary/10 text-primary"
-                }`}
+                className={cn(
+                  "mb-6 rounded-md border p-4",
+                  flash.type === "success" // Assuming flash.type is intended here, as 'state' is not defined.
+                    ? "border-green-200 bg-green-50 text-green-800 dark:border-green-900/50 dark:bg-green-900/20 dark:text-green-300"
+                    : "border-destructive/20 bg-destructive/10 text-destructive"
+                )}
               >
                 <p className="text-sm font-medium">{flash.message}</p>
               </div>

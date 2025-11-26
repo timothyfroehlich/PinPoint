@@ -1,42 +1,37 @@
-# Walkthrough: Progressive Enhancement for Auth Forms
+# Walkthrough: Comprehensive UI Review and Documentation Refactor
 
 ## Overview
 
-This PR refactors the `SignupForm` and `ForgotPasswordForm` to align with the project's progressive enhancement requirements (`CORE-ARCH-002`). The forms now use React 19's `useActionState` and `useFormStatus` hooks, ensuring they work without JavaScript while providing a better user experience with client-side feedback.
+This task focused on a "second pass" cleanup of the UI codebase and documentation to establish a strict, clear hierarchy and enforce best practices. The goal was to remove "cruft" (ad-hoc styles, hardcoded values) and ensure all UI code aligns with the "Modern Dark SaaS" aesthetic and "Server-First" architecture.
 
 ## Changes
 
-### 1. Client Components
+### 1. Documentation Refactor
 
-- **`src/app/(auth)/signup/signup-form.tsx`**:
-  - Replaced `useState` for form submission with `useActionState`.
-  - Added `SubmitButton` component using `useFormStatus` to handle pending state.
-  - Removed client-side redirect logic; now relies on server action redirect.
-  - Improved error message mapping.
-- **`src/app/(auth)/forgot-password/forgot-password-form.tsx`**:
-  - Replaced `useState` with `useActionState`.
-  - Added `SubmitButton` component.
-  - Handles success/error messages returned from the server action.
+- **`docs/UI_GUIDE.md`**: Rewritten as the single source of truth for UI development. Covers tech stack, styling philosophy, component architecture, and troubleshooting.
+- **`AGENTS.md`**: Added a "UI Development & Progressive Enhancement" section to guide AI agents.
+- **`docs/NON_NEGOTIABLES.md`**: Added strict UI rules (no global resets, no hardcoded spacing, mandatory `cn()` usage).
+- **Copilot Instructions**: Updated `.github/COPILOT_INSTRUCTIONS.md` and `.github/copilot-instructions.md` to reference the new documentation structure.
+- **`docs/ui-patterns/`**: Created/updated pattern files for Typography, Components, and Styling Principles.
 
-### 2. Server Actions
+### 2. UI Code Cleanup
 
-- **`src/app/(auth)/actions.ts`**:
-  - Updated `signupAction` and `forgotPasswordAction` signatures to accept `prevState` (required by `useActionState`).
-  - `signupAction` now uses `redirect()` for successful navigation.
-  - `forgotPasswordAction` returns a `Result` object instead of using `setFlash`.
+- **Fixed `cn()` Usage**: Replaced template literals with `cn()` utility in multiple files:
+  - `src/components/password-strength.tsx`
+  - Auth pages (`login`, `signup`, `reset-password`, `forgot-password`)
+  - `src/app/(app)/machines/page.tsx` & subpages
+  - `src/app/(app)/issues/page.tsx` & subpages
+  - `src/app/(app)/dashboard/page.tsx`
+- **Fixed Missing Imports**: Added missing imports for `cn`, `getIssueStatusStyles`, `getIssueSeverityStyles`, and Lucide icons.
+- **Logic Fixes**: Corrected invalid status comparison in `machines/page.tsx`.
+- **Created Issue Status Utility**: Created `src/lib/issues/status.ts` to centralize issue status/severity logic and styles.
 
-### 3. Tests
+### 3. Process Improvements
 
-- **Unit Tests**:
-  - Updated `src/app/(auth)/signup/signup-form.test.tsx` and `src/app/(auth)/forgot-password/forgot-password-form.test.tsx` to test the new implementation.
-  - Added `import React from "react"` to fix `ReferenceError`.
-  - Removed unused mocks and updated assertions.
-- **Integration Tests**:
-  - Updated `src/app/(auth)/actions.test.ts` and `src/test/integration/supabase/auth-actions-errors.test.ts` to pass `undefined` as the first argument to the refactored actions.
+- **GitHub Issue #529**: Created an issue to review Flash Message usage for consistency and security.
 
 ## Verification
 
-- **Unit Tests**: All unit tests passed (`npm test`).
-- **Integration Tests**: All integration tests passed (`npm run test:integration`).
-- **E2E Tests**: Preflight checks passed, confirming E2E flows work as expected.
-- **Manual Verification**: Verified that forms disable the submit button during submission and display appropriate messages.
+- **Build**: `npm run build` passed successfully.
+- **Preflight**: `npm run preflight` passed successfully.
+- **Manual Review**: Verified documentation links and flow.

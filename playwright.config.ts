@@ -11,7 +11,7 @@ try {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#")) continue;
     const [key, ...valueParts] = trimmed.split("=");
-    if (key && valueParts.length > 0) {
+    if (key && valueParts.length > 0 && process.env[key.trim()] === undefined) {
       process.env[key.trim()] = valueParts.join("=").trim();
     }
   }
@@ -92,12 +92,16 @@ export default defineConfig({
   webServer: {
     command: `HOSTNAME=${hostname} PORT=${port} npm run dev -- --hostname ${hostname}`,
     url: baseURL,
-    reuseExistingServer: false,
+    reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000, // 2 minutes
 
     // Default quiet output; override via PLAYWRIGHT_STDOUT/STDERR when debugging
-    stdout: webServerStdout as "pipe" | "ignore" | "inherit",
-    stderr: webServerStderr as "pipe" | "ignore" | "inherit",
+    stdout: (webServerStdout === "inherit" ? "pipe" : webServerStdout) as
+      | "pipe"
+      | "ignore",
+    stderr: (webServerStderr === "inherit" ? "pipe" : webServerStderr) as
+      | "pipe"
+      | "ignore",
 
     // Ignore HTTPS errors for local development
     ignoreHTTPSErrors: true,

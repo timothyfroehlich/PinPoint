@@ -2,121 +2,101 @@
 
 /* Material Design 3 Color System - Tailwind v4 */
 @theme {
-  /* Primary Colors - becomes bg-primary, text-primary, etc. */
-  --color-primary: #6750a4;
+  /* Base Colors */
+  --color-background: #1e1e1e;
+  --color-foreground: #ffffff;
+
+  /* Card & Surface */
+  --color-card: #2d2d2d;
+  --color-card-foreground: #ffffff;
+  --color-popover: #2d2d2d;
+  --color-popover-foreground: #ffffff;
+
+  /* Primary Action (Blue) */
+  --color-primary: #3b82f6;
+  --color-primary-foreground: #ffffff;
+
+  /* Secondary / Muted */
+  --color-secondary: #3e3e3e;
+  --color-secondary-foreground: #ffffff;
+  --color-muted: #2d2d2d;
+  --color-muted-foreground: #a1a1aa;
+
+  /* Accents & Status */
+  --color-accent: #3e3e3e;
+  --color-accent-foreground: #ffffff;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+
+  /* Status Specific */
+  --color-status-new: #3b82f6;
+  --color-status-in-progress: #eab308;
+  --color-status-resolved: #22c55e;
+  --color-status-unplayable: #ef4444;
+
+  /* Semantic Status Colors (Restored) */
+  --color-success: #22c55e;
+  --color-success-foreground: #ffffff;
+  --color-success-container: #14532d;
+  --color-on-success-container: #dcfce7;
+
+  --color-warning: #eab308;
+  --color-warning-foreground: #ffffff;
+  --color-warning-container: #713f12;
+  --color-on-warning-container: #fef9c3;
+
+  --color-error: #ef4444;
+  --color-error-foreground: #ffffff;
+  --color-error-container: #7f1d1d;
+  --color-on-error-container: #fee2e2;
+
+  /* Borders & Inputs */
+  --color-border: #3e3e3e;
+  --color-input: #2d2d2d;
+  --color-ring: #3b82f6;
+
+  /* Extended Surface Palette (MD3-inspired) */
+  --color-surface: #1e1e1e;
+  --color-surface-variant: #2d2d2d;
+  --color-outline: #3e3e3e;
+  --color-outline-variant: #4a4a4a;
+  --color-on-surface: #ffffff;
+  --color-on-surface-variant: #a1a1aa;
   --color-on-primary: #ffffff;
-  --color-primary-container: #eaddff;
-  --color-on-primary-container: #21005d;
-
-  /* Secondary Colors */
-  --color-secondary: #625b71;
   --color-on-secondary: #ffffff;
-  --color-secondary-container: #e8def8;
-  --color-on-secondary-container: #1d192b;
+  --color-primary-container: #1f3b87;
+  --color-on-primary-container: #dce9ff;
+  --color-secondary-container: #333333;
+  --color-on-secondary-container: #f4f4f5;
 
-  /* Tertiary Colors */
-  --color-tertiary: #7d5260;
-  --color-on-tertiary: #ffffff;
-  --color-tertiary-container: #ffd8e4;
-  --color-on-tertiary-container: #31111d;
-
-  /* Success Colors */
-  --color-success: #2e7d32;
-  --color-on-success: #ffffff;
-  --color-success-container: #b8f397;
-  --color-on-success-container: #002105;
-
-  /* Warning Colors */
-  --color-warning: #ef6c00;
-  --color-on-warning: #ffffff;
-  --color-warning-container: #ffe0b2;
-  --color-on-warning-container: #e65100;
-
-  /* Error Colors */
-  --color-error: #b3261e;
-  --color-on-error: #ffffff;
-  --color-error-container: #f9dedc;
-  --color-on-error-container: #410e0b;
-
-  /* Surface Colors */
-  --color-surface: #fffbfe;
-  --color-on-surface: #1c1b1f;
-  --color-surface-variant: #e7e0ec;
-  --color-on-surface-variant: #49454f;
-  --color-surface-dim: #ded8e1;
-  --color-surface-bright: #fffbfe;
-
-  /* Outline Colors */
-  --color-outline: #79747e;
-  --color-outline-variant: #cac4d0;
-
-  /* Inverse Colors */
-  --color-inverse-surface: #313033;
-  --color-inverse-on-surface: #f4eff4;
-  --color-inverse-primary: #d0bcff;
+  /* Radius */
+  --radius: 0.5rem;
 }
-
-@media (prefers-color-scheme: dark) {
-  @theme {
-    /* Primary Colors - Dark */
-    --color-primary: #d0bcff;
-    --color-on-primary: #381e72;
-    --color-primary-container: #4f378b;
-    --color-on-primary-container: #eaddff;
-
-    /* Secondary Colors - Dark */
-    --color-secondary: #ccc2dc;
-    --color-on-secondary: #332d41;
-    --color-secondary-container: #4a4458;
-    --color-on-secondary-container: #e8def8;
-
-    /* Tertiary Colors - Dark */
-    --color-tertiary: #efb8c8;
-    --color-on-tertiary: #492532;
-    --color-tertiary-container: #633b48;
-    --color-on-tertiary-container: #ffd8e4;
-
-    /* Success Colors - Dark */
-    --color-success: #4caf50;
-    --color-on-success: #083810;
-    --color-success-container: #1b5e20;
-    --color-on-success-container: #b8f397;
-
-    /* Warning Colors - Dark */
-    --color-warning: #ff9800;
-    --color-on-warning: #3e2723;
-    --color-warning-container: #e65100;
-    --color-on-warning-container: #ffe0b2;
-
-    /* Error Colors - Dark */
-    --color-error: #f2b8b5;
-    --color-on-error: #601410;
-    --color-error-container: #8c1d18;
-    --color-on-error-container: #f9dedc;
-
-    /* Surface Colors - Dark */
-    --color-surface: #1c1b1f;
-    --color-on-surface: #e6e1e5;
-    --color-surface-variant: #49454f;
-    --color-on-surface-variant: #cac4d0;
-    --color-surface-dim: #1c1b1f;
-    --color-surface-bright: #3b383e;
-
-    /* Outline Colors - Dark */
-    --color-outline: #938f99;
-    --color-outline-variant: #49454f;
-
-    /* Inverse Colors - Dark */
-    --color-inverse-surface: #e6e1e5;
-    --color-inverse-on-surface: #313033;
-    --color-inverse-primary: #6750a4;
+@layer base {
+  * {
+    @apply border-border;
   }
-}
-
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
+  body {
+    @apply bg-background text-foreground;
+  }
+  h1 {
+    @apply text-4xl font-extrabold tracking-tight lg:text-5xl;
+  }
+  h2 {
+    @apply text-3xl font-semibold tracking-tight;
+  }
+  h3 {
+    @apply text-2xl font-semibold tracking-tight;
+  }
+  h4 {
+    @apply text-xl font-semibold tracking-tight;
+  }
+  p {
+    @apply leading-7 [&:not(:first-child)]:mt-6;
+  }
+  a {
+    @apply font-medium text-primary underline underline-offset-4;
+  }
 }
 
 html,
@@ -136,15 +116,4 @@ body {
     Arial,
     sans-serif;
   line-height: 1.6;
-  background: linear-gradient(
-    135deg,
-    var(--color-surface-bright) 0%,
-    var(--color-surface-variant) 100%
-  );
-  color: var(--color-on-surface);
-}
-
-main {
-  min-height: 100vh;
-  padding: 1rem;
 }
