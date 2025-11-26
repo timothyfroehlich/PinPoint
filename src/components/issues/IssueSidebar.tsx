@@ -19,14 +19,41 @@ export function IssueSidebar({
   allUsers,
 }: IssueSidebarProps): React.JSX.Element {
   return (
-    <div className="w-full md:w-1/3 lg:w-1/4">
-      <div className="sticky top-8 space-y-6">
-        <Card className="border-outline-variant">
+    <div className="w-full shrink-0 lg:w-80">
+      <div className="sticky top-4 space-y-4">
+        <Card data-testid="issue-sidebar">
           <CardHeader>
-            <CardTitle className="text-base">Details</CardTitle>
+            <CardTitle>Details</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
             <SidebarActions issue={issue} allUsers={allUsers} />
+
+            {/* Additional Metadata */}
+            <div className="space-y-4 border-t pt-4">
+              <div className="grid grid-cols-[110px,1fr] items-center gap-3">
+                <span className="text-sm text-muted-foreground">Reporter</span>
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-medium text-muted-foreground">
+                    {issue.reportedByUser?.name.slice(0, 1).toUpperCase() ??
+                      "U"}
+                  </div>
+                  <span className="max-w-[160px] truncate text-sm text-foreground">
+                    {issue.reportedByUser?.name ?? "Unknown user"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-[110px,1fr] items-center gap-3">
+                <span className="text-sm text-muted-foreground">Created</span>
+                <span className="text-sm text-foreground">
+                  {new Date(issue.createdAt).toLocaleDateString(undefined, {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </span>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

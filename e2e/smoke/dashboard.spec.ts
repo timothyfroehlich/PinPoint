@@ -104,11 +104,15 @@ test.describe.serial("Member Dashboard", () => {
     if (count > 0) {
       // Click the first issue card
       const firstIssue = issueCards.first();
+      // Get the title from the card to verify on detail page
+      const issueTitle = await firstIssue.getByRole("heading").innerText();
       await firstIssue.click();
 
       // Should navigate to issue detail page
       await expect(page).toHaveURL(/\/issues\/[0-9a-f-]+/);
-      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await expect(
+        page.getByRole("heading", { name: issueTitle })
+      ).toBeVisible();
     }
   });
 });

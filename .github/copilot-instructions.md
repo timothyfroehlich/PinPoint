@@ -1,6 +1,6 @@
 # PinPoint v2 – GitHub Copilot Repository Instructions
 
-> Source of truth lives in: `docs/NON_NEGOTIABLES.md`, `docs/PATTERNS.md`, `docs/TYPESCRIPT_STRICTEST_PATTERNS.md`, `docs/PRODUCT_SPEC.md`, `docs/TECH_SPEC.md`, `docs/TESTING_PLAN.md`, plus root `AGENTS.md` and active tasks in `TASKS.md`. Do NOT duplicate full lists of forbidden patterns here—reference them.
+> Source of truth lives in: `docs/NON_NEGOTIABLES.md`, `docs/UI_GUIDE.md`, `docs/PATTERNS.md`, `docs/TYPESCRIPT_STRICTEST_PATTERNS.md`, `docs/PRODUCT_SPEC.md`, `docs/TECH_SPEC.md`, `docs/TESTING_PLAN.md`, plus root `AGENTS.md` and active tasks in `TASKS.md`. Do NOT duplicate full lists of forbidden patterns here—reference them.
 
 ## Phase & Context
 
@@ -76,6 +76,7 @@ Refer to `docs/PATTERNS.md` index for:
 
 ## UI & Styling
 
+- **Authority**: `docs/UI_GUIDE.md` - Follow this guide for all UI development.
 - Tailwind CSS v4 using `@import "tailwindcss"` & `@config` in `globals.css`.
 - Material Design 3 colors stored as CSS variables; prefer semantic tokens (`--color-primary-container`).
 - Use shadcn/ui primitives; never introduce MUI.

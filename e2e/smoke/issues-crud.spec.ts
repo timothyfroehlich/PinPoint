@@ -159,9 +159,15 @@ test.describe("Issues System", () => {
       rememberIssueId(page);
 
       // Should show metadata
-      await expect(page.getByText(/Machine:/)).toBeVisible();
-      await expect(page.getByText(/Reported by:/)).toBeVisible();
-      await expect(page.getByText(/Reported:/)).toBeVisible();
+      // Should show metadata
+      // Machine name is displayed as a breadcrumb link
+      await expect(page.getByText("The Addams Family")).toBeVisible();
+
+      const sidebar = page.getByTestId("issue-sidebar");
+      await expect(
+        sidebar.getByText("Reporter", { exact: true })
+      ).toBeVisible();
+      await expect(sidebar.getByText("Created", { exact: true })).toBeVisible();
 
       // Should show status and severity badges
       await expect(page.getByTestId("issue-status-badge")).toHaveText(/New/i);
@@ -171,7 +177,7 @@ test.describe("Issues System", () => {
 
       // Should show timeline
       await expect(
-        page.getByRole("heading", { name: "Timeline" })
+        page.getByRole("heading", { name: "Activity" })
       ).toBeVisible();
       await expect(page.getByText("Issue created")).toBeVisible();
     });
