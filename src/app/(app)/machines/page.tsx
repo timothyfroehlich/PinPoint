@@ -122,6 +122,7 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
                         {machine.name}
                       </CardTitle>
                       <Badge
+                        data-testid="machine-status-badge"
                         className={cn(
                           getMachineStatusStyles(machine.status),
                           "border px-2 py-1 text-xs font-semibold"

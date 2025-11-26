@@ -4,9 +4,14 @@
  * Tests signup, login, protected routes, logout, and password reset functionality.
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { getPasswordResetLink, deleteAllMessages } from "../support/mailpit";
 import { confirmUserEmail } from "../support/supabase-admin";
+
+const signOutThroughSidebar = async (page: Page): Promise<void> => {
+  await page.getByTestId("sidebar-signout").click();
+  await expect(page).toHaveURL("/");
+};
 
 test.describe("Authentication", () => {
   test("signup flow - create new account and access dashboard", async ({
@@ -117,16 +122,8 @@ test.describe("Authentication", () => {
       page.getByRole("heading", { name: "Dashboard" })
     ).toBeVisible();
 
-    // Open user menu and click sign out
-    await page.getByTestId("user-menu-button").click();
-    await page
-      .getByRole("menuitem", { name: "Sign Out" })
-      .waitFor({ state: "visible" });
-    await page.getByRole("menuitem", { name: "Sign Out" }).click();
-
-    // Should redirect to home page
-    await expect(page).toHaveURL("/");
-    await expect(page.getByRole("heading", { name: "PinPoint" })).toBeVisible();
+    // Sign out via sidebar
+    await signOutThroughSidebar(page);
 
     // Verify we're logged out by trying to access dashboard
     await page.goto("/dashboard");
@@ -160,9 +157,7 @@ test.describe("Authentication", () => {
     await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
 
     // Sign out to start reset journey
-    await page.getByTestId("user-menu-button").click();
-    await page.getByRole("menuitem", { name: "Sign Out" }).click();
-    await expect(page).toHaveURL("/");
+    await signOutThroughSidebar(page);
 
     await deleteAllMessages(testEmail);
 
@@ -194,8 +189,7 @@ test.describe("Authentication", () => {
     // Log in with new password (handle being auto-signed-in from reset flow)
     await page.goto("/login");
     if (await page.getByRole("heading", { name: "Dashboard" }).isVisible()) {
-      await page.getByTestId("user-menu-button").click();
-      await page.getByRole("menuitem", { name: "Sign Out" }).click();
+      await signOutThroughSidebar(page);
       await page.goto("/login");
     }
 
@@ -208,8 +202,7 @@ test.describe("Authentication", () => {
     ).toBeVisible();
 
     // Cleanup
-    await page.getByTestId("user-menu-button").click();
-    await page.getByRole("menuitem", { name: "Sign Out" }).click();
+    await signOutThroughSidebar(page);
     await deleteAllMessages(testEmail);
   });
 });

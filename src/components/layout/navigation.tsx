@@ -22,6 +22,7 @@ export async function Navigation(): Promise<React.JSX.Element> {
 
   return (
     <nav
+      data-testid="top-nav"
       className={cn(
         "w-full border-b border-outline-variant",
         user ? "bg-primary-container" : "bg-surface"

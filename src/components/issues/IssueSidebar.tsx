@@ -21,7 +21,7 @@ export function IssueSidebar({
   return (
     <div className="w-full shrink-0 lg:w-80">
       <div className="sticky top-4 space-y-4">
-        <Card>
+        <Card data-testid="issue-sidebar">
           <CardHeader>
             <CardTitle>Details</CardTitle>
           </CardHeader>

@@ -9,6 +9,7 @@ import {
   CircleDot,
 } from "lucide-react";
 import { cn } from "~/lib/utils";
+import { logoutAction } from "~/app/(auth)/actions";
 
 const sidebarItems = [
   {
@@ -34,7 +35,12 @@ export function Sidebar(): React.JSX.Element {
   // const pathname = usePathname();
 
   return (
-    <div className="flex h-screen w-64 flex-col border-r border-border bg-card text-card-foreground">
+    <div
+      role="navigation"
+      aria-label="main navigation"
+      data-testid="sidebar"
+      className="flex h-screen w-64 flex-col border-r border-border bg-card text-card-foreground"
+    >
       {/* Logo Area */}
       <div className="flex h-16 items-center px-6 border-b border-border">
         <Link
@@ -75,11 +81,11 @@ export function Sidebar(): React.JSX.Element {
           <Settings className="size-4" />
           Settings
         </Link>
-
-        {/* Sign Out would typically be a form action, keeping it visual for now */}
-        <form action="/auth/signout" method="post">
+        {/* Sign Out */}
+        <form action={logoutAction}>
           <button
             type="submit"
+            data-testid="sidebar-signout"
             className={cn(
               "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
               "text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
