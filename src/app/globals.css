@@ -97,9 +97,13 @@
     0 0 20px rgba(234, 179, 8, 0.3);
 }
 
-@utility text-glow {
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+@utility text-link {
+  @apply text-primary transition-all duration-300;
+  &:hover {
+    text-shadow: 0 0 8px rgba(74, 222, 128, 0.8);
+  }
 }
+
 @layer base {
   * {
     @apply border-border;
@@ -123,7 +127,7 @@
     @apply leading-7 [&:not(:first-child)]:mt-6;
   }
   a {
-    @apply font-medium text-primary underline-offset-4 hover:underline;
+    @apply transition-colors;
   }
 }
 

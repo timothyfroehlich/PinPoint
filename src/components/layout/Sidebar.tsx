@@ -1,5 +1,6 @@
 import type React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   LayoutDashboard,
   Gamepad2,
@@ -47,10 +48,13 @@ export function Sidebar(): React.JSX.Element {
           className="flex w-full items-start justify-start"
         >
           {/* APC Logo */}
-          <img
+          <Image
             src="/apc-logo.png"
             alt="Austin Pinball Collective"
+            width={200}
+            height={128}
             className="w-full h-auto max-h-32 object-contain drop-shadow-[0_0_8px_rgba(74,222,128,0.5)]"
+            priority
           />
         </Link>
       </div>
