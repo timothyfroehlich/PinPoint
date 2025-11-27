@@ -2,39 +2,39 @@
 
 /* Material Design 3 Color System - Tailwind v4 */
 @theme {
-  /* Base Colors */
-  --color-background: #1e1e1e;
-  --color-foreground: #ffffff;
+  /* Base Colors - Deep Charcoal & Crisp White */
+  --color-background: #0f0f11; /* Even darker for more contrast */
+  --color-foreground: #f8fafc;
 
-  /* Card & Surface */
-  --color-card: #2d2d2d;
-  --color-card-foreground: #ffffff;
-  --color-popover: #2d2d2d;
-  --color-popover-foreground: #ffffff;
+  /* Card & Surface - Slightly lighter charcoal with a hint of purple */
+  --color-card: #18151b;
+  --color-card-foreground: #f8fafc;
+  --color-popover: #18151b;
+  --color-popover-foreground: #f8fafc;
 
-  /* Primary Action (Blue) */
-  --color-primary: #3b82f6;
-  --color-primary-foreground: #ffffff;
+  /* Primary Action - APC Neon Green */
+  --color-primary: #4ade80;
+  --color-primary-foreground: #022c22;
 
-  /* Secondary / Muted */
-  --color-secondary: #3e3e3e;
+  /* Secondary / Accents - Electric Purple */
+  --color-secondary: #d946ef; /* More intense magenta/purple */
   --color-secondary-foreground: #ffffff;
-  --color-muted: #2d2d2d;
+  --color-muted: #27272a;
   --color-muted-foreground: #a1a1aa;
 
   /* Accents & Status */
-  --color-accent: #3e3e3e;
-  --color-accent-foreground: #ffffff;
+  --color-accent: #27272a;
+  --color-accent-foreground: #f8fafc;
   --color-destructive: #ef4444;
   --color-destructive-foreground: #ffffff;
 
   /* Status Specific */
-  --color-status-new: #3b82f6;
-  --color-status-in-progress: #eab308;
+  --color-status-new: #4ade80;
+  --color-status-in-progress: #d946ef;
   --color-status-resolved: #22c55e;
   --color-status-unplayable: #ef4444;
 
-  /* Semantic Status Colors (Restored) */
+  /* Semantic Status Colors */
   --color-success: #22c55e;
   --color-success-foreground: #ffffff;
   --color-success-container: #14532d;
@@ -51,26 +51,54 @@
   --color-on-error-container: #fee2e2;
 
   /* Borders & Inputs */
-  --color-border: #3e3e3e;
-  --color-input: #2d2d2d;
-  --color-ring: #3b82f6;
+  --color-border: #27272a;
+  --color-input: #27272a;
+  --color-ring: #4ade80;
 
-  /* Extended Surface Palette (MD3-inspired) */
-  --color-surface: #1e1e1e;
-  --color-surface-variant: #2d2d2d;
-  --color-outline: #3e3e3e;
-  --color-outline-variant: #4a4a4a;
-  --color-on-surface: #ffffff;
+  /* Extended Surface Palette */
+  --color-surface: #0f0f11;
+  --color-surface-variant: #18151b;
+  --color-outline: #3f3f46;
+  --color-outline-variant: #52525b;
+  --color-on-surface: #f8fafc;
   --color-on-surface-variant: #a1a1aa;
-  --color-on-primary: #ffffff;
+  --color-on-primary: #022c22;
   --color-on-secondary: #ffffff;
-  --color-primary-container: #1f3b87;
-  --color-on-primary-container: #dce9ff;
-  --color-secondary-container: #333333;
-  --color-on-secondary-container: #f4f4f5;
+  --color-primary-container: #14532d;
+  --color-on-primary-container: #dcfce7;
+  --color-secondary-container: #581c87;
+  --color-on-secondary-container: #f3e8ff;
 
   /* Radius */
   --radius: 0.5rem;
+}
+
+@utility glow-primary {
+  box-shadow:
+    0 0 10px rgba(74, 222, 128, 0.5),
+    0 0 20px rgba(74, 222, 128, 0.3);
+}
+
+@utility glow-secondary {
+  box-shadow:
+    0 0 10px rgba(217, 70, 239, 0.5),
+    0 0 20px rgba(217, 70, 239, 0.3);
+}
+
+@utility glow-destructive {
+  box-shadow:
+    0 0 10px rgba(239, 68, 68, 0.5),
+    0 0 20px rgba(239, 68, 68, 0.3);
+}
+
+@utility glow-warning {
+  box-shadow:
+    0 0 10px rgba(234, 179, 8, 0.5),
+    0 0 20px rgba(234, 179, 8, 0.3);
+}
+
+@utility text-glow {
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
 }
 @layer base {
   * {
@@ -95,7 +123,7 @@
     @apply leading-7 [&:not(:first-child)]:mt-6;
   }
   a {
-    @apply font-medium text-primary underline underline-offset-4;
+    @apply font-medium text-primary underline-offset-4 hover:underline;
   }
 }
 
