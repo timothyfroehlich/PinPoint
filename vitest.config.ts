@@ -1,4 +1,5 @@
 import { defineConfig } from "vitest/config";
+import react from "@vitejs/plugin-react";
 import { loadEnv } from "vite";
 import path from "path";
 
@@ -7,10 +8,10 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
 
   return {
+    plugins: [react()],
     test: {
       globals: true,
-      environment: "node",
-      setupFiles: ["./src/test/setup.ts"],
+      environment: "jsdom",
       env: {
         ...env,
         // Ensure DATABASE_URL is available for integration tests
@@ -51,6 +52,7 @@ export default defineConfig(({ mode }) => {
           extends: true,
           test: {
             name: "integration",
+            environment: "jsdom",
             include: [
               "src/test/integration/**/*.test.ts",
               "src/test/integration/**/*.test.tsx",

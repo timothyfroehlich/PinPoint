@@ -1,7 +1,12 @@
-import React from "react";
+"use client";
+
+import { useActionState, useRef } from "react";
+import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
-import { addCommentAction } from "~/app/(app)/issues/actions";
-import { AddCommentSubmitButton } from "~/components/issues/AddCommentSubmitButton";
+import {
+  addCommentAction,
+  type AddCommentResult,
+} from "~/app/(app)/issues/actions";
 
 interface AddCommentFormProps {
   issueId: string;
@@ -10,19 +15,31 @@ interface AddCommentFormProps {
 export function AddCommentForm({
   issueId,
 }: AddCommentFormProps): React.JSX.Element {
+  const formRef = useRef<HTMLFormElement>(null);
+  const [state, formAction] = useActionState<AddCommentResult, FormData>(
+    addCommentAction,
+    undefined
+  );
+
+  if (state?.ok) {
+    formRef.current?.reset();
+  }
+
   return (
-    <form action={addCommentAction} className="space-y-3">
+    <form action={formAction} ref={formRef} className="space-y-4">
       <input type="hidden" name="issueId" value={issueId} />
       <Textarea
         name="comment"
-        placeholder="Leave a comment..."
+        placeholder="Add a comment..."
         required
-        minLength={1}
-        className="min-h-24"
+        className="border-outline-variant bg-surface text-on-surface"
       />
-      <div className="flex justify-end">
-        <AddCommentSubmitButton />
-      </div>
+      <Button type="submit" size="sm">
+        Add Comment
+      </Button>
+      {state && !state.ok && (
+        <p className="text-sm text-destructive">{state.message}</p>
+      )}
     </form>
   );
 }

@@ -24,11 +24,6 @@ vi.mock("~/server/db", () => ({
   },
 }));
 
-// Mock flash messages
-vi.mock("~/lib/flash", () => ({
-  setFlash: vi.fn(),
-}));
-
 // Mock logger
 vi.mock("~/lib/logger", () => ({
   log: {
@@ -38,17 +33,16 @@ vi.mock("~/lib/logger", () => ({
   },
 }));
 
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { setFlash } from "~/lib/flash";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
 describe("addCommentAction", () => {
   const validUuid = "123e4567-e89b-12d3-a456-426614174000";
   const mockUser = { id: "user-123" };
+  const initialState = undefined;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -73,16 +67,15 @@ describe("addCommentAction", () => {
     formData.append("issueId", validUuid);
     formData.append("comment", "Test comment");
 
-    // Expect redirect to throw
-    await expect(addCommentAction(formData)).rejects.toThrow("NEXT_REDIRECT");
+    const result = await addCommentAction(initialState, formData);
 
+    expect(result.ok).toBe(true);
     // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(db.insert).toHaveBeenCalled();
     expect(revalidatePath).toHaveBeenCalledWith(`/issues/${validUuid}`);
-    expect(redirect).toHaveBeenCalledWith(`/issues/${validUuid}`);
   });
 
-  it("should redirect to login if not authenticated", async () => {
+  it("should return an error if not authenticated", async () => {
     vi.mocked(createClient).mockResolvedValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
@@ -93,12 +86,12 @@ describe("addCommentAction", () => {
     formData.append("issueId", validUuid);
     formData.append("comment", "Test comment");
 
-    await expect(addCommentAction(formData)).rejects.toThrow("NEXT_REDIRECT");
+    const result = await addCommentAction(initialState, formData);
 
-    expect(setFlash).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "error", message: "Unauthorized" })
-    );
-    expect(redirect).toHaveBeenCalledWith("/login");
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("UNAUTHORIZED");
+    }
   });
 
   it("should validate input", async () => {
@@ -106,12 +99,12 @@ describe("addCommentAction", () => {
     formData.append("issueId", validUuid);
     formData.append("comment", ""); // Empty comment
 
-    await expect(addCommentAction(formData)).rejects.toThrow("NEXT_REDIRECT");
+    const result = await addCommentAction(initialState, formData);
 
-    expect(setFlash).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "error" })
-    );
-    expect(redirect).toHaveBeenCalledWith(`/issues/${validUuid}`);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("VALIDATION");
+    }
     // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(db.insert).not.toHaveBeenCalled();
   });
@@ -128,28 +121,11 @@ describe("addCommentAction", () => {
     formData.append("issueId", validUuid);
     formData.append("comment", "Test comment");
 
-    await expect(addCommentAction(formData)).rejects.toThrow("NEXT_REDIRECT");
+    const result = await addCommentAction(initialState, formData);
 
-    expect(setFlash).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "error",
-        message: "Failed to add comment",
-      })
-    );
-    expect(redirect).toHaveBeenCalledWith(`/issues/${validUuid}`);
-  });
-
-  it("should revalidate and redirect on success", async () => {
-    const formData = new FormData();
-    formData.append("issueId", validUuid);
-    formData.append("comment", "Test comment");
-
-    await expect(addCommentAction(formData)).rejects.toThrow("NEXT_REDIRECT");
-
-    expect(setFlash).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "success" })
-    );
-    expect(revalidatePath).toHaveBeenCalledWith(`/issues/${validUuid}`);
-    expect(redirect).toHaveBeenCalledWith(`/issues/${validUuid}`);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("SERVER");
+    }
   });
 });

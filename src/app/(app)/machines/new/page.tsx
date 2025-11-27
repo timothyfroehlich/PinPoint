@@ -4,12 +4,8 @@ import Link from "next/link";
 import { createClient } from "~/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
 import { ArrowLeft } from "lucide-react";
-import { createMachineAction } from "~/app/(app)/machines/actions";
-import { cn } from "~/lib/utils";
-import { readFlash } from "~/lib/flash";
+import { CreateMachineForm } from "./create-machine-form";
 
 /**
  * Create Machine Page (Protected Route)
@@ -27,9 +23,6 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
   if (!user) {
     redirect("/login");
   }
-
-  // Read flash message (for form errors)
-  const flash = await readFlash();
 
   return (
     <main className="min-h-screen bg-surface">
@@ -68,59 +61,7 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {/* Flash message */}
-            {flash && (
-              <div
-                className={cn(
-                  "mb-6 rounded-md border p-4",
-                  flash.type === "success" // Assuming flash.type is intended here, as 'state' is not defined.
-                    ? "border-green-200 bg-green-50 text-green-800 dark:border-green-900/50 dark:bg-green-900/20 dark:text-green-300"
-                    : "border-destructive/20 bg-destructive/10 text-destructive"
-                )}
-              >
-                <p className="text-sm font-medium">{flash.message}</p>
-              </div>
-            )}
-
-            <form action={createMachineAction} className="space-y-6">
-              {/* Machine Name */}
-              <div className="space-y-2">
-                <Label htmlFor="name" className="text-on-surface">
-                  Machine Name *
-                </Label>
-                <Input
-                  id="name"
-                  name="name"
-                  type="text"
-                  required
-                  placeholder="e.g., Medieval Madness"
-                  className="border-outline bg-surface text-on-surface placeholder:text-on-surface-variant"
-                  autoFocus
-                />
-                <p className="text-xs text-on-surface-variant">
-                  Enter the full name of the pinball machine
-                </p>
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-3 pt-4">
-                <Button
-                  type="submit"
-                  className="flex-1 bg-primary text-on-primary hover:bg-primary/90"
-                >
-                  Create Machine
-                </Button>
-                <Link href="/machines" className="flex-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full border-outline text-on-surface hover:bg-surface-variant"
-                  >
-                    Cancel
-                  </Button>
-                </Link>
-              </div>
-            </form>
+            <CreateMachineForm />
           </CardContent>
         </Card>
       </div>
