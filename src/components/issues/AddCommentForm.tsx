@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useActionState, useRef } from "react";
 import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
@@ -16,10 +17,10 @@ export function AddCommentForm({
   issueId,
 }: AddCommentFormProps): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
-  const [state, formAction] = useActionState<AddCommentResult, FormData>(
-    addCommentAction,
-    undefined
-  );
+  const [state, formAction] = useActionState<
+    AddCommentResult | undefined,
+    FormData
+  >(addCommentAction, undefined);
 
   if (state?.ok) {
     formRef.current?.reset();
@@ -30,7 +31,7 @@ export function AddCommentForm({
       <input type="hidden" name="issueId" value={issueId} />
       <Textarea
         name="comment"
-        placeholder="Add a comment..."
+        placeholder="Leave a comment..."
         required
         className="border-outline-variant bg-surface text-on-surface"
       />

@@ -41,10 +41,7 @@ export default async function SignupPage(): Promise<React.JSX.Element> {
         {/* Login link */}
         <div className="text-center text-sm text-on-surface-variant">
           Already have an account?{" "}
-          <Link
-            href="/login"
-            className="text-primary hover:underline font-medium"
-          >
+          <Link href="/login" className="text-link font-medium">
             Sign in
           </Link>
         </div>

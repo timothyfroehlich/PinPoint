@@ -24,10 +24,10 @@ function SubmitButton(): React.JSX.Element {
 }
 
 export function SignupForm(): React.JSX.Element {
-  const [state, formAction] = useActionState<SignupResult, FormData>(
-    signupAction,
-    undefined
-  );
+  const [state, formAction] = useActionState<
+    SignupResult | undefined,
+    FormData
+  >(signupAction, undefined);
   const [password, setPassword] = useState("");
 
   return (

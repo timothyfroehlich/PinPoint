@@ -9,17 +9,12 @@ import { Label } from "~/components/ui/label";
 import { loginAction, type LoginResult } from "~/app/(auth)/actions";
 import { cn } from "~/lib/utils";
 import { TestAdminButton } from "./TestAdminButton";
-import { redirect } from "next/navigation";
 
 export function LoginForm(): React.JSX.Element {
-  const [state, formAction] = useActionState<LoginResult, FormData>(
+  const [state, formAction] = useActionState<LoginResult | undefined, FormData>(
     loginAction,
     undefined
   );
-
-  if (state?.ok) {
-    redirect("/dashboard");
-  }
 
   return (
     <>
@@ -58,7 +53,7 @@ export function LoginForm(): React.JSX.Element {
             <Label htmlFor="password">Password</Label>
             <Link
               href="/forgot-password"
-              className="text-sm text-primary hover:underline"
+              className="text-sm text-link hover:underline"
             >
               Forgot password?
             </Link>
@@ -108,10 +103,7 @@ export function LoginForm(): React.JSX.Element {
       {/* Signup link */}
       <div className="text-center text-sm text-muted-foreground">
         Don't have an account?{" "}
-        <Link
-          href="/signup"
-          className="text-primary hover:underline font-medium"
-        >
+        <Link href="/signup" className="text-link hover:underline font-medium">
           Sign up
         </Link>
       </div>

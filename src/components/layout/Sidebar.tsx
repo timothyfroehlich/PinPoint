@@ -1,12 +1,12 @@
 import type React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   LayoutDashboard,
   Gamepad2,
   AlertCircle,
   Settings,
   LogOut,
-  CircleDot,
 } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { logoutAction } from "~/app/(auth)/actions";
@@ -39,16 +39,23 @@ export function Sidebar(): React.JSX.Element {
       role="navigation"
       aria-label="main navigation"
       data-testid="sidebar"
-      className="flex h-screen w-64 flex-col border-r border-border bg-card text-card-foreground"
+      className="flex h-screen w-64 flex-col border-r border-primary/50 bg-card text-card-foreground shadow-[0_0_15px_rgba(74,222,128,0.15)]"
     >
       {/* Logo Area */}
-      <div className="flex h-16 items-center px-6 border-b border-border">
+      <div className="flex h-40 items-start justify-start px-4 pt-6 border-b border-primary/20">
         <Link
           href="/dashboard"
-          className="flex items-center gap-2 font-bold text-xl text-foreground"
+          className="flex w-full items-start justify-start"
         >
-          <CircleDot className="size-6 text-primary" />
-          <span>PinPoint</span>
+          {/* APC Logo */}
+          <Image
+            src="/apc-logo.png"
+            alt="Austin Pinball Collective"
+            width={200}
+            height={128}
+            className="w-full h-auto max-h-32 object-contain drop-shadow-[0_0_8px_rgba(74,222,128,0.5)]"
+            priority
+          />
         </Link>
       </div>
 

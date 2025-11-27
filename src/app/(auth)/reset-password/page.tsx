@@ -64,7 +64,7 @@ export default async function ResetPasswordPage({
           Remember your password?{" "}
           <Link
             href="/login"
-            className="text-primary hover:underline font-medium"
+            className="text-sm text-link flex items-center justify-center gap-2"
           >
             Sign in
           </Link>

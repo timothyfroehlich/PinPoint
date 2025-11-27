@@ -52,12 +52,10 @@ describe("SignupForm", () => {
 
   it("should display error message on failure", async () => {
     const user = userEvent.setup();
-    signupActionSpy.mockImplementation(async () => {
-      return {
-        ok: false,
-        code: "VALIDATION",
-        message: "Invalid input",
-      };
+    signupActionSpy.mockResolvedValue({
+      ok: false,
+      code: "VALIDATION",
+      message: "Invalid input",
     });
 
     render(<SignupForm />);

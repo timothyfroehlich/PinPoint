@@ -2,7 +2,10 @@
 
 import type React from "react";
 import { useActionState } from "react";
-import { assignIssueAction, type AssignIssueResult } from "~/app/(app)/issues/actions";
+import {
+  assignIssueAction,
+  type AssignIssueResult,
+} from "~/app/(app)/issues/actions";
 import { AssigneePicker } from "~/components/issues/AssigneePicker";
 
 interface AssignIssueFormProps {
@@ -16,10 +19,10 @@ export function AssignIssueForm({
   assignedToId,
   users,
 }: AssignIssueFormProps): React.JSX.Element {
-  const [state, formAction] = useActionState<AssignIssueResult, FormData>(
-    assignIssueAction,
-    undefined
-  );
+  const [state, formAction, isPending] = useActionState<
+    AssignIssueResult | undefined,
+    FormData
+  >(assignIssueAction, undefined);
 
   return (
     <form action={formAction}>
@@ -27,6 +30,7 @@ export function AssignIssueForm({
       <AssigneePicker
         assignedToId={assignedToId}
         users={users}
+        isPending={isPending}
         onAssign={(userId) => {
           const formData = new FormData();
           formData.append("issueId", issueId);

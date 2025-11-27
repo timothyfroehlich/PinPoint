@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import Link from "next/link";
 import { useActionState } from "react";
 import { Button } from "~/components/ui/button";
@@ -11,7 +12,6 @@ import {
   type CreateIssueResult,
 } from "~/app/(app)/issues/actions";
 import { cn } from "~/lib/utils";
-import { redirect } from "next/navigation";
 
 interface CreateIssueFormProps {
   machines: { id: string; name: string }[];
@@ -22,14 +22,10 @@ export function CreateIssueForm({
   machines,
   prefilledMachineId,
 }: CreateIssueFormProps): React.JSX.Element {
-  const [state, formAction] = useActionState<CreateIssueResult, FormData>(
-    createIssueAction,
-    undefined
-  );
-
-  if (state?.ok) {
-    redirect(`/issues/${state.data.issueId}`);
-  }
+  const [state, formAction] = useActionState<
+    CreateIssueResult | undefined,
+    FormData
+  >(createIssueAction, undefined);
 
   return (
     <>

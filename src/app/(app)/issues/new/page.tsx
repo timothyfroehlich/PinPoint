@@ -61,7 +61,7 @@ export default async function NewIssuePage({
           <CardContent>
             <CreateIssueForm
               machines={allMachines}
-              prefilledMachineId={prefilledMachineId}
+              {...(prefilledMachineId && { prefilledMachineId })}
             />
           </CardContent>
         </Card>

@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useActionState } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -20,10 +21,10 @@ interface UpdateMachineFormProps {
 export function UpdateMachineForm({
   machine,
 }: UpdateMachineFormProps): React.JSX.Element {
-  const [state, formAction] = useActionState<UpdateMachineResult, FormData>(
-    updateMachineAction,
-    undefined
-  );
+  const [state, formAction] = useActionState<
+    UpdateMachineResult | undefined,
+    FormData
+  >(updateMachineAction, undefined);
 
   return (
     <form action={formAction} className="space-y-6">

@@ -43,7 +43,7 @@ export default async function ForgotPasswordPage(): Promise<React.JSX.Element> {
           Remember your password?{" "}
           <Link
             href="/login"
-            className="text-primary hover:underline font-medium"
+            className="text-sm text-link flex items-center justify-center gap-2"
           >
             Sign in
           </Link>

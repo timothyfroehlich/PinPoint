@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useActionState } from "react";
 import { Button } from "~/components/ui/button";
 import {
@@ -24,7 +25,7 @@ export function UpdateIssueSeverityForm({
   currentSeverity,
 }: UpdateIssueSeverityFormProps): React.JSX.Element {
   const [state, formAction] = useActionState<
-    UpdateIssueSeverityResult,
+    UpdateIssueSeverityResult | undefined,
     FormData
   >(updateIssueSeverityAction, undefined);
 
@@ -35,9 +36,14 @@ export function UpdateIssueSeverityForm({
         name="severity"
         defaultValue={currentSeverity}
         className="w-full rounded-md border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface"
+        data-testid="issue-severity-select"
       >
         {severityOptions.map((option) => (
-          <option key={option.value} value={option.value}>
+          <option
+            key={option.value}
+            value={option.value}
+            data-testid={`severity-option-${option.value}`}
+          >
             {option.label}
           </option>
         ))}

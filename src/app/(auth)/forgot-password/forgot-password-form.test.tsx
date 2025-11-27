@@ -44,12 +44,10 @@ describe("ForgotPasswordForm", () => {
 
   it("should display error message on failure", async () => {
     const user = userEvent.setup();
-    forgotPasswordActionSpy.mockImplementation(async () => {
-      return {
-        ok: false,
-        code: "SERVER",
-        message: "Something went wrong",
-      };
+    forgotPasswordActionSpy.mockResolvedValue({
+      ok: false,
+      code: "SERVER",
+      message: "Something went wrong",
     });
 
     render(<ForgotPasswordForm />);

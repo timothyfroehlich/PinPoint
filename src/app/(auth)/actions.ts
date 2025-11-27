@@ -38,10 +38,14 @@ export type ResetPasswordResult = Result<void, "VALIDATION" | "SERVER">;
  * Authenticates user with email and password.
  * Supports "Remember Me" for persistent sessions.
  *
+ * @param _prevState - The previous state of the form
  * @param formData - Form data containing email, password, and optional rememberMe
  * @returns LoginResult with user ID or error
  */
-export async function loginAction(formData: FormData): Promise<LoginResult> {
+export async function loginAction(
+  _prevState: LoginResult | undefined,
+  formData: FormData
+): Promise<LoginResult> {
   // Validate input
   const parsed = loginSchema.safeParse({
     email: formData.get("email"),
@@ -50,7 +54,6 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
   });
 
   if (!parsed.success) {
-    const firstError = parsed.error.issues[0];
     log.warn(
       { errors: parsed.error.issues, action: "login" },
       "Login validation failed"
@@ -90,11 +93,7 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
       { userId: data.user.id, action: "login" },
       "User logged in successfully"
     );
-
-
-
-    // Return success (redirect happens in page component)
-    return ok({ userId: data.user.id });
+    redirect("/dashboard");
   } catch (error) {
     log.error(
       {
@@ -115,10 +114,12 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
  * Creates a new user account with email and password.
  * User profile is auto-created via database trigger (see supabase/seed.sql).
  *
+ * @param _prevState - The previous state of the form
  * @param formData - Form data containing name, email, and password
  * @returns SignupResult with user ID or error
  */
 export async function signupAction(
+  _prevState: SignupResult | undefined,
   formData: FormData
 ): Promise<SignupResult> {
   // Validate input
@@ -129,7 +130,6 @@ export async function signupAction(
   });
 
   if (!parsed.success) {
-    const firstError = parsed.error.issues[0];
     log.warn(
       { errors: parsed.error.issues, action: "signup" },
       "Signup validation failed"
@@ -194,9 +194,6 @@ export async function signupAction(
       { userId: data.user.id, action: "signup" },
       "User signed up successfully"
     );
-
-
-
     redirect("/dashboard");
   } catch (error) {
     // If redirect was thrown, re-throw it
@@ -255,8 +252,6 @@ export async function logoutAction(): Promise<void> {
       { userId: user?.id, action: "logout" },
       "User logged out successfully"
     );
-
-
   } catch (cause) {
     log.error(
       {
@@ -266,7 +261,6 @@ export async function logoutAction(): Promise<void> {
       },
       "Logout server error"
     );
-
   } finally {
     // Always redirect to home after logout attempt
     redirect("/");
@@ -292,7 +286,6 @@ export async function forgotPasswordAction(
   });
 
   if (!parsed.success) {
-    const firstError = parsed.error.issues[0];
     log.warn(
       { errors: parsed.error.issues, action: "forgot-password" },
       "Forgot password validation failed"
@@ -386,10 +379,12 @@ export async function forgotPasswordAction(
  * Updates the user's password after they click the reset link.
  * User must be authenticated via the reset link token.
  *
+ * @param _prevState - The previous state of the form
  * @param formData - Form data containing new password and confirmation
  * @returns ResetPasswordResult
  */
 export async function resetPasswordAction(
+  _prevState: ResetPasswordResult | undefined,
   formData: FormData
 ): Promise<ResetPasswordResult> {
   // Validate input
@@ -399,7 +394,6 @@ export async function resetPasswordAction(
   });
 
   if (!parsed.success) {
-    const firstError = parsed.error.issues[0];
     log.warn(
       { errors: parsed.error.issues, action: "reset-password" },
       "Reset password validation failed"
@@ -442,10 +436,8 @@ export async function resetPasswordAction(
       { userId: user.id, action: "reset-password" },
       "Password updated successfully"
     );
-
-
-
-    return ok(undefined);
+    await supabase.auth.signOut();
+    redirect("/login");
   } catch (error) {
     log.error(
       {

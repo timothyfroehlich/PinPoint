@@ -106,11 +106,6 @@ test.describe("Machines CRUD", () => {
 
     rememberMachineId(page.url());
 
-    // Verify success flash message
-    await expect(
-      page.getByText(`Machine "${machineName}" created successfully`)
-    ).toBeVisible();
-
     // Verify machine name is displayed
     await expect(
       page.getByRole("heading", { name: machineName })

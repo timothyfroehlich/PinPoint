@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useActionState } from "react";
 import { Button } from "~/components/ui/button";
 import {
@@ -19,10 +20,10 @@ export function UpdateIssueStatusForm({
   issueId,
   currentStatus,
 }: UpdateIssueStatusFormProps): React.JSX.Element {
-  const [state, formAction] = useActionState<UpdateIssueStatusResult, FormData>(
-    updateIssueStatusAction,
-    undefined
-  );
+  const [state, formAction] = useActionState<
+    UpdateIssueStatusResult | undefined,
+    FormData
+  >(updateIssueStatusAction, undefined);
 
   return (
     <form action={formAction} className="space-y-2">
@@ -31,9 +32,14 @@ export function UpdateIssueStatusForm({
         name="status"
         defaultValue={currentStatus}
         className="w-full rounded-md border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface"
+        data-testid="issue-status-select"
       >
         {statusOptions.map((status) => (
-          <option key={status} value={status}>
+          <option
+            key={status}
+            value={status}
+            data-testid={`status-option-${status}`}
+          >
             {status === "in_progress"
               ? "In Progress"
               : status.charAt(0).toUpperCase() + status.slice(1)}

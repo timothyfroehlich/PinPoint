@@ -9,17 +9,12 @@ import {
   resetPasswordAction,
   type ResetPasswordResult,
 } from "~/app/(auth)/actions";
-import { redirect } from "next/navigation";
 
 export function ResetPasswordForm(): React.JSX.Element {
-  const [state, formAction] = useActionState<ResetPasswordResult, FormData>(
-    resetPasswordAction,
-    undefined
-  );
-
-  if (state?.ok) {
-    redirect("/login");
-  }
+  const [state, formAction] = useActionState<
+    ResetPasswordResult | undefined,
+    FormData
+  >(resetPasswordAction, undefined);
 
   return (
     <form action={formAction} className="space-y-4">

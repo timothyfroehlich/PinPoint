@@ -170,7 +170,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Total Open Issues */}
-            <Card className="border-border bg-card">
+            <Card className="border-primary/20 bg-card glow-primary">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -190,7 +190,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
             </Card>
 
             {/* Machines Needing Service */}
-            <Card className="border-border bg-card">
+            <Card className="border-primary/20 bg-card glow-primary">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -210,7 +210,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
             </Card>
 
             {/* Issues Assigned to Me */}
-            <Card className="border-border bg-card">
+            <Card className="border-primary/20 bg-card glow-primary">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -250,7 +250,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
               {assignedIssues.map((issue) => (
                 <Link key={issue.id} href={`/issues/${issue.id}`}>
                   <Card
-                    className="border-border bg-card hover:border-primary transition-colors cursor-pointer"
+                    className="border-primary/20 bg-card hover:border-primary transition-all hover:glow-primary cursor-pointer"
                     data-testid="assigned-issue-card"
                   >
                     <CardHeader>
@@ -315,7 +315,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
               {unplayableMachines.map((machine) => (
                 <Link key={machine.id} href={`/machines/${machine.id}`}>
                   <Card
-                    className="border-destructive/20 bg-destructive/10 hover:border-destructive transition-colors cursor-pointer"
+                    className="border-destructive/30 bg-destructive/10 hover:border-destructive transition-all glow-destructive cursor-pointer"
                     data-testid="unplayable-machine-card"
                   >
                     <CardHeader>
@@ -363,7 +363,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
               {recentIssues.map((issue) => (
                 <Link key={issue.id} href={`/issues/${issue.id}`}>
                   <Card
-                    className="border-border bg-card hover:border-primary transition-colors cursor-pointer h-full"
+                    className="border-secondary/20 bg-card hover:border-secondary transition-all hover:glow-secondary cursor-pointer h-full"
                     data-testid="recent-issue-card"
                   >
                     <CardHeader>

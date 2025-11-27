@@ -7,8 +7,8 @@
 
 "use server";
 
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
@@ -145,7 +145,7 @@ export async function createIssueAction(
     revalidatePath("/issues");
     revalidatePath(`/machines/${machineId}`);
 
-    return ok({ issueId: issue.id });
+    redirect(`/issues/${issue.id}`);
   } catch (error) {
     if (isNextRedirectError(error)) {
       throw error;
@@ -470,7 +470,6 @@ export async function addCommentAction(
   });
 
   if (!validation.success) {
-    const issueId = toOptionalString(formData.get("issueId")) ?? "";
     return err(
       "VALIDATION",
       validation.error.issues[0]?.message ?? "Invalid input"

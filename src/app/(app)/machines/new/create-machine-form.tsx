@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import Link from "next/link";
 import { useActionState } from "react";
 import { Button } from "~/components/ui/button";
@@ -10,17 +11,12 @@ import {
   type CreateMachineResult,
 } from "~/app/(app)/machines/actions";
 import { cn } from "~/lib/utils";
-import { redirect } from "next/navigation";
 
 export function CreateMachineForm(): React.JSX.Element {
-  const [state, formAction] = useActionState<CreateMachineResult, FormData>(
-    createMachineAction,
-    undefined
-  );
-
-  if (state?.ok) {
-    redirect(`/machines/${state.data.machineId}`);
-  }
+  const [state, formAction] = useActionState<
+    CreateMachineResult | undefined,
+    FormData
+  >(createMachineAction, undefined);
 
   return (
     <>

@@ -8,10 +8,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { machines } from "~/server/db/schema";
-import { createMachineSchema } from "./schemas";
+import { createMachineSchema, updateMachineSchema } from "./schemas";
 import { type Result, ok, err } from "~/lib/result";
 import { eq } from "drizzle-orm";
 
@@ -50,10 +51,9 @@ export type DeleteMachineResult = Result<
  * Requires authentication (CORE-SEC-001).
  * Validates input with Zod (CORE-SEC-002).
  *
- * Uses redirect() for navigation, which throws to exit the function.
- * On error, sets flash message for PRG pattern.
- *
+ * @param _prevState - The previous state of the form.
  * @param formData - Form data from machine creation form
+ * @returns The result of the action.
  */
 export async function createMachineAction(
   _prevState: CreateMachineResult | undefined,
@@ -98,7 +98,7 @@ export async function createMachineAction(
 
     revalidatePath("/machines");
 
-    return ok({ machineId: machine.id });
+    redirect(`/machines/${machine.id}`);
   } catch (error) {
     if (isNextRedirectError(error)) {
       throw error;
@@ -137,7 +137,7 @@ export async function updateMachineAction(
     name: formData.get("name"),
   };
 
-  const validation = createMachineSchema.safeParse(rawData);
+  const validation = updateMachineSchema.safeParse(rawData);
   if (!validation.success) {
     const firstError = validation.error.issues[0];
     return err("VALIDATION", firstError?.message ?? "Invalid input");
