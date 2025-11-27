@@ -146,7 +146,7 @@ export default async function PublicReportPage({
                 Prefer a full member account?{" "}
                 <Link
                   href="/signup"
-                  className="text-primary underline-offset-2 hover:underline"
+                  className="text-primary text-link underline-offset-2"
                 >
                   Sign up here
                 </Link>

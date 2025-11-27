@@ -53,10 +53,11 @@ export function getIssueSeverityLabel(severity: IssueSeverity): string {
  */
 export function getIssueStatusStyles(status: IssueStatus): string {
   const styles: Record<IssueStatus, string> = {
-    new: "bg-surface-variant text-on-surface-variant border-outline-variant",
+    new: "bg-status-new/20 text-status-new border-status-new glow-primary",
     in_progress:
-      "bg-primary-container text-on-primary-container border-primary",
-    resolved: "bg-success-container text-on-success-container border-success",
+      "bg-status-in-progress/20 text-status-in-progress border-status-in-progress glow-secondary",
+    resolved:
+      "bg-status-resolved/20 text-status-resolved border-status-resolved",
   };
   return styles[status];
 }
@@ -67,9 +68,10 @@ export function getIssueStatusStyles(status: IssueStatus): string {
  */
 export function getIssueSeverityStyles(severity: IssueSeverity): string {
   const styles: Record<IssueSeverity, string> = {
-    minor: "bg-surface-variant text-on-surface-variant border-outline-variant",
-    playable: "bg-warning-container text-on-warning-container border-warning",
-    unplayable: "bg-error-container text-on-error-container border-error",
+    minor: "bg-muted/50 text-muted-foreground border-border",
+    playable: "bg-warning/20 text-warning border-warning glow-warning",
+    unplayable:
+      "bg-status-unplayable/20 text-status-unplayable border-status-unplayable glow-destructive",
   };
   return styles[severity];
 }
