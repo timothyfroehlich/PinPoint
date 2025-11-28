@@ -73,7 +73,7 @@ ON CONFLICT (id) DO NOTHING;
 -- Machine 3 (The Addams Family): 4 issues with mixed severities - will show as "unplayable" (has unplayable issue)
 
 -- Attack from Mars: 1 playable issue
-INSERT INTO issues (id, machine_id, title, description, status, severity, created_at, updated_at) VALUES
+INSERT INTO issues (id, machine_id, title, description, status, severity, priority, created_at, updated_at) VALUES
   (
     '10000000-0000-4000-8000-000000000001',
     '22222222-2222-4222-8222-222222222222',
@@ -81,13 +81,14 @@ INSERT INTO issues (id, machine_id, title, description, status, severity, create
     'The right flipper doesn''t have full strength. Can still play but makes ramp shots difficult.',
     'new',
     'playable',
+    'medium',
     NOW() - INTERVAL '2 days',
     NOW() - INTERVAL '2 days'
   )
 ON CONFLICT (id) DO NOTHING;
 
 -- The Addams Family: 4 issues with mixed severities
-INSERT INTO issues (id, machine_id, title, description, status, severity, created_at, updated_at) VALUES
+INSERT INTO issues (id, machine_id, title, description, status, severity, priority, created_at, updated_at) VALUES
   (
     '10000000-0000-4000-8000-000000000002',
     '33333333-3333-4333-8333-333333333333',
@@ -95,6 +96,7 @@ INSERT INTO issues (id, machine_id, title, description, status, severity, create
     'Extended sample issue with many timeline updates so contributors can preview the GitHub-style timeline layout.',
     'new',
     'unplayable',
+    'high',
     NOW() - INTERVAL '1 day',
     NOW() - INTERVAL '1 day'
   ),
@@ -105,6 +107,7 @@ INSERT INTO issues (id, machine_id, title, description, status, severity, create
     'The bookcase target isn''t registering when hit. Playable but can''t start multiball.',
     'in_progress',
     'playable',
+    'medium',
     NOW() - INTERVAL '3 days',
     NOW() - INTERVAL '1 day'
   ),
@@ -115,6 +118,7 @@ INSERT INTO issues (id, machine_id, title, description, status, severity, create
     'General illumination bulbs on left side are dim. Doesn''t affect gameplay.',
     'new',
     'minor',
+    'low',
     NOW() - INTERVAL '5 days',
     NOW() - INTERVAL '5 days'
   ),
@@ -125,6 +129,7 @@ INSERT INTO issues (id, machine_id, title, description, status, severity, create
     'Bear Kick feature not detecting ball. Can play but feature is unavailable.',
     'new',
     'playable',
+    'medium',
     NOW() - INTERVAL '1 week',
     NOW() - INTERVAL '1 week'
   )
