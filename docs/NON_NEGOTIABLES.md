@@ -136,6 +136,22 @@
 - **Do:** Use Zod for all form data and user inputs
 - **Don't:** Trust FormData or query params without validation
 
+**CORE-SEC-003:** Security headers via middleware
+
+- **Severity:** Critical
+- **Why:** Defense-in-depth protection against XSS, clickjacking, and protocol downgrade attacks
+- **Do:** Set security headers in `middleware.ts` (CSP with nonces) and `next.config.ts` (static headers)
+- **Don't:** Remove or weaken Content-Security-Policy, rely on 'unsafe-inline' or 'unsafe-eval'
+- **Reference:** `docs/SECURITY.md` for configuration and modification guidelines
+
+**CORE-SEC-004:** Nonce-based CSP
+
+- **Severity:** High
+- **Why:** Prevents XSS by blocking unauthorized scripts
+- **Do:** Generate unique nonce per request, use Web Crypto API in Edge Runtime
+- **Don't:** Use 'unsafe-inline' or 'unsafe-eval' in script-src, hardcode nonces
+- **Rationale:** Modern CSP with 'strict-dynamic' allows Next.js dynamic imports while blocking malicious scripts
+
 ---
 
 ## Performance & Caching
@@ -280,6 +296,8 @@
 - **Supabase SSR misuse**: No wrapper, wrong cookie contract, logic before `getUser()`
 - **Missing auth callback**: OAuth flows require callback route
 - **Response mutation**: Don't modify Supabase response object
+- **Weak CSP**: No 'unsafe-inline' or 'unsafe-eval' in script-src (use nonces)
+- **Missing security headers**: Middleware must set CSP, next.config.ts must set static headers
 - **TypeScript safety defeats**: No `any`, non-null `!`, or unsafe `as`
 - **Deep relative imports**: Use `~/` aliases
 - **Uncached fetch()**: Next.js 16 (since 15) requires explicit caching
@@ -323,11 +341,11 @@ If all Yes → ship it. Perfect is the enemy of done.
 **Rule IDs:**
 
 - CORE‑TS‑001..006: Type system
-- CORE‑SSR‑001..005: Supabase SSR and auth
-- CORE‑SEC‑001..002: Security
+- CORE‑SSR‑001..006: Supabase SSR and auth
+- CORE‑SEC‑001..004: Security
 - CORE‑PERF‑001..002: Performance
 - CORE‑TEST‑001..003: Testing
-- CORE‑ARCH‑001..004: Architecture
+- CORE‑ARCH‑001..007: Architecture
 
 **Cross-References:**
 
