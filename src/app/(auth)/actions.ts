@@ -26,7 +26,8 @@ import {
 
 export type LoginResult = Result<
   { userId: string },
-  "VALIDATION" | "AUTH" | "SERVER" | "RATE_LIMIT"
+  "VALIDATION" | "AUTH" | "SERVER" | "RATE_LIMIT",
+  { submittedEmail: string }
 >;
 
 export type SignupResult = Result<
@@ -65,13 +66,16 @@ export async function loginAction(
     rememberMe: formData.get("rememberMe") === "on",
   });
 
+  const emailEntry = formData.get("email");
+  const submittedEmail = typeof emailEntry === "string" ? emailEntry : "";
+
   if (!parsed.success) {
     log.warn(
       { errors: parsed.error.issues, action: "login" },
       "Login validation failed"
     );
 
-    return err("VALIDATION", "Invalid input");
+    return err("VALIDATION", "Invalid input", { submittedEmail });
   }
 
   const { email, password } = parsed.data;
@@ -90,7 +94,8 @@ export async function loginAction(
       );
       return err(
         "RATE_LIMIT",
-        `Too many login attempts. Please try again in ${formatResetTime(ipLimit.reset)}.`
+        `Too many login attempts. Please try again in ${formatResetTime(ipLimit.reset)}.`,
+        { submittedEmail }
       );
     }
 
@@ -108,7 +113,8 @@ export async function loginAction(
       );
       return err(
         "RATE_LIMIT",
-        `Too many login attempts for this account. Please try again in ${formatResetTime(accountLimit.reset)}.`
+        `Too many login attempts for this account. Please try again in ${formatResetTime(accountLimit.reset)}.`,
+        { submittedEmail }
       );
     }
 
@@ -131,7 +137,9 @@ export async function loginAction(
         "Login authentication failed"
       );
 
-      return err("AUTH", error?.message ?? "Authentication failed");
+      return err("AUTH", error?.message ?? "Authentication failed", {
+        submittedEmail,
+      });
     }
 
     log.info(
@@ -149,7 +157,9 @@ export async function loginAction(
       "Login server error"
     );
 
-    return err("SERVER", error instanceof Error ? error.message : "Unknown");
+    return err("SERVER", error instanceof Error ? error.message : "Unknown", {
+      submittedEmail,
+    });
   }
 }
 

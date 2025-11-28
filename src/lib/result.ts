@@ -15,9 +15,9 @@
  * }
  * ```
  */
-export type Result<T, C extends string = string> =
+export type Result<T, C extends string = string, M = undefined> =
   | { ok: true; value: T }
-  | { ok: false; code: C; message: string };
+  | { ok: false; code: C; message: string; meta?: M };
 
 /**
  * Create a successful Result
@@ -30,11 +30,22 @@ export const ok = <T>(value: T): Result<T, never> => ({
 /**
  * Create a failed Result with error code and message
  */
-export const err = <C extends string>(
+export const err = <C extends string, M = undefined>(
   code: C,
-  message: string
-): Result<never, C> => ({
-  ok: false as const,
-  code,
-  message,
-});
+  message: string,
+  meta?: M
+): Result<never, C, M> => {
+  if (meta !== undefined) {
+    return {
+      ok: false as const,
+      code,
+      message,
+      meta,
+    };
+  }
+  return {
+    ok: false as const,
+    code,
+    message,
+  };
+};
