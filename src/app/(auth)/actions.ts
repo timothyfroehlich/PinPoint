@@ -11,6 +11,14 @@ import {
   resetPasswordSchema,
 } from "./schemas";
 import { log } from "~/lib/logger";
+import {
+  checkLoginIpLimit,
+  checkLoginAccountLimit,
+  checkSignupLimit,
+  checkForgotPasswordLimit,
+  getClientIp,
+  formatResetTime,
+} from "~/lib/rate-limit";
 
 /**
  * Result Types
@@ -18,12 +26,16 @@ import { log } from "~/lib/logger";
 
 export type LoginResult = Result<
   { userId: string },
-  "VALIDATION" | "AUTH" | "SERVER"
+  "VALIDATION" | "AUTH" | "SERVER" | "RATE_LIMIT"
 >;
 
 export type SignupResult = Result<
   { userId: string },
-  "VALIDATION" | "EMAIL_TAKEN" | "SERVER" | "CONFIRMATION_REQUIRED"
+  | "VALIDATION"
+  | "EMAIL_TAKEN"
+  | "SERVER"
+  | "CONFIRMATION_REQUIRED"
+  | "RATE_LIMIT"
 >;
 
 export type LogoutResult = Result<void, "SERVER">;
@@ -67,6 +79,39 @@ export async function loginAction(
   // SSR sessions persist via cookies regardless of this setting
 
   try {
+    // Rate limiting: Check IP-based limit first
+    const ip = await getClientIp();
+    const ipLimit = await checkLoginIpLimit(ip);
+
+    if (!ipLimit.success) {
+      log.warn(
+        { ip, action: "login", resetIn: formatResetTime(ipLimit.reset) },
+        "Login IP rate limit exceeded"
+      );
+      return err(
+        "RATE_LIMIT",
+        `Too many login attempts. Please try again in ${formatResetTime(ipLimit.reset)}.`
+      );
+    }
+
+    // Rate limiting: Check account-based limit
+    const accountLimit = await checkLoginAccountLimit(email);
+
+    if (!accountLimit.success) {
+      log.warn(
+        {
+          email: email.substring(0, 3) + "***",
+          action: "login",
+          resetIn: formatResetTime(accountLimit.reset),
+        },
+        "Login account rate limit exceeded"
+      );
+      return err(
+        "RATE_LIMIT",
+        `Too many login attempts for this account. Please try again in ${formatResetTime(accountLimit.reset)}.`
+      );
+    }
+
     const supabase = await createClient();
 
     // Sign in with Supabase Auth
@@ -141,6 +186,21 @@ export async function signupAction(
   const { name, email, password } = parsed.data;
 
   try {
+    // Rate limiting: Check IP-based limit
+    const ip = await getClientIp();
+    const ipLimit = await checkSignupLimit(ip);
+
+    if (!ipLimit.success) {
+      log.warn(
+        { ip, action: "signup", resetIn: formatResetTime(ipLimit.reset) },
+        "Signup rate limit exceeded"
+      );
+      return err(
+        "RATE_LIMIT",
+        `Too many signup attempts. Please try again in ${formatResetTime(ipLimit.reset)}.`
+      );
+    }
+
     const supabase = await createClient();
 
     // Create user with Supabase Auth
@@ -297,6 +357,25 @@ export async function forgotPasswordAction(
   const { email } = parsed.data;
 
   try {
+    // Rate limiting: Check email-based limit
+    // Note: We check rate limit AFTER validation but BEFORE sending email
+    // We still return success to prevent email enumeration
+    const emailLimit = await checkForgotPasswordLimit(email);
+
+    if (!emailLimit.success) {
+      log.warn(
+        {
+          email: email.substring(0, 3) + "***",
+          action: "forgot-password",
+          resetIn: formatResetTime(emailLimit.reset),
+        },
+        "Forgot password rate limit exceeded"
+      );
+      // Return success to prevent email enumeration
+      // The rate limit is enforced but not revealed to the user
+      return ok(undefined);
+    }
+
     const supabase = await createClient();
 
     // Get origin dynamically (dev server can run on 3000 or 3100)
