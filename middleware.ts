@@ -36,15 +36,17 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   const isProduction = process.env["VERCEL_ENV"] === "production";
   const frameAncestors = isProduction ? "'none'" : "'self' https://vercel.live";
   const frameSrc = isProduction ? "'none'" : "'self' https://vercel.live";
+  const vercelScripts = isProduction ? "" : " https://vercel.live";
+  const vercelConnect = isProduction ? "" : " https://vercel.live";
 
   // 5. Construct CSP header with nonce-based script execution
   const cspHeader = `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${vercelScripts};
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob:;
     font-src 'self' data:;
-    connect-src 'self' ${supabaseUrl ?? ""} ${supabaseWsUrl ?? ""} http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:*;
+    connect-src 'self' ${supabaseUrl ?? ""} ${supabaseWsUrl ?? ""} http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:*${vercelConnect};
     object-src 'none';
     base-uri 'self';
     form-action 'self';
