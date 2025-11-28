@@ -130,6 +130,10 @@ let forgotPasswordLimiter: Ratelimit | null | undefined;
 
 /**
  * Get client IP address from request headers
+ *
+ * @note This implementation assumes the application is deployed behind a trusted proxy
+ * (like Vercel) that sets the `x-forwarded-for` header securely.
+ * If deployed elsewhere, ensure your proxy configuration prevents header spoofing.
  */
 export async function getClientIp(): Promise<string> {
   const headersList = await headers();
@@ -146,6 +150,10 @@ export async function getClientIp(): Promise<string> {
   if (realIp) return realIp;
 
   // Ultimate fallback
+  log.warn(
+    { action: "rate-limit" },
+    "Could not determine client IP, falling back to 'unknown'"
+  );
   return "unknown";
 }
 
@@ -323,7 +331,13 @@ export function formatResetTime(resetTimestamp: number): string {
     return "now";
   }
 
-  const diffMinutes = Math.ceil(diffMs / 1000 / 60);
+  const diffSeconds = Math.ceil(diffMs / 1000);
+
+  if (diffSeconds < 60) {
+    return `${diffSeconds} second${diffSeconds === 1 ? "" : "s"}`;
+  }
+
+  const diffMinutes = Math.ceil(diffSeconds / 60);
 
   if (diffMinutes < 60) {
     return `${diffMinutes} minute${diffMinutes === 1 ? "" : "s"}`;
