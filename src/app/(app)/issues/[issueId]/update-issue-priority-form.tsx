@@ -16,6 +16,10 @@ interface UpdateIssuePriorityFormProps {
 
 const priorityOptions: IssuePriority[] = ["low", "medium", "high"];
 
+/**
+ * Form component for updating issue priority with progressive enhancement.
+ * Uses useActionState for form submission with client-side validation.
+ */
 export function UpdateIssuePriorityForm({
   issueId,
   currentPriority,

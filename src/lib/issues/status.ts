@@ -1,3 +1,5 @@
+import { type IssuePriority } from "~/lib/types";
+
 export type IssueStatus = "new" | "in_progress" | "resolved";
 export type IssueSeverity = "minor" | "playable" | "unplayable";
 
@@ -75,8 +77,6 @@ export function getIssueSeverityStyles(severity: IssueSeverity): string {
   };
   return styles[severity];
 }
-
-export type IssuePriority = "low" | "medium" | "high";
 
 /**
  * Type guard for IssuePriority

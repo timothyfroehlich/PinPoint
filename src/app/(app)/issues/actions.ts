@@ -358,6 +358,7 @@ export async function updateIssueSeverityAction(
  *
  * Updates issue priority and creates timeline event.
  *
+ * @param _prevState - Previous action state (unused, required for useActionState)
  * @param formData - Form data with issueId and priority
  */
 export async function updateIssuePriorityAction(
