@@ -12,6 +12,10 @@ import {
   getMachineStatusStyles,
   type IssueForStatus,
 } from "~/lib/machines/status";
+import {
+  getIssuePriorityLabel,
+  getIssuePriorityStyles,
+} from "~/lib/issues/status";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
@@ -52,6 +56,7 @@ export default async function MachineDetailPage({
           title: true,
           status: true,
           severity: true,
+          priority: true,
           createdAt: true,
         },
         orderBy: (issues, { desc }) => [desc(issues.createdAt)],
@@ -244,6 +249,14 @@ export default async function MachineDetailPage({
                           </span>
                           <Badge variant="outline" className="text-xs">
                             {issue.severity}
+                          </Badge>
+                          <Badge
+                            className={cn(
+                              getIssuePriorityStyles(issue.priority),
+                              "border px-2 py-0.5 text-xs font-semibold"
+                            )}
+                          >
+                            {getIssuePriorityLabel(issue.priority)}
                           </Badge>
                           <Badge variant="outline" className="text-xs">
                             {issue.status}
