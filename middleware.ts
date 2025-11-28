@@ -33,18 +33,42 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   );
 
   // 4. Allow Vercel preview toolbar in non-production environments
+  // Per https://vercel.com/docs/vercel-toolbar/managing-toolbar#using-a-content-security-policy
   const isProduction = process.env["VERCEL_ENV"] === "production";
-  const frameAncestors = isProduction ? "'none'" : "'self' https://vercel.live";
+
+  // Production: strict-dynamic (nonce-only, blocks host allowlists)
+  // Preview: explicit allowlist (allows vercel.live scripts)
+  const scriptSrc = isProduction
+    ? `'self' 'nonce-${nonce}' 'strict-dynamic'`
+    : `'self' 'nonce-${nonce}' https://vercel.live`;
+
+  const styleSrc = isProduction
+    ? "'self' 'unsafe-inline'"
+    : "'self' 'unsafe-inline' https://vercel.live";
+
+  const imgSrc = isProduction
+    ? "'self' data: blob:"
+    : "'self' data: blob: https://vercel.live https://vercel.com";
+
+  const fontSrc = isProduction
+    ? "'self' data:"
+    : "'self' data: https://vercel.live https://assets.vercel.com https://fonts.gstatic.com";
+
+  const connectSrc = isProduction
+    ? `'self' ${supabaseUrl ?? ""} ${supabaseWsUrl ?? ""} http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:*`
+    : `'self' ${supabaseUrl ?? ""} ${supabaseWsUrl ?? ""} http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:* https://vercel.live wss://ws-us3.pusher.com`;
+
   const frameSrc = isProduction ? "'none'" : "'self' https://vercel.live";
+  const frameAncestors = isProduction ? "'none'" : "'self' https://vercel.live";
 
   // 5. Construct CSP header with nonce-based script execution
   const cspHeader = `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
-    style-src 'self' 'unsafe-inline';
-    img-src 'self' data: blob:;
-    font-src 'self' data:;
-    connect-src 'self' ${supabaseUrl ?? ""} ${supabaseWsUrl ?? ""} http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:*;
+    script-src ${scriptSrc};
+    style-src ${styleSrc};
+    img-src ${imgSrc};
+    font-src ${fontSrc};
+    connect-src ${connectSrc};
     object-src 'none';
     base-uri 'self';
     form-action 'self';
