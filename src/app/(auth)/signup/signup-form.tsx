@@ -1,13 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { PasswordStrength } from "~/components/password-strength";
 import { signupAction, type SignupResult } from "~/app/(auth)/actions";
-import { useActionState } from "react";
 
 function SubmitButton(): React.JSX.Element {
   const { pending } = useFormStatus();

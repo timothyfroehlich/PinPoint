@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useActionState, useRef } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
 import {
@@ -22,9 +22,11 @@ export function AddCommentForm({
     FormData
   >(addCommentAction, undefined);
 
-  if (state?.ok) {
-    formRef.current?.reset();
-  }
+  useEffect(() => {
+    if (state?.ok) {
+      formRef.current?.reset();
+    }
+  }, [state]);
 
   return (
     <form action={formAction} ref={formRef} className="space-y-4">
