@@ -34,15 +34,21 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   // 4. Allow Vercel preview toolbar in non-production environments
   const isProduction = process.env["VERCEL_ENV"] === "production";
+
+  // Production: strict-dynamic (nonce-only, blocks host allowlists)
+  // Preview: explicit allowlist (allows vercel.live scripts)
+  const scriptSrc = isProduction
+    ? `'self' 'nonce-${nonce}' 'strict-dynamic'`
+    : `'self' 'nonce-${nonce}' https://vercel.live`;
+
   const frameAncestors = isProduction ? "'none'" : "'self' https://vercel.live";
   const frameSrc = isProduction ? "'none'" : "'self' https://vercel.live";
-  const vercelScripts = isProduction ? "" : " https://vercel.live";
   const vercelConnect = isProduction ? "" : " https://vercel.live";
 
   // 5. Construct CSP header with nonce-based script execution
   const cspHeader = `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${vercelScripts};
+    script-src ${scriptSrc};
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob:;
     font-src 'self' data:;
