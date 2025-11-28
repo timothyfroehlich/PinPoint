@@ -385,12 +385,19 @@ export async function forgotPasswordAction(
  */
 export async function resetPasswordAction(
   _prevState: ResetPasswordResult | undefined,
-  formData: FormData
+  formData?: FormData
 ): Promise<ResetPasswordResult> {
+  const submittedFormData =
+    formData ?? (_prevState instanceof FormData ? _prevState : undefined);
+
+  if (!submittedFormData) {
+    return err("VALIDATION", "Invalid input");
+  }
+
   // Validate input
   const parsed = resetPasswordSchema.safeParse({
-    password: formData.get("password"),
-    confirmPassword: formData.get("confirmPassword"),
+    password: submittedFormData.get("password"),
+    confirmPassword: submittedFormData.get("confirmPassword"),
   });
 
   if (!parsed.success) {
