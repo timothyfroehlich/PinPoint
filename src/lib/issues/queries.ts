@@ -7,13 +7,14 @@ export interface IssueFilters {
   machineId?: string | undefined;
   status?: string | undefined;
   severity?: string | undefined;
+  priority?: string | undefined;
   assignedTo?: string | undefined;
 }
 
 export async function getIssues(
   filters: IssueFilters
 ): Promise<IssueListItem[]> {
-  const { machineId, status, severity, assignedTo } = filters;
+  const { machineId, status, severity, priority, assignedTo } = filters;
 
   // Build where conditions for filtering
   const conditions: SQL[] = [];
@@ -36,6 +37,13 @@ export async function getIssues(
       severity === "unplayable")
   ) {
     conditions.push(eq(issues.severity, severity));
+  }
+
+  if (
+    priority &&
+    (priority === "low" || priority === "medium" || priority === "high")
+  ) {
+    conditions.push(eq(issues.priority, priority));
   }
 
   if (assignedTo === "unassigned") {

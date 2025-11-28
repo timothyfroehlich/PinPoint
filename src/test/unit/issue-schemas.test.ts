@@ -3,6 +3,7 @@ import {
   createIssueSchema,
   updateIssueStatusSchema,
   updateIssueSeveritySchema,
+  updateIssuePrioritySchema,
   assignIssueSchema,
 } from "~/app/(app)/issues/schemas";
 
@@ -16,6 +17,7 @@ describe("Issue Validation Schemas", () => {
         description: "Test Description",
         machineId: validUuid,
         severity: "minor",
+        priority: "low",
       });
       expect(result.success).toBe(true);
     });
@@ -25,6 +27,7 @@ describe("Issue Validation Schemas", () => {
         title: "Test Issue",
         machineId: validUuid,
         severity: "playable",
+        priority: "medium",
       });
       expect(result.success).toBe(true);
     });
@@ -34,6 +37,7 @@ describe("Issue Validation Schemas", () => {
         description: "Test Description",
         machineId: validUuid,
         severity: "minor",
+        priority: "low",
       });
       expect(result.success).toBe(false);
     });
@@ -43,6 +47,7 @@ describe("Issue Validation Schemas", () => {
         title: "",
         machineId: validUuid,
         severity: "minor",
+        priority: "low",
       });
       expect(result.success).toBe(false);
     });
@@ -52,6 +57,7 @@ describe("Issue Validation Schemas", () => {
         title: "a".repeat(201),
         machineId: validUuid,
         severity: "minor",
+        priority: "low",
       });
       expect(result.success).toBe(false);
     });
@@ -61,6 +67,7 @@ describe("Issue Validation Schemas", () => {
         title: "Test Issue",
         machineId: "invalid-uuid",
         severity: "minor",
+        priority: "low",
       });
       expect(result.success).toBe(false);
     });
@@ -70,6 +77,7 @@ describe("Issue Validation Schemas", () => {
         title: "Test Issue",
         machineId: validUuid,
         severity: "critical", // invalid
+        priority: "low",
       });
       expect(result.success).toBe(false);
     });
@@ -122,6 +130,32 @@ describe("Issue Validation Schemas", () => {
       const result = updateIssueSeveritySchema.safeParse({
         issueId: "invalid",
         severity: "minor",
+      });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("updateIssuePrioritySchema", () => {
+    it("should validate valid priority update", () => {
+      const result = updateIssuePrioritySchema.safeParse({
+        issueId: validUuid,
+        priority: "high",
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject invalid priority", () => {
+      const result = updateIssuePrioritySchema.safeParse({
+        issueId: validUuid,
+        priority: "critical", // invalid
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject invalid issueId", () => {
+      const result = updateIssuePrioritySchema.safeParse({
+        issueId: "invalid",
+        priority: "low",
       });
       expect(result.success).toBe(false);
     });

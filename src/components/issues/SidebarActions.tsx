@@ -6,6 +6,7 @@ import { type IssueWithAllRelations } from "~/lib/types";
 import { AssignIssueForm } from "~/app/(app)/issues/[issueId]/assign-issue-form";
 import { UpdateIssueStatusForm } from "~/app/(app)/issues/[issueId]/update-issue-status-form";
 import { UpdateIssueSeverityForm } from "~/app/(app)/issues/[issueId]/update-issue-severity-form";
+import { UpdateIssuePriorityForm } from "~/app/(app)/issues/[issueId]/update-issue-priority-form";
 
 interface SidebarActionsProps {
   issue: IssueWithAllRelations;
@@ -48,6 +49,17 @@ export function SidebarActions({
           <UpdateIssueSeverityForm
             issueId={issue.id}
             currentSeverity={issue.severity}
+          />
+        </div>
+      </div>
+
+      {/* Update Priority */}
+      <div className="grid grid-cols-[110px,1fr] items-center gap-3">
+        <Label className="text-sm text-muted-foreground">Priority</Label>
+        <div className="min-w-0">
+          <UpdateIssuePriorityForm
+            issueId={issue.id}
+            currentPriority={issue.priority}
           />
         </div>
       </div>
