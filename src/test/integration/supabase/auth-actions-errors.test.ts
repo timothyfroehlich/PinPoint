@@ -72,7 +72,7 @@ describe("Auth Actions - Error Path Integration Tests", () => {
       formData.set("password", "NewPassword123!");
       formData.set("confirmPassword", "NewPassword123!");
 
-      const result = await resetPasswordAction(formData);
+      const result = await resetPasswordAction(undefined, formData);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -86,7 +86,7 @@ describe("Auth Actions - Error Path Integration Tests", () => {
       formData.set("password", "Password123!");
       formData.set("confirmPassword", "DifferentPassword123!");
 
-      const result = await resetPasswordAction(formData);
+      const result = await resetPasswordAction(undefined, formData);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -99,7 +99,7 @@ describe("Auth Actions - Error Path Integration Tests", () => {
       formData.set("password", "weak");
       formData.set("confirmPassword", "weak");
 
-      const result = await resetPasswordAction(formData);
+      const result = await resetPasswordAction(undefined, formData);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -111,7 +111,7 @@ describe("Auth Actions - Error Path Integration Tests", () => {
       const formData = new FormData();
       formData.set("confirmPassword", "Password123!");
 
-      const result = await resetPasswordAction(formData);
+      const result = await resetPasswordAction(undefined, formData);
 
       expect(result.ok).toBe(false);
       if (!result.ok) {

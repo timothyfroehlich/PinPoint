@@ -1,9 +1,7 @@
 import type React from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { cn } from "~/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { readFlash } from "~/lib/flash";
 import { createClient } from "~/lib/supabase/server";
 import { SignupForm } from "./signup-form";
 
@@ -25,9 +23,6 @@ export default async function SignupPage(): Promise<React.JSX.Element> {
     redirect("/dashboard");
   }
 
-  // Read flash message (if any)
-  const flash = await readFlash();
-
   return (
     <Card className="border-outline-variant bg-surface shadow-xl">
       <CardHeader className="space-y-1">
@@ -40,21 +35,6 @@ export default async function SignupPage(): Promise<React.JSX.Element> {
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* Flash message */}
-        {flash && (
-          <div
-            className={cn(
-              "rounded-lg px-4 py-3 text-sm",
-              flash.type === "error"
-                ? "bg-error-container text-on-error-container"
-                : "bg-success-container text-on-success-container"
-            )}
-            role="alert"
-          >
-            {flash.message}
-          </div>
-        )}
-
         {/* Signup form - Client Component for password strength */}
         <SignupForm />
 

@@ -3,13 +3,8 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
-import { resetPasswordAction } from "~/app/(auth)/actions";
-import { cn } from "~/lib/utils";
-import { readFlash } from "~/lib/flash";
 import { createClient } from "~/lib/supabase/server";
+import { ResetPasswordForm } from "./reset-password-form";
 
 /**
  * Reset Password Page
@@ -50,30 +45,6 @@ export default async function ResetPasswordPage({
     redirect("/forgot-password");
   }
 
-  // Read flash message (if any)
-  const flash = await readFlash();
-
-  /**
-   * Server action wrapper for progressive enhancement
-   */
-  async function handleResetPassword(formData: FormData): Promise<void> {
-    "use server";
-
-    const result = await resetPasswordAction(formData);
-
-    if (result.ok) {
-      // Sign out the user so they can log in with their new password
-      const supabase = await createClient();
-      await supabase.auth.signOut();
-
-      // Success - redirect to login
-      redirect("/login");
-    }
-
-    // Error - flash message was already set
-    redirect("/reset-password");
-  }
-
   return (
     <Card className="border-outline-variant bg-surface shadow-xl">
       <CardHeader className="space-y-1">
@@ -86,65 +57,7 @@ export default async function ResetPasswordPage({
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* Flash message */}
-        {flash && (
-          <div
-            className={cn(
-              "rounded-lg px-4 py-3 text-sm",
-              flash.type === "error"
-                ? "bg-error-container text-on-error-container"
-                : "bg-success-container text-on-success-container"
-            )}
-            role="alert"
-          >
-            {flash.message}
-          </div>
-        )}
-
-        {/* Reset password form */}
-        <form action={handleResetPassword} className="space-y-4">
-          {/* New Password */}
-          <div className="space-y-2">
-            <Label htmlFor="password">New Password</Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="new-password"
-              required
-              minLength={8}
-              maxLength={128}
-              className="bg-surface-variant"
-            />
-            <p className="text-xs text-on-surface-variant">
-              Must be at least 8 characters
-            </p>
-          </div>
-
-          {/* Confirm Password */}
-          <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm Password</Label>
-            <Input
-              id="confirmPassword"
-              name="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              required
-              minLength={8}
-              maxLength={128}
-              className="bg-surface-variant"
-            />
-          </div>
-
-          {/* Submit button */}
-          <Button
-            type="submit"
-            className="w-full bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container"
-            size="lg"
-          >
-            Update Password
-          </Button>
-        </form>
+        <ResetPasswordForm />
 
         {/* Back to login link */}
         <div className="text-center text-sm text-on-surface-variant">

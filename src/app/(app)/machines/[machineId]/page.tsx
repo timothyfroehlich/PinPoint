@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { ArrowLeft, Calendar, Plus } from "lucide-react";
-import { readFlash } from "~/lib/flash";
+import { UpdateMachineForm } from "./update-machine-form";
 
 /**
  * Machine Detail Page (Protected Route)
@@ -38,9 +38,6 @@ export default async function MachineDetailPage({
   if (!user) {
     redirect("/login");
   }
-
-  // Read flash message (if any)
-  const flash = await readFlash();
 
   // Await params (Next.js 15+ requirement)
   const { machineId } = await params;
@@ -117,21 +114,6 @@ export default async function MachineDetailPage({
       {/* Content */}
       <div className="container mx-auto px-4 py-8">
         <div className="space-y-6">
-          {/* Flash message */}
-          {flash && (
-            <div
-              className={cn(
-                "rounded-lg px-4 py-3 text-sm",
-                flash.type === "error"
-                  ? "bg-error-container text-on-error-container"
-                  : "bg-success-container text-on-success-container"
-              )}
-              role="alert"
-            >
-              {flash.message}
-            </div>
-          )}
-
           {/* Machine Info Card */}
           <Card className="border-outline-variant">
             <CardHeader>
@@ -140,6 +122,7 @@ export default async function MachineDetailPage({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <UpdateMachineForm machine={machine} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Status */}
                 <div>

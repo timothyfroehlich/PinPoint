@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useActionState, useState } from "react";
+import React, { useState, useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { PasswordStrength } from "~/components/password-strength";
-import { signupAction } from "~/app/(auth)/actions";
+import { signupAction, type SignupResult } from "~/app/(auth)/actions";
 
 function SubmitButton(): React.JSX.Element {
   const { pending } = useFormStatus();
@@ -23,28 +23,21 @@ function SubmitButton(): React.JSX.Element {
 }
 
 export function SignupForm(): React.JSX.Element {
-  const [state, formAction] = useActionState(signupAction, undefined);
+  const [state, formAction] = useActionState<
+    SignupResult | undefined,
+    FormData
+  >(signupAction, undefined);
   const [password, setPassword] = useState("");
-
-  // Map error codes to user-friendly messages
-  let errorMessage: string | null = null;
-  if (state && !state.ok) {
-    if (state.code === "VALIDATION") errorMessage = "Invalid input";
-    else if (state.code === "EMAIL_TAKEN") errorMessage = "Email already taken";
-    else if (state.code === "SERVER")
-      errorMessage = state.message || "Server error occurred";
-    else errorMessage = state.message || "Something went wrong";
-  }
 
   return (
     <form action={formAction} className="space-y-4">
       {/* Error Message */}
-      {errorMessage && (
+      {state && !state.ok && (
         <div
           className="rounded-lg bg-error-container px-4 py-3 text-sm text-on-error-container"
           role="alert"
         >
-          {errorMessage}
+          {state.message}
         </div>
       )}
 

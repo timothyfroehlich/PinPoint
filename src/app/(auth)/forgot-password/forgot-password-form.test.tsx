@@ -5,10 +5,8 @@ import { describe, it, expect, vi } from "vitest";
 import { ForgotPasswordForm } from "./forgot-password-form";
 import * as actions from "~/app/(auth)/actions";
 
-// Mock the server action
-vi.mock("~/app/(auth)/actions", () => ({
-  forgotPasswordAction: vi.fn(),
-}));
+// Spy on the server action
+const forgotPasswordActionSpy = vi.spyOn(actions, "forgotPasswordAction");
 
 describe("ForgotPasswordForm", () => {
   it("should render form fields", () => {
@@ -22,9 +20,9 @@ describe("ForgotPasswordForm", () => {
   it("should disable button while submitting", async () => {
     const user = userEvent.setup();
     // Mock slow response
-    vi.mocked(actions.forgotPasswordAction).mockImplementation(async () => {
+    forgotPasswordActionSpy.mockImplementation(async () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
-      return { ok: true, value: undefined };
+      return { ok: true, data: undefined };
     });
 
     render(<ForgotPasswordForm />);
@@ -46,7 +44,7 @@ describe("ForgotPasswordForm", () => {
 
   it("should display error message on failure", async () => {
     const user = userEvent.setup();
-    vi.mocked(actions.forgotPasswordAction).mockResolvedValue({
+    forgotPasswordActionSpy.mockResolvedValue({
       ok: false,
       code: "SERVER",
       message: "Something went wrong",
