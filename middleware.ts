@@ -52,7 +52,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   const fontSrc = isProduction
     ? "'self' data:"
-    : "'self' data: https://vercel.live https://assets.vercel.com";
+    : "'self' data: https://vercel.live https://assets.vercel.com https://fonts.gstatic.com";
 
   const connectSrc = isProduction
     ? `'self' ${supabaseUrl ?? ""} ${supabaseWsUrl ?? ""} http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:*`
