@@ -32,7 +32,11 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     match === "https://" ? "wss://" : "ws://"
   );
 
-  // 4. Construct CSP header with nonce-based script execution
+  // 4. Allow Vercel preview toolbar in non-production environments
+  const isProduction = process.env["VERCEL_ENV"] === "production";
+  const frameAncestors = isProduction ? "'none'" : "'self' https://vercel.live";
+
+  // 5. Construct CSP header with nonce-based script execution
   const cspHeader = `
     default-src 'self';
     script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
@@ -43,14 +47,14 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     object-src 'none';
     base-uri 'self';
     form-action 'self';
-    frame-ancestors 'none';
+    frame-ancestors ${frameAncestors};
     block-all-mixed-content;
     upgrade-insecure-requests;
   `
     .replace(/\s{2,}/g, " ")
     .trim();
 
-  // 5. Set headers
+  // 6. Set headers
   response.headers.set("Content-Security-Policy", cspHeader);
   response.headers.set("x-nonce", nonce);
 
