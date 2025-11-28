@@ -15,13 +15,24 @@ import { IssueSidebar } from "~/components/issues/IssueSidebar";
 import {
   getIssueStatusStyles,
   getIssueSeverityStyles,
+  getIssuePriorityStyles,
 } from "~/lib/issues/status";
-import { type IssueWithAllRelations, type IssueSeverity } from "~/lib/types";
+import {
+  type IssueWithAllRelations,
+  type IssueSeverity,
+  type IssuePriority,
+} from "~/lib/types";
 
 const severityCopy: Record<IssueSeverity, string> = {
   minor: "Minor",
   playable: "Playable",
   unplayable: "Unplayable",
+};
+
+const priorityCopy: Record<IssuePriority, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
 };
 
 /**
@@ -161,6 +172,16 @@ export default async function IssueDetailPage({
               )}
             >
               {severityCopy[issue.severity]}
+            </Badge>
+
+            <Badge
+              data-testid="issue-priority-badge"
+              className={cn(
+                "px-3 py-1 text-xs font-semibold border",
+                getIssuePriorityStyles(issue.priority)
+              )}
+            >
+              {priorityCopy[issue.priority]}
             </Badge>
           </div>
         </div>

@@ -75,3 +75,40 @@ export function getIssueSeverityStyles(severity: IssueSeverity): string {
   };
   return styles[severity];
 }
+
+export type IssuePriority = "low" | "medium" | "high";
+
+/**
+ * Type guard for IssuePriority
+ */
+export function isIssuePriority(value: unknown): value is IssuePriority {
+  return typeof value === "string" && ["low", "medium", "high"].includes(value);
+}
+
+/**
+ * Get display label for issue priority
+ */
+export function getIssuePriorityLabel(priority: IssuePriority): string {
+  const labels: Record<IssuePriority, string> = {
+    low: "Low",
+    medium: "Medium",
+    high: "High",
+  };
+  return labels[priority];
+}
+
+/**
+ * Get CSS classes for issue priority badge
+ * Reuses severity color scheme:
+ * Low -> Minor (Green/Muted)
+ * Medium -> Playable (Yellow/Warning)
+ * High -> Unplayable (Red/Destructive)
+ */
+export function getIssuePriorityStyles(priority: IssuePriority): string {
+  const styles: Record<IssuePriority, string> = {
+    low: "bg-muted/50 text-muted-foreground border-border",
+    medium: "bg-warning/20 text-warning border-warning glow-warning",
+    high: "bg-status-unplayable/20 text-status-unplayable border-status-unplayable glow-destructive",
+  };
+  return styles[priority];
+}

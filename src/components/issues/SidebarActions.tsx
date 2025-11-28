@@ -13,6 +13,7 @@ import {
 import {
   updateIssueStatusAction,
   updateIssueSeverityAction,
+  updateIssuePriorityAction,
   assignIssueAction,
 } from "~/app/(app)/issues/actions";
 
@@ -130,6 +131,44 @@ export function SidebarActions({
                 data-testid="severity-option-unplayable"
               >
                 Unplayable
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Update Priority */}
+      <div className="grid grid-cols-[110px,1fr] items-center gap-3">
+        <Label className="text-sm text-muted-foreground">Priority</Label>
+        <div className="min-w-0">
+          <Select
+            name="priority"
+            defaultValue={issue.priority}
+            onValueChange={(value) => {
+              startTransition(async () => {
+                const formData = new FormData();
+                formData.append("issueId", issue.id);
+                formData.append("priority", value);
+                await updateIssuePriorityAction(formData);
+              });
+            }}
+            disabled={isPending}
+          >
+            <SelectTrigger
+              className="h-10 w-full border-border/70 bg-background"
+              data-testid="issue-priority-select"
+            >
+              <SelectValue placeholder="Select priority" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="low" data-testid="priority-option-low">
+                Low
+              </SelectItem>
+              <SelectItem value="medium" data-testid="priority-option-medium">
+                Medium
+              </SelectItem>
+              <SelectItem value="high" data-testid="priority-option-high">
+                High
               </SelectItem>
             </SelectContent>
           </Select>

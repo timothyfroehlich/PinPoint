@@ -26,9 +26,10 @@ export function IssueFilters({
   const machineId = searchParams.get("machineId") ?? "";
   const status = searchParams.get("status") ?? "";
   const severity = searchParams.get("severity") ?? "";
+  const priority = searchParams.get("priority") ?? "";
   const assignedTo = searchParams.get("assignedTo") ?? "";
 
-  const hasFilters = machineId || status || severity || assignedTo;
+  const hasFilters = machineId || status || severity || priority || assignedTo;
 
   const updateFilter = (key: string, value: string): void => {
     const params = new URLSearchParams(searchParams.toString());
@@ -104,6 +105,27 @@ export function IssueFilters({
           <option value="minor">Minor</option>
           <option value="playable">Playable</option>
           <option value="unplayable">Unplayable</option>
+        </select>
+      </div>
+
+      {/* Priority Filter */}
+      <div className="flex items-center gap-2">
+        <label
+          htmlFor="issue-filter-priority"
+          className="text-sm text-on-surface-variant"
+        >
+          Priority:
+        </label>
+        <select
+          id="issue-filter-priority"
+          className="rounded-md border border-outline-variant bg-surface px-3 py-1.5 text-sm text-on-surface"
+          value={priority}
+          onChange={(e) => updateFilter("priority", e.target.value)}
+        >
+          <option value="">All Priorities</option>
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
         </select>
       </div>
 

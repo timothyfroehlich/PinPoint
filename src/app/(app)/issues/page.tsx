@@ -15,6 +15,7 @@ import { getIssues } from "~/lib/issues/queries";
 import {
   getIssueStatusStyles,
   getIssueSeverityStyles,
+  getIssuePriorityStyles,
 } from "~/lib/issues/status";
 
 /**
@@ -33,6 +34,7 @@ export default async function IssuesPage({
     machineId?: string;
     status?: string;
     severity?: string;
+    priority?: string;
     assignedTo?: string;
   }>;
 }): Promise<React.JSX.Element> {
@@ -48,13 +50,14 @@ export default async function IssuesPage({
 
   // Get search params (Next.js 16: searchParams is a Promise)
   const params = await searchParams;
-  const { machineId, status, severity, assignedTo } = params;
+  const { machineId, status, severity, priority, assignedTo } = params;
 
   // Query issues with filters
   const allIssues = await getIssues({
     machineId,
     status,
     severity,
+    priority,
     assignedTo,
   });
 
@@ -117,7 +120,7 @@ export default async function IssuesPage({
             <CardContent className="py-12 text-center">
               <AlertTriangle className="mx-auto mb-4 size-12 text-on-surface-variant" />
               <p className="text-lg text-on-surface-variant mb-4">
-                {machineId || status || severity || assignedTo
+                {machineId || status || severity || priority || assignedTo
                   ? "No issues match the selected filters"
                   : "No issues reported yet"}
               </p>
@@ -182,6 +185,16 @@ export default async function IssuesPage({
                         >
                           {issue.severity.charAt(0).toUpperCase() +
                             issue.severity.slice(1)}
+                        </Badge>
+                        {/* Priority Badge */}
+                        <Badge
+                          className={cn(
+                            "px-2 py-1 text-xs font-semibold",
+                            getIssuePriorityStyles(issue.priority)
+                          )}
+                        >
+                          {issue.priority.charAt(0).toUpperCase() +
+                            issue.priority.slice(1)}
                         </Badge>
                       </div>
                     </div>
