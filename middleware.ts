@@ -28,7 +28,9 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   // 3. Get Supabase URL from environment
   const supabaseUrl = process.env["NEXT_PUBLIC_SUPABASE_URL"];
-  const supabaseWsUrl = supabaseUrl?.replace("https://", "wss://");
+  const supabaseWsUrl = supabaseUrl?.replace(/^https?:\/\//, (match) =>
+    match === "https://" ? "wss://" : "ws://"
+  );
 
   // 4. Construct CSP header with nonce-based script execution
   const cspHeader = `

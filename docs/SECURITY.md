@@ -141,6 +141,79 @@ const cspHeader = `
 3. **Test User Flows**: Verify auth, forms, and dynamic features work
 4. **Use CSP Evaluator**: https://csp-evaluator.withgoogle.com/
 
+### Manual Testing on Staging/Production
+
+**Prerequisites:**
+
+- Deployment to staging environment (e.g., Vercel preview)
+- Browser DevTools (Chrome, Firefox, or Safari)
+
+**Test Procedure:**
+
+1. **Open DevTools** → Navigate to **Network** tab
+2. **Load the application** → Navigate to any page
+3. **Inspect Response Headers**:
+   - Click on the document request (first item in Network tab)
+   - Go to **Headers** tab
+   - Scroll to **Response Headers** section
+
+**Verify Headers Present:**
+
+```
+✅ strict-transport-security: max-age=63072000; includeSubDomains; preload
+✅ x-frame-options: DENY
+✅ x-content-type-options: nosniff
+✅ referrer-policy: strict-origin-when-cross-origin
+✅ permissions-policy: camera=(), microphone=(), geolocation=()
+✅ content-security-policy: default-src 'self'; script-src 'self' 'nonce-...' 'strict-dynamic'; ...
+✅ x-nonce: <uuid>
+```
+
+**Verify CSP Directives:**
+
+Check that `content-security-policy` contains:
+
+- `default-src 'self'`
+- `script-src 'self' 'nonce-<random-uuid>' 'strict-dynamic'`
+- `style-src 'self' 'unsafe-inline'`
+- `img-src 'self' data: blob:`
+- `connect-src 'self' https://<project>.supabase.co wss://<project>.supabase.co`
+- `object-src 'none'`
+- `frame-ancestors 'none'`
+
+**Verify Nonce:**
+
+1. **Copy nonce value** from `x-nonce` header (e.g., `a1b2c3d4-e5f6-...`)
+2. **Open Console** tab
+3. **Run test script**:
+
+   ```javascript
+   // This should FAIL (no nonce)
+   const scriptFail = document.createElement("script");
+   scriptFail.textContent = 'console.log("BLOCKED");';
+   document.body.appendChild(scriptFail);
+
+   // Check console for CSP violation error
+   ```
+
+4. **Expected Result**: Console shows CSP violation error
+
+**Verify User Flows Work:**
+
+- ✅ Authentication (login/logout)
+- ✅ Form submissions
+- ✅ Navigation between pages
+- ✅ Supabase realtime connections (if implemented)
+
+**Common Issues:**
+
+| Symptom                   | Likely Cause           | Fix                               |
+| ------------------------- | ---------------------- | --------------------------------- |
+| CSP header missing        | Middleware not running | Check middleware matcher config   |
+| Nonce header missing      | Middleware error       | Check server logs                 |
+| White screen              | CSP blocking scripts   | Check console for violations      |
+| Supabase connection fails | Wrong connect-src URL  | Verify `NEXT_PUBLIC_SUPABASE_URL` |
+
 ### CSP Reporting (Future)
 
 To monitor CSP violations in production, add a `report-uri` or `report-to` directive:
