@@ -35,6 +35,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   // 4. Allow Vercel preview toolbar in non-production environments
   const isProduction = process.env["VERCEL_ENV"] === "production";
   const frameAncestors = isProduction ? "'none'" : "'self' https://vercel.live";
+  const frameSrc = isProduction ? "'none'" : "'self' https://vercel.live";
 
   // 5. Construct CSP header with nonce-based script execution
   const cspHeader = `
@@ -47,6 +48,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     object-src 'none';
     base-uri 'self';
     form-action 'self';
+    frame-src ${frameSrc};
     frame-ancestors ${frameAncestors};
     block-all-mixed-content;
     upgrade-insecure-requests;
