@@ -43,6 +43,11 @@ export function LoginForm(): React.JSX.Element {
             placeholder="you@example.com"
             autoComplete="email"
             required
+            defaultValue={
+              !state?.ok && state?.meta?.submittedEmail
+                ? state.meta.submittedEmail
+                : ""
+            }
             className="bg-input border-border text-foreground placeholder:text-muted-foreground"
           />
         </div>
