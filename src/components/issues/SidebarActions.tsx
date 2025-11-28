@@ -1,24 +1,12 @@
 "use client";
 
 import type React from "react";
-import { useTransition } from "react";
 import { Label } from "~/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
-import {
-  updateIssueStatusAction,
-  updateIssueSeverityAction,
-  updateIssuePriorityAction,
-  assignIssueAction,
-} from "~/app/(app)/issues/actions";
-
 import { type IssueWithAllRelations } from "~/lib/types";
-import { AssigneePicker } from "~/components/issues/AssigneePicker";
+import { AssignIssueForm } from "~/app/(app)/issues/[issueId]/assign-issue-form";
+import { UpdateIssueStatusForm } from "~/app/(app)/issues/[issueId]/update-issue-status-form";
+import { UpdateIssueSeverityForm } from "~/app/(app)/issues/[issueId]/update-issue-severity-form";
+import { UpdateIssuePriorityForm } from "~/app/(app)/issues/[issueId]/update-issue-priority-form";
 
 interface SidebarActionsProps {
   issue: IssueWithAllRelations;
@@ -29,25 +17,16 @@ export function SidebarActions({
   issue,
   allUsers,
 }: SidebarActionsProps): React.JSX.Element {
-  const [isPending, startTransition] = useTransition();
   return (
     <div className="space-y-5">
       {/* Assignee */}
       <div className="grid grid-cols-[110px,1fr] items-center gap-3">
         <Label className="text-sm text-muted-foreground">Assignee</Label>
         <div className="min-w-0">
-          <AssigneePicker
+          <AssignIssueForm
+            issueId={issue.id}
             assignedToId={issue.assignedTo ?? null}
             users={allUsers}
-            isPending={isPending}
-            onAssign={(userId) => {
-              startTransition(async () => {
-                const formData = new FormData();
-                formData.append("issueId", issue.id);
-                formData.append("assignedTo", userId ?? "");
-                await assignIssueAction(formData);
-              });
-            }}
           />
         </div>
       </div>
@@ -56,40 +35,10 @@ export function SidebarActions({
       <div className="grid grid-cols-[110px,1fr] items-center gap-3">
         <Label className="text-sm text-muted-foreground">Status</Label>
         <div className="min-w-0">
-          <Select
-            name="status"
-            defaultValue={issue.status}
-            onValueChange={(value) => {
-              startTransition(async () => {
-                const formData = new FormData();
-                formData.append("issueId", issue.id);
-                formData.append("status", value);
-                await updateIssueStatusAction(formData);
-              });
-            }}
-            disabled={isPending}
-          >
-            <SelectTrigger
-              className="h-10 w-full border-border/70 bg-background"
-              data-testid="issue-status-select"
-            >
-              <SelectValue placeholder="Select status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="new" data-testid="status-option-new">
-                New
-              </SelectItem>
-              <SelectItem
-                value="in_progress"
-                data-testid="status-option-in_progress"
-              >
-                In Progress
-              </SelectItem>
-              <SelectItem value="resolved" data-testid="status-option-resolved">
-                Resolved
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          <UpdateIssueStatusForm
+            issueId={issue.id}
+            currentStatus={issue.status}
+          />
         </div>
       </div>
 
@@ -97,43 +46,10 @@ export function SidebarActions({
       <div className="grid grid-cols-[110px,1fr] items-center gap-3">
         <Label className="text-sm text-muted-foreground">Severity</Label>
         <div className="min-w-0">
-          <Select
-            name="severity"
-            defaultValue={issue.severity}
-            onValueChange={(value) => {
-              startTransition(async () => {
-                const formData = new FormData();
-                formData.append("issueId", issue.id);
-                formData.append("severity", value);
-                await updateIssueSeverityAction(formData);
-              });
-            }}
-            disabled={isPending}
-          >
-            <SelectTrigger
-              className="h-10 w-full border-border/70 bg-background"
-              data-testid="issue-severity-select"
-            >
-              <SelectValue placeholder="Select severity" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="minor" data-testid="severity-option-minor">
-                Minor
-              </SelectItem>
-              <SelectItem
-                value="playable"
-                data-testid="severity-option-playable"
-              >
-                Playable
-              </SelectItem>
-              <SelectItem
-                value="unplayable"
-                data-testid="severity-option-unplayable"
-              >
-                Unplayable
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          <UpdateIssueSeverityForm
+            issueId={issue.id}
+            currentSeverity={issue.severity}
+          />
         </div>
       </div>
 
@@ -141,37 +57,10 @@ export function SidebarActions({
       <div className="grid grid-cols-[110px,1fr] items-center gap-3">
         <Label className="text-sm text-muted-foreground">Priority</Label>
         <div className="min-w-0">
-          <Select
-            name="priority"
-            defaultValue={issue.priority}
-            onValueChange={(value) => {
-              startTransition(async () => {
-                const formData = new FormData();
-                formData.append("issueId", issue.id);
-                formData.append("priority", value);
-                await updateIssuePriorityAction(formData);
-              });
-            }}
-            disabled={isPending}
-          >
-            <SelectTrigger
-              className="h-10 w-full border-border/70 bg-background"
-              data-testid="issue-priority-select"
-            >
-              <SelectValue placeholder="Select priority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="low" data-testid="priority-option-low">
-                Low
-              </SelectItem>
-              <SelectItem value="medium" data-testid="priority-option-medium">
-                Medium
-              </SelectItem>
-              <SelectItem value="high" data-testid="priority-option-high">
-                High
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          <UpdateIssuePriorityForm
+            issueId={issue.id}
+            currentPriority={issue.priority}
+          />
         </div>
       </div>
     </div>

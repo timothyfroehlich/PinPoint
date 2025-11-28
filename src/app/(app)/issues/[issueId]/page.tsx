@@ -7,7 +7,6 @@ import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { issues, userProfiles, authUsers } from "~/server/db/schema";
 import { eq, asc } from "drizzle-orm";
-import { readFlash } from "~/lib/flash";
 import { Badge } from "~/components/ui/badge";
 import { PageShell } from "~/components/layout/PageShell";
 import { IssueTimeline } from "~/components/issues/IssueTimeline";
@@ -112,26 +111,8 @@ export default async function IssueDetailPage({
     .leftJoin(authUsers, eq(authUsers.id, userProfiles.id))
     .orderBy(asc(userProfiles.name));
 
-  // Read flash message
-  const flash = await readFlash();
-
   return (
     <PageShell className="space-y-8" size="wide">
-      {/* Flash message */}
-      {flash && (
-        <div
-          className={cn(
-            "rounded-lg border px-4 py-3 text-sm",
-            flash.type === "success"
-              ? "border-green-200 bg-green-50 text-green-800 dark:border-green-900/50 dark:bg-green-900/20 dark:text-green-300"
-              : "border-destructive/20 bg-destructive/10 text-destructive"
-          )}
-          role="status"
-        >
-          {flash.message}
-        </div>
-      )}
-
       {/* Back button */}
       <Link
         href="/issues"

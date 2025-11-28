@@ -5,10 +5,8 @@ import { describe, it, expect, vi } from "vitest";
 import { SignupForm } from "./signup-form";
 import * as actions from "~/app/(auth)/actions";
 
-// Mock the server action
-vi.mock("~/app/(auth)/actions", () => ({
-  signupAction: vi.fn(),
-}));
+// Spy on the server action
+const signupActionSpy = vi.spyOn(actions, "signupAction");
 
 // Mock useRouter
 // Not needed as we rely on server action redirect
@@ -32,9 +30,9 @@ describe("SignupForm", () => {
   it("should disable button while submitting", async () => {
     const user = userEvent.setup();
     // Mock slow response
-    vi.mocked(actions.signupAction).mockImplementation(async () => {
+    signupActionSpy.mockImplementation(async () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
-      return { ok: true, value: { userId: "123" } };
+      return { ok: true, data: { userId: "123" } };
     });
 
     render(<SignupForm />);
@@ -54,7 +52,7 @@ describe("SignupForm", () => {
 
   it("should display error message on failure", async () => {
     const user = userEvent.setup();
-    vi.mocked(actions.signupAction).mockResolvedValue({
+    signupActionSpy.mockResolvedValue({
       ok: false,
       code: "VALIDATION",
       message: "Invalid input",

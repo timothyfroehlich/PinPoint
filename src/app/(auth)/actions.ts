@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createClient } from "~/lib/supabase/server";
 import { type Result, ok, err } from "~/lib/result";
-import { setFlash } from "~/lib/flash";
 import {
   loginSchema,
   signupSchema,
@@ -39,10 +38,14 @@ export type ResetPasswordResult = Result<void, "VALIDATION" | "SERVER">;
  * Authenticates user with email and password.
  * Supports "Remember Me" for persistent sessions.
  *
+ * @param _prevState - The previous state of the form
  * @param formData - Form data containing email, password, and optional rememberMe
  * @returns LoginResult with user ID or error
  */
-export async function loginAction(formData: FormData): Promise<LoginResult> {
+export async function loginAction(
+  _prevState: LoginResult | undefined,
+  formData: FormData
+): Promise<LoginResult> {
   // Validate input
   const parsed = loginSchema.safeParse({
     email: formData.get("email"),
@@ -51,15 +54,11 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
   });
 
   if (!parsed.success) {
-    const firstError = parsed.error.issues[0];
     log.warn(
       { errors: parsed.error.issues, action: "login" },
       "Login validation failed"
     );
-    await setFlash({
-      type: "error",
-      message: firstError?.message ?? "Invalid input",
-    });
+
     return err("VALIDATION", "Invalid input");
   }
 
@@ -86,10 +85,7 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
         { action: "login", error: error?.message },
         "Login authentication failed"
       );
-      await setFlash({
-        type: "error",
-        message: "Invalid email or password",
-      });
+
       return err("AUTH", error?.message ?? "Authentication failed");
     }
 
@@ -97,14 +93,7 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
       { userId: data.user.id, action: "login" },
       "User logged in successfully"
     );
-
-    await setFlash({
-      type: "success",
-      message: "Signed in successfully",
-    });
-
-    // Return success (redirect happens in page component)
-    return ok({ userId: data.user.id });
+    redirect("/dashboard");
   } catch (error) {
     log.error(
       {
@@ -114,10 +103,7 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
       },
       "Login server error"
     );
-    await setFlash({
-      type: "error",
-      message: "Something went wrong. Please try again.",
-    });
+
     return err("SERVER", error instanceof Error ? error.message : "Unknown");
   }
 }
@@ -128,6 +114,7 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
  * Creates a new user account with email and password.
  * User profile is auto-created via database trigger (see supabase/seed.sql).
  *
+ * @param _prevState - The previous state of the form
  * @param formData - Form data containing name, email, and password
  * @returns SignupResult with user ID or error
  */
@@ -143,15 +130,11 @@ export async function signupAction(
   });
 
   if (!parsed.success) {
-    const firstError = parsed.error.issues[0];
     log.warn(
       { errors: parsed.error.issues, action: "signup" },
       "Signup validation failed"
     );
-    await setFlash({
-      type: "error",
-      message: firstError?.message ?? "Please check your input",
-    });
+
     return err("VALIDATION", "Invalid input");
   }
 
@@ -178,10 +161,7 @@ export async function signupAction(
           { action: "signup", error: error.message },
           "Signup failed: email already registered"
         );
-        await setFlash({
-          type: "error",
-          message: "An account with this email already exists",
-        });
+
         return err("EMAIL_TAKEN", error.message);
       }
 
@@ -189,19 +169,13 @@ export async function signupAction(
         { action: "signup", error: error.message },
         "Signup failed: Supabase error"
       );
-      await setFlash({
-        type: "error",
-        message: error.message,
-      });
+
       return err("SERVER", error.message);
     }
 
     if (!data.user) {
       log.error({ action: "signup" }, "Signup failed: no user returned");
-      await setFlash({
-        type: "error",
-        message: "Failed to create account",
-      });
+
       return err("SERVER", "No user returned");
     }
 
@@ -212,10 +186,7 @@ export async function signupAction(
         { userId: data.user.id, action: "signup" },
         "User signed up, confirmation required"
       );
-      await setFlash({
-        type: "success",
-        message: "Please check your email to confirm your account",
-      });
+
       redirect("/login");
     }
 
@@ -223,12 +194,6 @@ export async function signupAction(
       { userId: data.user.id, action: "signup" },
       "User signed up successfully"
     );
-
-    await setFlash({
-      type: "success",
-      message: "Account created successfully!",
-    });
-
     redirect("/dashboard");
   } catch (error) {
     // If redirect was thrown, re-throw it
@@ -253,10 +218,7 @@ export async function signupAction(
       },
       "Signup server error"
     );
-    await setFlash({
-      type: "error",
-      message: "Something went wrong. Please try again.",
-    });
+
     return err("SERVER", error instanceof Error ? error.message : "Unknown");
   }
 }
@@ -282,10 +244,7 @@ export async function logoutAction(): Promise<void> {
         { userId: user?.id, error: error.message, action: "logout" },
         "Logout failed"
       );
-      await setFlash({
-        type: "error",
-        message: "Failed to sign out",
-      });
+
       return; // Early exit without redirect
     }
 
@@ -293,11 +252,6 @@ export async function logoutAction(): Promise<void> {
       { userId: user?.id, action: "logout" },
       "User logged out successfully"
     );
-
-    await setFlash({
-      type: "success",
-      message: "Signed out successfully",
-    });
   } catch (cause) {
     log.error(
       {
@@ -307,10 +261,6 @@ export async function logoutAction(): Promise<void> {
       },
       "Logout server error"
     );
-    await setFlash({
-      type: "error",
-      message: "Something went wrong",
-    });
   } finally {
     // Always redirect to home after logout attempt
     redirect("/");
@@ -336,15 +286,11 @@ export async function forgotPasswordAction(
   });
 
   if (!parsed.success) {
-    const firstError = parsed.error.issues[0];
     log.warn(
       { errors: parsed.error.issues, action: "forgot-password" },
       "Forgot password validation failed"
     );
-    await setFlash({
-      type: "error",
-      message: firstError?.message ?? "Invalid email address",
-    });
+
     return err("VALIDATION", "Invalid input");
   }
 
@@ -433,10 +379,12 @@ export async function forgotPasswordAction(
  * Updates the user's password after they click the reset link.
  * User must be authenticated via the reset link token.
  *
+ * @param _prevState - The previous state of the form
  * @param formData - Form data containing new password and confirmation
  * @returns ResetPasswordResult
  */
 export async function resetPasswordAction(
+  _prevState: ResetPasswordResult | undefined,
   formData: FormData
 ): Promise<ResetPasswordResult> {
   // Validate input
@@ -446,15 +394,11 @@ export async function resetPasswordAction(
   });
 
   if (!parsed.success) {
-    const firstError = parsed.error.issues[0];
     log.warn(
       { errors: parsed.error.issues, action: "reset-password" },
       "Reset password validation failed"
     );
-    await setFlash({
-      type: "error",
-      message: firstError?.message ?? "Invalid input",
-    });
+
     return err("VALIDATION", "Invalid input");
   }
 
@@ -470,11 +414,7 @@ export async function resetPasswordAction(
 
     if (!user) {
       log.warn({ action: "reset-password" }, "User not authenticated");
-      await setFlash({
-        type: "error",
-        message:
-          "Invalid or expired reset link. Please request a new password reset.",
-      });
+
       return err("SERVER", "Not authenticated");
     }
 
@@ -488,10 +428,7 @@ export async function resetPasswordAction(
         { userId: user.id, action: "reset-password", error: error.message },
         "Password update failed"
       );
-      await setFlash({
-        type: "error",
-        message: "Failed to update password. Please try again.",
-      });
+
       return err("SERVER", error.message);
     }
 
@@ -499,13 +436,8 @@ export async function resetPasswordAction(
       { userId: user.id, action: "reset-password" },
       "Password updated successfully"
     );
-
-    await setFlash({
-      type: "success",
-      message: "Password updated successfully! You can now sign in.",
-    });
-
-    return ok(undefined);
+    await supabase.auth.signOut();
+    redirect("/login");
   } catch (error) {
     log.error(
       {
@@ -515,10 +447,7 @@ export async function resetPasswordAction(
       },
       "Reset password server error"
     );
-    await setFlash({
-      type: "error",
-      message: "Something went wrong. Please try again.",
-    });
+
     return err("SERVER", error instanceof Error ? error.message : "Unknown");
   }
 }

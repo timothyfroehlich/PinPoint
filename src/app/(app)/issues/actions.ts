@@ -7,13 +7,12 @@
 
 "use server";
 
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { issues, userProfiles, issueComments } from "~/server/db/schema";
-import { setFlash } from "~/lib/flash";
 import { createTimelineEvent } from "~/lib/timeline/events";
 import { log } from "~/lib/logger";
 import {
@@ -24,6 +23,7 @@ import {
   assignIssueSchema,
   addCommentSchema,
 } from "./schemas";
+import { type Result, ok, err } from "~/lib/result";
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
 
@@ -41,6 +41,36 @@ const isNextRedirectError = (error: unknown): error is { digest: string } => {
   );
 };
 
+export type CreateIssueResult = Result<
+  { issueId: string },
+  "VALIDATION" | "UNAUTHORIZED" | "SERVER"
+>;
+
+export type UpdateIssueStatusResult = Result<
+  { issueId: string },
+  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+>;
+
+export type UpdateIssueSeverityResult = Result<
+  { issueId: string },
+  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+>;
+
+export type UpdateIssuePriorityResult = Result<
+  { issueId: string },
+  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+>;
+
+export type AssignIssueResult = Result<
+  { issueId: string },
+  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+>;
+
+export type AddCommentResult = Result<
+  { issueId: string },
+  "VALIDATION" | "UNAUTHORIZED" | "SERVER"
+>;
+
 /**
  * Create Issue Action
  *
@@ -51,7 +81,10 @@ const isNextRedirectError = (error: unknown): error is { digest: string } => {
  *
  * @param formData - Form data from issue creation form
  */
-export async function createIssueAction(formData: FormData): Promise<void> {
+export async function createIssueAction(
+  _prevState: CreateIssueResult | undefined,
+  formData: FormData
+): Promise<CreateIssueResult> {
   // Auth check (CORE-SEC-001)
   const supabase = await createClient();
   const {
@@ -59,11 +92,7 @@ export async function createIssueAction(formData: FormData): Promise<void> {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    await setFlash({
-      type: "error",
-      message: "Unauthorized. Please log in.",
-    });
-    redirect("/login");
+    return err("UNAUTHORIZED", "Unauthorized. Please log in.");
   }
 
   // Extract and validate form data (CORE-SEC-002)
@@ -86,11 +115,7 @@ export async function createIssueAction(formData: FormData): Promise<void> {
       },
       "Issue creation validation failed"
     );
-    await setFlash({
-      type: "error",
-      message: firstError?.message ?? "Invalid input",
-    });
-    redirect("/issues/new");
+    return err("VALIDATION", firstError?.message ?? "Invalid input");
   }
 
   const { title, description, machineId, severity, priority } = validation.data;
@@ -125,10 +150,6 @@ export async function createIssueAction(formData: FormData): Promise<void> {
       "Issue created successfully"
     );
 
-    await setFlash({
-      type: "success",
-      message: `Issue "${title}" created successfully`,
-    });
     revalidatePath("/issues");
     revalidatePath(`/machines/${machineId}`);
 
@@ -145,11 +166,7 @@ export async function createIssueAction(formData: FormData): Promise<void> {
       },
       "Issue creation server error"
     );
-    await setFlash({
-      type: "error",
-      message: "Failed to create issue. Please try again.",
-    });
-    redirect("/issues/new");
+    return err("SERVER", "Failed to create issue. Please try again.");
   }
 }
 
@@ -161,8 +178,9 @@ export async function createIssueAction(formData: FormData): Promise<void> {
  * @param formData - Form data with issueId and status
  */
 export async function updateIssueStatusAction(
+  _prevState: UpdateIssueStatusResult | undefined,
   formData: FormData
-): Promise<void> {
+): Promise<UpdateIssueStatusResult> {
   // Auth check
   const supabase = await createClient();
   const {
@@ -170,8 +188,7 @@ export async function updateIssueStatusAction(
   } = await supabase.auth.getUser();
 
   if (!user) {
-    await setFlash({ type: "error", message: "Unauthorized" });
-    redirect("/login");
+    return err("UNAUTHORIZED", "Unauthorized");
   }
 
   // Validate input
@@ -183,11 +200,7 @@ export async function updateIssueStatusAction(
   const validation = updateIssueStatusSchema.safeParse(rawData);
   if (!validation.success) {
     const firstError = validation.error.issues[0];
-    await setFlash({
-      type: "error",
-      message: firstError?.message ?? "Invalid input",
-    });
-    redirect("/issues");
+    return err("VALIDATION", firstError?.message ?? "Invalid input");
   }
 
   const { issueId, status } = validation.data;
@@ -200,8 +213,7 @@ export async function updateIssueStatusAction(
     });
 
     if (!currentIssue) {
-      await setFlash({ type: "error", message: "Issue not found" });
-      redirect("/issues");
+      return err("NOT_FOUND", "Issue not found");
     }
 
     const oldStatus = currentIssue.status;
@@ -228,15 +240,11 @@ export async function updateIssueStatusAction(
       "Issue status updated"
     );
 
-    await setFlash({
-      type: "success",
-      message: "Issue status updated",
-    });
     revalidatePath(`/issues/${issueId}`);
     revalidatePath("/issues");
     revalidatePath(`/machines/${currentIssue.machineId}`);
 
-    redirect(`/issues/${issueId}`);
+    return ok({ issueId });
   } catch (error) {
     if (isNextRedirectError(error)) {
       throw error;
@@ -248,11 +256,7 @@ export async function updateIssueStatusAction(
       },
       "Update issue status error"
     );
-    await setFlash({
-      type: "error",
-      message: "Failed to update status",
-    });
-    redirect(`/issues/${issueId}`);
+    return err("SERVER", "Failed to update status");
   }
 }
 
@@ -264,8 +268,9 @@ export async function updateIssueStatusAction(
  * @param formData - Form data with issueId and severity
  */
 export async function updateIssueSeverityAction(
+  _prevState: UpdateIssueSeverityResult | undefined,
   formData: FormData
-): Promise<void> {
+): Promise<UpdateIssueSeverityResult> {
   // Auth check
   const supabase = await createClient();
   const {
@@ -273,8 +278,7 @@ export async function updateIssueSeverityAction(
   } = await supabase.auth.getUser();
 
   if (!user) {
-    await setFlash({ type: "error", message: "Unauthorized" });
-    redirect("/login");
+    return err("UNAUTHORIZED", "Unauthorized");
   }
 
   // Validate input
@@ -286,11 +290,7 @@ export async function updateIssueSeverityAction(
   const validation = updateIssueSeveritySchema.safeParse(rawData);
   if (!validation.success) {
     const firstError = validation.error.issues[0];
-    await setFlash({
-      type: "error",
-      message: firstError?.message ?? "Invalid input",
-    });
-    redirect("/issues");
+    return err("VALIDATION", firstError?.message ?? "Invalid input");
   }
 
   const { issueId, severity } = validation.data;
@@ -303,8 +303,7 @@ export async function updateIssueSeverityAction(
     });
 
     if (!currentIssue) {
-      await setFlash({ type: "error", message: "Issue not found" });
-      redirect("/issues");
+      return err("NOT_FOUND", "Issue not found");
     }
 
     const oldSeverity = currentIssue.severity;
@@ -334,15 +333,11 @@ export async function updateIssueSeverityAction(
       "Issue severity updated"
     );
 
-    await setFlash({
-      type: "success",
-      message: "Issue severity updated",
-    });
     revalidatePath(`/issues/${issueId}`);
     revalidatePath("/issues");
     revalidatePath(`/machines/${currentIssue.machineId}`);
 
-    redirect(`/issues/${issueId}`);
+    return ok({ issueId });
   } catch (error) {
     if (isNextRedirectError(error)) {
       throw error;
@@ -354,11 +349,7 @@ export async function updateIssueSeverityAction(
       },
       "Update issue severity error"
     );
-    await setFlash({
-      type: "error",
-      message: "Failed to update severity",
-    });
-    redirect(`/issues/${issueId}`);
+    return err("SERVER", "Failed to update severity");
   }
 }
 
@@ -370,8 +361,9 @@ export async function updateIssueSeverityAction(
  * @param formData - Form data with issueId and priority
  */
 export async function updateIssuePriorityAction(
+  _prevState: UpdateIssuePriorityResult | undefined,
   formData: FormData
-): Promise<void> {
+): Promise<UpdateIssuePriorityResult> {
   // Auth check
   const supabase = await createClient();
   const {
@@ -379,8 +371,7 @@ export async function updateIssuePriorityAction(
   } = await supabase.auth.getUser();
 
   if (!user) {
-    await setFlash({ type: "error", message: "Unauthorized" });
-    redirect("/login");
+    return err("UNAUTHORIZED", "Unauthorized");
   }
 
   // Validate input
@@ -392,11 +383,7 @@ export async function updateIssuePriorityAction(
   const validation = updateIssuePrioritySchema.safeParse(rawData);
   if (!validation.success) {
     const firstError = validation.error.issues[0];
-    await setFlash({
-      type: "error",
-      message: firstError?.message ?? "Invalid input",
-    });
-    redirect("/issues");
+    return err("VALIDATION", firstError?.message ?? "Invalid input");
   }
 
   const { issueId, priority } = validation.data;
@@ -409,8 +396,7 @@ export async function updateIssuePriorityAction(
     });
 
     if (!currentIssue) {
-      await setFlash({ type: "error", message: "Issue not found" });
-      redirect("/issues");
+      return err("NOT_FOUND", "Issue not found");
     }
 
     const oldPriority = currentIssue.priority;
@@ -440,15 +426,11 @@ export async function updateIssuePriorityAction(
       "Issue priority updated"
     );
 
-    await setFlash({
-      type: "success",
-      message: "Issue priority updated",
-    });
     revalidatePath(`/issues/${issueId}`);
     revalidatePath("/issues");
     revalidatePath(`/machines/${currentIssue.machineId}`);
 
-    redirect(`/issues/${issueId}`);
+    return ok({ issueId });
   } catch (error) {
     if (isNextRedirectError(error)) {
       throw error;
@@ -460,11 +442,7 @@ export async function updateIssuePriorityAction(
       },
       "Update issue priority error"
     );
-    await setFlash({
-      type: "error",
-      message: "Failed to update priority",
-    });
-    redirect(`/issues/${issueId}`);
+    return err("SERVER", "Failed to update priority");
   }
 }
 
@@ -475,7 +453,10 @@ export async function updateIssuePriorityAction(
  *
  * @param formData - Form data with issueId and assignedTo
  */
-export async function assignIssueAction(formData: FormData): Promise<void> {
+export async function assignIssueAction(
+  _prevState: AssignIssueResult | undefined,
+  formData: FormData
+): Promise<AssignIssueResult> {
   // Auth check
   const supabase = await createClient();
   const {
@@ -483,8 +464,7 @@ export async function assignIssueAction(formData: FormData): Promise<void> {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    await setFlash({ type: "error", message: "Unauthorized" });
-    redirect("/login");
+    return err("UNAUTHORIZED", "Unauthorized");
   }
 
   // Validate input
@@ -498,11 +478,7 @@ export async function assignIssueAction(formData: FormData): Promise<void> {
   const validation = assignIssueSchema.safeParse(rawData);
   if (!validation.success) {
     const firstError = validation.error.issues[0];
-    await setFlash({
-      type: "error",
-      message: firstError?.message ?? "Invalid input",
-    });
-    redirect("/issues");
+    return err("VALIDATION", firstError?.message ?? "Invalid input");
   }
 
   const { issueId, assignedTo } = validation.data;
@@ -520,8 +496,7 @@ export async function assignIssueAction(formData: FormData): Promise<void> {
     });
 
     if (!currentIssue) {
-      await setFlash({ type: "error", message: "Issue not found" });
-      redirect("/issues");
+      return err("NOT_FOUND", "Issue not found");
     }
 
     // Get new assignee name if assigning to someone
@@ -554,15 +529,11 @@ export async function assignIssueAction(formData: FormData): Promise<void> {
       "Issue assignment updated"
     );
 
-    await setFlash({
-      type: "success",
-      message: assignedTo ? `Assigned to ${assigneeName}` : "Issue unassigned",
-    });
     revalidatePath(`/issues/${issueId}`);
     revalidatePath("/issues");
     revalidatePath(`/machines/${currentIssue.machineId}`);
 
-    redirect(`/issues/${issueId}`);
+    return ok({ issueId });
   } catch (error) {
     if (isNextRedirectError(error)) {
       throw error;
@@ -574,26 +545,24 @@ export async function assignIssueAction(formData: FormData): Promise<void> {
       },
       "Assign issue error"
     );
-    await setFlash({
-      type: "error",
-      message: "Failed to assign issue",
-    });
-    redirect(`/issues/${issueId}`);
+    return err("SERVER", "Failed to assign issue");
   }
 }
 
 /**
  * Adds a comment to an issue.
  */
-export async function addCommentAction(formData: FormData): Promise<void> {
+export async function addCommentAction(
+  _prevState: AddCommentResult | undefined,
+  formData: FormData
+): Promise<AddCommentResult> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    await setFlash({ type: "error", message: "Unauthorized" });
-    redirect("/login");
+    return err("UNAUTHORIZED", "Unauthorized");
   }
 
   const validation = addCommentSchema.safeParse({
@@ -602,12 +571,10 @@ export async function addCommentAction(formData: FormData): Promise<void> {
   });
 
   if (!validation.success) {
-    const issueId = toOptionalString(formData.get("issueId")) ?? "";
-    await setFlash({
-      type: "error",
-      message: validation.error.issues[0]?.message ?? "Invalid input",
-    });
-    redirect(`/issues/${issueId}`);
+    return err(
+      "VALIDATION",
+      validation.error.issues[0]?.message ?? "Invalid input"
+    );
   }
 
   const { issueId, comment } = validation.data;
@@ -619,7 +586,6 @@ export async function addCommentAction(formData: FormData): Promise<void> {
       content: comment,
       isSystem: false,
     });
-    await setFlash({ type: "success", message: "Comment added" });
   } catch (error) {
     log.error(
       {
@@ -628,9 +594,9 @@ export async function addCommentAction(formData: FormData): Promise<void> {
       },
       "Failed to add issue comment"
     );
-    await setFlash({ type: "error", message: "Failed to add comment" });
+    return err("SERVER", "Failed to add comment");
   }
 
   revalidatePath(`/issues/${issueId}`);
-  redirect(`/issues/${issueId}`);
+  return ok({ issueId });
 }
