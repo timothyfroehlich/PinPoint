@@ -20,6 +20,7 @@ CREATE TABLE "issues" (
 	"description" text,
 	"status" text DEFAULT 'new' NOT NULL,
 	"severity" text DEFAULT 'playable' NOT NULL,
+	"priority" text DEFAULT 'low' NOT NULL,
 	"reported_by" uuid,
 	"assigned_to" uuid,
 	"resolved_at" timestamp with time zone,

@@ -34,6 +34,9 @@ export const createIssueSchema = z.object({
   severity: z.enum(["minor", "playable", "unplayable"], {
     message: "Invalid severity level",
   }),
+  priority: z.enum(["low", "medium", "high"], {
+    message: "Invalid priority level",
+  }),
 });
 
 /**
@@ -53,6 +56,16 @@ export const updateIssueSeveritySchema = z.object({
   issueId: uuidish,
   severity: z.enum(["minor", "playable", "unplayable"], {
     message: "Invalid severity level",
+  }),
+});
+
+/**
+ * Schema for updating issue priority
+ */
+export const updateIssuePrioritySchema = z.object({
+  issueId: uuidish,
+  priority: z.enum(["low", "medium", "high"], {
+    message: "Invalid priority level",
   }),
 });
 

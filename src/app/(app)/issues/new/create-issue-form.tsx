@@ -128,6 +128,27 @@ export function CreateIssueForm({
           </p>
         </div>
 
+        {/* Priority */}
+        <div className="space-y-2">
+          <Label htmlFor="priority" className="text-on-surface">
+            Priority *
+          </Label>
+          <select
+            id="priority"
+            name="priority"
+            defaultValue="low"
+            required
+            className="w-full rounded-md border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface"
+          >
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+          <p className="text-xs text-on-surface-variant">
+            How urgent is this issue?
+          </p>
+        </div>
+
         {/* Submit Button */}
         <div className="flex gap-3 pt-4">
           <Button
