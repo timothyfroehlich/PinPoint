@@ -6,6 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { CreateMachineForm } from "./create-machine-form";
+import { db } from "~/server/db";
+import { userProfiles } from "~/server/db/schema";
+import { eq, asc } from "drizzle-orm";
 
 /**
  * Create Machine Page (Protected Route)
@@ -22,6 +25,22 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
 
   if (!user) {
     redirect("/login");
+  }
+
+  // Fetch all users for owner selection (Admin only)
+  const currentUserProfile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, user.id),
+    columns: { role: true },
+  });
+
+  const isAdmin = currentUserProfile?.role === "admin";
+
+  let allUsers: { id: string; name: string }[] = [];
+  if (isAdmin) {
+    allUsers = await db
+      .select({ id: userProfiles.id, name: userProfiles.name })
+      .from(userProfiles)
+      .orderBy(asc(userProfiles.name));
   }
 
   return (
@@ -61,7 +80,7 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <CreateMachineForm />
+            <CreateMachineForm allUsers={allUsers} isAdmin={isAdmin} />
           </CardContent>
         </Card>
       </div>

@@ -21,6 +21,11 @@ vi.mock("~/lib/supabase/server", () => ({
 vi.mock("~/server/db", () => ({
   db: {
     insert: vi.fn(),
+    query: {
+      issues: {
+        findFirst: vi.fn(),
+      },
+    },
   },
 }));
 
@@ -31,6 +36,11 @@ vi.mock("~/lib/logger", () => ({
     warn: vi.fn(),
     error: vi.fn(),
   },
+}));
+
+// Mock notifications
+vi.mock("~/lib/notifications", () => ({
+  createNotification: vi.fn(),
 }));
 
 import { revalidatePath } from "next/cache";

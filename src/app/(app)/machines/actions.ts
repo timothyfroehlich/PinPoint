@@ -7,7 +7,6 @@
 
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
@@ -15,6 +14,7 @@ import { machines } from "~/server/db/schema";
 import { createMachineSchema, updateMachineSchema } from "./schemas";
 import { type Result, ok, err } from "~/lib/result";
 import { eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
 
@@ -72,6 +72,7 @@ export async function createMachineAction(
   // Extract form data
   const rawData = {
     name: formData.get("name"),
+    ownerId: formData.get("ownerId"),
   };
 
   // Validate input (CORE-SEC-002)
@@ -89,6 +90,7 @@ export async function createMachineAction(
       .insert(machines)
       .values({
         name,
+        ownerId: validation.data.ownerId ?? user.id, // Default to creator if not specified
       })
       .returning();
 
@@ -135,6 +137,7 @@ export async function updateMachineAction(
   const rawData = {
     id: formData.get("id"),
     name: formData.get("name"),
+    ownerId: formData.get("ownerId"),
   };
 
   const validation = updateMachineSchema.safeParse(rawData);
@@ -148,7 +151,10 @@ export async function updateMachineAction(
   try {
     const [machine] = await db
       .update(machines)
-      .set({ name })
+      .set({
+        name,
+        ...(validation.data.ownerId && { ownerId: validation.data.ownerId }),
+      })
       .where(eq(machines.id, id))
       .returning();
 

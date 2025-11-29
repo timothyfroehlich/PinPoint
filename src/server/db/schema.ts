@@ -6,6 +6,7 @@ import {
   timestamp,
   boolean,
   pgSchema,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 const authSchema = pgSchema("auth");
@@ -47,6 +48,7 @@ export const userProfiles = pgTable("user_profiles", {
 export const machines = pgTable("machines", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
+  ownerId: uuid("owner_id").references(() => userProfiles.id),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -90,6 +92,26 @@ export const issues = pgTable(
 );
 
 /**
+ * Issue Watchers Table
+ *
+ * Users watching an issue for notifications.
+ */
+export const issueWatchers = pgTable(
+  "issue_watchers",
+  {
+    issueId: uuid("issue_id")
+      .notNull()
+      .references(() => issues.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => userProfiles.id, { onDelete: "cascade" }),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.issueId, t.userId] }),
+  })
+);
+
+/**
  * Issue Comments Table
  *
  * Comments on issues, including system-generated timeline events.
@@ -111,17 +133,83 @@ export const issueComments = pgTable("issue_comments", {
 });
 
 /**
+ * Notifications Table
+ *
+ * In-app notifications for users.
+ */
+export const notifications = pgTable("notifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => userProfiles.id, { onDelete: "cascade" }),
+  type: text("type", {
+    enum: [
+      "issue_assigned",
+      "issue_status_changed",
+      "new_comment",
+      "new_issue",
+    ],
+  }).notNull(),
+  resourceId: uuid("resource_id").notNull(), // Generic reference to issue or machine
+  resourceType: text("resource_type", { enum: ["issue", "machine"] }).notNull(),
+  readAt: timestamp("read_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+/**
+ * Notification Preferences Table
+ *
+ * User preferences for notifications.
+ */
+export const notificationPreferences = pgTable("notification_preferences", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => userProfiles.id, { onDelete: "cascade" }),
+  emailEnabled: boolean("email_enabled").notNull().default(true),
+  inAppEnabled: boolean("in_app_enabled").notNull().default(true),
+  notifyOnAssigned: boolean("notify_on_assigned").notNull().default(true),
+  notifyOnStatusChange: boolean("notify_on_status_change")
+    .notNull()
+    .default(true),
+  notifyOnNewComment: boolean("notify_on_new_comment").notNull().default(true),
+  notifyOnNewIssue: boolean("notify_on_new_issue").notNull().default(true), // For owned machines
+  watchNewIssuesGlobal: boolean("watch_new_issues_global")
+    .notNull()
+    .default(false),
+  autoWatchOwnedMachines: boolean("auto_watch_owned_machines")
+    .notNull()
+    .default(true),
+});
+
+/**
  * Relations
  */
 
-export const userProfilesRelations = relations(userProfiles, ({ many }) => ({
-  reportedIssues: many(issues, { relationName: "reported_by" }),
-  assignedIssues: many(issues, { relationName: "assigned_to" }),
-  comments: many(issueComments),
-}));
+export const userProfilesRelations = relations(
+  userProfiles,
+  ({ many, one }) => ({
+    reportedIssues: many(issues, { relationName: "reported_by" }),
+    assignedIssues: many(issues, { relationName: "assigned_to" }),
+    comments: many(issueComments),
+    ownedMachines: many(machines, { relationName: "owner" }),
+    notificationPreferences: one(notificationPreferences, {
+      fields: [userProfiles.id],
+      references: [notificationPreferences.userId],
+    }),
+    notifications: many(notifications),
+    watchedIssues: many(issueWatchers),
+  })
+);
 
-export const machinesRelations = relations(machines, ({ many }) => ({
+export const machinesRelations = relations(machines, ({ many, one }) => ({
   issues: many(issues),
+  owner: one(userProfiles, {
+    fields: [machines.ownerId],
+    references: [userProfiles.id],
+    relationName: "owner",
+  }),
 }));
 
 export const issuesRelations = relations(issues, ({ one, many }) => ({
@@ -140,6 +228,18 @@ export const issuesRelations = relations(issues, ({ one, many }) => ({
     relationName: "assigned_to",
   }),
   comments: many(issueComments),
+  watchers: many(issueWatchers),
+}));
+
+export const issueWatchersRelations = relations(issueWatchers, ({ one }) => ({
+  issue: one(issues, {
+    fields: [issueWatchers.issueId],
+    references: [issues.id],
+  }),
+  user: one(userProfiles, {
+    fields: [issueWatchers.userId],
+    references: [userProfiles.id],
+  }),
 }));
 
 export const issueCommentsRelations = relations(issueComments, ({ one }) => ({
@@ -152,3 +252,20 @@ export const issueCommentsRelations = relations(issueComments, ({ one }) => ({
     references: [userProfiles.id],
   }),
 }));
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(userProfiles, {
+    fields: [notifications.userId],
+    references: [userProfiles.id],
+  }),
+}));
+
+export const notificationPreferencesRelations = relations(
+  notificationPreferences,
+  ({ one }) => ({
+    user: one(userProfiles, {
+      fields: [notificationPreferences.userId],
+      references: [userProfiles.id],
+    }),
+  })
+);

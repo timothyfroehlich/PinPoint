@@ -82,6 +82,9 @@ export default async function IssueDetailPage({
             },
           },
         },
+        watchers: {
+          columns: { userId: true },
+        },
       },
     });
 
@@ -156,7 +159,11 @@ export default async function IssueDetailPage({
         </section>
 
         {/* Sticky Sidebar */}
-        <IssueSidebar issue={issue} allUsers={allUsers} />
+        <IssueSidebar
+          issue={issue}
+          allUsers={allUsers}
+          currentUserId={user.id}
+        />
       </div>
     </PageShell>
   );

@@ -75,14 +75,12 @@ export function UserMenu({
           <span className="ml-auto text-xs">(Soon)</span>
         </DropdownMenuItem>
 
-        {/* Settings - future implementation */}
-        <DropdownMenuItem
-          disabled
-          className="cursor-not-allowed opacity-50 text-on-surface-variant"
-        >
-          <Settings className="mr-2 size-4" />
-          <span>Settings</span>
-          <span className="ml-auto text-xs">(Soon)</span>
+        {/* Settings */}
+        <DropdownMenuItem asChild>
+          <a href="/settings" className="flex items-center cursor-pointer">
+            <Settings className="mr-2 size-4" />
+            <span>Settings</span>
+          </a>
         </DropdownMenuItem>
 
         <DropdownMenuSeparator className="bg-outline-variant" />

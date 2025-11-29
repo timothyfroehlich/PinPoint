@@ -12,9 +12,17 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { issues, userProfiles, issueComments } from "~/server/db/schema";
+import {
+  issues,
+  userProfiles,
+  issueComments,
+  issueWatchers,
+  notificationPreferences,
+  machines,
+} from "~/server/db/schema";
 import { createTimelineEvent } from "~/lib/timeline/events";
 import { log } from "~/lib/logger";
+import { createNotification } from "~/lib/notifications";
 import {
   createIssueSchema,
   updateIssueStatusSchema,
@@ -142,6 +150,64 @@ export async function createIssueAction(
       "Issue created successfully"
     );
 
+    // --- Notifications & Watchers ---
+    try {
+      const watcherIds = new Set<string>();
+
+      // 1. Reporter (always watches)
+      watcherIds.add(user.id);
+
+      // 2. Machine Owner (if auto-watch enabled)
+      const machine = await db.query.machines.findFirst({
+        where: eq(machines.id, machineId),
+        with: { owner: true },
+      });
+
+      if (machine?.ownerId) {
+        const ownerPrefs = await db.query.notificationPreferences.findFirst({
+          where: eq(notificationPreferences.userId, machine.ownerId),
+        });
+        if (ownerPrefs?.autoWatchOwnedMachines) {
+          watcherIds.add(machine.ownerId);
+        }
+      }
+
+      // 3. Global Subscribers
+      const globalSubs = await db.query.notificationPreferences.findMany({
+        where: eq(notificationPreferences.watchNewIssuesGlobal, true),
+      });
+      globalSubs.forEach((sub) => watcherIds.add(sub.userId));
+
+      // Insert Watchers
+      if (watcherIds.size > 0) {
+        await db
+          .insert(issueWatchers)
+          .values(
+            Array.from(watcherIds).map((userId) => ({
+              issueId: issue.id,
+              userId,
+            }))
+          )
+          .onConflictDoNothing();
+      }
+
+      // Trigger Notification
+      await createNotification({
+        type: "new_issue",
+        resourceId: issue.id,
+        resourceType: "issue",
+        actorId: user.id,
+        issueTitle: title,
+        machineName: machine?.name ?? undefined,
+      });
+    } catch (error) {
+      log.error(
+        { error, action: "createIssue.notifications" },
+        "Failed to process notifications"
+      );
+      // Don't fail the action if notifications fail
+    }
+
     revalidatePath("/issues");
     revalidatePath(`/machines/${machineId}`);
 
@@ -231,6 +297,29 @@ export async function updateIssueStatusAction(
       { issueId, oldStatus, newStatus: status, action: "updateIssueStatus" },
       "Issue status updated"
     );
+
+    // Trigger Notification
+    try {
+      const issue = await db.query.issues.findFirst({
+        where: eq(issues.id, issueId),
+        with: { machine: true },
+      });
+
+      await createNotification({
+        type: "issue_status_changed",
+        resourceId: issueId,
+        resourceType: "issue",
+        actorId: user.id,
+        issueTitle: issue?.title ?? undefined,
+        machineName: issue?.machine.name ?? undefined,
+        newStatus: status,
+      });
+    } catch (error) {
+      log.error(
+        { error, action: "updateIssueStatus.notifications" },
+        "Failed to send notification"
+      );
+    }
 
     revalidatePath(`/issues/${issueId}`);
     revalidatePath("/issues");
@@ -428,6 +517,40 @@ export async function assignIssueAction(
       "Issue assignment updated"
     );
 
+    // Trigger Notification & Add Watcher
+    try {
+      const issue = await db.query.issues.findFirst({
+        where: eq(issues.id, issueId),
+        with: { machine: true },
+      });
+
+      if (assignedTo) {
+        // Add assignee as watcher
+        await db
+          .insert(issueWatchers)
+          .values({
+            issueId,
+            userId: assignedTo,
+          })
+          .onConflictDoNothing();
+
+        // Notify
+        await createNotification({
+          type: "issue_assigned",
+          resourceId: issueId,
+          resourceType: "issue",
+          actorId: user.id,
+          issueTitle: issue?.title ?? undefined,
+          machineName: issue?.machine.name ?? undefined,
+        });
+      }
+    } catch (error) {
+      log.error(
+        { error, action: "assignIssue.notifications" },
+        "Failed to process notifications"
+      );
+    }
+
     revalidatePath(`/issues/${issueId}`);
     revalidatePath("/issues");
     revalidatePath(`/machines/${currentIssue.machineId}`);
@@ -484,6 +607,22 @@ export async function addCommentAction(
       authorId: user.id,
       content: comment,
       isSystem: false,
+    });
+
+    // Trigger Notification
+    const issue = await db.query.issues.findFirst({
+      where: eq(issues.id, issueId),
+      with: { machine: true },
+    });
+
+    await createNotification({
+      type: "new_comment",
+      resourceId: issueId,
+      resourceType: "issue",
+      actorId: user.id,
+      issueTitle: issue?.title ?? undefined,
+      machineName: issue?.machine.name ?? undefined,
+      commentContent: comment,
     });
   } catch (error) {
     log.error(

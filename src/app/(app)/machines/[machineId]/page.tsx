@@ -4,8 +4,8 @@ import { cn } from "~/lib/utils";
 import Link from "next/link";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { machines } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
+import { machines, userProfiles } from "~/server/db/schema";
+import { eq, asc } from "drizzle-orm";
 import {
   deriveMachineStatus,
   getMachineStatusLabel,
@@ -56,8 +56,28 @@ export default async function MachineDetailPage({
         },
         orderBy: (issues, { desc }) => [desc(issues.createdAt)],
       },
+      owner: true,
     },
   });
+
+  // Fetch all users for owner selection (Admin only? For now fetch for all authorized users)
+  // Ideally we check if user is admin, but let's just fetch for now and handle UI visibility in form if needed.
+  // Actually, plan says "Admin only".
+  // Let's check role.
+  const currentUserProfile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, user.id),
+    columns: { role: true },
+  });
+
+  const isAdmin = currentUserProfile?.role === "admin";
+
+  let allUsers: { id: string; name: string }[] = [];
+  if (isAdmin) {
+    allUsers = await db
+      .select({ id: userProfiles.id, name: userProfiles.name })
+      .from(userProfiles)
+      .orderBy(asc(userProfiles.name));
+  }
 
   // 404 if machine not found
   if (!machine) {
@@ -122,7 +142,11 @@ export default async function MachineDetailPage({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <UpdateMachineForm machine={machine} />
+              <UpdateMachineForm
+                machine={machine}
+                allUsers={allUsers}
+                isAdmin={isAdmin}
+              />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Status */}
                 <div>
