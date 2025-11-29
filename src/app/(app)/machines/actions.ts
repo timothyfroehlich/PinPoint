@@ -72,7 +72,11 @@ export async function createMachineAction(
   // Extract form data
   const rawData = {
     name: formData.get("name"),
-    ownerId: formData.get("ownerId"),
+    ownerId:
+      typeof formData.get("ownerId") === "string" &&
+      (formData.get("ownerId") as string).length > 0
+        ? (formData.get("ownerId") as string)
+        : undefined,
   };
 
   // Validate input (CORE-SEC-002)
@@ -137,7 +141,11 @@ export async function updateMachineAction(
   const rawData = {
     id: formData.get("id"),
     name: formData.get("name"),
-    ownerId: formData.get("ownerId"),
+    ownerId:
+      typeof formData.get("ownerId") === "string" &&
+      (formData.get("ownerId") as string).length > 0
+        ? (formData.get("ownerId") as string)
+        : undefined,
   };
 
   const validation = updateMachineSchema.safeParse(rawData);
