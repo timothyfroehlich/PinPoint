@@ -58,6 +58,7 @@ export function createTestIssue(
     description: overrides?.description ?? "Test description",
     status: overrides?.status ?? "new",
     severity: overrides?.severity ?? "playable",
+    priority: overrides?.priority ?? "low",
     reportedBy: overrides?.reportedBy ?? null,
     assignedTo: overrides?.assignedTo ?? null,
     resolvedAt: overrides?.resolvedAt ?? null,

@@ -27,6 +27,7 @@ import {
   createIssueSchema,
   updateIssueStatusSchema,
   updateIssueSeveritySchema,
+  updateIssuePrioritySchema,
   assignIssueSchema,
   addCommentSchema,
 } from "./schemas";
@@ -59,6 +60,11 @@ export type UpdateIssueStatusResult = Result<
 >;
 
 export type UpdateIssueSeverityResult = Result<
+  { issueId: string },
+  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+>;
+
+export type UpdateIssuePriorityResult = Result<
   { issueId: string },
   "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
 >;
@@ -103,6 +109,7 @@ export async function createIssueAction(
     description: toOptionalString(formData.get("description")),
     machineId: toOptionalString(formData.get("machineId")),
     severity: toOptionalString(formData.get("severity")),
+    priority: toOptionalString(formData.get("priority")),
   };
 
   const validation = createIssueSchema.safeParse(rawData);
@@ -119,7 +126,7 @@ export async function createIssueAction(
     return err("VALIDATION", firstError?.message ?? "Invalid input");
   }
 
-  const { title, description, machineId, severity } = validation.data;
+  const { title, description, machineId, severity, priority } = validation.data;
 
   // Create issue (direct Drizzle query - no DAL)
   try {
@@ -130,6 +137,7 @@ export async function createIssueAction(
         description: description ?? null,
         machineId,
         severity,
+        priority,
         reportedBy: user.id,
         status: "new",
       })
@@ -431,6 +439,100 @@ export async function updateIssueSeverityAction(
       "Update issue severity error"
     );
     return err("SERVER", "Failed to update severity");
+  }
+}
+
+/**
+ * Update Issue Priority Action
+ *
+ * Updates issue priority and creates timeline event.
+ *
+ * @param _prevState - Previous action state (unused, required for useActionState)
+ * @param formData - Form data with issueId and priority
+ */
+export async function updateIssuePriorityAction(
+  _prevState: UpdateIssuePriorityResult | undefined,
+  formData: FormData
+): Promise<UpdateIssuePriorityResult> {
+  // Auth check
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return err("UNAUTHORIZED", "Unauthorized");
+  }
+
+  // Validate input
+  const rawData = {
+    issueId: toOptionalString(formData.get("issueId")),
+    priority: toOptionalString(formData.get("priority")),
+  };
+
+  const validation = updateIssuePrioritySchema.safeParse(rawData);
+  if (!validation.success) {
+    const firstError = validation.error.issues[0];
+    return err("VALIDATION", firstError?.message ?? "Invalid input");
+  }
+
+  const { issueId, priority } = validation.data;
+
+  try {
+    // Get current issue to check old priority
+    const currentIssue = await db.query.issues.findFirst({
+      where: eq(issues.id, issueId),
+      columns: { priority: true, machineId: true },
+    });
+
+    if (!currentIssue) {
+      return err("NOT_FOUND", "Issue not found");
+    }
+
+    const oldPriority = currentIssue.priority;
+
+    // Update priority
+    await db
+      .update(issues)
+      .set({
+        priority,
+        updatedAt: new Date(),
+      })
+      .where(eq(issues.id, issueId));
+
+    // Create timeline event
+    await createTimelineEvent(
+      issueId,
+      `Priority changed from ${oldPriority} to ${priority}`
+    );
+
+    log.info(
+      {
+        issueId,
+        oldPriority,
+        newPriority: priority,
+        action: "updateIssuePriority",
+      },
+      "Issue priority updated"
+    );
+
+    revalidatePath(`/issues/${issueId}`);
+    revalidatePath("/issues");
+    revalidatePath(`/machines/${currentIssue.machineId}`);
+
+    return ok({ issueId });
+  } catch (error) {
+    if (isNextRedirectError(error)) {
+      throw error;
+    }
+    log.error(
+      {
+        error: error instanceof Error ? error.message : "Unknown",
+        action: "updateIssuePriority",
+      },
+      "Update issue priority error"
+    );
+    return err("SERVER", "Failed to update priority");
   }
 }
 
