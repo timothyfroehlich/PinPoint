@@ -17,7 +17,7 @@
     "test:integration:supabase": "vitest run --project integration-supabase --silent --no-color",
     "test:watch": "vitest watch --project unit",
     "test:coverage": "vitest run --project unit --coverage --silent --no-color",
-    "test:generate-schema": "drizzle-kit generate --dialect=postgresql --schema=./src/server/db/schema.ts --out=src/test/setup/migrations",
+    "test:generate-schema": "drizzle-kit export --dialect=postgresql --schema=./src/server/db/schema.ts > src/test/setup/schema.sql",
     "smoke": "playwright test e2e/smoke",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
