@@ -1,107 +1,806 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-# Multi-Worktree Sync Script
-# Synchronizes dependencies, schemas, and environment variables across all PinPoint worktrees
+# Comprehensive Worktree Management Script
+# Fixes configs, merges main, detects merged PRs, restarts Supabase, and syncs dependencies
 
-MAIN_DIR="$HOME/Code/PinPoint"
-SECONDARY_DIR="$HOME/Code/PinPoint-Secondary"
-REVIEW_DIR="$HOME/Code/PinPoint-review"
-ANTIGRAVITY_DIR="$HOME/Code/PinPoint-AntiGravity"
+# ============================================================================
+# GLOBAL VARIABLES
+# ============================================================================
 
-WORKTREES=("$MAIN_DIR" "$SECONDARY_DIR" "$REVIEW_DIR" "$ANTIGRAVITY_DIR")
+# Command-line flags
+DRY_RUN=false
+NON_INTERACTIVE=false
+PROCESS_ALL=false
 
-echo "🔄 Syncing 4 worktrees..."
+# State tracking (associative arrays)
+declare -A WORKTREE_PATHS
+declare -A CONFIG_FIXED
+declare -A CONFIG_MESSAGES
+declare -A STASH_REFS
+declare -A PRE_MERGE_SHAS
+declare -A MERGE_STATUS
+declare -A MERGE_MESSAGES
+declare -A CONFLICTS_PRESENT
+declare -A RECOVERY_COMMANDS
+declare -A OVERALL_STATUS
+declare -A SUPABASE_RESTARTED
 
-# 1. Sync dependencies
-echo ""
-echo "📦 Running npm install in all worktrees..."
-for dir in "${WORKTREES[@]}"; do
-  if [ -d "$dir" ]; then
-    echo "  → $(basename "$dir")"
-    (cd "$dir" && npm install --silent 2>&1 | grep -v "^npm")
+# Port allocation table (from AGENTS.md)
+# Next.js uses +100 offsets, Supabase uses +1000 offsets
+declare -A NEXTJS_PORT_OFFSETS=(
+  ["PinPoint"]=0
+  ["PinPoint-Secondary"]=100
+  ["PinPoint-review"]=200
+  ["PinPoint-AntiGravity"]=300
+)
+
+declare -A SUPABASE_PORT_OFFSETS=(
+  ["PinPoint"]=0
+  ["PinPoint-Secondary"]=1000
+  ["PinPoint-review"]=2000
+  ["PinPoint-AntiGravity"]=3000
+)
+
+declare -A PROJECT_IDS=(
+  ["PinPoint"]="pinpoint"
+  ["PinPoint-Secondary"]="pinpoint-secondary"
+  ["PinPoint-review"]="pinpoint-review"
+  ["PinPoint-AntiGravity"]="pinpoint-antigravity"
+)
+
+# Base ports
+BASE_PORT_NEXTJS=3000
+BASE_PORT_API=54321
+BASE_PORT_DB=54322
+BASE_PORT_SHADOW=54320
+BASE_PORT_POOLER=54329
+BASE_PORT_INBUCKET=54324
+
+# ============================================================================
+# UTILITY FUNCTIONS
+# ============================================================================
+
+# Print colored output
+print_status() {
+  local status=$1
+  shift
+  case "$status" in
+    success) echo "✅ $*" ;;
+    warning) echo "⚠️  $*" ;;
+    error) echo "❌ $*" ;;
+    info) echo "ℹ️  $*" ;;
+    *) echo "$*" ;;
+  esac
+}
+
+# Dry-run wrapper
+run_command() {
+  local cmd="$1"
+  if [ "$DRY_RUN" = true ]; then
+    echo "[DRY-RUN] Would run: $cmd"
+    return 0
+  else
+    eval "$cmd"
   fi
-done
+}
 
-# 2. Sync test schemas (Drizzle schema.ts is auto-synced by git)
-echo ""
-echo "🗄️  Regenerating test schemas..."
-for dir in "${WORKTREES[@]}"; do
-  if [ -d "$dir" ]; then
-    echo "  → $(basename "$dir")"
-    (cd "$dir" && npm run test:generate-schema --silent 2>&1 | grep -v "warn" | grep -v "npm")
+# Interactive prompt with timeout and -y override
+prompt_with_timeout() {
+  local message="$1"
+  local default="${2:-N}"
+  local timeout="${3:-5}"
+
+  if [ "$DRY_RUN" = true ]; then
+    local answer="N"
+    if [ "$NON_INTERACTIVE" = true ]; then
+      answer="Y"
+    fi
+    echo "[DRY-RUN] Would prompt: \"$message\" Answer: $answer"
+    [ "$answer" = "Y" ]
+    return $?
   fi
-done
 
-# 3. Check for new environment variables
-echo ""
-echo "🔑 Checking for new environment variables..."
-if [ -f "$MAIN_DIR/.env.example" ]; then
-  EXAMPLE_KEYS=$(grep -v '^#' "$MAIN_DIR/.env.example" | grep -v '^$' | grep '=' | cut -d'=' -f1)
+  if [ "$NON_INTERACTIVE" = true ]; then
+    echo "$message Y (auto-accepted with -y)"
+    return 0
+  fi
 
-  for worktree_dir in "$SECONDARY_DIR" "$REVIEW_DIR" "$ANTIGRAVITY_DIR"; do
-    if [ -f "$worktree_dir/.env.local" ]; then
-      worktree_name=$(basename "$worktree_dir")
-      missing_keys=()
+  local response
+  read -t "$timeout" -p "$message " response || true
+  response=${response:-$default}
 
-      for key in $EXAMPLE_KEYS; do
-        if ! grep -q "^$key=" "$worktree_dir/.env.local"; then
-          missing_keys+=("$key")
-        fi
-      done
+  [[ "$response" =~ ^[Yy]$ ]]
+}
 
-      if [ ${#missing_keys[@]} -gt 0 ]; then
-        echo "  ⚠️  Missing in $worktree_name:"
-        for key in "${missing_keys[@]}"; do
-          echo "      - $key"
-        done
+# Get worktree name from path
+get_worktree_name() {
+  basename "$1"
+}
+
+# Get expected configuration for a worktree
+get_nextjs_port_offset() {
+  local name="$1"
+  echo "${NEXTJS_PORT_OFFSETS[$name]:-0}"
+}
+
+get_supabase_port_offset() {
+  local name="$1"
+  echo "${SUPABASE_PORT_OFFSETS[$name]:-0}"
+}
+
+get_project_id() {
+  local name="$1"
+  echo "${PROJECT_IDS[$name]:-unknown}"
+}
+
+# Update overall status (error > warning > success)
+update_overall_status() {
+  local name="$1"
+  local status="$2"
+
+  local current="${OVERALL_STATUS[$name]:-success}"
+
+  if [ "$status" = "error" ] || [ "$current" = "error" ]; then
+    OVERALL_STATUS[$name]="error"
+  elif [ "$status" = "warning" ] || [ "$current" = "warning" ]; then
+    OVERALL_STATUS[$name]="warning"
+  else
+    OVERALL_STATUS[$name]="success"
+  fi
+}
+
+# ============================================================================
+# PHASE 1: CONFIGURATION FIXING
+# ============================================================================
+
+fix_config_toml() {
+  local worktree_dir="$1"
+  local name="$2"
+  local config_file="$worktree_dir/supabase/config.toml"
+
+  if [ ! -f "$config_file" ]; then
+    CONFIG_MESSAGES[$name]="Missing supabase/config.toml"
+    update_overall_status "$name" "error"
+    return 1
+  fi
+
+  # Calculate expected values
+  local offset=$(get_supabase_port_offset "$name")
+  local expected_project_id=$(get_project_id "$name")
+  local expected_api_port=$((BASE_PORT_API + offset))
+  local expected_db_port=$((BASE_PORT_DB + offset))
+  local expected_shadow_port=$((BASE_PORT_SHADOW + offset))
+  local expected_pooler_port=$((BASE_PORT_POOLER + offset))
+
+  # Read current values
+  local current_project_id=$(grep '^project_id =' "$config_file" | sed 's/project_id = "\(.*\)"/\1/')
+  local current_api_port=$(sed -n '/^\[api\]/,/^\[/ { /^port = / { s/port = //p; q } }' "$config_file")
+  local current_db_port=$(sed -n '/^\[db\]/,/^\[/ { /^port = / { s/port = //p; q } }' "$config_file")
+  local current_shadow_port=$(sed -n '/^\[db\]/,/^\[/ { /^shadow_port = / { s/shadow_port = //p; q } }' "$config_file")
+  local current_pooler_port=$(sed -n '/^\[db\.pooler\]/,/^\[/ { /^port = / { s/port = //p; q } }' "$config_file")
+
+  local changes=()
+  local needs_fix=false
+
+  # Check each value
+  if [ "$current_project_id" != "$expected_project_id" ]; then
+    changes+=("project_id: $current_project_id → $expected_project_id")
+    needs_fix=true
+  fi
+
+  if [ "$current_api_port" != "$expected_api_port" ]; then
+    changes+=("API port: $current_api_port → $expected_api_port")
+    needs_fix=true
+  fi
+
+  if [ "$current_db_port" != "$expected_db_port" ]; then
+    changes+=("DB port: $current_db_port → $expected_db_port")
+    needs_fix=true
+  fi
+
+  if [ "$current_shadow_port" != "$expected_shadow_port" ]; then
+    changes+=("Shadow port: $current_shadow_port → $expected_shadow_port")
+    needs_fix=true
+  fi
+
+  if [ "$current_pooler_port" != "$expected_pooler_port" ]; then
+    changes+=("Pooler port: $current_pooler_port → $expected_pooler_port")
+    needs_fix=true
+  fi
+
+  if [ "$needs_fix" = false ]; then
+    CONFIG_MESSAGES[$name]="Validated (no changes needed)"
+    CONFIG_FIXED[$name]=false
+    return 0
+  fi
+
+  # Create backup and apply fixes
+  local backup_file="${config_file}.bak.$(date +%Y%m%d-%H%M%S)"
+
+  if [ "$DRY_RUN" = true ]; then
+    echo "[DRY-RUN] Would fix config.toml in $name:"
+    for change in "${changes[@]}"; do
+      echo "[DRY-RUN]   $change"
+    done
+    echo "[DRY-RUN] Would create backup: $(basename "$backup_file")"
+  else
+    cp "$config_file" "$backup_file"
+
+    # Apply fixes with sed
+    sed -i "s/^project_id = .*/project_id = \"$expected_project_id\"/" "$config_file"
+    sed -i "/^\[api\]/,/^\[/ s/^port = .*/port = $expected_api_port/" "$config_file"
+    sed -i "/^\[db\]/,/^\[/ { /^port = / s/port = .*/port = $expected_db_port/ }" "$config_file"
+    sed -i "/^\[db\]/,/^\[/ { /^shadow_port = / s/shadow_port = .*/shadow_port = $expected_shadow_port/ }" "$config_file"
+    sed -i "/^\[db\.pooler\]/,/^\[/ s/^port = .*/port = $expected_pooler_port/" "$config_file"
+  fi
+
+  CONFIG_FIXED[$name]=true
+  CONFIG_MESSAGES[$name]="Fixed: ${changes[*]}"
+  update_overall_status "$name" "warning"
+}
+
+fix_env_local() {
+  local worktree_dir="$1"
+  local name="$2"
+  local env_file="$worktree_dir/.env.local"
+
+  if [ ! -f "$env_file" ]; then
+    CONFIG_MESSAGES[$name]="${CONFIG_MESSAGES[$name]} | .env.local missing"
+    update_overall_status "$name" "warning"
+    return 1
+  fi
+
+  # Calculate expected values
+  local nextjs_offset=$(get_nextjs_port_offset "$name")
+  local supabase_offset=$(get_supabase_port_offset "$name")
+  local expected_nextjs_port=$((BASE_PORT_NEXTJS + nextjs_offset))
+  local expected_api_port=$((BASE_PORT_API + supabase_offset))
+  local expected_db_port=$((BASE_PORT_DB + supabase_offset))
+  local expected_inbucket_port=$((BASE_PORT_INBUCKET + supabase_offset))
+
+  local changes=()
+  local needs_fix=false
+
+  # Check current values
+  if grep -q "NEXT_PUBLIC_SUPABASE_URL" "$env_file"; then
+    local current_url_port=$(grep "NEXT_PUBLIC_SUPABASE_URL" "$env_file" | grep -oP ':\K[0-9]+')
+    if [ "$current_url_port" != "$expected_api_port" ]; then
+      changes+=(".env PORT in URL: $current_url_port → $expected_api_port")
+      needs_fix=true
+    fi
+  fi
+
+  if grep -q "^PORT=" "$env_file"; then
+    local current_nextjs_port=$(grep "^PORT=" "$env_file" | cut -d'=' -f2)
+    if [ "$current_nextjs_port" != "$expected_nextjs_port" ]; then
+      changes+=("Next.js PORT: $current_nextjs_port → $expected_nextjs_port")
+      needs_fix=true
+    fi
+  fi
+
+  if [ "$needs_fix" = false ]; then
+    return 0
+  fi
+
+  # Apply fixes
+  if [ "$DRY_RUN" = true ]; then
+    echo "[DRY-RUN] Would fix .env.local in $name:"
+    for change in "${changes[@]}"; do
+      echo "[DRY-RUN]   $change"
+    done
+  else
+    sed -i "s|NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:[0-9]*|NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:$expected_api_port|" "$env_file"
+    sed -i "s|@127.0.0.1:[0-9]*/|@127.0.0.1:$expected_db_port/|" "$env_file"
+    sed -i "s/MAILPIT_PORT=[0-9]*/MAILPIT_PORT=$expected_inbucket_port/" "$env_file"
+    sed -i "s/^PORT=[0-9]*/PORT=$expected_nextjs_port/" "$env_file"
+  fi
+
+  CONFIG_MESSAGES[$name]="${CONFIG_MESSAGES[$name]} | .env.local fixed"
+}
+
+fix_skip_worktree() {
+  local worktree_dir="$1"
+  local name="$2"
+
+  local skip_flag=$(git -C "$worktree_dir" ls-files -v supabase/config.toml 2>/dev/null | cut -c 1)
+
+  if [ "$name" = "PinPoint" ]; then
+    # Main should NOT have skip-worktree
+    if [ "$skip_flag" = "S" ]; then
+      if [ "$DRY_RUN" = true ]; then
+        echo "[DRY-RUN] Would remove skip-worktree from $name"
+      else
+        git -C "$worktree_dir" update-index --no-skip-worktree supabase/config.toml
       fi
+      CONFIG_MESSAGES[$name]="${CONFIG_MESSAGES[$name]} | skip-worktree removed"
+    fi
+  else
+    # Others MUST have skip-worktree
+    if [ "$skip_flag" != "S" ]; then
+      if [ "$DRY_RUN" = true ]; then
+        echo "[DRY-RUN] Would add skip-worktree to $name"
+      else
+        git -C "$worktree_dir" update-index --skip-worktree supabase/config.toml
+      fi
+      CONFIG_MESSAGES[$name]="${CONFIG_MESSAGES[$name]} | skip-worktree added"
+    fi
+  fi
+}
+
+# ============================================================================
+# PHASE 2: GIT STATE MANAGEMENT
+# ============================================================================
+
+safe_stash() {
+  local worktree_dir="$1"
+  local branch="$2"
+  local name=$(get_worktree_name "$worktree_dir")
+
+  # Check if there are uncommitted changes
+  if git -C "$worktree_dir" diff-index --quiet HEAD --; then
+    return 0  # No changes, no stash needed
+  fi
+
+  local stash_name="sync-worktrees-auto-${branch}-$(date +%Y%m%d-%H%M%S)"
+
+  if [ "$DRY_RUN" = true ]; then
+    echo "[DRY-RUN] Would stash: $stash_name"
+  else
+    git -C "$worktree_dir" stash push -u -m "$stash_name" >/dev/null 2>&1
+    STASH_REFS[$name]="stash@{0}"
+  fi
+}
+
+# ============================================================================
+# PHASE 3: BRANCH OPERATIONS
+# ============================================================================
+
+check_merged_pr() {
+  local branch="$1"
+
+  # Check if gh CLI is available
+  if ! command -v gh &> /dev/null; then
+    return 1
+  fi
+
+  # Query for merged PR
+  local pr_json=$(gh pr list --repo timothyfroehlich/PinPoint \
+    --head "$branch" --state merged --json number,title,mergedAt --limit 1 2>/dev/null || echo "[]")
+
+  if [ "$pr_json" = "[]" ] || [ -z "$pr_json" ]; then
+    return 1
+  fi
+
+  # Extract PR number
+  echo "$pr_json" | grep -oP '"number":\K[0-9]+'
+}
+
+safe_merge_main() {
+  local worktree_dir="$1"
+  local branch="$2"
+  local name=$(get_worktree_name "$worktree_dir")
+
+  # Skip if on main or detached HEAD
+  if [ "$branch" = "main" ] || [ "$branch" = "HEAD" ]; then
+    MERGE_STATUS[$name]="skipped"
+    MERGE_MESSAGES[$name]="On main branch, no merge needed"
+    return 0
+  fi
+
+  # Check for merged PR
+  local pr_number=$(check_merged_pr "$branch")
+  if [ -n "$pr_number" ]; then
+    echo ""
+    if prompt_with_timeout "Branch '$branch' has merged PR #$pr_number. Checkout detached HEAD at main? (y/N):" "N" 10; then
+      if [ "$DRY_RUN" = true ]; then
+        echo "[DRY-RUN] Would run: git checkout --detach main"
+      else
+        git -C "$worktree_dir" checkout --detach main >/dev/null 2>&1
+      fi
+      MERGE_STATUS[$name]="detached"
+      MERGE_MESSAGES[$name]="Checked out detached HEAD at main (PR #$pr_number merged)"
+      RECOVERY_COMMANDS[$name]="# Consider deleting merged branch:\ngit branch -d $branch"
+      update_overall_status "$name" "warning"
+      return 0
+    else
+      MERGE_STATUS[$name]="declined"
+      MERGE_MESSAGES[$name]="Merged PR #$pr_number found, but user declined detached HEAD"
+      update_overall_status "$name" "warning"
+      return 0
+    fi
+  fi
+
+  # Save pre-merge SHA for recovery
+  PRE_MERGE_SHAS[$name]=$(git -C "$worktree_dir" rev-parse HEAD)
+
+  # Attempt merge
+  if [ "$DRY_RUN" = true ]; then
+    echo "[DRY-RUN] Would run: git merge main"
+    MERGE_STATUS[$name]="success"
+    MERGE_MESSAGES[$name]="Would merge main"
+    return 0
+  fi
+
+  local merge_output
+  local merge_exit_code=0
+  merge_output=$(git -C "$worktree_dir" merge main 2>&1) || merge_exit_code=$?
+
+  if [ $merge_exit_code -eq 0 ]; then
+    if echo "$merge_output" | grep -q "Already up to date"; then
+      MERGE_STATUS[$name]="up-to-date"
+      MERGE_MESSAGES[$name]="Already up to date with main"
+    else
+      MERGE_STATUS[$name]="merged"
+      MERGE_MESSAGES[$name]="Merged main successfully"
+    fi
+  else
+    MERGE_STATUS[$name]="conflicts"
+    MERGE_MESSAGES[$name]="Merge conflicts detected"
+    CONFLICTS_PRESENT[$name]=true
+    update_overall_status "$name" "error"
+
+    # Generate recovery commands
+    local recovery="cd $worktree_dir\n\n"
+    recovery+="# Option 1: Resolve conflicts manually\ngit status\n# Edit files, then:\ngit add <resolved-files>\ngit commit\n\n"
+    recovery+="# Option 2: Abort merge\ngit merge --abort\ngit reset --hard ${PRE_MERGE_SHAS[$name]}\n\n"
+    recovery+="# Option 3: Accept main's changes\ngit checkout --theirs .\ngit add .\ngit commit -m \"Merge main (accept all main changes)\""
+    RECOVERY_COMMANDS[$name]=$recovery
+
+    return 1
+  fi
+}
+
+# ============================================================================
+# PHASE 4: STASH REAPPLICATION
+# ============================================================================
+
+safe_stash_pop() {
+  local worktree_dir="$1"
+  local name=$(get_worktree_name "$worktree_dir")
+
+  # Skip if no stash
+  if [ -z "${STASH_REFS[$name]:-}" ]; then
+    return 0
+  fi
+
+  if [ "$DRY_RUN" = true ]; then
+    echo "[DRY-RUN] Would run: git stash pop"
+    return 0
+  fi
+
+  local pop_output
+  local pop_exit_code=0
+  pop_output=$(git -C "$worktree_dir" stash pop 2>&1) || pop_exit_code=$?
+
+  if [ $pop_exit_code -ne 0 ]; then
+    CONFLICTS_PRESENT[$name]=true
+    update_overall_status "$name" "error"
+
+    local recovery="cd $worktree_dir\n\n"
+    recovery+="# Stash pop conflicts detected\n\n"
+    recovery+="# Option 1: Resolve conflicts\ngit status\n# Edit files, then:\ngit add <resolved-files>\n\n"
+    recovery+="# Option 2: Discard stash changes\ngit reset --hard HEAD"
+
+    if [ -n "${RECOVERY_COMMANDS[$name]:-}" ]; then
+      RECOVERY_COMMANDS[$name]="${RECOVERY_COMMANDS[$name]}\n\n$recovery"
+    else
+      RECOVERY_COMMANDS[$name]=$recovery
+    fi
+  fi
+}
+
+# ============================================================================
+# PHASE 5: DEPENDENCY & DATABASE SYNC
+# ============================================================================
+
+run_npm_install() {
+  local worktree_dir="$1"
+  local name=$(get_worktree_name "$worktree_dir")
+
+  # Skip if conflicts present
+  if [ "${CONFLICTS_PRESENT[$name]:-false}" = true ]; then
+    return 1
+  fi
+
+  echo ""
+  if ! prompt_with_timeout "Run npm install in $name? [Y/n]:" "Y" 5; then
+    return 0
+  fi
+
+  if [ "$DRY_RUN" = true ]; then
+    echo "[DRY-RUN] Would run: npm install --silent"
+  else
+    (cd "$worktree_dir" && npm install --silent 2>&1 | grep -v "^npm") || true
+  fi
+}
+
+restart_supabase() {
+  local worktree_dir="$1"
+  local name=$(get_worktree_name "$worktree_dir")
+
+  # Skip if conflicts present or config wasn't fixed
+  if [ "${CONFLICTS_PRESENT[$name]:-false}" = true ] || [ "${CONFIG_FIXED[$name]:-false}" = false ]; then
+    return 0
+  fi
+
+  echo ""
+  if ! prompt_with_timeout "Restart Supabase and reseed database in $name? [Y/n]:" "Y" 5; then
+    return 0
+  fi
+
+  if [ "$DRY_RUN" = true ]; then
+    echo "[DRY-RUN] Would run:"
+    echo "[DRY-RUN]   supabase stop"
+    echo "[DRY-RUN]   supabase start"
+    echo "[DRY-RUN]   npm run db:reset:local"
+    echo "[DRY-RUN]   npm run db:seed"
+    echo "[DRY-RUN]   npm run db:seed-users"
+  else
+    (cd "$worktree_dir" && {
+      supabase stop 2>/dev/null || true
+      supabase start >/dev/null 2>&1 || true
+      npm run db:reset:local --silent 2>&1 | grep -v "warn" || true
+      npm run db:seed --silent 2>&1 || true
+      npm run db:seed-users --silent 2>&1 || true
+    })
+    SUPABASE_RESTARTED[$name]=true
+  fi
+}
+
+regenerate_test_schema() {
+  local worktree_dir="$1"
+
+  if [ "$DRY_RUN" = true ]; then
+    echo "[DRY-RUN] Would run: npm run test:generate-schema"
+  else
+    (cd "$worktree_dir" && npm run test:generate-schema --silent 2>&1 | grep -v "warn" | grep -v "npm") || true
+  fi
+}
+
+# ============================================================================
+# MAIN PROCESSING FUNCTION
+# ============================================================================
+
+process_worktree() {
+  local worktree_dir="$1"
+  local name=$(get_worktree_name "$worktree_dir")
+
+  echo ""
+  echo "════════════════════════════════════════════════════════════════"
+  echo "Processing: $name"
+  echo "Path: $worktree_dir"
+  echo "════════════════════════════════════════════════════════════════"
+
+  # Initialize state
+  WORKTREE_PATHS[$name]=$worktree_dir
+  OVERALL_STATUS[$name]="success"
+  CONFLICTS_PRESENT[$name]=false
+
+  # Phase 1: Configuration
+  echo ""
+  echo "Phase 1: Configuration Validation & Fixing"
+  fix_config_toml "$worktree_dir" "$name"
+  fix_env_local "$worktree_dir" "$name"
+  fix_skip_worktree "$worktree_dir" "$name"
+  echo "  ${CONFIG_MESSAGES[$name]}"
+
+  # Phase 2: Git State
+  echo ""
+  echo "Phase 2: Git State Management"
+  local current_branch=$(git -C "$worktree_dir" rev-parse --abbrev-ref HEAD 2>/dev/null)
+  echo "  Current branch: $current_branch"
+  safe_stash "$worktree_dir" "$current_branch"
+  if [ -n "${STASH_REFS[$name]:-}" ]; then
+    echo "  Stashed uncommitted changes"
+  fi
+
+  # Phase 3: Branch Operations
+  echo ""
+  echo "Phase 3: Branch Operations"
+  safe_merge_main "$worktree_dir" "$current_branch"
+  echo "  ${MERGE_MESSAGES[$name]:-Merge status unknown}"
+
+  # Phase 4: Stash Reapplication
+  if [ -n "${STASH_REFS[$name]:-}" ] && [ "${CONFLICTS_PRESENT[$name]}" = false ]; then
+    echo ""
+    echo "Phase 4: Stash Reapplication"
+    safe_stash_pop "$worktree_dir"
+    if [ "${CONFLICTS_PRESENT[$name]}" = false ]; then
+      echo "  Stash popped successfully"
+    else
+      echo "  Stash pop conflicts - left in conflicted state"
+    fi
+  fi
+
+  # Phase 5: Dependency & Database Sync
+  if [ "${CONFLICTS_PRESENT[$name]}" = false ]; then
+    echo ""
+    echo "Phase 5: Dependency & Database Sync"
+    run_npm_install "$worktree_dir"
+    restart_supabase "$worktree_dir"
+    regenerate_test_schema "$worktree_dir"
+  else
+    echo ""
+    echo "Phase 5: Skipped (conflicts present)"
+  fi
+}
+
+# ============================================================================
+# SUMMARY REPORT
+# ============================================================================
+
+generate_report() {
+  echo ""
+  echo "===================================================================="
+  echo "🔄 PinPoint Worktree Sync Report"
+  echo "===================================================================="
+  echo ""
+  echo "Execution: $(date '+%Y-%m-%d %H:%M:%S')"
+
+  local mode="NORMAL"
+  [ "$DRY_RUN" = true ] && mode="DRY-RUN"
+  local interactive="Interactive"
+  [ "$NON_INTERACTIVE" = true ] && interactive="Non-interactive (-y)"
+  echo "Mode: $mode | $interactive"
+
+  local scope="Current worktree only"
+  [ "$PROCESS_ALL" = true ] && scope="All worktrees (-a)"
+  echo "Scope: $scope"
+
+  echo "Worktrees: ${#WORKTREE_PATHS[@]} processed"
+  echo ""
+  echo "────────────────────────────────────────────────────────────────────"
+  echo "📊 OVERALL SUMMARY"
+  echo "────────────────────────────────────────────────────────────────────"
+
+  local success_count=0
+  local warning_count=0
+  local error_count=0
+
+  for name in "${!OVERALL_STATUS[@]}"; do
+    case "${OVERALL_STATUS[$name]}" in
+      success) success_count=$((success_count + 1)) ;;
+      warning) warning_count=$((warning_count + 1)) ;;
+      error) error_count=$((error_count + 1)) ;;
+    esac
+  done
+
+  echo ""
+  echo "✅ Success:  $success_count worktree(s)"
+  echo "⚠️  Warnings: $warning_count worktree(s)"
+  echo "❌ Errors:   $error_count worktree(s)"
+
+  echo ""
+  echo "────────────────────────────────────────────────────────────────────"
+  echo "📋 WORKTREE DETAILS"
+  echo "────────────────────────────────────────────────────────────────────"
+
+  for name in "${!WORKTREE_PATHS[@]}"; do
+    echo ""
+    local status_icon="✅"
+    case "${OVERALL_STATUS[$name]}" in
+      warning) status_icon="⚠️ " ;;
+      error) status_icon="❌" ;;
+    esac
+
+    echo "$status_icon $name (${OVERALL_STATUS[$name]^^})"
+    echo "   Path: ${WORKTREE_PATHS[$name]}"
+    echo "   Config: ${CONFIG_MESSAGES[$name]:-Unknown}"
+    echo "   Merge: ${MERGE_MESSAGES[$name]:-Unknown}"
+
+    if [ "${CONFLICTS_PRESENT[$name]}" = true ]; then
+      echo "   ⚠️  CONFLICTS PRESENT - See recovery section below"
     fi
   done
-fi
 
-# 4. Check for Supabase config.toml changes
-echo ""
-echo "📝 Checking Supabase config + skip-worktree..."
-
-# Warn if base config.toml was modified (needs manual propagation to other worktrees)
-if git -C "$MAIN_DIR" diff --quiet -- supabase/config.toml; then
-  echo "  ✅ Base supabase/config.toml matches HEAD in main worktree"
-else
-  echo "  ⚠️  Base supabase/config.toml has local changes in main worktree"
-  echo "     After committing or pulling, re-apply port offsets in other worktrees."
-fi
-
-for worktree_dir in "$SECONDARY_DIR" "$REVIEW_DIR" "$ANTIGRAVITY_DIR"; do
-  if [ -d "$worktree_dir" ]; then
-    worktree_name=$(basename "$worktree_dir")
-    config_path="$worktree_dir/supabase/config.toml"
-
-    if [ ! -f "$config_path" ]; then
-      echo "  ⚠️  $worktree_name missing supabase/config.toml"
-      continue
+  # Recovery section
+  local has_recovery=false
+  for name in "${!RECOVERY_COMMANDS[@]}"; do
+    if [ -n "${RECOVERY_COMMANDS[$name]:-}" ]; then
+      has_recovery=true
+      break
     fi
+  done
 
-    skip_flag=$(git -C "$worktree_dir" ls-files -v supabase/config.toml 2>/dev/null | cut -c 1)
-    if [ "$skip_flag" != "S" ]; then
-      echo "  ⚠️  $worktree_name config.toml is tracked (no skip-worktree). Run:"
-      echo "      git -C \"$worktree_dir\" update-index --skip-worktree supabase/config.toml"
-    fi
+  if [ "$has_recovery" = true ]; then
+    echo ""
+    echo "────────────────────────────────────────────────────────────────────"
+    echo "🔧 RECOVERY ACTIONS NEEDED"
+    echo "────────────────────────────────────────────────────────────────────"
 
-    if diff -q "$MAIN_DIR/supabase/config.toml" "$config_path" > /dev/null 2>&1; then
-      echo "  ⚠️  $worktree_name config.toml matches main (ports/project_id not overridden)."
-      echo "      Update ports and project_id, then re-apply skip-worktree."
-    else
-      echo "  ✅ $worktree_name config.toml differs from main (custom ports applied)"
-    fi
+    for name in "${!RECOVERY_COMMANDS[@]}"; do
+      if [ -n "${RECOVERY_COMMANDS[$name]:-}" ]; then
+        echo ""
+        echo "$name:"
+        echo -e "${RECOVERY_COMMANDS[$name]}"
+      fi
+    done
   fi
-done
 
-echo ""
-echo "✅ Sync complete!"
-echo ""
-echo "Next steps:"
-echo "  1. If env vars are missing, add them to each worktree's .env.local"
-echo "  2. If base config.toml changed, propagate updates then re-apply port overrides"
-echo "  3. Ensure skip-worktree is set for non-main supabase/config.toml files"
-echo "  4. Run 'supabase start' in each worktree to refresh Supabase keys"
+  # Supabase restart notices
+  local needs_supabase_notice=false
+  for name in "${!SUPABASE_RESTARTED[@]}"; do
+    if [ "${SUPABASE_RESTARTED[$name]}" = true ]; then
+      needs_supabase_notice=true
+      break
+    fi
+  done
+
+  if [ "$needs_supabase_notice" = true ]; then
+    echo ""
+    echo "────────────────────────────────────────────────────────────────────"
+    echo "📝 NEXT STEPS"
+    echo "────────────────────────────────────────────────────────────────────"
+    echo ""
+    echo "For worktrees with restarted Supabase:"
+    echo "  1. Copy new Supabase keys to .env.local (from 'supabase status')"
+    echo "  2. Test: npm run dev"
+    echo "  3. Verify correct ports in browser"
+  fi
+
+  echo ""
+  echo "===================================================================="
+}
+
+# ============================================================================
+# MAIN ENTRY POINT
+# ============================================================================
+
+main() {
+  # Parse arguments
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      --dry-run)
+        DRY_RUN=true
+        shift
+        ;;
+      -y)
+        NON_INTERACTIVE=true
+        shift
+        ;;
+      -a|--all)
+        PROCESS_ALL=true
+        shift
+        ;;
+      *)
+        echo "Unknown option: $1"
+        echo "Usage: $0 [--dry-run] [-y] [-a|--all]"
+        exit 1
+        ;;
+    esac
+  done
+
+  echo "🔄 PinPoint Worktree Sync"
+  echo ""
+
+  # Determine which worktrees to process
+  local worktrees_to_process=()
+
+  if [ "$PROCESS_ALL" = true ]; then
+    # Process all worktrees
+    while IFS= read -r line; do
+      local path=$(echo "$line" | awk '{print $1}')
+      worktrees_to_process+=("$path")
+    done < <(git worktree list | tail -n +1)
+  else
+    # Process current worktree only
+    local current_worktree=$(git rev-parse --show-toplevel 2>/dev/null)
+    if [ -z "$current_worktree" ]; then
+      echo "Error: Not in a git repository"
+      exit 1
+    fi
+    worktrees_to_process=("$current_worktree")
+  fi
+
+  # Process each worktree
+  for worktree_dir in "${worktrees_to_process[@]}"; do
+    process_worktree "$worktree_dir"
+  done
+
+  # Generate report
+  generate_report
+}
+
+# Run main
+main "$@"
