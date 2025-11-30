@@ -2,7 +2,7 @@
 # For detailed reference: https://supabase.com/docs/guides/local-development/cli/config
 
 # Distinguish this project on the same host
-project_id = "pinpoint-v2"
+project_id = "pinpoint"
 
 [api]
 enabled = true
