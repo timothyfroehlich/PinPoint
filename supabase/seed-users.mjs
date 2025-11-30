@@ -40,9 +40,27 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 const sql = postgres(DATABASE_URL);
 
 const TEST_USERS = [
-  { email: "admin@test.com", name: "Admin User", role: "admin" },
-  { email: "member@test.com", name: "Member User", role: "member" },
-  { email: "guest@test.com", name: "Guest User", role: "guest" },
+  {
+    email: "admin@test.com",
+    name: "Admin User",
+    firstName: "Admin",
+    lastName: "User",
+    role: "admin",
+  },
+  {
+    email: "member@test.com",
+    name: "Member User",
+    firstName: "Member",
+    lastName: "User",
+    role: "member",
+  },
+  {
+    email: "guest@test.com",
+    name: "Guest User",
+    firstName: "Guest",
+    lastName: "User",
+    role: "guest",
+  },
 ];
 
 const PASSWORD = "TestPassword123";
@@ -62,6 +80,8 @@ async function seedUsersAndData() {
         email_confirm: true, // Auto-confirm email for test users
         user_metadata: {
           name: user.name,
+          first_name: user.firstName,
+          last_name: user.lastName,
         },
       });
 
@@ -103,6 +123,14 @@ async function seedUsersAndData() {
         WHERE id = ${userId}
       `;
       console.log(`   └─ Role set to: ${user.role}`);
+
+      // Ensure notification preferences exist
+      await sql`
+        INSERT INTO notification_preferences (user_id)
+        VALUES (${userId})
+        ON CONFLICT (user_id) DO NOTHING
+      `;
+      console.log(`   └─ Notification preferences ensured`);
     } catch (err) {
       console.error(`❌ Error processing ${user.email}:`, err);
     }
@@ -281,6 +309,30 @@ async function seedUsersAndData() {
     }
   } else {
     console.warn("⚠️ Admin user not found, skipping machine/issue seeding.");
+  }
+
+  // Insert notifications for admin
+  const { error: notifError } = await supabase.from("notifications").insert([
+    {
+      user_id: userIds.admin,
+      type: "issue_assigned",
+      resource_id: "10000000-0000-4000-8000-000000000002", // "Ball stuck in Thing's box"
+      resource_type: "issue",
+      created_at: new Date().toISOString(),
+    },
+    {
+      user_id: userIds.admin,
+      type: "new_comment",
+      resource_id: "10000000-0000-4000-8000-000000000002",
+      resource_type: "issue",
+      created_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+    },
+  ]);
+
+  if (notifError) {
+    console.error("Error seeding notifications:", notifError);
+  } else {
+    console.log("Seeded notifications for admin");
   }
 
   console.log("\n✨ Seeding complete!");

@@ -26,4 +26,27 @@ const Switch = React.forwardRef<
 ));
 Switch.displayName = SwitchPrimitives.Root.displayName;
 
-export { Switch };
+const SwitchWithFormSupport = React.forwardRef<
+  React.ElementRef<typeof SwitchPrimitives.Root>,
+  React.ComponentPropsWithoutRef<typeof SwitchPrimitives.Root>
+>(({ name, checked, defaultChecked, ...props }, ref) => (
+  <>
+    <Switch
+      name={name}
+      {...(checked !== undefined ? { checked } : {})}
+      {...(defaultChecked !== undefined ? { defaultChecked } : {})}
+      {...props}
+      ref={ref}
+    />
+    {name && (
+      <input
+        type="hidden"
+        name={name}
+        value={checked || defaultChecked ? "on" : "off"}
+      />
+    )}
+  </>
+));
+SwitchWithFormSupport.displayName = "Switch";
+
+export { SwitchWithFormSupport as Switch };

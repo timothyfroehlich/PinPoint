@@ -10,11 +10,19 @@ import { z } from "zod";
 const updatePreferencesSchema = z.object({
   emailEnabled: z.boolean(),
   inAppEnabled: z.boolean(),
-  notifyOnAssigned: z.boolean(),
-  notifyOnStatusChange: z.boolean(),
-  notifyOnNewComment: z.boolean(),
-  notifyOnNewIssue: z.boolean(),
-  watchNewIssuesGlobal: z.boolean(),
+
+  // Granular Preferences
+  emailNotifyOnAssigned: z.boolean(),
+  inAppNotifyOnAssigned: z.boolean(),
+  emailNotifyOnStatusChange: z.boolean(),
+  inAppNotifyOnStatusChange: z.boolean(),
+  emailNotifyOnNewComment: z.boolean(),
+  inAppNotifyOnNewComment: z.boolean(),
+  emailNotifyOnNewIssue: z.boolean(),
+  inAppNotifyOnNewIssue: z.boolean(),
+  emailWatchNewIssuesGlobal: z.boolean(),
+  inAppWatchNewIssuesGlobal: z.boolean(),
+
   autoWatchOwnedMachines: z.boolean(),
 });
 
@@ -39,11 +47,23 @@ export async function updateNotificationPreferencesAction(
   const rawData = {
     emailEnabled: formData.get("emailEnabled") === "on",
     inAppEnabled: formData.get("inAppEnabled") === "on",
-    notifyOnAssigned: formData.get("notifyOnAssigned") === "on",
-    notifyOnStatusChange: formData.get("notifyOnStatusChange") === "on",
-    notifyOnNewComment: formData.get("notifyOnNewComment") === "on",
-    notifyOnNewIssue: formData.get("notifyOnNewIssue") === "on",
-    watchNewIssuesGlobal: formData.get("watchNewIssuesGlobal") === "on",
+
+    // Granular Preferences
+    emailNotifyOnAssigned: formData.get("emailNotifyOnAssigned") === "on",
+    inAppNotifyOnAssigned: formData.get("inAppNotifyOnAssigned") === "on",
+    emailNotifyOnStatusChange:
+      formData.get("emailNotifyOnStatusChange") === "on",
+    inAppNotifyOnStatusChange:
+      formData.get("inAppNotifyOnStatusChange") === "on",
+    emailNotifyOnNewComment: formData.get("emailNotifyOnNewComment") === "on",
+    inAppNotifyOnNewComment: formData.get("inAppNotifyOnNewComment") === "on",
+    emailNotifyOnNewIssue: formData.get("emailNotifyOnNewIssue") === "on",
+    inAppNotifyOnNewIssue: formData.get("inAppNotifyOnNewIssue") === "on",
+    emailWatchNewIssuesGlobal:
+      formData.get("emailWatchNewIssuesGlobal") === "on",
+    inAppWatchNewIssuesGlobal:
+      formData.get("inAppWatchNewIssuesGlobal") === "on",
+
     autoWatchOwnedMachines: formData.get("autoWatchOwnedMachines") === "on",
   };
 

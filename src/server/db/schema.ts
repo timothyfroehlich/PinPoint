@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   pgTable,
   uuid,
@@ -27,7 +27,11 @@ export const authUsers = authSchema.table("users", {
  */
 export const userProfiles = pgTable("user_profiles", {
   id: uuid("id").primaryKey(),
-  name: text("name").notNull(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  name: text("name")
+    .generatedAlwaysAs(sql`first_name || ' ' || last_name`)
+    .notNull(),
   avatarUrl: text("avatar_url"),
   role: text("role", { enum: ["guest", "member", "admin"] })
     .notNull()
@@ -172,15 +176,48 @@ export const notificationPreferences = pgTable("notification_preferences", {
     .references(() => userProfiles.id, { onDelete: "cascade" }),
   emailEnabled: boolean("email_enabled").notNull().default(true),
   inAppEnabled: boolean("in_app_enabled").notNull().default(true),
-  notifyOnAssigned: boolean("notify_on_assigned").notNull().default(true),
-  notifyOnStatusChange: boolean("notify_on_status_change")
+
+  // Assignment
+  emailNotifyOnAssigned: boolean("email_notify_on_assigned")
     .notNull()
     .default(true),
-  notifyOnNewComment: boolean("notify_on_new_comment").notNull().default(true),
-  notifyOnNewIssue: boolean("notify_on_new_issue").notNull().default(true), // For owned machines
-  watchNewIssuesGlobal: boolean("watch_new_issues_global")
+  inAppNotifyOnAssigned: boolean("in_app_notify_on_assigned")
+    .notNull()
+    .default(true),
+
+  // Status Changes
+  emailNotifyOnStatusChange: boolean("email_notify_on_status_change")
+    .notNull()
+    .default(true),
+  inAppNotifyOnStatusChange: boolean("in_app_notify_on_status_change")
+    .notNull()
+    .default(true),
+
+  // New Comments
+  emailNotifyOnNewComment: boolean("email_notify_on_new_comment")
+    .notNull()
+    .default(true),
+  inAppNotifyOnNewComment: boolean("in_app_notify_on_new_comment")
+    .notNull()
+    .default(true),
+
+  // New Issues (Owned Machines)
+  emailNotifyOnNewIssue: boolean("email_notify_on_new_issue")
+    .notNull()
+    .default(true),
+  inAppNotifyOnNewIssue: boolean("in_app_notify_on_new_issue")
+    .notNull()
+    .default(true),
+
+  // Global New Issues (Watch All)
+  emailWatchNewIssuesGlobal: boolean("email_watch_new_issues_global")
     .notNull()
     .default(false),
+  inAppWatchNewIssuesGlobal: boolean("in_app_watch_new_issues_global")
+    .notNull()
+    .default(false),
+
+  // Logic / Behavior
   autoWatchOwnedMachines: boolean("auto_watch_owned_machines")
     .notNull()
     .default(true),

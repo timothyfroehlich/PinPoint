@@ -405,12 +405,16 @@ export async function forgotPasswordAction(
         : undefined) ?? (host ? `${protocol}://${host}` : fallback);
 
     // Validate origin against allowlist to prevent host header injection
+    // We allow:
+    // 1. The configured site URL (production)
+    // 2. The configured local port (development)
+    // 3. Default localhost:3000 (development fallback)
+    const localPort = process.env["PORT"] ?? "3000";
     const allowedOrigins = [
-      "http://localhost:3000",
-      "http://localhost:3100",
-      "http://localhost:3200",
-      "http://localhost:3300",
       siteUrl,
+      `http://localhost:${localPort}`,
+      // Also allow 127.0.0.1 for local dev consistency
+      `http://127.0.0.1:${localPort}`,
     ].filter((url): url is string => typeof url === "string" && url.length > 0);
 
     if (!allowedOrigins.some((allowed) => origin.startsWith(allowed))) {

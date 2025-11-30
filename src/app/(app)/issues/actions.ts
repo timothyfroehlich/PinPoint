@@ -182,7 +182,11 @@ export async function createIssueAction(
 
       // 3. Global Subscribers
       const globalSubs = await db.query.notificationPreferences.findMany({
-        where: eq(notificationPreferences.watchNewIssuesGlobal, true),
+        where: (prefs, { or, eq }) =>
+          or(
+            eq(prefs.emailWatchNewIssuesGlobal, true),
+            eq(prefs.inAppWatchNewIssuesGlobal, true)
+          ),
       });
       globalSubs.forEach((sub) => watcherIds.add(sub.userId));
 

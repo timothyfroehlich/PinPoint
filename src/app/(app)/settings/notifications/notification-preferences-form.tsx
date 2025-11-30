@@ -1,27 +1,19 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
 import { Switch } from "~/components/ui/switch";
 import { Label } from "~/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "~/components/ui/card";
 import {
   updateNotificationPreferencesAction,
   type UpdatePreferencesResult,
 } from "./actions";
 import { type notificationPreferences } from "~/server/db/schema";
+import React from "react";
 
 interface NotificationPreferencesFormProps {
   preferences: typeof notificationPreferences.$inferSelect;
 }
-
-import React from "react";
 
 export function NotificationPreferencesForm({
   preferences,
@@ -31,160 +23,269 @@ export function NotificationPreferencesForm({
     FormData
   >(updateNotificationPreferencesAction, undefined);
 
+  // Client-side state for master switches to control disabled state of other inputs
+  const [emailMasterEnabled, setEmailMasterEnabled] = useState(
+    preferences.emailEnabled
+  );
+  const [inAppMasterEnabled, setInAppMasterEnabled] = useState(
+    preferences.inAppEnabled
+  );
+
+  // Update state if preferences change (e.g. after server action)
+  useEffect(() => {
+    setEmailMasterEnabled(preferences.emailEnabled);
+    setInAppMasterEnabled(preferences.inAppEnabled);
+  }, [preferences.emailEnabled, preferences.inAppEnabled]);
+
   return (
-    <form action={formAction}>
-      <Card className="border-outline-variant">
-        <CardHeader>
-          <CardTitle>Notification Preferences</CardTitle>
-          <CardDescription>
-            Manage how and when you receive notifications.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {state && !state.ok && (
-            <div className="text-sm text-destructive">{state.message}</div>
-          )}
+    <form action={formAction} className="space-y-8">
+      {state && !state.ok && (
+        <div className="text-sm text-destructive">{state.message}</div>
+      )}
 
-          <div className="space-y-4">
-            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-              Channels
-            </h3>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="emailEnabled">Email Notifications</Label>
-                <p className="text-sm text-muted-foreground">
-                  Receive notifications via email
-                </p>
-              </div>
-              <Switch
-                id="emailEnabled"
-                name="emailEnabled"
-                defaultChecked={preferences.emailEnabled}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="inAppEnabled">In-App Notifications</Label>
-                <p className="text-sm text-muted-foreground">
-                  Show notifications in the app header
-                </p>
-              </div>
-              <Switch
-                id="inAppEnabled"
-                name="inAppEnabled"
-                defaultChecked={preferences.inAppEnabled}
-              />
-            </div>
+      {/* Master Switches */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+          Channels
+        </h3>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <MasterSwitchItem
+            id="emailEnabled"
+            label="Email Notifications"
+            description="Master switch for all email notifications"
+            checked={emailMasterEnabled}
+            onCheckedChange={setEmailMasterEnabled}
+          />
+          <MasterSwitchItem
+            id="inAppEnabled"
+            label="In-App Notifications"
+            description="Master switch for all in-app notifications"
+            checked={inAppMasterEnabled}
+            onCheckedChange={setInAppMasterEnabled}
+          />
+        </div>
+      </div>
+
+      {/* Events Matrix */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+          Events
+        </h3>
+        <div className="rounded-lg border border-outline-variant/50 bg-surface/50 overflow-hidden">
+          {/* Header Row */}
+          <div className="grid grid-cols-[1fr_auto_auto] gap-4 border-b border-outline-variant/50 bg-surface-variant/30 p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <div>Event Type</div>
+            <div className="text-center w-16">Email</div>
+            <div className="text-center w-16">In-App</div>
           </div>
 
-          <div className="space-y-4">
-            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-              Events
-            </h3>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="notifyOnAssigned">Issue Assignment</Label>
-                <p className="text-sm text-muted-foreground">
-                  When an issue is assigned to you
-                </p>
-              </div>
-              <Switch
-                id="notifyOnAssigned"
-                name="notifyOnAssigned"
-                defaultChecked={preferences.notifyOnAssigned}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="notifyOnStatusChange">Status Changes</Label>
-                <p className="text-sm text-muted-foreground">
-                  When status changes on watched issues
-                </p>
-              </div>
-              <Switch
-                id="notifyOnStatusChange"
-                name="notifyOnStatusChange"
-                defaultChecked={preferences.notifyOnStatusChange}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="notifyOnNewComment">New Comments</Label>
-                <p className="text-sm text-muted-foreground">
-                  When comments are added to watched issues
-                </p>
-              </div>
-              <Switch
-                id="notifyOnNewComment"
-                name="notifyOnNewComment"
-                defaultChecked={preferences.notifyOnNewComment}
-              />
-            </div>
+          {/* Rows */}
+          <div className="divide-y divide-outline-variant/50">
+            <PreferenceRow
+              label="Issue Assignment"
+              description="When an issue is assigned to you"
+              emailId="emailNotifyOnAssigned"
+              inAppId="inAppNotifyOnAssigned"
+              emailDefault={preferences.emailNotifyOnAssigned}
+              inAppDefault={preferences.inAppNotifyOnAssigned}
+              emailDisabled={!emailMasterEnabled}
+              inAppDisabled={!inAppMasterEnabled}
+            />
+            <PreferenceRow
+              label="Status Changes"
+              description="When status changes on watched issues"
+              emailId="emailNotifyOnStatusChange"
+              inAppId="inAppNotifyOnStatusChange"
+              emailDefault={preferences.emailNotifyOnStatusChange}
+              inAppDefault={preferences.inAppNotifyOnStatusChange}
+              emailDisabled={!emailMasterEnabled}
+              inAppDisabled={!inAppMasterEnabled}
+            />
+            <PreferenceRow
+              label="New Comments"
+              description="When comments are added to watched issues"
+              emailId="emailNotifyOnNewComment"
+              inAppId="inAppNotifyOnNewComment"
+              emailDefault={preferences.emailNotifyOnNewComment}
+              inAppDefault={preferences.inAppNotifyOnNewComment}
+              emailDisabled={!emailMasterEnabled}
+              inAppDisabled={!inAppMasterEnabled}
+            />
           </div>
+        </div>
+      </div>
 
-          <div className="space-y-4">
-            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-              Machine Ownership
-            </h3>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="notifyOnNewIssue">
-                  New Issues on Owned Machines
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  Receive notifications for new issues on machines you own
-                </p>
-              </div>
-              <Switch
-                id="notifyOnNewIssue"
-                name="notifyOnNewIssue"
-                defaultChecked={preferences.notifyOnNewIssue}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="autoWatchOwnedMachines">
-                  Auto-Watch Owned Machines
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  Automatically watch new issues reported on machines you own
-                </p>
-              </div>
-              <Switch
-                id="autoWatchOwnedMachines"
-                name="autoWatchOwnedMachines"
-                defaultChecked={preferences.autoWatchOwnedMachines}
-              />
-            </div>
+      {/* Machine Ownership Matrix */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+          Machine Ownership
+        </h3>
+        <div className="rounded-lg border border-outline-variant/50 bg-surface/50 overflow-hidden">
+          <div className="grid grid-cols-[1fr_auto_auto] gap-4 border-b border-outline-variant/50 bg-surface-variant/30 p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <div>Event Type</div>
+            <div className="text-center w-16">Email</div>
+            <div className="text-center w-16">In-App</div>
           </div>
+          <div className="divide-y divide-outline-variant/50">
+            <PreferenceRow
+              label="New Issues"
+              description="New issues on machines you own"
+              emailId="emailNotifyOnNewIssue"
+              inAppId="inAppNotifyOnNewIssue"
+              emailDefault={preferences.emailNotifyOnNewIssue}
+              inAppDefault={preferences.inAppNotifyOnNewIssue}
+              emailDisabled={!emailMasterEnabled}
+              inAppDisabled={!inAppMasterEnabled}
+            />
+          </div>
+        </div>
 
-          <div className="space-y-4">
-            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-              Global
-            </h3>
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="watchNewIssuesGlobal">
-                  Watch All New Issues
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  Receive notifications for EVERY new issue reported (use with
-                  caution)
-                </p>
-              </div>
-              <Switch
-                id="watchNewIssuesGlobal"
-                name="watchNewIssuesGlobal"
-                defaultChecked={preferences.watchNewIssuesGlobal}
-              />
-            </div>
-          </div>
+        {/* Auto-watch is separate as it's logic, not a notification channel */}
+        <div className="mt-4">
+          <SingleSwitchItem
+            id="autoWatchOwnedMachines"
+            label="Auto-Watch Owned Machines"
+            description="Automatically watch new issues reported on machines you own"
+            defaultChecked={preferences.autoWatchOwnedMachines}
+          />
+        </div>
+      </div>
 
-          <div className="pt-4">
-            <Button type="submit">Save Preferences</Button>
+      {/* Global Matrix */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+          Global
+        </h3>
+        <div className="rounded-lg border border-outline-variant/50 bg-surface/50 overflow-hidden">
+          <div className="grid grid-cols-[1fr_auto_auto] gap-4 border-b border-outline-variant/50 bg-surface-variant/30 p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <div>Event Type</div>
+            <div className="text-center w-16">Email</div>
+            <div className="text-center w-16">In-App</div>
           </div>
-        </CardContent>
-      </Card>
+          <div className="divide-y divide-outline-variant/50">
+            <PreferenceRow
+              label="Watch All New Issues"
+              description="Notify for EVERY new issue (use with caution)"
+              emailId="emailWatchNewIssuesGlobal"
+              inAppId="inAppWatchNewIssuesGlobal"
+              emailDefault={preferences.emailWatchNewIssuesGlobal}
+              inAppDefault={preferences.inAppWatchNewIssuesGlobal}
+              emailDisabled={!emailMasterEnabled}
+              inAppDisabled={!inAppMasterEnabled}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="pt-2">
+        <Button type="submit">Save Preferences</Button>
+      </div>
     </form>
+  );
+}
+
+interface MasterSwitchItemProps {
+  id: string;
+  label: string;
+  description: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}
+
+function MasterSwitchItem({
+  id,
+  label,
+  description,
+  checked,
+  onCheckedChange,
+}: MasterSwitchItemProps): React.JSX.Element {
+  return (
+    <div className="flex items-center justify-between rounded-lg border border-outline-variant/50 bg-surface/50 p-3 shadow-sm transition-colors hover:bg-surface-variant/30">
+      <div className="space-y-0.5 pr-4">
+        <Label htmlFor={id} className="text-sm font-medium cursor-pointer">
+          {label}
+        </Label>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </div>
+      <Switch
+        id={id}
+        name={id}
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+      />
+    </div>
+  );
+}
+
+interface SingleSwitchItemProps {
+  id: string;
+  label: string;
+  description: string;
+  defaultChecked: boolean;
+}
+
+function SingleSwitchItem({
+  id,
+  label,
+  description,
+  defaultChecked,
+}: SingleSwitchItemProps): React.JSX.Element {
+  return (
+    <div className="flex items-center justify-between rounded-lg border border-outline-variant/50 bg-surface/50 p-3 shadow-sm transition-colors hover:bg-surface-variant/30">
+      <div className="space-y-0.5 pr-4">
+        <Label htmlFor={id} className="text-sm font-medium cursor-pointer">
+          {label}
+        </Label>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </div>
+      <Switch id={id} name={id} defaultChecked={defaultChecked} />
+    </div>
+  );
+}
+
+interface PreferenceRowProps {
+  label: string;
+  description: string;
+  emailId: string;
+  inAppId: string;
+  emailDefault: boolean;
+  inAppDefault: boolean;
+  emailDisabled: boolean;
+  inAppDisabled: boolean;
+}
+
+function PreferenceRow({
+  label,
+  description,
+  emailId,
+  inAppId,
+  emailDefault,
+  inAppDefault,
+  emailDisabled,
+  inAppDisabled,
+}: PreferenceRowProps): React.JSX.Element {
+  return (
+    <div className="grid grid-cols-[1fr_auto_auto] gap-4 p-3 items-center hover:bg-surface-variant/30 transition-colors">
+      <div className="space-y-0.5">
+        <p className="text-sm font-medium">{label}</p>
+        <p className="text-xs text-muted-foreground">{description}</p>
+      </div>
+      <div className="flex justify-center w-16">
+        <Switch
+          id={emailId}
+          name={emailId}
+          defaultChecked={emailDefault}
+          disabled={emailDisabled}
+        />
+      </div>
+      <div className="flex justify-center w-16">
+        <Switch
+          id={inAppId}
+          name={inAppId}
+          defaultChecked={inAppDefault}
+          disabled={inAppDisabled}
+        />
+      </div>
+    </div>
   );
 }

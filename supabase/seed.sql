@@ -20,17 +20,43 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  INSERT INTO public.user_profiles (id, name, avatar_url, role)
+  INSERT INTO public.user_profiles (id, first_name, last_name, avatar_url, role)
   VALUES (
     NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'name', NEW.email),
+    COALESCE(NEW.raw_user_meta_data->>'first_name', ''),
+    COALESCE(NEW.raw_user_meta_data->>'last_name', ''),
     NEW.raw_user_meta_data->>'avatar_url',
     'member'
   );
 
   -- Create default notification preferences
-  INSERT INTO public.notification_preferences (user_id)
-  VALUES (NEW.id);
+  -- Create default notification preferences
+  INSERT INTO public.notification_preferences (
+    user_id,
+    email_enabled,
+    in_app_enabled,
+    email_notify_on_assigned,
+    in_app_notify_on_assigned,
+    email_notify_on_status_change,
+    in_app_notify_on_status_change,
+    email_notify_on_new_comment,
+    in_app_notify_on_new_comment,
+    email_notify_on_new_issue,
+    in_app_notify_on_new_issue,
+    email_watch_new_issues_global,
+    in_app_watch_new_issues_global,
+    auto_watch_owned_machines
+  )
+  VALUES (
+    NEW.id,
+    true, true, -- Master switches
+    true, true, -- Assigned
+    true, true, -- Status change
+    true, true, -- New comment
+    true, true, -- New issue (owned)
+    false, false, -- Global watch
+    true -- Auto watch owned
+  );
 
   RETURN NEW;
 END;

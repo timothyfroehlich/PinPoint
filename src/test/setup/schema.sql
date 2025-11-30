@@ -46,11 +46,16 @@ CREATE TABLE "notification_preferences" (
 	"user_id" uuid PRIMARY KEY NOT NULL,
 	"email_enabled" boolean DEFAULT true NOT NULL,
 	"in_app_enabled" boolean DEFAULT true NOT NULL,
-	"notify_on_assigned" boolean DEFAULT true NOT NULL,
-	"notify_on_status_change" boolean DEFAULT true NOT NULL,
-	"notify_on_new_comment" boolean DEFAULT true NOT NULL,
-	"notify_on_new_issue" boolean DEFAULT true NOT NULL,
-	"watch_new_issues_global" boolean DEFAULT false NOT NULL,
+	"email_notify_on_assigned" boolean DEFAULT true NOT NULL,
+	"in_app_notify_on_assigned" boolean DEFAULT true NOT NULL,
+	"email_notify_on_status_change" boolean DEFAULT true NOT NULL,
+	"in_app_notify_on_status_change" boolean DEFAULT true NOT NULL,
+	"email_notify_on_new_comment" boolean DEFAULT true NOT NULL,
+	"in_app_notify_on_new_comment" boolean DEFAULT true NOT NULL,
+	"email_notify_on_new_issue" boolean DEFAULT true NOT NULL,
+	"in_app_notify_on_new_issue" boolean DEFAULT true NOT NULL,
+	"email_watch_new_issues_global" boolean DEFAULT false NOT NULL,
+	"in_app_watch_new_issues_global" boolean DEFAULT false NOT NULL,
 	"auto_watch_owned_machines" boolean DEFAULT true NOT NULL
 );
 
@@ -66,7 +71,9 @@ CREATE TABLE "notifications" (
 
 CREATE TABLE "user_profiles" (
 	"id" uuid PRIMARY KEY NOT NULL,
-	"name" text NOT NULL,
+	"first_name" text NOT NULL,
+	"last_name" text NOT NULL,
+	"name" text GENERATED ALWAYS AS (first_name || ' ' || last_name) STORED NOT NULL,
 	"avatar_url" text,
 	"role" text DEFAULT 'member' NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,

@@ -109,7 +109,7 @@ describe("forgotPasswordAction - Origin Resolution", () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
 
     // Mock headers to return origin
-    vi.mocked(headers).mockReturnValue({
+    vi.mocked(headers).mockResolvedValue({
       get: (key: string) => {
         if (key === "origin") return "http://localhost:3000";
         return null;
@@ -131,9 +131,10 @@ describe("forgotPasswordAction - Origin Resolution", () => {
   it("should fall back to x-forwarded-proto + x-forwarded-host when origin missing", async () => {
     // Ensure NEXT_PUBLIC_SITE_URL is not set
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
+    vi.stubEnv("PORT", "3000"); // Allow localhost:3000
 
     // Use http protocol to match the allowlist (http://localhost:3000)
-    vi.mocked(headers).mockReturnValue({
+    vi.mocked(headers).mockResolvedValue({
       get: (key: string) => {
         if (key === "x-forwarded-proto") return "http";
         if (key === "x-forwarded-host") return "localhost:3000";
@@ -155,7 +156,7 @@ describe("forgotPasswordAction - Origin Resolution", () => {
   });
 
   it("should fall back to NEXT_PUBLIC_SITE_URL when all headers missing", async () => {
-    vi.mocked(headers).mockReturnValue({
+    vi.mocked(headers).mockResolvedValue({
       get: () => null,
     } as Headers);
 
@@ -180,7 +181,7 @@ describe("forgotPasswordAction - Origin Resolution", () => {
     vi.stubEnv("PORT", "3100");
 
     // Make sure no host header is present so it falls back to PORT
-    vi.mocked(headers).mockReturnValue({
+    vi.mocked(headers).mockResolvedValue({
       get: () => null,
     } as Headers);
 
@@ -196,10 +197,14 @@ describe("forgotPasswordAction - Origin Resolution", () => {
     expectRedirectToContain(mockSupabase, "http://localhost:3100");
   });
 
-  it("should handle referer header as ultimate fallback", async () => {
-    vi.mocked(headers).mockReturnValue({
+  it("should handle referer header as ultimate fallback (preserving 127.0.0.1)", async () => {
+    vi.stubEnv("PORT", "3200");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
+
+    vi.mocked(headers).mockResolvedValue({
       get: (key: string) => {
-        if (key === "referer") return "http://localhost:3200/forgot-password";
+        // Referer uses 127.0.0.1, which is allowed but distinct from localhost default
+        if (key === "referer") return "http://127.0.0.1:3200/forgot-password";
         return null;
       },
     } as Headers);
@@ -213,7 +218,8 @@ describe("forgotPasswordAction - Origin Resolution", () => {
     await forgotPasswordAction(undefined, formData);
 
     expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
-    expectRedirectToContain(mockSupabase, "http://localhost:3200");
+    // Should use 127.0.0.1 from referer, not localhost from fallback
+    expectRedirectToContain(mockSupabase, "http://127.0.0.1:3200");
   });
 });
 
@@ -227,7 +233,7 @@ describe("forgotPasswordAction - Origin Allowlist Validation", () => {
   });
 
   const setupMockForOrigin = (origin: string) => {
-    vi.mocked(headers).mockReturnValue({
+    vi.mocked(headers).mockResolvedValue({
       get: (key: string) => {
         if (key === "origin") return origin;
         return null;
@@ -239,19 +245,9 @@ describe("forgotPasswordAction - Origin Allowlist Validation", () => {
     return mockSupabase;
   };
 
-  it("should accept localhost:3000 (main worktree)", async () => {
-    const mockSupabase = setupMockForOrigin("http://localhost:3000");
-
-    const formData = new FormData();
-    formData.set("email", "test@example.com");
-
-    const result = await forgotPasswordAction(undefined, formData);
-
-    expect(result.ok).toBe(true);
-    expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
-  });
-
-  it("should accept localhost:3100 (secondary worktree)", async () => {
+  it("should accept configured PORT (e.g. 3100)", async () => {
+    // Simulate running on port 3100
+    vi.stubEnv("PORT", "3100");
     const mockSupabase = setupMockForOrigin("http://localhost:3100");
 
     const formData = new FormData();
@@ -263,20 +259,9 @@ describe("forgotPasswordAction - Origin Allowlist Validation", () => {
     expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
   });
 
-  it("should accept localhost:3200 (review worktree)", async () => {
-    const mockSupabase = setupMockForOrigin("http://localhost:3200");
-
-    const formData = new FormData();
-    formData.set("email", "test@example.com");
-
-    const result = await forgotPasswordAction(undefined, formData);
-
-    expect(result.ok).toBe(true);
-    expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
-  });
-
-  it("should accept localhost:3300 (antigravity worktree)", async () => {
-    const mockSupabase = setupMockForOrigin("http://localhost:3300");
+  it("should accept default port 3000 if PORT is unset", async () => {
+    vi.unstubAllEnvs(); // Ensure PORT is unset
+    const mockSupabase = setupMockForOrigin("http://localhost:3000");
 
     const formData = new FormData();
     formData.set("email", "test@example.com");
@@ -305,6 +290,7 @@ describe("forgotPasswordAction - Origin Allowlist Validation", () => {
   it("should reject unknown origin (security)", async () => {
     // Ensure NEXT_PUBLIC_SITE_URL is not set
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
+    vi.stubEnv("PORT", "3000");
 
     // Provide headers that construct an evil origin via host header
     vi.mocked(headers).mockResolvedValue({

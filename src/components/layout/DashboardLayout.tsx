@@ -50,10 +50,7 @@ export async function DashboardLayout({
             {user && (
               <>
                 <NotificationList notifications={userNotifications} />
-                <UserMenu
-                  userName={userProfile?.name ?? "User"}
-                  userEmail={user.email ?? ""}
-                />
+                <UserMenu userName={userProfile?.name ?? "User"} />
               </>
             )}
           </div>

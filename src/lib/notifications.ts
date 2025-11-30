@@ -31,16 +31,19 @@ interface CreateNotificationProps {
   newStatus?: string | undefined;
 }
 
-export async function createNotification({
-  type,
-  resourceId,
-  resourceType,
-  actorId,
-  issueTitle,
-  machineName,
-  commentContent,
-  newStatus,
-}: CreateNotificationProps): Promise<void> {
+export async function createNotification(
+  {
+    type,
+    resourceId,
+    resourceType,
+    actorId,
+    issueTitle,
+    machineName,
+    commentContent,
+    newStatus,
+  }: CreateNotificationProps,
+  tx = db
+): Promise<void> {
   // 1. Determine recipients
   let recipientIds: string[] = [];
 
@@ -53,7 +56,7 @@ export async function createNotification({
     let ownerId: string | null = null;
 
     if (resourceType === "issue") {
-      const issue = await db.query.issues.findFirst({
+      const issue = await tx.query.issues.findFirst({
         where: eq(issues.id, resourceId),
         with: {
           machine: true,
@@ -64,7 +67,7 @@ export async function createNotification({
       }
     } else {
       // If resource is machine directly (unlikely for new_issue but possible)
-      const machine = await db.query.machines.findFirst({
+      const machine = await tx.query.machines.findFirst({
         where: eq(machines.id, resourceId),
         columns: { ownerId: true },
       });
@@ -74,8 +77,13 @@ export async function createNotification({
     }
 
     // Get Global Subscribers
-    const globalSubscribers = await db.query.notificationPreferences.findMany({
-      where: eq(notificationPreferences.watchNewIssuesGlobal, true),
+    // We want anyone who has EITHER email OR in-app global watch enabled
+    const globalSubscribers = await tx.query.notificationPreferences.findMany({
+      where: (prefs, { or, eq }) =>
+        or(
+          eq(prefs.emailWatchNewIssuesGlobal, true),
+          eq(prefs.inAppWatchNewIssuesGlobal, true)
+        ),
     });
 
     const globalSubscriberIds = globalSubscribers.map((p) => p.userId);
@@ -84,10 +92,14 @@ export async function createNotification({
     // Add Owner if not already included and not the actor
     if (ownerId && !recipientIds.includes(ownerId)) {
       // Check owner preference
-      const ownerPref = await db.query.notificationPreferences.findFirst({
+      const ownerPref = await tx.query.notificationPreferences.findFirst({
         where: eq(notificationPreferences.userId, ownerId),
       });
-      if (ownerPref?.notifyOnNewIssue) {
+      // Check if owner wants notifications for new issues (via either channel)
+      if (
+        ownerPref?.emailNotifyOnNewIssue ||
+        ownerPref?.inAppNotifyOnNewIssue
+      ) {
         recipientIds.push(ownerId);
       }
     }
@@ -95,7 +107,7 @@ export async function createNotification({
     // For other events, notify Watchers
     // Watchers are on the ISSUE
     if (resourceType === "issue") {
-      const watchers = await db.query.issueWatchers.findMany({
+      const watchers = await tx.query.issueWatchers.findMany({
         where: eq(issueWatchers.issueId, resourceId),
       });
       recipientIds.push(...watchers.map((w) => w.userId));
@@ -111,7 +123,7 @@ export async function createNotification({
   if (recipientIds.length === 0) return;
 
   // 2. Fetch Preferences for all recipients
-  const preferences = await db.query.notificationPreferences.findMany({
+  const preferences = await tx.query.notificationPreferences.findMany({
     where: inArray(notificationPreferences.userId, recipientIds),
   });
 
@@ -126,26 +138,50 @@ export async function createNotification({
     if (!prefs) continue; // Should have prefs if in recipient list (or default)
 
     // Check specific toggle
-    let shouldNotify = false;
+    let emailNotify = false;
+    let inAppNotify = false;
+
     switch (type) {
       case "issue_assigned":
-        shouldNotify = prefs.notifyOnAssigned;
+        emailNotify = prefs.emailNotifyOnAssigned;
+        inAppNotify = prefs.inAppNotifyOnAssigned;
         break;
       case "issue_status_changed":
-        shouldNotify = prefs.notifyOnStatusChange;
+        emailNotify = prefs.emailNotifyOnStatusChange;
+        inAppNotify = prefs.inAppNotifyOnStatusChange;
         break;
       case "new_comment":
-        shouldNotify = prefs.notifyOnNewComment;
+        emailNotify = prefs.emailNotifyOnNewComment;
+        inAppNotify = prefs.inAppNotifyOnNewComment;
         break;
-      case "new_issue":
-        shouldNotify = true;
-        break; // Already filtered above
+      case "new_issue": {
+        // For new issues, we have two sources: Owned Machine vs Global Watch
+        // If they are the owner, check owned preference
+        // If they are a global watcher, check global preference
+        // If both, either being true is sufficient (union)
+
+        // Check if owner
+        // Note: We don't have easy access to "is owner" here without passing it in or re-checking
+        // But we can check if they have the "notify on new issue" pref enabled, which implies they want it for owned machines
+        // AND check if they have global watch enabled.
+
+        // However, the caller logic (createNotification) already filtered recipients based on these roles.
+        // So if they are in the list, we just need to check which channel they want.
+
+        // Simplified approach: Check if EITHER preference is on for the channel
+        const isOwnerPref = prefs.emailNotifyOnNewIssue; // "New Issues" (Owned)
+        const isGlobalPref = prefs.emailWatchNewIssuesGlobal;
+        emailNotify = isOwnerPref || isGlobalPref;
+
+        const isInAppOwnerPref = prefs.inAppNotifyOnNewIssue;
+        const isInAppGlobalPref = prefs.inAppWatchNewIssuesGlobal;
+        inAppNotify = isInAppOwnerPref || isInAppGlobalPref;
+        break;
+      }
     }
 
-    if (!shouldNotify) continue;
-
     // In-App
-    if (prefs.inAppEnabled) {
+    if (prefs.inAppEnabled && inAppNotify) {
       notificationsToInsert.push({
         userId,
         type,
@@ -155,10 +191,10 @@ export async function createNotification({
     }
 
     // Email
-    if (prefs.emailEnabled) {
+    if (prefs.emailEnabled && emailNotify) {
       // Fetch user email
       // Drizzle schema has `authUsers`.
-      const authUser = await db
+      const authUser = await tx
         .select({ email: authUsers.email })
         .from(authUsers)
         .where(eq(authUsers.id, userId))
@@ -182,7 +218,7 @@ export async function createNotification({
 
   // Batch Insert Notifications
   if (notificationsToInsert.length > 0) {
-    await db.insert(notifications).values(notificationsToInsert);
+    await tx.insert(notifications).values(notificationsToInsert);
   }
 
   // Send Emails (fire and forget)
@@ -237,8 +273,9 @@ function getEmailHtml(
       break;
   }
 
+  const port = process.env["PORT"] ?? "3000";
   const siteUrl =
-    process.env["NEXT_PUBLIC_SITE_URL"] ?? "http://localhost:3000";
+    process.env["NEXT_PUBLIC_SITE_URL"] ?? `http://localhost:${port}`;
   const machinePrefix = machineName ? `[${machineName}] ` : "";
 
   return `

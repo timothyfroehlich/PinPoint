@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useTransition } from "react";
+import React, { useTransition, useState } from "react";
 import { Bell } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
@@ -15,7 +15,6 @@ import {
   markAsReadAction,
   markAllAsReadAction,
 } from "~/app/(app)/notifications/actions";
-import { cn } from "~/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -36,8 +35,11 @@ export function NotificationList({
   notifications,
 }: NotificationListProps): React.JSX.Element {
   const [isPending, startTransition] = useTransition();
+  const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
-  const unreadCount = notifications.filter((n) => !n.readAt).length;
+
+  // Notifications passed in are already unread (read ones are deleted)
+  const unreadCount = notifications.length;
 
   const handleMarkAsRead = (id: string): void => {
     startTransition(async () => {
@@ -50,6 +52,7 @@ export function NotificationList({
     startTransition(async () => {
       await markAllAsReadAction();
       router.refresh();
+      setIsOpen(false);
     });
   };
 
@@ -74,12 +77,14 @@ export function NotificationList({
   };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="size-5" />
           {unreadCount > 0 && (
-            <span className="absolute top-2 right-2 size-2 rounded-full bg-primary" />
+            <span className="absolute -top-1 -right-1 flex size-5 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
           )}
           <span className="sr-only">Notifications</span>
         </Button>
@@ -102,7 +107,7 @@ export function NotificationList({
         <DropdownMenuSeparator />
         {notifications.length === 0 ? (
           <div className="p-4 text-center text-sm text-muted-foreground">
-            No notifications
+            No new notifications
           </div>
         ) : (
           <div className="max-h-[300px] overflow-y-auto">
@@ -110,23 +115,46 @@ export function NotificationList({
               <DropdownMenuItem key={notification.id} asChild>
                 <Link
                   href={getLink(notification)}
-                  className={cn(
-                    "flex flex-col gap-1 p-3 cursor-pointer",
-                    !notification.readAt && "bg-muted/50"
-                  )}
+                  className="flex w-full flex-col gap-1 rounded-sm p-3 hover:bg-accent cursor-pointer"
                   onClick={() => {
-                    if (!notification.readAt) {
-                      handleMarkAsRead(notification.id);
-                    }
+                    setIsOpen(false);
+                    // Fire and forget mark as read
+                    void markAsReadAction(notification.id);
                   }}
                 >
                   <div className="flex w-full items-start justify-between gap-2">
                     <span className="font-medium text-sm">
                       {getNotificationText(notification)}
                     </span>
-                    {!notification.readAt && (
-                      <span className="size-2 rounded-full bg-primary shrink-0 mt-1" />
-                    )}
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 rounded-full hover:bg-background/80"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleMarkAsRead(notification.id);
+                        }}
+                      >
+                        <span className="sr-only">Dismiss</span>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="opacity-60 hover:opacity-100"
+                        >
+                          <path d="M18 6 6 18" />
+                          <path d="m6 6 12 12" />
+                        </svg>
+                      </Button>
+                    </div>
                   </div>
                   <span className="text-xs text-muted-foreground">
                     {new Date(notification.createdAt).toLocaleDateString()}

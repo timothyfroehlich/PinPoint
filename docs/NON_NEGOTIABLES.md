@@ -152,6 +152,13 @@
 - **Don't:** Use 'unsafe-inline' or 'unsafe-eval' in script-src, hardcode nonces
 - **Rationale:** Modern CSP with 'strict-dynamic' allows Next.js dynamic imports while blocking malicious scripts
 
+**CORE-SEC-005:** No hardcoded hostnames or ports
+
+- **Severity:** Critical
+- **Why:** Prevents environment mismatches and "whack-a-mole" configuration bugs
+- **Do:** Use `NEXT_PUBLIC_SITE_URL` and `PORT` environment variables
+- **Don't:** Hardcode `localhost:3000` or specific domains in source code or tests
+
 ---
 
 ## Performance & Caching

@@ -26,8 +26,7 @@ export async function markAsReadAction(
 
   try {
     await db
-      .update(notifications)
-      .set({ readAt: new Date() })
+      .delete(notifications)
       .where(
         and(
           eq(notifications.id, notificationId),
@@ -55,8 +54,7 @@ export async function markAllAsReadAction(): Promise<MarkAsReadResult> {
 
   try {
     await db
-      .update(notifications)
-      .set({ readAt: new Date() })
+      .delete(notifications)
       .where(and(eq(notifications.userId, user.id)));
 
     revalidatePath("/", "layout");

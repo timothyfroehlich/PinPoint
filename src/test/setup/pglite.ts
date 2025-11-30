@@ -12,6 +12,7 @@ import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
+import type { PgliteDatabase } from "drizzle-orm/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { beforeAll, afterEach } from "vitest";
 import * as schema from "~/server/db/schema";
@@ -21,7 +22,7 @@ const __dirname = dirname(__filename);
 
 // Worker-scoped instance - created once per worker
 let pgliteInstance: PGlite | undefined;
-let testDb: ReturnType<typeof drizzle> | undefined;
+let testDb: PgliteDatabase<typeof schema> | undefined;
 
 /**
  * Get the worker-scoped test database instance.
