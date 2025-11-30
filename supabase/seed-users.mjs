@@ -91,6 +91,7 @@ async function seedUsersAndData() {
         // Check if user already exists
         if (
           error.message.includes("already registered") ||
+          error.message.includes("already been registered") ||
           error.message.includes("already exists")
         ) {
           console.log(`⏭️  ${user.email} already exists, fetching ID...`);
@@ -117,10 +118,16 @@ async function seedUsersAndData() {
       userIds[user.role] = userId;
 
       // Update user profile role
+      // Ensure user profile exists and has correct role (Upsert)
+      // This handles cases where auth.users exists but public.user_profiles was wiped
       await sql`
-        UPDATE user_profiles
-        SET role = ${user.role}
-        WHERE id = ${userId}
+        INSERT INTO user_profiles (id, first_name, last_name, role)
+        VALUES (${userId}, ${user.firstName}, ${user.lastName}, ${user.role})
+        ON CONFLICT (id) DO UPDATE SET
+          role = ${user.role},
+          first_name = ${user.firstName},
+          last_name = ${user.lastName},
+          updated_at = NOW()
       `;
       console.log(`   └─ Role set to: ${user.role}`);
 
