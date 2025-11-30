@@ -39,7 +39,8 @@ describe("Authentication Integration Tests", () => {
         password: "TestPassword123",
         options: {
           data: {
-            name: "Integration Test User",
+            first_name: "Integration",
+            last_name: "Test User",
           },
         },
       });
@@ -67,7 +68,8 @@ describe("Authentication Integration Tests", () => {
         password: "TestPassword123",
         options: {
           data: {
-            name: "First User",
+            first_name: "First",
+            last_name: "User",
           },
         },
       });
@@ -78,7 +80,8 @@ describe("Authentication Integration Tests", () => {
         password: "DifferentPassword456",
         options: {
           data: {
-            name: "Second User",
+            first_name: "Second",
+            last_name: "User",
           },
         },
       });
@@ -107,7 +110,8 @@ describe("Authentication Integration Tests", () => {
         password: "TestPassword123",
         options: {
           data: {
-            name: "Login Test User",
+            first_name: "Login",
+            last_name: "Test User",
           },
         },
       });
@@ -144,7 +148,8 @@ describe("Authentication Integration Tests", () => {
         password: "CorrectPassword123",
         options: {
           data: {
-            name: "Wrong Password Test",
+            first_name: "Wrong",
+            last_name: "Password Test",
           },
         },
       });
@@ -189,7 +194,8 @@ describe("Authentication Integration Tests", () => {
         password: "TestPassword123",
         options: {
           data: {
-            name: "Logout Test User",
+            first_name: "Logout",
+            last_name: "Test User",
           },
         },
       });

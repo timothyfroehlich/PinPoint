@@ -22,7 +22,8 @@ export function createTestUser(
 ): InferInsertModel<typeof userProfiles> {
   return {
     id: overrides?.id ?? randomUUID(),
-    name: overrides?.name ?? "Test User",
+    firstName: overrides?.firstName ?? "Test",
+    lastName: overrides?.lastName ?? "User",
     avatarUrl: overrides?.avatarUrl ?? null,
     role: overrides?.role ?? "member",
     createdAt: overrides?.createdAt ?? new Date(),

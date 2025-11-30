@@ -14,7 +14,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 
 describe("Mailpit Integration", () => {
   const mailpitPort = process.env.MAILPIT_PORT ?? "54324";
-  const mailpitUrl = `http://localhost:${mailpitPort}/api/v1/messages`;
+  const mailpitUrl = `http://127.0.0.1:${mailpitPort}/api/v1/messages`;
 
   beforeAll(() => {
     // Ensure we're testing against local Mailpit
@@ -37,7 +37,7 @@ describe("Mailpit Integration", () => {
   });
 
   it("should support search endpoint", async () => {
-    const searchUrl = `http://localhost:${mailpitPort}/api/v1/search?query=test`;
+    const searchUrl = `http://127.0.0.1:${mailpitPort}/api/v1/search?query=test`;
     const response = await fetch(searchUrl);
 
     expect(response.ok).toBe(true);
@@ -46,7 +46,7 @@ describe("Mailpit Integration", () => {
   });
 
   it("should support webUI endpoint", async () => {
-    const webUIUrl = `http://localhost:${mailpitPort}/`;
+    const webUIUrl = `http://127.0.0.1:${mailpitPort}/`;
     const response = await fetch(webUIUrl);
 
     expect(response.ok).toBe(true);

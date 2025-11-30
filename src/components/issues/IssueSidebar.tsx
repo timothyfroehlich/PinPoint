@@ -1,6 +1,8 @@
 import type React from "react";
+import { Eye } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { SidebarActions } from "~/components/issues/SidebarActions";
+import { WatchButton } from "~/components/issues/WatchButton";
 import { type IssueWithAllRelations } from "~/lib/types";
 
 interface SidebarUser {
@@ -12,12 +14,15 @@ interface SidebarUser {
 interface IssueSidebarProps {
   issue: IssueWithAllRelations;
   allUsers: SidebarUser[];
+  currentUserId: string;
 }
 
 export function IssueSidebar({
   issue,
   allUsers,
+  currentUserId,
 }: IssueSidebarProps): React.JSX.Element {
+  const isWatching = issue.watchers.some((w) => w.userId === currentUserId);
   return (
     <div className="w-full shrink-0 lg:w-80">
       <div className="sticky top-4 space-y-4">
@@ -26,7 +31,16 @@ export function IssueSidebar({
             <CardTitle>Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <SidebarActions issue={issue} allUsers={allUsers} />
+            <div className="space-y-2">
+              <SidebarActions issue={issue} allUsers={allUsers} />
+              <WatchButton issueId={issue.id} initialIsWatching={isWatching} />
+            </div>
+
+            {/* Watchers Count */}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Eye className="size-4" />
+              <span>{issue.watchers.length} watching</span>
+            </div>
 
             {/* Additional Metadata */}
             <div className="space-y-4 border-t pt-4">

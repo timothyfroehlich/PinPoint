@@ -11,8 +11,17 @@ import {
   type CreateMachineResult,
 } from "~/app/(app)/machines/actions";
 import { cn } from "~/lib/utils";
+import { OwnerSelect } from "~/components/machines/OwnerSelect";
 
-export function CreateMachineForm(): React.JSX.Element {
+interface CreateMachineFormProps {
+  allUsers: { id: string; name: string }[];
+  isAdmin: boolean;
+}
+
+export function CreateMachineForm({
+  allUsers,
+  isAdmin,
+}: CreateMachineFormProps): React.JSX.Element {
   const [state, formAction] = useActionState<
     CreateMachineResult | undefined,
     FormData
@@ -51,6 +60,9 @@ export function CreateMachineForm(): React.JSX.Element {
             Enter the full name of the pinball machine
           </p>
         </div>
+
+        {/* Owner Select (Admin Only) */}
+        {isAdmin && <OwnerSelect users={allUsers} />}
 
         {/* Actions */}
         <div className="flex gap-3 pt-4">

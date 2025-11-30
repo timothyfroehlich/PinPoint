@@ -24,7 +24,15 @@ export default defineConfig({
   },
   // Limit introspection to our app tables only
   // Prevents Drizzle Kit from parsing Supabase system tables
-  tablesFilter: ["user_profiles", "machines", "issues", "issue_comments"],
+  tablesFilter: [
+    "user_profiles",
+    "machines",
+    "issues",
+    "issue_comments",
+    "issue_watchers",
+    "notifications",
+    "notification_preferences",
+  ],
   schemaFilter: ["public"],
   verbose: true,
   strict: false, // Allow force operations in pre-beta

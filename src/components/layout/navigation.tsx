@@ -100,7 +100,6 @@ export async function Navigation(): Promise<React.JSX.Element> {
                 userName={
                   (user.user_metadata["name"] as string | undefined) ?? "User"
                 }
-                userEmail={user.email ?? ""}
               />
             </div>
           ) : (

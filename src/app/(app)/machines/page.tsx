@@ -1,5 +1,4 @@
 import type React from "react";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
@@ -30,9 +29,7 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) throw new Error("Unauthorized");
 
   // Query machines with their open issues (direct Drizzle query - no DAL)
   const allMachines = await db.query.machines.findMany({

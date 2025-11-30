@@ -105,7 +105,7 @@ describe("resolveRedirectPath", () => {
   it("should reject absolute URL not matching origin or forwarded host", () => {
     const result = resolveRedirectPath({
       nextParam: "https://evil.com/dashboard",
-      origin: "http://localhost:3000",
+      origin: "http://test.local",
       forwardedHost: "app.example.com",
     });
     expect(result).toBe("/");

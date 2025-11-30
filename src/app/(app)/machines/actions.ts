@@ -7,14 +7,14 @@
 
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { machines } from "~/server/db/schema";
 import { createMachineSchema, updateMachineSchema } from "./schemas";
 import { type Result, ok, err } from "~/lib/result";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
 
@@ -72,6 +72,11 @@ export async function createMachineAction(
   // Extract form data
   const rawData = {
     name: formData.get("name"),
+    ownerId:
+      typeof formData.get("ownerId") === "string" &&
+      (formData.get("ownerId") as string).length > 0
+        ? (formData.get("ownerId") as string)
+        : undefined,
   };
 
   // Validate input (CORE-SEC-002)
@@ -89,6 +94,7 @@ export async function createMachineAction(
       .insert(machines)
       .values({
         name,
+        ownerId: validation.data.ownerId ?? user.id, // Default to creator if not specified
       })
       .returning();
 
@@ -135,6 +141,11 @@ export async function updateMachineAction(
   const rawData = {
     id: formData.get("id"),
     name: formData.get("name"),
+    ownerId:
+      typeof formData.get("ownerId") === "string" &&
+      (formData.get("ownerId") as string).length > 0
+        ? (formData.get("ownerId") as string)
+        : undefined,
   };
 
   const validation = updateMachineSchema.safeParse(rawData);
@@ -148,8 +159,11 @@ export async function updateMachineAction(
   try {
     const [machine] = await db
       .update(machines)
-      .set({ name })
-      .where(eq(machines.id, id))
+      .set({
+        name,
+        ...(validation.data.ownerId && { ownerId: validation.data.ownerId }),
+      })
+      .where(and(eq(machines.id, id), eq(machines.ownerId, user.id)))
       .returning();
 
     if (!machine) {
@@ -194,7 +208,7 @@ export async function deleteMachineAction(
   try {
     const [machine] = await db
       .delete(machines)
-      .where(eq(machines.id, machineId))
+      .where(and(eq(machines.id, machineId), eq(machines.ownerId, user.id)))
       .returning();
 
     if (!machine) {

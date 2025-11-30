@@ -72,61 +72,70 @@ describe("loginSchema", () => {
 describe("signupSchema", () => {
   it("should validate correct name, email, and password", () => {
     const result = signupSchema.safeParse({
-      name: "John Doe",
+      firstName: "John",
+      lastName: "Doe",
       email: "john@example.com",
       password: "SecurePass123",
     });
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.name).toBe("John Doe");
+      expect(result.data.firstName).toBe("John");
+      expect(result.data.lastName).toBe("Doe");
       expect(result.data.email).toBe("john@example.com");
       expect(result.data.password).toBe("SecurePass123");
     }
   });
 
-  it("should trim whitespace from name", () => {
+  it("should trim whitespace from names", () => {
     const result = signupSchema.safeParse({
-      name: "  John Doe  ",
+      firstName: "  John  ",
+      lastName: "  Doe  ",
       email: "john@example.com",
       password: "SecurePass123",
     });
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.name).toBe("John Doe");
+      expect(result.data.firstName).toBe("John");
+      expect(result.data.lastName).toBe("Doe");
     }
   });
 
-  it("should reject empty name", () => {
+  it("should reject empty names", () => {
     const result = signupSchema.safeParse({
-      name: "",
+      firstName: "",
+      lastName: "",
       email: "john@example.com",
       password: "SecurePass123",
     });
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues[0]?.message).toContain("Name is required");
+      expect(result.error.issues[0]?.message).toContain(
+        "First name is required"
+      );
     }
   });
 
-  it("should reject name longer than 100 characters", () => {
+  it("should reject names longer than 50 characters", () => {
     const result = signupSchema.safeParse({
-      name: "a".repeat(101),
+      firstName: "a".repeat(51),
+      lastName: "Doe",
       email: "john@example.com",
       password: "SecurePass123",
     });
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues[0]?.message).toContain("less than 100");
+      expect(result.error.issues[0]?.message).toContain("less than 50");
     }
   });
 
   it("should reject invalid email format", () => {
     const result = signupSchema.safeParse({
-      name: "John Doe",
+      firstName: "John",
+      lastName: "Doe",
       email: "invalid-email",
       password: "SecurePass123",
     });
@@ -139,7 +148,8 @@ describe("signupSchema", () => {
 
   it("should reject password shorter than 8 characters", () => {
     const result = signupSchema.safeParse({
-      name: "John Doe",
+      firstName: "John",
+      lastName: "Doe",
       email: "john@example.com",
       password: "short",
     });
@@ -152,7 +162,8 @@ describe("signupSchema", () => {
 
   it("should reject password longer than 128 characters", () => {
     const result = signupSchema.safeParse({
-      name: "John Doe",
+      firstName: "John",
+      lastName: "Doe",
       email: "john@example.com",
       password: "a".repeat(129),
     });
@@ -165,7 +176,8 @@ describe("signupSchema", () => {
 
   it("should accept password exactly 8 characters", () => {
     const result = signupSchema.safeParse({
-      name: "John Doe",
+      firstName: "John",
+      lastName: "Doe",
       email: "john@example.com",
       password: "12345678",
     });
@@ -175,7 +187,8 @@ describe("signupSchema", () => {
 
   it("should accept password exactly 128 characters", () => {
     const result = signupSchema.safeParse({
-      name: "John Doe",
+      firstName: "John",
+      lastName: "Doe",
       email: "john@example.com",
       password: "a".repeat(128),
     });

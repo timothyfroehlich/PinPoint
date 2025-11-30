@@ -19,6 +19,7 @@ export const createMachineSchema = z.object({
     .trim()
     .min(1, "Machine name is required")
     .max(100, "Machine name must be less than 100 characters"),
+  ownerId: z.string().uuid().optional(),
 });
 
 export type CreateMachineInput = z.infer<typeof createMachineSchema>;
@@ -31,12 +32,9 @@ export type CreateMachineInput = z.infer<typeof createMachineSchema>;
  * - Name: Required, minimum 1 character (CORE-SEC-002)
  */
 export const updateMachineSchema = z.object({
-  id: z.string().uuid("Invalid machine ID"),
-  name: z
-    .string()
-    .trim()
-    .min(1, "Machine name is required")
-    .max(100, "Machine name must be less than 100 characters"),
+  id: z.string().uuid(),
+  name: z.string().min(1, "Name is required"),
+  ownerId: z.string().uuid().optional(),
 });
 
 export type UpdateMachineInput = z.infer<typeof updateMachineSchema>;

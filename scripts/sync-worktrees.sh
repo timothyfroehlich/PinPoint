@@ -214,6 +214,7 @@ fix_config_toml() {
   local expected_db_port=$((BASE_PORT_DB + offset))
   local expected_shadow_port=$((BASE_PORT_SHADOW + offset))
   local expected_pooler_port=$((BASE_PORT_POOLER + offset))
+  local expected_inbucket_port=$((BASE_PORT_INBUCKET + offset))
 
   # Read current values
   local current_project_id=$(grep '^project_id =' "$config_file" | sed 's/project_id = "\(.*\)"/\1/')
@@ -221,6 +222,7 @@ fix_config_toml() {
   local current_db_port=$(sed -n '/^\[db\]/,/^\[/ { /^port = / { s/port = //p; q } }' "$config_file")
   local current_shadow_port=$(sed -n '/^\[db\]/,/^\[/ { /^shadow_port = / { s/shadow_port = //p; q } }' "$config_file")
   local current_pooler_port=$(sed -n '/^\[db\.pooler\]/,/^\[/ { /^port = / { s/port = //p; q } }' "$config_file")
+  local current_inbucket_port=$(sed -n '/^\[inbucket\]/,/^\[/ { /^port = / { s/port = //p; q } }' "$config_file")
 
   local changes=()
   local needs_fix=false
@@ -251,6 +253,11 @@ fix_config_toml() {
     needs_fix=true
   fi
 
+  if [ "$current_inbucket_port" != "$expected_inbucket_port" ]; then
+    changes+=("Inbucket port: $current_inbucket_port → $expected_inbucket_port")
+    needs_fix=true
+  fi
+
   if [ "$needs_fix" = false ]; then
     CONFIG_MESSAGES[$name]="Validated (no changes needed)"
     CONFIG_FIXED[$name]=false
@@ -275,6 +282,7 @@ fix_config_toml() {
     sed -i "/^\[db\]/,/^\[/ { /^port = / s/port = .*/port = $expected_db_port/ }" "$config_file"
     sed -i "/^\[db\]/,/^\[/ { /^shadow_port = / s/shadow_port = .*/shadow_port = $expected_shadow_port/ }" "$config_file"
     sed -i "/^\[db\.pooler\]/,/^\[/ s/^port = .*/port = $expected_pooler_port/" "$config_file"
+    sed -i "/^\[inbucket\]/,/^\[/ s/^port = .*/port = $expected_inbucket_port/" "$config_file"
   fi
 
   CONFIG_FIXED[$name]=true
@@ -487,10 +495,56 @@ safe_merge_main() {
   local branch="$2"
   local name=$(get_worktree_name "$worktree_dir")
 
-  # Skip if on main or detached HEAD
-  if [ "$branch" = "main" ] || [ "$branch" = "HEAD" ]; then
-    MERGE_STATUS[$name]="skipped"
-    MERGE_MESSAGES[$name]="On main branch, no merge needed"
+  # Check if there are outstanding changes
+  local has_changes=false
+  if ! git -C "$worktree_dir" diff-index --quiet HEAD -- 2>/dev/null; then
+    has_changes=true
+  fi
+
+  # Handle detached HEAD state
+  if [ "$branch" = "HEAD" ]; then
+    if [ "$has_changes" = true ]; then
+      MERGE_STATUS[$name]="skipped"
+      MERGE_MESSAGES[$name]="Detached HEAD with outstanding changes - should be working on a branch"
+      update_overall_status "$name" "warning"
+      return 0
+    fi
+
+    # Switch to origin/main detached
+    if [ "$DRY_RUN" = true ]; then
+      echo "[DRY-RUN] Would run: git fetch origin && git checkout --detach origin/main"
+    else
+      git -C "$worktree_dir" fetch origin >/dev/null 2>&1
+      git -C "$worktree_dir" checkout --detach origin/main >/dev/null 2>&1
+    fi
+    MERGE_STATUS[$name]="detached"
+    MERGE_MESSAGES[$name]="Switched to origin/main detached"
+    return 0
+  fi
+
+  # Handle main branch
+  if [ "$branch" = "main" ]; then
+    if [ "$has_changes" = true ]; then
+      MERGE_STATUS[$name]="skipped"
+      MERGE_MESSAGES[$name]="On main with outstanding changes - should be working on a branch"
+      update_overall_status "$name" "warning"
+      return 0
+    fi
+
+    # Pull latest main
+    if [ "$DRY_RUN" = true ]; then
+      echo "[DRY-RUN] Would run: git pull"
+    else
+      local pull_output
+      pull_output=$(git -C "$worktree_dir" pull 2>&1)
+      if echo "$pull_output" | grep -q "Already up to date"; then
+        MERGE_STATUS[$name]="up-to-date"
+        MERGE_MESSAGES[$name]="Main already up to date"
+      else
+        MERGE_STATUS[$name]="pulled"
+        MERGE_MESSAGES[$name]="Main pulled successfully"
+      fi
+    fi
     return 0
   fi
 

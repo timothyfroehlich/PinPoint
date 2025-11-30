@@ -1,5 +1,4 @@
 import type React from "react";
-import { redirect } from "next/navigation";
 import { Plus } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
@@ -25,9 +24,7 @@ export default async function NewIssuePage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) throw new Error("Unauthorized");
 
   // Get search params (Next.js 16: searchParams is a Promise)
   const params = await searchParams;

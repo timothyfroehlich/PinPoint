@@ -35,11 +35,15 @@ export async function ensureLoggedIn(
   options?: LoginOptions
 ): Promise<void> {
   await page.goto("/dashboard");
-  const currentUrl = page.url();
-  if (currentUrl.includes("/login")) {
-    await loginAs(page, options);
-    return;
-  }
+  // Wait for any redirects or page loads to settle
+  await page.waitForLoadState("domcontentloaded");
 
+  if (page.url().includes("/login")) {
+    await loginAs(page, options);
+    // After login, ensure we land on dashboard and wait for it
+    await page.waitForURL("/dashboard");
+    await page.waitForLoadState("domcontentloaded");
+  }
+  // Now assert we are on dashboard
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
 }

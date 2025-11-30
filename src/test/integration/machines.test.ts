@@ -88,7 +88,6 @@ describe("Machine CRUD Operations (PGlite)", () => {
       await db.insert(issues).values([issue1, issue2]);
 
       // Query machine with issues
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const result = await db.query.machines.findFirst({
         where: eq(machines.id, machine.id),
         with: {
@@ -97,9 +96,7 @@ describe("Machine CRUD Operations (PGlite)", () => {
       });
 
       expect(result).toBeDefined();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect(result?.name).toBe("The Addams Family");
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect(result?.issues).toHaveLength(2);
     });
 
@@ -115,18 +112,13 @@ describe("Machine CRUD Operations (PGlite)", () => {
           createTestMachine({ name: "Medieval Madness" }),
         ]);
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const result = await db.query.machines.findMany({
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
         orderBy: (machines, { desc }) => [desc(machines.name)],
       });
 
       expect(result).toHaveLength(3);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect(result[0].name).toBe("Twilight Zone");
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect(result[1].name).toBe("Medieval Madness");
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect(result[2].name).toBe("Attack from Mars");
     });
   });
@@ -153,7 +145,6 @@ describe("Machine CRUD Operations (PGlite)", () => {
       ]);
 
       // Query machine with issues
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const result = await db.query.machines.findFirst({
         where: eq(machines.id, machine.id),
         with: {
@@ -167,7 +158,6 @@ describe("Machine CRUD Operations (PGlite)", () => {
       });
 
       // Derive status
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
       const status = deriveMachineStatus(result?.issues ?? []);
       expect(status).toBe("operational");
     });
@@ -197,7 +187,6 @@ describe("Machine CRUD Operations (PGlite)", () => {
       ]);
 
       // Query machine with issues
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const result = await db.query.machines.findFirst({
         where: eq(machines.id, machine.id),
         with: {
@@ -211,7 +200,6 @@ describe("Machine CRUD Operations (PGlite)", () => {
       });
 
       // Derive status
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
       const status = deriveMachineStatus(result?.issues ?? []);
       expect(status).toBe("needs_service");
     });
@@ -241,7 +229,6 @@ describe("Machine CRUD Operations (PGlite)", () => {
       ]);
 
       // Query machine with issues
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const result = await db.query.machines.findFirst({
         where: eq(machines.id, machine.id),
         with: {
@@ -255,7 +242,6 @@ describe("Machine CRUD Operations (PGlite)", () => {
       });
 
       // Derive status
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
       const status = deriveMachineStatus(result?.issues ?? []);
       expect(status).toBe("unplayable");
     });
@@ -288,7 +274,6 @@ describe("Machine CRUD Operations (PGlite)", () => {
       ]);
 
       // Query machine with issues
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const result = await db.query.machines.findFirst({
         where: eq(machines.id, machine.id),
         with: {
@@ -302,7 +287,6 @@ describe("Machine CRUD Operations (PGlite)", () => {
       });
 
       // Derive status - should be needs_service, not unplayable
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
       const status = deriveMachineStatus(result?.issues ?? []);
       expect(status).toBe("needs_service");
     });

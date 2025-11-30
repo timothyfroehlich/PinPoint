@@ -32,7 +32,8 @@ test.describe("Authentication", () => {
     const testEmail = `e2e-test-${timestamp}@example.com`;
     const password = "TestPassword123";
 
-    await page.getByLabel("Name").fill("E2E Test User");
+    await page.getByLabel("First Name").fill("E2E Test");
+    await page.getByLabel("Last Name").fill("User");
     await page.getByLabel("Email").fill(testEmail);
     await page.getByLabel("Password").fill(password);
 
@@ -103,6 +104,7 @@ test.describe("Authentication", () => {
   }) => {
     // Try to access dashboard without being logged in
     await page.goto("/dashboard");
+    await page.waitForURL("/login"); // Explicitly wait for the redirect
 
     // Should redirect to login page
     await expect(page).toHaveURL("/login");
@@ -127,6 +129,7 @@ test.describe("Authentication", () => {
 
     // Verify we're logged out by trying to access dashboard
     await page.goto("/dashboard");
+    await page.waitForURL("/login"); // Explicitly wait for the redirect
     await expect(page).toHaveURL("/login");
   });
 
@@ -140,7 +143,8 @@ test.describe("Authentication", () => {
 
     // Create account
     await page.goto("/signup");
-    await page.getByLabel("Name").fill("Password Reset Test");
+    await page.getByLabel("First Name").fill("Password Reset");
+    await page.getByLabel("Last Name").fill("Test");
     await page.getByLabel("Email").fill(testEmail);
     await page.getByLabel("Password").fill(oldPassword);
     await page.getByRole("button", { name: "Create Account" }).click();
