@@ -1,7 +1,6 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
 import { createClient } from "~/lib/supabase/server";
 import { type Result, ok, err } from "~/lib/result";
 import {
@@ -245,7 +244,6 @@ export async function signupAction(
 
     if (!data.user) {
       log.error({ action: "signup" }, "Signup failed: no user returned");
-
       return err("SERVER", "No user returned");
     }
 
@@ -388,21 +386,8 @@ export async function forgotPasswordAction(
 
     const supabase = await createClient();
 
-    // Get origin dynamically (dev server can run on 3000 or 3100)
-    const headersList = await headers();
-    const protocol =
-      headersList.get("x-forwarded-proto") ??
-      headersList.get("origin")?.split("://")[0] ??
-      "http";
-    const host = headersList.get("x-forwarded-host") ?? headersList.get("host");
-    const fallback =
-      headersList.get("referer")?.split("/").slice(0, 3).join("/") ??
-      `http://localhost:${process.env["PORT"] ?? "3000"}`;
+    // CHANGED: Fail closed if NEXT_PUBLIC_SITE_URL not configured
     const siteUrl = process.env["NEXT_PUBLIC_SITE_URL"];
-    const origin =
-      (typeof siteUrl === "string" && siteUrl.length > 0
-        ? siteUrl
-        : undefined) ?? (host ? `${protocol}://${host}` : fallback);
 
     // Validate origin against allowlist to prevent host header injection
     // We allow:
@@ -410,6 +395,16 @@ export async function forgotPasswordAction(
     // 2. The configured local port (development)
     // 3. Default localhost:3000 (development fallback)
     const localPort = process.env["PORT"] ?? "3000";
+
+    if (!siteUrl) {
+      log.error(
+        { action: "forgot-password" },
+        "NEXT_PUBLIC_SITE_URL not configured - cannot send password reset email"
+      );
+      return err("SERVER", "Configuration error. Please contact support.");
+    }
+
+    const origin = siteUrl; // No fallback, fail if not configured
     const allowedOrigins = [
       siteUrl,
       `http://localhost:${localPort}`,
@@ -446,7 +441,7 @@ export async function forgotPasswordAction(
     }
 
     log.info(
-      { email, action: "forgot-password" },
+      { action: "forgot-password" },
       "Password reset email sent successfully"
     );
 
