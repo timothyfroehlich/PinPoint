@@ -209,5 +209,7 @@ describe("forgotPasswordAction - Origin Allowlist Validation", () => {
     const result = await forgotPasswordAction(undefined, formData);
 
     expect(result.ok).toBe(true);
+    expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
+    expectRedirectToContain(mockSupabase, "https://any-valid-url.com");
   });
 });
