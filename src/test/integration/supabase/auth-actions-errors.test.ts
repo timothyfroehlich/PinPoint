@@ -1,4 +1,12 @@
-import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  beforeEach,
+  afterEach,
+  vi,
+} from "vitest";
 import { createClient } from "@supabase/supabase-js";
 import {
   resetPasswordAction,
@@ -61,6 +69,7 @@ describe("Auth Actions - Error Path Integration Tests", () => {
     }
     // Ensure we're signed out
     await supabase.auth.signOut();
+    vi.unstubAllEnvs();
   });
 
   describe("resetPasswordAction - Error Paths", () => {
@@ -121,6 +130,11 @@ describe("Auth Actions - Error Path Integration Tests", () => {
   });
 
   describe("forgotPasswordAction - Error Paths", () => {
+    beforeEach(() => {
+      // Ensure site URL is configured for fail-closed origin validation
+      vi.stubEnv("NEXT_PUBLIC_SITE_URL", "http://localhost:3000");
+    });
+
     it("should return VALIDATION error for invalid email format", async () => {
       const formData = new FormData();
       formData.set("email", "not-an-email");
