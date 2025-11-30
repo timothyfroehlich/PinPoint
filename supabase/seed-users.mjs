@@ -319,28 +319,41 @@ async function seedUsersAndData() {
     console.warn("⚠️ Admin user not found, skipping machine/issue seeding.");
   }
 
-  // Insert notifications for admin
-  const { error: notifError } = await supabase.from("notifications").insert([
-    {
-      user_id: userIds.admin,
-      type: "issue_assigned",
-      resource_id: "10000000-0000-4000-8000-000000000002", // "Ball stuck in Thing's box"
-      resource_type: "issue",
-      created_at: new Date().toISOString(),
-    },
-    {
-      user_id: userIds.admin,
-      type: "new_comment",
-      resource_id: "10000000-0000-4000-8000-000000000002",
-      resource_type: "issue",
-      created_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-    },
-  ]);
+  // 5. Seed Notifications for admin
+  if (userIds.admin) {
+    console.log("\n🔔 Seeding notifications...");
 
-  if (notifError) {
-    console.error("Error seeding notifications:", notifError);
-  } else {
-    console.log("Seeded notifications for admin");
+    try {
+      await sql`
+        INSERT INTO notifications (user_id, type, resource_id, resource_type, created_at)
+        VALUES
+          (
+            ${userIds.admin},
+            'issue_assigned',
+            '10000000-0000-4000-8000-000000000002',
+            'issue',
+            NOW() - INTERVAL '2 hours'
+          ),
+          (
+            ${userIds.admin},
+            'new_comment',
+            '10000000-0000-4000-8000-000000000002',
+            'issue',
+            NOW() - INTERVAL '1 day'
+          ),
+          (
+            ${userIds.admin},
+            'issue_status_changed',
+            '10000000-0000-4000-8000-000000000003',
+            'issue',
+            NOW() - INTERVAL '3 hours'
+          )
+        ON CONFLICT DO NOTHING
+      `;
+      console.log("✅ Notifications seeded for admin.");
+    } catch (err) {
+      console.error("❌ Error seeding notifications:", err);
+    }
   }
 
   console.log("\n✨ Seeding complete!");
