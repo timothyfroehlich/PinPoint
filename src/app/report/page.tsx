@@ -61,7 +61,7 @@ export default async function PublicReportPage({
               <input
                 type="text"
                 name="website"
-                className="hidden"
+                className="sr-only"
                 tabIndex={-1}
                 autoComplete="off"
                 aria-hidden="true"

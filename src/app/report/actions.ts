@@ -14,6 +14,7 @@ import {
 } from "~/lib/rate-limit";
 import { publicIssueSchema, type PublicIssueInput } from "./schemas";
 
+// Return undefined for non-string values so optional Zod fields validate correctly
 const toOptionalString = (
   value: FormDataEntryValue | null
 ): string | undefined => (typeof value === "string" ? value : undefined);
