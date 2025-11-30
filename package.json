@@ -4,7 +4,7 @@
   "type": "module",
   "description": "Pinball machine issue tracking for Austin Pinball Collective",
   "scripts": {
-    "dev": "next dev",
+    "dev": "PORT=$(grep '^PORT=' .env.local | cut -d'=' -f2) next dev --port $PORT",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit -p tsconfig.json",
