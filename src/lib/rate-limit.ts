@@ -182,6 +182,14 @@ export async function getClientIp(): Promise<string> {
  * @returns Rate limit result, or success if Redis not configured
  */
 export async function checkLoginIpLimit(ip: string): Promise<RateLimitResult> {
+  if (ip === "unknown") {
+    log.warn(
+      { action: "rate-limit" },
+      "Client IP unavailable - skipping login IP rate limit (fail open)"
+    );
+    return { success: true, limit: 0, remaining: 0, reset: 0 };
+  }
+
   if (loginIpLimiter === undefined) {
     loginIpLimiter = createLoginIpLimiter();
   }
@@ -221,6 +229,14 @@ export async function checkLoginIpLimit(ip: string): Promise<RateLimitResult> {
 export async function checkPublicIssueLimit(
   ip: string
 ): Promise<RateLimitResult> {
+  if (ip === "unknown") {
+    log.warn(
+      { action: "rate-limit" },
+      "Client IP unavailable - skipping public issue rate limit (fail open)"
+    );
+    return { success: true, limit: 0, remaining: 0, reset: 0 };
+  }
+
   if (publicIssueLimiter === undefined) {
     publicIssueLimiter = createPublicIssueLimiter();
   }
@@ -301,6 +317,14 @@ export async function checkLoginAccountLimit(
  * @returns Rate limit result, or success if Redis not configured
  */
 export async function checkSignupLimit(ip: string): Promise<RateLimitResult> {
+  if (ip === "unknown") {
+    log.warn(
+      { action: "rate-limit" },
+      "Client IP unavailable - skipping signup rate limit (fail open)"
+    );
+    return { success: true, limit: 0, remaining: 0, reset: 0 };
+  }
+
   if (signupLimiter === undefined) {
     signupLimiter = createSignupLimiter();
   }

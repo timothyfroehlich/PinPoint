@@ -14,8 +14,9 @@ import {
 } from "~/lib/rate-limit";
 import { publicIssueSchema, type PublicIssueInput } from "./schemas";
 
-const toOptionalString = (value: FormDataEntryValue | null): string | undefined =>
-  typeof value === "string" ? value : undefined;
+const toOptionalString = (
+  value: FormDataEntryValue | null
+): string | undefined => (typeof value === "string" ? value : undefined);
 
 const redirectWithError = (message: string): never => {
   const params = new URLSearchParams({ error: message });
@@ -44,7 +45,9 @@ export async function submitPublicIssueAction(
 
   if (!success) {
     const resetTime = formatResetTime(reset);
-    redirectWithError(`Too many submissions. Please try again in ${resetTime}.`);
+    redirectWithError(
+      `Too many submissions. Please try again in ${resetTime}.`
+    );
   }
 
   const rawData = {

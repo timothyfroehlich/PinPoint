@@ -25,10 +25,10 @@ vi.mock("~/server/db", () => ({
   db: {
     insert: vi.fn(),
     query: {
-       machines: {
-         findMany: vi.fn()
-       }
-    }
+      machines: {
+        findMany: vi.fn(),
+      },
+    },
   },
 }));
 
@@ -64,12 +64,12 @@ describe("submitPublicIssueAction", () => {
     });
 
     // Mock DB insert
-     const mockReturning = vi.fn().mockResolvedValue([{ id: 1 }]);
-     const mockValues = vi.fn().mockReturnValue({ returning: mockReturning });
+    const mockReturning = vi.fn().mockResolvedValue([{ id: 1 }]);
+    const mockValues = vi.fn().mockReturnValue({ returning: mockReturning });
     // eslint-disable-next-line @typescript-eslint/unbound-method
-     vi.mocked(db.insert).mockReturnValue({
-       values: mockValues,
-     } as unknown as ReturnType<typeof db.insert>);
+    vi.mocked(db.insert).mockReturnValue({
+      values: mockValues,
+    } as unknown as ReturnType<typeof db.insert>);
   });
 
   it("should fail if honeypot is filled", async () => {
@@ -113,7 +113,8 @@ describe("submitPublicIssueAction", () => {
     }
 
     // Should redirect with error
-    const expectedError = "Too many submissions. Please try again in 123456789.";
+    const expectedError =
+      "Too many submissions. Please try again in 123456789.";
     const params = new URLSearchParams({ error: expectedError });
     expect(redirect).toHaveBeenCalledWith(`/report?${params.toString()}`);
 

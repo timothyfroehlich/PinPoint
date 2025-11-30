@@ -197,6 +197,8 @@ describe("forgotPasswordAction - Origin Resolution", () => {
   });
 
   it("should handle referer header as ultimate fallback", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
+
     vi.mocked(headers).mockReturnValue({
       get: (key: string) => {
         if (key === "referer") return "http://localhost:3200/forgot-password";

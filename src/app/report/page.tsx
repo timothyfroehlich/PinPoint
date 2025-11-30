@@ -61,9 +61,10 @@ export default async function PublicReportPage({
               <input
                 type="text"
                 name="website"
-                style={{ display: "none" }}
+                className="hidden"
                 tabIndex={-1}
                 autoComplete="off"
+                aria-hidden="true"
               />
 
               <div className="space-y-2">
