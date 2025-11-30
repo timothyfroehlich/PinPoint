@@ -244,7 +244,6 @@ export async function signupAction(
 
     if (!data.user) {
       log.error({ action: "signup" }, "Signup failed: no user returned");
-
       return err("SERVER", "No user returned");
     }
 
