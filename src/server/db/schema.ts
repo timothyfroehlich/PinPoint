@@ -9,6 +9,16 @@ import {
   primaryKey,
 } from "drizzle-orm/pg-core";
 
+/**
+ * ⚠️ IMPORTANT: When adding new tables to this schema file,
+ * you MUST update the `tablesFilter` array in drizzle.config.ts
+ * to include the new table name(s). Otherwise, drizzle-kit will not
+ * be able to see or manage the new tables.
+ *
+ * Example: If you add `export const fooBar = pgTable("foo_bar", ...)`
+ * then add "foo_bar" to the tablesFilter array.
+ */
+
 const authSchema = pgSchema("auth");
 
 export const authUsers = authSchema.table("users", {
