@@ -115,7 +115,9 @@ describe("forgotPasswordAction - Origin Resolution", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe("SERVER");
-      expect(result.message).toBe("Configuration error. Please contact support.");
+      expect(result.message).toBe(
+        "Configuration error. Please contact support."
+      );
     }
     expect(mockSupabase.auth.resetPasswordForEmail).not.toHaveBeenCalled();
   });
