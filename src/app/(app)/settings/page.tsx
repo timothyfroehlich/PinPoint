@@ -14,9 +14,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) throw new Error("Unauthorized");
 
   // Fetch user profile
   const profile = await db.query.userProfiles.findFirst({

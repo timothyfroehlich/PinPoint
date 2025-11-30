@@ -1,37 +1,65 @@
-# Walkthrough: Comprehensive UI Review and Documentation Refactor
+# Walkthrough: Code Review Fixes
 
-## Overview
-
-This task focused on a "second pass" cleanup of the UI codebase and documentation to establish a strict, clear hierarchy and enforce best practices. The goal was to remove "cruft" (ad-hoc styles, hardcoded values) and ensure all UI code aligns with the "Modern Dark SaaS" aesthetic and "Server-First" architecture.
+I have addressed the critical and high-severity issues identified in the code review.
 
 ## Changes
 
-### 1. Documentation Refactor
+### 1. Profile Creation Name Mismatch (Critical)
 
-- **`docs/UI_GUIDE.md`**: Rewritten as the single source of truth for UI development. Covers tech stack, styling philosophy, component architecture, and troubleshooting.
-- **`AGENTS.md`**: Added a "UI Development & Progressive Enhancement" section to guide AI agents.
-- **`docs/NON_NEGOTIABLES.md`**: Added strict UI rules (no global resets, no hardcoded spacing, mandatory `cn()` usage).
-- **Copilot Instructions**: Updated `.github/COPILOT_INSTRUCTIONS.md` and `.github/copilot-instructions.md` to reference the new documentation structure.
-- **`docs/ui-patterns/`**: Created/updated pattern files for Typography, Components, and Styling Principles.
+**Problem:** The signup flow was sending a single `name` field, but the database trigger expected `first_name` and `last_name`, resulting in empty names in user profiles.
 
-### 2. UI Code Cleanup
+**Fix:**
 
-- **Fixed `cn()` Usage**: Replaced template literals with `cn()` utility in multiple files:
-  - `src/components/password-strength.tsx`
-  - Auth pages (`login`, `signup`, `reset-password`, `forgot-password`)
-  - `src/app/(app)/machines/page.tsx` & subpages
-  - `src/app/(app)/issues/page.tsx` & subpages
-  - `src/app/(app)/dashboard/page.tsx`
-- **Fixed Missing Imports**: Added missing imports for `cn`, `getIssueStatusStyles`, `getIssueSeverityStyles`, and Lucide icons.
-- **Logic Fixes**: Corrected invalid status comparison in `machines/page.tsx`.
-- **Created Issue Status Utility**: Created `src/lib/issues/status.ts` to centralize issue status/severity logic and styles.
+- **Schema:** Updated `signupSchema` to require `firstName` and `lastName` separately.
+- **UI:** Updated `SignupForm` to include separate inputs for First Name and Last Name.
+- **Server Action:** Updated `signupAction` to validate and pass `first_name` and `last_name` to Supabase Auth metadata.
+- **Tests:** Updated unit and integration tests to reflect these changes.
 
-### 3. Process Improvements
+**Files Modified:**
 
-- **GitHub Issue #529**: Created an issue to review Flash Message usage for consistency and security.
+- `src/app/(auth)/schemas.ts`
+- `src/app/(auth)/signup/signup-form.tsx`
+- `src/app/(auth)/actions.ts`
+- `src/test/unit/auth-validation.test.ts`
+- `src/test/integration/supabase/auth-actions.test.ts`
 
-## Verification
+### 2. Missing Request Caching (High Severity)
 
-- **Build**: `npm run build` passed successfully.
-- **Preflight**: `npm run preflight` passed successfully.
-- **Manual Review**: Verified documentation links and flow.
+**Problem:** The `getIssues` query was not wrapped in React's `cache()`, potentially leading to duplicate database queries in a single request.
+
+**Fix:**
+
+- Wrapped `getIssues` in `src/lib/issues/queries.ts` with `cache()`.
+
+**Files Modified:**
+
+- `src/lib/issues/queries.ts`
+
+## Verification Results
+
+### Unit Tests
+
+Ran `npm test src/test/unit/auth-validation.test.ts`:
+
+```
+✓ signupSchema (9)
+  ✓ should validate correct name, email, and password
+  ✓ should trim whitespace from names
+  ✓ should reject empty names
+  ...
+```
+
+**Result:** Passed ✅
+
+### Integration Tests
+
+Ran `npm run test:integration:supabase -- src/test/integration/supabase/auth-actions.test.ts`:
+
+```
+✓ Authentication Integration Tests (6)
+  ✓ Signup flow (2)
+  ✓ Login flow (3)
+  ✓ Logout flow (1)
+```
+
+**Result:** Passed ✅

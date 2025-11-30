@@ -142,12 +142,13 @@ describe("forgotPasswordAction - Origin Resolution", () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://pinpoint.example.com");
 
     // Provide headers that might otherwise confuse logic
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     vi.mocked(headers).mockReturnValue({
       get: (key: string) => {
         if (key === "host") return "evil.com";
         return null;
       },
-    } as Headers);
+    } as any);
 
     const mockSupabase = createMockSupabase();
     mockCreateClient(mockSupabase);

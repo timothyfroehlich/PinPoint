@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
+  if (process.env.NODE_ENV === "production") {
+    return new Response(null, { status: 404 });
+  }
+
   // Minimal connectivity check to the configured DATABASE_URL
   // Does not leak any data – just ensures the connection is valid
   try {

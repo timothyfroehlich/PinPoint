@@ -19,7 +19,8 @@ vi.mock("next/navigation", () => ({
 describe("SignupForm", () => {
   it("should render form fields", () => {
     render(<SignupForm />);
-    expect(screen.getByLabelText(/name/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/first name/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/last name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
     expect(
@@ -37,7 +38,8 @@ describe("SignupForm", () => {
 
     render(<SignupForm />);
 
-    await user.type(screen.getByLabelText(/name/i), "Test User");
+    await user.type(screen.getByLabelText(/first name/i), "Test");
+    await user.type(screen.getByLabelText(/last name/i), "User");
     await user.type(screen.getByLabelText(/email/i), "test@example.com");
     await user.type(screen.getByLabelText(/password/i), "Password123!");
 
@@ -60,7 +62,8 @@ describe("SignupForm", () => {
 
     render(<SignupForm />);
 
-    await user.type(screen.getByLabelText(/name/i), "Test User");
+    await user.type(screen.getByLabelText(/first name/i), "Test");
+    await user.type(screen.getByLabelText(/last name/i), "User");
     await user.type(screen.getByLabelText(/email/i), "test@example.com");
     await user.type(screen.getByLabelText(/password/i), "Password123!");
 

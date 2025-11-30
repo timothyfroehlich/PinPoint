@@ -1,5 +1,4 @@
 import type React from "react";
-import { redirect } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { notificationPreferences } from "~/server/db/schema";
@@ -13,9 +12,7 @@ export default async function NotificationPreferencesPage(): Promise<React.JSX.E
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) throw new Error("Unauthorized");
 
   // Fetch preferences or create default
   let preferences = await db.query.notificationPreferences.findFirst({

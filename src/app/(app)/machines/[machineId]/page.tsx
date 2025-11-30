@@ -1,5 +1,5 @@
 import type React from "react";
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import { cn } from "~/lib/utils";
 import Link from "next/link";
 import { createClient } from "~/lib/supabase/server";
@@ -39,9 +39,7 @@ export default async function MachineDetailPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) throw new Error("Unauthorized");
 
   // Await params (Next.js 15+ requirement)
   const { machineId } = await params;

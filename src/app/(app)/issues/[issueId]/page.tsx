@@ -50,9 +50,7 @@ export default async function IssueDetailPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) throw new Error("Unauthorized");
 
   // Get params (Next.js 16: params is a Promise)
   const { issueId } = await params;

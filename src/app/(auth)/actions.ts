@@ -178,7 +178,8 @@ export async function signupAction(
 ): Promise<SignupResult> {
   // Validate input
   const parsed = signupSchema.safeParse({
-    name: formData.get("name"),
+    firstName: formData.get("firstName"),
+    lastName: formData.get("lastName"),
     email: formData.get("email"),
     password: formData.get("password"),
   });
@@ -192,7 +193,7 @@ export async function signupAction(
     return err("VALIDATION", "Invalid input");
   }
 
-  const { name, email, password } = parsed.data;
+  const { firstName, lastName, email, password } = parsed.data;
 
   try {
     // Rate limiting: Check IP-based limit
@@ -218,7 +219,8 @@ export async function signupAction(
       password,
       options: {
         data: {
-          name, // Passed to trigger for user_profiles.name
+          first_name: firstName,
+          last_name: lastName,
         },
       },
     });

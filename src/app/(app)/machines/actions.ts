@@ -13,7 +13,7 @@ import { db } from "~/server/db";
 import { machines } from "~/server/db/schema";
 import { createMachineSchema, updateMachineSchema } from "./schemas";
 import { type Result, ok, err } from "~/lib/result";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
@@ -163,7 +163,7 @@ export async function updateMachineAction(
         name,
         ...(validation.data.ownerId && { ownerId: validation.data.ownerId }),
       })
-      .where(eq(machines.id, id))
+      .where(and(eq(machines.id, id), eq(machines.ownerId, user.id)))
       .returning();
 
     if (!machine) {
@@ -208,7 +208,7 @@ export async function deleteMachineAction(
   try {
     const [machine] = await db
       .delete(machines)
-      .where(eq(machines.id, machineId))
+      .where(and(eq(machines.id, machineId), eq(machines.ownerId, user.id)))
       .returning();
 
     if (!machine) {

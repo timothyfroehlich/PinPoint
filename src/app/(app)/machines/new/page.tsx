@@ -1,5 +1,4 @@
 import type React from "react";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "~/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -23,9 +22,7 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) throw new Error("Unauthorized");
 
   // Fetch all users for owner selection (Admin only)
   const currentUserProfile = await db.query.userProfiles.findFirst({

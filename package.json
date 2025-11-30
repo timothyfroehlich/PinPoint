@@ -4,7 +4,7 @@
   "type": "module",
   "description": "Pinball machine issue tracking for Austin Pinball Collective",
   "scripts": {
-    "dev": "PORT=$(grep '^PORT=' .env.local | cut -d'=' -f2) next dev --port $PORT",
+    "dev": "node --env-file=.env.local -e \"require('child_process').execSync('next dev --port ' + process.env.PORT, {stdio: 'inherit'})\"",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit -p tsconfig.json",
