@@ -12,12 +12,7 @@ import {
   formatResetTime,
   getClientIp,
 } from "~/lib/rate-limit";
-import { publicIssueSchema, type PublicIssueInput } from "./schemas";
-
-// Return undefined for non-string values so optional Zod fields validate correctly
-const toOptionalString = (
-  value: FormDataEntryValue | null
-): string | undefined => (typeof value === "string" ? value : undefined);
+import { parsePublicIssueForm } from "./validation";
 
 const redirectWithError = (message: string): never => {
   const params = new URLSearchParams({ error: message });
@@ -51,20 +46,13 @@ export async function submitPublicIssueAction(
     );
   }
 
-  const rawData = {
-    machineId: toOptionalString(formData.get("machineId")),
-    title: toOptionalString(formData.get("title")),
-    description: toOptionalString(formData.get("description")),
-    severity: toOptionalString(formData.get("severity")),
-  };
-
-  const validation = publicIssueSchema.safeParse(rawData);
-  if (!validation.success) {
-    const firstError = validation.error.issues[0]?.message ?? "Invalid input";
-    redirectWithError(firstError);
+  const parsed = parsePublicIssueForm(formData);
+  if (!parsed.success) {
+    redirectWithError(parsed.error);
+    return;
   }
 
-  const parsedData: PublicIssueInput = validation.data!;
+  const parsedData = parsed.data;
   const { machineId, title, description, severity } = parsedData;
 
   try {
