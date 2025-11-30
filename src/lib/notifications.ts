@@ -23,7 +23,7 @@ interface CreateNotificationProps {
   type: NotificationType;
   resourceId: string;
   resourceType: ResourceType;
-  actorId: string; // User who triggered the notification (to exclude them)
+  actorId?: string; // User who triggered the notification (optional for anonymous)
   // Context data for emails
   issueTitle?: string | undefined;
   machineName?: string | undefined;

@@ -12,17 +12,8 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import {
-  issues,
-  userProfiles,
-  issueComments,
-  issueWatchers,
-  notificationPreferences,
-  machines,
-} from "~/server/db/schema";
-import { createTimelineEvent } from "~/lib/timeline/events";
+import { issues, issueWatchers, userProfiles } from "~/server/db/schema";
 import { log } from "~/lib/logger";
-import { createNotification } from "~/lib/notifications";
 import {
   createIssueSchema,
   updateIssueStatusSchema,
@@ -32,6 +23,13 @@ import {
   addCommentSchema,
 } from "./schemas";
 import { type Result, ok, err } from "~/lib/result";
+import {
+  createIssue,
+  updateIssueStatus,
+  addIssueComment,
+} from "~/services/issues";
+import { createNotification } from "~/lib/notifications";
+import { createTimelineEvent } from "~/lib/timeline/events";
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
 
@@ -128,97 +126,16 @@ export async function createIssueAction(
 
   const { title, description, machineId, severity, priority } = validation.data;
 
-  // Create issue (direct Drizzle query - no DAL)
+  // Create issue via service
   try {
-    const [issue] = await db
-      .insert(issues)
-      .values({
-        title,
-        description: description ?? null,
-        machineId,
-        severity,
-        priority,
-        reportedBy: user.id,
-        status: "new",
-      })
-      .returning();
-
-    if (!issue) throw new Error("Issue creation failed");
-
-    // Create timeline event for issue creation
-    await createTimelineEvent(issue.id, "Issue created");
-
-    log.info(
-      {
-        issueId: issue.id,
-        machineId,
-        reportedBy: user.id,
-        action: "createIssue",
-      },
-      "Issue created successfully"
-    );
-
-    // --- Notifications & Watchers ---
-    try {
-      const watcherIds = new Set<string>();
-
-      // 1. Reporter (always watches)
-      watcherIds.add(user.id);
-
-      // 2. Machine Owner (if auto-watch enabled)
-      const machine = await db.query.machines.findFirst({
-        where: eq(machines.id, machineId),
-        with: { owner: true },
-      });
-
-      if (machine?.ownerId) {
-        const ownerPrefs = await db.query.notificationPreferences.findFirst({
-          where: eq(notificationPreferences.userId, machine.ownerId),
-        });
-        if (ownerPrefs?.autoWatchOwnedMachines) {
-          watcherIds.add(machine.ownerId);
-        }
-      }
-
-      // 3. Global Subscribers
-      const globalSubs = await db.query.notificationPreferences.findMany({
-        where: (prefs, { or, eq }) =>
-          or(
-            eq(prefs.emailWatchNewIssuesGlobal, true),
-            eq(prefs.inAppWatchNewIssuesGlobal, true)
-          ),
-      });
-      globalSubs.forEach((sub) => watcherIds.add(sub.userId));
-
-      // Insert Watchers
-      if (watcherIds.size > 0) {
-        await db
-          .insert(issueWatchers)
-          .values(
-            Array.from(watcherIds).map((userId) => ({
-              issueId: issue.id,
-              userId,
-            }))
-          )
-          .onConflictDoNothing();
-      }
-
-      // Trigger Notification
-      await createNotification({
-        type: "new_issue",
-        resourceId: issue.id,
-        resourceType: "issue",
-        actorId: user.id,
-        issueTitle: title,
-        machineName: machine?.name ?? undefined,
-      });
-    } catch (error) {
-      log.error(
-        { error, action: "createIssue.notifications" },
-        "Failed to process notifications"
-      );
-      // Don't fail the action if notifications fail
-    }
+    const issue = await createIssue({
+      title,
+      description: description ?? null,
+      machineId,
+      severity,
+      priority,
+      reportedBy: user.id,
+    });
 
     revalidatePath("/issues");
     revalidatePath(`/machines/${machineId}`);
@@ -286,52 +203,12 @@ export async function updateIssueStatusAction(
       return err("NOT_FOUND", "Issue not found");
     }
 
-    const oldStatus = currentIssue.status;
-
     // Update status
-    await db
-      .update(issues)
-      .set({
-        status,
-        updatedAt: new Date(),
-        // Set resolvedAt if status is resolved
-        ...(status === "resolved" && { resolvedAt: new Date() }),
-      })
-      .where(eq(issues.id, issueId));
-
-    // Create timeline event
-    await createTimelineEvent(
+    await updateIssueStatus({
       issueId,
-      `Status changed from ${oldStatus} to ${status}`
-    );
-
-    log.info(
-      { issueId, oldStatus, newStatus: status, action: "updateIssueStatus" },
-      "Issue status updated"
-    );
-
-    // Trigger Notification
-    try {
-      const issue = await db.query.issues.findFirst({
-        where: eq(issues.id, issueId),
-        with: { machine: true },
-      });
-
-      await createNotification({
-        type: "issue_status_changed",
-        resourceId: issueId,
-        resourceType: "issue",
-        actorId: user.id,
-        issueTitle: issue?.title ?? undefined,
-        machineName: issue?.machine.name ?? undefined,
-        newStatus: status,
-      });
-    } catch (error) {
-      log.error(
-        { error, action: "updateIssueStatus.notifications" },
-        "Failed to send notification"
-      );
-    }
+      status,
+      userId: user.id,
+    });
 
     revalidatePath(`/issues/${issueId}`);
     revalidatePath("/issues");
@@ -708,27 +585,10 @@ export async function addCommentAction(
   const { issueId, comment } = validation.data;
 
   try {
-    await db.insert(issueComments).values({
+    await addIssueComment({
       issueId,
-      authorId: user.id,
       content: comment,
-      isSystem: false,
-    });
-
-    // Trigger Notification
-    const issue = await db.query.issues.findFirst({
-      where: eq(issues.id, issueId),
-      with: { machine: true },
-    });
-
-    await createNotification({
-      type: "new_comment",
-      resourceId: issueId,
-      resourceType: "issue",
-      actorId: user.id,
-      issueTitle: issue?.title ?? undefined,
-      machineName: issue?.machine.name ?? undefined,
-      commentContent: comment,
+      userId: user.id,
     });
   } catch (error) {
     log.error(

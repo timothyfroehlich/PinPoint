@@ -2,11 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "~/lib/supabase/server";
-import { db } from "~/server/db";
-import { issueWatchers } from "~/server/db/schema";
-import { eq, and } from "drizzle-orm";
 import { log } from "~/lib/logger";
 import { type Result, ok, err } from "~/lib/result";
+import { toggleIssueWatcher } from "~/services/issues";
 
 export type ToggleWatcherResult = Result<
   { isWatching: boolean },
@@ -26,37 +24,9 @@ export async function toggleWatcherAction(
   }
 
   try {
-    // Check if already watching
-    const existing = await db.query.issueWatchers.findFirst({
-      where: and(
-        eq(issueWatchers.issueId, issueId),
-        eq(issueWatchers.userId, user.id)
-      ),
-    });
-
-    if (existing) {
-      // Unwatch
-      await db
-        .delete(issueWatchers)
-        .where(
-          and(
-            eq(issueWatchers.issueId, issueId),
-            eq(issueWatchers.userId, user.id)
-          )
-        );
-
-      revalidatePath(`/issues/${issueId}`);
-      return ok({ isWatching: false });
-    } else {
-      // Watch
-      await db.insert(issueWatchers).values({
-        issueId,
-        userId: user.id,
-      });
-
-      revalidatePath(`/issues/${issueId}`);
-      return ok({ isWatching: true });
-    }
+    const result = await toggleIssueWatcher({ issueId, userId: user.id });
+    revalidatePath(`/issues/${issueId}`);
+    return ok(result);
   } catch (error) {
     log.error({ error, action: "toggleWatcher" }, "toggleWatcherAction failed");
     return err("SERVER", "Failed to toggle watcher");

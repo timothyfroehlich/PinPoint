@@ -3,10 +3,8 @@
 import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { revalidatePath } from "next/cache";
-import { db } from "~/server/db";
-import { issues } from "~/server/db/schema";
-import { createTimelineEvent } from "~/lib/timeline/events";
 import { log } from "~/lib/logger";
+import { createIssue } from "~/services/issues";
 import {
   checkPublicIssueLimit,
   formatResetTime,
@@ -56,28 +54,13 @@ export async function submitPublicIssueAction(
   const { machineId, title, description, severity } = parsedData;
 
   try {
-    const [issue] = await db
-      .insert(issues)
-      .values({
-        machineId,
-        title,
-        description: description ?? null,
-        severity,
-        reportedBy: null,
-        status: "new",
-      })
-      .returning();
-
-    if (!issue) {
-      throw new Error("Issue creation returned empty result");
-    }
-
-    await createTimelineEvent(issue.id, "Issue reported via public form");
-
-    log.info(
-      { action: "publicIssueReport", issueId: issue.id, machineId },
-      "Anonymous issue reported"
-    );
+    await createIssue({
+      title,
+      description: description ?? null,
+      machineId,
+      severity,
+      reportedBy: null,
+    });
 
     revalidatePath("/issues");
     revalidatePath(`/machines/${machineId}`);

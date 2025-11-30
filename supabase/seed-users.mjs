@@ -14,6 +14,8 @@
 
 import { createClient } from "@supabase/supabase-js";
 import postgres from "postgres";
+import machinesData from "../src/test/data/machines.json" with { type: "json" };
+import usersData from "../src/test/data/users.json" with { type: "json" };
 
 // Environment variables are loaded by Node.js --env-file flag
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -40,31 +42,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 // Create direct database connection for role updates and data seeding
 const sql = postgres(DATABASE_URL);
 
-const TEST_USERS = [
-  {
-    email: "admin@test.com",
-    name: "Admin User",
-    firstName: "Admin",
-    lastName: "User",
-    role: "admin",
-  },
-  {
-    email: "member@test.com",
-    name: "Member User",
-    firstName: "Member",
-    lastName: "User",
-    role: "member",
-  },
-  {
-    email: "guest@test.com",
-    name: "Guest User",
-    firstName: "Guest",
-    lastName: "User",
-    role: "guest",
-  },
-];
-
-const PASSWORD = "TestPassword123";
+const TEST_USERS = Object.values(usersData);
 
 async function seedUsersAndData() {
   console.log("🌱 Seeding test users and data...\n");
@@ -77,7 +55,7 @@ async function seedUsersAndData() {
       // Create user using Supabase Admin API
       const { data, error } = await supabase.auth.admin.createUser({
         email: user.email,
-        password: PASSWORD,
+        password: user.password,
         email_confirm: true, // Auto-confirm email for test users
         user_metadata: {
           name: user.name,
@@ -148,11 +126,7 @@ async function seedUsersAndData() {
   if (userIds.admin) {
     console.log("\n🎰 Seeding machines...");
 
-    const machines = [
-      { id: "11111111-1111-4111-8111-111111111111", name: "Medieval Madness" },
-      { id: "22222222-2222-4222-8222-222222222222", name: "Attack from Mars" },
-      { id: "33333333-3333-4333-8333-333333333333", name: "The Addams Family" },
-    ];
+    const machines = Object.values(machinesData);
 
     for (const machine of machines) {
       await sql`
@@ -361,7 +335,7 @@ async function seedUsersAndData() {
   console.log("  admin@test.com (Admin role)");
   console.log("  member@test.com (Member role)");
   console.log("  guest@test.com (Guest role)");
-  console.log(`  Password: ${PASSWORD}`);
+  console.log(`  Password: ${usersData.admin.password}`);
 
   await sql.end();
   process.exit(0);

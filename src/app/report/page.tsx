@@ -77,6 +77,7 @@ export default async function PublicReportPage({
                   required
                   defaultValue={firstMachineId}
                   disabled={!hasMachines}
+                  data-testid="machine-select"
                   className="w-full rounded-md border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface"
                 >
                   {hasMachines ? (

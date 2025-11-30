@@ -43,9 +43,14 @@ vi.mock("~/lib/notifications", () => ({
   createNotification: vi.fn(),
 }));
 
+// Mock services
+vi.mock("~/services/issues", () => ({
+  addIssueComment: vi.fn(),
+}));
+
 import { revalidatePath } from "next/cache";
 import { createClient } from "~/lib/supabase/server";
-import { db } from "~/server/db";
+import { addIssueComment } from "~/services/issues";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -64,12 +69,8 @@ describe("addCommentAction", () => {
       },
     } as unknown as SupabaseClient);
 
-    // Setup db mock chain
-    const mockValues = vi.fn().mockResolvedValue(undefined);
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    vi.mocked(db.insert).mockReturnValue({
-      values: mockValues,
-    } as unknown as ReturnType<typeof db.insert>);
+    // Setup service mock
+    vi.mocked(addIssueComment).mockResolvedValue(undefined);
   });
 
   it("should successfully add a comment", async () => {
@@ -80,8 +81,11 @@ describe("addCommentAction", () => {
     const result = await addCommentAction(initialState, formData);
 
     expect(result.ok).toBe(true);
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(db.insert).toHaveBeenCalled();
+    expect(addIssueComment).toHaveBeenCalledWith({
+      issueId: validUuid,
+      content: "Test comment",
+      userId: mockUser.id,
+    });
     expect(revalidatePath).toHaveBeenCalledWith(`/issues/${validUuid}`);
   });
 
@@ -115,17 +119,12 @@ describe("addCommentAction", () => {
     if (!result.ok) {
       expect(result.code).toBe("VALIDATION");
     }
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    expect(db.insert).not.toHaveBeenCalled();
+    expect(addIssueComment).not.toHaveBeenCalled();
   });
 
   it("should handle database errors gracefully", async () => {
-    // Mock db error
-    const mockValues = vi.fn().mockRejectedValue(new Error("DB Error"));
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    vi.mocked(db.insert).mockReturnValue({
-      values: mockValues,
-    } as unknown as ReturnType<typeof db.insert>);
+    // Mock service error
+    vi.mocked(addIssueComment).mockRejectedValue(new Error("Service Error"));
 
     const formData = new FormData();
     formData.append("issueId", validUuid);

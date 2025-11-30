@@ -1,0 +1,26 @@
+{
+  "admin": {
+    "email": "admin@test.com",
+    "password": "TestPassword123",
+    "role": "admin",
+    "name": "Admin User",
+    "firstName": "Admin",
+    "lastName": "User"
+  },
+  "member": {
+    "email": "member@test.com",
+    "password": "TestPassword123",
+    "role": "member",
+    "name": "Member User",
+    "firstName": "Member",
+    "lastName": "User"
+  },
+  "guest": {
+    "email": "guest@test.com",
+    "password": "TestPassword123",
+    "role": "guest",
+    "name": "Guest User",
+    "firstName": "Guest",
+    "lastName": "User"
+  }
+}
