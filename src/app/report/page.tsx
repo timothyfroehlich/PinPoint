@@ -57,6 +57,15 @@ export default async function PublicReportPage({
               </p>
             ) : null}
             <form action={submitPublicIssueAction} className="space-y-5">
+              {/* Honeypot field - hidden from humans, filled by bots */}
+              <input
+                type="text"
+                name="website"
+                style={{ display: "none" }}
+                tabIndex={-1}
+                autoComplete="off"
+              />
+
               <div className="space-y-2">
                 <Label htmlFor="machineId" className="text-on-surface">
                   Machine *

@@ -8,6 +8,7 @@
  * - Login: 10 attempts per IP per 15 min, 5 attempts per email per 15 min
  * - Signup: 3 signups per IP per hour
  * - Forgot Password: 3 requests per email per hour
+ * - Public Issue: 5 submissions per IP per 15 min
  *
  * @see https://github.com/timothyfroehlich/PinPoint/issues/536
  * @see https://github.com/timothyfroehlich/PinPoint/issues/537
@@ -122,11 +123,28 @@ function createForgotPasswordLimiter(): Ratelimit | null {
   });
 }
 
+/**
+ * Public Issue rate limiter
+ * - IP-based: 5 submissions per 15 minutes (sliding window)
+ */
+function createPublicIssueLimiter(): Ratelimit | null {
+  const redis = getRedis();
+  if (!redis) return null;
+
+  return new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(5, "15 m"),
+    prefix: "ratelimit:public-issue:ip",
+    analytics: true,
+  });
+}
+
 // Lazy-initialized rate limiters
 let loginIpLimiter: Ratelimit | null | undefined;
 let loginAccountLimiter: Ratelimit | null | undefined;
 let signupLimiter: Ratelimit | null | undefined;
 let forgotPasswordLimiter: Ratelimit | null | undefined;
+let publicIssueLimiter: Ratelimit | null | undefined;
 
 /**
  * Get client IP address from request headers
@@ -188,6 +206,45 @@ export async function checkLoginIpLimit(ip: string): Promise<RateLimitResult> {
     log.error(
       { error: error instanceof Error ? error.message : "Unknown", ip },
       "Login IP rate limit check failed"
+    );
+    // Fail open - allow request if Redis is down
+    return { success: true, limit: 0, remaining: 0, reset: 0 };
+  }
+}
+
+/**
+ * Check public issue rate limit (IP-based)
+ *
+ * @param ip - Client IP address
+ * @returns Rate limit result, or success if Redis not configured
+ */
+export async function checkPublicIssueLimit(
+  ip: string
+): Promise<RateLimitResult> {
+  if (publicIssueLimiter === undefined) {
+    publicIssueLimiter = createPublicIssueLimiter();
+  }
+
+  if (!publicIssueLimiter) {
+    log.warn(
+      { action: "rate-limit" },
+      "Upstash Redis not configured - public issue rate limiting disabled"
+    );
+    return { success: true, limit: 0, remaining: 0, reset: 0 };
+  }
+
+  try {
+    const result = await publicIssueLimiter.limit(ip);
+    return {
+      success: result.success,
+      limit: result.limit,
+      remaining: result.remaining,
+      reset: result.reset,
+    };
+  } catch (error) {
+    log.error(
+      { error: error instanceof Error ? error.message : "Unknown", ip },
+      "Public issue rate limit check failed"
     );
     // Fail open - allow request if Redis is down
     return { success: true, limit: 0, remaining: 0, reset: 0 };
