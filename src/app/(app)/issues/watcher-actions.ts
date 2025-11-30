@@ -5,6 +5,7 @@ import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { issueWatchers } from "~/server/db/schema";
 import { eq, and } from "drizzle-orm";
+import { log } from "~/lib/logger";
 import { type Result, ok, err } from "~/lib/result";
 
 export type ToggleWatcherResult = Result<
@@ -57,7 +58,7 @@ export async function toggleWatcherAction(
       return ok({ isWatching: true });
     }
   } catch (error) {
-    console.error("toggleWatcherAction failed", error);
+    log.error({ error, action: "toggleWatcher" }, "toggleWatcherAction failed");
     return err("SERVER", "Failed to toggle watcher");
   }
 }

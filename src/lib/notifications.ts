@@ -129,6 +129,14 @@ export async function createNotification(
 
   const prefsMap = new Map(preferences.map((p) => [p.userId, p]));
 
+  // 3. Fetch Emails for all recipients (to avoid N+1 in loop)
+  const users = await tx
+    .select({ id: authUsers.id, email: authUsers.email })
+    .from(authUsers)
+    .where(inArray(authUsers.id, recipientIds));
+
+  const emailMap = new Map(users.map((u) => [u.id, u.email]));
+
   // 3. Create Notifications and Send Emails
   const notificationsToInsert = [];
   const emailsToSend = [];
@@ -192,17 +200,11 @@ export async function createNotification(
 
     // Email
     if (prefs.emailEnabled && emailNotify) {
-      // Fetch user email
-      // Drizzle schema has `authUsers`.
-      const authUser = await tx
-        .select({ email: authUsers.email })
-        .from(authUsers)
-        .where(eq(authUsers.id, userId))
-        .then((res) => res[0]);
+      const email = emailMap.get(userId);
 
-      if (authUser?.email) {
+      if (email) {
         emailsToSend.push({
-          to: authUser.email,
+          to: email,
           subject: getEmailSubject(type, issueTitle, machineName),
           html: getEmailHtml(
             type,

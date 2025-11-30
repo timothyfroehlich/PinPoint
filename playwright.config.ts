@@ -90,7 +90,7 @@ export default defineConfig({
 
   // Run your local dev server before starting the tests
   webServer: {
-    command: `HOSTNAME=${hostname} PORT=${port} npm run dev -- --hostname ${hostname}`,
+    command: `PORT=${port} npm run dev`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000, // 2 minutes

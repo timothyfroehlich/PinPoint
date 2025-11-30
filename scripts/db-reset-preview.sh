@@ -41,6 +41,22 @@ if [ -z "$DATABASE_URL" ]; then
   exit 1
 fi
 
+# Extract password from DATABASE_URL using Node.js for safety
+DB_PASSWORD=$(node -e 'try { console.log(new URL(process.env.DATABASE_URL).password) } catch (e) { console.error(e); process.exit(1) }')
+
+if [ -z "$DB_PASSWORD" ]; then
+  echo "Error: Could not extract password from DATABASE_URL"
+  exit 1
+fi
+
+# Construct new Session Pool URL
+# User requested specific host: aws-0-us-east-2.pooler.supabase.com:5432
+DATABASE_URL="postgresql://postgres.gjmpvmelowpgsveupbcy:${DB_PASSWORD}@aws-0-us-east-2.pooler.supabase.com:5432/postgres"
+
+# Also update DIRECT_URL to match, just in case
+export DATABASE_URL
+export DIRECT_URL="$DATABASE_URL"
+
 # Confirm before proceeding
 if [ "$SKIP_CONFIRM" = false ]; then
   echo "⚠️  WARNING: This will DESTROY all data in the database!"
@@ -103,8 +119,8 @@ echo "✅ SQL seed complete"
 
 echo ""
 echo "4️⃣  Seeding users..."
-if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
-  echo "⚠️  Skipping user seeding (SUPABASE_SERVICE_ROLE_KEY not set in $ENV_FILE)"
+if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] && [ -z "$SUPABASE_SECRET_KEY" ]; then
+  echo "⚠️  Skipping user seeding (SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY not set in $ENV_FILE)"
 else
   node supabase/seed-users.mjs
   echo "✅ Users seeded"

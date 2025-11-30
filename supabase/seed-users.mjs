@@ -17,13 +17,14 @@ import postgres from "postgres";
 
 // Environment variables are loaded by Node.js --env-file flag
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
 const DATABASE_URL = process.env.DATABASE_URL;
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !DATABASE_URL) {
   console.error("❌ Missing required environment variables:");
   console.error("  - NEXT_PUBLIC_SUPABASE_URL");
-  console.error("  - SUPABASE_SERVICE_ROLE_KEY");
+  console.error("  - SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY)");
   console.error("  - DATABASE_URL");
   process.exit(1);
 }
