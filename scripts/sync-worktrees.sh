@@ -147,8 +147,8 @@ compute_status_summary() {
   elif git -C "$worktree_dir" rev-parse --abbrev-ref "@{u}" >/dev/null 2>&1; then
     local ahead_behind
     ahead_behind=$(git -C "$worktree_dir" rev-list --left-right --count "HEAD...@{u}" 2>/dev/null || echo "0 0")
-    local behind=$(echo "$ahead_behind" | awk '{print $1}')
-    local ahead=$(echo "$ahead_behind" | awk '{print $2}')
+    local ahead=$(echo "$ahead_behind" | awk '{print $1}')
+    local behind=$(echo "$ahead_behind" | awk '{print $2}')
     upstream_status="ahead ${ahead}, behind ${behind}"
   else
     upstream_status="no upstream"
@@ -163,8 +163,8 @@ compute_status_summary() {
   local deletions=0
 
   if [ -n "$shortstat" ]; then
-    insertions=$(echo "$shortstat" | sed -n 's/.* \([0-9]\+\) insertion.*/\1/p')
-    deletions=$(echo "$shortstat" | sed -n 's/.* \([0-9]\+\) deletion.*/\1/p')
+    insertions=$(echo "$shortstat" | sed -n 's/.* \([0-9]\+\) insertion(s).*/\1/p')
+    deletions=$(echo "$shortstat" | sed -n 's/.* \([0-9]\+\) deletion(s).*/\1/p')
     insertions=${insertions:-0}
     deletions=${deletions:-0}
   fi
