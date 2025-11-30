@@ -23,18 +23,18 @@ export function NotificationPreferencesForm({
     FormData
   >(updateNotificationPreferencesAction, undefined);
 
-  // Client-side state for master switches to control disabled state of other inputs
-  const [emailMasterEnabled, setEmailMasterEnabled] = useState(
+  // Client-side state for main switches to control disabled state of other inputs
+  const [emailMainEnabled, setEmailMainEnabled] = useState(
     preferences.emailEnabled
   );
-  const [inAppMasterEnabled, setInAppMasterEnabled] = useState(
+  const [inAppMainEnabled, setInAppMainEnabled] = useState(
     preferences.inAppEnabled
   );
 
   // Update state if preferences change (e.g. after server action)
   useEffect(() => {
-    setEmailMasterEnabled(preferences.emailEnabled);
-    setInAppMasterEnabled(preferences.inAppEnabled);
+    setEmailMainEnabled(preferences.emailEnabled);
+    setInAppMainEnabled(preferences.inAppEnabled);
   }, [preferences.emailEnabled, preferences.inAppEnabled]);
 
   return (
@@ -43,25 +43,25 @@ export function NotificationPreferencesForm({
         <div className="text-sm text-destructive">{state.message}</div>
       )}
 
-      {/* Master Switches */}
+      {/* Main Switches */}
       <div className="space-y-3">
         <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
           Channels
         </h3>
         <div className="grid gap-4 sm:grid-cols-2">
-          <MasterSwitchItem
+          <MainSwitchItem
             id="emailEnabled"
             label="Email Notifications"
-            description="Master switch for all email notifications"
-            checked={emailMasterEnabled}
-            onCheckedChange={setEmailMasterEnabled}
+            description="Main switch for all email notifications"
+            checked={emailMainEnabled}
+            onCheckedChange={setEmailMainEnabled}
           />
-          <MasterSwitchItem
+          <MainSwitchItem
             id="inAppEnabled"
             label="In-App Notifications"
-            description="Master switch for all in-app notifications"
-            checked={inAppMasterEnabled}
-            onCheckedChange={setInAppMasterEnabled}
+            description="Main switch for all in-app notifications"
+            checked={inAppMainEnabled}
+            onCheckedChange={setInAppMainEnabled}
           />
         </div>
       </div>
@@ -88,8 +88,8 @@ export function NotificationPreferencesForm({
               inAppId="inAppNotifyOnAssigned"
               emailDefault={preferences.emailNotifyOnAssigned}
               inAppDefault={preferences.inAppNotifyOnAssigned}
-              emailDisabled={!emailMasterEnabled}
-              inAppDisabled={!inAppMasterEnabled}
+              emailDisabled={!emailMainEnabled}
+              inAppDisabled={!inAppMainEnabled}
             />
             <PreferenceRow
               label="Status Changes"
@@ -98,8 +98,8 @@ export function NotificationPreferencesForm({
               inAppId="inAppNotifyOnStatusChange"
               emailDefault={preferences.emailNotifyOnStatusChange}
               inAppDefault={preferences.inAppNotifyOnStatusChange}
-              emailDisabled={!emailMasterEnabled}
-              inAppDisabled={!inAppMasterEnabled}
+              emailDisabled={!emailMainEnabled}
+              inAppDisabled={!inAppMainEnabled}
             />
             <PreferenceRow
               label="New Comments"
@@ -108,8 +108,8 @@ export function NotificationPreferencesForm({
               inAppId="inAppNotifyOnNewComment"
               emailDefault={preferences.emailNotifyOnNewComment}
               inAppDefault={preferences.inAppNotifyOnNewComment}
-              emailDisabled={!emailMasterEnabled}
-              inAppDisabled={!inAppMasterEnabled}
+              emailDisabled={!emailMainEnabled}
+              inAppDisabled={!inAppMainEnabled}
             />
           </div>
         </div>
@@ -134,20 +134,32 @@ export function NotificationPreferencesForm({
               inAppId="inAppNotifyOnNewIssue"
               emailDefault={preferences.emailNotifyOnNewIssue}
               inAppDefault={preferences.inAppNotifyOnNewIssue}
-              emailDisabled={!emailMasterEnabled}
-              inAppDisabled={!inAppMasterEnabled}
+              emailDisabled={!emailMainEnabled}
+              inAppDisabled={!inAppMainEnabled}
             />
           </div>
         </div>
 
-        {/* Auto-watch is separate as it's logic, not a notification channel */}
-        <div className="mt-4">
-          <SingleSwitchItem
-            id="autoWatchOwnedMachines"
-            label="Auto-Watch Owned Machines"
-            description="Automatically watch new issues reported on machines you own"
-            defaultChecked={preferences.autoWatchOwnedMachines}
-          />
+        {/* Auto-watch integrated into matrix for alignment */}
+        <div className="rounded-lg border border-outline-variant/50 bg-surface/50 overflow-hidden mt-3">
+          <div className="grid grid-cols-[1fr_auto_auto] gap-4 p-3 items-center hover:bg-surface-variant/30 transition-colors">
+            <div className="space-y-0.5">
+              <p className="text-sm font-medium">Auto-Watch Owned Machines</p>
+              <p className="text-xs text-muted-foreground">
+                Automatically watch new issues reported on machines you own
+              </p>
+            </div>
+            <div className="flex justify-center w-16">
+              {/* Empty space for EMAIL column */}
+            </div>
+            <div className="flex justify-center w-16">
+              <Switch
+                id="autoWatchOwnedMachines"
+                name="autoWatchOwnedMachines"
+                defaultChecked={preferences.autoWatchOwnedMachines}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -170,8 +182,8 @@ export function NotificationPreferencesForm({
               inAppId="inAppWatchNewIssuesGlobal"
               emailDefault={preferences.emailWatchNewIssuesGlobal}
               inAppDefault={preferences.inAppWatchNewIssuesGlobal}
-              emailDisabled={!emailMasterEnabled}
-              inAppDisabled={!inAppMasterEnabled}
+              emailDisabled={!emailMainEnabled}
+              inAppDisabled={!inAppMainEnabled}
             />
           </div>
         </div>
@@ -184,7 +196,7 @@ export function NotificationPreferencesForm({
   );
 }
 
-interface MasterSwitchItemProps {
+interface MainSwitchItemProps {
   id: string;
   label: string;
   description: string;
@@ -192,13 +204,13 @@ interface MasterSwitchItemProps {
   onCheckedChange: (checked: boolean) => void;
 }
 
-function MasterSwitchItem({
+function MainSwitchItem({
   id,
   label,
   description,
   checked,
   onCheckedChange,
-}: MasterSwitchItemProps): React.JSX.Element {
+}: MainSwitchItemProps): React.JSX.Element {
   return (
     <div className="flex items-center justify-between rounded-lg border border-outline-variant/50 bg-surface/50 p-3 shadow-sm transition-colors hover:bg-surface-variant/30">
       <div className="space-y-0.5 pr-4">
@@ -213,32 +225,6 @@ function MasterSwitchItem({
         checked={checked}
         onCheckedChange={onCheckedChange}
       />
-    </div>
-  );
-}
-
-interface SingleSwitchItemProps {
-  id: string;
-  label: string;
-  description: string;
-  defaultChecked: boolean;
-}
-
-function SingleSwitchItem({
-  id,
-  label,
-  description,
-  defaultChecked,
-}: SingleSwitchItemProps): React.JSX.Element {
-  return (
-    <div className="flex items-center justify-between rounded-lg border border-outline-variant/50 bg-surface/50 p-3 shadow-sm transition-colors hover:bg-surface-variant/30">
-      <div className="space-y-0.5 pr-4">
-        <Label htmlFor={id} className="text-sm font-medium cursor-pointer">
-          {label}
-        </Label>
-        <p className="text-xs text-muted-foreground">{description}</p>
-      </div>
-      <Switch id={id} name={id} defaultChecked={defaultChecked} />
     </div>
   );
 }

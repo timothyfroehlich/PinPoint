@@ -75,7 +75,7 @@ describe("createNotification (Integration)", () => {
     expect(sendEmail).not.toHaveBeenCalled();
   });
 
-  it("should respect master switches", async () => {
+  it("should respect main switches", async () => {
     const db = await getTestDb();
 
     const [actor] = await db
@@ -101,7 +101,7 @@ describe("createNotification (Integration)", () => {
       userId: recipient.id,
     });
 
-    // Master switches OFF
+    // Main switches OFF
     await db
       .insert(notificationPreferences)
       .values({
