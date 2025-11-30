@@ -132,7 +132,9 @@ describe("Auth Actions - Error Path Integration Tests", () => {
   describe("forgotPasswordAction - Error Paths", () => {
     beforeEach(() => {
       // Ensure site URL is configured for fail-closed origin validation
-      vi.stubEnv("NEXT_PUBLIC_SITE_URL", "http://localhost:3000");
+      const siteUrl =
+        process.env.NEXT_PUBLIC_SITE_URL?.trim() ?? "http://localhost:3000";
+      vi.stubEnv("NEXT_PUBLIC_SITE_URL", siteUrl);
     });
 
     it("should return VALIDATION error for invalid email format", async () => {
