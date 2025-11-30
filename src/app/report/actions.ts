@@ -7,10 +7,12 @@ import { db } from "~/server/db";
 import { issues } from "~/server/db/schema";
 import { createTimelineEvent } from "~/lib/timeline/events";
 import { log } from "~/lib/logger";
-import { publicIssueSchema, type PublicIssueInput } from "./schemas";
-
-const toOptionalString = (value: FormDataEntryValue | null): string | null =>
-  typeof value === "string" ? value : null;
+import {
+  checkPublicIssueLimit,
+  formatResetTime,
+  getClientIp,
+} from "~/lib/rate-limit";
+import { parsePublicIssueForm } from "./validation";
 
 const redirectWithError = (message: string): never => {
   const params = new URLSearchParams({ error: message });
@@ -21,25 +23,36 @@ const redirectWithError = (message: string): never => {
  * Server Action: submit anonymous issue
  *
  * Allows unauthenticated visitors to report issues.
- * NOTE: Consider adding rate limiting if the form is abused.
  */
 export async function submitPublicIssueAction(
   formData: FormData
 ): Promise<void> {
-  const rawData = {
-    machineId: toOptionalString(formData.get("machineId")),
-    title: toOptionalString(formData.get("title")),
-    description: toOptionalString(formData.get("description")),
-    severity: toOptionalString(formData.get("severity")),
-  };
-
-  const validation = publicIssueSchema.safeParse(rawData);
-  if (!validation.success) {
-    const firstError = validation.error.issues[0]?.message ?? "Invalid input";
-    redirectWithError(firstError);
+  // 1. Check Honeypot
+  const honeypot = formData.get("website");
+  if (honeypot) {
+    // Bot detected, silently reject
+    log.warn({ action: "publicIssueReport", honeypot }, "Honeypot triggered");
+    redirect("/report/success");
   }
 
-  const parsedData: PublicIssueInput = validation.data!;
+  // 2. Check Rate Limit
+  const ip = await getClientIp();
+  const { success, reset } = await checkPublicIssueLimit(ip);
+
+  if (!success) {
+    const resetTime = formatResetTime(reset);
+    redirectWithError(
+      `Too many submissions. Please try again in ${resetTime}.`
+    );
+  }
+
+  const parsed = parsePublicIssueForm(formData);
+  if (!parsed.success) {
+    redirectWithError(parsed.error);
+    return;
+  }
+
+  const parsedData = parsed.data;
   const { machineId, title, description, severity } = parsedData;
 
   try {
