@@ -5,6 +5,7 @@ import {
   issueWatchers,
   machines,
   issueComments,
+  userProfiles,
 } from "~/server/db/schema";
 import { createTimelineEvent } from "~/lib/timeline/events";
 import { createNotification } from "~/lib/notifications";
@@ -31,6 +32,22 @@ export interface AddIssueCommentParams {
   issueId: string;
   content: string;
   userId: string;
+}
+
+export interface AssignIssueParams {
+  issueId: string;
+  assignedTo: string | null;
+  actorId: string;
+}
+
+export interface UpdateIssueSeverityParams {
+  issueId: string;
+  severity: string;
+}
+
+export interface UpdateIssuePriorityParams {
+  issueId: string;
+  priority: string;
 }
 
 export type Issue = InferSelectModel<typeof issues>;
@@ -82,54 +99,23 @@ export async function createIssue({
     "Issue created successfully"
   );
 
-  // 3. Setup Watchers & Notifications
+  // 3. Notifications
   try {
-    const watcherIds = new Set<string>();
-
-    // A. Reporter (always watches if authenticated)
-    if (reportedBy) {
-      watcherIds.add(reportedBy);
-    }
-
-    // B. Machine Owner (if auto-watch enabled)
-    // Auto-watch removed. Owners must manually watch issues or rely on "New Issue" notifications.
     const machine = await db.query.machines.findFirst({
       where: eq(machines.id, machineId),
-      with: { owner: true },
+      columns: { name: true, ownerId: true },
     });
 
-    // C. Global Subscribers
-    const globalSubs = await db.query.notificationPreferences.findMany({
-      where: (prefs, { or, eq }) =>
-        or(
-          eq(prefs.emailWatchNewIssuesGlobal, true),
-          eq(prefs.inAppWatchNewIssuesGlobal, true)
-        ),
-    });
-    globalSubs.forEach((sub) => watcherIds.add(sub.userId));
-
-    // Insert Watchers
-    if (watcherIds.size > 0) {
-      await db
-        .insert(issueWatchers)
-        .values(
-          Array.from(watcherIds).map((userId) => ({
-            issueId: issue.id,
-            userId,
-          }))
-        )
-        .onConflictDoNothing();
-    }
-
-    // Trigger Notification
-    // Note: actorId is optional for public reports
+    // Trigger Notification (actorId optional for public reports)
     await createNotification({
       type: "new_issue",
       resourceId: issue.id,
       resourceType: "issue",
       ...(reportedBy ? { actorId: reportedBy } : {}),
+      includeActor: true,
       issueTitle: title,
       machineName: machine?.name ?? undefined,
+      issueContext: { machineOwnerId: machine?.ownerId ?? null },
     });
   } catch (error) {
     log.error(
@@ -158,7 +144,13 @@ export async function updateIssueStatus({
   // Get current issue to check old status
   const currentIssue = await db.query.issues.findFirst({
     where: eq(issues.id, issueId),
-    columns: { status: true, machineId: true, title: true },
+    columns: {
+      status: true,
+      machineId: true,
+      title: true,
+      assignedTo: true,
+      reportedBy: true,
+    },
     with: { machine: true },
   });
 
@@ -195,9 +187,14 @@ export async function updateIssueStatus({
       resourceId: issueId,
       resourceType: "issue",
       actorId: userId,
+      includeActor: true,
       issueTitle: currentIssue.title,
       machineName: currentIssue.machine.name,
       newStatus: status,
+      issueContext: {
+        assignedToId: currentIssue.assignedTo ?? null,
+        reportedById: currentIssue.reportedBy ?? null,
+      },
     });
   } catch (error) {
     log.error(
@@ -231,20 +228,11 @@ export async function addIssueComment({
 
   if (!comment) throw new Error("Failed to create comment");
 
-  // 2. Add Author as Watcher (Auto-watch on comment)
-  await db
-    .insert(issueWatchers)
-    .values({
-      issueId,
-      userId,
-    })
-    .onConflictDoNothing();
-
-  // 3. Trigger Notification
+  // 2. Trigger Notification
   try {
     const issue = await db.query.issues.findFirst({
       where: eq(issues.id, issueId),
-      columns: { title: true },
+      columns: { title: true, assignedTo: true, reportedBy: true },
       with: { machine: true },
     });
 
@@ -256,6 +244,10 @@ export async function addIssueComment({
       issueTitle: issue?.title ?? undefined,
       machineName: issue?.machine.name ?? undefined,
       commentContent: content,
+      issueContext: {
+        assignedToId: issue?.assignedTo ?? null,
+        reportedById: issue?.reportedBy ?? null,
+      },
     });
   } catch (error) {
     log.error(
@@ -304,4 +296,186 @@ export async function toggleIssueWatcher({
     });
     return { isWatching: true };
   }
+}
+
+/**
+ * Assign an issue to a user
+ */
+export async function assignIssue({
+  issueId,
+  assignedTo,
+  actorId,
+}: AssignIssueParams): Promise<void> {
+  // Get current issue
+  const currentIssue = await db.query.issues.findFirst({
+    where: eq(issues.id, issueId),
+    columns: { machineId: true, title: true, reportedBy: true },
+    with: {
+      machine: true,
+      assignedToUser: {
+        columns: { name: true },
+      },
+    },
+  });
+
+  if (!currentIssue) {
+    throw new Error("Issue not found");
+  }
+
+  // Get new assignee name if assigning to someone
+  let assigneeName = "Unassigned";
+  if (assignedTo) {
+    const assignee = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, assignedTo),
+      columns: { name: true },
+    });
+    assigneeName = assignee?.name ?? "Unknown User";
+  }
+
+  // Update assignment
+  await db
+    .update(issues)
+    .set({
+      assignedTo,
+      updatedAt: new Date(),
+    })
+    .where(eq(issues.id, issueId));
+
+  // Create timeline event
+  const eventMessage = assignedTo
+    ? `Assigned to ${assigneeName}`
+    : "Unassigned";
+  await createTimelineEvent(issueId, eventMessage);
+
+  log.info(
+    { issueId, assignedTo, assigneeName, action: "assignIssue" },
+    "Issue assignment updated"
+  );
+
+  // Trigger Notification
+  try {
+    if (assignedTo) {
+      // Notify
+      await createNotification({
+        type: "issue_assigned",
+        resourceId: issueId,
+        resourceType: "issue",
+        actorId,
+        includeActor: true,
+        issueTitle: currentIssue.title,
+        machineName: currentIssue.machine.name,
+        issueContext: {
+          assignedToId: assignedTo,
+          reportedById: currentIssue.reportedBy ?? null,
+        },
+      });
+    }
+  } catch (error) {
+    log.error(
+      { error, action: "assignIssue.notifications" },
+      "Failed to process notifications"
+    );
+  }
+}
+
+/**
+ * Update issue severity
+ */
+export async function updateIssueSeverity({
+  issueId,
+  severity,
+}: UpdateIssueSeverityParams): Promise<{
+  issueId: string;
+  oldSeverity: string;
+  newSeverity: string;
+}> {
+  // Get current issue to check old severity
+  const currentIssue = await db.query.issues.findFirst({
+    where: eq(issues.id, issueId),
+    columns: { severity: true, machineId: true },
+  });
+
+  if (!currentIssue) {
+    throw new Error("Issue not found");
+  }
+
+  const oldSeverity = currentIssue.severity;
+
+  // Update severity
+  await db
+    .update(issues)
+    .set({
+      severity: severity as "minor" | "playable" | "unplayable",
+      updatedAt: new Date(),
+    })
+    .where(eq(issues.id, issueId));
+
+  // Create timeline event
+  await createTimelineEvent(
+    issueId,
+    `Severity changed from ${oldSeverity} to ${severity}`
+  );
+
+  log.info(
+    {
+      issueId,
+      oldSeverity,
+      newSeverity: severity,
+      action: "updateIssueSeverity",
+    },
+    "Issue severity updated"
+  );
+
+  return { issueId, oldSeverity, newSeverity: severity };
+}
+
+/**
+ * Update issue priority
+ */
+export async function updateIssuePriority({
+  issueId,
+  priority,
+}: UpdateIssuePriorityParams): Promise<{
+  issueId: string;
+  oldPriority: string;
+  newPriority: string;
+}> {
+  // Get current issue to check old priority
+  const currentIssue = await db.query.issues.findFirst({
+    where: eq(issues.id, issueId),
+    columns: { priority: true, machineId: true },
+  });
+
+  if (!currentIssue) {
+    throw new Error("Issue not found");
+  }
+
+  const oldPriority = currentIssue.priority;
+
+  // Update priority
+  await db
+    .update(issues)
+    .set({
+      priority: priority as "low" | "medium" | "high",
+      updatedAt: new Date(),
+    })
+    .where(eq(issues.id, issueId));
+
+  // Create timeline event
+  await createTimelineEvent(
+    issueId,
+    `Priority changed from ${oldPriority} to ${priority}`
+  );
+
+  log.info(
+    {
+      issueId,
+      oldPriority,
+      newPriority: priority,
+      action: "updateIssuePriority",
+    },
+    "Issue priority updated"
+  );
+
+  return { issueId, oldPriority, newPriority: priority };
 }

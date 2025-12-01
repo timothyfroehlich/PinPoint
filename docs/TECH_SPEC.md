@@ -153,99 +153,17 @@ CREATE INDEX idx_issue_comments_issue_id ON issue_comments(issue_id);
 
 ---
 
-## Why No DAL/Repository/Service Layers?
+## Service Layers (Updated)
 
-**Server Components + Drizzle provide everything those layers offer, without the overhead.**
+We now allow service layers when they clarify business rules, aggregate multiple operations, or keep Server Components lean. Keep them thin and focused—avoid needless repository/DAO layers.
 
-### The Over-Engineered Approach
+**Guidelines:**
 
-```typescript
-// ❌ Three layers for one query
-
-// Repository
-class IssueRepository {
-  async findByMachine(machineId: string): Promise<Issue[]> {
-    return await db.query.issues.findMany({
-      where: eq(issues.machineId, machineId),
-    });
-  }
-}
-
-// Service
-class IssueService {
-  constructor(private repo: IssueRepository) {}
-  async getIssuesForMachine(machineId: string): Promise<Issue[]> {
-    return await this.repo.findByMachine(machineId);
-  }
-}
-
-// Controller
-export async function getIssues(machineId: string) {
-  const service = new IssueService(new IssueRepository());
-  return await service.getIssuesForMachine(machineId);
-}
-```
-
-**Problems:**
-
-- 3 files to understand one query
-- Just passing data through layers
-- Testing requires mocking all layers
-- Mental overhead
-
-### The Server Component Approach
-
-```typescript
-// ✅ Direct query where needed
-
-export default async function MachinePage({ params }: { params: { id: string } }) {
-  const issues = await db.query.issues.findMany({
-    where: eq(issues.machineId, params.id),
-    with: { assignedTo: true },
-    orderBy: desc(issues.createdAt)
-  })
-
-  return <IssueList issues={issues} />
-}
-```
-
-**Benefits:**
-
-- 1 file to understand
-- Colocated with usage
-- Drizzle provides type safety
-- cache() handles deduplication
-- Less code = fewer bugs
-
-### When You WOULD Need Layers
-
-Add abstractions when you have:
-
-- Multiple clients (web app + mobile app + API)
-- Complex business logic (multi-step transactions, saga patterns)
-- Multiple databases (read/write splitting, sharding)
-- Large team (10+ engineers needing boundaries)
-
-**For MVP:** You have none of these. Direct queries are perfect.
-
-### The Rule of Three
-
-Add abstraction when you have **3+ duplicate implementations**, not before.
-
-```typescript
-// First usage - direct query (fine)
-const issues = await db.query.issues.findMany(...)
-
-// Second usage - still direct (fine)
-const issues = await db.query.issues.findMany(...)
-
-// Third usage - NOW consider abstracting
-export const getIssuesByMachine = cache(async (machineId: string) => {
-  return await db.query.issues.findMany({
-    where: eq(issues.machineId, machineId)
-  })
-})
-```
+- Use services for multi-step workflows (e.g., issue creation + timeline + notifications).
+- Keep Drizzle queries close to where data is used; don't wrap every query by default.
+- Services should expose typed, intention-revealing functions (e.g., `createIssue`, `assignIssue`).
+- Prefer pure helpers over classes; if you need state, use small modules not inheritance chains.
+- Add tests at the service boundary using `vitest-mock-extended` for deep mocks when stubbing db/IO.
 
 ---
 
@@ -595,16 +513,16 @@ npm run e2e
 
 ## Tech Stack Decisions
 
-| Date       | Decision                            | Rationale                                 |
-| ---------- | ----------------------------------- | ----------------------------------------- |
-| 2025-11-10 | Next.js 16                          | Use latest stable release                 |
-| 2025-11-10 | No real-time subscriptions          | MVP doesn't need it                       |
-| 2025-11-10 | No DAL/Repository layers            | Server Components + Drizzle is sufficient |
-| 2025-11-10 | Issues always per-machine           | Aligns with reality, simplifies schema    |
-| 2025-11-10 | Severity: minor/playable/unplayable | Clear, player-centric language            |
-| 2025-11-10 | Role: guest/member/admin            | Simple, extensible permission model       |
-| 2025-11-10 | Two Supabase projects               | Preview/prod separation                   |
-| 2025-11-10 | Drizzle push (no migrations)        | Direct schema updates during development  |
+| Date       | Decision                            | Rationale                                                |
+| ---------- | ----------------------------------- | -------------------------------------------------------- |
+| 2025-11-10 | Next.js 16                          | Use latest stable release                                |
+| 2025-11-10 | No real-time subscriptions          | MVP doesn't need it                                      |
+| 2025-11-10 | Service layer allowed where helpful | Use when coordinating workflows, avoid needless wrappers |
+| 2025-11-10 | Issues always per-machine           | Aligns with reality, simplifies schema                   |
+| 2025-11-10 | Severity: minor/playable/unplayable | Clear, player-centric language                           |
+| 2025-11-10 | Role: guest/member/admin            | Simple, extensible permission model                      |
+| 2025-11-10 | Two Supabase projects               | Preview/prod separation                                  |
+| 2025-11-10 | Drizzle push (no migrations)        | Direct schema updates during development                 |
 
 ---
 

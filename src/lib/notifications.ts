@@ -25,11 +25,18 @@ interface CreateNotificationProps {
   resourceId: string;
   resourceType: ResourceType;
   actorId?: string; // User who triggered the notification (optional for anonymous)
+  includeActor?: boolean;
   // Context data for emails
   issueTitle?: string | undefined;
   machineName?: string | undefined;
   commentContent?: string | undefined;
   newStatus?: string | undefined;
+  additionalRecipientIds?: string[];
+  issueContext?: {
+    reportedById?: string | null;
+    assignedToId?: string | null;
+    machineOwnerId?: string | null;
+  };
 }
 
 export async function createNotification(
@@ -38,53 +45,62 @@ export async function createNotification(
     resourceId,
     resourceType,
     actorId,
+    includeActor,
     issueTitle,
     machineName,
     commentContent,
     newStatus,
+    additionalRecipientIds,
+    issueContext,
   }: CreateNotificationProps,
   tx = db
 ): Promise<void> {
-  console.log(
-    `[DEBUG] createNotification called: type=${type}, resourceId=${resourceId}, actorId=${actorId}`
+  log.debug(
+    { type, resourceId, actorId, action: "createNotification" },
+    "Creating notification"
   );
 
   // 1. Determine recipients
-  let recipientIds: string[] = [];
+  const recipientIds = new Set<string>();
+
+  const addRecipients = (...ids: (string | null | undefined)[]): void => {
+    ids.forEach((id) => {
+      if (id) recipientIds.add(id);
+    });
+  };
+
+  addRecipients(...(additionalRecipientIds ?? []));
+
+  let resolvedIssueTitle = issueTitle;
+  let resolvedMachineName = machineName;
 
   if (type === "new_issue") {
-    // Notify Machine Owner (if opted in)
-    // Notify Global Subscribers
+    let ownerId = issueContext?.machineOwnerId ?? null;
 
-    // Get machine owner
-    // If resourceId is issue, fetch issue to get machine
-    let ownerId: string | null = null;
+    // If we weren't given the owner, look it up to honour preferences
+    if (!ownerId) {
+      if (resourceType === "issue") {
+        const issue = await tx.query.issues.findFirst({
+          where: eq(issues.id, resourceId),
+          with: {
+            machine: true,
+          },
+        });
 
-    if (resourceType === "issue") {
-      const issue = await tx.query.issues.findFirst({
-        where: eq(issues.id, resourceId),
-        with: {
-          machine: true,
-        },
-      });
-      if (issue?.machine.ownerId) {
-        ownerId = issue.machine.ownerId;
-      }
-    } else {
-      // If resource is machine directly (unlikely for new_issue but possible)
-      const machine = await tx.query.machines.findFirst({
-        where: eq(machines.id, resourceId),
-        columns: { ownerId: true },
-      });
-      if (machine?.ownerId) {
-        ownerId = machine.ownerId;
+        ownerId = issue?.machine.ownerId ?? null;
+        resolvedIssueTitle = resolvedIssueTitle ?? issue?.title;
+        resolvedMachineName = resolvedMachineName ?? issue?.machine.name;
+      } else {
+        const machine = await tx.query.machines.findFirst({
+          where: eq(machines.id, resourceId),
+          columns: { ownerId: true, name: true },
+        });
+        ownerId = machine?.ownerId ?? null;
+        resolvedMachineName = resolvedMachineName ?? machine?.name;
       }
     }
 
-    console.log(`[DEBUG] Owner ID found: ${ownerId}`);
-
-    // Get Global Subscribers
-    // We want anyone who has EITHER email OR in-app global watch enabled
+    // Global subscribers (email or in-app)
     const globalSubscribers = await tx.query.notificationPreferences.findMany({
       where: (prefs, { or, eq }) =>
         or(
@@ -93,50 +109,43 @@ export async function createNotification(
         ),
     });
 
-    const globalSubscriberIds = globalSubscribers.map((p) => p.userId);
-    recipientIds.push(...globalSubscriberIds);
+    addRecipients(...globalSubscribers.map((p) => p.userId));
 
-    // Add Owner if not already included and not the actor
-    if (ownerId && !recipientIds.includes(ownerId)) {
-      // Check owner preference
+    if (ownerId) {
       const ownerPref = await tx.query.notificationPreferences.findFirst({
         where: eq(notificationPreferences.userId, ownerId),
       });
-      console.log(`[DEBUG] Owner Prefs:`, ownerPref);
 
-      // Check if owner wants notifications for new issues (via either channel)
       if (
         ownerPref?.emailNotifyOnNewIssue ||
         ownerPref?.inAppNotifyOnNewIssue
       ) {
-        recipientIds.push(ownerId);
+        addRecipients(ownerId);
       }
     }
-  } else {
-    // For other events, notify Watchers
-    // Watchers are on the ISSUE
-    if (resourceType === "issue") {
-      const watchers = await tx.query.issueWatchers.findMany({
-        where: eq(issueWatchers.issueId, resourceId),
-      });
-      recipientIds.push(...watchers.map((w) => w.userId));
-    }
+  } else if (resourceType === "issue") {
+    const watchers = await tx.query.issueWatchers.findMany({
+      where: eq(issueWatchers.issueId, resourceId),
+    });
+
+    addRecipients(...watchers.map((w) => w.userId));
+    addRecipients(issueContext?.reportedById, issueContext?.assignedToId);
   }
 
-  // Exclude actor
-  console.log(`[DEBUG] Initial Recipient IDs: ${recipientIds.join(", ")}`);
-  recipientIds = recipientIds.filter((id) => id !== actorId);
+  if (includeActor && actorId) {
+    recipientIds.add(actorId);
+  }
 
-  // Deduplicate
-  recipientIds = [...new Set(recipientIds)];
+  // Exclude actor and dedupe
+  if (actorId && !includeActor) {
+    recipientIds.delete(actorId);
+  }
 
-  console.log(`[DEBUG] Final Recipient IDs: ${recipientIds.join(", ")}`);
-
-  if (recipientIds.length === 0) return;
+  if (recipientIds.size === 0) return;
 
   // 2. Fetch Preferences for all recipients
   const preferences = await tx.query.notificationPreferences.findMany({
-    where: inArray(notificationPreferences.userId, recipientIds),
+    where: inArray(notificationPreferences.userId, [...recipientIds]),
   });
 
   const prefsMap = new Map(preferences.map((p) => [p.userId, p]));
@@ -145,7 +154,7 @@ export async function createNotification(
   const users = await tx
     .select({ id: authUsers.id, email: authUsers.email })
     .from(authUsers)
-    .where(inArray(authUsers.id, recipientIds));
+    .where(inArray(authUsers.id, [...recipientIds]));
 
   const emailMap = new Map(users.map((u) => [u.id, u.email]));
 
@@ -175,31 +184,13 @@ export async function createNotification(
         inAppNotify = prefs.inAppNotifyOnNewComment;
         break;
       case "new_issue": {
-        // For new issues, we have two sources: Owned Machine vs Global Watch
-        // If they are the owner, check owned preference
-        // If they are a global watcher, check global preference
-        // If both, either being true is sufficient (union)
-
-        // Check if owner
-        // Note: We don't have easy access to "is owner" here without passing it in or re-checking
-        // But we can check if they have the "notify on new issue" pref enabled, which implies they want it for owned machines
-        // AND check if they have global watch enabled.
-
-        // However, the caller logic (createNotification) already filtered recipients based on these roles.
-        // So if they are in the list, we just need to check which channel they want.
-
-        // Simplified approach: Check if EITHER preference is on for the channel
-        const isOwnerPref = prefs.emailNotifyOnNewIssue; // "New Issues" (Owned)
+        const isOwnerPref = prefs.emailNotifyOnNewIssue;
         const isGlobalPref = prefs.emailWatchNewIssuesGlobal;
         emailNotify = isOwnerPref || isGlobalPref;
 
         const isInAppOwnerPref = prefs.inAppNotifyOnNewIssue;
         const isInAppGlobalPref = prefs.inAppWatchNewIssuesGlobal;
         inAppNotify = isInAppOwnerPref || isInAppGlobalPref;
-
-        console.log(
-          `[DEBUG] User ${userId} new_issue prefs: OwnerEmail=${isOwnerPref}, GlobalEmail=${isGlobalPref}, OwnerInApp=${isInAppOwnerPref}, GlobalInApp=${isInAppGlobalPref}`
-        );
         break;
       }
     }
@@ -221,11 +212,15 @@ export async function createNotification(
       if (email) {
         emailsToSend.push({
           to: email,
-          subject: getEmailSubject(type, issueTitle, machineName),
+          subject: getEmailSubject(
+            type,
+            resolvedIssueTitle,
+            resolvedMachineName
+          ),
           html: getEmailHtml(
             type,
-            issueTitle,
-            machineName,
+            resolvedIssueTitle,
+            resolvedMachineName,
             commentContent,
             newStatus
           ),
@@ -236,20 +231,23 @@ export async function createNotification(
 
   // Batch Insert Notifications
   if (notificationsToInsert.length > 0) {
-    console.log(
-      `[DEBUG] Inserting ${notificationsToInsert.length} notifications`
+    log.debug(
+      { count: notificationsToInsert.length, action: "createNotification" },
+      "Inserting notifications"
     );
     await tx.insert(notifications).values(notificationsToInsert);
-  } else {
-    console.log(`[DEBUG] No notifications to insert`);
   }
 
-  // Send Emails (fire and forget)
-  emailsToSend.forEach((email) => {
-    sendEmail(email).catch((err: unknown) => {
-      log.error({ err }, "Failed to send email notification");
-    });
-  });
+  // Send Emails (await all promises)
+  if (emailsToSend.length > 0) {
+    await Promise.all(
+      emailsToSend.map((email) =>
+        sendEmail(email).catch((err: unknown) => {
+          log.error({ err }, "Failed to send email notification");
+        })
+      )
+    );
+  }
 }
 
 function getEmailSubject(

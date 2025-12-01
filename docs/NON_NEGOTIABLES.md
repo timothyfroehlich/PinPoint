@@ -220,13 +220,6 @@
 - **Do:** Use Server Actions with `<form action={serverAction}>`
 - **Don't:** Require client-side JavaScript for core functionality
 
-**CORE-ARCH-003:** Direct database queries
-
-- **Severity:** Required
-- **Why:** Simplicity for single-tenant architecture
-- **Do:** Query Drizzle directly in Server Components and Server Actions
-- **Don't:** Create DAL/repository/service layers (premature abstraction)
-
 **CORE-ARCH-004:** Issues always per-machine
 
 - **Severity:** Critical

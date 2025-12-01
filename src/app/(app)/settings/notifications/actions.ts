@@ -20,6 +20,7 @@ const updatePreferencesSchema = z.object({
   inAppNotifyOnNewComment: z.boolean(),
   emailNotifyOnNewIssue: z.boolean(),
   inAppNotifyOnNewIssue: z.boolean(),
+
   emailWatchNewIssuesGlobal: z.boolean(),
   inAppWatchNewIssuesGlobal: z.boolean(),
 });
@@ -57,6 +58,7 @@ export async function updateNotificationPreferencesAction(
     inAppNotifyOnNewComment: formData.get("inAppNotifyOnNewComment") === "on",
     emailNotifyOnNewIssue: formData.get("emailNotifyOnNewIssue") === "on",
     inAppNotifyOnNewIssue: formData.get("inAppNotifyOnNewIssue") === "on",
+
     emailWatchNewIssuesGlobal:
       formData.get("emailWatchNewIssuesGlobal") === "on",
     inAppWatchNewIssuesGlobal:

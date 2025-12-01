@@ -44,8 +44,7 @@ BEGIN
     email_notify_on_new_issue,
     in_app_notify_on_new_issue,
     email_watch_new_issues_global,
-    in_app_watch_new_issues_global,
-    auto_watch_owned_machines
+    in_app_watch_new_issues_global
   )
   VALUES (
     NEW.id,
@@ -54,8 +53,7 @@ BEGIN
     true, true, -- Status change
     true, true, -- New comment
     true, true, -- New issue (owned)
-    false, false, -- Global watch
-    true -- Auto watch owned
+    false, false -- Global watch
   );
 
   RETURN NEW;

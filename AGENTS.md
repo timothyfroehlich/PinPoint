@@ -73,13 +73,13 @@ Read these immediately before starting work:
 
 - **Default**: Server Components for all new development
 - **Client Islands**: Minimal "use client" for specific interactivity only
-- **Data Flow**: Server Components → Drizzle → PostgreSQL (direct queries, no DAL/repository layers)
+- **Data Flow**: Server Components → Drizzle → PostgreSQL
 - **Mutations**: Server Actions with progressive enhancement
 
 ### Direct Database Queries
 
 - **Do**: Query Drizzle directly in Server Components and Server Actions
-- **Don't**: Create DAL/repository/service layers (premature abstraction)
+
 - **Why**: Single-tenant simplicity, follow the Rule of Three
 
 ### UI Framework & Progressive Enhancement
@@ -113,18 +113,19 @@ PinPoint uses parallel git worktrees so multiple assistants can work without ste
 
 ### Port Allocation
 
-| Worktree    | Next.js | Supabase API | PostgreSQL | Shadow DB | Inbucket | project_id           |
-| ----------- | ------- | ------------ | ---------- | --------- | -------- | -------------------- |
-| Main        | 3000    | 54321        | 54322      | 54320     | 54324    | pinpoint             |
-| Secondary   | 3100    | 55321        | 55322      | 55320     | 55324    | pinpoint-secondary   |
-| Review      | 3200    | 56321        | 56322      | 56320     | 56324    | pinpoint-review      |
-| AntiGravity | 3300    | 57321        | 57322      | 57320     | 57324    | pinpoint-antigravity |
+| Worktree    | Next.js | Supabase API | PostgreSQL | Shadow DB | Mailpit (config `[inbucket]`) | project_id           |
+| ----------- | ------- | ------------ | ---------- | --------- | ----------------------------- | -------------------- |
+| Main        | 3000    | 54321        | 54322      | 54320     | 54324                         | pinpoint             |
+| Secondary   | 3100    | 55321        | 55322      | 55320     | 55324                         | pinpoint-secondary   |
+| Review      | 3200    | 56321        | 56322      | 56320     | 56324                         | pinpoint-review      |
+| AntiGravity | 3300    | 57321        | 57322      | 57320     | 57324                         | pinpoint-antigravity |
 
 ### How It Works
 
 - Each non-main worktree edits its own `supabase/config.toml` (ports + `project_id`) and marks it `skip-worktree` so git ignores local changes.
 - `.env.local` (gitignored) holds worktree-specific ports/keys.
 - CI stays on the main config/ports; no CI changes required.
+- Supabase CLI now runs Mailpit for email testing even though the config section remains `[inbucket]`; keep using the same section name but refer to it as Mailpit in docs and code.
 
 ### Starting Development
 

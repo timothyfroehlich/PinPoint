@@ -12,7 +12,7 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { issues, issueWatchers, userProfiles } from "~/server/db/schema";
+import { issues } from "~/server/db/schema";
 import { log } from "~/lib/logger";
 import {
   createIssueSchema,
@@ -27,9 +27,10 @@ import {
   createIssue,
   updateIssueStatus,
   addIssueComment,
-} from "~/lib/issues/mutations";
-import { createNotification } from "~/lib/notifications";
-import { createTimelineEvent } from "~/lib/timeline/events";
+  assignIssue,
+  updateIssueSeverity,
+  updateIssuePriority,
+} from "~/services/issues";
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
 
@@ -276,32 +277,11 @@ export async function updateIssueSeverityAction(
       return err("NOT_FOUND", "Issue not found");
     }
 
-    const oldSeverity = currentIssue.severity;
-
     // Update severity
-    await db
-      .update(issues)
-      .set({
-        severity,
-        updatedAt: new Date(),
-      })
-      .where(eq(issues.id, issueId));
-
-    // Create timeline event
-    await createTimelineEvent(
+    await updateIssueSeverity({
       issueId,
-      `Severity changed from ${oldSeverity} to ${severity}`
-    );
-
-    log.info(
-      {
-        issueId,
-        oldSeverity,
-        newSeverity: severity,
-        action: "updateIssueSeverity",
-      },
-      "Issue severity updated"
-    );
+      severity,
+    });
 
     revalidatePath(`/issues/${issueId}`);
     revalidatePath("/issues");
@@ -370,32 +350,11 @@ export async function updateIssuePriorityAction(
       return err("NOT_FOUND", "Issue not found");
     }
 
-    const oldPriority = currentIssue.priority;
-
     // Update priority
-    await db
-      .update(issues)
-      .set({
-        priority,
-        updatedAt: new Date(),
-      })
-      .where(eq(issues.id, issueId));
-
-    // Create timeline event
-    await createTimelineEvent(
+    await updateIssuePriority({
       issueId,
-      `Priority changed from ${oldPriority} to ${priority}`
-    );
-
-    log.info(
-      {
-        issueId,
-        oldPriority,
-        newPriority: priority,
-        action: "updateIssuePriority",
-      },
-      "Issue priority updated"
-    );
+      priority,
+    });
 
     revalidatePath(`/issues/${issueId}`);
     revalidatePath("/issues");
@@ -459,80 +418,18 @@ export async function assignIssueAction(
     const currentIssue = await db.query.issues.findFirst({
       where: eq(issues.id, issueId),
       columns: { machineId: true },
-      with: {
-        assignedToUser: {
-          columns: { name: true },
-        },
-      },
     });
 
     if (!currentIssue) {
       return err("NOT_FOUND", "Issue not found");
     }
 
-    // Get new assignee name if assigning to someone
-    let assigneeName = "Unassigned";
-    if (assignedTo) {
-      const assignee = await db.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, assignedTo),
-        columns: { name: true },
-      });
-      assigneeName = assignee?.name ?? "Unknown User";
-    }
-
-    // Update assignment
-    await db
-      .update(issues)
-      .set({
-        assignedTo,
-        updatedAt: new Date(),
-      })
-      .where(eq(issues.id, issueId));
-
-    // Create timeline event
-    const eventMessage = assignedTo
-      ? `Assigned to ${assigneeName}`
-      : "Unassigned";
-    await createTimelineEvent(issueId, eventMessage);
-
-    log.info(
-      { issueId, assignedTo, assigneeName, action: "assignIssue" },
-      "Issue assignment updated"
-    );
-
-    // Trigger Notification & Add Watcher
-    try {
-      const issue = await db.query.issues.findFirst({
-        where: eq(issues.id, issueId),
-        with: { machine: true },
-      });
-
-      if (assignedTo) {
-        // Add assignee as watcher
-        await db
-          .insert(issueWatchers)
-          .values({
-            issueId,
-            userId: assignedTo,
-          })
-          .onConflictDoNothing();
-
-        // Notify
-        await createNotification({
-          type: "issue_assigned",
-          resourceId: issueId,
-          resourceType: "issue",
-          actorId: user.id,
-          issueTitle: issue?.title ?? undefined,
-          machineName: issue?.machine.name ?? undefined,
-        });
-      }
-    } catch (error) {
-      log.error(
-        { error, action: "assignIssue.notifications" },
-        "Failed to process notifications"
-      );
-    }
+    // Assign issue via service
+    await assignIssue({
+      issueId,
+      assignedTo,
+      actorId: user.id,
+    });
 
     revalidatePath(`/issues/${issueId}`);
     revalidatePath("/issues");

@@ -18,12 +18,12 @@ test.describe("Notifications", () => {
     await adminPage.goto("/settings/notifications");
 
     // Ensure the toggle is checked.
-    // Note: The switch uses a custom layout without a standard label association, so we use ID.
-    const autoWatchToggle = adminPage.locator("#autoWatchOwnedMachines");
-    if (!(await autoWatchToggle.isChecked())) {
-      await autoWatchToggle.check();
+    // We want to ensure In-App notifications are enabled for Owned Machines
+    const newIssueToggle = adminPage.locator("#inAppNotifyOnNewIssue");
+    if (!(await newIssueToggle.isChecked())) {
+      await newIssueToggle.check();
       await adminPage.getByRole("button", { name: "Save Preferences" }).click();
-      await expect(autoWatchToggle).toBeChecked();
+      await expect(newIssueToggle).toBeChecked();
     }
 
     // Get initial notification count
@@ -80,16 +80,25 @@ test.describe("Notifications", () => {
     const issueUrl = page.url();
     const issueId = issueUrl.split("/").pop();
 
-    // Ensure reporter is watching the issue (auto-watch might be off or flaky in test env)
-    // But default preference is auto-watch.
-    // Let's explicitly check the watch button state or toggle it on if needed.
-    // For now, let's just assume auto-watch works, but if it failed, maybe they aren't watching?
-    // Let's explicitly click "Watch" if it says "Watch".
+    // Reporter must opt-in to watch; auto-watch is disabled.
+    // Explicitly enable watch so the reporter will get updates.
     await page.reload(); // Ensure UI is fresh
-    const watchButton = page.getByRole("button", { name: /watch/i });
-    if ((await watchButton.textContent()) === "Watch") {
+    const watchButton = page.getByRole("button", {
+      name: "Watch",
+      exact: false,
+    });
+    const unwatchButton = page.getByRole("button", {
+      name: "Unwatch",
+      exact: false,
+    });
+
+    await expect(page.getByTestId("issue-sidebar")).toBeVisible();
+
+    if (await watchButton.isVisible()) {
       await watchButton.click();
-      await expect(page.getByRole("button", { name: "Unwatch" })).toBeVisible();
+      await expect(unwatchButton).toBeVisible();
+    } else {
+      await expect(unwatchButton).toBeVisible();
     }
 
     // 2. Action: Admin (User B) changes status
@@ -264,7 +273,7 @@ test.describe("Notifications", () => {
     await memberPage
       .getByRole("button", { name: "Submit Issue Report" })
       .click();
-    await expect(memberPage).toHaveURL(/\/issues\/.+/);
+    await expect(memberPage).toHaveURL("/report/success");
 
     // 3. Assertion: Admin verifies in-app notification created
     // (We can't easily check email, but we check the in-app notification which is created alongside)

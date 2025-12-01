@@ -15,7 +15,7 @@ export default async function MachineDetailPage({
 }) {
   const { machineId } = await params; // Next.js 16: params is now a Promise
 
-  // Direct query in Server Component - no DAL/repository layer
+// Direct query in Server Component – keep it simple unless a service adds real value
   const machine = await db.query.machines.findFirst({
     where: eq(machines.id, machineId),
     with: {

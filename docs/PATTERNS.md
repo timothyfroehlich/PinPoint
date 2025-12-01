@@ -34,6 +34,7 @@
   - Playwright E2E Tests
   - Integration Tests with PGlite
   - Unit Tests
+  - Vitest Deep Mocks (vitest-mock-extended)
 - [Logging](./patterns/logging.md)
   - Structured Logging in Server Actions
 - [UI & Styling](./patterns/ui-styling.md)
