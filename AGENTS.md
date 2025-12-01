@@ -174,6 +174,18 @@ git update-index --skip-worktree supabase/config.toml
 - **Git shows config.toml modified:** re-apply skip-worktree.
 - **Supabase keys changed after restart:** run `supabase start`, copy new `PUBLISHABLE_KEY/SERVICE_ROLE_KEY` into `.env.local`.
 
+### Supabase Config Management
+
+**WARNING**: `supabase/config.toml` is marked `skip-worktree` to allow local port customization. However, this hides structural changes (like adding new keys) from git.
+
+- **The Safety Net**: `npm run preflight` includes a `check:config` script that compares your local config keys against `main`. It will fail if you have added keys locally that aren't in git.
+- **How to Commit Config Changes**:
+  1. `git update-index --no-skip-worktree supabase/config.toml`
+  2. Revert ports to standard values (54321, 54322, etc.) but **keep your new keys**.
+  3. Commit the file.
+  4. Restore your local ports (or run `scripts/sync-worktrees.sh`).
+  5. `git update-index --skip-worktree supabase/config.toml`
+
 ### Available Commands
 
 - **Testing**: `npm test` (unit tests), `npm run test:integration` (Supabase tests), `npm run test:watch`, `npm run smoke` (E2E)

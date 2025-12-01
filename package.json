@@ -25,7 +25,8 @@
     "db:seed-users": "node --env-file=.env.local supabase/seed-users.mjs",
     "db:reset:local": "supabase db reset --yes",
     "db:prepare:test": "npm-run-all db:reset:local db:push db:seed db:seed-users",
-    "preflight": "npm-run-all --silent --parallel typecheck lint format test --sequential db:prepare:test --parallel build test:integration test:integration:supabase --sequential smoke",
+    "check:config": "python3 scripts/check-config-drift.py",
+    "preflight": "npm-run-all --silent --parallel typecheck lint format test check:config --sequential db:prepare:test --parallel build test:integration test:integration:supabase --sequential smoke",
     "supa:ci": "bash scripts/supa-ci.sh",
     "sync-worktrees": "bash scripts/sync-worktrees.sh",
     "prepare": "husky"
