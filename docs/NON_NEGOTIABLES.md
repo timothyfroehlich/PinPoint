@@ -1,3 +1,8 @@
+---
+trigger: always_on
+# For Antigravity
+---
+
 # PinPoint Non‑Negotiables
 
 **Last Updated**: November 25, 2025

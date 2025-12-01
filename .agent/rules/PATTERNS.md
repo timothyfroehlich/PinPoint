@@ -1,0 +1,1 @@
+/home/froeht/Code/PinPoint-AntiGravity/docs/PATTERNS.md

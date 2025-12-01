@@ -1,3 +1,8 @@
+---
+trigger: always_on
+# For Antigravity
+---
+
 # PinPoint Code Patterns
 
 **Last Updated**: November 22, 2025

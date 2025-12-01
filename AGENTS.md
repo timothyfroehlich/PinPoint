@@ -1,3 +1,8 @@
+---
+trigger: always_on
+# For Antigravity
+---
+
 # PinPoint Agent Guidelines
 
 ## About the User
