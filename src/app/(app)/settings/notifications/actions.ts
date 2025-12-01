@@ -22,8 +22,6 @@ const updatePreferencesSchema = z.object({
   inAppNotifyOnNewIssue: z.boolean(),
   emailWatchNewIssuesGlobal: z.boolean(),
   inAppWatchNewIssuesGlobal: z.boolean(),
-
-  autoWatchOwnedMachines: z.boolean(),
 });
 
 export type UpdatePreferencesResult = Result<
@@ -63,8 +61,6 @@ export async function updateNotificationPreferencesAction(
       formData.get("emailWatchNewIssuesGlobal") === "on",
     inAppWatchNewIssuesGlobal:
       formData.get("inAppWatchNewIssuesGlobal") === "on",
-
-    autoWatchOwnedMachines: formData.get("autoWatchOwnedMachines") === "on",
   };
 
   const validation = updatePreferencesSchema.safeParse(rawData);

@@ -39,6 +39,8 @@
 - [UI & Styling](./patterns/ui-styling.md)
   - Component Usage
   - Layout Patterns
+- [URL Construction](./patterns/url-construction.md)
+  - Consistent Site URL Resolution
 
 ## Adding New Patterns
 

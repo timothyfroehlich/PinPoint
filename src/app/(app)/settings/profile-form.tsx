@@ -11,11 +11,13 @@ import { cn } from "~/lib/utils";
 interface ProfileFormProps {
   firstName: string;
   lastName: string;
+  role: string;
 }
 
 export function ProfileForm({
   firstName,
   lastName,
+  role,
 }: ProfileFormProps): React.JSX.Element {
   const [state, formAction] = useActionState<
     UpdateProfileResult | undefined,
@@ -61,6 +63,16 @@ export function ProfileForm({
             placeholder="Doe"
             required
             className="max-w-[240px]"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="role">Role</Label>
+          <Input
+            id="role"
+            name="role"
+            value={role.charAt(0).toUpperCase() + role.slice(1)}
+            disabled
+            className="max-w-[240px] bg-muted"
           />
         </div>
       </div>

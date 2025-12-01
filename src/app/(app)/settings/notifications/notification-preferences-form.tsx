@@ -66,6 +66,42 @@ export function NotificationPreferencesForm({
         </div>
       </div>
 
+      {/* New Issue Notifications */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+          New Issue Notifications
+        </h3>
+        <div className="rounded-lg border border-outline-variant/50 bg-surface/50 overflow-hidden">
+          <div className="grid grid-cols-[1fr_auto_auto] gap-4 border-b border-outline-variant/50 bg-surface-variant/30 p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <div>Scope</div>
+            <div className="text-center w-16">Email</div>
+            <div className="text-center w-16">In-App</div>
+          </div>
+          <div className="divide-y divide-outline-variant/50">
+            <PreferenceRow
+              label="Owned Machines"
+              description="New issues on machines you own"
+              emailId="emailNotifyOnNewIssue"
+              inAppId="inAppNotifyOnNewIssue"
+              emailDefault={preferences.emailNotifyOnNewIssue}
+              inAppDefault={preferences.inAppNotifyOnNewIssue}
+              emailDisabled={!emailMainEnabled}
+              inAppDisabled={!inAppMainEnabled}
+            />
+            <PreferenceRow
+              label="All Machines"
+              description="Notify for EVERY new issue on the platform"
+              emailId="emailWatchNewIssuesGlobal"
+              inAppId="inAppWatchNewIssuesGlobal"
+              emailDefault={preferences.emailWatchNewIssuesGlobal}
+              inAppDefault={preferences.inAppWatchNewIssuesGlobal}
+              emailDisabled={!emailMainEnabled}
+              inAppDisabled={!inAppMainEnabled}
+            />
+          </div>
+        </div>
+      </div>
+
       {/* Events Matrix */}
       <div className="space-y-3">
         <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
@@ -108,80 +144,6 @@ export function NotificationPreferencesForm({
               inAppId="inAppNotifyOnNewComment"
               emailDefault={preferences.emailNotifyOnNewComment}
               inAppDefault={preferences.inAppNotifyOnNewComment}
-              emailDisabled={!emailMainEnabled}
-              inAppDisabled={!inAppMainEnabled}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Machine Ownership Matrix */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-          Machine Ownership
-        </h3>
-        <div className="rounded-lg border border-outline-variant/50 bg-surface/50 overflow-hidden">
-          <div className="grid grid-cols-[1fr_auto_auto] gap-4 border-b border-outline-variant/50 bg-surface-variant/30 p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            <div>Event Type</div>
-            <div className="text-center w-16">Email</div>
-            <div className="text-center w-16">In-App</div>
-          </div>
-          <div className="divide-y divide-outline-variant/50">
-            <PreferenceRow
-              label="New Issues"
-              description="New issues on machines you own"
-              emailId="emailNotifyOnNewIssue"
-              inAppId="inAppNotifyOnNewIssue"
-              emailDefault={preferences.emailNotifyOnNewIssue}
-              inAppDefault={preferences.inAppNotifyOnNewIssue}
-              emailDisabled={!emailMainEnabled}
-              inAppDisabled={!inAppMainEnabled}
-            />
-          </div>
-        </div>
-
-        {/* Auto-watch integrated into matrix for alignment */}
-        <div className="rounded-lg border border-outline-variant/50 bg-surface/50 overflow-hidden mt-3">
-          <div className="grid grid-cols-[1fr_auto_auto] gap-4 p-3 items-center hover:bg-surface-variant/30 transition-colors">
-            <div className="space-y-0.5">
-              <p className="text-sm font-medium">Auto-Watch Owned Machines</p>
-              <p className="text-xs text-muted-foreground">
-                Automatically watch new issues reported on machines you own
-              </p>
-            </div>
-            <div className="flex justify-center w-16">
-              {/* Empty space for EMAIL column */}
-            </div>
-            <div className="flex justify-center w-16">
-              <Switch
-                id="autoWatchOwnedMachines"
-                name="autoWatchOwnedMachines"
-                defaultChecked={preferences.autoWatchOwnedMachines}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Global Matrix */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-          Global
-        </h3>
-        <div className="rounded-lg border border-outline-variant/50 bg-surface/50 overflow-hidden">
-          <div className="grid grid-cols-[1fr_auto_auto] gap-4 border-b border-outline-variant/50 bg-surface-variant/30 p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            <div>Event Type</div>
-            <div className="text-center w-16">Email</div>
-            <div className="text-center w-16">In-App</div>
-          </div>
-          <div className="divide-y divide-outline-variant/50">
-            <PreferenceRow
-              label="Watch All New Issues"
-              description="Notify for EVERY new issue (use with caution)"
-              emailId="emailWatchNewIssuesGlobal"
-              inAppId="inAppWatchNewIssuesGlobal"
-              emailDefault={preferences.emailWatchNewIssuesGlobal}
-              inAppDefault={preferences.inAppWatchNewIssuesGlobal}
               emailDisabled={!emailMainEnabled}
               inAppDisabled={!inAppMainEnabled}
             />

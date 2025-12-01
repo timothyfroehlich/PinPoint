@@ -10,6 +10,7 @@ import {
 } from "~/server/db/schema";
 import { sendEmail } from "~/lib/email/client";
 import { log } from "~/lib/logger";
+import { getSiteUrl } from "~/lib/url";
 
 export type NotificationType =
   | "issue_assigned"
@@ -44,6 +45,10 @@ export async function createNotification(
   }: CreateNotificationProps,
   tx = db
 ): Promise<void> {
+  console.log(
+    `[DEBUG] createNotification called: type=${type}, resourceId=${resourceId}, actorId=${actorId}`
+  );
+
   // 1. Determine recipients
   let recipientIds: string[] = [];
 
@@ -76,6 +81,8 @@ export async function createNotification(
       }
     }
 
+    console.log(`[DEBUG] Owner ID found: ${ownerId}`);
+
     // Get Global Subscribers
     // We want anyone who has EITHER email OR in-app global watch enabled
     const globalSubscribers = await tx.query.notificationPreferences.findMany({
@@ -95,6 +102,8 @@ export async function createNotification(
       const ownerPref = await tx.query.notificationPreferences.findFirst({
         where: eq(notificationPreferences.userId, ownerId),
       });
+      console.log(`[DEBUG] Owner Prefs:`, ownerPref);
+
       // Check if owner wants notifications for new issues (via either channel)
       if (
         ownerPref?.emailNotifyOnNewIssue ||
@@ -115,10 +124,13 @@ export async function createNotification(
   }
 
   // Exclude actor
+  console.log(`[DEBUG] Initial Recipient IDs: ${recipientIds.join(", ")}`);
   recipientIds = recipientIds.filter((id) => id !== actorId);
 
   // Deduplicate
   recipientIds = [...new Set(recipientIds)];
+
+  console.log(`[DEBUG] Final Recipient IDs: ${recipientIds.join(", ")}`);
 
   if (recipientIds.length === 0) return;
 
@@ -184,6 +196,10 @@ export async function createNotification(
         const isInAppOwnerPref = prefs.inAppNotifyOnNewIssue;
         const isInAppGlobalPref = prefs.inAppWatchNewIssuesGlobal;
         inAppNotify = isInAppOwnerPref || isInAppGlobalPref;
+
+        console.log(
+          `[DEBUG] User ${userId} new_issue prefs: OwnerEmail=${isOwnerPref}, GlobalEmail=${isGlobalPref}, OwnerInApp=${isInAppOwnerPref}, GlobalInApp=${isInAppGlobalPref}`
+        );
         break;
       }
     }
@@ -220,7 +236,12 @@ export async function createNotification(
 
   // Batch Insert Notifications
   if (notificationsToInsert.length > 0) {
+    console.log(
+      `[DEBUG] Inserting ${notificationsToInsert.length} notifications`
+    );
     await tx.insert(notifications).values(notificationsToInsert);
+  } else {
+    console.log(`[DEBUG] No notifications to insert`);
   }
 
   // Send Emails (fire and forget)
@@ -275,9 +296,7 @@ function getEmailHtml(
       break;
   }
 
-  const port = process.env["PORT"] ?? "3000";
-  const siteUrl =
-    process.env["NEXT_PUBLIC_SITE_URL"] ?? `http://localhost:${port}`;
+  const siteUrl = getSiteUrl();
   const machinePrefix = machineName ? `[${machineName}] ` : "";
 
   return `

@@ -18,6 +18,7 @@ import {
   getClientIp,
   formatResetTime,
 } from "~/lib/rate-limit";
+import { getSiteUrl } from "~/lib/url";
 
 /**
  * Result Types
@@ -388,8 +389,7 @@ export async function forgotPasswordAction(
 
     const supabase = await createClient();
 
-    // CHANGED: Fail closed if NEXT_PUBLIC_SITE_URL not configured
-    const siteUrl = process.env["NEXT_PUBLIC_SITE_URL"];
+    const siteUrl = getSiteUrl();
 
     // Validate origin against allowlist to prevent host header injection
     // We allow:
@@ -397,14 +397,6 @@ export async function forgotPasswordAction(
     // 2. The configured local port (development)
     // 3. Default localhost:3000 (development fallback)
     const localPort = process.env["PORT"] ?? "3000";
-
-    if (!siteUrl) {
-      log.error(
-        { action: "forgot-password" },
-        "NEXT_PUBLIC_SITE_URL not configured - cannot send password reset email"
-      );
-      return err("SERVER", "Configuration error. Please contact support.");
-    }
 
     const origin = siteUrl; // No fallback, fail if not configured
     const allowedOrigins = [

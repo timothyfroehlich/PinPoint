@@ -73,60 +73,56 @@ test.describe("Notifications", () => {
       .getByTestId("machine-select")
       .selectOption({ label: seededMachines.attackFromMars.name });
     await page.getByLabel("Issue Title").fill("Status Change Test Issue");
-    await page.getByRole("button", { name: "Submit" }).click();
+    await page.getByRole("button", { name: "Report Issue" }).click();
 
     // Capture Issue URL/ID
     await expect(page).toHaveURL(/\/issues\/.+/);
     const issueUrl = page.url();
     const issueId = issueUrl.split("/").pop();
 
+    // Ensure reporter is watching the issue (auto-watch might be off or flaky in test env)
+    // But default preference is auto-watch.
+    // Let's explicitly check the watch button state or toggle it on if needed.
+    // For now, let's just assume auto-watch works, but if it failed, maybe they aren't watching?
+    // Let's explicitly click "Watch" if it says "Watch".
+    await page.reload(); // Ensure UI is fresh
+    const watchButton = page.getByRole("button", { name: /watch/i });
+    if ((await watchButton.textContent()) === "Watch") {
+      await watchButton.click();
+      await expect(page.getByRole("button", { name: "Unwatch" })).toBeVisible();
+    }
+
     // 2. Action: Admin (User B) changes status
-    // We need a second user. For simplicity in this env, we might need to use the same user
-    // if we don't have a second seeded user easily accessible.
-    // But notifications usually exclude the actor.
-    // So if User A changes their own status, they won't get a notification.
-    // We need a second user.
-    // If we only have one seeded user, we can't easily test "User A notifies User B" without creating a user.
-    // However, the "Public Issue" test covered "Anonymous -> Admin".
-    // Let's try to simulate a second user if possible, or skip if we lack data.
-    // Assuming we only have 'seededMember'.
-    // We can create a new user via Supabase API or just use the public form for the "Reporter" role.
+    // We use a second browser context for the admin
+    const adminContext = await browser.newContext();
+    const adminPage = await adminContext.newPage();
+    await loginAs(adminPage, TEST_USERS.admin);
 
-    // Strategy: Use Public Form to create issue (Reporter = null/Anonymous).
-    // But Anonymous users don't get in-app notifications.
+    await adminPage.goto(`/issues/${issueId}`);
 
-    // Alternative: We can test "Global Watcher" flow instead which involves Admin.
-    // Or we can just skip this if we lack a second user.
-    // BUT, the requirement is "User creates issue with admin having watch all new issues enabled".
-    // That implies two users: "User" and "Admin".
-    // If 'seededMember' is Admin, who is 'User'?
-    // I'll assume we can register a new user or use a second seeded user if available.
-    // Checking constants.ts... only 'seededMember'.
+    // Change status
+    await adminPage
+      .getByTestId("issue-status-select")
+      .selectOption("in_progress");
+    await adminPage.getByRole("button", { name: "Update Status" }).click();
 
-    // I will register a new user for this test.
-    const userContext = await browser.newContext();
-    const userPage = await userContext.newPage();
+    // Wait for submission to complete before switching context
+    await expect(adminPage.getByTestId("status-update-success")).toBeVisible({
+      timeout: 5000,
+    });
 
-    // Register User B
-    const userEmail = `test-user-${Date.now()}@example.com`;
-    await userPage.goto("/signup");
-    await userPage.getByLabel("Email").fill(userEmail);
-    await userPage.getByLabel("Password").fill("password123");
-    await userPage.getByRole("button", { name: "Sign Up" }).click();
-    // Handle email confirmation if needed (in dev mode it might be auto or skipped)
-    // If it redirects to /dashboard, we are good.
-    // If it asks for confirmation, we might need to verify via Mailpit.
-    // Assuming dev environment allows login or auto-confirm.
-    // If strictly "confirm email", we need to fetch link.
+    // 3. Assertion: Reporter (User A) receives notification
+    await page.bringToFront();
+    await page.reload();
 
-    // Let's assume for now we can use the "Global Watcher" test to cover the multi-user aspect
-    // by using the public form (Anonymous) -> Admin.
-    // But the user asked for "User creates issue".
+    const bell = page.getByRole("button", { name: /notifications/i });
+    await expect(bell).toBeVisible();
 
-    // Let's stick to the "Public Issue" test for now as it's robust.
-    // And add "Global Watcher" test using Public Form -> Admin (Global Watcher).
+    // Check for notification
+    await bell.click();
+    await expect(page.getByText("Issue status updated")).toBeVisible();
 
-    await userContext.close();
+    await adminContext.close();
   });
 
   test("should notify global watcher on new issue", async ({ browser }) => {
@@ -233,37 +229,55 @@ test.describe("Notifications", () => {
     // Let's just remove the problematic assertion for now.
   });
 
-  test("email notification flow", async ({ page, request }) => {
+  test("email notification flow", async ({ page, browser }) => {
+    // 1. Setup: Admin (Owner) enables Email Notifications AND In-App New Issue Notifications
     await loginAs(page, TEST_USERS.admin);
-
-    // 1. Setup: Enable Email Notifications
     await page.goto("/settings/notifications");
+
     const emailMainSwitch = page.getByLabel("Email Notifications"); // Main switch
     if (!(await emailMainSwitch.isChecked())) {
       await emailMainSwitch.check();
-      await page.getByRole("button", { name: "Save Preferences" }).click();
-      await expect(emailMainSwitch).toBeChecked();
     }
 
-    // 2. Action: Trigger notification (Public Report)
-    await page.goto("/report");
-    await page
+    // Ensure In-App notification for New Issues (Owned) is enabled
+    // Default is false in seed.sql
+    const inAppNewIssueSwitch = page.locator("#inAppNotifyOnNewIssue");
+    if (!(await inAppNewIssueSwitch.isChecked())) {
+      await inAppNewIssueSwitch.check();
+    }
+
+    await page.getByRole("button", { name: "Save Preferences" }).click();
+    await expect(emailMainSwitch).toBeChecked();
+    await expect(inAppNewIssueSwitch).toBeChecked();
+
+    // 2. Action: Member reports an issue
+    // We need a separate context so we don't log out the admin
+    const memberContext = await browser.newContext();
+    const memberPage = await memberContext.newPage();
+    await loginAs(memberPage, TEST_USERS.member);
+
+    await memberPage.goto("/report");
+    await memberPage
       .getByTestId("machine-select")
       .selectOption({ label: seededMachines.attackFromMars.name });
-    await page.getByLabel("Issue Title").fill("Email Test Issue");
-    await page.getByRole("button", { name: "Submit Issue Report" }).click();
+    await memberPage.getByLabel("Issue Title").fill("Email Test Issue");
+    await memberPage
+      .getByRole("button", { name: "Submit Issue Report" })
+      .click();
+    await expect(memberPage).toHaveURL(/\/issues\/.+/);
 
-    // 3. Assertion: Verify in-app notification created
-    // NOTE: Email testing is intentionally skipped in E2E tests:
-    // - Integration tests mock sendEmail (see src/test/integration/notifications.test.ts)
-    // - Mailpit SMTP port (1025) is not exposed to host, only Docker internal network
-    // - Email preferences are tested separately via unit tests
-    // This test verifies that enabling email notifications doesn't break the flow
+    // 3. Assertion: Admin verifies in-app notification created
+    // (We can't easily check email, but we check the in-app notification which is created alongside)
+    await page.bringToFront();
+    await page.goto("/"); // Reload dashboard
 
-    await page.goto("/");
-    await page.getByRole("button", { name: /notifications/i }).click();
-    await expect(
-      page.getByText(/New issue reported|No new notifications/i)
-    ).toBeVisible();
+    const bell = page.getByRole("button", { name: /notifications/i });
+    await expect(bell).toBeVisible();
+    await bell.click();
+
+    // Admin should see "New issue reported"
+    await expect(page.getByText("New issue reported")).toBeVisible();
+
+    await memberContext.close();
   });
 });

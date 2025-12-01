@@ -226,11 +226,6 @@ export const notificationPreferences = pgTable("notification_preferences", {
   inAppWatchNewIssuesGlobal: boolean("in_app_watch_new_issues_global")
     .notNull()
     .default(false),
-
-  // Logic / Behavior
-  autoWatchOwnedMachines: boolean("auto_watch_owned_machines")
-    .notNull()
-    .default(true),
 });
 
 /**

@@ -27,7 +27,7 @@ import {
   createIssue,
   updateIssueStatus,
   addIssueComment,
-} from "~/services/issues";
+} from "~/lib/issues/mutations";
 import { createNotification } from "~/lib/notifications";
 import { createTimelineEvent } from "~/lib/timeline/events";
 

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { revalidatePath } from "next/cache";
 import { log } from "~/lib/logger";
-import { createIssue } from "~/services/issues";
+import { createIssue } from "~/lib/issues/mutations";
 import {
   checkPublicIssueLimit,
   formatResetTime,

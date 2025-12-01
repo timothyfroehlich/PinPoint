@@ -100,7 +100,7 @@ describe("forgotPasswordAction - Origin Resolution", () => {
     vi.unstubAllEnvs();
   });
 
-  it("should fail when NEXT_PUBLIC_SITE_URL is not set", async () => {
+  it("should fallback to localhost when NEXT_PUBLIC_SITE_URL is not set", async () => {
     // Ensure NEXT_PUBLIC_SITE_URL is not set
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "");
     vi.stubEnv("PORT", "3000"); // Allow localhost:3000
@@ -113,14 +113,10 @@ describe("forgotPasswordAction - Origin Resolution", () => {
 
     const result = await forgotPasswordAction(undefined, formData);
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.code).toBe("SERVER");
-      expect(result.message).toBe(
-        "Configuration error. Please contact support."
-      );
-    }
-    expect(mockSupabase.auth.resetPasswordForEmail).not.toHaveBeenCalled();
+    // It should succeed by falling back to localhost
+    expect(result.ok).toBe(true);
+    expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled();
+    expectRedirectToContain(mockSupabase, "http://localhost:3000");
   });
 
   it("should use NEXT_PUBLIC_SITE_URL when set", async () => {

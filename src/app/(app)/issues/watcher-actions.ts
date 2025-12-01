@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "~/lib/supabase/server";
 import { log } from "~/lib/logger";
 import { type Result, ok, err } from "~/lib/result";
-import { toggleIssueWatcher } from "~/services/issues";
+import { toggleIssueWatcher } from "~/lib/issues/mutations";
 
 export type ToggleWatcherResult = Result<
   { isWatching: boolean },

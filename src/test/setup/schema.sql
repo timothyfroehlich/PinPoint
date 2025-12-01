@@ -55,8 +55,7 @@ CREATE TABLE "notification_preferences" (
 	"email_notify_on_new_issue" boolean DEFAULT true NOT NULL,
 	"in_app_notify_on_new_issue" boolean DEFAULT true NOT NULL,
 	"email_watch_new_issues_global" boolean DEFAULT false NOT NULL,
-	"in_app_watch_new_issues_global" boolean DEFAULT false NOT NULL,
-	"auto_watch_owned_machines" boolean DEFAULT true NOT NULL
+	"in_app_watch_new_issues_global" boolean DEFAULT false NOT NULL
 );
 
 CREATE TABLE "notifications" (

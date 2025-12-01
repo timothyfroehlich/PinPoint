@@ -44,13 +44,13 @@ vi.mock("~/lib/notifications", () => ({
 }));
 
 // Mock services
-vi.mock("~/services/issues", () => ({
+vi.mock("~/lib/issues/mutations", () => ({
   addIssueComment: vi.fn(),
 }));
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "~/lib/supabase/server";
-import { addIssueComment } from "~/services/issues";
+import { addIssueComment } from "~/lib/issues/mutations";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 

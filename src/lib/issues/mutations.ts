@@ -33,6 +33,12 @@ export interface AddIssueCommentParams {
   userId: string;
 }
 
+export interface AssignIssueParams {
+  issueId: string;
+  assignedTo: string | null;
+  actorId: string;
+}
+
 export type Issue = InferSelectModel<typeof issues>;
 export type IssueComment = InferSelectModel<typeof issueComments>;
 
