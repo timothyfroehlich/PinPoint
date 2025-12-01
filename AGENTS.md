@@ -128,6 +128,7 @@ PinPoint uses parallel git worktrees so multiple assistants can work without ste
 ### How It Works
 
 - Each non-main worktree edits its own `supabase/config.toml` (ports + `project_id`) and marks it `skip-worktree` so git ignores local changes.
+- **WARNING**: `scripts/sync-worktrees.sh` AUTOMATICALLY rewrites `supabase/config.toml` in secondary worktrees to prevent port conflicts. Do not manually edit ports in secondary worktrees.
 - `.env.local` (gitignored) holds worktree-specific ports/keys.
 - CI stays on the main config/ports; no CI changes required.
 - Supabase CLI now runs Mailpit for email testing even though the config section remains `[inbucket]`; keep using the same section name but refer to it as Mailpit in docs and code.

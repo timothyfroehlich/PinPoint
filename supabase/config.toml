@@ -1,5 +1,12 @@
 # Supabase Local Development Configuration
 # For detailed reference: https://supabase.com/docs/guides/local-development/cli/config
+#
+# ⚠️ AUTOMATED CONFIGURATION WARNING ⚠️
+# This file is automatically managed by `scripts/sync-worktrees.sh` in secondary worktrees.
+# - Ports and project_id are rewritten to avoid conflicts between parallel worktrees.
+# - This file is marked as `skip-worktree` in git to prevent local changes from being committed.
+# - DO NOT manually change ports or project_id here; they will be overwritten.
+# - To change shared config, edit this file in the MAIN worktree or ensure you don't commit local port changes.
 
 # Distinguish this project on the same host
 project_id = "pinpoint"
@@ -57,6 +64,8 @@ api_url = "http://localhost"
 # Email testing server for local auth flows
 enabled = true
 port = 54324
+smtp_port = 54325
+pop3_port = 54326
 
 [storage]
 enabled = false
