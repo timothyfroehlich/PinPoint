@@ -1,15 +1,17 @@
+"use client";
+
 import type React from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
   LayoutDashboard,
   Gamepad2,
   AlertCircle,
-  Settings,
-  LogOut,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "~/lib/utils";
-import { logoutAction } from "~/app/(auth)/actions";
 
 const sidebarItems = [
   {
@@ -30,30 +32,44 @@ const sidebarItems = [
 ];
 
 export function Sidebar(): React.JSX.Element {
-  // We'll use this for active state styling later if needed,
-  // though for now simple hover effects might suffice for the "half-broken" phase.
-  // const pathname = usePathname();
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
     <div
       role="navigation"
       aria-label="main navigation"
       data-testid="sidebar"
-      className="flex h-screen w-64 flex-col border-r border-primary/50 bg-card text-card-foreground shadow-[0_0_15px_rgba(74,222,128,0.15)]"
+      className={cn(
+        "flex min-h-screen h-full flex-col border-r border-primary/50 bg-card text-card-foreground shadow-[0_0_15px_rgba(74,222,128,0.15)] transition-all duration-300",
+        isCollapsed ? "w-20" : "w-64"
+      )}
     >
       {/* Logo Area */}
-      <div className="flex h-40 items-start justify-start px-4 pt-6 border-b border-primary/20">
+      <div
+        className={cn(
+          "flex items-center border-b border-primary/20 transition-all duration-300",
+          isCollapsed
+            ? "justify-center p-2 h-20"
+            : "justify-start px-4 pt-6 h-40 items-start"
+        )}
+      >
         <Link
           href="/dashboard"
-          className="flex w-full items-start justify-start"
+          className={cn(
+            "flex w-full items-center",
+            isCollapsed ? "justify-center" : "justify-start"
+          )}
         >
           {/* APC Logo */}
           <Image
             src="/apc-logo.png"
             alt="Austin Pinball Collective"
-            width={200}
-            height={128}
-            className="w-full h-auto max-h-32 object-contain drop-shadow-[0_0_8px_rgba(74,222,128,0.5)]"
+            width={isCollapsed ? 48 : 200}
+            height={isCollapsed ? 48 : 128}
+            className={cn(
+              "object-contain drop-shadow-[0_0_8px_rgba(74,222,128,0.5)] transition-all duration-300",
+              isCollapsed ? "w-12 h-12" : "w-full h-auto max-h-32"
+            )}
             priority
           />
         </Link>
@@ -66,42 +82,36 @@ export function Sidebar(): React.JSX.Element {
             key={item.href}
             href={item.href}
             className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              "text-muted-foreground hover:bg-primary/10 hover:text-primary"
+              "flex items-center gap-3 rounded-lg py-2 text-sm font-medium transition-colors",
+              "text-muted-foreground hover:bg-primary/10 hover:text-primary",
+              isCollapsed ? "justify-center px-0" : "px-3"
             )}
+            title={isCollapsed ? item.title : undefined}
           >
-            <item.icon className="size-4" />
-            {item.title}
+            <item.icon className="size-4 shrink-0" />
+            {!isCollapsed && <span>{item.title}</span>}
           </Link>
         ))}
       </div>
 
-      {/* Footer / Settings */}
-      <div className="border-t border-border p-4 space-y-1">
-        <Link
-          href="/settings"
+      {/* Collapse Toggle */}
+      <div className="border-t border-border p-4">
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
           className={cn(
-            "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-            "text-muted-foreground hover:bg-primary/10 hover:text-primary"
+            "flex w-full items-center gap-3 rounded-lg py-2 text-sm font-medium transition-colors hover:bg-primary/10 hover:text-primary text-muted-foreground",
+            isCollapsed ? "justify-center px-0" : "px-3"
           )}
+          data-testid="sidebar-toggle"
+          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          <Settings className="size-4" />
-          Settings
-        </Link>
-        {/* Sign Out */}
-        <form action={logoutAction}>
-          <button
-            type="submit"
-            data-testid="sidebar-signout"
-            className={cn(
-              "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              "text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-            )}
-          >
-            <LogOut className="size-4" />
-            Sign Out
-          </button>
-        </form>
+          {isCollapsed ? (
+            <ChevronRight className="size-4" />
+          ) : (
+            <ChevronLeft className="size-4" />
+          )}
+          {!isCollapsed && <span>Collapse</span>}
+        </button>
       </div>
     </div>
   );

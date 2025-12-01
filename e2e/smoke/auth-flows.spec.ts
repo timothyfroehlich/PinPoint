@@ -8,8 +8,9 @@ import { test, expect, type Page } from "@playwright/test";
 import { getPasswordResetLink, deleteAllMessages } from "../support/mailpit";
 import { confirmUserEmail } from "../support/supabase-admin";
 
-const signOutThroughSidebar = async (page: Page): Promise<void> => {
-  await page.getByTestId("sidebar-signout").click();
+const signOut = async (page: Page): Promise<void> => {
+  await page.getByTestId("user-menu-button").click();
+  await page.getByTestId("user-menu-signout").click();
   await expect(page).toHaveURL("/");
 };
 
@@ -123,7 +124,7 @@ test.describe("Authentication", () => {
     ).toBeVisible();
 
     // Sign out via sidebar
-    await signOutThroughSidebar(page);
+    await signOut(page);
 
     // Verify we're logged out by trying to access dashboard
     await page.goto("/dashboard");
@@ -157,7 +158,7 @@ test.describe("Authentication", () => {
     await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
 
     // Sign out to start reset journey
-    await signOutThroughSidebar(page);
+    await signOut(page);
 
     await deleteAllMessages(testEmail);
 
@@ -189,7 +190,7 @@ test.describe("Authentication", () => {
     // Log in with new password (handle being auto-signed-in from reset flow)
     await page.goto("/login");
     if (await page.getByRole("heading", { name: "Dashboard" }).isVisible()) {
-      await signOutThroughSidebar(page);
+      await signOut(page);
       await page.goto("/login");
     }
 
@@ -202,7 +203,7 @@ test.describe("Authentication", () => {
     ).toBeVisible();
 
     // Cleanup
-    await signOutThroughSidebar(page);
+    await signOut(page);
     await deleteAllMessages(testEmail);
   });
 });

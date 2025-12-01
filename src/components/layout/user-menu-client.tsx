@@ -90,6 +90,7 @@ export function UserMenu({
         {/* Sign Out */}
         <DropdownMenuItem
           className="text-error hover:text-error focus:text-error cursor-pointer"
+          data-testid="user-menu-signout"
           onSelect={async (event) => {
             event.preventDefault();
             await logoutAction();
