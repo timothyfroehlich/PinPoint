@@ -1,6 +1,6 @@
 "use client";
 
-import type React from "react";
+import React from "react";
 import { User, Settings, LogOut, ChevronDown } from "lucide-react";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import {
@@ -14,6 +14,7 @@ import { logoutAction } from "~/app/(auth)/actions";
 
 interface UserMenuProps {
   userName: string;
+  shouldSignOut?: boolean;
 }
 
 /**
@@ -24,7 +25,17 @@ interface UserMenuProps {
  * - Settings (future)
  * - Sign Out
  */
-export function UserMenu({ userName }: UserMenuProps): React.JSX.Element {
+export function UserMenu({
+  userName,
+  shouldSignOut,
+}: UserMenuProps): React.JSX.Element {
+  // Handle automatic signout for missing profiles (redirect loop fix)
+  React.useEffect(() => {
+    if (shouldSignOut) {
+      void logoutAction();
+    }
+  }, [shouldSignOut]);
+
   // Get user initials for avatar fallback
   const initials = userName
     .split(" ")

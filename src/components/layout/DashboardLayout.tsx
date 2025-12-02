@@ -31,6 +31,9 @@ export async function DashboardLayout({
       where: eq(userProfiles.id, user.id),
       columns: { name: true },
     });
+
+    // Redirect logic moved to UserMenu component (client-side)
+    // if (!userProfile) { ... }
   }
 
   return (
@@ -50,7 +53,10 @@ export async function DashboardLayout({
             {user && (
               <>
                 <NotificationList notifications={userNotifications} />
-                <UserMenu userName={userProfile?.name ?? "User"} />
+                <UserMenu
+                  userName={userProfile?.name ?? "User"}
+                  shouldSignOut={!userProfile}
+                />
               </>
             )}
           </div>
