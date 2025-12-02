@@ -14,7 +14,6 @@ import { logoutAction } from "~/app/(auth)/actions";
 
 interface UserMenuProps {
   userName: string;
-  shouldSignOut?: boolean;
 }
 
 /**
@@ -25,17 +24,7 @@ interface UserMenuProps {
  * - Settings (future)
  * - Sign Out
  */
-export function UserMenu({
-  userName,
-  shouldSignOut,
-}: UserMenuProps): React.JSX.Element {
-  // Handle automatic signout for missing profiles (redirect loop fix)
-  React.useEffect(() => {
-    if (shouldSignOut) {
-      void logoutAction();
-    }
-  }, [shouldSignOut]);
-
+export function UserMenu({ userName }: UserMenuProps): React.JSX.Element {
   // Get user initials for avatar fallback
   const initials = userName
     .split(" ")

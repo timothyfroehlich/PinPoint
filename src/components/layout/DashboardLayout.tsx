@@ -6,6 +6,7 @@ import { notifications, userProfiles } from "~/server/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { NotificationList } from "~/components/notifications/NotificationList";
 import { UserMenu } from "./user-menu-client";
+import { ensureUserProfile } from "~/lib/auth/profile";
 
 export async function DashboardLayout({
   children,
@@ -32,8 +33,16 @@ export async function DashboardLayout({
       columns: { name: true },
     });
 
-    // Redirect logic moved to UserMenu component (client-side)
-    // if (!userProfile) { ... }
+    if (!userProfile) {
+      // Auto-heal profile if missing (e.g. after DB reset)
+      await ensureUserProfile(user);
+
+      // Refetch profile after healing
+      userProfile = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, user.id),
+        columns: { name: true },
+      });
+    }
   }
 
   return (
@@ -53,10 +62,7 @@ export async function DashboardLayout({
             {user && (
               <>
                 <NotificationList notifications={userNotifications} />
-                <UserMenu
-                  userName={userProfile?.name ?? "User"}
-                  shouldSignOut={!userProfile}
-                />
+                <UserMenu userName={userProfile?.name ?? "User"} />
               </>
             )}
           </div>
