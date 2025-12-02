@@ -26,7 +26,7 @@
     "db:reset:local": "supabase db reset --yes",
     "db:prepare:test": "npm-run-all db:reset:local db:push db:seed db:seed-users",
     "check:config": "python3 scripts/check-config-drift.py",
-    "preflight": "npm-run-all --silent --parallel typecheck lint format test check:config --sequential db:prepare:test --parallel build test:integration test:integration:supabase --sequential smoke",
+    "preflight": "npm-run-all --silent --parallel typecheck lint:fix format:fix test check:config --sequential db:prepare:test --parallel build test:integration test:integration:supabase --sequential smoke",
     "supa:ci": "bash scripts/supa-ci.sh",
     "sync-worktrees": "bash scripts/sync-worktrees.sh",
     "prepare": "husky"
@@ -63,6 +63,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "drizzle-orm": "^0.44.7",
+    "isomorphic-dompurify": "^2.33.0",
     "lucide-react": "^0.553.0",
     "next": "^16.0.3",
     "nodemailer": "^7.0.11",

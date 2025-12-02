@@ -31,6 +31,8 @@ import {
   updateIssueSeverity,
   updateIssuePriority,
 } from "~/services/issues";
+import { canUpdateIssue } from "~/lib/permissions";
+import { userProfiles } from "~/server/db/schema";
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
 
@@ -197,11 +199,40 @@ export async function updateIssueStatusAction(
     // Get current issue to check old status
     const currentIssue = await db.query.issues.findFirst({
       where: eq(issues.id, issueId),
-      columns: { status: true, machineId: true },
+      columns: {
+        status: true,
+        machineId: true,
+        reportedBy: true,
+        assignedTo: true,
+      },
+      with: {
+        machine: {
+          columns: { ownerId: true },
+        },
+      },
     });
 
     if (!currentIssue) {
       return err("NOT_FOUND", "Issue not found");
+    }
+
+    // Permission check
+    const userProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true },
+    });
+
+    if (
+      !canUpdateIssue(
+        { id: user.id, role: userProfile?.role ?? "guest" },
+        currentIssue,
+        currentIssue.machine
+      )
+    ) {
+      return err(
+        "UNAUTHORIZED",
+        "You do not have permission to update this issue"
+      );
     }
 
     // Update status
@@ -270,11 +301,40 @@ export async function updateIssueSeverityAction(
     // Get current issue to check old severity
     const currentIssue = await db.query.issues.findFirst({
       where: eq(issues.id, issueId),
-      columns: { severity: true, machineId: true },
+      columns: {
+        severity: true,
+        machineId: true,
+        reportedBy: true,
+        assignedTo: true,
+      },
+      with: {
+        machine: {
+          columns: { ownerId: true },
+        },
+      },
     });
 
     if (!currentIssue) {
       return err("NOT_FOUND", "Issue not found");
+    }
+
+    // Permission check
+    const userProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true },
+    });
+
+    if (
+      !canUpdateIssue(
+        { id: user.id, role: userProfile?.role ?? "guest" },
+        currentIssue,
+        currentIssue.machine
+      )
+    ) {
+      return err(
+        "UNAUTHORIZED",
+        "You do not have permission to update this issue"
+      );
     }
 
     // Update severity
@@ -343,11 +403,40 @@ export async function updateIssuePriorityAction(
     // Get current issue to check old priority
     const currentIssue = await db.query.issues.findFirst({
       where: eq(issues.id, issueId),
-      columns: { priority: true, machineId: true },
+      columns: {
+        priority: true,
+        machineId: true,
+        reportedBy: true,
+        assignedTo: true,
+      },
+      with: {
+        machine: {
+          columns: { ownerId: true },
+        },
+      },
     });
 
     if (!currentIssue) {
       return err("NOT_FOUND", "Issue not found");
+    }
+
+    // Permission check
+    const userProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true },
+    });
+
+    if (
+      !canUpdateIssue(
+        { id: user.id, role: userProfile?.role ?? "guest" },
+        currentIssue,
+        currentIssue.machine
+      )
+    ) {
+      return err(
+        "UNAUTHORIZED",
+        "You do not have permission to update this issue"
+      );
     }
 
     // Update priority
@@ -417,11 +506,35 @@ export async function assignIssueAction(
     // Get current issue
     const currentIssue = await db.query.issues.findFirst({
       where: eq(issues.id, issueId),
-      columns: { machineId: true },
+      columns: { machineId: true, reportedBy: true, assignedTo: true },
+      with: {
+        machine: {
+          columns: { ownerId: true },
+        },
+      },
     });
 
     if (!currentIssue) {
       return err("NOT_FOUND", "Issue not found");
+    }
+
+    // Permission check
+    const userProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true },
+    });
+
+    if (
+      !canUpdateIssue(
+        { id: user.id, role: userProfile?.role ?? "guest" },
+        currentIssue,
+        currentIssue.machine
+      )
+    ) {
+      return err(
+        "UNAUTHORIZED",
+        "You do not have permission to update this issue"
+      );
     }
 
     // Assign issue via service

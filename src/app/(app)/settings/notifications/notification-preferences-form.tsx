@@ -9,6 +9,7 @@ import {
   type UpdatePreferencesResult,
 } from "./actions";
 import { type notificationPreferences } from "~/server/db/schema";
+import { cn } from "~/lib/utils";
 import React from "react";
 
 interface NotificationPreferencesFormProps {
@@ -39,8 +40,19 @@ export function NotificationPreferencesForm({
 
   return (
     <form action={formAction} className="space-y-8">
-      {state && !state.ok && (
-        <div className="text-sm text-destructive">{state.message}</div>
+      {state && (
+        <div
+          className={cn(
+            "rounded-md border p-4",
+            state.ok
+              ? "border-primary/20 bg-primary/10 text-primary"
+              : "border-destructive/20 bg-destructive/10 text-destructive"
+          )}
+        >
+          <p className="text-sm font-medium">
+            {state.ok ? "Preferences saved successfully." : state.message}
+          </p>
+        </div>
       )}
 
       {/* Main Switches */}

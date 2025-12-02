@@ -44,7 +44,8 @@ const mockInsertReturning = <T>(value: T) => {
 };
 
 const mockInsertVoid = () => {
-  const values = vi.fn().mockResolvedValue(undefined);
+  const onConflictDoNothing = vi.fn().mockResolvedValue(undefined);
+  const values = vi.fn().mockReturnValue({ onConflictDoNothing });
   return { values } as unknown as ReturnType<typeof db.insert>;
 };
 

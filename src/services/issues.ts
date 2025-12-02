@@ -228,7 +228,13 @@ export async function addIssueComment({
 
   if (!comment) throw new Error("Failed to create comment");
 
-  // 2. Trigger Notification
+  // 2. Auto-watch for commenter
+  await db
+    .insert(issueWatchers)
+    .values({ issueId, userId })
+    .onConflictDoNothing();
+
+  // 3. Trigger Notification
   try {
     const issue = await db.query.issues.findFirst({
       where: eq(issues.id, issueId),
@@ -340,6 +346,14 @@ export async function assignIssue({
       updatedAt: new Date(),
     })
     .where(eq(issues.id, issueId));
+
+  // Auto-watch for assignee
+  if (assignedTo) {
+    await db
+      .insert(issueWatchers)
+      .values({ issueId, userId: assignedTo })
+      .onConflictDoNothing();
+  }
 
   // Create timeline event
   const eventMessage = assignedTo
