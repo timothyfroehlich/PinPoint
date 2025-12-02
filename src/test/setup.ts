@@ -46,7 +46,7 @@ if (typeof window !== "undefined") {
         this.twist = params.twist ?? 0;
       }
     }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
     globalThis.PointerEvent = PointerEvent as any;
   }
 

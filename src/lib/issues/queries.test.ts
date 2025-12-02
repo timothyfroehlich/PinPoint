@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { getIssues } from "./queries";
 import { db } from "~/server/db";
@@ -35,7 +34,6 @@ describe("getIssues", () => {
   it("should fetch all issues when no filters are provided", async () => {
     await getIssues({});
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(db.query.issues.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: undefined,
@@ -48,7 +46,6 @@ describe("getIssues", () => {
     const machineId = "123";
     await getIssues({ machineId });
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(db.query.issues.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -64,7 +61,6 @@ describe("getIssues", () => {
   it("should filter by status", async () => {
     await getIssues({ status: "new" });
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(db.query.issues.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -80,7 +76,6 @@ describe("getIssues", () => {
   it("should ignore invalid status", async () => {
     await getIssues({ status: "invalid_status" });
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(db.query.issues.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: undefined,
@@ -91,7 +86,6 @@ describe("getIssues", () => {
   it("should filter by severity", async () => {
     await getIssues({ severity: "unplayable" });
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(db.query.issues.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -108,7 +102,6 @@ describe("getIssues", () => {
     const userId = "user-123";
     await getIssues({ assignedTo: userId });
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(db.query.issues.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -124,7 +117,6 @@ describe("getIssues", () => {
   it("should filter by assignedTo (unassigned)", async () => {
     await getIssues({ assignedTo: "unassigned" });
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(db.query.issues.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -143,7 +135,6 @@ describe("getIssues", () => {
       status: "new",
     });
 
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     expect(db.query.issues.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({

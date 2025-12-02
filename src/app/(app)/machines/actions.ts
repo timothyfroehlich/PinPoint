@@ -15,6 +15,7 @@ import { createMachineSchema, updateMachineSchema } from "./schemas";
 import { type Result, ok, err } from "~/lib/result";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { userProfiles } from "~/server/db/schema";
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
 
@@ -69,6 +70,15 @@ export async function createMachineAction(
     return err("UNAUTHORIZED", "Unauthorized. Please log in.");
   }
 
+  // Fetch user profile to check role
+  const profile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, user.id),
+  });
+
+  if (!profile) {
+    return err("UNAUTHORIZED", "User profile not found.");
+  }
+
   // Extract form data
   const rawData = {
     name: formData.get("name"),
@@ -94,7 +104,12 @@ export async function createMachineAction(
       .insert(machines)
       .values({
         name,
-        ownerId: validation.data.ownerId ?? user.id, // Default to creator if not specified
+        // Enforce role-based ownership assignment
+        // Only admins can assign machines to others
+        ownerId:
+          profile.role === "admin" && validation.data.ownerId
+            ? validation.data.ownerId
+            : user.id,
       })
       .returning();
 
