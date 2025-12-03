@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { log } from "~/lib/logger";
 
 export const dynamic = "force-dynamic";
 
-interface ClientLogEntry {
-  level: "log" | "info" | "warn" | "error" | "debug";
-  message: string;
-  args?: unknown[];
-  timestamp: number;
-  userAgent?: string;
-  url?: string;
-}
+const clientLogEntrySchema = z.object({
+  level: z.enum(["log", "info", "warn", "error", "debug"]),
+  message: z.string().min(1, "message is required"),
+  args: z.array(z.unknown()).optional(),
+  timestamp: z.number().int().nonnegative(),
+  userAgent: z.string().optional(),
+  url: z.string().optional(),
+});
 
 /**
  * API endpoint that receives frontend console logs and writes them to the server log.
@@ -25,29 +26,24 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
+  let body: unknown;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const body = await request.json();
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
 
-    // Validate required fields at runtime
-    const validLevels = ["log", "info", "warn", "error", "debug"];
-    if (
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      !body.level ||
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
-      !validLevels.includes(body.level) ||
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      !body.message
-    ) {
-      return NextResponse.json(
-        { error: "Missing required fields: level, message" },
-        { status: 400 }
-      );
-    }
+  const parsedEntry = clientLogEntrySchema.safeParse(body);
+  if (!parsedEntry.success) {
+    return NextResponse.json(
+      { error: "Invalid log entry payload" },
+      { status: 400 }
+    );
+  }
 
-    // Now we can safely cast to the expected type
-    const entry = body as ClientLogEntry;
+  const entry = parsedEntry.data;
 
+  try {
     // Build log message with context
     const logData = {
       source: "client",
