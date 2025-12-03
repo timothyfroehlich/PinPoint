@@ -36,3 +36,20 @@ try {
     process.exit(1);
   }
 }
+
+// lsof can be empty in some environments; fall back to pkill on common dev-server commands
+const pkillPatterns = [`next dev --port ${port}`];
+
+for (const pattern of pkillPatterns) {
+  try {
+    execSync(`pkill -f "${pattern}"`, { stdio: 'ignore' });
+    console.log(`🔫 pkill -f "${pattern}" executed (may be no-op if none running).`);
+  } catch (error) {
+    // pkill non-zero exit means nothing matched or an error; log and continue
+    console.warn(
+      `⚠️  pkill -f "${pattern}" returned ${error.status ?? 'unknown'} (${error.message.trim()}). Continuing.`
+    );
+  }
+}
+
+console.log('✅ Zombie cleanup complete.');
