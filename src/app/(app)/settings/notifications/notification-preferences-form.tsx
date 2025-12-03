@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState, useEffect } from "react";
-import { Button } from "~/components/ui/button";
+import { SaveCancelButtons } from "~/components/save-cancel-buttons";
 import { Switch } from "~/components/ui/switch";
 import { Label } from "~/components/ui/label";
 import {
@@ -19,10 +19,20 @@ interface NotificationPreferencesFormProps {
 export function NotificationPreferencesForm({
   preferences,
 }: NotificationPreferencesFormProps): React.JSX.Element {
-  const [state, formAction] = useActionState<
+  const [state, formAction, isPending] = useActionState<
     UpdatePreferencesResult | undefined,
     FormData
   >(updateNotificationPreferencesAction, undefined);
+
+  // Control visibility of feedback (flash message and button state)
+  const [showFeedback, setShowFeedback] = useState(false);
+
+  // Show feedback when state updates
+  useEffect(() => {
+    if (state) {
+      setShowFeedback(true);
+    }
+  }, [state]);
 
   // Client-side state for main switches to control disabled state of other inputs
   const [emailMainEnabled, setEmailMainEnabled] = useState(
@@ -38,9 +48,17 @@ export function NotificationPreferencesForm({
     setInAppMainEnabled(preferences.inAppEnabled);
   }, [preferences.emailEnabled, preferences.inAppEnabled]);
 
+  // Reset key to force re-render on cancel
+  const [resetKey, setResetKey] = useState(0);
+
   return (
-    <form action={formAction} className="space-y-8">
-      {state && (
+    <form
+      key={resetKey}
+      action={formAction}
+      className="space-y-8"
+      data-testid="notification-preferences-form"
+    >
+      {state && showFeedback && (
         <div
           className={cn(
             "rounded-md border p-4",
@@ -164,7 +182,17 @@ export function NotificationPreferencesForm({
       </div>
 
       <div className="pt-2">
-        <Button type="submit">Save Preferences</Button>
+        <SaveCancelButtons
+          isPending={isPending}
+          isSuccess={!!state?.ok && showFeedback}
+          onCancel={() => {
+            setResetKey((k) => k + 1);
+            setEmailMainEnabled(preferences.emailEnabled);
+            setInAppMainEnabled(preferences.inAppEnabled);
+            setShowFeedback(false);
+          }}
+          saveLabel="Save Preferences"
+        />
       </div>
     </form>
   );

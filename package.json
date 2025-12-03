@@ -29,6 +29,7 @@
     "preflight": "npm-run-all --silent --parallel typecheck lint:fix format:fix test check:config --sequential db:prepare:test --parallel build test:integration test:integration:supabase --sequential smoke",
     "supa:ci": "bash scripts/supa-ci.sh",
     "sync-worktrees": "bash scripts/sync-worktrees.sh",
+    "kill:zombies": "node --env-file=.env.local scripts/kill-zombies.mjs",
     "prepare": "husky"
   },
   "repository": {

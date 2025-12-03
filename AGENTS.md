@@ -112,6 +112,9 @@ Read these immediately before starting work:
 | `npm test 2>&1` | `npm test`         | Vitest treats redirection as test filters |
 | `find`          | `rg --files`, `fd` | Safer/faster search                       |
 
+> [!WARNING]
+> **ESCAPE PARENTHESES IN PATHS**: Some directories have parentheses in their names (e.g., `src/app/(app)`). You MUST escape them in shell commands (e.g., `src/app/\(app\)`). Failure to do so will cause commands to fail.
+
 ## Multi-Worktree Development Setup
 
 PinPoint uses parallel git worktrees so multiple assistants can work without stepping on each other. Each worktree runs its own Supabase instance on unique ports; changes to `supabase/config.toml` are kept local via `git update-index --skip-worktree`.

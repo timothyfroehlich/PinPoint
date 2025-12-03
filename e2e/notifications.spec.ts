@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { loginAs } from "./support/actions";
 import { seededMachines, TEST_USERS } from "./support/constants";
+import { extractIdFromUrl } from "./support/cleanup";
 
 test.describe("Notifications", () => {
   test.beforeEach(async ({ page }) => {
@@ -15,7 +16,7 @@ test.describe("Notifications", () => {
     const adminContext = await browser.newContext();
     const adminPage = await adminContext.newPage();
     await loginAs(adminPage, TEST_USERS.admin);
-    await adminPage.goto("/settings/notifications");
+    await adminPage.goto("/settings");
 
     // Ensure the toggle is checked.
     // We want to ensure In-App notifications are enabled for Owned Machines
@@ -23,6 +24,9 @@ test.describe("Notifications", () => {
     if (!(await newIssueToggle.isChecked())) {
       await newIssueToggle.check();
       await adminPage.getByRole("button", { name: "Save Preferences" }).click();
+      await expect(
+        adminPage.getByRole("button", { name: "Saved!" })
+      ).toBeVisible();
       await expect(newIssueToggle).toBeChecked();
     }
 
@@ -37,7 +41,7 @@ test.describe("Notifications", () => {
     await publicPage.goto("/report");
     await publicPage
       .getByTestId("machine-select")
-      .selectOption({ label: seededMachines.attackFromMars.name });
+      .selectOption({ value: seededMachines.attackFromMars.id });
     await publicPage.getByLabel("Issue Title").fill("Public Report Test Issue");
     await publicPage.getByLabel("Severity").selectOption("minor");
     await publicPage
@@ -71,35 +75,60 @@ test.describe("Notifications", () => {
     await page.goto("/issues/new");
     await page
       .getByTestId("machine-select")
-      .selectOption({ label: seededMachines.attackFromMars.name });
+      .selectOption({ value: seededMachines.attackFromMars.id });
+
+    // Verify selection
+    await expect(page.getByTestId("machine-select")).toHaveValue(
+      seededMachines.attackFromMars.id
+    );
+
     await page.getByLabel("Issue Title").fill("Status Change Test Issue");
     await page.getByRole("button", { name: "Report Issue" }).click();
 
+    const issueDetailUrlPattern =
+      /\/issues\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+    await expect(page).toHaveURL(issueDetailUrlPattern);
+
+    // Debug: Check for error alert if redirect doesn't happen
+    const alert = page.getByRole("alert");
+    if (await alert.isVisible()) {
+      console.log("Alert text:", await alert.textContent());
+    }
+
     // Capture Issue URL/ID
-    await expect(page).toHaveURL(/\/issues\/.+/);
     const issueUrl = page.url();
-    const issueId = issueUrl.split("/").pop();
+    const issueId = extractIdFromUrl(issueUrl);
+    if (!issueId) {
+      throw new Error(`Expected issue detail URL, received ${issueUrl}`);
+    }
+
+    page.on("console", (msg) => console.log(`BROWSER LOG: ${msg.text()}`));
+    page.on("pageerror", (err) => console.log(`BROWSER ERROR: ${err}`));
 
     // Reporter must opt-in to watch; auto-watch is disabled.
     // Explicitly enable watch so the reporter will get updates.
-    await page.reload(); // Ensure UI is fresh
+    await expect(page.getByTestId("issue-sidebar")).toBeVisible();
+    await page.reload();
+
     const watchButton = page.getByRole("button", {
-      name: "Watch",
-      exact: false,
+      name: "Watch Issue",
+      exact: true,
     });
     const unwatchButton = page.getByRole("button", {
-      name: "Unwatch",
-      exact: false,
+      name: "Unwatch Issue",
+      exact: true,
     });
 
-    await expect(page.getByTestId("issue-sidebar")).toBeVisible();
+    // Verify sidebar is present via heading
+    await expect(page.getByRole("heading", { name: "Details" })).toBeVisible();
 
+    // If we are not watching, click watch
     if (await watchButton.isVisible()) {
       await watchButton.click();
-      await expect(unwatchButton).toBeVisible();
-    } else {
-      await expect(unwatchButton).toBeVisible();
     }
+
+    // Verify we are now watching
+    await expect(unwatchButton).toBeVisible();
 
     // 2. Action: Admin (User B) changes status
     // We use a second browser context for the admin
@@ -140,12 +169,15 @@ test.describe("Notifications", () => {
     await loginAs(adminPage, TEST_USERS.admin);
 
     // 1. Setup: Enable "Watch All New Issues"
-    await adminPage.goto("/settings/notifications");
+    await adminPage.goto("/settings");
     // Use ID for the In-App switch in the Global matrix
     const globalWatchSwitch = adminPage.locator("#inAppWatchNewIssuesGlobal");
     if (!(await globalWatchSwitch.isChecked())) {
       await globalWatchSwitch.check();
       await adminPage.getByRole("button", { name: "Save Preferences" }).click();
+      await expect(
+        adminPage.getByRole("button", { name: "Saved!" })
+      ).toBeVisible();
       await expect(globalWatchSwitch).toBeChecked();
     }
 
@@ -155,7 +187,7 @@ test.describe("Notifications", () => {
     await publicPage.goto("/report");
     await publicPage
       .getByTestId("machine-select")
-      .selectOption({ label: seededMachines.medievalMadness.name });
+      .selectOption({ value: seededMachines.medievalMadness.id });
     await publicPage.getByLabel("Issue Title").fill("Global Watcher Test");
     await publicPage.getByLabel("Severity").selectOption("unplayable");
     await publicPage
@@ -190,7 +222,7 @@ test.describe("Notifications", () => {
     await page.goto("/report");
     await page
       .getByTestId("machine-select")
-      .selectOption({ label: seededMachines.attackFromMars.name });
+      .selectOption({ value: seededMachines.attackFromMars.id });
     await page.getByLabel("Issue Title").fill("Interaction Test Issue");
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
@@ -241,7 +273,7 @@ test.describe("Notifications", () => {
   test("email notification flow", async ({ page, browser }) => {
     // 1. Setup: Admin (Owner) enables Email Notifications AND In-App New Issue Notifications
     await loginAs(page, TEST_USERS.admin);
-    await page.goto("/settings/notifications");
+    await page.goto("/settings");
 
     const emailMainSwitch = page.getByLabel("Email Notifications"); // Main switch
     if (!(await emailMainSwitch.isChecked())) {
@@ -256,6 +288,7 @@ test.describe("Notifications", () => {
     }
 
     await page.getByRole("button", { name: "Save Preferences" }).click();
+    await expect(page.getByRole("button", { name: "Saved!" })).toBeVisible();
     await expect(emailMainSwitch).toBeChecked();
     await expect(inAppNewIssueSwitch).toBeChecked();
 
@@ -268,7 +301,13 @@ test.describe("Notifications", () => {
     await memberPage.goto("/report");
     await memberPage
       .getByTestId("machine-select")
-      .selectOption({ label: seededMachines.attackFromMars.name });
+      .selectOption({ value: seededMachines.attackFromMars.id });
+
+    // Verify selection
+    await expect(memberPage.getByTestId("machine-select")).toHaveValue(
+      seededMachines.attackFromMars.id
+    );
+
     await memberPage.getByLabel("Issue Title").fill("Email Test Issue");
     await memberPage
       .getByRole("button", { name: "Submit Issue Report" })
@@ -285,7 +324,14 @@ test.describe("Notifications", () => {
     await bell.click();
 
     // Admin should see "New issue reported"
-    await expect(page.getByText("New issue reported")).toBeVisible();
+    const notification = page.getByText("New issue reported");
+    if (!(await notification.isVisible())) {
+      console.log(
+        "Visible notifications:",
+        await page.locator("div[role='menuitem']").allTextContents()
+      );
+    }
+    await expect(notification).toBeVisible();
 
     await memberContext.close();
   });

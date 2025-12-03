@@ -1,8 +1,8 @@
 "use client";
 
-import type React from "react";
+import React, { useState, useEffect } from "react";
 import { useActionState } from "react";
-import { Button } from "~/components/ui/button";
+import { SaveCancelButtons } from "~/components/save-cancel-buttons";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { updateProfileAction, type UpdateProfileResult } from "./actions";
@@ -19,15 +19,33 @@ export function ProfileForm({
   lastName,
   role,
 }: ProfileFormProps): React.JSX.Element {
-  const [state, formAction] = useActionState<
+  const [state, formAction, isPending] = useActionState<
     UpdateProfileResult | undefined,
     FormData
   >(updateProfileAction, undefined);
 
+  // Control visibility of feedback (flash message and button state)
+  const [showFeedback, setShowFeedback] = useState(false);
+
+  // Show feedback when state updates
+  useEffect(() => {
+    if (state) {
+      setShowFeedback(true);
+    }
+  }, [state]);
+
+  // Reset key to force re-render on cancel
+  const [resetKey, setResetKey] = useState(0);
+
   return (
-    <form action={formAction} className="space-y-6">
+    <form
+      key={resetKey}
+      action={formAction}
+      className="space-y-6"
+      data-testid="profile-form"
+    >
       {/* Flash message */}
-      {state && (
+      {state && showFeedback && (
         <div
           className={cn(
             "rounded-md border p-4",
@@ -77,7 +95,17 @@ export function ProfileForm({
         </div>
       </div>
 
-      <Button type="submit">Update Profile</Button>
+      <div className="pt-2">
+        <SaveCancelButtons
+          isPending={isPending}
+          isSuccess={!!state?.ok && showFeedback}
+          onCancel={() => {
+            setResetKey((k) => k + 1);
+            setShowFeedback(false);
+          }}
+          saveLabel="Update Profile"
+        />
+      </div>
     </form>
   );
 }
