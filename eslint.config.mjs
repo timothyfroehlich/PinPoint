@@ -170,6 +170,14 @@ export default [
       "@typescript-eslint/explicit-function-return-type": "off",
       // Allow unused vars in tests (setup functions)
       "unused-imports/no-unused-vars": "off",
+
+      // Disable strict type checks in tests (mocking often violates these)
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/no-unsafe-return": "off",
+      "@typescript-eslint/no-unsafe-argument": "off",
+      "@typescript-eslint/unbound-method": "off",
     },
   },
   {

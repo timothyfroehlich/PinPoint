@@ -1,3 +1,8 @@
+---
+trigger: always_on
+# For Antigravity
+---
+
 # PinPoint Non‑Negotiables
 
 **Last Updated**: November 25, 2025
@@ -152,6 +157,13 @@
 - **Don't:** Use 'unsafe-inline' or 'unsafe-eval' in script-src, hardcode nonces
 - **Rationale:** Modern CSP with 'strict-dynamic' allows Next.js dynamic imports while blocking malicious scripts
 
+**CORE-SEC-005:** No hardcoded hostnames or ports
+
+- **Severity:** Critical
+- **Why:** Prevents environment mismatches and "whack-a-mole" configuration bugs
+- **Do:** Use `NEXT_PUBLIC_SITE_URL` and `PORT` environment variables
+- **Don't:** Hardcode `localhost:3000` or specific domains in source code or tests
+
 ---
 
 ## Performance & Caching
@@ -195,6 +207,13 @@
 - **Do:** Reference `docs/TESTING_PLAN.md` for test types and placement
 - **Don't:** Mix test types or create per-test database instances
 
+**CORE-TEST-004:** Prefer Integration Tests for DB Logic
+
+- **Severity:** Required
+- **Why:** Mocking Drizzle/DB clients leads to brittle, over-mocked tests that don't verify actual behavior
+- **Do:** Use integration tests (with PGlite) for service layer logic that primarily interacts with the database
+- **Don't:** Write unit tests that require extensive mocking of `db.query`, `db.transaction`, or method chains
+
 ---
 
 ## Architecture
@@ -212,13 +231,6 @@
 - **Why:** Forms work without JavaScript
 - **Do:** Use Server Actions with `<form action={serverAction}>`
 - **Don't:** Require client-side JavaScript for core functionality
-
-**CORE-ARCH-003:** Direct database queries
-
-- **Severity:** Required
-- **Why:** Simplicity for single-tenant architecture
-- **Do:** Query Drizzle directly in Server Components and Server Actions
-- **Don't:** Create DAL/repository/service layers (premature abstraction)
 
 **CORE-ARCH-004:** Issues always per-machine
 

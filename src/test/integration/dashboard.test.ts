@@ -32,8 +32,8 @@ describe("Dashboard Queries (PGlite)", () => {
       const db = await getTestDb();
 
       // Create users
-      const user1 = createTestUser({ name: "User 1" });
-      const user2 = createTestUser({ name: "User 2" });
+      const user1 = createTestUser({ firstName: "User", lastName: "1" });
+      const user2 = createTestUser({ firstName: "User", lastName: "2" });
       const [testUser1] = await db
         .insert(userProfiles)
         .values(user1)
@@ -70,7 +70,6 @@ describe("Dashboard Queries (PGlite)", () => {
       ]);
 
       // Query assigned issues for user1 (dashboard query pattern)
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const assignedIssues = await db.query.issues.findMany({
         where: and(
           eq(issues.assignedTo, testUser1.id),
@@ -89,7 +88,6 @@ describe("Dashboard Queries (PGlite)", () => {
 
       // Should only return 1 open issue for user1
       expect(assignedIssues).toHaveLength(1);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect(assignedIssues[0].title).toBe("Issue 1 for User 1");
     });
 
@@ -99,7 +97,6 @@ describe("Dashboard Queries (PGlite)", () => {
       const userId = randomUUID();
 
       // Query with no data
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const assignedIssues = await db.query.issues.findMany({
         where: and(
           eq(issues.assignedTo, userId),
@@ -116,7 +113,10 @@ describe("Dashboard Queries (PGlite)", () => {
       const db = await getTestDb();
 
       // Create user and machine
-      const testUser = createTestUser({ name: "Reporter" });
+      const testUser = createTestUser({
+        firstName: "Reporter",
+        lastName: "User",
+      });
       const [user] = await db.insert(userProfiles).values(testUser).returning();
 
       const testMachine = createTestMachine();
@@ -136,7 +136,6 @@ describe("Dashboard Queries (PGlite)", () => {
       await db.insert(issues).values(issuesData);
 
       // Query recent issues (dashboard query pattern)
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const recentIssues = await db.query.issues.findMany({
         orderBy: desc(issues.createdAt),
         limit: 10,
@@ -158,9 +157,7 @@ describe("Dashboard Queries (PGlite)", () => {
 
       // Should return exactly 10 (most recent)
       expect(recentIssues).toHaveLength(10);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect(recentIssues[0].title).toBe("Issue 12"); // Most recent
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect(recentIssues[9].title).toBe("Issue 3"); // 10th most recent
     });
   });
@@ -204,7 +201,6 @@ describe("Dashboard Queries (PGlite)", () => {
       );
 
       // Query all machines with issues (dashboard query pattern)
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const allMachines = await db.query.machines.findMany({
         with: {
           issues: {
@@ -217,8 +213,6 @@ describe("Dashboard Queries (PGlite)", () => {
         },
       });
 
-      // Filter to unplayable machines
-      /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
       const unplayableMachines = allMachines
         .map((machine) => {
           const status = deriveMachineStatus(
@@ -237,13 +231,10 @@ describe("Dashboard Queries (PGlite)", () => {
           };
         })
         .filter((machine) => machine.status === "unplayable");
-      /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 
       // Should only return machine1
       expect(unplayableMachines).toHaveLength(1);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect(unplayableMachines[0].name).toBe("Unplayable Machine");
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       expect(unplayableMachines[0].unplayableIssuesCount).toBe(1);
     });
   });
@@ -319,7 +310,6 @@ describe("Dashboard Queries (PGlite)", () => {
       // Machine 4: no issues (operational)
 
       // Query all machines with issues (dashboard query pattern)
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const allMachines = await db.query.machines.findMany({
         with: {
           issues: {
@@ -332,12 +322,10 @@ describe("Dashboard Queries (PGlite)", () => {
       });
 
       // Calculate machines needing service
-      /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
       const machinesNeedingService = allMachines.filter((machine) => {
         const status = deriveMachineStatus(machine.issues as IssueForStatus[]);
         return status !== "operational";
       }).length;
-      /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 
       expect(machinesNeedingService).toBe(2); // machine1 and machine2
     });
@@ -373,7 +361,6 @@ describe("Dashboard Queries (PGlite)", () => {
       ]);
 
       // Query assigned issues count (dashboard pattern)
-      /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
       const assignedIssues = await db.query.issues.findMany({
         where: and(
           eq(issues.assignedTo, user.id),
@@ -382,7 +369,6 @@ describe("Dashboard Queries (PGlite)", () => {
       });
 
       const myIssuesCount = assignedIssues.length;
-      /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 
       expect(myIssuesCount).toBe(2); // Only open issues
     });

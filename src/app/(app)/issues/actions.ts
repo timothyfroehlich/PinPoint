@@ -12,8 +12,7 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { issues, userProfiles, issueComments } from "~/server/db/schema";
-import { createTimelineEvent } from "~/lib/timeline/events";
+import { issues } from "~/server/db/schema";
 import { log } from "~/lib/logger";
 import {
   createIssueSchema,
@@ -24,6 +23,16 @@ import {
   addCommentSchema,
 } from "./schemas";
 import { type Result, ok, err } from "~/lib/result";
+import {
+  createIssue,
+  updateIssueStatus,
+  addIssueComment,
+  assignIssue,
+  updateIssueSeverity,
+  updateIssuePriority,
+} from "~/services/issues";
+import { canUpdateIssue } from "~/lib/permissions";
+import { userProfiles } from "~/server/db/schema";
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
 
@@ -120,35 +129,16 @@ export async function createIssueAction(
 
   const { title, description, machineId, severity, priority } = validation.data;
 
-  // Create issue (direct Drizzle query - no DAL)
+  // Create issue via service
   try {
-    const [issue] = await db
-      .insert(issues)
-      .values({
-        title,
-        description: description ?? null,
-        machineId,
-        severity,
-        priority,
-        reportedBy: user.id,
-        status: "new",
-      })
-      .returning();
-
-    if (!issue) throw new Error("Issue creation failed");
-
-    // Create timeline event for issue creation
-    await createTimelineEvent(issue.id, "Issue created");
-
-    log.info(
-      {
-        issueId: issue.id,
-        machineId,
-        reportedBy: user.id,
-        action: "createIssue",
-      },
-      "Issue created successfully"
-    );
+    const issue = await createIssue({
+      title,
+      description: description ?? null,
+      machineId,
+      severity,
+      priority,
+      reportedBy: user.id,
+    });
 
     revalidatePath("/issues");
     revalidatePath(`/machines/${machineId}`);
@@ -209,36 +199,48 @@ export async function updateIssueStatusAction(
     // Get current issue to check old status
     const currentIssue = await db.query.issues.findFirst({
       where: eq(issues.id, issueId),
-      columns: { status: true, machineId: true },
+      columns: {
+        status: true,
+        machineId: true,
+        reportedBy: true,
+        assignedTo: true,
+      },
+      with: {
+        machine: {
+          columns: { ownerId: true },
+        },
+      },
     });
 
     if (!currentIssue) {
       return err("NOT_FOUND", "Issue not found");
     }
 
-    const oldStatus = currentIssue.status;
+    // Permission check
+    const userProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true },
+    });
+
+    if (
+      !canUpdateIssue(
+        { id: user.id, role: userProfile?.role ?? "guest" },
+        currentIssue,
+        currentIssue.machine
+      )
+    ) {
+      return err(
+        "UNAUTHORIZED",
+        "You do not have permission to update this issue"
+      );
+    }
 
     // Update status
-    await db
-      .update(issues)
-      .set({
-        status,
-        updatedAt: new Date(),
-        // Set resolvedAt if status is resolved
-        ...(status === "resolved" && { resolvedAt: new Date() }),
-      })
-      .where(eq(issues.id, issueId));
-
-    // Create timeline event
-    await createTimelineEvent(
+    await updateIssueStatus({
       issueId,
-      `Status changed from ${oldStatus} to ${status}`
-    );
-
-    log.info(
-      { issueId, oldStatus, newStatus: status, action: "updateIssueStatus" },
-      "Issue status updated"
-    );
+      status,
+      userId: user.id,
+    });
 
     revalidatePath(`/issues/${issueId}`);
     revalidatePath("/issues");
@@ -299,39 +301,47 @@ export async function updateIssueSeverityAction(
     // Get current issue to check old severity
     const currentIssue = await db.query.issues.findFirst({
       where: eq(issues.id, issueId),
-      columns: { severity: true, machineId: true },
+      columns: {
+        severity: true,
+        machineId: true,
+        reportedBy: true,
+        assignedTo: true,
+      },
+      with: {
+        machine: {
+          columns: { ownerId: true },
+        },
+      },
     });
 
     if (!currentIssue) {
       return err("NOT_FOUND", "Issue not found");
     }
 
-    const oldSeverity = currentIssue.severity;
+    // Permission check
+    const userProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true },
+    });
+
+    if (
+      !canUpdateIssue(
+        { id: user.id, role: userProfile?.role ?? "guest" },
+        currentIssue,
+        currentIssue.machine
+      )
+    ) {
+      return err(
+        "UNAUTHORIZED",
+        "You do not have permission to update this issue"
+      );
+    }
 
     // Update severity
-    await db
-      .update(issues)
-      .set({
-        severity,
-        updatedAt: new Date(),
-      })
-      .where(eq(issues.id, issueId));
-
-    // Create timeline event
-    await createTimelineEvent(
+    await updateIssueSeverity({
       issueId,
-      `Severity changed from ${oldSeverity} to ${severity}`
-    );
-
-    log.info(
-      {
-        issueId,
-        oldSeverity,
-        newSeverity: severity,
-        action: "updateIssueSeverity",
-      },
-      "Issue severity updated"
-    );
+      severity,
+    });
 
     revalidatePath(`/issues/${issueId}`);
     revalidatePath("/issues");
@@ -393,39 +403,47 @@ export async function updateIssuePriorityAction(
     // Get current issue to check old priority
     const currentIssue = await db.query.issues.findFirst({
       where: eq(issues.id, issueId),
-      columns: { priority: true, machineId: true },
+      columns: {
+        priority: true,
+        machineId: true,
+        reportedBy: true,
+        assignedTo: true,
+      },
+      with: {
+        machine: {
+          columns: { ownerId: true },
+        },
+      },
     });
 
     if (!currentIssue) {
       return err("NOT_FOUND", "Issue not found");
     }
 
-    const oldPriority = currentIssue.priority;
+    // Permission check
+    const userProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true },
+    });
+
+    if (
+      !canUpdateIssue(
+        { id: user.id, role: userProfile?.role ?? "guest" },
+        currentIssue,
+        currentIssue.machine
+      )
+    ) {
+      return err(
+        "UNAUTHORIZED",
+        "You do not have permission to update this issue"
+      );
+    }
 
     // Update priority
-    await db
-      .update(issues)
-      .set({
-        priority,
-        updatedAt: new Date(),
-      })
-      .where(eq(issues.id, issueId));
-
-    // Create timeline event
-    await createTimelineEvent(
+    await updateIssuePriority({
       issueId,
-      `Priority changed from ${oldPriority} to ${priority}`
-    );
-
-    log.info(
-      {
-        issueId,
-        oldPriority,
-        newPriority: priority,
-        action: "updateIssuePriority",
-      },
-      "Issue priority updated"
-    );
+      priority,
+    });
 
     revalidatePath(`/issues/${issueId}`);
     revalidatePath("/issues");
@@ -488,10 +506,10 @@ export async function assignIssueAction(
     // Get current issue
     const currentIssue = await db.query.issues.findFirst({
       where: eq(issues.id, issueId),
-      columns: { machineId: true },
+      columns: { machineId: true, reportedBy: true, assignedTo: true },
       with: {
-        assignedToUser: {
-          columns: { name: true },
+        machine: {
+          columns: { ownerId: true },
         },
       },
     });
@@ -500,35 +518,31 @@ export async function assignIssueAction(
       return err("NOT_FOUND", "Issue not found");
     }
 
-    // Get new assignee name if assigning to someone
-    let assigneeName = "Unassigned";
-    if (assignedTo) {
-      const assignee = await db.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, assignedTo),
-        columns: { name: true },
-      });
-      assigneeName = assignee?.name ?? "Unknown User";
+    // Permission check
+    const userProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true },
+    });
+
+    if (
+      !canUpdateIssue(
+        { id: user.id, role: userProfile?.role ?? "guest" },
+        currentIssue,
+        currentIssue.machine
+      )
+    ) {
+      return err(
+        "UNAUTHORIZED",
+        "You do not have permission to update this issue"
+      );
     }
 
-    // Update assignment
-    await db
-      .update(issues)
-      .set({
-        assignedTo,
-        updatedAt: new Date(),
-      })
-      .where(eq(issues.id, issueId));
-
-    // Create timeline event
-    const eventMessage = assignedTo
-      ? `Assigned to ${assigneeName}`
-      : "Unassigned";
-    await createTimelineEvent(issueId, eventMessage);
-
-    log.info(
-      { issueId, assignedTo, assigneeName, action: "assignIssue" },
-      "Issue assignment updated"
-    );
+    // Assign issue via service
+    await assignIssue({
+      issueId,
+      assignedTo,
+      actorId: user.id,
+    });
 
     revalidatePath(`/issues/${issueId}`);
     revalidatePath("/issues");
@@ -581,11 +595,10 @@ export async function addCommentAction(
   const { issueId, comment } = validation.data;
 
   try {
-    await db.insert(issueComments).values({
+    await addIssueComment({
       issueId,
-      authorId: user.id,
       content: comment,
-      isSystem: false,
+      userId: user.id,
     });
   } catch (error) {
     log.error(

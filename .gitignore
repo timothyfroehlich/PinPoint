@@ -77,6 +77,7 @@ node_modules/
 # Supabase
 supabase/.temp/
 supabase/.branches/
+supabase/config.toml.bak.*
 
 # Archived v1 test artifacts and build caches
 # (should have been ignored in v1, preventing future similar issues)
@@ -94,6 +95,7 @@ worktrees/
 *-errors.json
 *-report.json
 *-output.log
+test-output-*.txt
 typescript-output.log
 eslint-test-output.log
 eslint-prod-errors.json
@@ -118,3 +120,9 @@ PROJECT_INDEX.json
 .claude/recycle_bin/
 .playwright-mcp/
 logs_result.json
+
+# Agent Artifacts
+walkthrough.md
+implementation_plan.md
+task.md
+planning_task.md

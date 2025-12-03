@@ -50,9 +50,7 @@ export default async function IssueDetailPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) throw new Error("Unauthorized");
 
   // Get params (Next.js 16: params is a Promise)
   const { issueId } = await params;
@@ -92,6 +90,9 @@ export default async function IssueDetailPage({
               },
             },
           },
+        },
+        watchers: {
+          columns: { userId: true },
         },
       },
     });
@@ -177,7 +178,11 @@ export default async function IssueDetailPage({
         </section>
 
         {/* Sticky Sidebar */}
-        <IssueSidebar issue={issue} allUsers={allUsers} />
+        <IssueSidebar
+          issue={issue}
+          allUsers={allUsers}
+          currentUserId={user.id}
+        />
       </div>
     </PageShell>
   );

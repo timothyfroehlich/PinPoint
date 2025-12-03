@@ -1,155 +1,237 @@
 /**
- * Mailpit email testing helpers
+ * Mailpit email testing utilities for E2E tests
  *
- * Mailpit is configured in supabase/config.toml and runs on a worktree-specific port.
- * It captures all emails sent by Supabase during local development.
- *
- * Port Configuration (via MAILPIT_PORT environment variable):
- * - Main: 54324
- * - Secondary: 55324
- * - Review: 56324
- * - AntiGravity: 57324
+ * Supabase now ships Mailpit under the legacy "inbucket" section name.
+ * We prefer MAILPIT_* env vars but keep INBUCKET_* as a compatibility alias.
  */
 
-/// <reference lib="dom" />
-
-const MAILPIT_PORT = Number(process.env.MAILPIT_PORT ?? "54324");
-const MAILPIT_URL = `http://localhost:${MAILPIT_PORT}`;
+interface MailpitRecipient {
+  Name?: string;
+  Address: string;
+}
 
 interface MailpitMessage {
   ID: string;
-  From: { Address: string };
-  To: { Address: string }[];
   Subject: string;
-  Created: string;
-  Size: number;
-  Snippet: string;
+  To: MailpitRecipient[];
+  From?: MailpitRecipient;
+  Date?: string;
+  // Convenience normalized fields for tests
+  id?: string;
+  subject?: string;
+  to?: string[];
 }
 
-interface MailpitMessagesResponse {
-  total: number;
-  messages?: MailpitMessage[];
-}
+type MailpitMessageDetail = MailpitMessage & {
+  HTML?: string;
+  Text?: string;
+};
 
-interface MailpitMessageBody {
-  HTML: string;
-  Text: string;
-}
+export class MailpitClient {
+  public readonly apiUrl: string;
 
-/**
- * Get all messages for a specific email address with retry logic
- *
- * Handles cases when no messages exist yet (before first email arrives).
- * Retries with exponential backoff: 500ms, 1s, 1.5s, 2s, 2.5s
- */
-export async function getMessages(
-  email: string,
-  retries = 5
-): Promise<MailpitMessage[]> {
-  for (let attempt = 0; attempt < retries; attempt++) {
-    const response = await fetch(`${MAILPIT_URL}/api/v1/messages`);
+  constructor() {
+    const port =
+      process.env.MAILPIT_PORT ?? process.env.INBUCKET_PORT ?? "54324";
+    this.apiUrl = `http://127.0.0.1:${port}/api/v1`;
+  }
+
+  /**
+   * Get all messages for a mailbox
+   */
+  async getMessages(email: string): Promise<MailpitMessage[]> {
+    const response = await fetch(
+      `${this.apiUrl}/messages?query=addressed:"${email}"`
+    );
+    if (!response.ok) {
+      if (response.status === 404) {
+        return []; // Tolerate 404 as empty mailbox
+      }
+      throw new Error(
+        `Failed to fetch messages: ${response.status} ${response.statusText}`
+      );
+    }
+
+    const data = (await response.json()) as
+      | { messages: MailpitMessage[] }
+      | MailpitMessage[]
+      | { items: MailpitMessage[] };
+
+    const list: MailpitMessage[] = Array.isArray(data)
+      ? data
+      : "messages" in data
+        ? data.messages
+        : "items" in data
+          ? data.items
+          : [];
+
+    return list.map((msg) => ({
+      ...msg,
+      id: msg.ID,
+      subject: msg.Subject,
+      to: msg.To.map((r) => r.Address),
+    }));
+  }
+
+  /**
+   * Get a specific message by ID
+   */
+  async getMessage(
+    email: string,
+    messageId: string
+  ): Promise<MailpitMessageDetail> {
+    const response = await fetch(`${this.apiUrl}/message/${messageId}`);
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch message ${messageId}: ${response.statusText}`
+      );
+    }
+
+    const detail = (await response.json()) as MailpitMessageDetail;
+    return {
+      ...detail,
+      id: detail.ID,
+      subject: detail.Subject,
+      to: detail.To.map((r) => r.Address),
+    };
+  }
+
+  /**
+   * Wait for an email matching criteria to arrive
+   */
+  async waitForEmail(
+    email: string,
+    criteria: {
+      subject?: string;
+      subjectContains?: string;
+      timeout?: number;
+      pollIntervalMs?: number;
+    } = {}
+  ): Promise<MailpitMessage | null> {
+    const timeout = criteria.timeout ?? 10000; // 10 seconds default
+    const interval = criteria.pollIntervalMs ?? 500;
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < timeout) {
+      const messages = await this.getMessages(email);
+
+      const match = messages.find((msg) => {
+        if (criteria.subject && msg.Subject !== criteria.subject) {
+          return false;
+        }
+        if (
+          criteria.subjectContains &&
+          !msg.Subject.includes(criteria.subjectContains)
+        ) {
+          return false;
+        }
+        return true;
+      });
+
+      if (match) {
+        return match;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, interval));
+    }
+
+    return null;
+  }
+
+  /**
+   * Extract password reset link from the latest email for a mailbox
+   */
+  async getPasswordResetLink(email: string): Promise<string> {
+    const latest =
+      (await this.waitForEmail(email, {
+        subjectContains: "Reset",
+        timeout: 30000,
+        pollIntervalMs: 750,
+      })) ??
+      (await this.waitForEmail(email, {
+        timeout: 30000,
+        pollIntervalMs: 750,
+      }));
+
+    if (!latest) {
+      throw new Error(`No messages found for ${email}`);
+    }
+
+    const detail = await this.getMessage(email, latest.ID);
+    const html = (detail.HTML ?? detail.Text ?? "").toString();
+    const match = PASSWORD_RESET_LINK_REGEX.exec(html);
+    if (!match?.[1]) {
+      throw new Error("Password reset link not found in email body");
+    }
+    return decodeHtmlEntities(match[1]);
+  }
+
+  /**
+   * Delete all messages for a specific email
+   */
+  async clearMailbox(email: string): Promise<void> {
+    // Mailpit does not support mailbox-scoped delete; use global delete for test isolation.
+    await this.deleteAllMessages();
+  }
+
+  /**
+   * Delete a specific message by ID
+   */
+  async deleteMessage(messageId: string): Promise<void> {
+    const response = await fetch(`${this.apiUrl}/message/${messageId}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      throw new Error(
+        `Failed to delete message ${messageId}: ${response.status} ${response.statusText}`
+      );
+    }
+  }
+
+  /**
+   * Delete all messages across all mailboxes
+   */
+  async deleteAllMessages(): Promise<void> {
+    const response = await fetch(`${this.apiUrl}/messages`, {
+      method: "DELETE",
+    });
 
     if (!response.ok) {
-      // If API call fails, wait and retry
-      if (attempt < retries - 1) {
-        await new Promise((resolve) =>
-          setTimeout(resolve, 500 * (attempt + 1))
-        );
-        continue;
-      }
-      // Last attempt failed, return empty array
-      return [];
-    }
-
-    const data = (await response.json()) as MailpitMessagesResponse;
-
-    // Filter messages for this email address
-    const filtered = (data.messages ?? []).filter((msg) =>
-      msg.To.some((recipient) => recipient.Address === email)
-    );
-
-    // If we found messages, return them
-    if (filtered.length > 0) {
-      return filtered;
-    }
-
-    // No messages yet, retry
-    if (attempt < retries - 1) {
-      await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+      throw new Error(
+        `Failed to clear all messages: ${response.status} ${response.statusText}`
+      );
     }
   }
-
-  return [];
 }
 
-/**
- * Get a specific message body by ID
- */
-export async function getMessageBody(
-  messageId: string
-): Promise<MailpitMessageBody> {
-  const response = await fetch(`${MAILPIT_URL}/api/v1/message/${messageId}`);
+const PASSWORD_RESET_LINK_REGEX = /href="([^"]*\/auth\/v1\/verify[^"]*)"/i;
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch Mailpit message body: ${response.status}`);
+const decodeHtmlEntities = (text: string): string =>
+  text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+
+const mailpitClient = new MailpitClient();
+
+export const deleteAllMessages = async (email?: string): Promise<void> => {
+  if (email) {
+    await mailpitClient.clearMailbox(email);
+    return;
   }
+  await mailpitClient.deleteAllMessages();
+};
 
-  return (await response.json()) as MailpitMessageBody;
-}
+export const getPasswordResetLink = async (email: string): Promise<string> =>
+  mailpitClient.getPasswordResetLink(email);
 
-/**
- * Extract password reset link from Supabase email with retry logic
- *
- * Returns the full URL including token and type parameters.
- * Retries up to 6 times with exponential backoff: 500ms, 1s, 2s, 4s, 8s, 16s (~31.5s max wait total).
- */
-export async function getPasswordResetLink(
-  email: string
-): Promise<string | null> {
-  // Try up to 6 times with exponential backoff: 500ms * 2^attempt
-  for (let attempt = 0; attempt < 6; attempt++) {
-    const messages = await getMessages(email);
-
-    // Find the password reset email
-    const resetEmail = messages.find((msg) =>
-      msg.Subject.toLowerCase().includes("reset")
-    );
-
-    if (resetEmail) {
-      // Get the message body
-      const body = await getMessageBody(resetEmail.ID);
-
-      // Extract the Supabase verification link (contains redirect_to to our callback)
-      const linkRegex = /href="([^"]*\/auth\/v1\/verify[^"]*)"/i;
-      const linkMatch = linkRegex.exec(body.HTML);
-
-      if (linkMatch?.[1]) {
-        // Decode HTML entities (e.g., &amp; -> &)
-        return linkMatch[1]
-          .replace(/&amp;/g, "&")
-          .replace(/&lt;/g, "<")
-          .replace(/&gt;/g, ">")
-          .replace(/&quot;/g, '"')
-          .replace(/&#39;/g, "'");
-      }
-    }
-
-    // Exponential backoff: 500ms * 2^attempt (500ms, 1s, 2s, 4s, 8s, 16s)
-    if (attempt < 5) {
-      const waitTime = 500 * Math.pow(2, attempt);
-      await new Promise((resolve) => setTimeout(resolve, waitTime));
-    }
-  }
-
-  return null;
-}
-
-/**
- * Delete all messages for an email address (cleanup)
- */
-export async function deleteAllMessages(email: string): Promise<void> {
-  // Mailpit uses DELETE /api/v1/messages to delete all messages
-  await fetch(`${MAILPIT_URL}/api/v1/messages`, {
-    method: "DELETE",
-  });
-}
+export const waitForEmail = async (
+  email: string,
+  criteria: {
+    subject?: string;
+    subjectContains?: string;
+    timeout?: number;
+  } = {}
+) => mailpitClient.waitForEmail(email, criteria);

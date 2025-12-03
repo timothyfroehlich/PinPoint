@@ -182,7 +182,11 @@ jobs:
         run: npm ci
 
       - name: Run unit tests
-        run: npm test -- --reporter=verbose
+        run: |
+          set -a
+          source .env.ci
+          set +a
+          npm test -- --reporter=verbose
 
   test-integration:
     name: Integration Tests

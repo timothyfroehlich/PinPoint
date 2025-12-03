@@ -54,6 +54,7 @@ export function CreateIssueForm({
             defaultValue={prefilledMachineId ?? machines[0]?.id ?? ""}
             required
             className="w-full rounded-md border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface"
+            data-testid="machine-select"
           >
             {prefilledMachineId == null && !machines.length && (
               <option value="" disabled>

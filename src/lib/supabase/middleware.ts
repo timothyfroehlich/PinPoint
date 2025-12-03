@@ -53,14 +53,29 @@ export async function updateSession(
 
   // IMPORTANT: DO NOT REMOVE - This refreshes the auth token
   // Without this call, sessions will expire and users will be randomly logged out
-  // Trigger token refresh; result unused intentionally
   const {
-    data: { user: _user },
-    error: _error,
+    data: { user },
   } = await supabase.auth.getUser();
 
-  // MVP: No route protection in middleware
-  // Auth checks happen in Server Components/Actions as needed
+  // Protected routes logic
+  const path = request.nextUrl.pathname;
+  const isPublic =
+    path === "/" ||
+    path.startsWith("/login") ||
+    path.startsWith("/signup") ||
+    path.startsWith("/forgot-password") ||
+    path.startsWith("/reset-password") ||
+    path.startsWith("/auth") ||
+    path.startsWith("/report") ||
+    path.startsWith("/api");
+
+  if (!user && !isPublic) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    // Preserve original destination
+    url.searchParams.set("next", path);
+    return NextResponse.redirect(url);
+  }
 
   return supabaseResponse;
 }

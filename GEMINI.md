@@ -11,6 +11,7 @@ ALWAYS DETERMINE IF YOU SHOULD READ ANY OF THE FILES IN `/docs` BEFORE BEGINNING
 
 ### Essential Documentation (Auto-Load)
 
-- **@docs/NON_NEGOTIABLES.md** - Static analysis patterns
-- **@docs/TYPESCRIPT_STRICTEST_PATTERNS.md** - Type safety patterns
-- **@package.json** - Available scripts, dependencies, and project configuration
+- @AGENTS.md - Agent Guidelines
+- @docs/NON_NEGOTIABLES.md - Static analysis patterns
+- @docs/TYPESCRIPT_STRICTEST_PATTERNS.md - Type safety patterns
+- @package.json - Available scripts, dependencies, and project configuration

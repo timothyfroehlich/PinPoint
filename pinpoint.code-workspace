@@ -5,30 +5,30 @@
   "folders": [
     {
       "path": ".",
-      "name": "PinPoint (Main - 3000)"
+      "name": "PinPoint (Main - 3000)",
     },
     {
       "path": "../PinPoint-Secondary",
-      "name": "PinPoint (Secondary - 3100)"
+      "name": "PinPoint (Secondary - 3100)",
     },
     {
       "path": "../PinPoint-review",
-      "name": "PinPoint (Review - 3200)"
+      "name": "PinPoint (Review - 3200)",
     },
     {
       "path": "../PinPoint-AntiGravity",
-      "name": "PinPoint (AntiGravity - 3300)"
-    }
+      "name": "PinPoint (AntiGravity - 3300)",
+    },
   ],
   "settings": {
     "files.exclude": {
       "**/node_modules": true,
-      "**/.next": true
+      "**/.next": true,
     },
     "search.exclude": {
       "**/node_modules": true,
       "**/.next": true,
-      "**/coverage": true
-    }
-  }
+      "**/coverage": true,
+    },
+  },
 }

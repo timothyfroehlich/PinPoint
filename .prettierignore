@@ -30,3 +30,6 @@ yarn.lock
 # Coverage reports
 coverage/
 .nyc_output/
+
+# Claude
+.claude/

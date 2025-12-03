@@ -41,19 +41,36 @@ export function SignupForm(): React.JSX.Element {
         </div>
       )}
 
-      {/* Name */}
-      <div className="space-y-2">
-        <Label htmlFor="name">Name</Label>
-        <Input
-          id="name"
-          name="name"
-          type="text"
-          placeholder="Your name"
-          autoComplete="name"
-          required
-          maxLength={100}
-          className="bg-surface-variant"
-        />
+      <div className="grid grid-cols-2 gap-4">
+        {/* First Name */}
+        <div className="space-y-2">
+          <Label htmlFor="firstName">First Name</Label>
+          <Input
+            id="firstName"
+            name="firstName"
+            type="text"
+            placeholder="Jane"
+            autoComplete="given-name"
+            required
+            maxLength={50}
+            className="bg-surface-variant"
+          />
+        </div>
+
+        {/* Last Name */}
+        <div className="space-y-2">
+          <Label htmlFor="lastName">Last Name</Label>
+          <Input
+            id="lastName"
+            name="lastName"
+            type="text"
+            placeholder="Doe"
+            autoComplete="family-name"
+            required
+            maxLength={50}
+            className="bg-surface-variant"
+          />
+        </div>
       </div>
 
       {/* Email */}

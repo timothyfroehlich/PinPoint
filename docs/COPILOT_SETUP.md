@@ -80,7 +80,7 @@ All instructions emphasize **single-tenant simplicity**:
 ### Direct Data Access
 
 - Query Drizzle directly from Server Components
-- No DAL/repository/service layers (until Rule of Three)
+  // Service layers are allowed when they simplify multi-step workflows; keep them thin.
 - Server Actions for mutations
 
 ### Strict TypeScript

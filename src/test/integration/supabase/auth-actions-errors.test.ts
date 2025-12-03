@@ -31,7 +31,8 @@ vi.mock("next/navigation", () => ({
 vi.mock("next/headers", () => ({
   headers: vi.fn(() => ({
     get: vi.fn((header: string) => {
-      if (header === "host") return "localhost:3000";
+      const port = process.env.PORT ?? "3000";
+      if (header === "host") return `localhost:${port}`;
       if (header === "x-forwarded-proto") return "http";
       return null;
     }),
