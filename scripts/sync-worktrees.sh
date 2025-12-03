@@ -988,49 +988,74 @@ main() {
 
   print_status info "Running pre-flight checks..."
 
-  # 1. Stop all Supabase instances to avoid port conflicts
-  print_status info "Stopping all Supabase instances..."
-  if [ "$DRY_RUN" = true ]; then
-    echo "[DRY-RUN] Would run: supabase stop --all"
-  else
-    if supabase stop --all >/dev/null 2>&1; then
-      print_status success "All Supabase instances stopped"
-    else
-      print_status warning "No Supabase instances running or stop failed"
+  # 1. Check if Supabase instances are running - must be stopped manually
+  print_status info "Checking for running Supabase instances..."
+  if [ "$DRY_RUN" = false ]; then
+    local running_instances=$(docker ps --filter "name=supabase_" --format "{{.Names}}" 2>/dev/null)
+    if [ -n "$running_instances" ]; then
+      print_status error "Running Supabase instances detected!"
+      echo ""
+      echo "The following Supabase containers are running:"
+      echo "$running_instances"
+      echo ""
+      echo "These must be stopped before syncing to avoid port conflicts."
+      echo ""
+      echo "To fix:"
+      echo "  supabase stop --all"
+      echo ""
+      echo "Then re-run this script."
+      exit 1
     fi
+    print_status success "No Supabase instances running"
+  else
+    echo "[DRY-RUN] Would check for running Supabase instances"
   fi
 
-  # 2. Check for and clean up legacy Docker volumes
+  # 2. Check for legacy Docker volumes - must be removed manually
   if command -v docker &>/dev/null; then
     local legacy_volumes=$(docker volume ls --filter label=com.supabase.cli.project=pinpoint-v2 --format '{{.Name}}' 2>/dev/null)
     if [ -n "$legacy_volumes" ]; then
-      print_status warning "Found legacy pinpoint-v2 Docker volumes"
-      if [ "$DRY_RUN" = true ]; then
-        echo "[DRY-RUN] Would remove: $legacy_volumes"
-      else
-        if prompt_with_timeout "Remove legacy pinpoint-v2 volumes? (y/N):" "N" 10; then
-          echo "$legacy_volumes" | xargs docker volume rm 2>/dev/null
-          print_status success "Legacy volumes removed"
+      print_status warning "Found legacy pinpoint-v2 Docker volumes!"
+      echo ""
+      echo "The following legacy volumes exist:"
+      echo "$legacy_volumes"
+      echo ""
+      echo "These should be removed to avoid conflicts with 'pinpoint' project."
+      echo ""
+      echo "To fix:"
+      echo "  docker volume rm $legacy_volumes"
+      echo ""
+      if [ "$DRY_RUN" = false ]; then
+        if ! prompt_with_timeout "Continue anyway? (y/N):" "N" 10; then
+          echo "Aborting. Remove volumes and re-run."
+          exit 1
         fi
       fi
     fi
   fi
 
-  # 3. Update main worktree from origin
+  # 3. Check if main worktree needs updating
   local main_worktree=$(git worktree list | grep " \[main\]" | awk '{print $1}')
   if [ -n "$main_worktree" ] && [ -d "$main_worktree" ]; then
-    print_status info "Updating main worktree from origin..."
+    print_status info "Checking main worktree status..."
     if [ "$DRY_RUN" = true ]; then
-      echo "[DRY-RUN] Would run: cd $main_worktree && git pull origin main"
+      echo "[DRY-RUN] Would check if main is behind origin"
     else
-      local pull_output=$(git -C "$main_worktree" pull origin main 2>&1)
-      if echo "$pull_output" | grep -q "Already up to date"; then
-        print_status success "Main worktree already up to date"
-      elif echo "$pull_output" | grep -qi "error\|fatal"; then
-        print_status warning "Failed to update main worktree: $pull_output"
-      else
-        print_status success "Main worktree updated from origin"
+      git -C "$main_worktree" fetch origin >/dev/null 2>&1
+      local behind_count=$(git -C "$main_worktree" rev-list --count HEAD..origin/main 2>/dev/null || echo "0")
+      if [ "$behind_count" -gt 0 ]; then
+        print_status error "Main worktree is $behind_count commits behind origin/main!"
+        echo ""
+        echo "Main must be up-to-date before syncing other worktrees."
+        echo ""
+        echo "To fix:"
+        echo "  cd $main_worktree"
+        echo "  git pull origin main"
+        echo ""
+        echo "Then re-run this script."
+        exit 1
       fi
+      print_status success "Main worktree is up to date"
     fi
   fi
 
