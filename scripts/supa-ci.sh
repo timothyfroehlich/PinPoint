@@ -8,12 +8,15 @@ echo "Resetting Supabase database..."
 supabase db reset
 
 echo "Applying database schema..."
-npm run db:push
+npm run db:_push
+
+echo "Generating test schema..."
+npm run test:_generate-schema
 
 echo "Seeding database..."
-npm run db:seed
+npm run db:_seed
 
 echo "Seeding users..."
-npm run db:seed-users
+npm run db:_seed-users
 
 echo "Done."
