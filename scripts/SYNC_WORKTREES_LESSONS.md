@@ -38,7 +38,7 @@
    - **Problem**: After merging big features (notifications/ownership), E2E tests fail with "element not found" errors
    - **Root Cause**: Form submissions not redirecting properly - likely due to incompatible changes between branches
    - **Lesson**: Database schema was applied correctly, but application code may have conflicts
-   - **Resolution**: Need to investigate pr-567 branch changes vs main changes
+   - **Resolution**: See `E2E_FAILURES.md` in project root for detailed analysis and debugging steps
    - **Note**: This is a code compatibility issue, not a sync script issue
 
 7. **Test Schema Must Be Auto-Generated**
@@ -70,20 +70,20 @@
    - Restart Supabase after config changes
 
 3. **Post-Sync Validation**:
-   - Regenerate test schema (`npm run test:generate-schema`)
-   - Run database prepare script (`npm run db:prepare:test`)
+   - Run database reset (`npm run db:reset`)
    - Run preflight checks on critical worktrees
    - Verify E2E tests pass on main before syncing secondaries
 
 ### Script Improvements Needed
 
-1. Add `supabase stop --all` as first step
-2. Add legacy volume cleanup check
-3. Add main branch update step (git pull origin main)
+1. ✅ Add `supabase stop --all` as first step (COMPLETED)
+2. ✅ Add legacy volume cleanup check (COMPLETED)
+3. ✅ Add main branch update step (git pull origin main) (COMPLETED)
 4. Improve conflict detection - distinguish config.toml from other files
 5. Add post-merge validation option (run preflight)
 6. Add better error messages for manual conflict resolution
-7. Auto-regenerate test schema after merges (`npm run test:generate-schema`)
+7. ✅ Auto-regenerate test schema after merges (`npm run db:reset`) (COMPLETED)
+8. ✅ Reorganize database scripts for clarity (COMPLETED - see `package.json`)
 
 ### Commands Reference
 
@@ -110,6 +110,6 @@ git ls-files -v supabase/config.toml
 git checkout --ours supabase/config.toml  # Keep worktree-specific config
 git checkout --theirs src/app/**/*.ts     # Accept main changes for code
 
-# Regenerate test schema after schema changes
-npm run test:generate-schema
+# Reset database after schema/seed changes
+npm run db:reset  # Restarts Supabase, pushes schema, generates test schema, seeds data
 ```
