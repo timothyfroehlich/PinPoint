@@ -57,6 +57,8 @@ BASE_PORT_DB=54322
 BASE_PORT_SHADOW=54320
 BASE_PORT_POOLER=54329
 BASE_PORT_INBUCKET=54324
+BASE_PORT_SMTP=54325
+BASE_PORT_POP3=54326
 
 # ============================================================================
 # UTILITY FUNCTIONS
@@ -214,6 +216,9 @@ fix_config_toml() {
   local expected_db_port=$((BASE_PORT_DB + offset))
   local expected_shadow_port=$((BASE_PORT_SHADOW + offset))
   local expected_pooler_port=$((BASE_PORT_POOLER + offset))
+  local expected_inbucket_port=$((BASE_PORT_INBUCKET + offset))
+  local expected_smtp_port=$((BASE_PORT_SMTP + offset))
+  local expected_pop3_port=$((BASE_PORT_POP3 + offset))
 
   # Read current values
   local current_project_id=$(grep '^project_id =' "$config_file" | sed 's/project_id = "\(.*\)"/\1/')
@@ -221,6 +226,9 @@ fix_config_toml() {
   local current_db_port=$(sed -n '/^\[db\]/,/^\[/ { /^port = / { s/port = //p; q } }' "$config_file")
   local current_shadow_port=$(sed -n '/^\[db\]/,/^\[/ { /^shadow_port = / { s/shadow_port = //p; q } }' "$config_file")
   local current_pooler_port=$(sed -n '/^\[db\.pooler\]/,/^\[/ { /^port = / { s/port = //p; q } }' "$config_file")
+  local current_inbucket_port=$(sed -n '/^\[inbucket\]/,/^\[/ { /^port = / { s/port = //p; q } }' "$config_file")
+  local current_smtp_port=$(sed -n '/^\[inbucket\]/,/^\[/ { /^smtp_port = / { s/smtp_port = //p; q } }' "$config_file")
+  local current_pop3_port=$(sed -n '/^\[inbucket\]/,/^\[/ { /^pop3_port = / { s/pop3_port = //p; q } }' "$config_file")
 
   local changes=()
   local needs_fix=false
@@ -251,6 +259,21 @@ fix_config_toml() {
     needs_fix=true
   fi
 
+  if [ "$current_inbucket_port" != "$expected_inbucket_port" ]; then
+    changes+=("Mailpit port (config [inbucket]): $current_inbucket_port → $expected_inbucket_port")
+    needs_fix=true
+  fi
+
+  if [ "$current_smtp_port" != "$expected_smtp_port" ]; then
+    changes+=("Mailpit SMTP port (config [inbucket]): ${current_smtp_port:-<missing>} → $expected_smtp_port")
+    needs_fix=true
+  fi
+
+  if [ "$current_pop3_port" != "$expected_pop3_port" ]; then
+    changes+=("Mailpit POP3 port (config [inbucket]): ${current_pop3_port:-<missing>} → $expected_pop3_port")
+    needs_fix=true
+  fi
+
   if [ "$needs_fix" = false ]; then
     CONFIG_MESSAGES[$name]="Validated (no changes needed)"
     CONFIG_FIXED[$name]=false
@@ -275,6 +298,25 @@ fix_config_toml() {
     sed -i "/^\[db\]/,/^\[/ { /^port = / s/port = .*/port = $expected_db_port/ }" "$config_file"
     sed -i "/^\[db\]/,/^\[/ { /^shadow_port = / s/shadow_port = .*/shadow_port = $expected_shadow_port/ }" "$config_file"
     sed -i "/^\[db\.pooler\]/,/^\[/ s/^port = .*/port = $expected_pooler_port/" "$config_file"
+    sed -i "/^\[inbucket\]/,/^\[/ s/^port = .*/port = $expected_inbucket_port/" "$config_file"
+
+    # Handle SMTP port (update if exists, add if missing)
+    if grep -q "^smtp_port = " "$config_file"; then
+      sed -i "/^\[inbucket\]/,/^\[/ s/^smtp_port = .*/smtp_port = $expected_smtp_port/" "$config_file"
+    else
+      sed -i "/^\[inbucket\]/,/^\[/ { /^port = / a\\
+smtp_port = $expected_smtp_port
+}" "$config_file"
+    fi
+
+    # Handle POP3 port (update if exists, add if missing)
+    if grep -q "^pop3_port = " "$config_file"; then
+      sed -i "/^\[inbucket\]/,/^\[/ s/^pop3_port = .*/pop3_port = $expected_pop3_port/" "$config_file"
+    else
+      sed -i "/^\[inbucket\]/,/^\[/ { /^smtp_port = / a\\
+pop3_port = $expected_pop3_port
+}" "$config_file"
+    fi
   fi
 
   CONFIG_FIXED[$name]=true
@@ -294,6 +336,8 @@ fix_env_local() {
   local expected_api_port=$((BASE_PORT_API + supabase_offset))
   local expected_db_port=$((BASE_PORT_DB + supabase_offset))
   local expected_inbucket_port=$((BASE_PORT_INBUCKET + supabase_offset))
+  local expected_mailpit_smtp_port=$((BASE_PORT_SMTP + supabase_offset))
+  local expected_smtp_port=$((BASE_PORT_SMTP + supabase_offset))
   local expected_site_url="http://localhost:${expected_nextjs_port}"
 
   # Helper to set or append a key=value pair
@@ -315,8 +359,14 @@ fix_env_local() {
 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:${expected_api_port}
 DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:${expected_db_port}/postgres
 PORT=${expected_nextjs_port}
-MAILPIT_PORT=${expected_inbucket_port}
 NEXT_PUBLIC_SITE_URL=${expected_site_url}
+
+# Email Configuration
+EMAIL_TRANSPORT=smtp
+MAILPIT_PORT=${expected_inbucket_port}
+MAILPIT_SMTP_PORT=${expected_mailpit_smtp_port}
+INBUCKET_PORT=${expected_inbucket_port}
+INBUCKET_SMTP_PORT=${expected_smtp_port}
 
 # Fill these from 'supabase start' output for this worktree
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
@@ -397,9 +447,13 @@ EOF
   else
     set_or_add_var "NEXT_PUBLIC_SUPABASE_URL" "http://127.0.0.1:${expected_api_port}"
     set_or_add_var "DATABASE_URL" "postgresql://postgres:postgres@127.0.0.1:${expected_db_port}/postgres"
-    set_or_add_var "MAILPIT_PORT" "${expected_inbucket_port}"
     set_or_add_var "PORT" "${expected_nextjs_port}"
     set_or_add_var "NEXT_PUBLIC_SITE_URL" "${expected_site_url}"
+    set_or_add_var "EMAIL_TRANSPORT" "smtp"
+    set_or_add_var "MAILPIT_PORT" "${expected_inbucket_port}"
+    set_or_add_var "MAILPIT_SMTP_PORT" "${expected_mailpit_smtp_port}"
+    set_or_add_var "INBUCKET_PORT" "${expected_inbucket_port}"
+    set_or_add_var "INBUCKET_SMTP_PORT" "${expected_smtp_port}"
   fi
 
   CONFIG_MESSAGES[$name]="${CONFIG_MESSAGES[$name]} | .env.local fixed"
@@ -487,10 +541,56 @@ safe_merge_main() {
   local branch="$2"
   local name=$(get_worktree_name "$worktree_dir")
 
-  # Skip if on main or detached HEAD
-  if [ "$branch" = "main" ] || [ "$branch" = "HEAD" ]; then
-    MERGE_STATUS[$name]="skipped"
-    MERGE_MESSAGES[$name]="On main branch, no merge needed"
+  # Check if there are outstanding changes
+  local has_changes=false
+  if ! git -C "$worktree_dir" diff-index --quiet HEAD -- 2>/dev/null; then
+    has_changes=true
+  fi
+
+  # Handle detached HEAD state
+  if [ "$branch" = "HEAD" ]; then
+    if [ "$has_changes" = true ]; then
+      MERGE_STATUS[$name]="skipped"
+      MERGE_MESSAGES[$name]="Detached HEAD with outstanding changes - should be working on a branch"
+      update_overall_status "$name" "warning"
+      return 0
+    fi
+
+    # Switch to origin/main detached
+    if [ "$DRY_RUN" = true ]; then
+      echo "[DRY-RUN] Would run: git fetch origin && git checkout --detach origin/main"
+    else
+      git -C "$worktree_dir" fetch origin >/dev/null 2>&1
+      git -C "$worktree_dir" checkout --detach origin/main >/dev/null 2>&1
+    fi
+    MERGE_STATUS[$name]="detached"
+    MERGE_MESSAGES[$name]="Switched to origin/main detached"
+    return 0
+  fi
+
+  # Handle main branch
+  if [ "$branch" = "main" ]; then
+    if [ "$has_changes" = true ]; then
+      MERGE_STATUS[$name]="skipped"
+      MERGE_MESSAGES[$name]="On main with outstanding changes - should be working on a branch"
+      update_overall_status "$name" "warning"
+      return 0
+    fi
+
+    # Pull latest main
+    if [ "$DRY_RUN" = true ]; then
+      echo "[DRY-RUN] Would run: git pull"
+    else
+      local pull_output
+      pull_output=$(git -C "$worktree_dir" pull 2>&1)
+      if echo "$pull_output" | grep -q "Already up to date"; then
+        MERGE_STATUS[$name]="up-to-date"
+        MERGE_MESSAGES[$name]="Main already up to date"
+      else
+        MERGE_STATUS[$name]="pulled"
+        MERGE_MESSAGES[$name]="Main pulled successfully"
+      fi
+    fi
     return 0
   fi
 

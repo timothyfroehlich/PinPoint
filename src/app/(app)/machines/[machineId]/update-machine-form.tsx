@@ -10,16 +10,19 @@ import {
   type UpdateMachineResult,
 } from "~/app/(app)/machines/actions";
 import { cn } from "~/lib/utils";
+import { OwnerSelect } from "~/components/machines/OwnerSelect";
+import { type machines } from "~/server/db/schema";
 
 interface UpdateMachineFormProps {
-  machine: {
-    id: string;
-    name: string;
-  };
+  machine: typeof machines.$inferSelect & { owner?: { id: string } | null };
+  allUsers: { id: string; name: string }[];
+  isAdmin: boolean;
 }
 
 export function UpdateMachineForm({
   machine,
+  allUsers,
+  isAdmin,
 }: UpdateMachineFormProps): React.JSX.Element {
   const [state, formAction] = useActionState<
     UpdateMachineResult | undefined,
@@ -69,6 +72,14 @@ export function UpdateMachineForm({
           Enter the full name of the pinball machine
         </p>
       </div>
+
+      {/* Owner Select (Admin Only) */}
+      {isAdmin && (
+        <OwnerSelect
+          users={allUsers}
+          defaultValue={machine.owner?.id ?? null}
+        />
+      )}
 
       {/* Actions */}
       <div className="flex gap-3 pt-4">

@@ -1,0 +1,1 @@
+/home/froeht/Code/PinPoint-AntiGravity/docs/TYPESCRIPT_STRICTEST_PATTERNS.md

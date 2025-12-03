@@ -12,6 +12,9 @@ import type {
   machines,
   issues,
   issueComments,
+  notifications,
+  notificationPreferences,
+  issueWatchers,
 } from "~/server/db/schema";
 
 // Select types (full row from database)
@@ -31,3 +34,9 @@ export type UserRole = "guest" | "member" | "admin";
 export type IssueStatus = "new" | "in_progress" | "resolved";
 export type IssueSeverity = "minor" | "playable" | "unplayable";
 export type IssuePriority = "low" | "medium" | "high";
+
+export type Notification = InferSelectModel<typeof notifications>;
+export type NotificationPreference = InferSelectModel<
+  typeof notificationPreferences
+>;
+export type IssueWatcher = InferSelectModel<typeof issueWatchers>;

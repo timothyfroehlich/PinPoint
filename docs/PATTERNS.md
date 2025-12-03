@@ -1,3 +1,8 @@
+---
+trigger: always_on
+# For Antigravity
+---
+
 # PinPoint Code Patterns
 
 **Last Updated**: November 22, 2025
@@ -34,11 +39,14 @@
   - Playwright E2E Tests
   - Integration Tests with PGlite
   - Unit Tests
+  - Vitest Deep Mocks (vitest-mock-extended)
 - [Logging](./patterns/logging.md)
   - Structured Logging in Server Actions
 - [UI & Styling](./patterns/ui-styling.md)
   - Component Usage
   - Layout Patterns
+- [URL Construction](./patterns/url-construction.md)
+  - Consistent Site URL Resolution
 
 ## Adding New Patterns
 

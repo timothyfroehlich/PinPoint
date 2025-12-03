@@ -1,0 +1,1 @@
+/home/froeht/Code/PinPoint-AntiGravity/docs/NON_NEGOTIABLES.md

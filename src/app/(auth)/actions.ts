@@ -18,6 +18,7 @@ import {
   getClientIp,
   formatResetTime,
 } from "~/lib/rate-limit";
+import { getSiteUrl } from "~/lib/url";
 
 /**
  * Result Types
@@ -178,7 +179,8 @@ export async function signupAction(
 ): Promise<SignupResult> {
   // Validate input
   const parsed = signupSchema.safeParse({
-    name: formData.get("name"),
+    firstName: formData.get("firstName"),
+    lastName: formData.get("lastName"),
     email: formData.get("email"),
     password: formData.get("password"),
   });
@@ -192,7 +194,7 @@ export async function signupAction(
     return err("VALIDATION", "Invalid input");
   }
 
-  const { name, email, password } = parsed.data;
+  const { firstName, lastName, email, password } = parsed.data;
 
   try {
     // Rate limiting: Check IP-based limit
@@ -218,7 +220,8 @@ export async function signupAction(
       password,
       options: {
         data: {
-          name, // Passed to trigger for user_profiles.name
+          first_name: firstName,
+          last_name: lastName,
         },
       },
     });
@@ -386,26 +389,21 @@ export async function forgotPasswordAction(
 
     const supabase = await createClient();
 
-    // CHANGED: Fail closed if NEXT_PUBLIC_SITE_URL not configured
-    const siteUrl = process.env["NEXT_PUBLIC_SITE_URL"];
+    const siteUrl = getSiteUrl();
 
-    if (!siteUrl) {
-      log.error(
-        { action: "forgot-password" },
-        "NEXT_PUBLIC_SITE_URL not configured - cannot send password reset email"
-      );
-      return err("SERVER", "Configuration error. Please contact support.");
-    }
+    // Validate origin against allowlist to prevent host header injection
+    // We allow:
+    // 1. The configured site URL (production)
+    // 2. The configured local port (development)
+    // 3. Default localhost:3000 (development fallback)
+    const localPort = process.env["PORT"] ?? "3000";
 
     const origin = siteUrl; // No fallback, fail if not configured
-
-    // Validate origin against allowlist (keep existing validation)
     const allowedOrigins = [
-      "http://localhost:3000",
-      "http://localhost:3100",
-      "http://localhost:3200",
-      "http://localhost:3300",
       siteUrl,
+      `http://localhost:${localPort}`,
+      // Also allow 127.0.0.1 for local dev consistency
+      `http://127.0.0.1:${localPort}`,
     ].filter((url): url is string => typeof url === "string" && url.length > 0);
 
     if (!allowedOrigins.some((allowed) => origin.startsWith(allowed))) {
@@ -437,7 +435,7 @@ export async function forgotPasswordAction(
     }
 
     log.info(
-      { email, action: "forgot-password" },
+      { action: "forgot-password" },
       "Password reset email sent successfully"
     );
 

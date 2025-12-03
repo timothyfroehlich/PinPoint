@@ -18,4 +18,5 @@ export type IssueWithAllRelations = Issue & {
   reportedByUser?: Pick<UserProfile, "id" | "name"> | null;
   assignedToUser?: Pick<UserProfile, "id" | "name"> | null;
   comments: IssueCommentWithAuthor[];
+  watchers: { userId: string }[];
 };

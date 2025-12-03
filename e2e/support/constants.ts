@@ -1,11 +1,10 @@
-export const seededMember = {
-  name: "Member User",
-  email: "member@test.com",
-  password: "TestPassword123",
-};
+import machines from "~/test/data/machines.json" with { type: "json" };
+import users from "~/test/data/users.json" with { type: "json" };
+
+export const seededMember = users.member;
+
+export const seededMachines = machines;
 
 export const DEFAULT_NAVIGATION_TIMEOUT = 10_000;
 
-export const TEST_USERS = {
-  member: seededMember,
-};
+export const TEST_USERS = users;

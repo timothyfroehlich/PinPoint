@@ -50,9 +50,13 @@ describe("Password Reset Integration Tests", () => {
 
       expect(signupData.user).toBeDefined();
 
+      const port = process.env.PORT ?? "3000";
+      const baseUrl =
+        process.env.NEXT_PUBLIC_SITE_URL ?? `http://localhost:${port}`;
+
       // Request password reset
       const { error } = await supabase.auth.resetPasswordForEmail(testEmail, {
-        redirectTo: "http://localhost:3000/reset-password",
+        redirectTo: `${baseUrl}/reset-password`,
       });
 
       expect(error).toBeNull();
@@ -64,11 +68,15 @@ describe("Password Reset Integration Tests", () => {
     });
 
     it("should not reveal if email does not exist", async () => {
+      const port = process.env.PORT ?? "3000";
+      const baseUrl =
+        process.env.NEXT_PUBLIC_SITE_URL ?? `http://localhost:${port}`;
+
       // Request password reset for non-existent email
       const { error } = await supabase.auth.resetPasswordForEmail(
         "nonexistent-user-12345@example.com",
         {
-          redirectTo: "http://localhost:3000/reset-password",
+          redirectTo: `${baseUrl}/reset-password`,
         }
       );
 

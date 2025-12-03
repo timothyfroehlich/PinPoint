@@ -15,10 +15,10 @@ _Server-first authentication and realtime patterns for Next.js App Router_
 
 ### **🚀 2025 Platform Updates**
 
-**Geo-Routing Improvements** (April 2025): Enhanced global edge network performance  
-**Node.js 20 Requirement**: October 31, 2025 deadline for Node.js 20 migration (30 days left!)  
-**Enhanced RLS AI Assistant**: Improved policy debugging and optimization tools  
-**Fly Postgres Deprecation** (April 2025): Deprecated in favor of scale-to-zero architecture  
+**Geo-Routing Improvements** (April 2025): Enhanced global edge network performance
+**Node.js 20 Requirement**: October 31, 2025 deadline for Node.js 20 migration (30 days left!)
+**Enhanced RLS AI Assistant**: Improved policy debugging and optimization tools
+**Fly Postgres Deprecation** (April 2025): Deprecated in favor of scale-to-zero architecture
 **Schema Access Restrictions** (April 2025): Limited access to auth/storage/realtime schemas
 
 ### 🚨 **Critical Migration Required**
@@ -320,7 +320,7 @@ vi.mock("@/utils/supabase/client", () => ({
 
 ### Current Configuration
 
-**Service**: Mailpit v1.22.3 (replaces Inbucket in newer CLI versions)
+**Service**: Mailpit v1.22.3 (replaces Inbucket)
 **Default Port**: 54324 (configurable per worktree)
 **API**: REST API v1 at `http://localhost:54324/api/v1/`
 **Web UI**: `http://localhost:54324/` (interactive email viewer)

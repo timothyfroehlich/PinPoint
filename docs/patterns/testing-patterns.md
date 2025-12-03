@@ -106,3 +106,10 @@ describe("deriveMachineStatus", () => {
 - Test edge cases (empty arrays, resolved issues, etc.)
 - Keep tests focused and readable
 - Unit tests in same directory as source (e.g., `status.test.ts` next to `status.ts`)
+
+## Vitest Deep Mocks (vitest-mock-extended)
+
+- Use `mockDeep` + `mockReset` for complex dependencies (e.g., Drizzle `db` object with chained builders).
+- Centralize chain helpers (e.g., `mockInsertReturning`) inside the test file to keep call sites small and intention-revealing.
+- Always call `mockReset` in `beforeEach` to avoid cross-test pollution.
+- Prefer mocking at service boundaries rather than individual functions to keep assertions focused on behavior.

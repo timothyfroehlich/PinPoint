@@ -12,6 +12,11 @@ export default async function globalSetup(): Promise<void> {
   // Satisfy @typescript-eslint/require-await
   await Promise.resolve();
 
+  if (process.env.SKIP_SUPABASE_RESET === "true") {
+    console.log("⏭️  SKIP_SUPABASE_RESET=true, skipping Supabase reset/seed.");
+    return;
+  }
+
   // Note: .env.local is now loaded in playwright.config.ts before this runs
   // All environment variables are already available in process.env
 

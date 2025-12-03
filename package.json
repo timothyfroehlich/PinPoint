@@ -4,7 +4,7 @@
   "type": "module",
   "description": "Pinball machine issue tracking for Austin Pinball Collective",
   "scripts": {
-    "dev": "PORT=$(grep '^PORT=' .env.local | cut -d'=' -f2) next dev --port $PORT",
+    "dev": "node --env-file=.env.local -e \"require('child_process').execSync('next dev --port ' + process.env.PORT, {stdio: 'inherit'})\"",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -25,9 +25,11 @@
     "db:seed-users": "node --env-file=.env.local supabase/seed-users.mjs",
     "db:reset:local": "supabase db reset --yes",
     "db:prepare:test": "npm-run-all db:reset:local db:push db:seed db:seed-users",
-    "preflight": "npm-run-all --silent --parallel typecheck lint format test --sequential db:prepare:test --parallel build test:integration test:integration:supabase --sequential smoke",
+    "check:config": "python3 scripts/check-config-drift.py",
+    "preflight": "npm-run-all --silent --parallel typecheck lint:fix format:fix test check:config --sequential db:prepare:test --parallel build test:integration test:integration:supabase --sequential smoke",
     "supa:ci": "bash scripts/supa-ci.sh",
     "sync-worktrees": "bash scripts/sync-worktrees.sh",
+    "kill:zombies": "node --env-file=.env.local scripts/kill-zombies.mjs",
     "prepare": "husky"
   },
   "repository": {
@@ -50,8 +52,11 @@
     "@radix-ui/react-label": "^2.1.8",
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-slot": "^1.2.4",
+    "@radix-ui/react-switch": "^1.2.6",
+    "@react-email/components": "^1.0.1",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.81.1",
+    "@types/nodemailer": "^7.0.4",
     "@types/zxcvbn": "^4.4.5",
     "@upstash/ratelimit": "^2.0.7",
     "@upstash/redis": "^1.35.7",
@@ -61,11 +66,14 @@
     "drizzle-orm": "^0.44.7",
     "lucide-react": "^0.553.0",
     "next": "^16.0.3",
+    "nodemailer": "^7.0.11",
     "pino": "^10.1.0",
     "postgres": "^3.4.7",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-hook-form": "^7.66.0",
+    "resend": "^6.5.2",
+    "sanitize-html": "^2.17.0",
     "tailwind-merge": "^3.4.0",
     "zod": "^4.1.12",
     "zxcvbn": "^4.4.2"
@@ -84,11 +92,13 @@
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.4",
     "@types/react-dom": "^19.2.0",
+    "@types/sanitize-html": "^2.16.0",
     "@typescript-eslint/eslint-plugin": "^8.46.4",
     "@typescript-eslint/parser": "^8.46.4",
     "@vitejs/plugin-react": "^5.1.1",
     "@vitest/coverage-v8": "^4.0.8",
     "@vitest/ui": "^4.0.8",
+    "baseline-browser-mapping": "^2.8.32",
     "drizzle-kit": "^0.31.7",
     "eslint": "^9.39.1",
     "eslint-config-next": "^16.0.3",
@@ -104,7 +114,8 @@
     "prettier": "^3.6.2",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.8"
+    "vitest": "^4.0.8",
+    "vitest-mock-extended": "^3.1.0"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

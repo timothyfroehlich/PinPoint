@@ -26,9 +26,12 @@ import { issueComments } from "~/server/db/schema";
  */
 export async function createTimelineEvent(
   issueId: string,
-  content: string
+  content: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  txArg: any = db
 ): Promise<void> {
-  await db.insert(issueComments).values({
+  const tx = txArg as typeof db;
+  await tx.insert(issueComments).values({
     issueId,
     content,
     isSystem: true,

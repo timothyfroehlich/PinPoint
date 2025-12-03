@@ -4,14 +4,10 @@
  * Tests issue CRUD operations and timeline events with PGlite.
  */
 
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-
 import { describe, it, expect, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { createTestUser } from "~/test/helpers/factories";
 import {
   issues,
   machines,
@@ -39,11 +35,12 @@ describe("Issues CRUD Operations (PGlite)", () => {
     // Create test user
     const [user] = await db
       .insert(userProfiles)
-      .values({
-        id: "00000000-0000-0000-0000-000000000001",
-        name: "Test User",
-        role: "member",
-      })
+      .values(
+        createTestUser({
+          id: "00000000-0000-0000-0000-000000000001",
+          role: "member",
+        })
+      )
       .returning();
     testUser = user;
   });
@@ -194,8 +191,8 @@ describe("Issues CRUD Operations (PGlite)", () => {
       });
 
       expect(issue).toBeDefined();
-      expect(issue?.machine?.name).toBe("Test Machine");
-      expect(issue?.reportedByUser?.name).toBe("Test User");
+      expect(issue!.machine.name).toBe("Test Machine");
+      expect(issue!.reportedByUser!.name).toBe("Test User");
     });
   });
 
