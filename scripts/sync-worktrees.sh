@@ -27,6 +27,27 @@ declare -A OVERALL_STATUS
 declare -A SUPABASE_RESTARTED
 declare -A STATUS_SUMMARY
 
+# Optional explicit worktree targets
+WORKTREES_SELECTED=()
+MAIN_WORKTREE_PATH=""
+
+print_usage() {
+  cat <<'EOF'
+Usage: scripts/sync-worktrees.sh [options] [worktree path]
+
+Options:
+  --dry-run           Show actions without making changes
+  -y                  Non-interactive (auto-confirm prompts)
+  -a, --all           Process all worktrees
+  -p, --path <dir>    Process a specific worktree (single path)
+  --help              Show this help message
+
+Notes:
+- Without --all, the script processes exactly one worktree (current by default).
+- When both positional path and --path are provided, only the first path is used.
+EOF
+}
+
 # Port allocation table (from AGENTS.md)
 # Next.js uses +100 offsets, Supabase uses +1000 offsets
 declare -A NEXTJS_PORT_OFFSETS=(
@@ -462,11 +483,21 @@ EOF
 fix_skip_worktree() {
   local worktree_dir="$1"
   local name="$2"
+  local abs_path
+  abs_path=$(cd "$worktree_dir" && pwd)
+
+  local is_main_worktree=false
+  if [ -n "$MAIN_WORKTREE_PATH" ] && [ "$abs_path" = "$MAIN_WORKTREE_PATH" ]; then
+    is_main_worktree=true
+  elif [ "$name" = "PinPoint" ] && [ -z "$MAIN_WORKTREE_PATH" ]; then
+    # Fallback for environments where worktree list parsing failed
+    is_main_worktree=true
+  fi
 
   local skip_flag=$(git -C "$worktree_dir" ls-files -v supabase/config.toml 2>/dev/null | cut -c 1)
 
-  if [ "$name" = "PinPoint" ]; then
-    # Main should NOT have skip-worktree
+  if [ "$is_main_worktree" = true ]; then
+    # Main worktree should NOT have skip-worktree
     if [ "$skip_flag" = "S" ]; then
       if [ "$DRY_RUN" = true ]; then
         echo "[DRY-RUN] Would remove skip-worktree from $name"
@@ -710,14 +741,14 @@ run_npm_install() {
   fi
 
   echo ""
-  if ! prompt_with_timeout "Run npm install in $name? [Y/n]:" "Y" 5; then
+  if ! prompt_with_timeout "Run npm ci in $name? [Y/n]:" "Y" 5; then
     return 0
   fi
 
   if [ "$DRY_RUN" = true ]; then
-    echo "[DRY-RUN] Would run: npm install --silent"
+    echo "[DRY-RUN] Would run: npm ci --silent"
   else
-    (cd "$worktree_dir" && npm install --silent 2>&1 | grep -v "^npm") || true
+    (cd "$worktree_dir" && npm ci --silent 2>&1 | grep -v "^npm") || true
   fi
 }
 
@@ -971,16 +1002,35 @@ main() {
         PROCESS_ALL=true
         shift
         ;;
+      -p|--path)
+        if [ -z "${2:-}" ]; then
+          echo "Error: --path requires a directory argument"
+          exit 1
+        fi
+        WORKTREES_SELECTED+=("$(cd "$2" && pwd)")
+        shift 2
+        ;;
+      --help)
+        print_usage
+        exit 0
+        ;;
       *)
-        echo "Unknown option: $1"
-        echo "Usage: $0 [--dry-run] [-y] [-a|--all]"
-        exit 1
+        if [[ "$1" == -* ]]; then
+          echo "Unknown option: $1"
+          print_usage
+          exit 1
+        fi
+        WORKTREES_SELECTED+=("$(cd "$1" && pwd)")
+        shift
         ;;
     esac
   done
 
   echo "🔄 PinPoint Worktree Sync"
   echo ""
+
+  # Resolve main worktree path (used for skip-worktree handling)
+  MAIN_WORKTREE_PATH=$(git worktree list | awk '$3=="[main]" {print $1}' | head -n 1 || true)
 
   # ============================================================================
   # PRE-FLIGHT CHECKS
@@ -1070,6 +1120,21 @@ main() {
       local path=$(echo "$line" | awk '{print $1}')
       worktrees_to_process+=("$path")
     done < <(git worktree list | tail -n +1)
+  elif [ "${#WORKTREES_SELECTED[@]}" -gt 0 ]; then
+    # Process only the first explicitly provided worktree
+    local path="${WORKTREES_SELECTED[0]}"
+    if [ ! -d "$path" ]; then
+      echo "Error: Worktree path not found: $path"
+      exit 1
+    fi
+    if ! git -C "$path" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      echo "Error: Not a git worktree: $path"
+      exit 1
+    fi
+    worktrees_to_process+=("$path")
+    if [ "${#WORKTREES_SELECTED[@]}" -gt 1 ]; then
+      echo "Note: Multiple paths provided; processing only the first (${path}). Re-run for others."
+    fi
   else
     # Process current worktree only
     local current_worktree=$(git rev-parse --show-toplevel 2>/dev/null)
