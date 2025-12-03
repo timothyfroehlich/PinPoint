@@ -32,15 +32,22 @@ export default async function globalSetup(): Promise<void> {
     // Step 2: Push Drizzle schema - creates tables
     // Note: This project doesn't use migration files, schema is managed by Drizzle
     console.log("📋 Pushing Drizzle schema...");
-    execSync("npm run db:push", {
+    execSync("npm run db:_push", {
       stdio: "inherit",
       env: process.env,
     });
     console.log("✅ Schema pushed");
 
+    console.log("🧪 Regenerating test schema...");
+    execSync("npm run test:_generate-schema", {
+      stdio: "inherit",
+      env: process.env,
+    });
+    console.log("✅ Test schema regenerated");
+
     // Step 3: Seed test data (machines and issues)
     console.log("🌱 Seeding test data...");
-    execSync("npm run db:seed", {
+    execSync("npm run db:_seed", {
       stdio: "inherit",
       env: process.env,
     });
@@ -49,7 +56,7 @@ export default async function globalSetup(): Promise<void> {
     // Step 4: Create test users via Supabase Auth API
     // Note: Users must be created this way (not via SQL) so passwords work with signInWithPassword()
     console.log("👤 Creating test users...");
-    execSync("npm run db:seed-users", {
+    execSync("npm run db:_seed-users", {
       stdio: "inherit",
       env: process.env,
     });

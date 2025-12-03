@@ -128,6 +128,8 @@ PinPoint uses parallel git worktrees so multiple assistants can work without ste
 | Review      | 3200    | 56321        | 56322      | 56320     | 56324                         | pinpoint-review      |
 | AntiGravity | 3300    | 57321        | 57322      | 57320     | 57324                         | pinpoint-antigravity |
 
+> Mailpit extra ports: SMTP is `BASE_SMTP (54325) + worktree offset`, POP3 is `BASE_POP3 (54326) + worktree offset`. Ensure both keys exist in `[inbucket]` (see Supabase Config Management).
+
 ### How It Works
 
 - Each non-main worktree edits its own `supabase/config.toml` (ports + `project_id`) and marks it `skip-worktree` so git ignores local changes.
@@ -188,6 +190,13 @@ git update-index --skip-worktree supabase/config.toml
   3. Commit the file.
   4. Restore your local ports (or run `scripts/sync-worktrees.sh`).
   5. `git update-index --skip-worktree supabase/config.toml`
+- **Merging with skip-worktree set**: skip-worktree blocks merges/checkout of `supabase/config.toml`.
+  1. Before merging/pulling: `git update-index --no-skip-worktree supabase/config.toml`.
+  2. Stash or commit your local config if ports differ from main.
+  3. Merge/pull.
+  4. Restore your local ports from stash or `scripts/sync-worktrees.sh`.
+  5. Re-apply skip flag: `git update-index --skip-worktree supabase/config.toml`.
+- **Mailpit keys required**: Ensure `[inbucket]` contains `port`, `smtp_port`, and `pop3_port` using the per-worktree offsets (see table above). Missing SMTP/POP3 ports will block syncs and Supabase start.
 
 ### Available Commands
 

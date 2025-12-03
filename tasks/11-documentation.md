@@ -33,7 +33,7 @@ README, setup guide, environment variables documentation for easy onboarding.
     3. Copy `.env.example` to `.env.local`
     4. Create Supabase project
     5. Add Supabase credentials to `.env.local`
-    6. Push database schema (`npm run db:push`)
+    6. Reset database (restart Supabase, push schema, seed) (`npm run db:reset`)
     7. Run development server (`npm run dev`)
   - Development commands (dev, build, typecheck, lint, format, test, smoke)
   - Testing guide (unit, integration, E2E)
@@ -53,9 +53,9 @@ README, setup guide, environment variables documentation for easy onboarding.
   - Development workflow overview
   - How to run tests (`npm test`, `npm run smoke`)
   - How to add new components (`npx shadcn add [component]`)
-  - Database management (`npm run db:push`, `npm run db:studio`)
+  - Database management (`npm run db:reset`, `npm run db:studio`)
     - **NOTE**: Add migration workflow for production (`drizzle-kit generate` + `drizzle-kit migrate`)
-    - Explain when to transition from `push` (pre-beta) to migrations (production)
+    - Explain when to transition from `reset`/`push` (pre-beta) to migrations (production)
   - Common troubleshooting:
     - Supabase connection issues
     - Type errors with strictest config

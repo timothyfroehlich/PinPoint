@@ -51,13 +51,13 @@ We use **Supabase** (PostgreSQL) and **Drizzle ORM**.
 
 ### Local Development
 
-- **Push Schema Changes**:
+- **Reset & Sync Database**:
 
   ```bash
-  npm run db:push
+  npm run db:reset
   ```
 
-  This syncs your local Drizzle schema with your Supabase database. Use this for rapid development.
+  Restarts Supabase, pushes the Drizzle schema, regenerates the test schema, and seeds data/users for rapid development.
 
 - **View Database**:
   ```bash
