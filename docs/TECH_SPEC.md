@@ -456,7 +456,7 @@ pinpoint/
 npm run dev
 
 # Apply schema changes (no migration files)
-npm run db:push:local
+npm run db:reset
 
 # Open Drizzle Studio
 npm run db:studio
@@ -471,12 +471,12 @@ npm run e2e
 ### Database Changes
 
 1. Edit schema in `src/server/db/schema/`
-2. Run `npm run db:push:local` (pushes changes directly)
+2. Run `npm run db:reset` (restarts Supabase, pushes schema, regenerates test schema, seeds data/users)
 3. Update seed data if needed
 4. Test locally
 5. Repeat for production when ready
 
-**No migration files** - Use drizzle-kit push for direct schema updates.
+**No migration files** - Use `db:reset` (drizzle-kit push under the hood) for direct schema updates.
 
 ---
 

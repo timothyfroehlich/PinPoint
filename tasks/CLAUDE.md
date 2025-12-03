@@ -142,11 +142,11 @@ Read these before starting your task:
 - Complete schema: `user_profiles`, `machines`, `issues`, `issue_comments`
 - Database trigger for auto-profile creation (`supabase/seed.sql`)
 - Type exports in `~/lib/types` (UserProfile, Machine, Issue, IssueComment)
-- Package.json scripts: `db:push`, `db:studio`
+- Package.json scripts: `db:reset`, `db:studio`
 
 **Key patterns established:**
 
-- Use `drizzle-kit push` for pre-beta (no migrations until production)
+- Use `drizzle-kit push` via `npm run db:reset`/`npm run db:_push` for pre-beta (no migrations until production)
 - Cross-schema FK constraints go in `seed.sql` (Drizzle limitation)
 - Use bracket notation for `process.env["DATABASE_URL"]` (@tsconfig/strictest)
 - Schema uses snake_case, convert to camelCase at boundaries
@@ -154,8 +154,7 @@ Read these before starting your task:
 
 **For Task 3 agent:**
 
-- Run `supabase start` to launch local database
-- Run `npm run db:push` to sync schema
+- Run `npm run db:reset` to restart Supabase, push schema, regenerate test schema, and seed data/users
 - Trigger will auto-create user_profiles on signup
 - Types ready for auth implementation
 

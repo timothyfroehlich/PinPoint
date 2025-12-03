@@ -49,10 +49,10 @@ Supabase client, middleware, auth callback, and schema deployment to live Supaba
 - [x] Apply schema to Supabase preview project
   - Used Supabase MCP server (`mcp__supabase__apply_migration`)
 - [x] Apply schema to local Supabase
-  - Used `npm run db:push` after `supabase start`
+  - Used `npm run db:reset` to restart Supabase, push schema, and seed locally
 - [x] Execute trigger creation SQL in both environments
   - Preview: `mcp__supabase__execute_sql`
-  - Local: `npm run db:seed`
+  - Local: `npm run db:_seed`
 - [x] Verify tables exist in Supabase dashboard
 - [x] Test database connection from application
   - Created integration tests in `src/test/integration/supabase/connection.test.ts`
@@ -105,7 +105,7 @@ Supabase client, middleware, auth callback, and schema deployment to live Supaba
 - **Supabase SSR Auth**: Use `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`; legacy anon key deprecated. Middleware and SSR client patterns are in place; reuse these for future auth-dependent routes.
 - **Environment files**: `.env.local` (local Docker via `supabase start`), `.env.preview.local` (cloud preview), `.env.example` (documentation template)
 - **Testing infrastructure**: `src/test/unit/` for pure functions, `src/test/integration/supabase/` for database-dependent tests. Integration tests require `supabase start`.
-- **Database deployment**: Use Supabase MCP server (`mcp__supabase__apply_migration`, `mcp__supabase__execute_sql`) for preview deployments, `npm run db:push` for local.
+- **Database deployment**: Use Supabase MCP server (`mcp__supabase__apply_migration`, `mcp__supabase__execute_sql`) for preview deployments, `npm run db:reset` for local.
 - **Preflight script**: Two-stage parallel execution (fast checks first, then slow checks) with fail-fast and minimal output.
 - **Package.json scripts**: `test` (unit only), `test:integration` (requires Supabase), `preflight` (comprehensive pre-commit).
 

@@ -79,7 +79,7 @@ Drizzle ORM setup and complete schema definition with database trigger for auto-
 
 - [x] Add package.json scripts:
   - [x] ~~`db:generate` - Generate Drizzle migrations~~ (Deferred to Task 11 docs)
-  - [x] `db:push` - Push schema to database
+  - [x] `db:reset` - Restart Supabase, push schema, regenerate test schema, and seed
   - [x] `db:studio` - Open Drizzle Studio
 
 ## Key Decisions
@@ -166,7 +166,7 @@ Drizzle can't reference tables outside the `public` schema (like Supabase's `aut
 
 - Database schema is ready (4 tables: user_profiles, machines, issues, issue_comments)
 - Auto-profile creation trigger is in `supabase/seed.sql`
-- Use `npm run db:push` to sync schema to local Supabase
+- Use `npm run db:reset` to sync schema to local Supabase
 - Foreign key `user_profiles.id → auth.users.id` enforced by seed.sql
 - Types available at `~/lib/types` (UserProfile, Machine, Issue, IssueComment)
 
