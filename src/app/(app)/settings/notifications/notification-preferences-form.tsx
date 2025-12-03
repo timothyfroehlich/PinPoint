@@ -58,18 +58,13 @@ export function NotificationPreferencesForm({
       className="space-y-8"
       data-testid="notification-preferences-form"
     >
-      {state && showFeedback && (
+      {state && !state.ok && showFeedback && (
         <div
           className={cn(
-            "rounded-md border p-4",
-            state.ok
-              ? "border-primary/20 bg-primary/10 text-primary"
-              : "border-destructive/20 bg-destructive/10 text-destructive"
+            "rounded-md border p-4 border-destructive/20 bg-destructive/10 text-destructive"
           )}
         >
-          <p className="text-sm font-medium">
-            {state.ok ? "Preferences saved successfully." : state.message}
-          </p>
+          <p className="text-sm font-medium">{state.message}</p>
         </div>
       )}
 

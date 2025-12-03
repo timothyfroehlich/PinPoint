@@ -63,6 +63,9 @@ describe("Issue Service", () => {
     vi.clearAllMocks();
     mockDb.insert.mockReturnValue(mockInsertVoid());
     mockUpdateChain();
+    mockDb.transaction.mockImplementation(async (cb) => {
+      return await cb(mockDb as any);
+    });
   });
 
   describe("assignIssue", () => {
@@ -90,19 +93,22 @@ describe("Issue Service", () => {
 
       await assignIssue({ issueId, assignedTo: assigneeId, actorId });
 
-      expect(createNotification).toHaveBeenCalledWith({
-        type: "issue_assigned",
-        resourceId: issueId,
-        resourceType: "issue",
-        actorId,
-        includeActor: true,
-        issueTitle: "Test Issue",
-        machineName: "Test Machine",
-        issueContext: {
-          assignedToId: assigneeId,
-          reportedById: "reporter-1",
+      expect(createNotification).toHaveBeenCalledWith(
+        {
+          type: "issue_assigned",
+          resourceId: issueId,
+          resourceType: "issue",
+          actorId,
+          includeActor: true,
+          issueTitle: "Test Issue",
+          machineName: "Test Machine",
+          issueContext: {
+            assignedToId: assigneeId,
+            reportedById: "reporter-1",
+          },
         },
-      });
+        expect.anything()
+      );
     });
   });
 
@@ -130,16 +136,19 @@ describe("Issue Service", () => {
       await createIssue(params);
 
       expect(createTimelineEvent).toHaveBeenCalled();
-      expect(createNotification).toHaveBeenCalledWith({
-        type: "new_issue",
-        resourceId: "issue-new",
-        resourceType: "issue",
-        actorId: "user-1",
-        includeActor: true,
-        issueTitle: "New Issue",
-        machineName: "Test Machine",
-        issueContext: { machineOwnerId: "owner-1" },
-      });
+      expect(createNotification).toHaveBeenCalledWith(
+        {
+          type: "new_issue",
+          resourceId: "issue-new",
+          resourceType: "issue",
+          actorId: "user-1",
+          includeActor: true,
+          issueTitle: "New Issue",
+          machineName: "Test Machine",
+          issueContext: { machineOwnerId: "owner-1" },
+        },
+        expect.anything()
+      );
     });
   });
 
@@ -203,20 +212,23 @@ describe("Issue Service", () => {
 
       await updateIssueStatus(params);
 
-      expect(createNotification).toHaveBeenCalledWith({
-        type: "issue_status_changed",
-        resourceId: "issue-1",
-        resourceType: "issue",
-        actorId: "user-1",
-        includeActor: true,
-        issueTitle: "Issue Title",
-        machineName: "Machine Name",
-        newStatus: "resolved",
-        issueContext: {
-          assignedToId: "assignee-1",
-          reportedById: "reporter-1",
+      expect(createNotification).toHaveBeenCalledWith(
+        {
+          type: "issue_status_changed",
+          resourceId: "issue-1",
+          resourceType: "issue",
+          actorId: "user-1",
+          includeActor: true,
+          issueTitle: "Issue Title",
+          machineName: "Machine Name",
+          newStatus: "resolved",
+          issueContext: {
+            assignedToId: "assignee-1",
+            reportedById: "reporter-1",
+          },
         },
-      });
+        expect.anything()
+      );
     });
   });
 });

@@ -82,7 +82,7 @@ export async function updateNotificationPreferencesAction(
         set: validation.data,
       });
 
-    revalidatePath("/settings/notifications");
+    revalidatePath("/settings");
     return ok({ success: true });
   } catch (error) {
     console.error("updateNotificationPreferencesAction failed", error);

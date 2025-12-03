@@ -207,6 +207,13 @@ trigger: always_on
 - **Do:** Reference `docs/TESTING_PLAN.md` for test types and placement
 - **Don't:** Mix test types or create per-test database instances
 
+**CORE-TEST-004:** Prefer Integration Tests for DB Logic
+
+- **Severity:** Required
+- **Why:** Mocking Drizzle/DB clients leads to brittle, over-mocked tests that don't verify actual behavior
+- **Do:** Use integration tests (with PGlite) for service layer logic that primarily interacts with the database
+- **Don't:** Write unit tests that require extensive mocking of `db.query`, `db.transaction`, or method chains
+
 ---
 
 ## Architecture

@@ -6,6 +6,7 @@ import {
   machines,
   issueComments,
   userProfiles,
+  notificationPreferences,
 } from "~/server/db/schema";
 import { createTimelineEvent } from "~/lib/timeline/events";
 import { createNotification } from "~/lib/notifications";
@@ -67,65 +68,98 @@ export async function createIssue({
   priority,
   reportedBy,
 }: CreateIssueParams): Promise<Issue> {
-  // 1. Insert Issue
-  const [issue] = await db
-    .insert(issues)
-    .values({
-      machineId,
-      title,
-      description: description ?? null,
-      severity: severity as "minor" | "playable" | "unplayable",
-      priority: (priority ?? "low") as "low" | "medium" | "high",
-      reportedBy: reportedBy ?? null,
-      status: "new",
-    })
-    .returning();
+  return await db.transaction(async (tx) => {
+    // 1. Insert Issue
+    const [issue] = await tx
+      .insert(issues)
+      .values({
+        machineId,
+        title,
+        description: description ?? null,
+        severity: severity as "minor" | "playable" | "unplayable",
+        priority: (priority ?? "low") as "low" | "medium" | "high",
+        reportedBy: reportedBy ?? null,
+        status: "new",
+      })
+      .returning();
 
-  if (!issue) throw new Error("Issue creation failed");
+    if (!issue) throw new Error("Issue creation failed");
 
-  // 2. Create Timeline Event
-  await createTimelineEvent(
-    issue.id,
-    reportedBy ? "Issue created" : "Issue reported via public form"
-  );
+    // 2. Create Timeline Event
+    await createTimelineEvent(
+      issue.id,
+      reportedBy ? "Issue created" : "Issue reported via public form",
+      tx
+    );
 
-  log.info(
-    {
-      issueId: issue.id,
-      machineId,
-      reportedBy,
-      action: "createIssue",
-    },
-    "Issue created successfully"
-  );
+    log.info(
+      {
+        issueId: issue.id,
+        machineId,
+        reportedBy,
+        action: "createIssue",
+      },
+      "Issue created successfully"
+    );
 
-  // 3. Notifications
-  try {
-    const machine = await db.query.machines.findFirst({
+    // 3. Auto-Watch Logic
+    // Reporter
+    if (reportedBy) {
+      await tx
+        .insert(issueWatchers)
+        .values({ issueId: issue.id, userId: reportedBy })
+        .onConflictDoNothing();
+    }
+
+    // Machine Owner (if prefs enabled)
+    const machine = await tx.query.machines.findFirst({
       where: eq(machines.id, machineId),
       columns: { name: true, ownerId: true },
     });
 
-    // Trigger Notification (actorId optional for public reports)
-    await createNotification({
-      type: "new_issue",
-      resourceId: issue.id,
-      resourceType: "issue",
-      ...(reportedBy ? { actorId: reportedBy } : {}),
-      includeActor: true,
-      issueTitle: title,
-      machineName: machine?.name ?? undefined,
-      issueContext: { machineOwnerId: machine?.ownerId ?? null },
-    });
-  } catch (error) {
-    log.error(
-      { error, action: "createIssue.notifications" },
-      "Failed to process notifications"
-    );
-    // Don't fail the action if notifications fail
-  }
+    if (machine?.ownerId) {
+      const ownerPrefs = await tx.query.notificationPreferences.findFirst({
+        where: eq(notificationPreferences.userId, machine.ownerId),
+      });
 
-  return issue;
+      // If owner wants notifications for new issues, auto-watch this specific issue
+      if (
+        ownerPrefs?.emailNotifyOnNewIssue ||
+        ownerPrefs?.inAppNotifyOnNewIssue
+      ) {
+        await tx
+          .insert(issueWatchers)
+          .values({ issueId: issue.id, userId: machine.ownerId })
+          .onConflictDoNothing();
+      }
+    }
+
+    // 4. Notifications
+    try {
+      // Trigger Notification (actorId optional for public reports)
+      await createNotification(
+        {
+          type: "new_issue",
+          resourceId: issue.id,
+          resourceType: "issue",
+          ...(reportedBy ? { actorId: reportedBy } : {}),
+          includeActor: true,
+          issueTitle: title,
+          machineName: machine?.name ?? undefined,
+          issueContext: { machineOwnerId: machine?.ownerId ?? null },
+        },
+        tx
+      );
+    } catch (error) {
+      log.error(
+        { error, action: "createIssue.notifications" },
+        "Failed to process notifications"
+      );
+      // Don't fail the action if notifications fail
+    }
+
+    return issue;
+  });
 }
 
 /**
@@ -141,69 +175,75 @@ export async function updateIssueStatus({
   oldStatus: string;
   newStatus: string;
 }> {
-  // Get current issue to check old status
-  const currentIssue = await db.query.issues.findFirst({
-    where: eq(issues.id, issueId),
-    columns: {
-      status: true,
-      machineId: true,
-      title: true,
-      assignedTo: true,
-      reportedBy: true,
-    },
-    with: { machine: true },
-  });
-
-  if (!currentIssue) {
-    throw new Error("Issue not found");
-  }
-
-  const oldStatus = currentIssue.status;
-
-  // 1. Update Status
-  await db
-    .update(issues)
-    .set({
-      status,
-      updatedAt: new Date(),
-    })
-    .where(eq(issues.id, issueId));
-
-  // 2. Create Timeline Event
-  await createTimelineEvent(
-    issueId,
-    `Status changed from ${oldStatus} to ${status}`
-  );
-
-  log.info(
-    { issueId, oldStatus, newStatus: status, action: "updateIssueStatus" },
-    "Issue status updated"
-  );
-
-  // 3. Trigger Notification
-  try {
-    await createNotification({
-      type: "issue_status_changed",
-      resourceId: issueId,
-      resourceType: "issue",
-      actorId: userId,
-      includeActor: true,
-      issueTitle: currentIssue.title,
-      machineName: currentIssue.machine.name,
-      newStatus: status,
-      issueContext: {
-        assignedToId: currentIssue.assignedTo ?? null,
-        reportedById: currentIssue.reportedBy ?? null,
+  return await db.transaction(async (tx) => {
+    // Get current issue to check old status
+    const currentIssue = await tx.query.issues.findFirst({
+      where: eq(issues.id, issueId),
+      columns: {
+        status: true,
+        machineId: true,
+        title: true,
+        assignedTo: true,
+        reportedBy: true,
       },
+      with: { machine: true },
     });
-  } catch (error) {
-    log.error(
-      { error, action: "updateIssueStatus.notifications" },
-      "Failed to send notification"
-    );
-  }
 
-  return { issueId, oldStatus, newStatus: status };
+    if (!currentIssue) {
+      throw new Error("Issue not found");
+    }
+
+    const oldStatus = currentIssue.status;
+
+    // 1. Update Status
+    await tx
+      .update(issues)
+      .set({
+        status,
+        updatedAt: new Date(),
+      })
+      .where(eq(issues.id, issueId));
+
+    // 2. Create Timeline Event
+    await createTimelineEvent(
+      issueId,
+      `Status changed from ${oldStatus} to ${status}`,
+      tx
+    );
+
+    log.info(
+      { issueId, oldStatus, newStatus: status, action: "updateIssueStatus" },
+      "Issue status updated"
+    );
+
+    // 3. Trigger Notification
+    try {
+      await createNotification(
+        {
+          type: "issue_status_changed",
+          resourceId: issueId,
+          resourceType: "issue",
+          actorId: userId,
+          includeActor: true,
+          issueTitle: currentIssue.title,
+          machineName: currentIssue.machine.name,
+          newStatus: status,
+          issueContext: {
+            assignedToId: currentIssue.assignedTo ?? null,
+            reportedById: currentIssue.reportedBy ?? null,
+          },
+        },
+        tx
+      );
+    } catch (error) {
+      log.error(
+        { error, action: "updateIssueStatus.notifications" },
+        "Failed to send notification"
+      );
+    }
+
+    return { issueId, oldStatus, newStatus: status };
+  });
 }
 
 /**
@@ -312,84 +352,89 @@ export async function assignIssue({
   assignedTo,
   actorId,
 }: AssignIssueParams): Promise<void> {
-  // Get current issue
-  const currentIssue = await db.query.issues.findFirst({
-    where: eq(issues.id, issueId),
-    columns: { machineId: true, title: true, reportedBy: true },
-    with: {
-      machine: true,
-      assignedToUser: {
-        columns: { name: true },
-      },
-    },
-  });
-
-  if (!currentIssue) {
-    throw new Error("Issue not found");
-  }
-
-  // Get new assignee name if assigning to someone
-  let assigneeName = "Unassigned";
-  if (assignedTo) {
-    const assignee = await db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, assignedTo),
-      columns: { name: true },
-    });
-    assigneeName = assignee?.name ?? "Unknown User";
-  }
-
-  // Update assignment
-  await db
-    .update(issues)
-    .set({
-      assignedTo,
-      updatedAt: new Date(),
-    })
-    .where(eq(issues.id, issueId));
-
-  // Auto-watch for assignee
-  if (assignedTo) {
-    await db
-      .insert(issueWatchers)
-      .values({ issueId, userId: assignedTo })
-      .onConflictDoNothing();
-  }
-
-  // Create timeline event
-  const eventMessage = assignedTo
-    ? `Assigned to ${assigneeName}`
-    : "Unassigned";
-  await createTimelineEvent(issueId, eventMessage);
-
-  log.info(
-    { issueId, assignedTo, assigneeName, action: "assignIssue" },
-    "Issue assignment updated"
-  );
-
-  // Trigger Notification
-  try {
-    if (assignedTo) {
-      // Notify
-      await createNotification({
-        type: "issue_assigned",
-        resourceId: issueId,
-        resourceType: "issue",
-        actorId,
-        includeActor: true,
-        issueTitle: currentIssue.title,
-        machineName: currentIssue.machine.name,
-        issueContext: {
-          assignedToId: assignedTo,
-          reportedById: currentIssue.reportedBy ?? null,
+  await db.transaction(async (tx) => {
+    // Get current issue
+    const currentIssue = await tx.query.issues.findFirst({
+      where: eq(issues.id, issueId),
+      columns: { machineId: true, title: true, reportedBy: true },
+      with: {
+        machine: true,
+        assignedToUser: {
+          columns: { name: true },
         },
-      });
+      },
+    });
+
+    if (!currentIssue) {
+      throw new Error("Issue not found");
     }
-  } catch (error) {
-    log.error(
-      { error, action: "assignIssue.notifications" },
-      "Failed to process notifications"
+
+    // Get new assignee name if assigning to someone
+    let assigneeName = "Unassigned";
+    if (assignedTo) {
+      const assignee = await tx.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, assignedTo),
+        columns: { name: true },
+      });
+      assigneeName = assignee?.name ?? "Unknown User";
+    }
+
+    // Update assignment
+    await tx
+      .update(issues)
+      .set({
+        assignedTo,
+        updatedAt: new Date(),
+      })
+      .where(eq(issues.id, issueId));
+
+    // Auto-watch for assignee
+    if (assignedTo) {
+      await tx
+        .insert(issueWatchers)
+        .values({ issueId, userId: assignedTo })
+        .onConflictDoNothing();
+    }
+
+    // Create timeline event
+    const eventMessage = assignedTo
+      ? `Assigned to ${assigneeName}`
+      : "Unassigned";
+    await createTimelineEvent(issueId, eventMessage, tx);
+
+    log.info(
+      { issueId, assignedTo, assigneeName, action: "assignIssue" },
+      "Issue assignment updated"
     );
-  }
+
+    // Trigger Notification
+    try {
+      if (assignedTo) {
+        // Notify
+        await createNotification(
+          {
+            type: "issue_assigned",
+            resourceId: issueId,
+            resourceType: "issue",
+            actorId,
+            includeActor: true,
+            issueTitle: currentIssue.title,
+            machineName: currentIssue.machine.name,
+            issueContext: {
+              assignedToId: assignedTo,
+              reportedById: currentIssue.reportedBy ?? null,
+            },
+          },
+          tx
+        );
+      }
+    } catch (error) {
+      log.error(
+        { error, action: "assignIssue.notifications" },
+        "Failed to process notifications"
+      );
+    }
+  });
 }
 
 /**

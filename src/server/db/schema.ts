@@ -7,6 +7,7 @@ import {
   boolean,
   pgSchema,
   primaryKey,
+  index,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -125,6 +126,7 @@ export const issueWatchers = pgTable(
   },
   (t) => ({
     pk: primaryKey({ columns: [t.issueId, t.userId] }),
+    issueIdIdx: index("idx_issue_watchers_issue_id").on(t.issueId),
   })
 );
 
@@ -154,79 +156,99 @@ export const issueComments = pgTable("issue_comments", {
  *
  * In-app notifications for users.
  */
-export const notifications = pgTable("notifications", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => userProfiles.id, { onDelete: "cascade" }),
-  type: text("type", {
-    enum: [
-      "issue_assigned",
-      "issue_status_changed",
-      "new_comment",
-      "new_issue",
-    ],
-  }).notNull(),
-  resourceId: uuid("resource_id").notNull(), // Generic reference to issue or machine
-  resourceType: text("resource_type", { enum: ["issue", "machine"] }).notNull(),
-  readAt: timestamp("read_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => userProfiles.id, { onDelete: "cascade" }),
+    type: text("type", {
+      enum: [
+        "issue_assigned",
+        "issue_status_changed",
+        "new_comment",
+        "new_issue",
+      ],
+    }).notNull(),
+    resourceId: uuid("resource_id").notNull(), // Generic reference to issue or machine
+    resourceType: text("resource_type", {
+      enum: ["issue", "machine"],
+    }).notNull(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    userUnreadIdx: index("idx_notifications_user_unread").on(
+      t.userId,
+      t.readAt,
+      t.createdAt
+    ),
+  })
+);
 
 /**
  * Notification Preferences Table
  *
  * User preferences for notifications.
  */
-export const notificationPreferences = pgTable("notification_preferences", {
-  userId: uuid("user_id")
-    .primaryKey()
-    .references(() => userProfiles.id, { onDelete: "cascade" }),
-  emailEnabled: boolean("email_enabled").notNull().default(true),
-  inAppEnabled: boolean("in_app_enabled").notNull().default(true),
+export const notificationPreferences = pgTable(
+  "notification_preferences",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => userProfiles.id, { onDelete: "cascade" }),
+    emailEnabled: boolean("email_enabled").notNull().default(true),
+    inAppEnabled: boolean("in_app_enabled").notNull().default(true),
 
-  // Assignment
-  emailNotifyOnAssigned: boolean("email_notify_on_assigned")
-    .notNull()
-    .default(true),
-  inAppNotifyOnAssigned: boolean("in_app_notify_on_assigned")
-    .notNull()
-    .default(true),
+    // Assignment
+    emailNotifyOnAssigned: boolean("email_notify_on_assigned")
+      .notNull()
+      .default(true),
+    inAppNotifyOnAssigned: boolean("in_app_notify_on_assigned")
+      .notNull()
+      .default(true),
 
-  // Status Changes
-  emailNotifyOnStatusChange: boolean("email_notify_on_status_change")
-    .notNull()
-    .default(true),
-  inAppNotifyOnStatusChange: boolean("in_app_notify_on_status_change")
-    .notNull()
-    .default(true),
+    // Status Changes
+    emailNotifyOnStatusChange: boolean("email_notify_on_status_change")
+      .notNull()
+      .default(true),
+    inAppNotifyOnStatusChange: boolean("in_app_notify_on_status_change")
+      .notNull()
+      .default(true),
 
-  // New Comments
-  emailNotifyOnNewComment: boolean("email_notify_on_new_comment")
-    .notNull()
-    .default(true),
-  inAppNotifyOnNewComment: boolean("in_app_notify_on_new_comment")
-    .notNull()
-    .default(true),
+    // New Comments
+    emailNotifyOnNewComment: boolean("email_notify_on_new_comment")
+      .notNull()
+      .default(true),
+    inAppNotifyOnNewComment: boolean("in_app_notify_on_new_comment")
+      .notNull()
+      .default(true),
 
-  // New Issues (Owned Machines)
-  emailNotifyOnNewIssue: boolean("email_notify_on_new_issue")
-    .notNull()
-    .default(true),
-  inAppNotifyOnNewIssue: boolean("in_app_notify_on_new_issue")
-    .notNull()
-    .default(true),
+    // New Issues (Owned Machines)
+    emailNotifyOnNewIssue: boolean("email_notify_on_new_issue")
+      .notNull()
+      .default(true),
+    inAppNotifyOnNewIssue: boolean("in_app_notify_on_new_issue")
+      .notNull()
+      .default(true),
 
-  // Global New Issues (Watch All)
-  emailWatchNewIssuesGlobal: boolean("email_watch_new_issues_global")
-    .notNull()
-    .default(false),
-  inAppWatchNewIssuesGlobal: boolean("in_app_watch_new_issues_global")
-    .notNull()
-    .default(false),
-});
+    // Global New Issues (Watch All)
+    emailWatchNewIssuesGlobal: boolean("email_watch_new_issues_global")
+      .notNull()
+      .default(false),
+    inAppWatchNewIssuesGlobal: boolean("in_app_watch_new_issues_global")
+      .notNull()
+      .default(false),
+  },
+  (t) => ({
+    globalWatchEmailIdx: index("idx_notif_prefs_global_watch_email").on(
+      t.emailWatchNewIssuesGlobal
+    ),
+  })
+);
 
 /**
  * Relations

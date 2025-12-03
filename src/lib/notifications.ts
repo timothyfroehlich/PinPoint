@@ -8,6 +8,7 @@ import {
   issueWatchers,
   machines,
 } from "~/server/db/schema";
+import type { IssueWatcher } from "~/lib/types/database";
 import { sendEmail } from "~/lib/email/client";
 import { log } from "~/lib/logger";
 import { getEmailHtml, getEmailSubject } from "~/lib/notification-formatting";
@@ -20,7 +21,7 @@ export type NotificationType =
 
 type ResourceType = "issue" | "machine";
 
-interface CreateNotificationProps {
+export interface CreateNotificationProps {
   type: NotificationType;
   resourceId: string;
   resourceType: ResourceType;
@@ -53,8 +54,10 @@ export async function createNotification(
     additionalRecipientIds,
     issueContext,
   }: CreateNotificationProps,
-  tx = db
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  txArg: any = db
 ): Promise<void> {
+  const tx = txArg as typeof db;
   log.debug(
     { type, resourceId, actorId, action: "createNotification" },
     "Creating notification"
@@ -128,8 +131,7 @@ export async function createNotification(
       where: eq(issueWatchers.issueId, resourceId),
     });
 
-    addRecipients(...watchers.map((w) => w.userId));
-    addRecipients(issueContext?.reportedById, issueContext?.assignedToId);
+    addRecipients(...watchers.map((w: IssueWatcher) => w.userId));
   }
 
   if (includeActor && actorId) {
@@ -163,8 +165,22 @@ export async function createNotification(
   const emailsToSend = [];
 
   for (const userId of recipientIds) {
-    const prefs = prefsMap.get(userId);
-    if (!prefs) continue; // Should have prefs if in recipient list (or default)
+    const prefs = prefsMap.get(userId) ?? {
+      // Fallback defaults if no prefs found (e.g. trigger failed)
+      userId,
+      emailEnabled: true,
+      inAppEnabled: true,
+      emailNotifyOnAssigned: true,
+      inAppNotifyOnAssigned: true,
+      emailNotifyOnStatusChange: true,
+      inAppNotifyOnStatusChange: true,
+      emailNotifyOnNewComment: true,
+      inAppNotifyOnNewComment: true,
+      emailNotifyOnNewIssue: true,
+      inAppNotifyOnNewIssue: true,
+      emailWatchNewIssuesGlobal: false,
+      inAppWatchNewIssuesGlobal: false,
+    };
 
     // Check specific toggle
     let emailNotify = false;

@@ -1,4 +1,4 @@
-import DOMPurify from "isomorphic-dompurify";
+import sanitizeHtml from "sanitize-html";
 import { getSiteUrl } from "~/lib/url";
 import { type NotificationType } from "~/lib/notifications";
 
@@ -44,7 +44,7 @@ export function getEmailHtml(
     case "new_comment": {
       // Sanitize comment content to prevent XSS
       const sanitizedComment = commentContent
-        ? DOMPurify.sanitize(commentContent)
+        ? sanitizeHtml(commentContent)
         : "";
       body = `New comment:<br/><blockquote>${sanitizedComment}</blockquote>`;
       break;
