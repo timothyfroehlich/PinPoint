@@ -982,6 +982,60 @@ main() {
   echo "🔄 PinPoint Worktree Sync"
   echo ""
 
+  # ============================================================================
+  # PRE-FLIGHT CHECKS
+  # ============================================================================
+
+  print_status info "Running pre-flight checks..."
+
+  # 1. Stop all Supabase instances to avoid port conflicts
+  print_status info "Stopping all Supabase instances..."
+  if [ "$DRY_RUN" = true ]; then
+    echo "[DRY-RUN] Would run: supabase stop --all"
+  else
+    if supabase stop --all >/dev/null 2>&1; then
+      print_status success "All Supabase instances stopped"
+    else
+      print_status warning "No Supabase instances running or stop failed"
+    fi
+  fi
+
+  # 2. Check for and clean up legacy Docker volumes
+  if command -v docker &>/dev/null; then
+    local legacy_volumes=$(docker volume ls --filter label=com.supabase.cli.project=pinpoint-v2 --format '{{.Name}}' 2>/dev/null)
+    if [ -n "$legacy_volumes" ]; then
+      print_status warning "Found legacy pinpoint-v2 Docker volumes"
+      if [ "$DRY_RUN" = true ]; then
+        echo "[DRY-RUN] Would remove: $legacy_volumes"
+      else
+        if prompt_with_timeout "Remove legacy pinpoint-v2 volumes? (y/N):" "N" 10; then
+          echo "$legacy_volumes" | xargs docker volume rm 2>/dev/null
+          print_status success "Legacy volumes removed"
+        fi
+      fi
+    fi
+  fi
+
+  # 3. Update main worktree from origin
+  local main_worktree=$(git worktree list | grep " \[main\]" | awk '{print $1}')
+  if [ -n "$main_worktree" ] && [ -d "$main_worktree" ]; then
+    print_status info "Updating main worktree from origin..."
+    if [ "$DRY_RUN" = true ]; then
+      echo "[DRY-RUN] Would run: cd $main_worktree && git pull origin main"
+    else
+      local pull_output=$(git -C "$main_worktree" pull origin main 2>&1)
+      if echo "$pull_output" | grep -q "Already up to date"; then
+        print_status success "Main worktree already up to date"
+      elif echo "$pull_output" | grep -qi "error\|fatal"; then
+        print_status warning "Failed to update main worktree: $pull_output"
+      else
+        print_status success "Main worktree updated from origin"
+      fi
+    fi
+  fi
+
+  echo ""
+
   # Determine which worktrees to process
   local worktrees_to_process=()
 
