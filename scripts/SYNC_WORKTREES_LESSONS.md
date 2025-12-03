@@ -48,6 +48,13 @@
    - **Script Update**: Add post-merge step to regenerate test schema
    - **Rationale**: Ensures PGlite test instances use exact same schema as production
 
+8. **`db:reset` Doesn't Restart All Services**
+   - **Problem**: After `supabase db reset`, auth and other services remain stopped
+   - **Root Cause**: `db:reset` only restarts database container, not full Supabase stack
+   - **Solution**: Run `supabase stop && supabase start` instead of just `db:reset`
+   - **Impact**: `db:seed-users` fails with ECONNREFUSED on port 54321 (auth service)
+   - **Script Update**: Replace `db:reset:local` with full restart in `db:prepare:test`
+
 ### Best Practices
 
 1. **Pre-Sync Checklist**:
