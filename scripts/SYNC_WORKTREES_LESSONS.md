@@ -41,6 +41,13 @@
    - **Resolution**: Need to investigate pr-567 branch changes vs main changes
    - **Note**: This is a code compatibility issue, not a sync script issue
 
+7. **Test Schema Must Be Auto-Generated**
+   - **Problem**: Test schema (`src/test/setup/schema.sql`) can get out of sync with Drizzle schema after merges
+   - **Root Cause**: Schema changes from merges don't automatically update test schema
+   - **Solution**: Always run `npm run test:generate-schema` after schema changes
+   - **Script Update**: Add post-merge step to regenerate test schema
+   - **Rationale**: Ensures PGlite test instances use exact same schema as production
+
 ### Best Practices
 
 1. **Pre-Sync Checklist**:
@@ -56,6 +63,7 @@
    - Restart Supabase after config changes
 
 3. **Post-Sync Validation**:
+   - Regenerate test schema (`npm run test:generate-schema`)
    - Run database prepare script (`npm run db:prepare:test`)
    - Run preflight checks on critical worktrees
    - Verify E2E tests pass on main before syncing secondaries
@@ -68,6 +76,7 @@
 4. Improve conflict detection - distinguish config.toml from other files
 5. Add post-merge validation option (run preflight)
 6. Add better error messages for manual conflict resolution
+7. Auto-regenerate test schema after merges (`npm run test:generate-schema`)
 
 ### Commands Reference
 
@@ -93,4 +102,7 @@ git ls-files -v supabase/config.toml
 # Manual conflict resolution
 git checkout --ours supabase/config.toml  # Keep worktree-specific config
 git checkout --theirs src/app/**/*.ts     # Accept main changes for code
+
+# Regenerate test schema after schema changes
+npm run test:generate-schema
 ```
