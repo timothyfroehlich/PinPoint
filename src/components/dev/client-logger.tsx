@@ -30,6 +30,37 @@ export function ClientLogger(): null {
     let isSendingLog = false;
 
     /**
+     * Helper to serialize an argument for JSON transmission
+     */
+    function serializeArg(arg: unknown): unknown {
+      if (
+        typeof arg === "string" ||
+        typeof arg === "number" ||
+        typeof arg === "boolean"
+      ) {
+        return arg;
+      }
+      if (arg === null || arg === undefined) {
+        return arg;
+      }
+      if (arg instanceof Error) {
+        return {
+          name: arg.name,
+          message: arg.message,
+          stack: arg.stack,
+        };
+      }
+      try {
+        // Test if it can be serialized
+        JSON.stringify(arg);
+        return arg;
+      } catch {
+        // Handle circular references and unserializable objects
+        return "[Unserializable]";
+      }
+    }
+
+    /**
      * Send a log entry to the backend
      */
     function sendLogToBackend(
@@ -70,14 +101,7 @@ export function ClientLogger(): null {
           body: JSON.stringify({
             level,
             message,
-            args: args.map((arg) => {
-              // Try to serialize args for backend, but handle circular refs
-              try {
-                return JSON.parse(JSON.stringify(arg)) as unknown;
-              } catch {
-                return String(arg);
-              }
-            }),
+            args: args.map(serializeArg),
             timestamp: Date.now(),
             userAgent: navigator.userAgent,
             url: window.location.href,

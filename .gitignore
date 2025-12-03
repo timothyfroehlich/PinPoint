@@ -118,3 +118,4 @@ PROJECT_INDEX.json
 .claude/recycle_bin/
 .playwright-mcp/
 logs_result.json
+/src/app/test-logs/
