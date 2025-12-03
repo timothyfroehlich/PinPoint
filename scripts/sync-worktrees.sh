@@ -770,16 +770,12 @@ restart_supabase() {
     echo "[DRY-RUN] Would run:"
     echo "[DRY-RUN]   supabase stop"
     echo "[DRY-RUN]   supabase start"
-    echo "[DRY-RUN]   npm run db:reset:local"
-    echo "[DRY-RUN]   npm run db:seed"
-    echo "[DRY-RUN]   npm run db:seed-users"
+    echo "[DRY-RUN]   npm run db:reset"
   else
     (cd "$worktree_dir" && {
       supabase stop 2>/dev/null || true
       supabase start >/dev/null 2>&1 || true
-      npm run db:reset:local --silent 2>&1 | grep -v "warn" || true
-      npm run db:seed --silent 2>&1 || true
-      npm run db:seed-users --silent 2>&1 || true
+      npm run db:reset --silent 2>&1 | grep -v "warn" || true
     })
     SUPABASE_RESTARTED[$name]=true
   fi
