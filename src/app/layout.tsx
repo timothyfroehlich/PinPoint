@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type React from "react";
 import "./globals.css";
+import { ClientLogger } from "~/components/dev/client-logger";
 
 export const metadata: Metadata = {
   title: "PinPoint - Pinball Machine Issue Tracking",
@@ -13,9 +14,14 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>): React.JSX.Element {
+  const isDevelopment = process.env.NODE_ENV === "development";
+
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {isDevelopment && <ClientLogger />}
+        {children}
+      </body>
     </html>
   );
 }

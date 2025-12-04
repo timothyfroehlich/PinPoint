@@ -39,6 +39,7 @@ export default [
         window: "readonly",
         navigator: "readonly",
         console: "readonly",
+        fetch: "readonly",
       },
     },
     rules: {
