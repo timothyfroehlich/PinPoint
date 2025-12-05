@@ -62,6 +62,8 @@ export function NotificationList({
         return "You were assigned to an issue";
       case "issue_status_changed":
         return "Issue status updated";
+      case "new_issue":
+        return "New issue reported";
       case "new_comment":
         return "New comment on issue";
       default:

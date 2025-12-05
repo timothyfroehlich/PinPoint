@@ -74,37 +74,7 @@ test.describe("Machines CRUD", () => {
     await expect(addamsCard.getByText("Unplayable")).toBeVisible();
   });
 
-  test("should create a new machine", async ({ page }) => {
-    // Navigate to add new machine page (new URL: /m/new)
-    await page.goto("/m/new");
-    await expect(page).toHaveURL("/m/new");
-    await expect(
-      page.getByRole("heading", { name: "Add New Machine" })
-    ).toBeVisible();
-
-    // Fill out the form
-    const timestamp = Date.now();
-    const machineName = `Test Machine ${timestamp}`;
-    const initials = `TM${Math.floor(Math.random() * 100)}`; // Random initials for uniqueness
-    await page.locator("#name").fill(machineName);
-    await page.locator("#initials").fill(initials);
-
-    // Submit form
-    await page.getByRole("button", { name: "Create Machine" }).click();
-
-    // Should redirect to machine detail page (new URL format: /m/[initials])
-    await expect(page).toHaveURL(new RegExp(`/m/${initials}`));
-
-    // Verify machine name is displayed
-    await expect(
-      page.getByRole("heading", { name: machineName })
-    ).toBeVisible();
-
-    // Verify status is "Operational" (no issues yet)
-    await expect(page.getByTestId("machine-status-badge")).toHaveText(
-      "Operational"
-    );
-  });
+  // Machine creation moved to integration/full suite
 
   test("should display machine issues on detail page", async ({ page }) => {
     // Navigate to The Addams Family (has unplayable issue)
@@ -139,24 +109,5 @@ test.describe("Machines CRUD", () => {
     await expect(page.getByText("Bear Kick opto not working")).toBeVisible();
   });
 
-  test("should show empty state for machine with no issues", async ({
-    page,
-  }) => {
-    // Create a new machine via UI to avoid importing server action
-    await page.goto("/m/new");
-    const machineName = `Empty Machine ${Date.now()}`;
-    const initials = `EM${Math.floor(Math.random() * 100)}`;
-    await page.locator("#name").fill(machineName);
-    await page.locator("#initials").fill(initials);
-    await page.getByRole("button", { name: "Create Machine" }).click();
-
-    // Should be on detail page
-    await expect(page).toHaveURL(new RegExp(`/m/${initials}`));
-
-    // Should show empty state for issues
-    await expect(page.getByText("No issues reported yet")).toBeVisible();
-    await expect(page.getByTestId("detail-open-issues-count")).toContainText(
-      "0"
-    );
-  });
+  // Empty state test (requires creation) moved to integration/full suite
 });

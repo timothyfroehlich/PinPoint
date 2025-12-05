@@ -182,59 +182,6 @@ test.describe("Issues System", () => {
       await expect(page.getByText("Issue created")).toBeVisible();
     });
 
-    test("should support timeline comments, status, and assignee updates", async ({
-      page,
-    }) => {
-      // Navigate to the created issue's detail page
-      await page.goto(issueUrl);
-
-      const commentText = `Operator note ${Date.now()}`;
-      await page.getByPlaceholder("Leave a comment...").fill(commentText);
-      await page.getByRole("button", { name: "Add comment" }).click();
-      await expect(page.getByText(commentText)).toBeVisible();
-
-      await page.getByTestId("issue-status-select").selectOption("in_progress");
-      await page.getByRole("button", { name: "Update Status" }).click();
-      await expect(page.getByTestId("issue-status-badge")).toHaveText(
-        /In Progress/i
-      );
-      await expect(
-        page.getByText(/Status changed from new to in_progress/)
-      ).toBeVisible();
-
-      await page
-        .getByTestId("issue-severity-select")
-        .selectOption("unplayable");
-      await page.getByRole("button", { name: "Update Severity" }).click();
-      await expect(page.getByTestId("issue-severity-badge")).toHaveText(
-        /Unplayable/i
-      );
-      await expect(
-        page.getByText(/Severity changed from playable to unplayable/)
-      ).toBeVisible();
-
-      await page.getByTestId("assignee-picker-trigger").click();
-      await page.getByTestId("assignee-search-input").fill("member");
-      await page
-        .locator('[aria-label="Assignee options"]')
-        .getByRole("button", { name: /Member User/ })
-        .first()
-        .click();
-      await expect(page.getByTestId("assignee-picker-trigger")).toContainText(
-        "Member User"
-      );
-      // Wait for timeline event to appear (use .last() to get most recent event)
-      await expect(
-        page.getByText(/^Assigned to Member User$/).last()
-      ).toBeVisible();
-
-      await page.getByTestId("assignee-picker-trigger").click();
-      await page.getByTestId("assignee-option-unassigned").click();
-      await expect(page.getByTestId("assignee-picker-trigger")).toContainText(
-        "Unassigned"
-      );
-      // Wait for timeline event to appear (use .last() to get most recent event)
-      await expect(page.getByText(/^Unassigned$/).last()).toBeVisible();
-    });
+    // Update tests moved to integration/full suite
   });
 });
