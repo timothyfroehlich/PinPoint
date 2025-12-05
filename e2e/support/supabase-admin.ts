@@ -104,7 +104,21 @@ export async function createTestMachine(ownerId: string) {
     })
     .select()
     .single();
-
   if (error) throw error;
   return data;
+}
+
+/**
+ * Update a user's role directly in the database
+ */
+export async function updateUserRole(
+  userId: string,
+  role: "guest" | "member" | "admin"
+) {
+  const { error } = await supabaseAdmin
+    .from("user_profiles")
+    .update({ role })
+    .eq("id", userId);
+
+  if (error) throw error;
 }

@@ -28,7 +28,9 @@ export async function DashboardLayout({
 
   let userNotifications: (typeof notifications.$inferSelect)[] = [];
   let enrichedNotifications: EnrichedNotification[] = [];
-  let userProfile: { name: string } | undefined;
+  let userProfile:
+    | { name: string; role: "guest" | "member" | "admin" }
+    | undefined;
 
   if (user) {
     userNotifications = await db.query.notifications.findMany({
@@ -77,7 +79,7 @@ export async function DashboardLayout({
 
     userProfile = await db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, user.id),
-      columns: { name: true },
+      columns: { name: true, role: true },
     });
 
     if (!userProfile) {
@@ -87,7 +89,7 @@ export async function DashboardLayout({
       // Refetch profile after healing
       userProfile = await db.query.userProfiles.findFirst({
         where: eq(userProfiles.id, user.id),
-        columns: { name: true },
+        columns: { name: true, role: true },
       });
     }
   }
@@ -96,7 +98,7 @@ export async function DashboardLayout({
     <div className="flex min-h-screen bg-background text-foreground">
       {/* Sidebar - Hidden on mobile for MVP (or we can add a simple toggle later) */}
       <aside className="hidden md:block">
-        <Sidebar />
+        <Sidebar role={userProfile?.role} />
       </aside>
 
       {/* Main Content */}
