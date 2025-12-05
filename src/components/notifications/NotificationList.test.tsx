@@ -31,6 +31,8 @@ describe("NotificationList", () => {
       readAt: null,
       createdAt: new Date(),
       link: "/m/MM/i/1", // Add link
+      machineInitials: "MM",
+      issueNumber: 1,
     },
     // Read notifications are removed from DB, so we don't pass them
   ];
@@ -55,9 +57,8 @@ describe("NotificationList", () => {
     await user.click(trigger);
 
     // Check content
-    expect(
-      await screen.findByText("You were assigned to an issue")
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Assigned to MM-1")).toBeInTheDocument();
+    expect(await screen.findByText("less than a minute ago")).toBeInTheDocument();
   });
 
   it("should call markAsReadAction when dismiss is clicked", async () => {
@@ -108,9 +109,7 @@ describe("NotificationList", () => {
     await user.click(trigger);
 
     // Click the notification link
-    const notificationLink = await screen.findByText(
-      "You were assigned to an issue"
-    );
+    const notificationLink = await screen.findByText("Assigned to MM-1");
     await user.click(notificationLink);
 
     await waitFor(() => {
@@ -127,19 +126,15 @@ describe("NotificationList", () => {
     await user.click(trigger);
 
     // Verify it's open
-    expect(
-      await screen.findByText("You were assigned to an issue")
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Assigned to MM-1")).toBeInTheDocument();
 
     // Click the notification link
-    const notificationLink = screen.getByText("You were assigned to an issue");
+    const notificationLink = screen.getByText("Assigned to MM-1");
     await user.click(notificationLink);
 
     // Verify it closes (content should disappear)
     await waitFor(() => {
-      expect(
-        screen.queryByText("You were assigned to an issue")
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Assigned to MM-1")).not.toBeInTheDocument();
     });
   });
 });
