@@ -851,6 +851,40 @@ git reset --hard HEAD"""
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
             pass
 
+    def sync_python_env(self) -> None:
+        """Ensure Python virtual environment exists and is up to date"""
+        venv_path = self.path / ".venv"
+        req_path = self.path / "scripts" / "requirements.txt"
+
+        if self.dry_run:
+            print(f"[DRY-RUN] Would check/create .venv in {self.name}")
+            if req_path.exists():
+                print(f"[DRY-RUN] Would install requirements from {req_path}")
+            return
+
+        # Create venv if missing
+        if not venv_path.exists():
+            print(f"  Creating .venv in {self.name}...")
+            try:
+                subprocess.run(
+                    [sys.executable, "-m", "venv", str(venv_path)],
+                    check=True, capture_output=True
+                )
+            except subprocess.CalledProcessError as e:
+                print(f"  ⚠️  Failed to create venv: {e}")
+                return
+
+        # Install requirements if present
+        if req_path.exists():
+            pip_path = venv_path / "bin" / "pip"
+            try:
+                subprocess.run(
+                    [str(pip_path), "install", "-r", str(req_path), "--quiet"],
+                    check=True, capture_output=True
+                )
+            except subprocess.CalledProcessError as e:
+                print(f"  ⚠️  Failed to install requirements: {e}")
+
     def restart_supabase(self, non_interactive: bool = False) -> bool:
         """Restart Supabase and reseed database"""
         if self.state.conflicts_present or not self.state.config_fixed:
@@ -925,24 +959,14 @@ git reset --hard HEAD"""
             return True
 
         try:
-            # Reset database
-            print("  Resetting database...")
+            # Run consolidated check script
+            print("  Running validation (npm run check)...")
             subprocess.run(
-                ["npm", "run", "db:reset", "--silent"],
+                ["npm", "run", "check"],
                 cwd=self.path,
                 capture_output=True,
                 check=True,
-                timeout=60
-            )
-
-            # Run integration tests
-            print("  Running integration tests...")
-            subprocess.run(
-                ["npm", "run", "test:integration"],
-                cwd=self.path,
-                capture_output=True,
-                check=True,
-                timeout=300
+                timeout=120
             )
 
             print("  ✅ Validation passed")
@@ -1119,6 +1143,7 @@ class SyncManager:
         if not worktree.state.conflicts_present:
             print()
             print("Phase 5: Dependency & Database Sync")
+            worktree.sync_python_env()
             worktree.run_npm_install(self.non_interactive)
             worktree.restart_supabase(self.non_interactive)
             worktree.regenerate_test_schema()
@@ -1314,6 +1339,19 @@ Notes:
         args.worktree_path = None
     elif args.worktree_path:
         args.path = args.worktree_path
+
+    # Ensure we're running in the virtual environment
+    # Skip if dry-run to avoid infinite loops if venv creation fails in dry-run
+    if not args.dry_run and not os.environ.get("VIRTUAL_ENV"):
+        venv_path = Path.cwd() / ".venv"
+        if venv_path.exists():
+            python_bin = venv_path / "bin" / "python3"
+            if python_bin.exists():
+                print(f"🔄 Restarting in .venv: {python_bin}")
+                try:
+                    os.execv(str(python_bin), [str(python_bin)] + sys.argv)
+                except OSError as e:
+                    print(f"⚠️  Failed to restart in venv: {e}")
 
     print("🔄 PinPoint Worktree Sync")
     print()

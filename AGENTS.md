@@ -204,11 +204,11 @@ Two scripts are available for managing worktrees:
 
 1. **`scripts/sync_worktrees.py`** (recommended) - Modern Python rewrite with:
    - Object-oriented design and better error handling
-   - Unit tests with pytest
-   - Type hints and comprehensive documentation
+   - Auto-manages Python environment (`.venv`)
+   - Consolidated process killing (`npm run kill:zombies`)
    - Usage: `python3 scripts/sync_worktrees.py [--dry-run] [--all] [-y]`
 
-2. **`scripts/sync-worktrees.sh`** (legacy) - Original Bash implementation (1000+ lines)
+2. **`scripts/sync-worktrees.sh`** (legacy) - Original Bash implementation
    - Maintained for backward compatibility
    - Usage: `./scripts/sync-worktrees.sh [options]`
 
