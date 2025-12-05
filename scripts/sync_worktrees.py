@@ -1346,12 +1346,23 @@ Notes:
         venv_path = Path.cwd() / ".venv"
         if venv_path.exists():
             python_bin = venv_path / "bin" / "python3"
-            if python_bin.exists():
-                print(f"🔄 Restarting in .venv: {python_bin}")
-                try:
-                    os.execv(str(python_bin), [str(python_bin)] + sys.argv)
-                except OSError as e:
-                    print(f"⚠️  Failed to restart in venv: {e}")
+            # Check if we are already running with the venv python
+            # Resolve symlinks to be sure
+            try:
+                current_exe = Path(sys.executable).resolve()
+                venv_exe = python_bin.resolve()
+                if current_exe != venv_exe:
+                    print(f"🔄 Restarting in .venv: {python_bin}")
+                    env = os.environ.copy()
+                    env["VIRTUAL_ENV"] = str(venv_path)
+                    # Update PATH to prefer venv bin
+                    env["PATH"] = f"{venv_path / 'bin'}:{env.get('PATH', '')}"
+                    try:
+                        os.execve(str(python_bin), [str(python_bin)] + sys.argv, env)
+                    except OSError as e:
+                        print(f"⚠️  Failed to restart in venv: {e}")
+            except Exception:
+                pass
 
     print("🔄 PinPoint Worktree Sync")
     print()
