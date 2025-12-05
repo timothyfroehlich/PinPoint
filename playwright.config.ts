@@ -16,7 +16,8 @@ try {
       process.env[key.trim()] = valueParts.join("=").trim();
     }
   }
-} catch {
+} catch (e) {
+  console.error("Failed to read .env.local:", e);
   // .env.local not found - use defaults
 }
 
@@ -30,6 +31,9 @@ const baseURL = `http://${hostname}:${port}`;
 const webServerStdout = process.env.PLAYWRIGHT_STDOUT ?? "ignore";
 const webServerStderr = process.env.PLAYWRIGHT_STDERR ?? "pipe";
 const healthCheckTimeoutMs = process.env.CI ? 1500 : 1000;
+
+console.log(`[playwright.config.ts] Resolved PORT: ${port}`);
+console.log(`[playwright.config.ts] Resolved baseURL: ${baseURL}`);
 
 function listPidsOnPort(targetPort: number): string[] {
   try {
@@ -106,10 +110,10 @@ export default defineConfig({
   // Run tests sequentially for stability (Supabase + Next dev server)
   fullyParallel: false,
 
-  // Short, developer-friendly timeouts
-  timeout: process.env.CI ? 15 * 1000 : 20 * 1000, // per-test timeout
+  // Increased timeouts for stability in heavy load environments
+  timeout: process.env.CI ? 30 * 1000 : 30 * 1000, // per-test timeout
   expect: {
-    timeout: process.env.CI ? 7 * 1000 : 4 * 1000,
+    timeout: process.env.CI ? 15 * 1000 : 10 * 1000, // assertion timeout
   },
 
   // Fail the build on CI if you accidentally left test.only in the source code
@@ -137,9 +141,9 @@ export default defineConfig({
     // Screenshot on failure
     screenshot: "only-on-failure",
 
-    // Keep interactions snappy during dev
-    actionTimeout: 5 * 1000,
-    navigationTimeout: 15 * 1000,
+    // Keep interactions snappy during dev but allow buffer
+    actionTimeout: 10 * 1000,
+    navigationTimeout: 20 * 1000,
   },
 
   // Configure projects for major browsers

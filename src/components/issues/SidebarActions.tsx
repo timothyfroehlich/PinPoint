@@ -3,10 +3,10 @@
 import type React from "react";
 import { Label } from "~/components/ui/label";
 import { type IssueWithAllRelations } from "~/lib/types";
-import { AssignIssueForm } from "~/app/(app)/issues/[issueId]/assign-issue-form";
-import { UpdateIssueStatusForm } from "~/app/(app)/issues/[issueId]/update-issue-status-form";
-import { UpdateIssueSeverityForm } from "~/app/(app)/issues/[issueId]/update-issue-severity-form";
-import { UpdateIssuePriorityForm } from "~/app/(app)/issues/[issueId]/update-issue-priority-form";
+import { AssignIssueForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/assign-issue-form";
+import { UpdateIssueStatusForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/update-issue-status-form";
+import { UpdateIssueSeverityForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/update-issue-severity-form";
+import { UpdateIssuePriorityForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/update-issue-priority-form";
 
 interface SidebarActionsProps {
   issue: IssueWithAllRelations;

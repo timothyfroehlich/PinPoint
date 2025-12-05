@@ -1,4 +1,4 @@
-import { eq, and, type InferSelectModel } from "drizzle-orm";
+import { eq, and, type InferSelectModel, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import {
   issues,
@@ -11,13 +11,14 @@ import {
 import { createTimelineEvent } from "~/lib/timeline/events";
 import { createNotification } from "~/lib/notifications";
 import { log } from "~/lib/logger";
+import { formatIssueId } from "~/lib/issues/utils";
 
 // --- Types ---
 
 export interface CreateIssueParams {
   title: string;
   description?: string | null;
-  machineId: string;
+  machineInitials: string;
   severity: string;
   priority?: string;
   reportedBy?: string | null; // Null for anonymous
@@ -58,22 +59,41 @@ export type IssueComment = InferSelectModel<typeof issueComments>;
 
 /**
  * Create a new issue
- * Handles DB insert, timeline event, watchers, and notifications.
+ * Handles DB insert (with sequential numbering), timeline event, watchers, and notifications.
  */
 export async function createIssue({
   title,
   description,
-  machineId,
+  machineInitials,
   severity,
   priority,
   reportedBy,
 }: CreateIssueParams): Promise<Issue> {
   return await db.transaction(async (tx) => {
-    // 1. Insert Issue
+    // 1. Lock machine row and get next number (Atomic increment)
+    const [updatedMachine] = await tx
+      .update(machines)
+      .set({ nextIssueNumber: sql`${machines.nextIssueNumber} + 1` })
+      .where(eq(machines.initials, machineInitials))
+      .returning({
+        nextIssueNumber: machines.nextIssueNumber,
+        name: machines.name,
+        ownerId: machines.ownerId,
+      });
+
+    if (!updatedMachine) {
+      throw new Error(`Machine not found: ${machineInitials}`);
+    }
+
+    // The number we just reserved is (nextIssueNumber - 1) because we incremented it
+    const issueNumber = updatedMachine.nextIssueNumber - 1;
+
+    // 2. Insert Issue
     const [issue] = await tx
       .insert(issues)
       .values({
-        machineId,
+        machineInitials,
+        issueNumber,
         title,
         description: description ?? null,
         severity: severity as "minor" | "playable" | "unplayable",
@@ -85,7 +105,7 @@ export async function createIssue({
 
     if (!issue) throw new Error("Issue creation failed");
 
-    // 2. Create Timeline Event
+    // 3. Create Timeline Event
     await createTimelineEvent(
       issue.id,
       reportedBy ? "Issue created" : "Issue reported via public form",
@@ -95,14 +115,15 @@ export async function createIssue({
     log.info(
       {
         issueId: issue.id,
-        machineId,
+        machineInitials,
+        issueNumber,
         reportedBy,
         action: "createIssue",
       },
       "Issue created successfully"
     );
 
-    // 3. Auto-Watch Logic
+    // 4. Auto-Watch Logic
     // Reporter
     if (reportedBy) {
       await tx
@@ -112,14 +133,9 @@ export async function createIssue({
     }
 
     // Machine Owner (if prefs enabled)
-    const machine = await tx.query.machines.findFirst({
-      where: eq(machines.id, machineId),
-      columns: { name: true, ownerId: true },
-    });
-
-    if (machine?.ownerId) {
+    if (updatedMachine.ownerId) {
       const ownerPrefs = await tx.query.notificationPreferences.findFirst({
-        where: eq(notificationPreferences.userId, machine.ownerId),
+        where: eq(notificationPreferences.userId, updatedMachine.ownerId),
       });
 
       // If owner wants notifications for new issues, auto-watch this specific issue
@@ -129,12 +145,12 @@ export async function createIssue({
       ) {
         await tx
           .insert(issueWatchers)
-          .values({ issueId: issue.id, userId: machine.ownerId })
+          .values({ issueId: issue.id, userId: updatedMachine.ownerId })
           .onConflictDoNothing();
       }
     }
 
-    // 4. Notifications
+    // 5. Notifications
     try {
       // Trigger Notification (actorId optional for public reports)
       await createNotification(
@@ -145,8 +161,9 @@ export async function createIssue({
           ...(reportedBy ? { actorId: reportedBy } : {}),
           includeActor: true,
           issueTitle: title,
-          machineName: machine?.name ?? undefined,
-          issueContext: { machineOwnerId: machine?.ownerId ?? null },
+          machineName: updatedMachine.name,
+          formattedIssueId: formatIssueId(machineInitials, issueNumber),
+          issueContext: { machineOwnerId: updatedMachine.ownerId ?? null },
         },
         tx
       );
@@ -181,7 +198,8 @@ export async function updateIssueStatus({
       where: eq(issues.id, issueId),
       columns: {
         status: true,
-        machineId: true,
+        machineInitials: true, // Changed from machineId
+        issueNumber: true,
         title: true,
         assignedTo: true,
         reportedBy: true,
@@ -227,6 +245,10 @@ export async function updateIssueStatus({
           includeActor: true,
           issueTitle: currentIssue.title,
           machineName: currentIssue.machine.name,
+          formattedIssueId: formatIssueId(
+            currentIssue.machineInitials,
+            currentIssue.issueNumber
+          ),
           newStatus: status,
           issueContext: {
             assignedToId: currentIssue.assignedTo ?? null,
@@ -278,7 +300,13 @@ export async function addIssueComment({
   try {
     const issue = await db.query.issues.findFirst({
       where: eq(issues.id, issueId),
-      columns: { title: true, assignedTo: true, reportedBy: true },
+      columns: {
+        title: true,
+        assignedTo: true,
+        reportedBy: true,
+        machineInitials: true,
+        issueNumber: true,
+      },
       with: { machine: true },
     });
 
@@ -289,6 +317,9 @@ export async function addIssueComment({
       actorId: userId,
       issueTitle: issue?.title ?? undefined,
       machineName: issue?.machine.name ?? undefined,
+      formattedIssueId: issue
+        ? formatIssueId(issue.machineInitials, issue.issueNumber)
+        : undefined,
       commentContent: content,
       issueContext: {
         assignedToId: issue?.assignedTo ?? null,
@@ -356,7 +387,12 @@ export async function assignIssue({
     // Get current issue
     const currentIssue = await tx.query.issues.findFirst({
       where: eq(issues.id, issueId),
-      columns: { machineId: true, title: true, reportedBy: true },
+      columns: {
+        machineInitials: true,
+        issueNumber: true,
+        title: true,
+        reportedBy: true,
+      }, // Changed from machineId
       with: {
         machine: true,
         assignedToUser: {
@@ -420,6 +456,10 @@ export async function assignIssue({
             includeActor: true,
             issueTitle: currentIssue.title,
             machineName: currentIssue.machine.name,
+            formattedIssueId: formatIssueId(
+              currentIssue.machineInitials,
+              currentIssue.issueNumber
+            ),
             issueContext: {
               assignedToId: assignedTo,
               reportedById: currentIssue.reportedBy ?? null,
@@ -451,7 +491,7 @@ export async function updateIssueSeverity({
   // Get current issue to check old severity
   const currentIssue = await db.query.issues.findFirst({
     where: eq(issues.id, issueId),
-    columns: { severity: true, machineId: true },
+    columns: { severity: true, machineInitials: true }, // Changed from machineId
   });
 
   if (!currentIssue) {
@@ -502,7 +542,7 @@ export async function updateIssuePriority({
   // Get current issue to check old priority
   const currentIssue = await db.query.issues.findFirst({
     where: eq(issues.id, issueId),
-    columns: { priority: true, machineId: true },
+    columns: { priority: true, machineInitials: true }, // Changed from machineId
   });
 
   if (!currentIssue) {

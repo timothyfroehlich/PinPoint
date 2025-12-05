@@ -49,12 +49,17 @@ const mockInsertVoid = () => {
   return { values } as unknown as ReturnType<typeof db.insert>;
 };
 
-const mockUpdateChain = () => {
+const mockUpdateReturning = <T>(value: T) => {
+  const returning = vi.fn().mockResolvedValue([value]);
+  const where = vi.fn().mockReturnValue({ returning });
+  const set = vi.fn().mockReturnValue({ where });
+  return { set } as unknown as ReturnType<typeof db.update>;
+};
+
+const mockUpdateVoid = () => {
   const where = vi.fn();
   const set = vi.fn().mockReturnValue({ where });
-  mockDb.update.mockReturnValue({ set } as unknown as ReturnType<
-    typeof db.update
-  >);
+  return { set } as unknown as ReturnType<typeof db.update>;
 };
 
 describe("Issue Service", () => {
@@ -62,7 +67,7 @@ describe("Issue Service", () => {
     mockReset(mockDb);
     vi.clearAllMocks();
     mockDb.insert.mockReturnValue(mockInsertVoid());
-    mockUpdateChain();
+    mockDb.update.mockReturnValue(mockUpdateVoid());
     mockDb.transaction.mockImplementation(async (cb) => {
       return await cb(mockDb as any);
     });
@@ -76,7 +81,7 @@ describe("Issue Service", () => {
 
       mockDb.query.issues.findFirst.mockResolvedValue({
         id: issueId,
-        machineId: "machine-1",
+        machineInitials: "MM",
         title: "Test Issue",
         machine: { name: "Test Machine" },
         assignedToUser: { name: "Old User" },
@@ -116,22 +121,23 @@ describe("Issue Service", () => {
     it("sends new issue notifications without auto-watch", async () => {
       const params = {
         title: "New Issue",
-        machineId: "machine-1",
+        machineInitials: "MM",
         severity: "minor" as const,
         reportedBy: "user-1",
       };
 
-      const mockIssue = { id: "issue-new", ...params };
-
-      mockDb.insert.mockReturnValueOnce(mockInsertReturning(mockIssue));
-
-      mockDb.query.machines.findFirst.mockResolvedValue({
-        id: "machine-1",
+      const mockIssue = { id: "issue-new", ...params, issueNumber: 1 };
+      const mockMachineUpdate = {
+        nextIssueNumber: 2,
         name: "Test Machine",
         ownerId: "owner-1",
-      } as unknown as Awaited<
-        ReturnType<typeof mockDb.query.machines.findFirst>
-      >);
+      };
+
+      // Mock machine update returning next issue number
+      mockDb.update.mockReturnValueOnce(mockUpdateReturning(mockMachineUpdate));
+
+      // Mock issue insert
+      mockDb.insert.mockReturnValueOnce(mockInsertReturning(mockIssue));
 
       await createIssue(params);
 

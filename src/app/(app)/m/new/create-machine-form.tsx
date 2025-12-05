@@ -9,7 +9,7 @@ import { Label } from "~/components/ui/label";
 import {
   createMachineAction,
   type CreateMachineResult,
-} from "~/app/(app)/machines/actions";
+} from "~/app/(app)/m/actions";
 import { cn } from "~/lib/utils";
 import { OwnerSelect } from "~/components/machines/OwnerSelect";
 
@@ -61,6 +61,31 @@ export function CreateMachineForm({
           </p>
         </div>
 
+        {/* Machine Initials */}
+        <div className="space-y-2">
+          <Label htmlFor="initials" className="text-on-surface">
+            Initials *
+          </Label>
+          <Input
+            id="initials"
+            name="initials"
+            type="text"
+            required
+            minLength={2}
+            maxLength={6}
+            placeholder="e.g., MM"
+            className="border-outline bg-surface text-on-surface placeholder:text-on-surface-variant uppercase"
+            onChange={(e) => {
+              e.target.value = e.target.value
+                .toUpperCase()
+                .replace(/[^A-Z0-9]/g, "");
+            }}
+          />
+          <p className="text-xs text-on-surface-variant">
+            2-6 characters. Permanent unique identifier.
+          </p>
+        </div>
+
         {/* Owner Select (Admin Only) */}
         {isAdmin && <OwnerSelect users={allUsers} />}
 
@@ -72,7 +97,7 @@ export function CreateMachineForm({
           >
             Create Machine
           </Button>
-          <Link href="/machines" className="flex-1">
+          <Link href="/m" className="flex-1">
             <Button
               type="button"
               variant="outline"

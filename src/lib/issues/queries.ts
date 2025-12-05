@@ -5,7 +5,7 @@ import { issues } from "~/server/db/schema";
 import { eq, and, desc, isNull, type SQL } from "drizzle-orm";
 
 export interface IssueFilters {
-  machineId?: string | undefined;
+  machineInitials?: string | undefined;
   status?: string | undefined;
   severity?: string | undefined;
   priority?: string | undefined;
@@ -14,13 +14,13 @@ export interface IssueFilters {
 
 export const getIssues = cache(
   async (filters: IssueFilters): Promise<IssueListItem[]> => {
-    const { machineId, status, severity, priority, assignedTo } = filters;
+    const { machineInitials, status, severity, priority, assignedTo } = filters;
 
     // Build where conditions for filtering
     const conditions: SQL[] = [];
 
-    if (machineId) {
-      conditions.push(eq(issues.machineId, machineId));
+    if (machineInitials) {
+      conditions.push(eq(issues.machineInitials, machineInitials));
     }
 
     if (
@@ -61,6 +61,7 @@ export const getIssues = cache(
           columns: {
             id: true,
             name: true,
+            initials: true,
           },
         },
         reportedByUser: {

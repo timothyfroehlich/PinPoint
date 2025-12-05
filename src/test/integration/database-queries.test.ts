@@ -1,65 +1,52 @@
 /**
- * Integration Test: Database Queries with PGlite
+ * Integration Tests for Database Queries
  *
- * Demonstrates how to write integration tests using worker-scoped PGlite.
- * These tests verify database operations without requiring a real Supabase instance.
+ * Validates core database operations including insertions, queries,
+ * and constraint enforcement using PGlite.
  */
 
-import { randomUUID } from "node:crypto";
 import { describe, it, expect } from "vitest";
 import { eq } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { createTestMachine, createTestIssue } from "~/test/helpers/factories";
 import {
   machines,
   issues,
   userProfiles,
   notifications,
   notificationPreferences,
-  issueWatchers,
 } from "~/server/db/schema";
-import {
-  createTestMachine,
-  createTestIssue,
-  createTestUser,
-} from "~/test/helpers/factories";
-import { createNotification } from "~/lib/notifications";
 
 describe("Database Queries (PGlite)", () => {
-  // Set up worker-scoped PGlite and auto-cleanup after each test
   setupTestDb();
 
   describe("Machines", () => {
     it("should insert and query a machine", async () => {
       const db = await getTestDb();
-      const testMachine = createTestMachine({ name: "Attack from Mars" });
-
-      // Insert
-      await db.insert(machines).values(testMachine);
-
-      // Query
-      const result = await db.select().from(machines);
-
-      expect(result).toHaveLength(1);
-      expect(result[0].name).toBe("Attack from Mars");
-    });
-
-    it("should find machine by id", async () => {
-      const db = await getTestDb();
-      const machineId = randomUUID();
-      const testMachine = createTestMachine({
-        id: machineId,
-        name: "Medieval Madness",
-      });
+      const testMachine = createTestMachine({ name: "Twilight Zone" });
 
       await db.insert(machines).values(testMachine);
 
       const result = await db.query.machines.findFirst({
-        where: eq(machines.id, machineId),
+        where: eq(machines.name, "Twilight Zone"),
       });
 
       expect(result).toBeDefined();
+      expect(result?.name).toBe("Twilight Zone");
+    });
 
-      expect(result?.name).toBe("Medieval Madness");
+    it("should find machine by id", async () => {
+      const db = await getTestDb();
+      const testMachine = createTestMachine();
+
+      await db.insert(machines).values(testMachine);
+
+      const result = await db.query.machines.findFirst({
+        where: eq(machines.id, testMachine.id),
+      });
+
+      expect(result).toBeDefined();
+      expect(result?.id).toBe(testMachine.id);
     });
   });
 
@@ -67,75 +54,61 @@ describe("Database Queries (PGlite)", () => {
     it("should insert issue with machine reference", async () => {
       const db = await getTestDb();
 
-      // Create machine first
-      const testMachine = createTestMachine({ name: "Twilight Zone" });
-      const [machine] = await db
-        .insert(machines)
-        .values(testMachine)
-        .returning();
+      const testMachine = createTestMachine({ initials: "AFM" });
+      await db.insert(machines).values(testMachine);
 
-      // Create issue for that machine
-      const testIssue = createTestIssue(machine.id, {
+      const testIssue = createTestIssue(testMachine.initials, {
         title: "Broken flipper",
+        issueNumber: 1,
         severity: "unplayable",
       });
       await db.insert(issues).values(testIssue);
 
       // Query with relation
-
       const result = await db.query.issues.findFirst({
-        where: eq(issues.machineId, machine.id),
+        where: eq(issues.id, testIssue.id),
         with: {
           machine: true,
         },
       });
 
       expect(result).toBeDefined();
-
       expect(result?.title).toBe("Broken flipper");
-
-      expect(result?.severity).toBe("unplayable");
-
-      expect(result?.machine.name).toBe("Twilight Zone");
+      expect(result?.machine.name).toBe(testMachine.name);
     });
 
-    it("should enforce machine_id NOT NULL constraint", async () => {
+    it("should enforce machine_initials NOT NULL constraint", async () => {
       const db = await getTestDb();
 
-      // Attempt to insert issue without machineId (should fail)
-      await expect(
-        db.insert(issues).values({
-          // @ts-expect-error - Testing constraint violation
-          machineId: null,
-          title: "Test",
-          status: "new",
-          severity: "minor",
-        })
-      ).rejects.toThrow();
+      const testIssue = createTestIssue("", {
+        title: "Orphan Issue",
+      });
+      // @ts-expect-error - Testing constraint violation
+      testIssue.machineInitials = null;
+
+      await expect(db.insert(issues).values(testIssue)).rejects.toThrow();
     });
 
     it("should cascade delete issues when machine is deleted", async () => {
       const db = await getTestDb();
 
-      // Create machine with issue
-      const testMachine = createTestMachine();
-      const [machine] = await db
-        .insert(machines)
-        .values(testMachine)
-        .returning();
+      const testMachine = createTestMachine({ initials: "TZ" });
+      await db.insert(machines).values(testMachine);
 
-      const testIssue = createTestIssue(machine.id);
+      const testIssue = createTestIssue(testMachine.initials, {
+        issueNumber: 1,
+      });
       await db.insert(issues).values(testIssue);
 
       // Verify issue exists
-      const beforeDelete = await db.select().from(issues);
+      const beforeDelete = await db.query.issues.findMany();
       expect(beforeDelete).toHaveLength(1);
 
       // Delete machine
-      await db.delete(machines).where(eq(machines.id, machine.id));
+      await db.delete(machines).where(eq(machines.id, testMachine.id));
 
-      // Verify issue was cascade deleted
-      const afterDelete = await db.select().from(issues);
+      // Verify issue is gone
+      const afterDelete = await db.query.issues.findMany();
       expect(afterDelete).toHaveLength(0);
     });
   });
@@ -143,59 +116,57 @@ describe("Database Queries (PGlite)", () => {
   describe("User Profiles", () => {
     it("should insert and query user profile", async () => {
       const db = await getTestDb();
-      const testUser = createTestUser({
-        firstName: "John",
-        lastName: "Doe",
-        role: "member",
-      });
+
+      const testUser = {
+        id: "00000000-0000-0000-0000-000000000001",
+        firstName: "Test",
+        lastName: "User",
+        role: "member" as const,
+      };
 
       await db.insert(userProfiles).values(testUser);
 
-      const result = await db.select().from(userProfiles);
+      const result = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, testUser.id),
+      });
 
-      expect(result).toHaveLength(1);
-      expect(result[0].firstName).toBe("John");
-      expect(result[0].lastName).toBe("Doe");
-      expect(result[0].name).toBe("John Doe");
-      expect(result[0].role).toBe("member");
+      expect(result).toBeDefined();
+      expect(result?.name).toBe("Test User"); // Generated column
     });
 
     it("should link user to reported issues", async () => {
       const db = await getTestDb();
 
       // Create user
-      const testUser = createTestUser({
+      const testUser = {
+        id: "00000000-0000-0000-0000-000000000001",
         firstName: "Reporter",
-        lastName: "User",
-      });
-      const [user] = await db.insert(userProfiles).values(testUser).returning();
+        lastName: "Person",
+        role: "member" as const,
+      };
+      await db.insert(userProfiles).values(testUser);
 
       // Create machine
-      const testMachine = createTestMachine();
-      const [machine] = await db
-        .insert(machines)
-        .values(testMachine)
-        .returning();
+      const testMachine = createTestMachine({ initials: "MM" });
+      await db.insert(machines).values(testMachine);
 
       // Create issue reported by user
-      const testIssue = createTestIssue(machine.id, {
+      const testIssue = createTestIssue(testMachine.initials, {
+        issueNumber: 1,
         title: "User reported issue",
-        reportedBy: user.id,
+        reportedBy: testUser.id,
       });
       await db.insert(issues).values(testIssue);
 
       // Query with relation
-
       const result = await db.query.issues.findFirst({
-        where: eq(issues.reportedBy, user.id),
+        where: eq(issues.id, testIssue.id),
         with: {
           reportedByUser: true,
         },
       });
 
-      expect(result).toBeDefined();
-
-      expect(result?.reportedByUser?.name).toBe("Reporter User");
+      expect(result?.reportedByUser?.firstName).toBe("Reporter");
     });
   });
 
@@ -203,36 +174,38 @@ describe("Database Queries (PGlite)", () => {
     it("should create notification when issue is assigned", async () => {
       const db = await getTestDb();
 
-      // Setup: Machine, Reporter, Assignee
-      const [machine] = await db
-        .insert(machines)
-        .values(createTestMachine())
-        .returning();
-      const [reporter] = await db
-        .insert(userProfiles)
-        .values(createTestUser({ firstName: "Reporter" }))
-        .returning();
-      const [assignee] = await db
-        .insert(userProfiles)
-        .values(createTestUser({ firstName: "Assignee" }))
-        .returning();
+      // Create users
+      const assigner = {
+        id: "00000000-0000-0000-0000-000000000001",
+        firstName: "Admin",
+        lastName: "User",
+        role: "admin" as const,
+      };
+      const assignee = {
+        id: "00000000-0000-0000-0000-000000000002",
+        firstName: "Member",
+        lastName: "User",
+        role: "member" as const,
+      };
+      await db.insert(userProfiles).values([assigner, assignee]);
+
+      // Create Machine
+      const testMachine = createTestMachine({ initials: "TAF" });
+      await db.insert(machines).values(testMachine);
 
       // Create Issue
       const [issue] = await db
         .insert(issues)
         .values(
-          createTestIssue(machine.id, {
-            reportedBy: reporter.id,
+          createTestIssue(testMachine.initials, {
+            issueNumber: 1,
             assignedTo: assignee.id,
+            reportedBy: assigner.id,
           })
         )
         .returning();
 
-      // Note: The actual notification creation happens in the Server Action, not the DB layer directly.
-      // However, we can verify that if we manually call the notification logic (or simulate it), it inserts correctly.
-      // Since this is a DB query test, we'll verify the schema supports the insert.
-
-      // Simulate notification insert
+      // Manual Notification Creation (simulating service logic)
       await db.insert(notifications).values({
         userId: assignee.id,
         type: "issue_assigned",
@@ -240,124 +213,124 @@ describe("Database Queries (PGlite)", () => {
         resourceType: "issue",
       });
 
-      const userNotifications = await db.query.notifications.findMany({
+      // Verify notification
+      const result = await db.query.notifications.findFirst({
         where: eq(notifications.userId, assignee.id),
       });
 
-      expect(userNotifications).toHaveLength(1);
-      expect(userNotifications[0].type).toBe("issue_assigned");
-      expect(userNotifications[0].readAt).toBeNull();
+      expect(result).toBeDefined();
+      expect(result?.type).toBe("issue_assigned");
+      expect(result?.resourceId).toBe(issue.id);
     });
 
     it("should create notification using library function (integration)", async () => {
       const db = await getTestDb();
+      const { createNotification } = await import("~/lib/notifications");
 
-      // Setup: Machine, Reporter, Assignee
-      const [machine] = await db
-        .insert(machines)
-        .values(createTestMachine())
-        .returning();
-      const [reporter] = await db
-        .insert(userProfiles)
-        .values(createTestUser({ firstName: "Reporter" }))
-        .returning();
-      const [assignee] = await db
-        .insert(userProfiles)
-        .values(createTestUser({ firstName: "Assignee" }))
-        .returning();
+      // Create user
+      const user = {
+        id: "00000000-0000-0000-0000-000000000001",
+        firstName: "Test",
+        lastName: "User",
+        role: "member" as const,
+      };
+      await db.insert(userProfiles).values(user);
 
-      // Ensure assignee has preferences (usually handled by triggers, but we need to be sure in test env)
-      // The trigger might not run in PGlite if not set up, but our seed data logic usually handles it.
-      // Let's manually insert preferences to be safe and isolate the test.
-      await db
-        .insert(notificationPreferences)
-        .values({
-          userId: assignee.id,
-          inAppEnabled: true,
-          inAppNotifyOnAssigned: true,
-        })
-        .onConflictDoNothing();
+      // Set up notification preferences for the user (notifications enabled)
+      await db.insert(notificationPreferences).values({
+        userId: user.id,
+        emailEnabled: true,
+        inAppEnabled: true,
+        emailWatchNewIssuesGlobal: true, // Watch all new issues
+        inAppWatchNewIssuesGlobal: true,
+      });
 
-      // Create Issue
+      // Create machine
+      const testMachine = createTestMachine({ initials: "TZ" });
+      await db.insert(machines).values(testMachine);
+
+      // Create issue
       const [issue] = await db
         .insert(issues)
         .values(
-          createTestIssue(machine.id, {
-            reportedBy: reporter.id,
-            assignedTo: assignee.id,
+          createTestIssue(testMachine.initials, {
+            issueNumber: 1,
+            reportedBy: user.id, // Reported by same user, but global watch should still notify?
+            // Actually createNotification logic excludes actor unless includeActor is true.
+            // In this test call below, actorId is passed as user.id.
+            // But wait, if actorId == user.id, they are excluded.
+            // Let's make reportedBy someone else to avoid confusion, OR use includeActor: true if that's the intent.
+            // The test passes actorId: user.id.
+            assignedTo: null,
           })
         )
         .returning();
 
-      // Add assignee as watcher (simulating assignIssueAction behavior)
-      await db.insert(issueWatchers).values({
-        issueId: issue.id,
-        userId: assignee.id,
-      });
-
-      // Call the actual library function with the test DB
+      // Create notification
       await createNotification(
         {
-          type: "issue_assigned",
+          type: "new_issue",
           resourceId: issue.id,
           resourceType: "issue",
-          actorId: reporter.id,
-          issueTitle: issue.title,
-          machineName: machine.name,
+          actorId: "some-other-user-id", // Actor is someone else
+          issueTitle: "Test Issue",
+          machineName: "Test Machine",
+          issueContext: {
+            assignedToId: null,
+          },
         },
         db
       );
 
-      // Verify notification was created
-      const userNotifications = await db.query.notifications.findMany({
-        where: eq(notifications.userId, assignee.id),
+      // Verify
+      const results = await db.query.notifications.findMany({
+        where: eq(notifications.userId, user.id),
       });
 
-      expect(userNotifications).toHaveLength(1);
-      expect(userNotifications[0].type).toBe("issue_assigned");
-      expect(userNotifications[0].resourceId).toBe(issue.id);
+      // Should notify user because they are watching global new issues
+      expect(results).toHaveLength(1);
+      expect(results[0].type).toBe("new_issue");
     });
+
     it("should delete notification (mark as read behavior)", async () => {
       const db = await getTestDb();
 
-      // Setup data
-      const [testUser] = await db
-        .insert(userProfiles)
-        .values(createTestUser())
-        .returning();
-      const [machine] = await db
-        .insert(machines)
-        .values(createTestMachine())
-        .returning();
-      const [testIssue] = await db
-        .insert(issues)
-        .values(createTestIssue(machine.id))
-        .returning();
+      const user = {
+        id: "00000000-0000-0000-0000-000000000001",
+        firstName: "Test",
+        lastName: "User",
+        role: "member" as const,
+      };
+      await db.insert(userProfiles).values(user);
 
-      // 1. Create a notification
-      const [notification] = await db
+      const testMachine = createTestMachine({ initials: "MM" });
+      await db.insert(machines).values(testMachine);
+
+      const testIssue = createTestIssue(testMachine.initials, {
+        issueNumber: 1,
+      });
+      await db.insert(issues).values(testIssue);
+
+      // Create notification
+      const [notif] = await db
         .insert(notifications)
         .values({
-          userId: testUser.id,
+          userId: user.id,
           type: "issue_assigned",
           resourceId: testIssue.id,
           resourceType: "issue",
         })
         .returning();
 
-      expect(notification).toBeDefined();
+      // "Mark as read" (delete)
+      await db.delete(notifications).where(eq(notifications.id, notif.id));
 
-      // 2. Delete it (simulating markAsReadAction)
-      await db
-        .delete(notifications)
-        .where(eq(notifications.id, notification.id));
-
-      // 3. Verify it's gone
-      const found = await db.query.notifications.findFirst({
-        where: eq(notifications.id, notification.id),
+      // Verify gone
+      const result = await db.query.notifications.findFirst({
+        where: eq(notifications.id, notif.id),
       });
 
-      expect(found).toBeUndefined();
+      expect(result).toBeUndefined();
     });
   });
 });

@@ -14,13 +14,13 @@ import {
 import { cn } from "~/lib/utils";
 
 interface CreateIssueFormProps {
-  machines: { id: string; name: string }[];
-  prefilledMachineId?: string;
+  machineInitials: string;
+  machineName: string;
 }
 
 export function CreateIssueForm({
-  machines,
-  prefilledMachineId,
+  machineInitials,
+  machineName,
 }: CreateIssueFormProps): React.JSX.Element {
   const [state, formAction] = useActionState<
     CreateIssueResult | undefined,
@@ -43,33 +43,14 @@ export function CreateIssueForm({
 
       {/* Create Issue Form */}
       <form action={formAction} className="space-y-6">
-        {/* Machine Selector */}
+        <input type="hidden" name="machineInitials" value={machineInitials} />
+
+        {/* Machine Display (Read-only) */}
         <div className="space-y-2">
-          <Label htmlFor="machineId" className="text-on-surface">
-            Machine *
-          </Label>
-          <select
-            id="machineId"
-            name="machineId"
-            defaultValue={prefilledMachineId ?? machines[0]?.id ?? ""}
-            required
-            className="w-full rounded-md border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface"
-            data-testid="machine-select"
-          >
-            {prefilledMachineId == null && !machines.length && (
-              <option value="" disabled>
-                Select a machine
-              </option>
-            )}
-            {machines.map((machine) => (
-              <option key={machine.id} value={machine.id}>
-                {machine.name}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-on-surface-variant">
-            Select the machine with the issue
-          </p>
+          <Label className="text-on-surface">Machine</Label>
+          <div className="rounded-md border border-outline-variant bg-surface-variant px-3 py-2 text-sm text-on-surface font-medium">
+            {machineName} ({machineInitials})
+          </div>
         </div>
 
         {/* Title */}
@@ -85,6 +66,7 @@ export function CreateIssueForm({
             maxLength={200}
             placeholder="Brief description of the issue"
             className="border-outline-variant bg-surface text-on-surface"
+            autoFocus
           />
         </div>
 
@@ -164,7 +146,7 @@ export function CreateIssueForm({
             variant="outline"
             className="border-outline-variant text-on-surface"
           >
-            <Link href="/issues">Cancel</Link>
+            <Link href={`/m/${machineInitials}`}>Cancel</Link>
           </Button>
         </div>
       </form>

@@ -5,7 +5,10 @@
     "paths": {
       "~/*": ["src/*"]
     },
-    "noEmit": true
+    "noEmit": true,
+    "moduleResolution": "NodeNext", // Keep this for modern resolution
+    "target": "es2020", // Explicitly set target for Node.js environment
+    "module": "es2020" // Explicitly set module for Node.js environment
   },
   "include": ["**/*.ts", "**/*.tsx", "../playwright.config.ts"]
 }

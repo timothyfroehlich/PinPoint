@@ -44,7 +44,7 @@ describe("Dashboard Queries (PGlite)", () => {
         .returning();
 
       // Create machine
-      const testMachine = createTestMachine();
+      const testMachine = createTestMachine({ initials: "MM" });
       const [machine] = await db
         .insert(machines)
         .values(testMachine)
@@ -52,18 +52,21 @@ describe("Dashboard Queries (PGlite)", () => {
 
       // Create issues: 2 for user1 (1 open, 1 resolved), 1 for user2
       await db.insert(issues).values([
-        createTestIssue(machine.id, {
+        createTestIssue(machine.initials, {
           title: "Issue 1 for User 1",
+          issueNumber: 1,
           assignedTo: testUser1.id,
           status: "new",
         }),
-        createTestIssue(machine.id, {
+        createTestIssue(machine.initials, {
           title: "Issue 2 for User 1 (resolved)",
+          issueNumber: 2,
           assignedTo: testUser1.id,
           status: "resolved",
         }),
-        createTestIssue(machine.id, {
+        createTestIssue(machine.initials, {
           title: "Issue for User 2",
+          issueNumber: 3,
           assignedTo: testUser2.id,
           status: "new",
         }),
@@ -119,7 +122,7 @@ describe("Dashboard Queries (PGlite)", () => {
       });
       const [user] = await db.insert(userProfiles).values(testUser).returning();
 
-      const testMachine = createTestMachine();
+      const testMachine = createTestMachine({ initials: "RR" });
       const [machine] = await db
         .insert(machines)
         .values(testMachine)
@@ -127,8 +130,9 @@ describe("Dashboard Queries (PGlite)", () => {
 
       // Create 12 issues to test limit of 10
       const issuesData = Array.from({ length: 12 }, (_, i) =>
-        createTestIssue(machine.id, {
+        createTestIssue(machine.initials, {
           title: `Issue ${i + 1}`,
+          issueNumber: i + 1,
           reportedBy: user.id,
           createdAt: new Date(Date.now() - (12 - i) * 1000), // Stagger timestamps
         })
@@ -170,15 +174,16 @@ describe("Dashboard Queries (PGlite)", () => {
       const [machine1, machine2, machine3] = await db
         .insert(machines)
         .values([
-          createTestMachine({ name: "Unplayable Machine" }),
-          createTestMachine({ name: "Playable Machine" }),
-          createTestMachine({ name: "Operational Machine" }),
+          createTestMachine({ name: "Unplayable Machine", initials: "UM" }),
+          createTestMachine({ name: "Playable Machine", initials: "PM" }),
+          createTestMachine({ name: "Operational Machine", initials: "OM" }),
         ])
         .returning();
 
       // Machine 1: unplayable issue (open)
       await db.insert(issues).values(
-        createTestIssue(machine1.id, {
+        createTestIssue(machine1.initials, {
+          issueNumber: 1,
           severity: "unplayable",
           status: "new",
         })
@@ -186,7 +191,8 @@ describe("Dashboard Queries (PGlite)", () => {
 
       // Machine 2: only playable issues (open)
       await db.insert(issues).values(
-        createTestIssue(machine2.id, {
+        createTestIssue(machine2.initials, {
+          issueNumber: 1,
           severity: "playable",
           status: "new",
         })
@@ -194,7 +200,8 @@ describe("Dashboard Queries (PGlite)", () => {
 
       // Machine 3: unplayable issue (resolved - should NOT appear)
       await db.insert(issues).values(
-        createTestIssue(machine3.id, {
+        createTestIssue(machine3.initials, {
+          issueNumber: 1,
           severity: "unplayable",
           status: "resolved",
         })
@@ -244,22 +251,29 @@ describe("Dashboard Queries (PGlite)", () => {
       const db = await getTestDb();
 
       // Create machine
-      const testMachine = createTestMachine();
+      const testMachine = createTestMachine({ initials: "DS" });
       const [machine] = await db
         .insert(machines)
         .values(testMachine)
         .returning();
 
       // Create 3 open issues, 2 resolved
-      await db
-        .insert(issues)
-        .values([
-          createTestIssue(machine.id, { status: "new" }),
-          createTestIssue(machine.id, { status: "in_progress" }),
-          createTestIssue(machine.id, { status: "new" }),
-          createTestIssue(machine.id, { status: "resolved" }),
-          createTestIssue(machine.id, { status: "resolved" }),
-        ]);
+      await db.insert(issues).values([
+        createTestIssue(machine.initials, { issueNumber: 1, status: "new" }),
+        createTestIssue(machine.initials, {
+          issueNumber: 2,
+          status: "in_progress",
+        }),
+        createTestIssue(machine.initials, { issueNumber: 3, status: "new" }),
+        createTestIssue(machine.initials, {
+          issueNumber: 4,
+          status: "resolved",
+        }),
+        createTestIssue(machine.initials, {
+          issueNumber: 5,
+          status: "resolved",
+        }),
+      ]);
 
       // Query total open issues (dashboard stat pattern)
       const totalOpenIssuesResult = await db
@@ -279,30 +293,33 @@ describe("Dashboard Queries (PGlite)", () => {
       const [machine1, machine2, machine3] = await db
         .insert(machines)
         .values([
-          createTestMachine({ name: "Machine 1" }),
-          createTestMachine({ name: "Machine 2" }),
-          createTestMachine({ name: "Machine 3" }),
-          createTestMachine({ name: "Machine 4" }),
+          createTestMachine({ name: "Machine 1", initials: "M1" }),
+          createTestMachine({ name: "Machine 2", initials: "M2" }),
+          createTestMachine({ name: "Machine 3", initials: "M3" }),
+          createTestMachine({ name: "Machine 4", initials: "M4" }),
         ])
         .returning();
 
       // Machine 1: open issue (needs service)
       await db.insert(issues).values(
-        createTestIssue(machine1.id, {
+        createTestIssue(machine1.initials, {
+          issueNumber: 1,
           status: "new",
         })
       );
 
       // Machine 2: open issue (needs service)
       await db.insert(issues).values(
-        createTestIssue(machine2.id, {
+        createTestIssue(machine2.initials, {
+          issueNumber: 1,
           status: "in_progress",
         })
       );
 
       // Machine 3: only resolved issues (operational)
       await db.insert(issues).values(
-        createTestIssue(machine3.id, {
+        createTestIssue(machine3.initials, {
+          issueNumber: 1,
           status: "resolved",
         })
       );
@@ -338,7 +355,7 @@ describe("Dashboard Queries (PGlite)", () => {
       const [user] = await db.insert(userProfiles).values(testUser).returning();
 
       // Create machine
-      const testMachine = createTestMachine();
+      const testMachine = createTestMachine({ initials: "AI" });
       const [machine] = await db
         .insert(machines)
         .values(testMachine)
@@ -346,15 +363,18 @@ describe("Dashboard Queries (PGlite)", () => {
 
       // Create 2 open assigned issues, 1 resolved assigned issue
       await db.insert(issues).values([
-        createTestIssue(machine.id, {
+        createTestIssue(machine.initials, {
+          issueNumber: 1,
           assignedTo: user.id,
           status: "new",
         }),
-        createTestIssue(machine.id, {
+        createTestIssue(machine.initials, {
+          issueNumber: 2,
           assignedTo: user.id,
           status: "in_progress",
         }),
-        createTestIssue(machine.id, {
+        createTestIssue(machine.initials, {
+          issueNumber: 3,
           assignedTo: user.id,
           status: "resolved",
         }),

@@ -109,9 +109,14 @@ test.describe.serial("Member Dashboard", () => {
       await firstIssue.click();
 
       // Should navigate to issue detail page
-      await expect(page).toHaveURL(/\/issues\/[0-9a-f-]+/);
+      await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
+
+      // Use filter to find the specific h1 containing the title, avoiding strict mode violation
+      // with the Dashboard h1
       await expect(
-        page.getByRole("heading", { name: issueTitle })
+        page
+          .getByRole("main")
+          .getByRole("heading", { level: 1, name: issueTitle })
       ).toBeVisible();
     }
   });

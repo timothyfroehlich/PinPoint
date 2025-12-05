@@ -6,7 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { issues, userProfiles, authUsers } from "~/server/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, and } from "drizzle-orm";
 import { Badge } from "~/components/ui/badge";
 import { PageShell } from "~/components/layout/PageShell";
 import { IssueTimeline } from "~/components/issues/IssueTimeline";
@@ -21,6 +21,7 @@ import {
   type IssueSeverity,
   type IssuePriority,
 } from "~/lib/types";
+import { formatIssueId } from "~/lib/issues/utils";
 
 const severityCopy: Record<IssueSeverity, string> = {
   minor: "Minor",
@@ -42,7 +43,7 @@ const priorityCopy: Record<IssuePriority, string> = {
 export default async function IssueDetailPage({
   params,
 }: {
-  params: Promise<{ issueId: string }>;
+  params: Promise<{ initials: string; issueNumber: string }>;
 }): Promise<React.JSX.Element> {
   // Auth guard
   const supabase = await createClient();
@@ -53,17 +54,26 @@ export default async function IssueDetailPage({
   if (!user) throw new Error("Unauthorized");
 
   // Get params (Next.js 16: params is a Promise)
-  const { issueId } = await params;
+  const { initials, issueNumber } = await params;
+  const issueNum = parseInt(issueNumber, 10);
+
+  if (isNaN(issueNum)) {
+    redirect(`/m/${initials}`);
+  }
 
   // Query issue with all relations
   const issue: IssueWithAllRelations | undefined =
     await db.query.issues.findFirst({
-      where: eq(issues.id, issueId),
+      where: and(
+        eq(issues.machineInitials, initials),
+        eq(issues.issueNumber, issueNum)
+      ),
       with: {
         machine: {
           columns: {
             id: true,
             name: true,
+            initials: true,
           },
         },
         reportedByUser: {
@@ -98,7 +108,7 @@ export default async function IssueDetailPage({
     });
 
   if (!issue) {
-    redirect("/issues");
+    redirect(`/m/${initials}`);
   }
 
   // Fetch all users for assignment dropdown
@@ -116,7 +126,7 @@ export default async function IssueDetailPage({
     <PageShell className="space-y-8" size="wide">
       {/* Back button */}
       <Link
-        href="/issues"
+        href={`/m/${initials}/i`}
         className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="size-4" />
@@ -126,13 +136,18 @@ export default async function IssueDetailPage({
       {/* Header */}
       <div className="space-y-3">
         <Link
-          href={`/machines/${issue.machine.id}`}
+          href={`/m/${initials}`}
           className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           {issue.machine.name}
         </Link>
         <div className="space-y-3">
-          <h1>{issue.title}</h1>
+          <h1 className="flex items-center gap-3">
+            <span className="text-muted-foreground font-mono text-2xl">
+              {formatIssueId(initials, issue.issueNumber)}
+            </span>{" "}
+            {issue.title}
+          </h1>
           <div className="flex flex-wrap items-center gap-2">
             <Badge
               data-testid="issue-status-badge"

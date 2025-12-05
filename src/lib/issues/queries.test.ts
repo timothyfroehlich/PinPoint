@@ -42,16 +42,16 @@ describe("getIssues", () => {
     );
   });
 
-  it("should filter by machineId", async () => {
-    const machineId = "123";
-    await getIssues({ machineId });
+  it("should filter by machineInitials", async () => {
+    const machineInitials = "MM";
+    await getIssues({ machineInitials });
 
     expect(db.query.issues.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           op: "and",
           args: expect.arrayContaining([
-            expect.objectContaining({ op: "eq", val: machineId }),
+            expect.objectContaining({ op: "eq", val: machineInitials }),
           ]),
         }),
       })
@@ -131,7 +131,7 @@ describe("getIssues", () => {
 
   it("should combine multiple filters", async () => {
     await getIssues({
-      machineId: "m1",
+      machineInitials: "MM",
       status: "new",
     });
 
@@ -140,7 +140,7 @@ describe("getIssues", () => {
         where: expect.objectContaining({
           op: "and",
           args: expect.arrayContaining([
-            expect.objectContaining({ op: "eq", val: "m1" }),
+            expect.objectContaining({ op: "eq", val: "MM" }),
             expect.objectContaining({ op: "eq", val: "new" }),
           ]),
         }),

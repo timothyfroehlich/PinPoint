@@ -5,18 +5,19 @@ import { type NotificationType } from "~/lib/notifications";
 export function getEmailSubject(
   type: NotificationType,
   issueTitle?: string,
-  machineName?: string
+  machineName?: string,
+  formattedIssueId?: string
 ): string {
   const prefix = machineName ? `[${machineName}] ` : "";
   switch (type) {
     case "new_issue":
-      return `${prefix}New Issue: ${issueTitle}`;
+      return `${prefix}New Issue ${formattedIssueId ? `(${formattedIssueId})` : ""}: ${issueTitle}`;
     case "issue_assigned":
-      return `${prefix}Issue Assigned: ${issueTitle}`;
+      return `${prefix}Issue Assigned ${formattedIssueId ? `(${formattedIssueId})` : ""}: ${issueTitle}`;
     case "issue_status_changed":
-      return `${prefix}Status Changed: ${issueTitle}`;
+      return `${prefix}Status Changed ${formattedIssueId ? `(${formattedIssueId})` : ""}: ${issueTitle}`;
     case "new_comment":
-      return `${prefix}New Comment on: ${issueTitle}`;
+      return `${prefix}New Comment on ${formattedIssueId ? `(${formattedIssueId})` : ""}: ${issueTitle}`;
     default:
       return "PinPoint Notification";
   }
@@ -26,6 +27,7 @@ export function getEmailHtml(
   type: NotificationType,
   issueTitle?: string,
   machineName?: string,
+  formattedIssueId?: string,
   commentContent?: string,
   newStatus?: string
 ): string {
@@ -55,7 +57,7 @@ export function getEmailHtml(
   const machinePrefix = machineName ? `[${machineName}] ` : "";
 
   return `
-      <h2>${machinePrefix}${issueTitle}</h2>
+      <h2>${machinePrefix}${formattedIssueId ? `${formattedIssueId}: ` : ""}${issueTitle}</h2>
       <p>${body}</p>
       <p><a href="${siteUrl}/issues">View Issue</a></p>
     `;
