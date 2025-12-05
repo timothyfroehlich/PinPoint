@@ -67,3 +67,44 @@ export async function confirmUserEmail(email: string): Promise<void> {
     );
   }
 }
+
+/**
+ * Create a test user with verified email
+ */
+export async function createTestUser(
+  email: string,
+  password = "TestPassword123"
+) {
+  const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: {
+      first_name: "Test",
+      last_name: "User",
+    },
+  });
+
+  if (error) throw error;
+  return data.user;
+}
+
+/**
+ * Create a test machine directly in the database
+ */
+export async function createTestMachine(ownerId: string) {
+  const initials = `TM${Math.floor(Math.random() * 10000)}`;
+  const { data, error } = await supabaseAdmin
+    .from("machines")
+    .insert({
+      initials,
+      name: `Test Machine ${initials}`,
+      owner_id: ownerId,
+      next_issue_number: 1,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}

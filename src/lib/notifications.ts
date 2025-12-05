@@ -139,8 +139,13 @@ export async function createNotification(
         ownerPref?.emailNotifyOnNewIssue ||
         ownerPref?.inAppNotifyOnNewIssue
       ) {
+        // console.log(`[DEBUG] Adding owner ${ownerId} to recipients`);
         addRecipients(ownerId);
+      } else {
+        // console.log(`[DEBUG] Owner ${ownerId} has prefs disabled:`, ownerPref);
       }
+    } else {
+      // console.log(`[DEBUG] No ownerId found for new_issue`);
     }
   } else if (resourceType === "issue") {
     const watchers = await tx.query.issueWatchers.findMany({

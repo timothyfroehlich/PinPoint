@@ -6,9 +6,10 @@
       "~/*": ["src/*"]
     },
     "noEmit": true,
-    "moduleResolution": "NodeNext", // Keep this for modern resolution
-    "target": "es2020", // Explicitly set target for Node.js environment
-    "module": "es2020" // Explicitly set module for Node.js environment
+    "moduleResolution": "NodeNext",
+    "target": "es2022",
+    "module": "NodeNext"
   },
-  "include": ["**/*.ts", "**/*.tsx", "../playwright.config.ts"]
+  "include": ["**/*.ts", "**/*.tsx", "../playwright.config.ts"],
+  "exclude": ["../node_modules"]
 }

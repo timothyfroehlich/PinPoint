@@ -24,13 +24,13 @@ try {
 // Default port matches main worktree (3000)
 // Other worktrees should set PORT in .env.local (3100, 3200, 3300)
 // See AGENTS.md for port allocation table
-const port = Number(process.env.PORT ?? "3000");
+const port = Number(process.env["PORT"] ?? "3000");
 // Keep host consistent with Supabase site_url to avoid cookie host mismatches
-const hostname = process.env.PLAYWRIGHT_HOST ?? "localhost";
+const hostname = process.env["PLAYWRIGHT_HOST"] ?? "localhost";
 const baseURL = `http://${hostname}:${port}`;
-const webServerStdout = process.env.PLAYWRIGHT_STDOUT ?? "ignore";
-const webServerStderr = process.env.PLAYWRIGHT_STDERR ?? "pipe";
-const healthCheckTimeoutMs = process.env.CI ? 1500 : 1000;
+const webServerStdout = process.env["PLAYWRIGHT_STDOUT"] ?? "ignore";
+const webServerStderr = process.env["PLAYWRIGHT_STDERR"] ?? "pipe";
+const healthCheckTimeoutMs = process.env["CI"] ? 1500 : 1000;
 
 console.log(`[playwright.config.ts] Resolved PORT: ${port}`);
 console.log(`[playwright.config.ts] Resolved baseURL: ${baseURL}`);
@@ -111,22 +111,22 @@ export default defineConfig({
   fullyParallel: false,
 
   // Increased timeouts for stability in heavy load environments
-  timeout: process.env.CI ? 30 * 1000 : 30 * 1000, // per-test timeout
+  timeout: process.env["CI"] ? 30 * 1000 : 30 * 1000, // per-test timeout
   expect: {
-    timeout: process.env.CI ? 15 * 1000 : 10 * 1000, // assertion timeout
+    timeout: process.env["CI"] ? 15 * 1000 : 10 * 1000, // assertion timeout
   },
 
   // Fail the build on CI if you accidentally left test.only in the source code
-  forbidOnly: !!process.env.CI,
+  forbidOnly: !!process.env["CI"],
 
   // Retry on CI only
-  retries: process.env.CI ? 2 : 0,
+  retries: process.env["CI"] ? 2 : 0,
 
   // Keep a single worker for stability across environments
   workers: 1,
 
   // Reporters: print progress locally; keep CI quiet; never block on HTML
-  reporter: process.env.CI
+  reporter: process.env["CI"]
     ? [["dot"], ["html", { open: "never" }]]
     : [["list"], ["html", { open: "never" }]],
 
@@ -158,8 +158,8 @@ export default defineConfig({
   webServer: {
     command: `PORT=${port} npm run dev`,
     url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: process.env.CI ? 120 * 1000 : 60 * 1000,
+    reuseExistingServer: !process.env["CI"],
+    timeout: process.env["CI"] ? 120 * 1000 : 60 * 1000,
 
     // Default quiet output; override via PLAYWRIGHT_STDOUT/STDERR when debugging
     stdout: (webServerStdout === "inherit" ? "pipe" : webServerStdout) as
