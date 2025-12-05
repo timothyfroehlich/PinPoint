@@ -1,10 +1,10 @@
 import { test, expect } from "@playwright/test";
-import { ensureLoggedIn } from "../support/actions";
+import { loginAs } from "../support/actions";
 import { TEST_USERS } from "../support/constants";
 
 test.describe("Profile Settings", () => {
   test("should update profile and handle cancel", async ({ page }) => {
-    await ensureLoggedIn(page, TEST_USERS.member);
+    await loginAs(page, TEST_USERS.member);
     await page.goto("/settings");
 
     // 1. Update Profile
