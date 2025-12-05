@@ -82,6 +82,7 @@ describe("Issue Service", () => {
       mockDb.query.issues.findFirst.mockResolvedValue({
         id: issueId,
         machineInitials: "MM",
+        issueNumber: 1,
         title: "Test Issue",
         machine: { name: "Test Machine" },
         assignedToUser: { name: "Old User" },
@@ -107,6 +108,7 @@ describe("Issue Service", () => {
           includeActor: true,
           issueTitle: "Test Issue",
           machineName: "Test Machine",
+          formattedIssueId: "MM-01",
           issueContext: {
             assignedToId: assigneeId,
             reportedById: "reporter-1",
@@ -151,6 +153,7 @@ describe("Issue Service", () => {
           includeActor: true,
           issueTitle: "New Issue",
           machineName: "Test Machine",
+          formattedIssueId: "MM-01",
           issueContext: { machineOwnerId: "owner-1" },
         },
         expect.anything()
@@ -172,6 +175,8 @@ describe("Issue Service", () => {
 
       mockDb.query.issues.findFirst.mockResolvedValue({
         title: "Issue Title",
+        machineInitials: "MM",
+        issueNumber: 1,
         machine: { name: "Machine Name" },
         assignedTo: "assignee-1",
         reportedBy: "reporter-1",
@@ -188,6 +193,7 @@ describe("Issue Service", () => {
         actorId: "user-1",
         issueTitle: "Issue Title",
         machineName: "Machine Name",
+        formattedIssueId: "MM-01",
         commentContent: "My comment",
         issueContext: {
           assignedToId: "assignee-1",
@@ -208,6 +214,8 @@ describe("Issue Service", () => {
       mockDb.query.issues.findFirst.mockResolvedValue({
         id: "issue-1",
         status: "new",
+        machineInitials: "MM",
+        issueNumber: 1,
         title: "Issue Title",
         machine: { name: "Machine Name" },
         assignedTo: "assignee-1",
@@ -227,6 +235,7 @@ describe("Issue Service", () => {
           includeActor: true,
           issueTitle: "Issue Title",
           machineName: "Machine Name",
+          formattedIssueId: "MM-01",
           newStatus: "resolved",
           issueContext: {
             assignedToId: "assignee-1",
