@@ -281,6 +281,19 @@ git update-index --skip-worktree supabase/config.toml
   /--------------\
 ```
 
+### Development Loop (How to Run Tests)
+
+To maintain velocity and avoid running the full `preflight` suite (~60s) for every change, use the following protocol:
+
+| Scope             | Command                                                | When to use                                                                      |
+| :---------------- | :----------------------------------------------------- | :------------------------------------------------------------------------------- |
+| **Sanity**        | `npm run check:fast`                                   | **Rule 1**: Run after ANY code change. Checks types, lint, and unit tests (~5s). |
+| **Targeted Unit** | `npm test -- src/path/to/file.test.ts`                 | Debugging a specific unit test failure.                                          |
+| **Targeted Int**  | `npm run test:integration -- src/path/to/file.test.ts` | Debugging a specific DB/API test failure.                                        |
+| **Targeted E2E**  | `npm run smoke -- e2e/smoke/file.spec.ts`              | Debugging a specific UI flow.                                                    |
+| **Full Suite**    | `npm run <script>`                                     | Verifying no regressions in that layer.                                          |
+| **Final Gate**    | `npm run preflight`                                    | **Rule 2**: Run ONLY before submitting/finishing. Runs EVERYTHING.               |
+
 **Distribution & Targets**:
 
 - **70% Unit Tests** (~70-100 tests) - Pure functions, utilities, validation
