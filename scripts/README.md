@@ -12,10 +12,13 @@ This directory contains scripts for managing PinPoint's multi-worktree developme
 
 - Object-oriented design for worktree state management
 - Comprehensive error handling with Python exceptions
-- Unit tested with pytest
+- Unit tested with pytest (18 tests)
 - Rich CLI with argparse
 - Type hints for safety
 - Better code organization and readability
+- **Improved conflict handling**: Distinguishes config.toml from other files with targeted recovery instructions
+- **Post-merge validation**: Optional `--validate` flag to run db:reset + integration tests
+- **Enhanced error messaging**: Clear, actionable recovery commands for different conflict scenarios
 
 ### Usage
 
@@ -35,8 +38,11 @@ python3 scripts/sync_worktrees.py --dry-run
 # Non-interactive mode
 python3 scripts/sync_worktrees.py -y
 
+# Run post-merge validation (db:reset + integration tests)
+python3 scripts/sync_worktrees.py --validate
+
 # Combination
-python3 scripts/sync_worktrees.py --all --dry-run -y
+python3 scripts/sync_worktrees.py --all --dry-run -y --validate
 ```
 
 ### Testing
@@ -109,8 +115,17 @@ Both scripts perform comprehensive worktree management:
 ### Reporting
 
 - Comprehensive status summary
-- Recovery commands for conflicts
-- Next steps guidance
+- **Smart conflict detection**: Distinguishes config.toml conflicts (auto-resolvable) from code conflicts
+- **Actionable recovery commands**: Tailored instructions based on which files have conflicts
+- Next steps guidance with specific commands to run
+
+### Post-merge Validation (Optional)
+
+Use `--validate` flag to run validation after merge:
+
+- Runs `npm run db:reset` to reset database
+- Runs `npm run test:integration` to verify changes
+- Helps catch integration issues early
 
 ## Port Allocation
 

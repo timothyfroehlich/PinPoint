@@ -658,16 +658,67 @@ SUPABASE_SERVICE_ROLE_KEY=
                 self.state.merge_message = "Merged main successfully"
         else:
             self.state.merge_status = MergeStatus.CONFLICTS
-            self.state.merge_message = "Merge conflicts detected"
             self.state.conflicts_present = True
             self.state.update_status(StatusLevel.ERROR)
             
-            # Generate recovery commands
-            recovery = f"""cd {self.path}
+            # Check which files have conflicts
+            conflicted_files = self._get_conflicted_files()
+            
+            # Distinguish config.toml from other conflicts
+            config_conflict = "supabase/config.toml" in conflicted_files
+            other_conflicts = [f for f in conflicted_files if f != "supabase/config.toml"]
+            
+            if config_conflict and not other_conflicts:
+                # Only config.toml has conflicts - can auto-resolve
+                self.state.merge_message = "Merge conflicts in config.toml (auto-resolvable)"
+                recovery = f"""cd {self.path}
 
-# Option 1: Resolve conflicts manually
+# Config.toml conflict detected - recommend accepting main's version
+# Your local port customizations are preserved via skip-worktree
+
+# Auto-resolve (accept main's config structure, restore ports after):
+git checkout --theirs supabase/config.toml
+git add supabase/config.toml
+git commit -m "Merge main (accept config.toml structure)"
+python3 scripts/sync_worktrees.py  # Restore correct ports
+"""
+            elif config_conflict and other_conflicts:
+                # Mixed conflicts - manual intervention needed
+                self.state.merge_message = f"Merge conflicts in config.toml + {len(other_conflicts)} other file(s)"
+                recovery = f"""cd {self.path}
+
+# CONFLICTS IN MULTIPLE FILES - MANUAL RESOLUTION REQUIRED
+# Files with conflicts: {', '.join(conflicted_files)}
+
+# Step 1: Resolve config.toml (accept main's structure)
+git checkout --theirs supabase/config.toml
+git add supabase/config.toml
+
+# Step 2: Resolve other conflicts manually
+# Edit each file, then:
+git add <resolved-files>
+
+# Step 3: Complete merge
+git commit
+
+# Step 4: Restore correct ports
+python3 scripts/sync_worktrees.py
+
+# Alternative: Abort merge entirely
+git merge --abort
+git reset --hard {self.state.pre_merge_sha}
+"""
+            else:
+                # Only non-config conflicts
+                self.state.merge_message = f"Merge conflicts in {len(conflicted_files)} file(s)"
+                recovery = f"""cd {self.path}
+
+# MANUAL CONFLICT RESOLUTION REQUIRED
+# Files with conflicts: {', '.join(conflicted_files)}
+
+# Option 1: Resolve manually
 git status
-# Edit files, then:
+# Edit files to resolve conflicts, then:
 git add <resolved-files>
 git commit
 
@@ -675,10 +726,11 @@ git commit
 git merge --abort
 git reset --hard {self.state.pre_merge_sha}
 
-# Option 3: Accept main's changes
+# Option 3: Accept all main's changes
 git checkout --theirs .
 git add .
-git commit -m "Merge main (accept all main changes)" """
+git commit -m "Merge main (accept all main changes)"
+"""
             
             self.state.add_recovery_command(recovery)
         
@@ -706,6 +758,17 @@ git commit -m "Merge main (accept all main changes)" """
             pass
         
         return None
+    
+    def _get_conflicted_files(self) -> list[str]:
+        """Get list of files with merge conflicts"""
+        try:
+            result = subprocess.run(
+                ["git", "-C", str(self.path), "diff", "--name-only", "--diff-filter=U"],
+                capture_output=True, text=True, check=True
+            )
+            return [f.strip() for f in result.stdout.strip().split('\n') if f.strip()]
+        except subprocess.CalledProcessError:
+            return []
     
     def pop_stash(self) -> bool:
         """Pop stashed changes back"""
@@ -828,14 +891,55 @@ git reset --hard HEAD"""
                 pass
         
         return True
+    
+    def run_validation(self) -> bool:
+        """Run post-merge validation (db:reset + integration tests)"""
+        if self.state.conflicts_present:
+            return False
+        
+        print()
+        print("Running post-merge validation...")
+        
+        if self.dry_run:
+            print("[DRY-RUN] Would run: npm run db:reset && npm run test:integration")
+            return True
+        
+        try:
+            # Reset database
+            print("  Resetting database...")
+            subprocess.run(
+                ["npm", "run", "db:reset", "--silent"],
+                cwd=self.path,
+                capture_output=True,
+                check=True,
+                timeout=60
+            )
+            
+            # Run integration tests
+            print("  Running integration tests...")
+            subprocess.run(
+                ["npm", "run", "test:integration"],
+                cwd=self.path,
+                capture_output=True,
+                check=True,
+                timeout=300
+            )
+            
+            print("  ✅ Validation passed")
+            return True
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+            print(f"  ❌ Validation failed: {e}")
+            self.state.update_status(StatusLevel.WARNING)
+            return False
 
 
 class SyncManager:
     """Manages the sync process across multiple worktrees"""
     
-    def __init__(self, dry_run: bool = False, non_interactive: bool = False):
+    def __init__(self, dry_run: bool = False, non_interactive: bool = False, validate: bool = False):
         self.dry_run = dry_run
         self.non_interactive = non_interactive
+        self.validate = validate
         self.worktrees: list[Worktree] = []
         self.main_worktree_path: Optional[Path] = None
     
@@ -1036,6 +1140,12 @@ class SyncManager:
         else:
             print()
             print("Phase 5: Skipped (conflicts present)")
+        
+        # Phase 6: Post-merge validation (optional)
+        if self.validate and not worktree.state.conflicts_present:
+            print()
+            print("Phase 6: Post-merge Validation")
+            worktree.run_validation()
     
     def generate_report(self) -> None:
         """Generate comprehensive sync report"""
@@ -1200,6 +1310,11 @@ Notes:
         help="Process a specific worktree (single path)"
     )
     parser.add_argument(
+        "--validate",
+        action="store_true",
+        help="Run post-merge validation (db:reset + integration tests)"
+    )
+    parser.add_argument(
         "worktree_path",
         nargs="?",
         type=str,
@@ -1219,7 +1334,11 @@ Notes:
     print()
     
     # Create sync manager
-    manager = SyncManager(dry_run=args.dry_run, non_interactive=args.non_interactive)
+    manager = SyncManager(
+        dry_run=args.dry_run,
+        non_interactive=args.non_interactive,
+        validate=args.validate
+    )
     
     # Run pre-flight checks
     if not manager.pre_flight_checks():
