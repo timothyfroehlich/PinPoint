@@ -1,6 +1,5 @@
 import type React from "react";
 import { cache } from "react";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -30,47 +29,65 @@ import { formatIssueId } from "~/lib/issues/utils";
  * Cached dashboard data fetcher (CORE-PERF-001)
  * Wraps all dashboard queries to prevent duplicate execution within a single request
  */
-const getDashboardData = cache(async (userId: string) => {
-  // Get user profile to get the user's database ID
-  const userProfile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, userId),
-    columns: {
-      id: true,
-      name: true,
-    },
-  });
+const getDashboardData = cache(async (userId?: string) => {
+  let userProfile;
+  let assignedIssues: {
+    id: string;
+    title: string;
+    status: string;
+    severity: string;
+    machineInitials: string;
+    issueNumber: number;
+    createdAt: Date;
+    machine: {
+      id: string;
+      name: string;
+      initials: string;
+    };
+  }[] = [];
+  let myIssuesCount = 0;
 
-  if (!userProfile) {
-    return null;
-  }
+  if (userId) {
+    // Get user profile to get the user's database ID
+    userProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, userId),
+      columns: {
+        id: true,
+        name: true,
+      },
+    });
 
-  // Query 1: Issues assigned to current user (with machine relation)
-  const assignedIssues = await db.query.issues.findMany({
-    where: and(
-      eq(issues.assignedTo, userProfile.id),
-      ne(issues.status, "resolved")
-    ),
-    orderBy: desc(issues.createdAt),
-    limit: 10,
-    with: {
-      machine: {
+    if (userProfile) {
+      // Query 1: Issues assigned to current user (with machine relation)
+      assignedIssues = await db.query.issues.findMany({
+        where: and(
+          eq(issues.assignedTo, userProfile.id),
+          ne(issues.status, "resolved")
+        ),
+        orderBy: desc(issues.createdAt),
+        limit: 10,
+        with: {
+          machine: {
+            columns: {
+              id: true,
+              name: true,
+              initials: true,
+            },
+          },
+        },
         columns: {
           id: true,
-          name: true,
-          initials: true,
+          title: true,
+          status: true,
+          severity: true,
+          machineInitials: true,
+          issueNumber: true,
+          createdAt: true,
         },
-      },
-    },
-    columns: {
-      id: true,
-      title: true,
-      status: true,
-      severity: true,
-      machineInitials: true,
-      issueNumber: true,
-      createdAt: true,
-    },
-  });
+      });
+      myIssuesCount = assignedIssues.length;
+    }
+  }
 
   // Query 2: Recently reported issues (last 10, with machine and reporter)
   const recentIssues = await db.query.issues.findMany({
@@ -142,15 +159,15 @@ const getDashboardData = cache(async (userId: string) => {
     unplayableMachines,
     totalOpenIssues,
     machinesNeedingService,
-    myIssuesCount: assignedIssues.length,
+    myIssuesCount,
   };
 });
 
 /**
- * Member Dashboard Page (Protected Route)
+ * Member Dashboard Page (Public Route)
  *
  * Displays:
- * - Issues assigned to current user
+ * - Issues assigned to current user (Member only)
  * - Recently reported issues (last 10)
  * - Unplayable machines (machines with unplayable issues)
  * - Quick stats (total open issues, machines needing service, issues assigned to me)
@@ -162,16 +179,8 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
-
-  // Fetch all dashboard data with caching
-  const data = await getDashboardData(user.id);
-
-  if (!data) {
-    redirect("/login");
-  }
+  // Fetch all dashboard data with caching (public allowed)
+  const data = await getDashboardData(user?.id);
 
   const {
     assignedIssues,
@@ -232,100 +241,104 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
             </Card>
 
             {/* Issues Assigned to Me */}
-            <Card className="border-primary/20 bg-card glow-primary">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Assigned to Me
-                  </CardTitle>
-                  <CheckCircle2 className="size-4 text-muted-foreground" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div
-                  className="text-3xl font-bold text-foreground"
-                  data-testid="stat-assigned-to-me-value"
-                >
-                  {myIssuesCount}
-                </div>
-              </CardContent>
-            </Card>
+            {user && (
+              <Card className="border-primary/20 bg-card glow-primary">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Assigned to Me
+                    </CardTitle>
+                    <CheckCircle2 className="size-4 text-muted-foreground" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div
+                    className="text-3xl font-bold text-foreground"
+                    data-testid="stat-assigned-to-me-value"
+                  >
+                    {myIssuesCount}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
 
         {/* Issues Assigned to Me Section */}
-        <div className="lg:col-span-2">
-          <h2 className="text-xl font-semibold text-foreground mb-4">
-            Issues Assigned to Me
-          </h2>
-          {assignedIssues.length === 0 ? (
-            <Card className="border-border bg-card">
-              <CardContent className="py-12 text-center">
-                <CheckCircle2 className="mx-auto mb-4 size-12 text-muted-foreground" />
-                <p className="text-lg text-muted-foreground">
-                  No issues assigned to you
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3" data-testid="assigned-issues-list">
-              {assignedIssues.map((issue) => (
-                <Link
-                  key={issue.id}
-                  href={`/m/${issue.machineInitials}/i/${issue.issueNumber}`}
-                >
-                  <Card
-                    className="border-primary/20 bg-card hover:border-primary transition-all hover:glow-primary cursor-pointer"
-                    data-testid="assigned-issue-card"
+        {user && (
+          <div className="lg:col-span-2">
+            <h2 className="text-xl font-semibold text-foreground mb-4">
+              Issues Assigned to Me
+            </h2>
+            {assignedIssues.length === 0 ? (
+              <Card className="border-border bg-card">
+                <CardContent className="py-12 text-center">
+                  <CheckCircle2 className="mx-auto mb-4 size-12 text-muted-foreground" />
+                  <p className="text-lg text-muted-foreground">
+                    No issues assigned to you
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3" data-testid="assigned-issues-list">
+                {assignedIssues.map((issue) => (
+                  <Link
+                    key={issue.id}
+                    href={`/m/${issue.machineInitials}/i/${issue.issueNumber}`}
                   >
-                    <CardHeader>
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <CardTitle className="text-base text-foreground mb-1">
-                            <span className="text-muted-foreground font-mono mr-2">
-                              {formatIssueId(
-                                issue.machineInitials,
-                                issue.issueNumber
-                              )}
-                            </span>{" "}
-                            {issue.title}
-                          </CardTitle>
-                          <p className="text-sm text-muted-foreground">
-                            {issue.machine.name}
-                          </p>
+                    <Card
+                      className="border-primary/20 bg-card hover:border-primary transition-all hover:glow-primary cursor-pointer"
+                      data-testid="assigned-issue-card"
+                    >
+                      <CardHeader>
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <CardTitle className="text-base text-foreground mb-1">
+                              <span className="text-muted-foreground font-mono mr-2">
+                                {formatIssueId(
+                                  issue.machineInitials,
+                                  issue.issueNumber
+                                )}
+                              </span>{" "}
+                              {issue.title}
+                            </CardTitle>
+                            <p className="text-sm text-muted-foreground">
+                              {issue.machine.name}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            {/* Status Badge */}
+                            {isIssueStatus(issue.status) && (
+                              <Badge
+                                className={cn(
+                                  "px-2 py-1 text-xs font-semibold",
+                                  getIssueStatusStyles(issue.status)
+                                )}
+                              >
+                                {getIssueStatusLabel(issue.status)}
+                              </Badge>
+                            )}
+                            {/* Severity Badge */}
+                            {isIssueSeverity(issue.severity) && (
+                              <Badge
+                                className={cn(
+                                  "px-2 py-1 text-xs font-semibold",
+                                  getIssueSeverityStyles(issue.severity)
+                                )}
+                              >
+                                {getIssueSeverityLabel(issue.severity)}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex gap-2">
-                          {/* Status Badge */}
-                          {isIssueStatus(issue.status) && (
-                            <Badge
-                              className={cn(
-                                "px-2 py-1 text-xs font-semibold",
-                                getIssueStatusStyles(issue.status)
-                              )}
-                            >
-                              {getIssueStatusLabel(issue.status)}
-                            </Badge>
-                          )}
-                          {/* Severity Badge */}
-                          {isIssueSeverity(issue.severity) && (
-                            <Badge
-                              className={cn(
-                                "px-2 py-1 text-xs font-semibold",
-                                getIssueSeverityStyles(issue.severity)
-                              )}
-                            >
-                              {getIssueSeverityLabel(issue.severity)}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    </CardHeader>
-                  </Card>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
+                      </CardHeader>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Unplayable Machines Section */}
         <div className="lg:col-span-1">

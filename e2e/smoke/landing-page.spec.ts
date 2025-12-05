@@ -7,20 +7,18 @@
 
 import { test, expect } from "@playwright/test";
 
-test("landing page loads with all key elements", async ({ page }) => {
-  // Navigate to the home page
+test("public dashboard loads with key elements", async ({ page }) => {
+  // Navigate to the home page (should redirect to dashboard)
   await page.goto("/");
 
   // Verify page title
   await expect(page).toHaveTitle(/PinPoint/);
 
-  // Verify main heading
-  await expect(page.getByRole("heading", { name: "PinPoint" })).toBeVisible();
+  // Verify Quick Stats are visible (guest access)
+  await expect(page.getByTestId("quick-stats")).toBeVisible();
 
-  // Verify key navigation elements
+  // Verify key navigation elements in header
   await expect(page.getByTestId("nav-signup")).toBeVisible();
   await expect(page.getByTestId("nav-signin")).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: "Report an Issue" })
-  ).toBeVisible();
+  await expect(page.getByTestId("nav-report-issue")).toBeVisible();
 });

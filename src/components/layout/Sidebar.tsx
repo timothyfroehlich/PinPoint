@@ -1,9 +1,27 @@
+"use client";
+
 import type React from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { LayoutDashboard, Gamepad2, Settings, LogOut } from "lucide-react";
+import { usePathname } from "next/navigation";
+import {
+  LayoutDashboard,
+  Gamepad2,
+  Settings,
+  ChevronLeft,
+  ChevronRight,
+  AlertTriangle,
+  CircleDot,
+} from "lucide-react";
 import { cn } from "~/lib/utils";
-import { logoutAction } from "~/app/(auth)/actions";
+import { Button } from "~/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 
 const sidebarItems = [
   {
@@ -12,10 +30,21 @@ const sidebarItems = [
     icon: LayoutDashboard,
   },
   {
+    title: "Issues",
+    href: "/issues",
+    icon: AlertTriangle,
+  },
+  {
     title: "Machines",
     href: "/m",
     icon: Gamepad2,
   },
+  // {
+  //   title: "Report Issue",
+  //   href: "/report",
+  //   icon: Wrench,
+  //   variant: "accent",
+  // },
 ];
 
 export function Sidebar({
@@ -23,91 +52,155 @@ export function Sidebar({
 }: {
   role?: "guest" | "member" | "admin" | undefined;
 }): React.JSX.Element {
-  // We'll use this for active state styling later if needed,
-  // though for now simple hover effects might suffice for the "half-broken" phase.
-  // const pathname = usePathname();
+  const [collapsed, setCollapsed] = useState(false);
+  const pathname = usePathname();
+
+  // Load state from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedState = window.localStorage.getItem("sidebar-collapsed");
+      if (savedState) {
+        setCollapsed(JSON.parse(savedState) as boolean);
+      }
+    }
+  }, []);
+
+  const toggleSidebar = (): void => {
+    const newState = !collapsed;
+    setCollapsed(newState);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(
+        "sidebar-collapsed",
+        JSON.stringify(newState)
+      );
+    }
+  };
+
+  const NavItem = ({
+    item,
+  }: {
+    item: {
+      title: string;
+      href: string;
+      icon: React.ElementType;
+      variant?: string;
+    };
+  }): React.JSX.Element => {
+    const isActive = pathname === item.href;
+    const isReport = item.variant === "accent";
+
+    const content = (
+      <Link
+        href={item.href}
+        className={cn(
+          "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors relative group",
+          isActive
+            ? "bg-primary/10 text-primary"
+            : "text-muted-foreground hover:bg-primary/10 hover:text-primary",
+          isReport && !collapsed
+            ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground mt-4 mb-2 justify-center"
+            : "",
+          collapsed && "justify-center px-2"
+        )}
+      >
+        <item.icon
+          className={cn(
+            "shrink-0",
+            collapsed ? "size-5" : "size-4",
+            isReport && !collapsed ? "text-primary-foreground" : ""
+          )}
+        />
+        {!collapsed && <span>{item.title}</span>}
+      </Link>
+    );
+
+    if (collapsed) {
+      return (
+        <TooltipProvider delayDuration={0}>
+          <Tooltip>
+            <TooltipTrigger asChild>{content}</TooltipTrigger>
+            <TooltipContent side="right">
+              <p>{item.title}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    return content;
+  };
 
   return (
     <div
       role="navigation"
       aria-label="main navigation"
       data-testid="sidebar"
-      className="flex h-screen w-64 flex-col border-r border-primary/50 bg-card text-card-foreground shadow-[0_0_15px_rgba(74,222,128,0.15)]"
+      className={cn(
+        "flex h-full flex-col border-r border-primary/50 bg-card text-card-foreground shadow-[0_0_15px_rgba(74,222,128,0.15)] transition-all duration-300 ease-in-out overflow-x-hidden",
+        collapsed ? "w-[64px]" : "w-64"
+      )}
     >
       {/* Logo Area */}
-      <div className="flex h-40 items-start justify-start px-4 pt-6 border-b border-primary/20">
+      <div
+        className={cn(
+          "flex h-24 items-center justify-center border-b border-primary/20 transition-all duration-300",
+          collapsed ? "px-0" : "px-4"
+        )}
+      >
         <Link
           href="/dashboard"
-          className="flex w-full items-start justify-start"
+          className="flex size-full items-center justify-center"
         >
-          {/* APC Logo */}
-          <Image
-            src="/apc-logo.png"
-            alt="Austin Pinball Collective"
-            width={200}
-            height={128}
-            className="w-full h-auto max-h-32 object-contain drop-shadow-[0_0_8px_rgba(74,222,128,0.5)]"
-            priority
-          />
+          {collapsed ? (
+            <CircleDot className="size-8 text-primary animate-in fade-in zoom-in duration-300" />
+          ) : (
+            <Image
+              src="/apc-logo.png"
+              alt="Austin Pinball Collective"
+              width={160}
+              height={100}
+              className="w-auto h-20 object-contain drop-shadow-[0_0_8px_rgba(74,222,128,0.5)] animate-in fade-in slide-in-from-left-4 duration-300"
+              priority
+            />
+          )}
         </Link>
       </div>
 
       {/* Navigation */}
-      <div className="flex-1 py-6 px-4 space-y-1">
+      <div className="flex-1 py-6 px-2 space-y-1 overflow-y-auto scrollbar-thin">
         {sidebarItems.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              "text-muted-foreground hover:bg-primary/10 hover:text-primary"
-            )}
-          >
-            <item.icon className="size-4" />
-            {item.title}
-          </Link>
+          <NavItem key={item.href} item={item} />
         ))}
 
         {role === "admin" && (
-          <Link
-            href="/admin/users"
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              "text-muted-foreground hover:bg-primary/10 hover:text-primary"
-            )}
-          >
-            <Settings className="size-4" />
-            Admin
-          </Link>
+          <NavItem
+            item={{
+              title: "Admin",
+              href: "/admin/users",
+              icon: Settings,
+            }}
+          />
         )}
       </div>
 
-      {/* Footer / Settings */}
-      <div className="border-t border-border p-4 space-y-1">
-        <Link
-          href="/settings"
-          className={cn(
-            "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-            "text-muted-foreground hover:bg-primary/10 hover:text-primary"
-          )}
+      {/* Collapse Toggle */}
+      <div className="border-t border-border p-2 flex justify-center">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={toggleSidebar}
+          className="w-full h-10 hover:bg-primary/10 hover:text-primary"
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          <Settings className="size-4" />
-          Settings
-        </Link>
-        {/* Sign Out */}
-        <form action={logoutAction}>
-          <button
-            type="submit"
-            data-testid="sidebar-signout"
-            className={cn(
-              "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              "text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-            )}
-          >
-            <LogOut className="size-4" />
-            Sign Out
-          </button>
-        </form>
+          {collapsed ? (
+            <ChevronRight className="size-4" />
+          ) : (
+            <div className="flex items-center gap-2">
+              <ChevronLeft className="size-4" />
+              <span className="text-xs uppercase font-semibold">Collapse</span>
+            </div>
+          )}
+        </Button>
       </div>
     </div>
   );

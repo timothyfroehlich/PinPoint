@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
-import { loginAs } from "../support/actions";
-import { createTestUser, updateUserRole } from "../support/supabase-admin";
+import { loginAs, logout } from "../support/actions.js";
+import { createTestUser, updateUserRole } from "../support/supabase-admin.js";
 
 test.describe("Privilege Reset on Account Switch", () => {
   let adminEmail: string;
@@ -31,13 +31,8 @@ test.describe("Privilege Reset on Account Switch", () => {
       page.getByRole("heading", { name: "User Management" })
     ).toBeVisible();
 
-    // 2. Logout (using UI or clearing cookies? UI is better for full flow)
-    // Assuming there is a logout button in sidebar or header
-    // Sidebar has "Sign Out"
-    await page.getByRole("button", { name: "Sign Out" }).click();
-
-    // Wait for redirect to login or home
-    await expect(page).toHaveURL("/"); // or /login?
+    // 2. Logout (using shared action)
+    await logout(page);
 
     // 3. Login as Member
     await loginAs(page, { email: memberEmail, password: "TestPassword123" });
@@ -47,9 +42,7 @@ test.describe("Privilege Reset on Account Switch", () => {
 
     // Verify Redirect to Dashboard (Access Denied)
     await expect(page).toHaveURL("/dashboard");
-    await expect(
-      page.getByRole("heading", { name: "Dashboard" })
-    ).toBeVisible();
+    await expect(page.getByTestId("quick-stats")).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "User Management" })
     ).not.toBeVisible();

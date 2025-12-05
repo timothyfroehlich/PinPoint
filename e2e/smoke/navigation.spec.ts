@@ -5,7 +5,7 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { loginAs } from "../support/actions";
+import { loginAs } from "../support/actions.js";
 
 test.describe.serial("Navigation", () => {
   test("unauthenticated navigation - show Sign In and Sign Up buttons", async ({
@@ -14,17 +14,18 @@ test.describe.serial("Navigation", () => {
     // Navigate to home page
     await page.goto("/");
 
-    // Verify navigation shows PinPoint logo
-    await expect(page.getByText("PinPoint").first()).toBeVisible();
+    // Verify Quick Stats are visible instead of old landing page text
+    await expect(page.getByTestId("quick-stats")).toBeVisible();
 
-    // Verify Sign In and Sign Up buttons are visible (use test ids to avoid strict conflicts)
+    // Verify Sign In and Sign Up buttons are visible (use test ids)
     await expect(page.getByTestId("nav-signin")).toBeVisible();
     await expect(page.getByTestId("nav-signup")).toBeVisible();
 
     // Verify Report Issue shortcut is available to guests
-    await expect(
-      page.getByRole("link", { name: "Report Issue" })
-    ).toBeVisible();
+    await expect(page.getByTestId("nav-report-issue")).toBeVisible();
+
+    // Verify Pre-Beta Banner is present
+    await expect(page.getByText("Pre-Beta Notice")).toBeVisible();
   });
 
   test("authenticated navigation - show quick links and user menu", async ({
@@ -38,14 +39,24 @@ test.describe.serial("Navigation", () => {
     await expect(sidebar).toBeVisible();
 
     // Verify primary navigation links exist
+    // Verify Sidebar Items (Common)
     await expect(
       sidebar.getByRole("link", { name: "Dashboard" })
     ).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: "Issues" })).toBeVisible();
     await expect(sidebar.getByRole("link", { name: "Machines" })).toBeVisible();
-    // The "Issues" link has been removed, so no need to check for it.
 
-    // Settings + Sign Out entries should be present
-    await expect(sidebar.getByRole("link", { name: "Settings" })).toBeVisible();
-    await expect(page.getByTestId("sidebar-signout")).toBeVisible();
+    // Verify User Menu Items
+    const userMenu = page.getByTestId("user-menu-button");
+    await expect(userMenu).toBeVisible();
+    await userMenu.click();
+
+    const menuContent = page.getByRole("menu");
+    await expect(
+      menuContent.getByRole("menuitem", { name: "Settings" })
+    ).toBeVisible();
+    await expect(
+      menuContent.getByRole("menuitem", { name: "Sign Out" })
+    ).toBeVisible();
   });
 });

@@ -5,14 +5,13 @@
  * These are part of the full suite, not the smoke suite.
  */
 
-import { test, expect, type Page } from "@playwright/test";
-import { getPasswordResetLink, deleteAllMessages } from "../support/mailpit";
-import { confirmUserEmail } from "../support/supabase-admin";
+import { test, expect } from "@playwright/test";
+import { loginAs, logout } from "../support/actions.js";
+import { seededMember } from "../support/constants.js";
+import { getPasswordResetLink, deleteAllMessages } from "../support/mailpit.js";
+import { confirmUserEmail } from "../support/supabase-admin.js";
 
-const signOutThroughSidebar = async (page: Page): Promise<void> => {
-  await page.getByTestId("sidebar-signout").click();
-  await expect(page).toHaveURL("/");
-};
+// Removed local signOut helper in favor of shared action
 
 test.describe("Extended Authentication", () => {
   test("signup flow - create new account and access dashboard", async ({
@@ -20,10 +19,14 @@ test.describe("Extended Authentication", () => {
   }) => {
     // Navigate to signup page
     await page.goto("/");
-    await page.getByTestId("hero-signup").click();
+    console.log("On homepage, clicking signup...");
+    const signupBtn = page.getByTestId("nav-signup");
+    await expect(signupBtn).toBeVisible({ timeout: 5000 });
+    await signupBtn.click();
+    console.log("Clicked signup, waiting for URL...");
 
     // Verify we're on the signup page
-    await expect(page).toHaveURL("/signup");
+    await expect(page).toHaveURL(/\/signup/, { timeout: 15000 });
     await expect(
       page.getByRole("heading", { name: "Create Account" })
     ).toBeVisible();
@@ -49,18 +52,12 @@ test.describe("Extended Authentication", () => {
     await confirmUserEmail(testEmail);
 
     // Now login to establish session
-    await page.goto("/login");
-    await page.getByLabel("Email").fill(testEmail);
-    await page.getByLabel("Password").fill(password);
-    await page.getByRole("button", { name: "Sign In" }).click();
+    await loginAs(page, { email: testEmail, password });
 
     // Should redirect to dashboard after successful login
     await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
 
     // Verify dashboard content (quick stats present)
-    await expect(
-      page.getByRole("heading", { name: "Dashboard" })
-    ).toBeVisible();
     await expect(page.getByTestId("quick-stats")).toBeVisible();
     await expect(page.getByTestId("stat-open-issues-value")).toBeVisible();
   });
@@ -68,8 +65,8 @@ test.describe("Extended Authentication", () => {
   test("protected route - redirect to login when not authenticated", async ({
     page,
   }) => {
-    // Try to access dashboard without being logged in
-    await page.goto("/dashboard");
+    // Try to access protected page (issues) without being logged in
+    await page.goto("/issues");
     await page.waitForURL("/login"); // Explicitly wait for the redirect
 
     // Should redirect to login page
@@ -78,25 +75,18 @@ test.describe("Extended Authentication", () => {
   });
 
   test("logout flow - sign out and verify redirect", async ({ page }) => {
-    // Login first
-    await page.goto("/login");
-    await page.getByLabel("Email").fill("member@test.com");
-    await page.getByLabel("Password").fill("TestPassword123");
-    await page.getByRole("button", { name: "Sign In" }).click();
+    // Login first using helper
+    await loginAs(page, seededMember);
 
     // Wait for dashboard to load
     await expect(page).toHaveURL("/dashboard");
-    await expect(
-      page.getByRole("heading", { name: "Dashboard" })
-    ).toBeVisible();
+    await expect(page.getByTestId("quick-stats")).toBeVisible();
 
-    // Sign out via sidebar
-    await signOutThroughSidebar(page);
+    // Sign out via header
+    await logout(page);
 
-    // Verify we're logged out by trying to access dashboard
-    await page.goto("/dashboard");
-    await page.waitForURL("/login"); // Explicitly wait for the redirect
-    await expect(page).toHaveURL("/login");
+    // Verify we're logged out
+    await expect(page.getByTestId("nav-signin")).toBeVisible();
   });
 
   test("password reset flow - user journey only", async ({ page }) => {
@@ -127,7 +117,7 @@ test.describe("Extended Authentication", () => {
     await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
 
     // Sign out to start reset journey
-    await signOutThroughSidebar(page);
+    await logout(page);
 
     await deleteAllMessages(testEmail);
 
@@ -157,9 +147,11 @@ test.describe("Extended Authentication", () => {
     await page.getByRole("button", { name: "Update Password" }).click();
 
     // Log in with new password (handle being auto-signed-in from reset flow)
+    // Log in with new password (handle being auto-signed-in from reset flow)
     await page.goto("/login");
-    if (await page.getByRole("heading", { name: "Dashboard" }).isVisible()) {
-      await signOutThroughSidebar(page);
+    // Check if we were redirected to dashboard (meaning we are logged in)
+    if (page.url().includes("/dashboard")) {
+      await logout(page);
       await page.goto("/login");
     }
 
@@ -167,12 +159,10 @@ test.describe("Extended Authentication", () => {
     await page.getByLabel("Password").fill(newPassword);
     await page.getByRole("button", { name: "Sign In" }).click();
     await expect(page).toHaveURL("/dashboard");
-    await expect(
-      page.getByRole("heading", { name: "Dashboard" })
-    ).toBeVisible();
+    await expect(page.getByTestId("quick-stats")).toBeVisible();
 
     // Cleanup
-    await signOutThroughSidebar(page);
+    await logout(page);
     await deleteAllMessages(testEmail);
   });
 });

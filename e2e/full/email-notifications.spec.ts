@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
-import { MailpitClient } from "../support/mailpit";
-import { TEST_USERS } from "../support/constants";
+import { MailpitClient } from "../support/mailpit.js";
+import { TEST_USERS } from "../support/constants.js";
+import { deleteTestIssueByNumber } from "e2e/support/supabase-admin.js";
 
 /**
  * Email notification verification tests
@@ -15,6 +16,15 @@ import { TEST_USERS } from "../support/constants";
 
 test.describe("Email Notifications", () => {
   const mailpit = new MailpitClient();
+  const cleanupIssues: { initials: string; number: number }[] = [];
+
+  test.afterAll(async () => {
+    for (const issue of cleanupIssues) {
+      await deleteTestIssueByNumber(issue.initials, issue.number).catch(
+        () => undefined
+      );
+    }
+  });
 
   test("should send email when issue is created", async ({ page }) => {
     // Clear mailbox before test
@@ -25,9 +35,7 @@ test.describe("Email Notifications", () => {
     await page.getByLabel("Email").fill(TEST_USERS.admin.email);
     await page.getByLabel("Password").fill(TEST_USERS.admin.password);
     await page.getByRole("button", { name: "Sign In" }).click();
-    await expect(
-      page.getByRole("heading", { name: "Dashboard", exact: true })
-    ).toBeVisible();
+    await expect(page.getByTestId("quick-stats")).toBeVisible();
 
     // Create an issue for a specific machine (e.g., MM)
     await page.goto("/m/MM/report");
@@ -38,7 +46,21 @@ test.describe("Email Notifications", () => {
 
     // Wait for redirect to issue page (new URL format)
     await expect(page).toHaveURL(/\/m\/MM\/i\/[0-9]+/);
+    const url = page.url();
+    const issueIdMatch = /\/i\/(\d+)/.exec(url);
+    const issueId = issueIdMatch?.[1];
 
+    if (issueId) {
+      cleanupIssues.push({ initials: "MM", number: parseInt(issueId) });
+      // Note: This is an integer ID (issue_number), but deleteTestIssue expects UUID usually?
+      // Wait, let's check schema. Issue ID is UUID or Int?
+      // Based on URL it's integer issue_number.
+      // deleteTestIssue deletes by "id" which works if we get the "id" (UUID) or if we delete by issue_number/machine_id.
+      // But we only have issue_number here.
+      // Actually, supabaseAdmin delete by "id" usually implies the primary key.
+      // Issues table: id is generic UUID? Or bigserial?
+      // Let's check schema/types.
+    }
     // Wait for email to arrive in Mailpit
     const email = await mailpit.waitForEmail(TEST_USERS.admin.email, {
       subjectContains: "Test Issue for Email",
@@ -61,9 +83,7 @@ test.describe("Email Notifications", () => {
     await page.getByLabel("Email").fill(TEST_USERS.admin.email);
     await page.getByLabel("Password").fill(TEST_USERS.admin.password);
     await page.getByRole("button", { name: "Sign In" }).click();
-    await expect(
-      page.getByRole("heading", { name: "Dashboard", exact: true })
-    ).toBeVisible();
+    await expect(page.getByTestId("quick-stats")).toBeVisible();
 
     // Create issue for a specific machine (e.g., MM)
     await page.goto("/m/MM/report");
@@ -86,6 +106,12 @@ test.describe("Email Notifications", () => {
     await page.getByTestId("issue-status-select").selectOption("in_progress");
     await page.getByRole("button", { name: "Update Status" }).click();
     await expect(page.getByTestId("status-update-success")).toBeVisible();
+
+    const url = page.url();
+    const issueIdMatch = /\/i\/(\d+)/.exec(url);
+    if (issueIdMatch) {
+      cleanupIssues.push({ initials: "MM", number: parseInt(issueIdMatch[1]) });
+    }
 
     // Wait for status change email
     const email = await mailpit.waitForEmail(TEST_USERS.admin.email, {

@@ -27,6 +27,7 @@ test.describe("Admin User Management", () => {
 
     // Navigate to Admin Users Page
     await page.goto("/admin/users");
+    // Verify we are on User Management page
     await expect(
       page.getByRole("heading", { name: "User Management" })
     ).toBeVisible();
@@ -82,8 +83,6 @@ test.describe("Admin User Management", () => {
 
     // Should be redirected to dashboard
     await expect(page).toHaveURL("/dashboard");
-    await expect(
-      page.getByRole("heading", { name: "Dashboard" })
-    ).toBeVisible();
+    await expect(page.getByTestId("quick-stats")).toBeVisible();
   });
 });
