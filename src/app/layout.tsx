@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type React from "react";
 import "./globals.css";
+import { Toaster } from "sonner";
 import { ClientLogger } from "~/components/dev/client-logger";
 
 export const metadata: Metadata = {
@@ -21,6 +22,7 @@ export default function RootLayout({
       <body>
         {isDevelopment && <ClientLogger />}
         {children}
+        <Toaster />
       </body>
     </html>
   );

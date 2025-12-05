@@ -18,7 +18,11 @@ const sidebarItems = [
   },
 ];
 
-export function Sidebar(): React.JSX.Element {
+export function Sidebar({
+  role,
+}: {
+  role?: "guest" | "member" | "admin" | undefined;
+}): React.JSX.Element {
   // We'll use this for active state styling later if needed,
   // though for now simple hover effects might suffice for the "half-broken" phase.
   // const pathname = usePathname();
@@ -63,6 +67,19 @@ export function Sidebar(): React.JSX.Element {
             {item.title}
           </Link>
         ))}
+
+        {role === "admin" && (
+          <Link
+            href="/admin/users"
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+              "text-muted-foreground hover:bg-primary/10 hover:text-primary"
+            )}
+          >
+            <Settings className="size-4" />
+            Admin
+          </Link>
+        )}
       </div>
 
       {/* Footer / Settings */}
