@@ -1,9 +1,9 @@
 import { test, expect } from "@playwright/test";
-import { loginAs } from "../support/actions";
-import { createTestUser, updateUserRole } from "../support/supabase-admin";
+import { loginAs } from "../support/actions.js";
+import { createTestUser, updateUserRole } from "../support/supabase-admin.js";
 
-const ARTIFACT_DIR =
-  "/home/froeht/.gemini/antigravity/brain/48ca0616-c3f4-47ce-bb79-6277d89c967c";
+// Use a relative path for artifacts or default to test-results
+const ARTIFACT_DIR = "test-results/screenshots";
 
 test.describe("Admin Screenshots", () => {
   let adminEmail: string;
@@ -28,7 +28,9 @@ test.describe("Admin Screenshots", () => {
     await expect(
       page.getByRole("heading", { name: "User Management" })
     ).toBeVisible();
-    await page.waitForTimeout(1000); // Wait for animations/avatars
+
+    // Wait for table content to be fully loaded
+    await expect(page.getByRole("row").first()).toBeVisible();
 
     // Screenshot 1: User List
     await page.screenshot({
@@ -40,7 +42,9 @@ test.describe("Admin Screenshots", () => {
     // Find a user row (not self)
     const row = page.getByRole("row").filter({ hasText: "user1_" }).first();
     await row.getByRole("combobox").click();
-    await page.waitForTimeout(500); // Wait for dropdown animation
+
+    // Wait for dropdown animation/content
+    await expect(page.getByRole("option", { name: "Guest" })).toBeVisible();
 
     await page.screenshot({ path: `${ARTIFACT_DIR}/role_dropdown.png` });
   });

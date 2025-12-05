@@ -48,6 +48,7 @@ export function UserRoleSelect({
 
   return (
     <Select
+      key={currentRole}
       defaultValue={currentRole}
       onValueChange={handleRoleChange}
       disabled={

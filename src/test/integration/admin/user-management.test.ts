@@ -1,23 +1,15 @@
-import {
-  describe,
-  it,
-  expect,
-  beforeAll,
-  afterAll,
-  vi,
-  beforeEach,
-} from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { randomUUID } from "node:crypto";
-import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { updateUserRole } from "~/app/(app)/admin/users/actions";
 import { createTestUser } from "~/test/helpers/factories";
+import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 
 // Mock next/cache
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
-  redirect: vi.fn(), // Add redirect if used
+  redirect: vi.fn(),
 }));
 
 // Mock Supabase Server Client
@@ -31,21 +23,35 @@ vi.mock("~/lib/supabase/server", () => ({
     }),
 }));
 
+// Mock the global db to point to our test db from PGlite
+vi.mock("~/server/db", async () => {
+  const { getTestDb } = await import("~/test/setup/pglite");
+  const db = await getTestDb();
+  return { db };
+});
+
 describe("Admin User Management Integration", () => {
+  setupTestDb();
+
   let adminUser: { id: string; email: string } | undefined;
   let targetUser: { id: string; email: string } | undefined;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+
     // Create Admin User
     const adminId = randomUUID();
     const adminEmail = `admin-${Date.now()}@test.com`;
 
     // Insert into auth.users (raw SQL as it's not in drizzle schema usually, or use sql template)
-    await db.execute(
+    await (
+      await getTestDb()
+    ).execute(
       `INSERT INTO auth.users (id, email) VALUES ('${adminId}', '${adminEmail}')`
     );
 
-    // Profile is auto-created by trigger. Update it with test data.
+    // Profile is auto-created by trigger in production, but PGlite schema might lack the trigger.
+    // Manually insert profile.
     const adminProfileData = createTestUser({
       id: adminId,
       firstName: "Admin",
@@ -53,10 +59,7 @@ describe("Admin User Management Integration", () => {
       role: "admin",
     });
 
-    await db
-      .update(userProfiles)
-      .set(adminProfileData)
-      .where(eq(userProfiles.id, adminId));
+    await (await getTestDb()).insert(userProfiles).values(adminProfileData);
 
     adminUser = { id: adminId, email: adminEmail };
 
@@ -64,7 +67,9 @@ describe("Admin User Management Integration", () => {
     const targetId = randomUUID();
     const targetEmail = `target-${Date.now()}@test.com`;
 
-    await db.execute(
+    await (
+      await getTestDb()
+    ).execute(
       `INSERT INTO auth.users (id, email) VALUES ('${targetId}', '${targetEmail}')`
     );
 
@@ -75,27 +80,9 @@ describe("Admin User Management Integration", () => {
       role: "member",
     });
 
-    await db
-      .update(userProfiles)
-      .set(targetProfileData)
-      .where(eq(userProfiles.id, targetId));
+    await (await getTestDb()).insert(userProfiles).values(targetProfileData);
 
     targetUser = { id: targetId, email: targetEmail };
-  });
-
-  afterAll(async () => {
-    if (adminUser) {
-      await db.execute(`DELETE FROM auth.users WHERE id = '${adminUser.id}'`);
-      await db.delete(userProfiles).where(eq(userProfiles.id, adminUser.id));
-    }
-    if (targetUser) {
-      await db.execute(`DELETE FROM auth.users WHERE id = '${targetUser.id}'`);
-      await db.delete(userProfiles).where(eq(userProfiles.id, targetUser.id));
-    }
-  });
-
-  beforeEach(() => {
-    vi.clearAllMocks();
   });
 
   it("should allow admin to change user role", async () => {
@@ -104,7 +91,9 @@ describe("Admin User Management Integration", () => {
 
     await updateUserRole(targetUser!.id, "admin");
 
-    const updatedProfile = await db.query.userProfiles.findFirst({
+    const updatedProfile = await (
+      await getTestDb()
+    ).query.userProfiles.findFirst({
       where: eq(userProfiles.id, targetUser!.id),
     });
     expect(updatedProfile?.role).toBe("admin");
@@ -118,7 +107,9 @@ describe("Admin User Management Integration", () => {
       "Admins cannot demote themselves"
     );
 
-    const profile = await db.query.userProfiles.findFirst({
+    const profile = await (
+      await getTestDb()
+    ).query.userProfiles.findFirst({
       where: eq(userProfiles.id, adminUser!.id),
     });
     expect(profile?.role).toBe("admin");
@@ -126,7 +117,7 @@ describe("Admin User Management Integration", () => {
 
   it("should prevent non-admin from changing roles", async () => {
     // Reset Target User to Member (it was made admin in first test)
-    await db
+    await (await getTestDb())
       .update(userProfiles)
       .set({ role: "member" })
       .where(eq(userProfiles.id, targetUser!.id));

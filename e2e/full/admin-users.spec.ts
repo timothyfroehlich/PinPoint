@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
-import { loginAs } from "../support/actions";
-import { createTestUser, updateUserRole } from "../support/supabase-admin";
+import { loginAs } from "../support/actions.js";
+import { createTestUser, updateUserRole } from "../support/supabase-admin.js";
 
 test.describe("Admin User Management", () => {
   let adminEmail: string;
@@ -71,13 +71,7 @@ test.describe("Admin User Management", () => {
   });
 
   test("non-admin cannot access admin page", async ({ page }) => {
-    // Login as Target User (who was made admin in previous test? No, tests run in parallel or serial? Default is parallel but beforeAll is shared if in same file?
-    // Wait, if I change target user role in first test, it affects second test if they share state.
-    // Playwright tests in same file run in parallel by default unless configured otherwise, but beforeAll runs once per worker.
-    // If I want isolation, I should create fresh users for each test or use serial mode.
-    // I'll use separate users for this test or just use `test.describe.serial`.
-
-    // Actually, let's create a fresh member for this test to be safe.
+    // Create a member user to test access control be safe.
     const memberEmail = `member_${Date.now()}@example.com`;
     await createTestUser(memberEmail);
 
