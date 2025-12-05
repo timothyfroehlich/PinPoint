@@ -57,7 +57,7 @@ export default async function IssueDetailPage({
   const { initials, issueNumber } = await params;
   const issueNum = parseInt(issueNumber, 10);
 
-  if (isNaN(issueNum)) {
+  if (isNaN(issueNum) || issueNum < 1) {
     redirect(`/m/${initials}`);
   }
 
