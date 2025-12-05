@@ -361,7 +361,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 
 - **Style**: Conventional commits (`feat:`, `fix:`, `chore:`)
 - **Before pushing**: ALWAYS run `npm run preflight` (runs typecheck, lint, format, test, build, test:integration)
-- **PRs**: Clear description, screenshots for UI changes
+- **PRs**: Clear description, screenshots for UI changes. **UPDATE CHANGELOG.md** with a brief description of changes.
 - **No migrations**: Schema changes via direct modification only
 
 ## Quality Gates
