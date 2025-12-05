@@ -5,7 +5,11 @@
     "paths": {
       "~/*": ["src/*"]
     },
-    "noEmit": true
+    "noEmit": true,
+    "moduleResolution": "NodeNext",
+    "target": "es2022",
+    "module": "NodeNext"
   },
-  "include": ["**/*.ts", "**/*.tsx", "../playwright.config.ts"]
+  "include": ["**/*.ts", "**/*.tsx", "../playwright.config.ts"],
+  "exclude": ["../node_modules"]
 }

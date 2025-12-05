@@ -30,6 +30,7 @@ describe("NotificationList", () => {
       resourceType: "issue" as const,
       readAt: null,
       createdAt: new Date(),
+      link: "/m/MM/i/1", // Add link
     },
     // Read notifications are removed from DB, so we don't pass them
   ];

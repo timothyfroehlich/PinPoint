@@ -17,18 +17,18 @@ import {
 } from "~/app/(app)/notifications/actions";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { type notifications } from "~/server/db/schema"; // Import notifications schema
 
-interface Notification {
-  id: string;
-  type: "issue_assigned" | "issue_status_changed" | "new_comment" | "new_issue";
-  resourceId: string;
-  resourceType: "issue" | "machine";
-  readAt: Date | null;
-  createdAt: Date;
+// Define the base notification type from the Drizzle schema
+type BaseNotification = typeof notifications.$inferSelect;
+
+// Extend it for the enriched notifications used in the UI
+export interface EnrichedNotification extends BaseNotification {
+  link: string;
 }
 
 interface NotificationListProps {
-  notifications: Notification[];
+  notifications: EnrichedNotification[]; // Use EnrichedNotification here
 }
 
 export function NotificationList({
@@ -56,24 +56,24 @@ export function NotificationList({
     });
   };
 
-  const getNotificationText = (n: Notification): string => {
+  const getNotificationText = (n: EnrichedNotification): string => {
     switch (n.type) {
       case "issue_assigned":
         return "You were assigned to an issue";
       case "issue_status_changed":
         return "Issue status updated";
-      case "new_comment":
-        return "New comment on issue";
       case "new_issue":
         return "New issue reported";
+      case "new_comment":
+        return "New comment on issue";
       default:
         return "New notification";
     }
   };
 
-  const getLink = (n: Notification): string => {
-    if (n.resourceType === "issue") return `/issues/${n.resourceId}`;
-    return `/machines/${n.resourceId}`;
+  const getLink = (n: EnrichedNotification): string => {
+    // We expect 'link' to always be present for EnrichedNotification
+    return n.link;
   };
 
   return (

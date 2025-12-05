@@ -2,9 +2,17 @@ import type React from "react";
 import { Sidebar } from "./Sidebar";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { notifications, userProfiles } from "~/server/db/schema";
-import { eq, desc } from "drizzle-orm";
-import { NotificationList } from "~/components/notifications/NotificationList";
+import {
+  notifications,
+  userProfiles,
+  issues,
+  machines,
+} from "~/server/db/schema";
+import { eq, desc, inArray } from "drizzle-orm";
+import {
+  NotificationList,
+  type EnrichedNotification,
+} from "~/components/notifications/NotificationList";
 import { UserMenu } from "./user-menu-client";
 import { ensureUserProfile } from "~/lib/auth/profile";
 
@@ -19,6 +27,7 @@ export async function DashboardLayout({
   } = await supabase.auth.getUser();
 
   let userNotifications: (typeof notifications.$inferSelect)[] = [];
+  let enrichedNotifications: EnrichedNotification[] = [];
   let userProfile: { name: string } | undefined;
 
   if (user) {
@@ -26,6 +35,44 @@ export async function DashboardLayout({
       where: eq(notifications.userId, user.id),
       orderBy: [desc(notifications.createdAt)],
       limit: 20,
+    });
+
+    // Enrich notifications with links
+    const issueIds = userNotifications
+      .filter((n) => n.resourceType === "issue")
+      .map((n) => n.resourceId);
+    const machineIds = userNotifications
+      .filter((n) => n.resourceType === "machine")
+      .map((n) => n.resourceId);
+
+    const issuesData =
+      issueIds.length > 0
+        ? await db.query.issues.findMany({
+            where: inArray(issues.id, issueIds),
+            columns: { id: true, machineInitials: true, issueNumber: true },
+          })
+        : [];
+
+    const machinesData =
+      machineIds.length > 0
+        ? await db.query.machines.findMany({
+            where: inArray(machines.id, machineIds),
+            columns: { id: true, initials: true },
+          })
+        : [];
+
+    enrichedNotifications = userNotifications.map((n) => {
+      let link = "/dashboard";
+      if (n.resourceType === "issue") {
+        const issue = issuesData.find((i) => i.id === n.resourceId);
+        if (issue) link = `/m/${issue.machineInitials}/i/${issue.issueNumber}`;
+      } else {
+        // If not an issue, it must be a machine based on resourceType enum
+        const machine = machinesData.find((m) => m.id === n.resourceId);
+        if (machine) link = `/m/${machine.initials}`;
+      }
+      // Ensure all properties of EnrichedNotification are present
+      return { ...n, link };
     });
 
     userProfile = await db.query.userProfiles.findFirst({
@@ -61,7 +108,7 @@ export async function DashboardLayout({
           <div className="flex items-center gap-4">
             {user && (
               <>
-                <NotificationList notifications={userNotifications} />
+                <NotificationList notifications={enrichedNotifications} />
                 <UserMenu userName={userProfile?.name ?? "User"} />
               </>
             )}

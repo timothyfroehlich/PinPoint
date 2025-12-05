@@ -8,6 +8,9 @@ import {
   pgSchema,
   primaryKey,
   index,
+  integer,
+  check,
+  unique,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -60,17 +63,25 @@ export const userProfiles = pgTable("user_profiles", {
  *
  * Pinball machines in the collection.
  */
-export const machines = pgTable("machines", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull(),
-  ownerId: uuid("owner_id").references(() => userProfiles.id),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const machines = pgTable(
+  "machines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    initials: text("initials").notNull().unique(),
+    nextIssueNumber: integer("next_issue_number").notNull().default(1),
+    name: text("name").notNull(),
+    ownerId: uuid("owner_id").references(() => userProfiles.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  () => ({
+    initialsCheck: check("initials_check", sql`initials ~ '^[A-Z0-9]{2,6}$'`),
+  })
+);
 
 /**
  * Issues Table
@@ -82,9 +93,10 @@ export const issues = pgTable(
   "issues",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    machineId: uuid("machine_id")
+    machineInitials: text("machine_initials")
       .notNull()
-      .references(() => machines.id, { onDelete: "cascade" }),
+      .references(() => machines.initials, { onDelete: "cascade" }),
+    issueNumber: integer("issue_number").notNull(),
     title: text("title").notNull(),
     description: text("description"),
     status: text("status", { enum: ["new", "in_progress", "resolved"] })
@@ -105,8 +117,13 @@ export const issues = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
-  }
-  // No additional table-level constraints needed; machineId is already NOT NULL.
+  },
+  (t) => ({
+    uniqueIssueNumber: unique("unique_issue_number").on(
+      t.machineInitials,
+      t.issueNumber
+    ),
+  })
 );
 
 /**
@@ -281,8 +298,8 @@ export const machinesRelations = relations(machines, ({ many, one }) => ({
 
 export const issuesRelations = relations(issues, ({ one, many }) => ({
   machine: one(machines, {
-    fields: [issues.machineId],
-    references: [machines.id],
+    fields: [issues.machineInitials],
+    references: [machines.initials],
   }),
   reportedByUser: one(userProfiles, {
     fields: [issues.reportedBy],
@@ -298,17 +315,6 @@ export const issuesRelations = relations(issues, ({ one, many }) => ({
   watchers: many(issueWatchers),
 }));
 
-export const issueWatchersRelations = relations(issueWatchers, ({ one }) => ({
-  issue: one(issues, {
-    fields: [issueWatchers.issueId],
-    references: [issues.id],
-  }),
-  user: one(userProfiles, {
-    fields: [issueWatchers.userId],
-    references: [userProfiles.id],
-  }),
-}));
-
 export const issueCommentsRelations = relations(issueComments, ({ one }) => ({
   issue: one(issues, {
     fields: [issueComments.issueId],
@@ -316,6 +322,17 @@ export const issueCommentsRelations = relations(issueComments, ({ one }) => ({
   }),
   author: one(userProfiles, {
     fields: [issueComments.authorId],
+    references: [userProfiles.id],
+  }),
+}));
+
+export const issueWatchersRelations = relations(issueWatchers, ({ one }) => ({
+  issue: one(issues, {
+    fields: [issueWatchers.issueId],
+    references: [issues.id],
+  }),
+  user: one(userProfiles, {
+    fields: [issueWatchers.userId],
     references: [userProfiles.id],
   }),
 }));

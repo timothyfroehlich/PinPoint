@@ -1,22 +1,22 @@
 import type React from "react";
+import { notFound } from "next/navigation";
 import { Plus } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { machines } from "~/server/db/schema";
-import { desc } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { CreateIssueForm } from "./create-issue-form";
 
 /**
  * Report New Issue Page (Protected Route)
  *
- * Form to report a new issue with machine selector.
- * Can be pre-filled with ?machineId=xxx from machine pages.
+ * Form to report a new issue for a specific machine.
  */
 export default async function NewIssuePage({
-  searchParams,
+  params,
 }: {
-  searchParams: Promise<{ machineId?: string }>;
+  params: Promise<{ initials: string }>;
 }): Promise<React.JSX.Element> {
   // Auth guard
   const supabase = await createClient();
@@ -26,18 +26,21 @@ export default async function NewIssuePage({
 
   if (!user) throw new Error("Unauthorized");
 
-  // Get search params (Next.js 16: searchParams is a Promise)
-  const params = await searchParams;
-  const prefilledMachineId = params.machineId;
+  // Get params (Next.js 16: params is a Promise)
+  const { initials } = await params;
 
-  // Fetch all machines for dropdown
-  const allMachines = await db.query.machines.findMany({
-    orderBy: desc(machines.name),
+  // Fetch machine
+  const machine = await db.query.machines.findFirst({
+    where: eq(machines.initials, initials),
     columns: {
-      id: true,
       name: true,
+      initials: true,
     },
   });
+
+  if (!machine) {
+    notFound();
+  }
 
   return (
     <main className="min-h-screen bg-surface py-8">
@@ -51,14 +54,14 @@ export default async function NewIssuePage({
               </CardTitle>
             </div>
             <p className="text-sm text-on-surface-variant">
-              Report a new issue with a pinball machine
+              Report a new issue for {machine.name}
             </p>
           </CardHeader>
 
           <CardContent>
             <CreateIssueForm
-              machines={allMachines}
-              {...(prefilledMachineId && { prefilledMachineId })}
+              machineInitials={machine.initials}
+              machineName={machine.name}
             />
           </CardContent>
         </Card>

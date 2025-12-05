@@ -21,7 +21,8 @@ CREATE TABLE "issue_watchers" (
 
 CREATE TABLE "issues" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"machine_id" uuid NOT NULL,
+	"machine_initials" text NOT NULL,
+	"issue_number" integer NOT NULL,
 	"title" text NOT NULL,
 	"description" text,
 	"status" text DEFAULT 'new' NOT NULL,
@@ -31,15 +32,20 @@ CREATE TABLE "issues" (
 	"assigned_to" uuid,
 	"resolved_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "unique_issue_number" UNIQUE("machine_initials","issue_number")
 );
 
 CREATE TABLE "machines" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"initials" text NOT NULL,
+	"next_issue_number" integer DEFAULT 1 NOT NULL,
 	"name" text NOT NULL,
 	"owner_id" uuid,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "machines_initials_unique" UNIQUE("initials"),
+	CONSTRAINT "initials_check" CHECK (initials ~ '^[A-Z0-9]{2,6}$')
 );
 
 CREATE TABLE "notification_preferences" (
@@ -83,7 +89,7 @@ ALTER TABLE "issue_comments" ADD CONSTRAINT "issue_comments_issue_id_issues_id_f
 ALTER TABLE "issue_comments" ADD CONSTRAINT "issue_comments_author_id_user_profiles_id_fk" FOREIGN KEY ("author_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "issue_watchers" ADD CONSTRAINT "issue_watchers_issue_id_issues_id_fk" FOREIGN KEY ("issue_id") REFERENCES "public"."issues"("id") ON DELETE cascade ON UPDATE no action;
 ALTER TABLE "issue_watchers" ADD CONSTRAINT "issue_watchers_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE cascade ON UPDATE no action;
-ALTER TABLE "issues" ADD CONSTRAINT "issues_machine_id_machines_id_fk" FOREIGN KEY ("machine_id") REFERENCES "public"."machines"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "issues" ADD CONSTRAINT "issues_machine_initials_machines_initials_fk" FOREIGN KEY ("machine_initials") REFERENCES "public"."machines"("initials") ON DELETE cascade ON UPDATE no action;
 ALTER TABLE "issues" ADD CONSTRAINT "issues_reported_by_user_profiles_id_fk" FOREIGN KEY ("reported_by") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "issues" ADD CONSTRAINT "issues_assigned_to_user_profiles_id_fk" FOREIGN KEY ("assigned_to") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "machines" ADD CONSTRAINT "machines_owner_id_user_profiles_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;

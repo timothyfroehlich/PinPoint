@@ -20,7 +20,7 @@ const uuidish = z
  * Validates:
  * - title: Required, trimmed, 1-200 characters
  * - description: Optional, trimmed
- * - machineId: Required UUID (CORE-ARCH-004)
+ * - machineInitials: Required (Plan: Machine Initials)
  * - severity: Enum of 'minor' | 'playable' | 'unplayable'
  */
 export const createIssueSchema = z.object({
@@ -30,7 +30,11 @@ export const createIssueSchema = z.object({
     .max(200, "Title must be less than 200 characters")
     .trim(),
   description: z.string().trim().optional(),
-  machineId: uuidish,
+  machineInitials: z
+    .string()
+    .min(2, "Machine initials invalid")
+    .max(6, "Machine initials invalid")
+    .regex(/^[A-Z0-9]+$/, "Machine initials invalid"),
   severity: z.enum(["minor", "playable", "unplayable"], {
     message: "Invalid severity level",
   }),

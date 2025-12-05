@@ -1,6 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-
-import { seededMember } from "./constants";
+import { TEST_USERS } from "./constants";
 
 interface LoginOptions {
   email?: string;
@@ -13,8 +12,8 @@ interface LoginOptions {
 export async function loginAs(
   page: Page,
   {
-    email = seededMember.email,
-    password = seededMember.password,
+    email = TEST_USERS.member.email,
+    password = TEST_USERS.member.password,
   }: LoginOptions = {}
 ): Promise<void> {
   await page.goto("/login");

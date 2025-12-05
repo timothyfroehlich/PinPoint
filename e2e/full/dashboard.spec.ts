@@ -6,7 +6,7 @@
  */
 
 import { test, expect, type Page } from "@playwright/test";
-import { loginAs } from "../support/actions";
+import { ensureLoggedIn } from "../support/actions";
 
 async function getStatNumber(page: Page, testId: string): Promise<number> {
   const rawText = await page.getByTestId(testId).innerText();
@@ -28,7 +28,7 @@ function ensureCardsOrEmpty(
 
 test.describe.serial("Member Dashboard", () => {
   test("dashboard loads with all sections", async ({ page }) => {
-    await loginAs(page);
+    await ensureLoggedIn(page);
 
     // Quick Stats
     await expect(
@@ -95,7 +95,7 @@ test.describe.serial("Member Dashboard", () => {
   });
 
   test("dashboard issue cards link to issue detail pages", async ({ page }) => {
-    await loginAs(page);
+    await ensureLoggedIn(page);
 
     // Check if there are any issue cards
     const issueCards = page.getByTestId("recent-issue-card");
@@ -109,9 +109,14 @@ test.describe.serial("Member Dashboard", () => {
       await firstIssue.click();
 
       // Should navigate to issue detail page
-      await expect(page).toHaveURL(/\/issues\/[0-9a-f-]+/);
+      await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
+
+      // Use filter to find the specific h1 containing the title, avoiding strict mode violation
+      // with the Dashboard h1
       await expect(
-        page.getByRole("heading", { name: issueTitle })
+        page
+          .getByRole("main")
+          .getByRole("heading", { level: 1, name: issueTitle })
       ).toBeVisible();
     }
   });

@@ -42,7 +42,7 @@ test.describe.serial("Navigation", () => {
       sidebar.getByRole("link", { name: "Dashboard" })
     ).toBeVisible();
     await expect(sidebar.getByRole("link", { name: "Machines" })).toBeVisible();
-    await expect(sidebar.getByRole("link", { name: "Issues" })).toBeVisible();
+    // The "Issues" link has been removed, so no need to check for it.
 
     // Settings + Sign Out entries should be present
     await expect(sidebar.getByRole("link", { name: "Settings" })).toBeVisible();

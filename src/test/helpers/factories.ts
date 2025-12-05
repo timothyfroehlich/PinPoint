@@ -39,6 +39,7 @@ export function createTestMachine(
 ): InferInsertModel<typeof machines> {
   return {
     id: overrides?.id ?? randomUUID(),
+    initials: overrides?.initials ?? "TM",
     name: overrides?.name ?? "Test Machine",
     createdAt: overrides?.createdAt ?? new Date(),
     updatedAt: overrides?.updatedAt ?? new Date(),
@@ -49,12 +50,13 @@ export function createTestMachine(
  * Create a test issue
  */
 export function createTestIssue(
-  machineId: string,
+  machineInitials: string,
   overrides?: Partial<InferInsertModel<typeof issues>>
 ): InferInsertModel<typeof issues> {
   return {
     id: overrides?.id ?? randomUUID(),
-    machineId,
+    machineInitials,
+    issueNumber: overrides?.issueNumber ?? 1,
     title: overrides?.title ?? "Test Issue",
     description: overrides?.description ?? "Test description",
     status: overrides?.status ?? "new",

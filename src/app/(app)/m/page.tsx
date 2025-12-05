@@ -42,6 +42,12 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
         },
       },
     },
+    columns: {
+      id: true,
+      name: true,
+      initials: true,
+      createdAt: true,
+    },
   });
 
   // Derive status for each machine
@@ -54,6 +60,7 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
     return {
       id: machine.id,
       name: machine.name,
+      initials: machine.initials,
       status,
       openIssuesCount,
       createdAt: machine.createdAt,
@@ -77,7 +84,7 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
               asChild
               className="bg-primary text-on-primary hover:bg-primary/90"
             >
-              <Link href="/machines/new">
+              <Link href="/m/new">
                 <Plus className="mr-2 size-4" />
                 Add Machine
               </Link>
@@ -95,7 +102,7 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
               <p className="text-lg text-on-surface-variant mb-4">
                 No machines yet
               </p>
-              <Link href="/machines/new">
+              <Link href="/m/new">
                 <Button className="bg-primary text-on-primary hover:bg-primary/90">
                   <Plus className="mr-2 size-4" />
                   Add Your First Machine
@@ -110,7 +117,7 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
               <Link
                 key={machine.id}
                 data-testid="machine-card"
-                href={`/machines/${machine.id}`}
+                href={`/m/${machine.initials}`}
               >
                 <Card className="h-full border-outline-variant hover:border-primary transition-colors cursor-pointer">
                   <CardHeader>

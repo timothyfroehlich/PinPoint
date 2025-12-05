@@ -30,6 +30,19 @@ const isNextRedirectError = (error: unknown): error is { digest: string } => {
   );
 };
 
+interface PostgresError extends Error {
+  code: string;
+  constraint_name?: string;
+}
+
+const isPostgresError = (error: unknown): error is PostgresError => {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    typeof (error as PostgresError).code === "string"
+  );
+};
+
 export type CreateMachineResult = Result<
   { machineId: string },
   "VALIDATION" | "UNAUTHORIZED" | "SERVER"
@@ -82,6 +95,7 @@ export async function createMachineAction(
   // Extract form data
   const rawData = {
     name: formData.get("name"),
+    initials: formData.get("initials"),
     ownerId:
       typeof formData.get("ownerId") === "string" &&
       (formData.get("ownerId") as string).length > 0
@@ -96,7 +110,7 @@ export async function createMachineAction(
     return err("VALIDATION", firstError?.message ?? "Invalid input");
   }
 
-  const { name } = validation.data;
+  const { name, initials } = validation.data;
 
   // Insert machine (direct Drizzle query - no DAL)
   try {
@@ -104,6 +118,7 @@ export async function createMachineAction(
       .insert(machines)
       .values({
         name,
+        initials,
         // Enforce role-based ownership assignment
         // Only admins can assign machines to others
         ownerId:
@@ -117,12 +132,16 @@ export async function createMachineAction(
       throw new Error("Machine creation failed");
     }
 
-    revalidatePath("/machines");
+    revalidatePath("/m");
 
-    redirect(`/machines/${machine.id}`);
-  } catch (error) {
+    redirect(`/m/${machine.initials}`);
+  } catch (error: unknown) {
     if (isNextRedirectError(error)) {
       throw error;
+    }
+
+    if (isPostgresError(error) && error.code === "23505") {
+      return err("VALIDATION", `Initials '${initials}' are already taken.`);
     }
 
     console.error("createMachineAction failed", error);
@@ -185,8 +204,8 @@ export async function updateMachineAction(
       return err("NOT_FOUND", "Machine not found.");
     }
 
-    revalidatePath("/machines");
-    revalidatePath(`/machines/${machine.id}`);
+    revalidatePath("/m");
+    revalidatePath(`/m/${machine.initials}`);
 
     return ok({ machineId: machine.id });
   } catch (error) {
@@ -230,7 +249,7 @@ export async function deleteMachineAction(
       return err("NOT_FOUND", "Machine not found.");
     }
 
-    revalidatePath("/machines");
+    revalidatePath("/m");
 
     return ok({ machineId });
   } catch (error) {

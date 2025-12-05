@@ -10,7 +10,8 @@ describe("Notification Formatting", () => {
         "new_comment",
         "Test Issue",
         "Test Machine",
-        maliciousContent
+        "MM-01", // formattedIssueId
+        maliciousContent // commentContent
       );
 
       // Should not contain script tags or onerror handlers
@@ -19,8 +20,6 @@ describe("Notification Formatting", () => {
 
       // Should still contain safe content
       expect(html).toContain("Hello");
-      // DOMPurify might strip the img tag entirely if it's invalid or keep it safe
-      // We mainly care that the dangerous parts are gone
     });
 
     it("should preserve safe HTML in comments", () => {
@@ -29,6 +28,7 @@ describe("Notification Formatting", () => {
         "new_comment",
         "Test Issue",
         "Test Machine",
+        "MM-01",
         safeContent
       );
 
@@ -41,6 +41,7 @@ describe("Notification Formatting", () => {
         "new_comment",
         "Test Issue",
         "Test Machine",
+        "MM-01",
         undefined
       );
 

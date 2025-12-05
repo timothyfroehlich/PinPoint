@@ -85,7 +85,13 @@ describe("addCommentAction", () => {
     } as unknown as SupabaseClient);
 
     // Setup service mock
-    vi.mocked(addIssueComment).mockResolvedValue(undefined);
+    vi.mocked(addIssueComment).mockResolvedValue(undefined as any);
+
+    // Setup DB mock for fetching issue details
+    vi.mocked(db.query.issues.findFirst).mockResolvedValue({
+      machineInitials: "MM",
+      issueNumber: 1,
+    } as any);
   });
 
   it("should successfully add a comment", async () => {
@@ -101,7 +107,7 @@ describe("addCommentAction", () => {
       content: "Test comment",
       userId: mockUser.id,
     });
-    expect(revalidatePath).toHaveBeenCalledWith(`/issues/${validUuid}`);
+    expect(revalidatePath).toHaveBeenCalledWith("/m/MM/i/1");
   });
 
   it("should return an error if not authenticated", async () => {
@@ -174,11 +180,14 @@ describe("updateIssueStatusAction", () => {
     // Mock issue found
     vi.mocked(db.query.issues.findFirst).mockResolvedValue({
       status: "new",
-      machineId: "machine-123",
+      machineInitials: "MM",
+      issueNumber: 1,
+      machineId: "machine-123", // Still needed? Schema changed but maybe tests mock it loosely?
+      // Actually, query selects machineInitials.
       reportedBy: "user-123",
       assignedTo: null,
       machine: { ownerId: "owner-123" },
-    });
+    } as any);
 
     // Mock user profile
     vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
@@ -204,17 +213,20 @@ describe("updateIssueStatusAction", () => {
     expect(result.ok).toBe(true);
     expect(canUpdateIssue).toHaveBeenCalled();
     expect(updateIssueStatus).toHaveBeenCalled();
+    expect(revalidatePath).toHaveBeenCalledWith("/m/MM/i/1");
+    expect(revalidatePath).toHaveBeenCalledWith("/m/MM");
   });
 
   it("should deny update if unauthorized", async () => {
     // Mock issue found
     vi.mocked(db.query.issues.findFirst).mockResolvedValue({
       status: "new",
-      machineId: "machine-123",
+      machineInitials: "MM",
+      issueNumber: 1,
       reportedBy: "other-user",
       assignedTo: null,
       machine: { ownerId: "owner-123" },
-    });
+    } as any);
 
     // Mock user profile
     vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
