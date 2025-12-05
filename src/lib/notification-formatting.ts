@@ -59,9 +59,12 @@ export function getEmailHtml(
     ? `[${sanitizedMachineName}] `
     : "";
   const sanitizedIssueTitle = issueTitle ? sanitizeHtml(issueTitle) : "";
+  const sanitizedIssueId = formattedIssueId
+    ? sanitizeHtml(formattedIssueId)
+    : "";
 
   return `
-      <h2>${machinePrefix}${formattedIssueId ? `${formattedIssueId}: ` : ""}${sanitizedIssueTitle}</h2>
+      <h2>${machinePrefix}${sanitizedIssueId ? `${sanitizedIssueId}: ` : ""}${sanitizedIssueTitle}</h2>
       <p>${body}</p>
       <p><a href="${siteUrl}/issues">View Issue</a></p>
     `;
