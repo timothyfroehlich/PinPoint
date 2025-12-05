@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -44,4 +45,18 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Wrap config with Sentry for error tracking and source maps
+const sentryOptions: Parameters<typeof withSentryConfig>[1] = {
+  // Suppresses source map upload logs during build
+  silent: true,
+};
+
+// Only set org and project if defined (for source map uploads)
+if (process.env["SENTRY_ORG"]) {
+  sentryOptions.org = process.env["SENTRY_ORG"];
+}
+if (process.env["SENTRY_PROJECT"]) {
+  sentryOptions.project = process.env["SENTRY_PROJECT"];
+}
+
+export default withSentryConfig(nextConfig, sentryOptions);

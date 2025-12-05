@@ -1,5 +1,7 @@
 import type React from "react";
 import { Sidebar } from "./Sidebar";
+import { Button } from "~/components/ui/button";
+import { MessageSquarePlus } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import {
@@ -108,6 +110,15 @@ export async function DashboardLayout({
           <div className="flex items-center gap-4">
             {user && (
               <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  id="feedback-trigger"
+                  className="gap-2"
+                >
+                  <MessageSquarePlus className="size-4" />
+                  Feedback
+                </Button>
                 <NotificationList notifications={enrichedNotifications} />
                 <UserMenu userName={userProfile?.name ?? "User"} />
               </>

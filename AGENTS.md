@@ -1,8 +1,3 @@
----
-trigger: always_on
-# For Antigravity
----
-
 # PinPoint Agent Guidelines
 
 ## About the User
@@ -78,30 +73,19 @@ Read these immediately before starting work:
 
 - **Default**: Server Components for all new development
 - **Client Islands**: Minimal "use client" for specific interactivity only
-- **Data Flow**: Server Components → Drizzle → PostgreSQL
+- **Data Flow**: Server Components → Drizzle → PostgreSQL (direct queries, no DAL/repository layers)
 - **Mutations**: Server Actions with progressive enhancement
 
 ### Direct Database Queries
 
 - **Do**: Query Drizzle directly in Server Components and Server Actions
-
+- **Don't**: Create DAL/repository/service layers (premature abstraction)
 - **Why**: Single-tenant simplicity, follow the Rule of Three
 
-### UI Framework & Progressive Enhancement
+### UI Framework
 
-- **Stack**: shadcn/ui + Tailwind CSS v4 + Lucide Icons
-- **Styling**:
-  - **Global**: Use `globals.css` for typography and theme variables.
-  - **Local**: Use `className` with `cn()` for component-specific styles.
-  - **Forbidden**: No `style={{ ... }}` props, no hardcoded hex colors (use CSS variables).
-- **Progressive Enhancement**:
-  - **Forms**: Must work without JavaScript. Use `<form action={serverAction}>`.
-  - **Interactivity**: Use CSS-only patterns (`group`, `peer`) where possible.
-  - **Client Components**: Push `use client` down to the leaves (buttons, inputs).
-- **Documentation Hierarchy**:
-  1.  `AGENTS.md` (High-level rules)
-  2.  `docs/UI_GUIDE.md` (The "Goto" manual for all UI work)
-  3.  `docs/ui-patterns/*` (Specific implementation patterns)
+- **New Development**: shadcn/ui + Tailwind CSS v4 only
+- **CSS**: Material Design 3 colors from globals.css
 
 ## Development Guidelines
 
@@ -112,31 +96,24 @@ Read these immediately before starting work:
 | `npm test 2>&1` | `npm test`         | Vitest treats redirection as test filters |
 | `find`          | `rg --files`, `fd` | Safer/faster search                       |
 
-> [!WARNING]
-> **ESCAPE PARENTHESES IN PATHS**: Some directories have parentheses in their names (e.g., `src/app/(app)`). You MUST escape them in shell commands (e.g., `src/app/\(app\)`). Failure to do so will cause commands to fail.
-
 ## Multi-Worktree Development Setup
 
 PinPoint uses parallel git worktrees so multiple assistants can work without stepping on each other. Each worktree runs its own Supabase instance on unique ports; changes to `supabase/config.toml` are kept local via `git update-index --skip-worktree`.
 
 ### Port Allocation
 
-| Worktree    | Next.js | Supabase API | PostgreSQL | Shadow DB | Mailpit (config `[inbucket]`) | project_id           |
-| ----------- | ------- | ------------ | ---------- | --------- | ----------------------------- | -------------------- |
-| Main        | 3000    | 54321        | 54322      | 54320     | 54324                         | pinpoint             |
-| Secondary   | 3100    | 55321        | 55322      | 55320     | 55324                         | pinpoint-secondary   |
-| Review      | 3200    | 56321        | 56322      | 56320     | 56324                         | pinpoint-review      |
-| AntiGravity | 3300    | 57321        | 57322      | 57320     | 57324                         | pinpoint-antigravity |
-
-> Mailpit extra ports: SMTP is `BASE_SMTP (54325) + worktree offset`, POP3 is `BASE_POP3 (54326) + worktree offset`. Ensure both keys exist in `[inbucket]` (see Supabase Config Management).
+| Worktree    | Next.js | Supabase API | PostgreSQL | Shadow DB | Inbucket | project_id           |
+| ----------- | ------- | ------------ | ---------- | --------- | -------- | -------------------- |
+| Main        | 3000    | 54321        | 54322      | 54320     | 54324    | pinpoint             |
+| Secondary   | 3100    | 55321        | 55322      | 55320     | 55324    | pinpoint-secondary   |
+| Review      | 3200    | 56321        | 56322      | 56320     | 56324    | pinpoint-review      |
+| AntiGravity | 3300    | 57321        | 57322      | 57320     | 57324    | pinpoint-antigravity |
 
 ### How It Works
 
 - Each non-main worktree edits its own `supabase/config.toml` (ports + `project_id`) and marks it `skip-worktree` so git ignores local changes.
-- **WARNING**: `scripts/sync-worktrees.sh` AUTOMATICALLY rewrites `supabase/config.toml` in secondary worktrees to prevent port conflicts. Do not manually edit ports in secondary worktrees.
 - `.env.local` (gitignored) holds worktree-specific ports/keys.
 - CI stays on the main config/ports; no CI changes required.
-- Supabase CLI now runs Mailpit for email testing even though the config section remains `[inbucket]`; keep using the same section name but refer to it as Mailpit in docs and code.
 
 ### Starting Development
 
@@ -178,41 +155,6 @@ git update-index --skip-worktree supabase/config.toml
 - **Port already in use:** `lsof -i :55321` then `supabase stop` in that worktree.
 - **Git shows config.toml modified:** re-apply skip-worktree.
 - **Supabase keys changed after restart:** run `supabase start`, copy new `PUBLISHABLE_KEY/SERVICE_ROLE_KEY` into `.env.local`.
-
-### Supabase Config Management
-
-**WARNING**: `supabase/config.toml` is marked `skip-worktree` to allow local port customization. However, this hides structural changes (like adding new keys) from git.
-
-- **The Safety Net**: `npm run preflight` includes a `check:config` script that compares your local config keys against `main`. It will fail if you have added keys locally that aren't in git.
-- **How to Commit Config Changes**:
-  1. `git update-index --no-skip-worktree supabase/config.toml`
-  2. Revert ports to standard values (54321, 54322, etc.) but **keep your new keys**.
-  3. Commit the file.
-  4. Restore your local ports (or run `python3 scripts/sync_worktrees.py`).
-  5. `git update-index --skip-worktree supabase/config.toml`
-- **Merging with skip-worktree set**: skip-worktree blocks merges/checkout of `supabase/config.toml`.
-  1. Before merging/pulling: `git update-index --no-skip-worktree supabase/config.toml`.
-  2. Stash or commit your local config if ports differ from main.
-  3. Merge/pull.
-  4. Restore your local ports from stash or `python3 scripts/sync_worktrees.py`.
-  5. Re-apply skip flag: `git update-index --skip-worktree supabase/config.toml`.
-- **Mailpit keys required**: Ensure `[inbucket]` contains `port`, `smtp_port`, and `pop3_port` using the per-worktree offsets (see table above). Missing SMTP/POP3 ports will block syncs and Supabase start.
-
-### Worktree Sync Scripts
-
-Two scripts are available for managing worktrees:
-
-1. **`scripts/sync_worktrees.py`** (recommended) - Modern Python rewrite with:
-   - Object-oriented design and better error handling
-   - Auto-manages Python environment (`.venv`)
-   - Consolidated process killing (`npm run kill:zombies`)
-   - Usage: `python3 scripts/sync_worktrees.py [--dry-run] [--all] [-y]`
-
-2. **`scripts/sync-worktrees.sh`** (legacy) - Original Bash implementation
-   - Maintained for backward compatibility
-   - Usage: `./scripts/sync-worktrees.sh [options]`
-
-Both scripts perform the same operations. See `scripts/README.md` for detailed usage.
 
 ### Available Commands
 
@@ -296,19 +238,6 @@ Both scripts perform the same operations. See `scripts/README.md` for detailed u
    /    Unit    \ ← 70-100 tests (pure logic)
   /--------------\
 ```
-
-### Development Loop (How to Run Tests)
-
-To maintain velocity and avoid running the full `preflight` suite (~60s) for every change, use the following protocol:
-
-| Scope             | Command                                                | When to use                                                                      |
-| :---------------- | :----------------------------------------------------- | :------------------------------------------------------------------------------- |
-| **Sanity**        | `npm run check:fast`                                   | **Rule 1**: Run after ANY code change. Checks types, lint, and unit tests (~5s). |
-| **Targeted Unit** | `npm test -- src/path/to/file.test.ts`                 | Debugging a specific unit test failure.                                          |
-| **Targeted Int**  | `npm run test:integration -- src/path/to/file.test.ts` | Debugging a specific DB/API test failure.                                        |
-| **Targeted E2E**  | `npm run smoke -- e2e/smoke/file.spec.ts`              | Debugging a specific UI flow.                                                    |
-| **Full Suite**    | `npm run <script>`                                     | Verifying no regressions in that layer.                                          |
-| **Final Gate**    | `npm run preflight`                                    | **Rule 2**: Run ONLY before submitting/finishing. Runs EVERYTHING.               |
 
 **Distribution & Targets**:
 

@@ -1,11 +1,6 @@
----
-trigger: always_on
-# For Antigravity
----
-
 # PinPoint Non‑Negotiables
 
-**Last Updated**: November 25, 2025
+**Last Updated**: November 10, 2025
 **Version**: 2.0 (Greenfield)
 
 ## Overview
@@ -141,29 +136,6 @@ trigger: always_on
 - **Do:** Use Zod for all form data and user inputs
 - **Don't:** Trust FormData or query params without validation
 
-**CORE-SEC-003:** Security headers via middleware
-
-- **Severity:** Critical
-- **Why:** Defense-in-depth protection against XSS, clickjacking, and protocol downgrade attacks
-- **Do:** Set security headers in `middleware.ts` (CSP with nonces) and `next.config.ts` (static headers)
-- **Don't:** Remove or weaken Content-Security-Policy, rely on 'unsafe-inline' or 'unsafe-eval'
-- **Reference:** `docs/SECURITY.md` for configuration and modification guidelines
-
-**CORE-SEC-004:** Nonce-based CSP
-
-- **Severity:** High
-- **Why:** Prevents XSS by blocking unauthorized scripts
-- **Do:** Generate unique nonce per request, use Web Crypto API in Edge Runtime
-- **Don't:** Use 'unsafe-inline' or 'unsafe-eval' in script-src, hardcode nonces
-- **Rationale:** Modern CSP with 'strict-dynamic' allows Next.js dynamic imports while blocking malicious scripts
-
-**CORE-SEC-005:** No hardcoded hostnames or ports
-
-- **Severity:** Critical
-- **Why:** Prevents environment mismatches and "whack-a-mole" configuration bugs
-- **Do:** Use `NEXT_PUBLIC_SITE_URL` and `PORT` environment variables
-- **Don't:** Hardcode `localhost:3000` or specific domains in source code or tests
-
 ---
 
 ## Performance & Caching
@@ -207,13 +179,6 @@ trigger: always_on
 - **Do:** Reference `docs/TESTING_PLAN.md` for test types and placement
 - **Don't:** Mix test types or create per-test database instances
 
-**CORE-TEST-004:** Prefer Integration Tests for DB Logic
-
-- **Severity:** Required
-- **Why:** Mocking Drizzle/DB clients leads to brittle, over-mocked tests that don't verify actual behavior
-- **Do:** Use integration tests (with PGlite) for service layer logic that primarily interacts with the database
-- **Don't:** Write unit tests that require extensive mocking of `db.query`, `db.transaction`, or method chains
-
 ---
 
 ## Architecture
@@ -231,6 +196,13 @@ trigger: always_on
 - **Why:** Forms work without JavaScript
 - **Do:** Use Server Actions with `<form action={serverAction}>`
 - **Don't:** Require client-side JavaScript for core functionality
+
+**CORE-ARCH-003:** Direct database queries
+
+- **Severity:** Required
+- **Why:** Simplicity for single-tenant architecture
+- **Do:** Query Drizzle directly in Server Components and Server Actions
+- **Don't:** Create DAL/repository/service layers (premature abstraction)
 
 **CORE-ARCH-004:** Issues always per-machine
 
@@ -255,46 +227,6 @@ trigger: always_on
 - **Don't:** Use form submission inside `DropdownMenuItem`
 - **Rationale:** Radix UI dropdowns auto-close and unmount content, causing "Form submission canceled because the form is not connected" errors
 
-**CORE-ARCH-007:** Use useActionState for form feedback
-
-- **Severity:** Required
-- **Why:** Modern React 19 pattern, simpler than cookie-based flash messages, instant feedback
-- **Do:** Use `useActionState` hook with Server Actions returning state objects
-- **Don't:** Use flash messages (`setFlash`/`readFlash`) for form validation or success feedback
-- **Rationale:** `useActionState` provides instant, state-based feedback without cookies or redirects, aligning with React 19 Server Actions architecture
-
----
-
-## UI & Styling
-
-**CORE-UI-001:** No global resets
-
-- **Severity:** Critical
-- **Why:** Breaks component internals, causes "spooky action at a distance"
-- **Do:** Use Tailwind's built-in Preflight
-- **Don't:** `* { margin: 0; padding: 0; }`
-
-**CORE-UI-002:** No hardcoded spacing in reusable components
-
-- **Severity:** High
-- **Why:** Makes components rigid and hard to compose
-- **Do:** Allow `className` prop to control margins
-- **Don't:** Add `m-4` to the root of a Button or Input component
-
-**CORE-UI-003:** Always use `cn()` for class merging
-
-- **Severity:** Critical
-- **Why:** Ensures parent styles properly override default styles
-- **Do:** `className={cn("default-classes", className)}`
-- **Don't:** `className={`default-classes ${className}`}`
-
-**CORE-UI-004:** No inline styles
-
-- **Severity:** High
-- **Why:** Bypasses the design system, hard to maintain
-- **Do:** Use Tailwind utility classes or CSS variables
-- **Don't:** `style={{ marginTop: '10px' }}` (unless dynamic coordinates)
-
 ---
 
 ## Forbidden Patterns
@@ -308,8 +240,6 @@ trigger: always_on
 - **Supabase SSR misuse**: No wrapper, wrong cookie contract, logic before `getUser()`
 - **Missing auth callback**: OAuth flows require callback route
 - **Response mutation**: Don't modify Supabase response object
-- **Weak CSP**: No 'unsafe-inline' or 'unsafe-eval' in script-src (use nonces)
-- **Missing security headers**: Middleware must set CSP, next.config.ts must set static headers
 - **TypeScript safety defeats**: No `any`, non-null `!`, or unsafe `as`
 - **Deep relative imports**: Use `~/` aliases
 - **Uncached fetch()**: Next.js 16 (since 15) requires explicit caching
@@ -321,7 +251,6 @@ trigger: always_on
 - **Infrastructure fighting TypeScript**: Complex patterns generating `exactOptionalPropertyTypes` violations indicate wrong complexity level
 - **Inline Server Action wrappers**: Don't wrap Server Actions in inline async functions in forms
 - **Forms in dropdown menus**: Don't use `<form>` inside `DropdownMenuItem` (dropdown closes before submission completes)
-- **Flash messages**: Don't use `setFlash()`/`readFlash()` for form feedback (use `useActionState` instead)
 - **Playwright arbitrary waits**: No `page.waitForTimeout()` in tests; assert on real UI state (add `data-testid` hooks if needed)
 
 ---
@@ -353,11 +282,11 @@ If all Yes → ship it. Perfect is the enemy of done.
 **Rule IDs:**
 
 - CORE‑TS‑001..006: Type system
-- CORE‑SSR‑001..006: Supabase SSR and auth
-- CORE‑SEC‑001..004: Security
+- CORE‑SSR‑001..005: Supabase SSR and auth
+- CORE‑SEC‑001..002: Security
 - CORE‑PERF‑001..002: Performance
 - CORE‑TEST‑001..003: Testing
-- CORE‑ARCH‑001..007: Architecture
+- CORE‑ARCH‑001..004: Architecture
 
 **Cross-References:**
 

@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { createClient } from "@supabase/supabase-js";
-import { confirmTestUserEmail } from "~/test/helpers/supabase";
 
 /**
  * Integration tests for password reset flow
@@ -45,18 +44,16 @@ describe("Password Reset Integration Tests", () => {
       });
 
       if (signupData.user) {
-        await confirmTestUserEmail(adminSupabase, signupData.user);
+        await adminSupabase.auth.admin.updateUserById(signupData.user.id, {
+          email_confirm: true,
+        });
       }
 
       expect(signupData.user).toBeDefined();
 
-      const port = process.env.PORT ?? "3000";
-      const baseUrl =
-        process.env.NEXT_PUBLIC_SITE_URL ?? `http://localhost:${port}`;
-
       // Request password reset
       const { error } = await supabase.auth.resetPasswordForEmail(testEmail, {
-        redirectTo: `${baseUrl}/reset-password`,
+        redirectTo: "http://localhost:3000/reset-password",
       });
 
       expect(error).toBeNull();
@@ -68,15 +65,11 @@ describe("Password Reset Integration Tests", () => {
     });
 
     it("should not reveal if email does not exist", async () => {
-      const port = process.env.PORT ?? "3000";
-      const baseUrl =
-        process.env.NEXT_PUBLIC_SITE_URL ?? `http://localhost:${port}`;
-
       // Request password reset for non-existent email
       const { error } = await supabase.auth.resetPasswordForEmail(
         "nonexistent-user-12345@example.com",
         {
-          redirectTo: `${baseUrl}/reset-password`,
+          redirectTo: "http://localhost:3000/reset-password",
         }
       );
 
@@ -92,6 +85,7 @@ describe("Password Reset Integration Tests", () => {
       const newPassword = "NewPassword456";
 
       // Create and login user
+      // Create and login user
       const { data: signupData } = await supabase.auth.signUp({
         email: testEmail,
         password: oldPassword,
@@ -103,7 +97,9 @@ describe("Password Reset Integration Tests", () => {
       });
 
       if (signupData.user) {
-        await confirmTestUserEmail(adminSupabase, signupData.user);
+        await adminSupabase.auth.admin.updateUserById(signupData.user.id, {
+          email_confirm: true,
+        });
       }
 
       const { data: loginData } = await supabase.auth.signInWithPassword({

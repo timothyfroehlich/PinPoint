@@ -47,16 +47,16 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     : "'self' 'unsafe-inline' https://vercel.live";
 
   const imgSrc = isProduction
-    ? "'self' data: blob:"
-    : "'self' data: blob: https://vercel.live https://vercel.com";
+    ? "'self' data: blob: https://*.sentry.io"
+    : "'self' data: blob: https://*.sentry.io https://vercel.live https://vercel.com";
 
   const fontSrc = isProduction
     ? "'self' data:"
     : "'self' data: https://vercel.live https://assets.vercel.com https://fonts.gstatic.com";
 
   const connectSrc = isProduction
-    ? `'self' ${supabaseUrl ?? ""} ${supabaseWsUrl ?? ""} http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:*`
-    : `'self' ${supabaseUrl ?? ""} ${supabaseWsUrl ?? ""} http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:* https://vercel.live wss://ws-us3.pusher.com`;
+    ? `'self' ${supabaseUrl ?? ""} ${supabaseWsUrl ?? ""} https://*.sentry.io http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:*`
+    : `'self' ${supabaseUrl ?? ""} ${supabaseWsUrl ?? ""} https://*.sentry.io http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:* https://vercel.live wss://ws-us3.pusher.com`;
 
   const frameSrc = isProduction ? "'none'" : "'self' https://vercel.live";
   const frameAncestors = isProduction ? "'none'" : "'self' https://vercel.live";

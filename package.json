@@ -60,6 +60,8 @@
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-switch": "^1.2.6",
     "@react-email/components": "^1.0.1",
+    "@sentry/nextjs": "^10.29.0",
+    "@supabase/sentry-js-integration": "^0.3.0",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.84.0",
     "@types/nodemailer": "^7.0.4",

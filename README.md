@@ -122,11 +122,13 @@ For detailed evolution plans, see [`RSC_MIGRATION/`](./RSC_MIGRATION/) and the C
     - Update `.env.local` with these values.
 
 5.  **Initialize Database**
-    Apply the schema, regenerate test schema, and seed data:
+    Push the schema to your Supabase project:
 
     ```bash
-    npm run db:reset
+    npm run db:push
     ```
+
+    _Note: This uses `drizzle-kit push` which is suitable for prototyping. For production, use migrations._
 
 6.  **Run Development Server**
     ```bash

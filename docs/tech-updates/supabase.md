@@ -320,7 +320,7 @@ vi.mock("@/utils/supabase/client", () => ({
 
 ### Current Configuration
 
-**Service**: Mailpit v1.22.3 (replaces Inbucket)
+**Service**: Mailpit v1.22.3 (replaces Inbucket in newer CLI versions)
 **Default Port**: 54324 (configurable per worktree)
 **API**: REST API v1 at `http://localhost:54324/api/v1/`
 **Web UI**: `http://localhost:54324/` (interactive email viewer)

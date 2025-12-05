@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+// Force load Sentry client config
+import "~/sentry.client.config";
 import type React from "react";
 import "./globals.css";
 import { ClientLogger } from "~/components/dev/client-logger";

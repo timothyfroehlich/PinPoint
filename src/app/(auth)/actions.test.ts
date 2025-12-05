@@ -12,7 +12,7 @@ import { forgotPasswordAction } from "./actions";
  * Mocking Strategy:
  * - Next.js headers() is mocked to return test-controlled header values
  * - Supabase client is mocked to avoid database dependencies
- * - Flash messages are mocked to avoid cookie operations
+
  * - Logger is mocked to avoid console output
  *
  * IMPORTANT: Server Actions are async functions that use Next.js server context.
