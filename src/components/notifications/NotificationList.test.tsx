@@ -58,7 +58,9 @@ describe("NotificationList", () => {
 
     // Check content
     expect(await screen.findByText("Assigned to MM-1")).toBeInTheDocument();
-    expect(await screen.findByText("less than a minute ago")).toBeInTheDocument();
+    expect(
+      await screen.findByText("less than a minute ago")
+    ).toBeInTheDocument();
   });
 
   it("should call markAsReadAction when dismiss is clicked", async () => {
