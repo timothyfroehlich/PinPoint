@@ -1,13 +1,7 @@
 import type React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import {
-  LayoutDashboard,
-  Gamepad2,
-  AlertCircle,
-  Settings,
-  LogOut,
-} from "lucide-react";
+import { LayoutDashboard, Gamepad2, Settings, LogOut } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { logoutAction } from "~/app/(auth)/actions";
 
@@ -19,13 +13,8 @@ const sidebarItems = [
   },
   {
     title: "Machines",
-    href: "/machines",
+    href: "/m",
     icon: Gamepad2,
-  },
-  {
-    title: "Issues",
-    href: "/issues",
-    icon: AlertCircle,
   },
 ];
 

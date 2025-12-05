@@ -9,13 +9,14 @@ import {
 
 describe("Issue Validation Schemas", () => {
   const validUuid = "123e4567-e89b-12d3-a456-426614174000";
+  const validInitials = "MM";
 
   describe("createIssueSchema", () => {
     it("should validate a valid issue", () => {
       const result = createIssueSchema.safeParse({
         title: "Test Issue",
         description: "Test Description",
-        machineId: validUuid,
+        machineInitials: validInitials,
         severity: "minor",
         priority: "low",
       });
@@ -25,7 +26,7 @@ describe("Issue Validation Schemas", () => {
     it("should validate a valid issue without description", () => {
       const result = createIssueSchema.safeParse({
         title: "Test Issue",
-        machineId: validUuid,
+        machineInitials: validInitials,
         severity: "playable",
         priority: "medium",
       });
@@ -35,7 +36,7 @@ describe("Issue Validation Schemas", () => {
     it("should reject missing title", () => {
       const result = createIssueSchema.safeParse({
         description: "Test Description",
-        machineId: validUuid,
+        machineInitials: validInitials,
         severity: "minor",
         priority: "low",
       });
@@ -45,7 +46,7 @@ describe("Issue Validation Schemas", () => {
     it("should reject empty title", () => {
       const result = createIssueSchema.safeParse({
         title: "",
-        machineId: validUuid,
+        machineInitials: validInitials,
         severity: "minor",
         priority: "low",
       });
@@ -55,27 +56,43 @@ describe("Issue Validation Schemas", () => {
     it("should reject long title", () => {
       const result = createIssueSchema.safeParse({
         title: "a".repeat(201),
-        machineId: validUuid,
+        machineInitials: validInitials,
         severity: "minor",
         priority: "low",
       });
       expect(result.success).toBe(false);
     });
 
-    it("should reject invalid machineId", () => {
+    it("should reject invalid machineInitials", () => {
       const result = createIssueSchema.safeParse({
         title: "Test Issue",
-        machineId: "invalid-uuid",
+        machineInitials: "A", // too short
         severity: "minor",
         priority: "low",
       });
       expect(result.success).toBe(false);
+
+      const result2 = createIssueSchema.safeParse({
+        title: "Test Issue",
+        machineInitials: "TOOLONG", // too long
+        severity: "minor",
+        priority: "low",
+      });
+      expect(result2.success).toBe(false);
+
+      const result3 = createIssueSchema.safeParse({
+        title: "Test Issue",
+        machineInitials: "A!", // invalid char
+        severity: "minor",
+        priority: "low",
+      });
+      expect(result3.success).toBe(false);
     });
 
     it("should reject invalid severity", () => {
       const result = createIssueSchema.safeParse({
         title: "Test Issue",
-        machineId: validUuid,
+        machineInitials: validInitials,
         severity: "critical", // invalid
         priority: "low",
       });

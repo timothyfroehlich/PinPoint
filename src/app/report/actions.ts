@@ -11,6 +11,9 @@ import {
   getClientIp,
 } from "~/lib/rate-limit";
 import { parsePublicIssueForm } from "./validation";
+import { db } from "~/server/db";
+import { machines } from "~/server/db/schema";
+import { eq } from "drizzle-orm";
 
 const redirectWithError = (message: string): never => {
   const params = new URLSearchParams({ error: message });
@@ -53,17 +56,28 @@ export async function submitPublicIssueAction(
   const parsedData = parsed.data;
   const { machineId, title, description, severity } = parsedData;
 
+  // Resolve machine initials from ID
+  const machine = await db.query.machines.findFirst({
+    where: eq(machines.id, machineId),
+    columns: { initials: true },
+  });
+
+  if (!machine) {
+    redirectWithError("Machine not found.");
+    return;
+  }
+
   try {
     await createIssue({
       title,
       description: description ?? null,
-      machineId,
+      machineInitials: machine.initials,
       severity,
       reportedBy: null,
     });
 
-    revalidatePath("/issues");
-    revalidatePath(`/machines/${machineId}`);
+    revalidatePath(`/m/${machine.initials}`);
+    revalidatePath(`/m/${machine.initials}/i`);
     redirect("/report/success");
   } catch (error) {
     if (isRedirectError(error)) {

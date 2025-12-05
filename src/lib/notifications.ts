@@ -30,6 +30,7 @@ export interface CreateNotificationProps {
   // Context data for emails
   issueTitle?: string | undefined;
   machineName?: string | undefined;
+  formattedIssueId?: string | undefined;
   commentContent?: string | undefined;
   newStatus?: string | undefined;
   additionalRecipientIds?: string[];
@@ -49,6 +50,7 @@ export async function createNotification(
     includeActor,
     issueTitle,
     machineName,
+    formattedIssueId,
     commentContent,
     newStatus,
     additionalRecipientIds,
@@ -76,6 +78,7 @@ export async function createNotification(
 
   let resolvedIssueTitle = issueTitle;
   let resolvedMachineName = machineName;
+  let resolvedFormattedIssueId = formattedIssueId;
 
   if (type === "new_issue") {
     let ownerId = issueContext?.machineOwnerId ?? null;
@@ -100,6 +103,19 @@ export async function createNotification(
         });
         ownerId = machine?.ownerId ?? null;
         resolvedMachineName = resolvedMachineName ?? machine?.name;
+      }
+    }
+
+    // Resolve formatted ID if missing
+    if (!resolvedFormattedIssueId && resourceType === "issue") {
+      const issue = await tx.query.issues.findFirst({
+        where: eq(issues.id, resourceId),
+        columns: { issueNumber: true, machineInitials: true },
+      });
+      if (issue) {
+        // Import dynamically to avoid circular dependency if needed, or just format here
+        // Simple format: INITIALS-01
+        resolvedFormattedIssueId = `${issue.machineInitials}-${String(issue.issueNumber).padStart(2, "0")}`;
       }
     }
 
@@ -231,12 +247,14 @@ export async function createNotification(
           subject: getEmailSubject(
             type,
             resolvedIssueTitle,
-            resolvedMachineName
+            resolvedMachineName,
+            resolvedFormattedIssueId
           ),
           html: getEmailHtml(
             type,
             resolvedIssueTitle,
             resolvedMachineName,
+            resolvedFormattedIssueId,
             commentContent,
             newStatus
           ),

@@ -47,11 +47,11 @@ describe("createNotification (Integration)", () => {
       .returning();
     const [machine] = await db
       .insert(machines)
-      .values(createTestMachine())
+      .values(createTestMachine({ initials: "MM" }))
       .returning();
     const [issue] = await db
       .insert(issues)
-      .values(createTestIssue(machine.id))
+      .values(createTestIssue(machine.initials, { issueNumber: 1 }))
       .returning();
 
     await db.insert(issueWatchers).values({
@@ -89,11 +89,11 @@ describe("createNotification (Integration)", () => {
       .returning();
     const [machine] = await db
       .insert(machines)
-      .values(createTestMachine())
+      .values(createTestMachine({ initials: "AFM" }))
       .returning();
     const [issue] = await db
       .insert(issues)
-      .values(createTestIssue(machine.id))
+      .values(createTestIssue(machine.initials, { issueNumber: 1 }))
       .returning();
 
     // Recipient watching issue
@@ -149,11 +149,11 @@ describe("createNotification (Integration)", () => {
       .returning();
     const [machine] = await db
       .insert(machines)
-      .values(createTestMachine())
+      .values(createTestMachine({ initials: "TZ" }))
       .returning();
     const [issue] = await db
       .insert(issues)
-      .values(createTestIssue(machine.id))
+      .values(createTestIssue(machine.initials, { issueNumber: 1 }))
       .returning();
 
     await db.insert(issueWatchers).values({
@@ -208,11 +208,11 @@ describe("createNotification (Integration)", () => {
       .returning();
     const [machine] = await db
       .insert(machines)
-      .values(createTestMachine())
+      .values(createTestMachine({ initials: "NGG" }))
       .returning();
     const [issue] = await db
       .insert(issues)
-      .values(createTestIssue(machine.id))
+      .values(createTestIssue(machine.initials, { issueNumber: 1 }))
       .returning();
 
     await db.insert(issueWatchers).values({
@@ -238,11 +238,7 @@ describe("createNotification (Integration)", () => {
         },
       });
 
-    // Mock auth.users email (since we can't easily insert into auth schema in pglite without raw sql,
-    // but our setup does create the schema. Let's try inserting if possible, or rely on the fact that
-    // createNotification might query userProfiles if it joins, or auth.users.
-    // Looking at implementation: it queries `db.select({ email: authUsers.email })...`
-    // So we MUST insert into auth.users.
+    // Mock auth.users email
     await db.execute(
       `INSERT INTO auth.users (id, email) VALUES ('${recipient.id}', 'user2@test.com')`
     );

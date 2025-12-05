@@ -108,7 +108,7 @@ export async function createIssueAction(
   const rawData = {
     title: toOptionalString(formData.get("title")),
     description: toOptionalString(formData.get("description")),
-    machineId: toOptionalString(formData.get("machineId")),
+    machineInitials: toOptionalString(formData.get("machineInitials")),
     severity: toOptionalString(formData.get("severity")),
     priority: toOptionalString(formData.get("priority")),
   };
@@ -120,30 +120,34 @@ export async function createIssueAction(
       {
         errors: validation.error.issues,
         action: "createIssue",
-        rawMachineId: rawData.machineId,
+        rawMachineInitials: rawData.machineInitials,
       },
       "Issue creation validation failed"
     );
     return err("VALIDATION", firstError?.message ?? "Invalid input");
   }
 
-  const { title, description, machineId, severity, priority } = validation.data;
+  const { title, description, machineInitials, severity, priority } =
+    validation.data;
 
   // Create issue via service
   try {
     const issue = await createIssue({
       title,
       description: description ?? null,
-      machineId,
+      machineInitials,
       severity,
       priority,
       reportedBy: user.id,
     });
 
-    revalidatePath("/issues");
-    revalidatePath(`/machines/${machineId}`);
+    // Revalidate machine issues list
+    // Note: URL changed to /m/[initials]
+    revalidatePath(`/m/${machineInitials}`);
+    revalidatePath(`/m/${machineInitials}/i`);
 
-    redirect(`/issues/${issue.id}`);
+    // Redirect to new issue page
+    redirect(`/m/${machineInitials}/i/${issue.issueNumber}`);
   } catch (error) {
     if (isNextRedirectError(error)) {
       throw error;
@@ -201,7 +205,8 @@ export async function updateIssueStatusAction(
       where: eq(issues.id, issueId),
       columns: {
         status: true,
-        machineId: true,
+        machineInitials: true,
+        issueNumber: true,
         reportedBy: true,
         assignedTo: true,
       },
@@ -242,9 +247,9 @@ export async function updateIssueStatusAction(
       userId: user.id,
     });
 
-    revalidatePath(`/issues/${issueId}`);
-    revalidatePath("/issues");
-    revalidatePath(`/machines/${currentIssue.machineId}`);
+    const issuePath = `/m/${currentIssue.machineInitials}/i/${currentIssue.issueNumber}`;
+    revalidatePath(issuePath);
+    revalidatePath(`/m/${currentIssue.machineInitials}`);
 
     return ok({ issueId });
   } catch (error) {
@@ -303,7 +308,8 @@ export async function updateIssueSeverityAction(
       where: eq(issues.id, issueId),
       columns: {
         severity: true,
-        machineId: true,
+        machineInitials: true,
+        issueNumber: true,
         reportedBy: true,
         assignedTo: true,
       },
@@ -343,9 +349,9 @@ export async function updateIssueSeverityAction(
       severity,
     });
 
-    revalidatePath(`/issues/${issueId}`);
-    revalidatePath("/issues");
-    revalidatePath(`/machines/${currentIssue.machineId}`);
+    const issuePath = `/m/${currentIssue.machineInitials}/i/${currentIssue.issueNumber}`;
+    revalidatePath(issuePath);
+    revalidatePath(`/m/${currentIssue.machineInitials}`);
 
     return ok({ issueId });
   } catch (error) {
@@ -405,7 +411,8 @@ export async function updateIssuePriorityAction(
       where: eq(issues.id, issueId),
       columns: {
         priority: true,
-        machineId: true,
+        machineInitials: true,
+        issueNumber: true,
         reportedBy: true,
         assignedTo: true,
       },
@@ -445,9 +452,9 @@ export async function updateIssuePriorityAction(
       priority,
     });
 
-    revalidatePath(`/issues/${issueId}`);
-    revalidatePath("/issues");
-    revalidatePath(`/machines/${currentIssue.machineId}`);
+    const issuePath = `/m/${currentIssue.machineInitials}/i/${currentIssue.issueNumber}`;
+    revalidatePath(issuePath);
+    revalidatePath(`/m/${currentIssue.machineInitials}`);
 
     return ok({ issueId });
   } catch (error) {
@@ -506,7 +513,12 @@ export async function assignIssueAction(
     // Get current issue
     const currentIssue = await db.query.issues.findFirst({
       where: eq(issues.id, issueId),
-      columns: { machineId: true, reportedBy: true, assignedTo: true },
+      columns: {
+        machineInitials: true,
+        issueNumber: true,
+        reportedBy: true,
+        assignedTo: true,
+      },
       with: {
         machine: {
           columns: { ownerId: true },
@@ -544,9 +556,9 @@ export async function assignIssueAction(
       actorId: user.id,
     });
 
-    revalidatePath(`/issues/${issueId}`);
-    revalidatePath("/issues");
-    revalidatePath(`/machines/${currentIssue.machineId}`);
+    const issuePath = `/m/${currentIssue.machineInitials}/i/${currentIssue.issueNumber}`;
+    revalidatePath(issuePath);
+    revalidatePath(`/m/${currentIssue.machineInitials}`);
 
     return ok({ issueId });
   } catch (error) {
@@ -611,6 +623,15 @@ export async function addCommentAction(
     return err("SERVER", "Failed to add comment");
   }
 
-  revalidatePath(`/issues/${issueId}`);
+  // We need issue context for revalidation
+  // This is a bit inefficient, but necessary for correct revalidation paths
+  const issue = await db.query.issues.findFirst({
+    where: eq(issues.id, issueId),
+    columns: { machineInitials: true, issueNumber: true },
+  });
+
+  if (issue) {
+    revalidatePath(`/m/${issue.machineInitials}/i/${issue.issueNumber}`);
+  }
   return ok({ issueId });
 }

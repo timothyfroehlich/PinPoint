@@ -8,12 +8,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { loginAs } from "../support/actions";
 import { cleanupTestEntities, extractIdFromUrl } from "../support/cleanup";
-
-async function selectFirstMachine(page: Page): Promise<void> {
-  // Select "The Addams Family" to avoid contaminating Medieval Madness
-  // which should remain "Operational" for the machines status test
-  await page.locator("#machineId").selectOption({ label: "The Addams Family" });
-}
+import { seededMachines } from "../support/constants";
 
 const createdIssueIds = new Set<string>();
 
@@ -41,38 +36,31 @@ test.describe("Issues System", () => {
   });
 
   test.describe("Issue Creation Flow", () => {
-    test("should create an issue from issues page", async ({ page }) => {
-      // Navigate to issues page
-      await page.goto("/issues");
-      await expect(page.getByRole("heading", { name: "Issues" })).toBeVisible();
+    test("should create an issue for a specific machine", async ({ page }) => {
+      const machineInitials = seededMachines.addamsFamily.initials;
 
-      // Click "Report Issue" button
-      await page
-        .getByRole("main")
-        .getByRole("link", { name: "Report Issue" })
-        .click();
-      await expect(page).toHaveURL("/issues/new");
+      // Navigate to report page for The Addams Family
+      await page.goto(`/m/${machineInitials}/report`);
 
       // Fill out form
-      await selectFirstMachine(page);
-
       await page.getByLabel("Issue Title *").fill("Test flipper not working");
       await page
         .getByLabel("Description")
         .fill("The right flipper does not respond when button is pressed");
-
       await page.getByLabel("Severity *").selectOption("playable");
 
       // Submit form
       await page.getByRole("button", { name: "Report Issue" }).click();
 
-      // Should redirect to issue detail page
-      await expect(page).toHaveURL(/\/issues\/[a-f0-9-]+/);
-      await expect(
-        page.getByRole("heading", { name: "Test flipper not working" })
-      ).toBeVisible();
+      // Should redirect to issue detail page in new format
+      await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
 
-      // Check timeline shows "Issue created" event
+      // Check H1 contains title using robust locator
+      await expect(
+        page
+          .getByRole("main")
+          .getByRole("heading", { level: 1, name: /Test flipper not working/ })
+      ).toBeVisible();
       await expect(page.getByText("Issue created")).toBeVisible();
 
       rememberIssueId(page);
@@ -81,15 +69,18 @@ test.describe("Issues System", () => {
     test("should create an issue from machine page with pre-filled machine", async ({
       page,
     }) => {
-      // Navigate to machines page
-      await page.goto("/machines");
+      // Navigate to machines list page
+      await page.goto("/m");
       await expect(
         page.getByRole("heading", { name: "Machines" })
       ).toBeVisible();
 
-      // Click on a machine
-      await page.getByTestId("machine-card").first().click();
-      await expect(page).toHaveURL(/\/machines\/[a-f0-9-]+/);
+      // Click on a machine (e.g., The Addams Family)
+      const addamsFamilyCard = page
+        .getByTestId("machine-card")
+        .filter({ hasText: seededMachines.addamsFamily.name });
+      await addamsFamilyCard.click();
+      await expect(page).toHaveURL(/\/m\/TAF/); // Expect TAF machine detail page
 
       // Click "Report Issue" button on machine page
       await page
@@ -97,13 +88,16 @@ test.describe("Issues System", () => {
         .getByRole("link", { name: "Report Issue" })
         .click();
 
-      // Should be on new issue page with machine pre-filled
-      await expect(page).toHaveURL(/\/issues\/new\?machineId=[a-f0-9-]+/);
+      // Should be on new issue page for TAF
+      await expect(page).toHaveURL(/\/m\/TAF\/report/);
 
-      // Machine dropdown should have a value selected
-      const machineSelect = page.locator("#machineId");
-      await expect(machineSelect).toBeVisible();
-      // Note: We can't easily test the selected value, but the form should work
+      // Verify machine name is displayed
+      await expect(
+        page
+          .locator("div")
+          .filter({ hasText: seededMachines.addamsFamily.name })
+          .first()
+      ).toBeVisible();
 
       // Fill out remaining fields
       await page.getByLabel("Issue Title *").fill("Display flickering");
@@ -113,55 +107,61 @@ test.describe("Issues System", () => {
       await page.getByRole("button", { name: "Report Issue" }).click();
 
       // Verify creation
-      await expect(page).toHaveURL(/\/issues\/[a-f0-9-]+/);
+      await expect(page).toHaveURL(/\/m\/TAF\/i\/[0-9]+/);
+      // Check H1 contains title
       await expect(
-        page.getByRole("heading", { name: "Display flickering" })
+        page
+          .getByRole("main")
+          .getByRole("heading", { level: 1, name: /Display flickering/ })
       ).toBeVisible();
 
       rememberIssueId(page);
-    });
-  });
-
-  test.describe("Issue List", () => {
-    test("should display all issues", async ({ page }) => {
-      await page.goto("/issues");
-
-      // Page should load
-      await expect(page.getByRole("heading", { name: "Issues" })).toBeVisible();
-
-      // Should have issue cards or empty state
-      const emptyState = page.getByText("No issues reported yet");
-      const issueCards = page
-        .getByRole("link")
-        .filter({ has: page.getByTestId(/issue-/) });
-
-      // Either empty state or issue cards should be visible
-      const hasContent =
-        (await emptyState.isVisible()) || (await issueCards.count()) > 0;
-      expect(hasContent).toBe(true);
     });
   });
 
   test.describe("Issue Detail and Updates", () => {
-    test("should display issue details", async ({ page }) => {
-      // Create an issue first (or navigate to existing one)
-      await page.goto("/issues/new");
-      await selectFirstMachine(page);
-      await page.getByLabel("Issue Title *").fill("Test Issue for Details");
+    let issueUrl: string;
+    let issueTitle: string;
+    let machineInitials: string;
+    let issueNumber: number;
+
+    test.beforeEach(async ({ page }) => {
+      // Create an issue first to navigate to via UI interaction
+      machineInitials = seededMachines.addamsFamily.initials;
+      issueTitle = `Test Issue for Details ${Date.now()}`;
+      await page.goto(`/m/${machineInitials}/report`);
+      await page.getByLabel("Issue Title *").fill(issueTitle);
       await page.locator("#severity").selectOption("playable");
       await page.getByRole("button", { name: "Report Issue" }).click();
 
+      await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
+      issueUrl = page.url();
+      issueNumber = Number(issueUrl.split("/").pop()); // Extract issue number from URL
+      rememberIssueId(page);
+    });
+
+    test("should display issue details", async ({ page }) => {
+      // Navigate to the created issue's detail page
+      await page.goto(issueUrl);
+
       // Should be on detail page
+      // Check H1 contains title
       await expect(
-        page.getByRole("heading", { name: "Test Issue for Details" })
+        page
+          .getByRole("main")
+          .getByRole("heading", { level: 1, name: issueTitle })
       ).toBeVisible();
 
-      rememberIssueId(page);
+      // Check H1 contains ID
+      const idText = `${machineInitials}-${String(issueNumber).padStart(2, "0")}`;
+      await expect(
+        page.getByRole("main").getByRole("heading", { level: 1, name: idText })
+      ).toBeVisible();
 
       // Should show metadata
-      // Should show metadata
-      // Machine name is displayed as a breadcrumb link
-      await expect(page.getByText("The Addams Family")).toBeVisible();
+      await expect(
+        page.getByText(seededMachines.addamsFamily.name)
+      ).toBeVisible();
 
       const sidebar = page.getByTestId("issue-sidebar");
       await expect(
@@ -185,16 +185,8 @@ test.describe("Issues System", () => {
     test("should support timeline comments, status, and assignee updates", async ({
       page,
     }) => {
-      await page.goto("/issues/new");
-      await selectFirstMachine(page);
-      const issueTitle = `Timeline Issue ${Date.now()}`;
-      await page.getByLabel("Issue Title *").fill(issueTitle);
-      await page.getByRole("button", { name: "Report Issue" }).click();
-
-      await expect(
-        page.getByRole("heading", { name: issueTitle })
-      ).toBeVisible();
-      rememberIssueId(page);
+      // Navigate to the created issue's detail page
+      await page.goto(issueUrl);
 
       const commentText = `Operator note ${Date.now()}`;
       await page.getByPlaceholder("Leave a comment...").fill(commentText);

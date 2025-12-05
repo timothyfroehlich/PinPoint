@@ -11,7 +11,7 @@ import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { machines, issues } from "~/server/db/schema";
 import { createTestMachine, createTestIssue } from "~/test/helpers/factories";
 import { deriveMachineStatus } from "~/lib/machines/status";
-import { createMachineSchema } from "~/app/(app)/machines/schemas";
+import { createMachineSchema } from "~/app/(app)/m/schemas";
 
 describe("Machine CRUD Operations (PGlite)", () => {
   // Set up worker-scoped PGlite and auto-cleanup after each test
@@ -20,7 +20,10 @@ describe("Machine CRUD Operations (PGlite)", () => {
   describe("Machine Creation", () => {
     it("should create a machine with valid name", async () => {
       const db = await getTestDb();
-      const testMachine = createTestMachine({ name: "Medieval Madness" });
+      const testMachine = createTestMachine({
+        name: "Medieval Madness",
+        initials: "MM",
+      });
 
       const [machine] = await db
         .insert(machines)
@@ -29,6 +32,7 @@ describe("Machine CRUD Operations (PGlite)", () => {
 
       expect(machine).toBeDefined();
       expect(machine.name).toBe("Medieval Madness");
+      expect(machine.initials).toBe("MM");
       expect(machine.id).toBeDefined();
       expect(machine.createdAt).toBeDefined();
     });
@@ -37,12 +41,14 @@ describe("Machine CRUD Operations (PGlite)", () => {
       // Valid name
       const validResult = createMachineSchema.safeParse({
         name: "Attack from Mars",
+        initials: "AFM",
       });
       expect(validResult.success).toBe(true);
 
       // Empty name should fail
       const emptyResult = createMachineSchema.safeParse({
         name: "",
+        initials: "AFM",
       });
       expect(emptyResult.success).toBe(false);
 
@@ -54,6 +60,7 @@ describe("Machine CRUD Operations (PGlite)", () => {
     it("should trim whitespace from machine name", () => {
       const result = createMachineSchema.safeParse({
         name: "  Twilight Zone  ",
+        initials: "TZ",
       });
       expect(result.success).toBe(true);
       if (result.success) {
@@ -67,20 +74,25 @@ describe("Machine CRUD Operations (PGlite)", () => {
       const db = await getTestDb();
 
       // Create machine
-      const testMachine = createTestMachine({ name: "The Addams Family" });
+      const testMachine = createTestMachine({
+        name: "The Addams Family",
+        initials: "TAF",
+      });
       const [machine] = await db
         .insert(machines)
         .values(testMachine)
         .returning();
 
       // Create issues for the machine
-      const issue1 = createTestIssue(machine.id, {
+      const issue1 = createTestIssue(machine.initials, {
         title: "Broken flipper",
+        issueNumber: 1,
         severity: "unplayable",
         status: "new",
       });
-      const issue2 = createTestIssue(machine.id, {
+      const issue2 = createTestIssue(machine.initials, {
         title: "Missing decal",
+        issueNumber: 2,
         severity: "minor",
         status: "new",
       });
@@ -107,9 +119,9 @@ describe("Machine CRUD Operations (PGlite)", () => {
       await db
         .insert(machines)
         .values([
-          createTestMachine({ name: "Twilight Zone" }),
-          createTestMachine({ name: "Attack from Mars" }),
-          createTestMachine({ name: "Medieval Madness" }),
+          createTestMachine({ name: "Twilight Zone", initials: "TZ" }),
+          createTestMachine({ name: "Attack from Mars", initials: "AFM" }),
+          createTestMachine({ name: "Medieval Madness", initials: "MM" }),
         ]);
 
       const result = await db.query.machines.findMany({
@@ -128,7 +140,10 @@ describe("Machine CRUD Operations (PGlite)", () => {
       const db = await getTestDb();
 
       // Create machine
-      const testMachine = createTestMachine({ name: "Operational Machine" });
+      const testMachine = createTestMachine({
+        name: "Operational Machine",
+        initials: "OP",
+      });
       const [machine] = await db
         .insert(machines)
         .values(testMachine)
@@ -136,8 +151,9 @@ describe("Machine CRUD Operations (PGlite)", () => {
 
       // Create only resolved issues
       await db.insert(issues).values([
-        createTestIssue(machine.id, {
+        createTestIssue(machine.initials, {
           title: "Fixed issue",
+          issueNumber: 1,
           severity: "unplayable",
           status: "resolved",
           resolvedAt: new Date(),
@@ -166,7 +182,10 @@ describe("Machine CRUD Operations (PGlite)", () => {
       const db = await getTestDb();
 
       // Create machine
-      const testMachine = createTestMachine({ name: "Needs Service Machine" });
+      const testMachine = createTestMachine({
+        name: "Needs Service Machine",
+        initials: "NS",
+      });
       const [machine] = await db
         .insert(machines)
         .values(testMachine)
@@ -174,13 +193,15 @@ describe("Machine CRUD Operations (PGlite)", () => {
 
       // Create playable and minor issues
       await db.insert(issues).values([
-        createTestIssue(machine.id, {
+        createTestIssue(machine.initials, {
           title: "Playable issue",
+          issueNumber: 1,
           severity: "playable",
           status: "new",
         }),
-        createTestIssue(machine.id, {
+        createTestIssue(machine.initials, {
           title: "Minor issue",
+          issueNumber: 2,
           severity: "minor",
           status: "in_progress",
         }),
@@ -208,7 +229,10 @@ describe("Machine CRUD Operations (PGlite)", () => {
       const db = await getTestDb();
 
       // Create machine
-      const testMachine = createTestMachine({ name: "Unplayable Machine" });
+      const testMachine = createTestMachine({
+        name: "Unplayable Machine",
+        initials: "UP",
+      });
       const [machine] = await db
         .insert(machines)
         .values(testMachine)
@@ -216,13 +240,15 @@ describe("Machine CRUD Operations (PGlite)", () => {
 
       // Create unplayable issue and other issues
       await db.insert(issues).values([
-        createTestIssue(machine.id, {
+        createTestIssue(machine.initials, {
           title: "Broken flipper",
+          issueNumber: 1,
           severity: "unplayable",
           status: "in_progress",
         }),
-        createTestIssue(machine.id, {
+        createTestIssue(machine.initials, {
           title: "Minor cosmetic issue",
+          issueNumber: 2,
           severity: "minor",
           status: "new",
         }),
@@ -252,6 +278,7 @@ describe("Machine CRUD Operations (PGlite)", () => {
       // Create machine
       const testMachine = createTestMachine({
         name: "Machine with resolved unplayable",
+        initials: "MR",
       });
       const [machine] = await db
         .insert(machines)
@@ -260,14 +287,16 @@ describe("Machine CRUD Operations (PGlite)", () => {
 
       // Create resolved unplayable issue and open minor issue
       await db.insert(issues).values([
-        createTestIssue(machine.id, {
+        createTestIssue(machine.initials, {
           title: "Fixed unplayable issue",
+          issueNumber: 1,
           severity: "unplayable",
           status: "resolved",
           resolvedAt: new Date(),
         }),
-        createTestIssue(machine.id, {
+        createTestIssue(machine.initials, {
           title: "Current minor issue",
+          issueNumber: 2,
           severity: "minor",
           status: "new",
         }),
@@ -297,24 +326,28 @@ describe("Machine CRUD Operations (PGlite)", () => {
       const db = await getTestDb();
 
       // Create machine with issues
-      const testMachine = createTestMachine();
+      const testMachine = createTestMachine({ initials: "DEL" });
       const [machine] = await db
         .insert(machines)
         .values(testMachine)
         .returning();
 
-      await db
-        .insert(issues)
-        .values([
-          createTestIssue(machine.id, { title: "Issue 1" }),
-          createTestIssue(machine.id, { title: "Issue 2" }),
-        ]);
+      await db.insert(issues).values([
+        createTestIssue(machine.initials, {
+          title: "Issue 1",
+          issueNumber: 1,
+        }),
+        createTestIssue(machine.initials, {
+          title: "Issue 2",
+          issueNumber: 2,
+        }),
+      ]);
 
       // Verify issues exist
       const beforeDelete = await db
         .select()
         .from(issues)
-        .where(eq(issues.machineId, machine.id));
+        .where(eq(issues.machineInitials, machine.initials));
       expect(beforeDelete).toHaveLength(2);
 
       // Delete machine
@@ -324,7 +357,7 @@ describe("Machine CRUD Operations (PGlite)", () => {
       const afterDelete = await db
         .select()
         .from(issues)
-        .where(eq(issues.machineId, machine.id));
+        .where(eq(issues.machineInitials, machine.initials));
       expect(afterDelete).toHaveLength(0);
     });
   });

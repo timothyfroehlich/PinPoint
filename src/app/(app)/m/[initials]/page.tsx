@@ -21,6 +21,7 @@ import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { ArrowLeft, Calendar, Plus } from "lucide-react";
 import { UpdateMachineForm } from "./update-machine-form";
+import { formatIssueId } from "~/lib/issues/utils";
 
 /**
  * Machine Detail Page (Protected Route)
@@ -31,7 +32,7 @@ import { UpdateMachineForm } from "./update-machine-form";
 export default async function MachineDetailPage({
   params,
 }: {
-  params: Promise<{ machineId: string }>;
+  params: Promise<{ initials: string }>;
 }): Promise<React.JSX.Element> {
   // Auth guard - check if user is authenticated (CORE-SSR-002)
   const supabase = await createClient();
@@ -42,15 +43,16 @@ export default async function MachineDetailPage({
   if (!user) throw new Error("Unauthorized");
 
   // Await params (Next.js 15+ requirement)
-  const { machineId } = await params;
+  const { initials } = await params;
 
   // Query machine with issues (direct Drizzle query - no DAL)
   const machine = await db.query.machines.findFirst({
-    where: eq(machines.id, machineId),
+    where: eq(machines.initials, initials),
     with: {
       issues: {
         columns: {
           id: true,
+          issueNumber: true,
           title: true,
           status: true,
           severity: true,
@@ -63,10 +65,7 @@ export default async function MachineDetailPage({
     },
   });
 
-  // Fetch all users for owner selection (Admin only? For now fetch for all authorized users)
-  // Ideally we check if user is admin, but let's just fetch for now and handle UI visibility in form if needed.
-  // Actually, plan says "Admin only".
-  // Let's check role.
+  // Fetch all users for owner selection (Admin only)
   const currentUserProfile = await db.query.userProfiles.findFirst({
     where: eq(userProfiles.id, user.id),
     columns: { role: true },
@@ -100,7 +99,7 @@ export default async function MachineDetailPage({
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link href="/machines">
+              <Link href="/m">
                 <Button
                   variant="outline"
                   size="sm"
@@ -222,7 +221,7 @@ export default async function MachineDetailPage({
                     className="bg-primary text-on-primary hover:bg-primary/90"
                     asChild
                   >
-                    <Link href={`/issues/new?machineId=${machine.id}`}>
+                    <Link href={`/m/${machine.initials}/report`}>
                       <Plus className="mr-2 size-4" />
                       Report Issue
                     </Link>
@@ -233,7 +232,7 @@ export default async function MachineDetailPage({
                       variant="outline"
                       className="border-outline-variant text-on-surface"
                     >
-                      <Link href={`/issues?machineId=${machine.id}`}>
+                      <Link href={`/m/${machine.initials}/i`}>
                         View All Issues for {machine.name}
                       </Link>
                     </Button>
@@ -249,43 +248,56 @@ export default async function MachineDetailPage({
                     No issues reported yet
                   </p>
                   <p className="text-sm text-on-surface-variant">
-                    Issues will be available in Task 8
+                    Report an issue to get started
                   </p>
                 </div>
               ) : (
-                // Issues list (placeholder UI ready for Task 8)
+                // Issues list
                 <div className="space-y-3">
                   {openIssues.map((issue) => (
-                    <div
+                    <Link
                       key={issue.id}
-                      data-testid="issue-card"
-                      className="flex items-center justify-between p-4 rounded-lg border border-outline-variant bg-surface-variant"
+                      href={`/m/${machine.initials}/i/${issue.issueNumber}`}
+                      className="block"
                     >
-                      <div className="flex-1">
-                        <h3 className="font-medium text-on-surface">
-                          {issue.title}
-                        </h3>
-                        <div className="mt-1 flex items-center gap-3 text-xs text-on-surface-variant">
-                          <span>
-                            {new Date(issue.createdAt).toLocaleDateString()}
-                          </span>
-                          <Badge variant="outline" className="text-xs">
-                            {issue.severity}
-                          </Badge>
-                          <Badge
-                            className={cn(
-                              getIssuePriorityStyles(issue.priority),
-                              "border px-2 py-0.5 text-xs font-semibold"
-                            )}
-                          >
-                            {getIssuePriorityLabel(issue.priority)}
-                          </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            {issue.status}
-                          </Badge>
+                      <div
+                        data-testid="issue-card"
+                        className="flex items-center justify-between p-4 rounded-lg border border-outline-variant bg-surface-variant hover:border-primary/50 transition-colors"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-mono text-sm font-bold text-primary">
+                              {formatIssueId(
+                                machine.initials,
+                                issue.issueNumber
+                              )}
+                            </span>
+                            <h3 className="font-medium text-on-surface">
+                              {issue.title}
+                            </h3>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-on-surface-variant">
+                            <span>
+                              {new Date(issue.createdAt).toLocaleDateString()}
+                            </span>
+                            <Badge variant="outline" className="text-xs">
+                              {issue.severity}
+                            </Badge>
+                            <Badge
+                              className={cn(
+                                getIssuePriorityStyles(issue.priority),
+                                "border px-2 py-0.5 text-xs font-semibold"
+                              )}
+                            >
+                              {getIssuePriorityLabel(issue.priority)}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {issue.status}
+                            </Badge>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               )}

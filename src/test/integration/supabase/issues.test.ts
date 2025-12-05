@@ -19,7 +19,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
   // Set up worker-scoped PGlite and auto-cleanup after each test
   setupTestDb();
 
-  let testMachine: { id: string; name: string };
+  let testMachine: { id: string; name: string; initials: string };
   let testUser: { id: string; name: string };
 
   beforeEach(async () => {
@@ -28,7 +28,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
     // Create test machine
     const [machine] = await db
       .insert(machines)
-      .values({ name: "Test Machine" })
+      .values({ name: "Test Machine", initials: "TM" })
       .returning();
     testMachine = machine;
 
@@ -54,7 +54,8 @@ describe("Issues CRUD Operations (PGlite)", () => {
         .values({
           title: "Test Issue",
           description: "Test description",
-          machineId: testMachine.id,
+          machineInitials: testMachine.initials,
+          issueNumber: 1,
           severity: "playable",
           reportedBy: testUser.id,
           status: "new",
@@ -64,21 +65,23 @@ describe("Issues CRUD Operations (PGlite)", () => {
       expect(issue).toBeDefined();
       expect(issue.title).toBe("Test Issue");
       expect(issue.description).toBe("Test description");
-      expect(issue.machineId).toBe(testMachine.id);
+      expect(issue.machineInitials).toBe(testMachine.initials);
+      expect(issue.issueNumber).toBe(1);
       expect(issue.severity).toBe("playable");
       expect(issue.status).toBe("new");
       expect(issue.reportedBy).toBe(testUser.id);
     });
 
-    it("should enforce machine requirement (NOT NULL constraint)", async () => {
+    it("should enforce machine initials requirement (NOT NULL constraint)", async () => {
       const db = await getTestDb();
 
-      // Attempt to create issue without machineId should fail
+      // Attempt to create issue without machineInitials should fail
       await expect(
         db.insert(issues).values({
           title: "Test Issue",
           // @ts-expect-error - Testing validation
-          machineId: null,
+          machineInitials: null,
+          issueNumber: 1,
           severity: "minor",
           reportedBy: testUser.id,
         })
@@ -92,7 +95,8 @@ describe("Issues CRUD Operations (PGlite)", () => {
         .insert(issues)
         .values({
           title: "Test Issue",
-          machineId: testMachine.id,
+          machineInitials: testMachine.initials,
+          issueNumber: 1,
           severity: "minor",
           reportedBy: testUser.id,
         })
@@ -108,7 +112,8 @@ describe("Issues CRUD Operations (PGlite)", () => {
         .insert(issues)
         .values({
           title: "Test Issue",
-          machineId: testMachine.id,
+          machineInitials: testMachine.initials,
+          issueNumber: 1,
           reportedBy: testUser.id,
         })
         .returning();
@@ -125,21 +130,24 @@ describe("Issues CRUD Operations (PGlite)", () => {
       await db.insert(issues).values([
         {
           title: "Issue 1",
-          machineId: testMachine.id,
+          machineInitials: testMachine.initials,
+          issueNumber: 1,
           severity: "unplayable",
           status: "new",
           reportedBy: testUser.id,
         },
         {
           title: "Issue 2",
-          machineId: testMachine.id,
+          machineInitials: testMachine.initials,
+          issueNumber: 2,
           severity: "playable",
           status: "in_progress",
           reportedBy: testUser.id,
         },
         {
           title: "Issue 3",
-          machineId: testMachine.id,
+          machineInitials: testMachine.initials,
+          issueNumber: 3,
           severity: "minor",
           status: "resolved",
           reportedBy: testUser.id,
@@ -151,7 +159,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
       const db = await getTestDb();
 
       const machineIssues = await db.query.issues.findMany({
-        where: eq(issues.machineId, testMachine.id),
+        where: eq(issues.machineInitials, testMachine.initials),
       });
 
       expect(machineIssues).toHaveLength(3);
@@ -197,7 +205,13 @@ describe("Issues CRUD Operations (PGlite)", () => {
   });
 
   describe("Issue Updates", () => {
-    let testIssue: { id: string; status: string; severity: string };
+    let testIssue: {
+      id: string;
+      status: string;
+      severity: string;
+      machineInitials: string;
+      issueNumber: number;
+    };
 
     beforeEach(async () => {
       const db = await getTestDb();
@@ -206,7 +220,8 @@ describe("Issues CRUD Operations (PGlite)", () => {
         .insert(issues)
         .values({
           title: "Test Issue",
-          machineId: testMachine.id,
+          machineInitials: testMachine.initials,
+          issueNumber: 1,
           severity: "playable",
           status: "new",
           reportedBy: testUser.id,
@@ -292,7 +307,8 @@ describe("Issues CRUD Operations (PGlite)", () => {
         .insert(issues)
         .values({
           title: "Test Issue",
-          machineId: testMachine.id,
+          machineInitials: testMachine.initials,
+          issueNumber: 1,
           severity: "playable",
           reportedBy: testUser.id,
         })
@@ -337,23 +353,30 @@ describe("Issues CRUD Operations (PGlite)", () => {
         authorId: testUser.id,
       });
 
-      const timeline = await db.query.issueComments.findMany({
-        where: eq(issueComments.issueId, testIssue.id),
-        with: {
-          author: true,
-        },
-      });
+      // Use explicit JOINs instead of db.query relations which were causing
+      // "Cannot read properties of undefined (reading 'referencedTable')" error
+      const timeline = await db
+        .select({
+          comment: issueComments,
+          author: userProfiles,
+        })
+        .from(issueComments)
+        .leftJoin(userProfiles, eq(issueComments.authorId, userProfiles.id))
+        .where(eq(issueComments.issueId, testIssue.id));
 
       expect(timeline).toHaveLength(2);
 
-      const systemEvent = timeline.find((t) => t.isSystem);
-      const userComment = timeline.find((t) => !t.isSystem);
+      const systemEvent = timeline.find((t) => t.comment.isSystem);
+      const userComment = timeline.find((t) => !t.comment.isSystem);
 
-      expect(systemEvent?.content).toBe(
+      if (!userComment) throw new Error("User comment not found");
+      if (!systemEvent) throw new Error("System event not found");
+
+      expect(systemEvent.comment.content).toBe(
         "Status changed from new to in_progress"
       );
-      expect(systemEvent?.authorId).toBeNull();
-      expect(userComment?.author?.name).toBe("Test User");
+      expect(systemEvent.comment.authorId).toBeNull();
+      expect(userComment.author?.name).toBe("Test User");
     });
 
     it("should order timeline events chronologically", async () => {
@@ -401,7 +424,8 @@ describe("Issues CRUD Operations (PGlite)", () => {
         .insert(issues)
         .values({
           title: "Public Issue",
-          machineId: testMachine.id,
+          machineInitials: testMachine.initials,
+          issueNumber: 1,
           severity: "minor",
           reportedBy: null,
         })
@@ -417,20 +441,22 @@ describe("Issues CRUD Operations (PGlite)", () => {
       await db.insert(issues).values([
         {
           title: "Member Issue",
-          machineId: testMachine.id,
+          machineInitials: testMachine.initials,
+          issueNumber: 1,
           severity: "playable",
           reportedBy: testUser.id,
         },
         {
           title: "Anonymous Issue",
-          machineId: testMachine.id,
+          machineInitials: testMachine.initials,
+          issueNumber: 2,
           severity: "unplayable",
           reportedBy: null,
         },
       ]);
 
       const results = await db.query.issues.findMany({
-        where: eq(issues.machineId, testMachine.id),
+        where: eq(issues.machineInitials, testMachine.initials),
         with: {
           reportedByUser: {
             columns: { id: true, name: true },
@@ -459,7 +485,8 @@ describe("Issues CRUD Operations (PGlite)", () => {
       // Create issue
       await db.insert(issues).values({
         title: "Test Issue",
-        machineId: testMachine.id,
+        machineInitials: testMachine.initials,
+        issueNumber: 1,
         severity: "minor",
         reportedBy: testUser.id,
       });
@@ -469,7 +496,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
 
       // Check that issue was also deleted (cascade)
       const remainingIssues = await db.query.issues.findMany({
-        where: eq(issues.machineId, testMachine.id),
+        where: eq(issues.machineInitials, testMachine.initials),
       });
 
       expect(remainingIssues).toHaveLength(0);
@@ -483,7 +510,8 @@ describe("Issues CRUD Operations (PGlite)", () => {
         .insert(issues)
         .values({
           title: "Test Issue",
-          machineId: testMachine.id,
+          machineInitials: testMachine.initials,
+          issueNumber: 1,
           severity: "minor",
           reportedBy: testUser.id,
         })

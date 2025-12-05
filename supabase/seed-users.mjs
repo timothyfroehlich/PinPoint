@@ -130,9 +130,11 @@ async function seedUsersAndData() {
 
     for (const machine of machines) {
       await sql`
-        INSERT INTO machines (id, name, owner_id, created_at, updated_at)
-        VALUES (${machine.id}, ${machine.name}, ${userIds.admin}, NOW(), NOW())
-        ON CONFLICT (id) DO UPDATE SET owner_id = ${userIds.admin}
+        INSERT INTO machines (id, name, initials, owner_id, created_at, updated_at)
+        VALUES (${machine.id}, ${machine.name}, ${machine.initials}, ${userIds.admin}, NOW(), NOW())
+        ON CONFLICT (id) DO UPDATE SET 
+          owner_id = ${userIds.admin},
+          initials = ${machine.initials}
       `;
     }
     console.log("✅ Machines seeded with Admin owner.");
@@ -142,12 +144,13 @@ async function seedUsersAndData() {
 
     // Attack from Mars: 1 playable issue
     await sql`
-      INSERT INTO issues (id, machine_id, title, description, status, severity, created_at, updated_at)
+      INSERT INTO issues (id, machine_initials, issue_number, title, description, status, severity, created_at, updated_at)
       VALUES (
         '10000000-0000-4000-8000-000000000001',
-        '22222222-2222-4222-8222-222222222222',
+        'AFM',
+        1,
         'Right flipper feels weak',
-        'The right flipper doesn''t have full strength. Can still play but makes ramp shots difficult.',
+        'The right flipper doesn\''t have full strength. Can still play but makes ramp shots difficult.',
         'new',
         'playable',
         NOW() - INTERVAL '2 days',
@@ -156,14 +159,18 @@ async function seedUsersAndData() {
       ON CONFLICT (id) DO NOTHING
     `;
 
+    // Update AFM next issue number
+    await sql`UPDATE machines SET next_issue_number = 2 WHERE initials = 'AFM'`
+
     // The Addams Family: Multiple issues
     await sql`
-      INSERT INTO issues (id, machine_id, title, description, status, severity, created_at, updated_at)
+      INSERT INTO issues (id, machine_initials, issue_number, title, description, status, severity, created_at, updated_at)
       VALUES
       (
         '10000000-0000-4000-8000-000000000002',
-        '33333333-3333-4333-8333-333333333333',
-        'Ball stuck in Thing''s box',
+        'TAF',
+        1,
+        'Ball stuck in Thing\''s box',
         'Extended sample issue with many timeline updates.',
         'new',
         'unplayable',
@@ -172,9 +179,10 @@ async function seedUsersAndData() {
       ),
       (
         '10000000-0000-4000-8000-000000000003',
-        '33333333-3333-4333-8333-333333333333',
+        'TAF',
+        2,
         'Bookcase not registering hits',
-        'The bookcase target isn''t registering when hit.',
+        'The bookcase target doesn\''t registering when hit.',
         'in_progress',
         'playable',
         NOW() - INTERVAL '3 days',
@@ -182,7 +190,8 @@ async function seedUsersAndData() {
       ),
       (
         '10000000-0000-4000-8000-000000000004',
-        '33333333-3333-4333-8333-333333333333',
+        'TAF',
+        3,
         'Dim GI lighting on left side',
         'General illumination bulbs on left side are dim.',
         'new',
@@ -192,7 +201,8 @@ async function seedUsersAndData() {
       ),
       (
         '10000000-0000-4000-8000-000000000005',
-        '33333333-3333-4333-8333-333333333333',
+        'TAF',
+        4,
         'Bear Kick opto not working',
         'Bear Kick feature not detecting ball.',
         'new',
@@ -201,7 +211,11 @@ async function seedUsersAndData() {
         NOW() - INTERVAL '1 week'
       )
       ON CONFLICT (id) DO NOTHING
-    `;
+    `
+
+    // Update TAF next issue number
+    await sql`UPDATE machines SET next_issue_number = 5 WHERE initials = 'TAF'`
+
     console.log("✅ Issues seeded.");
 
     // 4. Seed Comments (using real user IDs)
@@ -209,7 +223,7 @@ async function seedUsersAndData() {
       console.log("\n💬 Seeding comments...");
 
       // Clear existing comments for the main issue to avoid duplicates/mess
-      await sql`DELETE FROM issue_comments WHERE issue_id = '10000000-0000-4000-8000-000000000002'`;
+      await sql`DELETE FROM issue_comments WHERE issue_id = '10000000-0000-4000-8000-000000000002'`
 
       const comments = [
         {

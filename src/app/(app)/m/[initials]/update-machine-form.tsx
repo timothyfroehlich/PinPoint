@@ -8,7 +8,7 @@ import { Label } from "~/components/ui/label";
 import {
   updateMachineAction,
   type UpdateMachineResult,
-} from "~/app/(app)/machines/actions";
+} from "~/app/(app)/m/actions";
 import { cn } from "~/lib/utils";
 import { OwnerSelect } from "~/components/machines/OwnerSelect";
 import { type machines } from "~/server/db/schema";
@@ -53,6 +53,23 @@ export function UpdateMachineForm({
           <p className="text-sm font-medium">Machine updated successfully!</p>
         </div>
       )}
+
+      {/* Machine Initials (Read Only) */}
+      <div className="space-y-2">
+        <Label htmlFor="initials" className="text-on-surface">
+          Initials
+        </Label>
+        <Input
+          id="initials"
+          value={machine.initials}
+          disabled
+          className="border-outline bg-surface-variant text-on-surface-variant"
+        />
+        <p className="text-xs text-on-surface-variant">
+          Machine initials cannot be changed
+        </p>
+      </div>
+
       {/* Machine Name */}
       <div className="space-y-2">
         <Label htmlFor="name" className="text-on-surface">

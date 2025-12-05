@@ -29,16 +29,15 @@ test.describe("Email Notifications", () => {
       page.getByRole("heading", { name: "Dashboard", exact: true })
     ).toBeVisible();
 
-    // Create an issue
-    await page.goto("/issues/new");
-    await page.getByTestId("machine-select").selectOption({ index: 0 });
+    // Create an issue for a specific machine (e.g., MM)
+    await page.goto("/m/MM/report");
     await page.getByLabel("Title").fill("Test Issue for Email");
     await page.getByLabel("Description").fill("Testing email notifications");
     await page.getByLabel("Severity").selectOption("playable");
     await page.getByRole("button", { name: "Report Issue" }).click();
 
-    // Wait for redirect to issue page
-    await expect(page).toHaveURL(/\/issues\/[a-f0-9-]+$/);
+    // Wait for redirect to issue page (new URL format)
+    await expect(page).toHaveURL(/\/m\/MM\/i\/[0-9]+/);
 
     // Wait for email to arrive in Mailpit
     const email = await mailpit.waitForEmail(TEST_USERS.admin.email, {
@@ -66,12 +65,18 @@ test.describe("Email Notifications", () => {
       page.getByRole("heading", { name: "Dashboard", exact: true })
     ).toBeVisible();
 
-    // Create issue
-    await page.goto("/issues/new");
-    await page.getByTestId("machine-select").selectOption({ index: 0 });
+    // Create issue for a specific machine (e.g., MM)
+    await page.goto("/m/MM/report");
     await page.getByLabel("Title").fill("Status Change Test");
     await page.getByRole("button", { name: "Report Issue" }).click();
-    await expect(page).toHaveURL(/\/issues\/[a-f0-9-]+$/);
+    await expect(page).toHaveURL(/\/m\/MM\/i\/[0-9]+/);
+
+    // Ensure we are on the page before interacting with sidebar
+    await expect(
+      page
+        .getByRole("main")
+        .getByRole("heading", { level: 1, name: /Status Change Test/ })
+    ).toBeVisible();
 
     // Clear the "new issue" email
     await new Promise((resolve) => setTimeout(resolve, 1000));

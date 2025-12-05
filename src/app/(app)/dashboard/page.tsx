@@ -24,6 +24,7 @@ import {
   isIssueStatus,
   isIssueSeverity,
 } from "~/lib/issues/status";
+import { formatIssueId } from "~/lib/issues/utils";
 
 /**
  * Cached dashboard data fetcher (CORE-PERF-001)
@@ -56,8 +57,18 @@ const getDashboardData = cache(async (userId: string) => {
         columns: {
           id: true,
           name: true,
+          initials: true,
         },
       },
+    },
+    columns: {
+      id: true,
+      title: true,
+      status: true,
+      severity: true,
+      machineInitials: true,
+      issueNumber: true,
+      createdAt: true,
     },
   });
 
@@ -70,6 +81,7 @@ const getDashboardData = cache(async (userId: string) => {
         columns: {
           id: true,
           name: true,
+          initials: true,
         },
       },
       reportedByUser: {
@@ -79,6 +91,15 @@ const getDashboardData = cache(async (userId: string) => {
         },
       },
     },
+    columns: {
+      id: true,
+      title: true,
+      status: true,
+      severity: true,
+      machineInitials: true,
+      issueNumber: true,
+      createdAt: true,
+    },
   });
 
   // Query 3: Unplayable machines (database-level filtering for efficiency - PERF-002)
@@ -87,14 +108,15 @@ const getDashboardData = cache(async (userId: string) => {
     .select({
       id: machines.id,
       name: machines.name,
+      initials: machines.initials,
       unplayableIssuesCount: sql<number>`count(*)::int`,
     })
     .from(machines)
-    .innerJoin(issues, eq(issues.machineId, machines.id))
+    .innerJoin(issues, eq(issues.machineInitials, machines.initials))
     .where(
       and(eq(issues.severity, "unplayable"), ne(issues.status, "resolved"))
     )
-    .groupBy(machines.id, machines.name);
+    .groupBy(machines.id, machines.name, machines.initials);
 
   // Query 4: Total open issues count
   const totalOpenIssuesResult = await db
@@ -108,7 +130,7 @@ const getDashboardData = cache(async (userId: string) => {
   const machinesNeedingServiceResult = await db
     .selectDistinct({ id: machines.id })
     .from(machines)
-    .innerJoin(issues, eq(issues.machineId, machines.id))
+    .innerJoin(issues, eq(issues.machineInitials, machines.initials))
     .where(ne(issues.status, "resolved"));
 
   const machinesNeedingService = machinesNeedingServiceResult.length;
@@ -248,7 +270,10 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
           ) : (
             <div className="space-y-3" data-testid="assigned-issues-list">
               {assignedIssues.map((issue) => (
-                <Link key={issue.id} href={`/issues/${issue.id}`}>
+                <Link
+                  key={issue.id}
+                  href={`/m/${issue.machineInitials}/i/${issue.issueNumber}`}
+                >
                   <Card
                     className="border-primary/20 bg-card hover:border-primary transition-all hover:glow-primary cursor-pointer"
                     data-testid="assigned-issue-card"
@@ -257,6 +282,12 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                           <CardTitle className="text-base text-foreground mb-1">
+                            <span className="text-muted-foreground font-mono mr-2">
+                              {formatIssueId(
+                                issue.machineInitials,
+                                issue.issueNumber
+                              )}
+                            </span>{" "}
                             {issue.title}
                           </CardTitle>
                           <p className="text-sm text-muted-foreground">
@@ -313,7 +344,7 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
           ) : (
             <div className="space-y-3" data-testid="unplayable-machines-list">
               {unplayableMachines.map((machine) => (
-                <Link key={machine.id} href={`/machines/${machine.id}`}>
+                <Link key={machine.id} href={`/m/${machine.initials}`}>
                   <Card
                     className="border-destructive/30 bg-destructive/10 hover:border-destructive transition-all glow-destructive cursor-pointer"
                     data-testid="unplayable-machine-card"
@@ -361,7 +392,10 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
               data-testid="recent-issues-list"
             >
               {recentIssues.map((issue) => (
-                <Link key={issue.id} href={`/issues/${issue.id}`}>
+                <Link
+                  key={issue.id}
+                  href={`/m/${issue.machineInitials}/i/${issue.issueNumber}`}
+                >
                   <Card
                     className="border-secondary/20 bg-card hover:border-secondary transition-all hover:glow-secondary cursor-pointer h-full"
                     data-testid="recent-issue-card"
@@ -370,6 +404,12 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                           <CardTitle className="text-base text-foreground mb-1">
+                            <span className="text-muted-foreground font-mono mr-2">
+                              {formatIssueId(
+                                issue.machineInitials,
+                                issue.issueNumber
+                              )}
+                            </span>{" "}
                             {issue.title}
                           </CardTitle>
                           <div className="flex flex-col gap-1 text-xs text-muted-foreground">
