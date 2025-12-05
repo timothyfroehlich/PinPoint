@@ -188,15 +188,31 @@ git update-index --skip-worktree supabase/config.toml
   1. `git update-index --no-skip-worktree supabase/config.toml`
   2. Revert ports to standard values (54321, 54322, etc.) but **keep your new keys**.
   3. Commit the file.
-  4. Restore your local ports (or run `scripts/sync-worktrees.sh`).
+  4. Restore your local ports (or run `python3 scripts/sync_worktrees.py`).
   5. `git update-index --skip-worktree supabase/config.toml`
 - **Merging with skip-worktree set**: skip-worktree blocks merges/checkout of `supabase/config.toml`.
   1. Before merging/pulling: `git update-index --no-skip-worktree supabase/config.toml`.
   2. Stash or commit your local config if ports differ from main.
   3. Merge/pull.
-  4. Restore your local ports from stash or `scripts/sync-worktrees.sh`.
+  4. Restore your local ports from stash or `python3 scripts/sync_worktrees.py`.
   5. Re-apply skip flag: `git update-index --skip-worktree supabase/config.toml`.
 - **Mailpit keys required**: Ensure `[inbucket]` contains `port`, `smtp_port`, and `pop3_port` using the per-worktree offsets (see table above). Missing SMTP/POP3 ports will block syncs and Supabase start.
+
+### Worktree Sync Scripts
+
+Two scripts are available for managing worktrees:
+
+1. **`scripts/sync_worktrees.py`** (recommended) - Modern Python rewrite with:
+   - Object-oriented design and better error handling
+   - Unit tests with pytest
+   - Type hints and comprehensive documentation
+   - Usage: `python3 scripts/sync_worktrees.py [--dry-run] [--all] [-y]`
+
+2. **`scripts/sync-worktrees.sh`** (legacy) - Original Bash implementation (1000+ lines)
+   - Maintained for backward compatibility
+   - Usage: `./scripts/sync-worktrees.sh [options]`
+
+Both scripts perform the same operations. See `scripts/README.md` for detailed usage.
 
 ### Available Commands
 

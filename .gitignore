@@ -127,3 +127,4 @@ walkthrough.md
 implementation_plan.md
 task.md
 planning_task.md
+.pytest_cache/
