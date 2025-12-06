@@ -1,8 +1,4 @@
-CREATE TABLE "auth"."users" (
-	"id" uuid PRIMARY KEY NOT NULL,
-	"email" text NOT NULL
-);
---> statement-breakpoint
+
 CREATE TABLE "issue_comments" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"issue_id" uuid NOT NULL,

@@ -41,6 +41,7 @@ CREATE TABLE "machines" (
 	"initials" text NOT NULL,
 	"next_issue_number" integer DEFAULT 1 NOT NULL,
 	"name" text NOT NULL,
+	"migration_test_col" text DEFAULT 'verified',
 	"owner_id" uuid,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,

@@ -70,6 +70,7 @@ export const machines = pgTable(
     initials: text("initials").notNull().unique(),
     nextIssueNumber: integer("next_issue_number").notNull().default(1),
     name: text("name").notNull(),
+    migrationTestCol: text("migration_test_col").default("verified"),
     ownerId: uuid("owner_id").references(() => userProfiles.id),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
