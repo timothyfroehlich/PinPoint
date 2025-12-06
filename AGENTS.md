@@ -366,14 +366,18 @@ If all Yes → ship it. Perfect is the enemy of done.
 ### Changelog Workflow
 
 1. Create the PR _without_ updating `CHANGELOG.md`.
-2. Get the PR number from GitHub.
-3. Update `CHANGELOG.md` with a new header: `## YYYY-MM-DD (#PR_NUMBER)` and list changes below.
+2. Get the PR number and title from GitHub.
+3. Update `CHANGELOG.md` with a new header: `## #PR_NUMBER - <title>` followed by `__YYYY-MM-DD__`, then list changes below.
+   - Document what the branch _actually adds/changes_, not review-driven adjustments
+   - Use clear, user-facing language ("Added", "Changed", "Fixed")
+   - Focus on end user impact, not implementation details
+   - Update the dates for the last few entries to reflect their actual merge dates (check git log on main)
 4. Push this change to the PR branch.
 5. Merge.
 
 ## Quality Gates
 
-- All tests pass before commits
+- `npm run preflight` passes before commits that include code changes
 - Pre-commit hooks (Husky + lint-staged)
 - Server-first principles for new development
 - Progressive enhancement (forms work without JS)
