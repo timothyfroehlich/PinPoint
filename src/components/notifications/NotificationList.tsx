@@ -18,6 +18,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type notifications } from "~/server/db/schema"; // Import notifications schema
+import { formatDistanceToNow } from "date-fns";
 
 // Define the base notification type from the Drizzle schema
 type BaseNotification = typeof notifications.$inferSelect;
@@ -25,6 +26,8 @@ type BaseNotification = typeof notifications.$inferSelect;
 // Extend it for the enriched notifications used in the UI
 export interface EnrichedNotification extends BaseNotification {
   link: string;
+  machineInitials?: string | undefined;
+  issueNumber?: number | undefined;
 }
 
 interface NotificationListProps {
@@ -57,15 +60,20 @@ export function NotificationList({
   };
 
   const getNotificationText = (n: EnrichedNotification): string => {
+    const issueId =
+      n.machineInitials && n.issueNumber
+        ? `${n.machineInitials}-${n.issueNumber}`
+        : "issue";
+
     switch (n.type) {
       case "issue_assigned":
-        return "You were assigned to an issue";
+        return `Assigned to ${issueId}`;
       case "issue_status_changed":
-        return "Issue status updated";
+        return `Status updated for ${issueId}`;
       case "new_issue":
-        return "New issue reported";
+        return `New report ${issueId}`;
       case "new_comment":
-        return "New comment on issue";
+        return `New comment on ${issueId}`;
       default:
         return "New notification";
     }
@@ -115,7 +123,7 @@ export function NotificationList({
               <DropdownMenuItem key={notification.id} asChild>
                 <Link
                   href={getLink(notification)}
-                  className="flex w-full flex-col gap-1 rounded-sm p-3 hover:bg-accent cursor-pointer"
+                  className="flex w-full flex-col items-start gap-1 rounded-sm p-3 hover:bg-accent cursor-pointer text-left"
                   onClick={() => {
                     setIsOpen(false);
                     // Fire and forget mark as read
@@ -156,8 +164,10 @@ export function NotificationList({
                       </Button>
                     </div>
                   </div>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(notification.createdAt).toLocaleDateString()}
+                  <span className="text-xs text-muted-foreground self-end">
+                    {formatDistanceToNow(new Date(notification.createdAt), {
+                      addSuffix: true,
+                    })}
                   </span>
                 </Link>
               </DropdownMenuItem>

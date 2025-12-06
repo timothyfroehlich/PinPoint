@@ -48,13 +48,14 @@ Referencing `TASKS.md` PR order:
 ## Copilot Review Priorities
 
 1. **GitHub Staging Files**: Any files in `.github-staging/` directory MUST be manually reviewed before moving to `.github/`. Never automatically move or activate these files. See `.github-staging/README.md` for review process.
-2. Security & Data Integrity: Input validation, single-tenant assumptions honored, issue-machine relationship enforced.
-3. Server-First Compliance: Avoid unnecessary `"use client"`.
-4. Type Safety: No forbidden escapes; proper narrowing.
-5. Progressive Enhancement: `<form action={serverAction}>` patterns validated.
-6. Memory Safety & Test Patterns: Worker-scoped DB setup; no per-test instances.
-7. Domain Consistency: Issue severity vocabulary and one-machine rule.
-8. **E2E Test Quality**: Follow `docs/E2E_BEST_PRACTICES.md` - semantic selectors (role + name), no hard-coded delays, independent tests, descriptive names, reusable actions extracted. Validate critical user journeys only, avoid testing implementation details or edge cases.
+2. **Release Notes**: Verify `CHANGELOG.md` has been updated with a brief description of changes for user-facing or significant technical updates. Skip only for CI, refactoring, or test-only changes.
+3. Security & Data Integrity: Input validation, single-tenant assumptions honored, issue-machine relationship enforced.
+4. Server-First Compliance: Avoid unnecessary `"use client"`.
+5. Type Safety: No forbidden escapes; proper narrowing.
+6. Progressive Enhancement: `<form action={serverAction}>` patterns validated.
+7. Memory Safety & Test Patterns: Worker-scoped DB setup; no per-test instances.
+8. Domain Consistency: Issue severity vocabulary and one-machine rule.
+9. **E2E Test Quality**: Follow `docs/E2E_BEST_PRACTICES.md` - semantic selectors (role + name), no hard-coded delays, independent tests, descriptive names, reusable actions extracted. Validate critical user journeys only, avoid testing implementation details or edge cases.
 
 ## Preferred Implementation Examples
 
@@ -120,4 +121,4 @@ As features stabilize (Machines CRUD, Issues workflow, Comments), patterns that 
 
 ---
 
-Last Updated: 2025-11-09 (v2 greenfield start)
+Last Updated: 2025-12-05 (Added release notes requirement)

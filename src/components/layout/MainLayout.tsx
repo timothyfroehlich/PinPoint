@@ -67,16 +67,23 @@ export async function MainLayout({
 
     enrichedNotifications = userNotifications.map((n) => {
       let link = "/dashboard";
+      let machineInitials: string | undefined;
+      let issueNumber: number | undefined;
+
       if (n.resourceType === "issue") {
         const issue = issuesData.find((i) => i.id === n.resourceId);
-        if (issue) link = `/m/${issue.machineInitials}/i/${issue.issueNumber}`;
+        if (issue) {
+          link = `/m/${issue.machineInitials}/i/${issue.issueNumber}`;
+          machineInitials = issue.machineInitials;
+          issueNumber = issue.issueNumber;
+        }
       } else {
         // If not an issue, it must be a machine based on resourceType enum
         const machine = machinesData.find((m) => m.id === n.resourceId);
         if (machine) link = `/m/${machine.initials}`;
       }
       // Ensure all properties of EnrichedNotification are present
-      return { ...n, link };
+      return { ...n, link, machineInitials, issueNumber };
     });
 
     userProfile = await db.query.userProfiles.findFirst({
