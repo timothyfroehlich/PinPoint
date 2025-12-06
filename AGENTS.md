@@ -303,7 +303,7 @@ To maintain velocity and avoid running the full `preflight` suite (~60s) for eve
 
 | Scope             | Command                                                | When to use                                                                      |
 | :---------------- | :----------------------------------------------------- | :------------------------------------------------------------------------------- |
-| **Sanity**        | `npm run check:fast`                                   | **Rule 1**: Run after ANY code change. Checks types, lint, and unit tests (~5s). |
+| **Sanity**        | `npm run check`                                        | **Rule 1**: Run after ANY code change. Checks types, lint, and unit tests (~5s). |
 | **Targeted Unit** | `npm test -- src/path/to/file.test.ts`                 | Debugging a specific unit test failure.                                          |
 | **Targeted Int**  | `npm run test:integration -- src/path/to/file.test.ts` | Debugging a specific DB/API test failure.                                        |
 | **Targeted E2E**  | `npm run smoke -- e2e/smoke/file.spec.ts`              | Debugging a specific UI flow.                                                    |

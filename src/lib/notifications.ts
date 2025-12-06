@@ -1,5 +1,5 @@
 import { eq, inArray } from "drizzle-orm";
-import { db } from "~/server/db";
+import { db, type DbOrTx } from "~/server/db";
 import {
   notifications,
   notificationPreferences,
@@ -56,10 +56,8 @@ export async function createNotification(
     additionalRecipientIds,
     issueContext,
   }: CreateNotificationProps,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  txArg: any = db
+  tx: DbOrTx = db
 ): Promise<void> {
-  const tx = txArg as typeof db;
   log.debug(
     { type, resourceId, actorId, action: "createNotification" },
     "Creating notification"
