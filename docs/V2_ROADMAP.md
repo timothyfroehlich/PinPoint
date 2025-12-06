@@ -1,27 +1,20 @@
 # PinPoint Roadmap
 
-**Last Updated**: 2025-11-10
-**Status**: PARKING LOT - Ideas deferred from MVP
-
-## Purpose
-
-This document captures **good ideas that aren't essential for MVP**. Everything here gets reconsidered after MVP ships based on real user feedback, not assumptions.
-
----
+**Last Updated**: 2025-12-06
 
 ## Release Strategy
 
-### MVP (Minimum Viable Product)
+### MVP (Minimum Viable Product) - ✅ COMPLETED
 
 Bare minimum to start tracking issues. See PRODUCT_SPEC.md for details.
 
-- Members-only
-- Machines with name only
-- Basic issue tracking (title, description, severity, status, comments)
-- Anonymous public reporting
-- Simple dashboard
+- ✅ Members-only
+- ✅ Machines with name only
+- ✅ Basic issue tracking (title, description, severity, status, comments)
+- ✅ Anonymous public reporting
+- ✅ Simple dashboard
 
-### MVP+ (Immediate Next Set)
+### MVP+ (Immediate Next Set) - 🚧 IN PROGRESS
 
 Polish and usability improvements that make it practical for daily use.
 **These are "obviously next" features.**
@@ -52,13 +45,13 @@ These make MVP practical for daily use:
 - Effort: Small (1-2 days)
 - Impact: Dramatically improves public reporting UX
 
-**Machine Details**
+**OPDB Integration (Open Pinball Database)** - 🚧 IN PROGRESS
 
-- Problem: Name alone isn't enough as fleet grows
-- Solution: Add manufacturer, year, model, location
-- Scope: Add fields to machine model, update forms and display
-- Effort: Small (1-2 days)
-- Impact: Better machine identification
+- Problem: Manual machine data entry is tedious
+- Solution: Search OPDB, import machine details (name, manufacturer, year, etc.)
+- Scope: OPDB API integration, search UI, import flow
+- Status: Infrastructure and schema partially implemented (Machine Details)
+- Impact: Faster machine setup
 
 **Machine Photos**
 
@@ -86,12 +79,12 @@ These make MVP practical for daily use:
 
 ### Medium Priority
 
-**Machine Ownership & Notifications**
+**Machine Ownership & Notifications** - ✅ COMPLETED
 
 - Problem: Machine owners want to know about issues with their machines
 - Solution: Assign owner to machine, notify on new issues
 - Scope: owner_id field, notification to owner on issue creation
-- Effort: Medium (depends on notification system)
+- Status: Infrastructure and schema implemented
 - Impact: Proactive issue awareness
 
 **Public Landing Page**
@@ -102,12 +95,12 @@ These make MVP practical for daily use:
 - Effort: Small (1-2 days)
 - Impact: Transparency, reduces duplicate reports
 
-**Guest Accounts**
+**Guest Accounts** - ✅ COMPLETED
 
 - Problem: Public reporters can't track their reports
 - Solution: Self-service guest account creation, can view their submitted issues
 - Scope: Guest role, self-signup, filter issues by "reported by me"
-- Effort: Small (1-2 days)
+- Status: Role implemented, signup flow active
 - Impact: Better engagement with public reporters
 
 **Email Capture on Public Reports**
@@ -118,22 +111,22 @@ These make MVP practical for daily use:
 - Effort: Trivial (<1 day)
 - Impact: Follow-up capability
 
-**Recent Issues Per Machine**
+**Recent Issues Per Machine** - ✅ COMPLETED
 
 - Problem: Machine page doesn't show issue history
 - Solution: Show last 5 issues on machine detail page
 - Scope: Query recent resolved issues, display below open issues
-- Effort: Trivial (<1 day)
+- Status: Implemented on machine page
 - Impact: Context for recurring problems
 
 ### Polish
 
-**Issue Priority Field**
+**Issue Priority Field** - ✅ COMPLETED
 
 - Problem: Severity alone might not be enough for prioritization
 - Solution: Add optional priority field (low/medium/high)
 - Scope: Add field, update forms, filter by priority
-- Effort: Small (1 day)
+- Status: Schema and UI implemented
 - Impact: Better prioritization if severity isn't sufficient
 
 **Better Mobile UX**
@@ -149,7 +142,7 @@ These make MVP practical for daily use:
 
 Major features that complete the vision:
 
-### Notifications
+### Notifications - ✅ COMPLETED
 
 **Email Notifications**
 
@@ -157,8 +150,7 @@ Major features that complete the vision:
 - Status changes (issues you reported or are assigned to)
 - New comments (issues you're participating in)
 - Configurable per-user preferences
-- Effort: Medium (3-4 days)
-- Dependency: Email service (Resend, SendGrid)
+- Status: Implemented (Mailpit/Resend)
 
 **In-App Notifications**
 
@@ -166,17 +158,16 @@ Major features that complete the vision:
 - List of recent notifications
 - Link to relevant issue
 - Mark as read
-- Effort: Medium (3 days)
-- Dependency: Real-time updates (optional)
+- Status: Implemented (Real-time polling)
 
-### Roles & Permissions
+### Roles & Permissions - ✅ COMPLETED
 
 **Guest Role**
 
 - Can report issues
 - Can view their own reports
 - Read-only for everything else
-- Effort: Small (role checking in queries)
+- Status: Implemented
 
 **Member Role**
 
@@ -190,7 +181,7 @@ Major features that complete the vision:
 - User management (promote guest → member)
 - System settings
 - Can delete machines/issues
-- Effort: Medium (admin UI needed)
+- Status: Implemented (Admin dashboard)
 
 ### Integration
 
@@ -225,12 +216,12 @@ Major features that complete the vision:
 - Maintenance history/notes
 - Effort: Small (2 days)
 
-**Self-Service Guest Accounts**
+**Self-Service Guest Accounts** - ✅ COMPLETED
 
 - Public users can create guest accounts
 - Email verification
 - Upgrade to member (admin approval)
-- Effort: Medium (signup flow + verification)
+- Status: SignUp flow and Admin approval implemented
 
 ### Issue Management (1.0+)
 
@@ -343,11 +334,9 @@ Major features that complete the vision:
 **Needs More Thought:**
 
 - [ ] Issue dependencies (blocking issues)
-- [ ] Machine grouping (zones, areas in arcade)
 - [ ] Custom fields per machine type
 - [ ] Issue templates (common problems)
 - [ ] Issue duplication (copy issue as template)
-- [ ] Export issue list to PDF
 - [ ] Dark mode toggle
 - [ ] User activity feed (who did what)
 - [ ] @mentions in comments
@@ -359,136 +348,3 @@ Major features that complete the vision:
 - [ ] Multi-language support
 
 ---
-
-## Decision Framework
-
-Before building ANY feature, ask:
-
-1. **Has a user explicitly requested it?**
-2. **Can you measure the impact?**
-3. **What's the effort/impact ratio?**
-4. **Does it align with core mission?**
-
-**Example:**
-
-**Feature: QR Codes**
-
-1. ✅ Users: "It's hard to report issues, need easier way"
-2. ✅ Measure: % of reports via QR vs manual
-3. ✅ Effort/Impact: Low effort, high impact
-4. ✅ Mission: Directly improves issue reporting
-
-**Decision: BUILD (MVP+)**
-
-**Feature: Gamification**
-
-1. ❌ Users: No one asked
-2. ❓ Measure: Unclear success metric
-3. ❌ Effort/Impact: Medium effort, unclear impact
-4. ❓ Mission: Tangential
-
-**Decision: DEFER (Unsorted)**
-
----
-
-## Prioritization After MVP Ships
-
-### Week 1-2: Stabilization
-
-- Fix critical bugs
-- Gather user feedback
-- Monitor usage patterns
-
-### Week 3-4: MVP+ Planning
-
-- Interview 3-5 active users
-- Prioritize MVP+ features based on feedback
-- Estimate effort for top 5 features
-
-### Month 2: MVP+ Development
-
-- Ship top 3-5 MVP+ features
-- QR codes (likely highest priority)
-- Machine/issue photos
-- Machine details
-
-### Month 3+: 1.0 Planning
-
-- Assess which 1.0 features users actually want
-- Email notifications (likely high priority)
-- Saved filters
-- OPDB integration
-
----
-
-## Success Metrics
-
-### MVP Success
-
-- Austin Pinball Collective using it daily
-- Issues tracked start to finish
-- Public reports coming in
-
-### MVP+ Success
-
-- QR codes deployed on all machines
-- Photo attachments improve clarity
-- Machine search used regularly
-
-### 1.0 Success
-
-- Email notifications keep members engaged
-- OPDB integration saves time
-- Guest accounts enable public engagement
-
-### 2.0 Success
-
-- Other arcades requesting access
-- Validated willingness to pay (if SaaS)
-- Multi-org architecture scales well
-
----
-
-## Long-Term Vision Scenarios
-
-### Scenario 1: Focused Tool
-
-- Stay single-org
-- Deep customization for Austin Pinball Collective
-- Open source for other arcades to self-host
-- Community-driven development
-
-### Scenario 2: Multi-Tenant SaaS
-
-- Expand to other pinball arcades
-- Standardized feature set
-- Paid tiers (Free/Pro/Enterprise)
-- Support infrastructure
-
-### Scenario 3: Platform
-
-- API-first approach
-- Ecosystem of integrations
-- Parts supplier partnerships
-- Service provider network
-
-**Don't decide now. Let MVP usage guide you.**
-
----
-
-## Monthly Review
-
-**First Monday of each month:**
-
-1. Review what shipped last month
-2. Gather user feedback
-3. Re-prioritize this roadmap
-4. Move features between MVP+/1.0+/2.0+ based on data
-5. Archive ideas no longer relevant
-6. Add new ideas to Inbox
-
-**Keep it fresh, keep it real.**
-
----
-
-**Remember**: This is a parking lot, not a commitment. Build what users actually need, not what you think they might need.
