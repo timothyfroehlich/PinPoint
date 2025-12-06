@@ -2,7 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+**Format**
+
+- `## YYYY-MM-DD (#PR_NUMBER)`
+- List of changes...
+
+> **Note**: Entries should be added _after_ creating the PR so you have the PR number. See [AGENTS.md](AGENTS.md) for the workflow.
+
+## 2025-12-06 (#586)
 
 ### Added
 
@@ -13,6 +20,8 @@ All notable changes to this project will be documented in this file.
 - Centralized Sentry configuration for client, server, and edge runtimes
 - Reduced Sentry `tracesSampleRate` to 0.1 in production for cost optimization
 - Refactored feedback button to a dedicated client component (`FeedbackButton.tsx`)
+
+## 2025-12-05 (#581)
 
 ### Added
 

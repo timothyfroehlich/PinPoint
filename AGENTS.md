@@ -361,8 +361,15 @@ If all Yes → ship it. Perfect is the enemy of done.
 
 - **Style**: Conventional commits (`feat:`, `fix:`, `chore:`)
 - **Before pushing**: ALWAYS run `npm run preflight` (runs typecheck, lint, format, test, build, test:integration)
-- **PRs**: Clear description, screenshots for UI changes. **UPDATE CHANGELOG.md** with a brief description of changes.
 - **No migrations**: Schema changes via direct modification only
+
+### Changelog Workflow
+
+1. Create the PR _without_ updating `CHANGELOG.md`.
+2. Get the PR number from GitHub.
+3. Update `CHANGELOG.md` with a new header: `## YYYY-MM-DD (#PR_NUMBER)` and list changes below.
+4. Push this change to the PR branch.
+5. Merge.
 
 ## Quality Gates
 
