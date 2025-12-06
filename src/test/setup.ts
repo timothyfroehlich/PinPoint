@@ -9,16 +9,16 @@ import "@testing-library/jest-dom/vitest";
 // Mock ResizeObserver
 if (typeof window !== "undefined") {
   globalThis.ResizeObserver = class ResizeObserver {
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking ResizeObserver
     observe() {}
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking ResizeObserver
     unobserve() {}
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking ResizeObserver
     disconnect() {}
   };
 
   // Mock PointerEvent (required for Radix UI)
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Polyfill PointerEvent if missing
   if (!globalThis.PointerEvent) {
     class PointerEvent extends MouseEvent {
       public height: number;
@@ -51,6 +51,6 @@ if (typeof window !== "undefined") {
   }
 
   // Mock scrollIntoView
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  // eslint-disable-next-line @typescript-eslint/no-empty-function -- Mocking scrollIntoView
   window.HTMLElement.prototype.scrollIntoView = function () {};
 }
