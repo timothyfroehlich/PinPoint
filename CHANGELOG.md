@@ -2,9 +2,8 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## 2025-12-06
 
-### Added
-
+- feat: validate migration workflow and add help/changelog pages (#588)
 - Initial setup of CHANGELOG.md
 - Mandatory release notes process
