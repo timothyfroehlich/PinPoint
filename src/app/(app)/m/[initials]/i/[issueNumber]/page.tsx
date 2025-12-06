@@ -33,6 +33,7 @@ const priorityCopy: Record<IssuePriority, string> = {
   low: "Low",
   medium: "Medium",
   high: "High",
+  critical: "Critical",
 };
 
 /**

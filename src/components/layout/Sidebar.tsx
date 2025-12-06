@@ -39,12 +39,6 @@ const sidebarItems = [
     href: "/m",
     icon: Gamepad2,
   },
-  // {
-  //   title: "Report Issue",
-  //   href: "/report",
-  //   icon: Wrench,
-  //   variant: "accent",
-  // },
 ];
 
 export function Sidebar({
@@ -57,23 +51,16 @@ export function Sidebar({
 
   // Load state from localStorage on mount
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedState = window.localStorage.getItem("sidebar-collapsed");
-      if (savedState) {
-        setCollapsed(JSON.parse(savedState) as boolean);
-      }
+    const savedState = window.localStorage.getItem("sidebar-collapsed");
+    if (savedState) {
+      setCollapsed(JSON.parse(savedState) as boolean);
     }
   }, []);
 
   const toggleSidebar = (): void => {
     const newState = !collapsed;
     setCollapsed(newState);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(
-        "sidebar-collapsed",
-        JSON.stringify(newState)
-      );
-    }
+    window.localStorage.setItem("sidebar-collapsed", JSON.stringify(newState));
   };
 
   const NavItem = ({
@@ -116,14 +103,12 @@ export function Sidebar({
 
     if (collapsed) {
       return (
-        <TooltipProvider delayDuration={0}>
-          <Tooltip>
-            <TooltipTrigger asChild>{content}</TooltipTrigger>
-            <TooltipContent side="right">
-              <p>{item.title}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>{content}</TooltipTrigger>
+          <TooltipContent side="right">
+            <p>{item.title}</p>
+          </TooltipContent>
+        </Tooltip>
       );
     }
 
@@ -131,77 +116,81 @@ export function Sidebar({
   };
 
   return (
-    <div
-      role="navigation"
-      aria-label="main navigation"
-      data-testid="sidebar"
-      className={cn(
-        "flex h-full flex-col border-r border-primary/50 bg-card text-card-foreground shadow-[0_0_15px_rgba(74,222,128,0.15)] transition-all duration-300 ease-in-out overflow-x-hidden",
-        collapsed ? "w-[64px]" : "w-64"
-      )}
-    >
-      {/* Logo Area */}
+    <TooltipProvider delayDuration={0}>
       <div
+        role="navigation"
+        aria-label="main navigation"
+        data-testid="sidebar"
         className={cn(
-          "flex h-24 items-center justify-center border-b border-primary/20 transition-all duration-300",
-          collapsed ? "px-0" : "px-4"
+          "flex h-full flex-col border-r border-primary/50 bg-card text-card-foreground shadow-[0_0_15px_rgba(74,222,128,0.15)] transition-all duration-300 ease-in-out overflow-x-hidden",
+          collapsed ? "w-[64px]" : "w-64"
         )}
       >
-        <Link
-          href="/dashboard"
-          className="flex size-full items-center justify-center"
+        {/* Logo Area */}
+        <div
+          className={cn(
+            "flex h-24 items-center justify-center border-b border-primary/20 transition-all duration-300",
+            collapsed ? "px-0" : "px-4"
+          )}
         >
-          {collapsed ? (
-            <CircleDot className="size-8 text-primary animate-in fade-in zoom-in duration-300" />
-          ) : (
-            <Image
-              src="/apc-logo.png"
-              alt="Austin Pinball Collective"
-              width={160}
-              height={100}
-              className="w-auto h-20 object-contain drop-shadow-[0_0_8px_rgba(74,222,128,0.5)] animate-in fade-in slide-in-from-left-4 duration-300"
-              priority
+          <Link
+            href="/dashboard"
+            className="flex size-full items-center justify-center"
+          >
+            {collapsed ? (
+              <CircleDot className="size-8 text-primary animate-in fade-in zoom-in duration-300" />
+            ) : (
+              <Image
+                src="/apc-logo.png"
+                alt="Austin Pinball Collective"
+                width={160}
+                height={100}
+                className="w-auto h-20 object-contain drop-shadow-[0_0_8px_rgba(74,222,128,0.5)] animate-in fade-in slide-in-from-left-4 duration-300"
+                priority
+              />
+            )}
+          </Link>
+        </div>
+
+        {/* Navigation */}
+        <div className="flex-1 py-6 px-2 space-y-1 overflow-y-auto scrollbar-thin">
+          {sidebarItems.map((item) => (
+            <NavItem key={item.href} item={item} />
+          ))}
+
+          {role === "admin" && (
+            <NavItem
+              item={{
+                title: "Admin",
+                href: "/admin/users",
+                icon: Settings,
+              }}
             />
           )}
-        </Link>
-      </div>
+        </div>
 
-      {/* Navigation */}
-      <div className="flex-1 py-6 px-2 space-y-1 overflow-y-auto scrollbar-thin">
-        {sidebarItems.map((item) => (
-          <NavItem key={item.href} item={item} />
-        ))}
-
-        {role === "admin" && (
-          <NavItem
-            item={{
-              title: "Admin",
-              href: "/admin/users",
-              icon: Settings,
-            }}
-          />
-        )}
+        {/* Collapse Toggle */}
+        <div className="border-t border-border p-2 flex justify-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleSidebar}
+            className="w-full h-10 hover:bg-primary/10 hover:text-primary"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {collapsed ? (
+              <ChevronRight className="size-4" />
+            ) : (
+              <div className="flex items-center gap-2">
+                <ChevronLeft className="size-4" />
+                <span className="text-xs uppercase font-semibold">
+                  Collapse
+                </span>
+              </div>
+            )}
+          </Button>
+        </div>
       </div>
-
-      {/* Collapse Toggle */}
-      <div className="border-t border-border p-2 flex justify-center">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={toggleSidebar}
-          className="w-full h-10 hover:bg-primary/10 hover:text-primary"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {collapsed ? (
-            <ChevronRight className="size-4" />
-          ) : (
-            <div className="flex items-center gap-2">
-              <ChevronLeft className="size-4" />
-              <span className="text-xs uppercase font-semibold">Collapse</span>
-            </div>
-          )}
-        </Button>
-      </div>
-    </div>
+    </TooltipProvider>
   );
 }

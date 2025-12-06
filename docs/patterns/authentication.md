@@ -31,7 +31,7 @@ import { createClient } from "~/lib/supabase/server";
 import { redirect } from "next/navigation";
 
 export async function updateProfileAction(
-  prevState: any,
+  prevState: { ok: boolean; message?: string } | undefined,
   formData: FormData
 ): Promise<{ ok: boolean; message?: string }> {
   const supabase = await createClient();
