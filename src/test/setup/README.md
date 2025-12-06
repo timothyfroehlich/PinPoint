@@ -8,11 +8,11 @@ The `schema.sql` file is generated from `src/server/db/schema.ts` using `drizzle
 
 - ✅ **No schema drift** between tests and production
 - ✅ **Single source of truth** (Drizzle schema)
-- ✅ **Fresh schema** without migration files (pre-beta, no migrations policy)
+- ✅ **Fresh schema** based on the same schema used to generate Drizzle migrations
 
 ## When to Regenerate
 
-Run `npm run test:generate-schema` whenever you modify `src/server/db/schema.ts`:
+Run `npm run test:_generate-schema` whenever you modify `src/server/db/schema.ts`:
 
 - Add/remove tables
 - Add/remove columns
@@ -37,7 +37,7 @@ Run `npm run test:generate-schema` whenever you modify `src/server/db/schema.ts`
 - ⚠️ **Do not edit** `schema.sql` manually - it will be overwritten
 - ✅ **Do commit** `schema.sql` to git - it is the test database schema
 - ✅ **Do regenerate** after schema changes to keep tests in sync
-- 🚫 **No migration files** - we use `drizzle-kit export` for fresh schema, not migrations
+- 🚫 **Do not hand-edit** test schema or create ad-hoc SQL for tests – always regenerate from the Drizzle schema
 
 ## Example Workflow
 
@@ -46,7 +46,7 @@ Run `npm run test:generate-schema` whenever you modify `src/server/db/schema.ts`
 vim src/server/db/schema.ts
 
 # 2. Regenerate test schema
-npm run test:generate-schema
+npm run test:_generate-schema
 
 # 3. Run tests to verify
 npm test
@@ -60,14 +60,15 @@ git commit -m "feat: add new column to machines table"
 
 **Tests fail with "table does not exist"**
 
-- Run `npm run test:generate-schema` to regenerate schema
+- Run `npm run test:_generate-schema` to regenerate schema
 - Ensure `schema.sql` exists in this directory
 
 **Schema mismatch between test and production**
 
-- Regenerate: `npm run test:generate-schema`
+- Regenerate: `npm run test:_generate-schema`
 - The test schema should always match `src/server/db/schema.ts`
 
-## Why Not Migrations?
+## Relationship to Migrations
 
-Per `docs/NON_NEGOTIABLES.md`, PinPoint is pre-beta with zero users, so we don't use migration files. Schema changes are made directly in `src/server/db/schema.ts` and exported fresh for tests using `drizzle-kit export`.
+Production/preview databases are managed via **Drizzle migrations** generated from the same `schema.ts`.  
+Tests use `schema.sql` as a fast, deterministic snapshot of that schema for PGlite.

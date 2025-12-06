@@ -1,0 +1,1 @@
+ALTER TABLE "machines" ADD COLUMN "migration_test_col" text DEFAULT 'verified';

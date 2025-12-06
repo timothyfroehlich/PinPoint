@@ -1,7 +1,3 @@
-CREATE TABLE "auth"."users" (
-	"id" uuid PRIMARY KEY NOT NULL,
-	"email" text NOT NULL
-);
 
 CREATE TABLE "issue_comments" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -12,13 +8,13 @@ CREATE TABLE "issue_comments" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
-
+--> statement-breakpoint
 CREATE TABLE "issue_watchers" (
 	"issue_id" uuid NOT NULL,
 	"user_id" uuid NOT NULL,
 	CONSTRAINT "issue_watchers_issue_id_user_id_pk" PRIMARY KEY("issue_id","user_id")
 );
-
+--> statement-breakpoint
 CREATE TABLE "issues" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"machine_initials" text NOT NULL,
@@ -35,20 +31,19 @@ CREATE TABLE "issues" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "unique_issue_number" UNIQUE("machine_initials","issue_number")
 );
-
+--> statement-breakpoint
 CREATE TABLE "machines" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"initials" text NOT NULL,
 	"next_issue_number" integer DEFAULT 1 NOT NULL,
 	"name" text NOT NULL,
-	"migration_test_col" text DEFAULT 'verified',
 	"owner_id" uuid,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "machines_initials_unique" UNIQUE("initials"),
 	CONSTRAINT "initials_check" CHECK (initials ~ '^[A-Z0-9]{2,6}$')
 );
-
+--> statement-breakpoint
 CREATE TABLE "notification_preferences" (
 	"user_id" uuid PRIMARY KEY NOT NULL,
 	"email_enabled" boolean DEFAULT true NOT NULL,
@@ -64,7 +59,7 @@ CREATE TABLE "notification_preferences" (
 	"email_watch_new_issues_global" boolean DEFAULT false NOT NULL,
 	"in_app_watch_new_issues_global" boolean DEFAULT false NOT NULL
 );
-
+--> statement-breakpoint
 CREATE TABLE "notifications" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
@@ -74,7 +69,7 @@ CREATE TABLE "notifications" (
 	"read_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
-
+--> statement-breakpoint
 CREATE TABLE "user_profiles" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"first_name" text NOT NULL,
@@ -85,17 +80,17 @@ CREATE TABLE "user_profiles" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
-
-ALTER TABLE "issue_comments" ADD CONSTRAINT "issue_comments_issue_id_issues_id_fk" FOREIGN KEY ("issue_id") REFERENCES "public"."issues"("id") ON DELETE cascade ON UPDATE no action;
-ALTER TABLE "issue_comments" ADD CONSTRAINT "issue_comments_author_id_user_profiles_id_fk" FOREIGN KEY ("author_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;
-ALTER TABLE "issue_watchers" ADD CONSTRAINT "issue_watchers_issue_id_issues_id_fk" FOREIGN KEY ("issue_id") REFERENCES "public"."issues"("id") ON DELETE cascade ON UPDATE no action;
-ALTER TABLE "issue_watchers" ADD CONSTRAINT "issue_watchers_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE cascade ON UPDATE no action;
-ALTER TABLE "issues" ADD CONSTRAINT "issues_machine_initials_machines_initials_fk" FOREIGN KEY ("machine_initials") REFERENCES "public"."machines"("initials") ON DELETE cascade ON UPDATE no action;
-ALTER TABLE "issues" ADD CONSTRAINT "issues_reported_by_user_profiles_id_fk" FOREIGN KEY ("reported_by") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;
-ALTER TABLE "issues" ADD CONSTRAINT "issues_assigned_to_user_profiles_id_fk" FOREIGN KEY ("assigned_to") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;
-ALTER TABLE "machines" ADD CONSTRAINT "machines_owner_id_user_profiles_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;
-ALTER TABLE "notification_preferences" ADD CONSTRAINT "notification_preferences_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE cascade ON UPDATE no action;
-ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE cascade ON UPDATE no action;
-CREATE INDEX "idx_issue_watchers_issue_id" ON "issue_watchers" USING btree ("issue_id");
-CREATE INDEX "idx_notif_prefs_global_watch_email" ON "notification_preferences" USING btree ("email_watch_new_issues_global");
+--> statement-breakpoint
+ALTER TABLE "issue_comments" ADD CONSTRAINT "issue_comments_issue_id_issues_id_fk" FOREIGN KEY ("issue_id") REFERENCES "public"."issues"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "issue_comments" ADD CONSTRAINT "issue_comments_author_id_user_profiles_id_fk" FOREIGN KEY ("author_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "issue_watchers" ADD CONSTRAINT "issue_watchers_issue_id_issues_id_fk" FOREIGN KEY ("issue_id") REFERENCES "public"."issues"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "issue_watchers" ADD CONSTRAINT "issue_watchers_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "issues" ADD CONSTRAINT "issues_machine_initials_machines_initials_fk" FOREIGN KEY ("machine_initials") REFERENCES "public"."machines"("initials") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "issues" ADD CONSTRAINT "issues_reported_by_user_profiles_id_fk" FOREIGN KEY ("reported_by") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "issues" ADD CONSTRAINT "issues_assigned_to_user_profiles_id_fk" FOREIGN KEY ("assigned_to") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "machines" ADD CONSTRAINT "machines_owner_id_user_profiles_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "notification_preferences" ADD CONSTRAINT "notification_preferences_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "idx_issue_watchers_issue_id" ON "issue_watchers" USING btree ("issue_id");--> statement-breakpoint
+CREATE INDEX "idx_notif_prefs_global_watch_email" ON "notification_preferences" USING btree ("email_watch_new_issues_global");--> statement-breakpoint
 CREATE INDEX "idx_notifications_user_unread" ON "notifications" USING btree ("user_id","read_at","created_at");
