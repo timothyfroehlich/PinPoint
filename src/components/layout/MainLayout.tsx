@@ -17,6 +17,7 @@ import { UserMenu } from "./user-menu-client";
 import { ensureUserProfile } from "~/lib/auth/profile";
 import Link from "next/link";
 import { Button } from "~/components/ui/button";
+import { FeedbackButton } from "./FeedbackButton";
 
 export async function MainLayout({
   children,
@@ -128,6 +129,7 @@ export async function MainLayout({
                 >
                   <Link href="/report">Report Issue</Link>
                 </Button>
+                <FeedbackButton />
                 <NotificationList notifications={enrichedNotifications} />
                 <UserMenu userName={userProfile?.name ?? "User"} />
               </>
