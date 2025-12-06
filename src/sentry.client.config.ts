@@ -24,10 +24,8 @@ if (dsn) {
     // Add Feedback widget for bug reports with screenshots
     integrations: [
       feedbackIntegration({
-        // Ensure widget is injected automatically
-        autoInject: true,
-        // Attach to our manual button in MainLayout (updated from DashboardLayout)
-        attachTo: "#feedback-trigger",
+        // Disable autoInject to manually attach to our button
+        autoInject: false,
 
         // Customize the button
         triggerLabel: "Report a Bug",
@@ -42,7 +40,6 @@ if (dsn) {
         successMessageText: "Thanks! We'll review your report soon.",
       }),
     ],
-
     // Tracing - adjust sample rate for production
     tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
 

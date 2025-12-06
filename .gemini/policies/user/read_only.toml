@@ -1,0 +1,165 @@
+# --- Git Read-Only ---
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^git status$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^git log$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^git branch$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^git show$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^git diff$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^git ls-files$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^git rev-parse$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^git remote -v$"
+decision = "allow"
+
+# --- GitHub CLI Read-Only ---
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^gh repo view$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^gh issue list$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^gh pr list$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^gh run list$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^gh api --method GET$"
+decision = "allow"
+
+# --- NPM Safe Scripts ---
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^npm run lint$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^npm test$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^npm run build$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^npm run typecheck$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^npm run format$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^npm run check$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^npm run test:coverage$"
+decision = "allow"
+
+# --- System & File Exploration ---
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^rg .*"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^ls.*"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^pwd$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^node -v$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^npm -v$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^npm list$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^npm outdated$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^npm audit$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^supabase status$"
+decision = "allow"
+
+# --- Local Network ---
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^curl -I http://localhost:[0-9]+.*"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^curl -I http://127.0.0.1:[0-9]+.*"
+decision = "allow"
+
+# --- Explicit Deny ---
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^find .*"
+decision = "deny"

@@ -1,0 +1,95 @@
+
+# --- Basic File Manipulation ---
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^mkdir . *"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^touch . *"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^cp . *"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^mv . *"
+decision = "allow"
+
+# --- Stream Editor ---
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^sed . *"
+decision = "allow"
+
+# --- Explicit Safety Stops (Destructive) ---
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^rm . *"
+decision = "ask_user"
+
+# --- Git Write Operations ---
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^git add . *"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^git commit . *"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^git push $"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^git pull $"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^git fetch $"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^git branch [a-zA-Z0-9\/\-_]+$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^git checkout [a-zA-Z0-9\/\-_]+$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^git switch [a-zA-Z0-9\/\-_]+$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^git stash( (push|pop|apply|drop))?$"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^git restore . *"
+decision = "allow"
+
+# --- GitHub CLI Write Operations ---
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^gh issue create . *"
+decision = "allow"
+
+[[rule]]
+toolName = "run_shell_command"
+commandRegex = "^gh pr create . *"
+decision = "allow"
