@@ -28,7 +28,7 @@ trigger: always_on
 8. Never use `any`, non‑null `!`, or unsafe `as`; write proper type guards
 9. Default to Server Components, minimal Client Components
 10. Forms work without JavaScript (progressive enhancement)
-11. No migration files (pre-beta, schema changes via direct modification)
+11. Use Drizzle migrations for schema changes (no ad-hoc `push` to production/preview)
 12. Keep auth host consistent: use `localhost` everywhere (Supabase site_url, Next dev, Playwright baseURL) to prevent cookie host mismatches
 
 ---
@@ -302,7 +302,7 @@ trigger: always_on
 **Never Do These:**
 
 - **Memory safety**: Per‑test PGlite instances (causes system lockups)
-- **Schema changes**: No migration files (pre-beta, direct modification only)
+- **Schema changes (legacy approach)**: Do not rely on ad-hoc `push`/schema resets to evolve production databases. Use Drizzle migrations instead.
 - **Schema lock**: Code adapts to schema, never modify schema to fix TypeScript errors
 - **Deprecated imports**: `@supabase/auth-helpers-nextjs` (use `@supabase/ssr`)
 - **Supabase SSR misuse**: No wrapper, wrong cookie contract, logic before `getUser()`

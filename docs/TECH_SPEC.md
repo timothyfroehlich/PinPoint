@@ -470,13 +470,20 @@ npm run e2e
 
 ### Database Changes
 
-1. Edit schema in `src/server/db/schema/`
-2. Run `npm run db:reset` (restarts Supabase, pushes schema, regenerates test schema, seeds data/users)
-3. Update seed data if needed
-4. Test locally
-5. Repeat for production when ready
+1. Edit schema in `src/server/db/schema.ts`
+2. Generate a migration and apply it locally:
 
-**No migration files** - Use `db:reset` (drizzle-kit push under the hood) for direct schema updates.
+   ```bash
+   npm run db:generate -- --name <change-name>
+   npm run db:migrate
+   npm run test:_generate-schema
+   ```
+
+3. Update seed data if needed (`supabase/seed.sql`, `supabase/seed-users.mjs`)
+4. Test locally (`npm run check`, `npm run preflight` before pushing)
+5. Commit `schema.ts`, the `drizzle/` migration files, and the regenerated test schema
+
+`db:reset` remains a **destructive** helper for local/dev environments: it restarts Supabase, drops application tables, reapplies all migrations, regenerates the test schema, and seeds data/users.
 
 ---
 
@@ -514,7 +521,7 @@ npm run e2e
 ## Tech Stack Decisions
 
 | Date       | Decision                            | Rationale                                                |
-| ---------- | ----------------------------------- | -------------------------------------------------------- |
+| ---------- | ----------------------------------- | -------------------------------------------------------- | --- |
 | 2025-11-10 | Next.js 16                          | Use latest stable release                                |
 | 2025-11-10 | No real-time subscriptions          | MVP doesn't need it                                      |
 | 2025-11-10 | Service layer allowed where helpful | Use when coordinating workflows, avoid needless wrappers |
@@ -522,7 +529,7 @@ npm run e2e
 | 2025-11-10 | Severity: minor/playable/unplayable | Clear, player-centric language                           |
 | 2025-11-10 | Role: guest/member/admin            | Simple, extensible permission model                      |
 | 2025-11-10 | Two Supabase projects               | Preview/prod separation                                  |
-| 2025-11-10 | Drizzle push (no migrations)        | Direct schema updates during development                 |
+| 2025-11-20 | Drizzle migrations                  | Schema version control, production safety                |     |
 
 ---
 

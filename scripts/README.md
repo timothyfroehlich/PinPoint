@@ -60,22 +60,9 @@ python3 -m pytest scripts/tests/ --cov=scripts --cov-report=term-missing
 - Python 3.10 or higher
 - pytest (for testing only)
 
-## Bash Script (Legacy)
+## What the Script Does
 
-**`sync-worktrees.sh`** - Original 1000+ line Bash implementation
-
-This script is maintained for backward compatibility but the Python version is recommended for new use.
-
-### Usage
-
-```bash
-# Same interface as Python version
-./scripts/sync-worktrees.sh [options] [worktree path]
-```
-
-## What the Scripts Do
-
-Both scripts perform comprehensive worktree management:
+The Python script performs comprehensive worktree management:
 
 ### Phase 1: Configuration Validation & Fixing
 

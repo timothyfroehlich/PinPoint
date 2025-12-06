@@ -95,13 +95,15 @@ npx drizzle-kit generate
 
 ## Migration Commands Reference
 
-| Task                     | Command                | Use Case                      |
-| ------------------------ | ---------------------- | ----------------------------- |
-| **Schema Introspection** | `drizzle-kit pull`     | Import existing DB schema     |
-| **Generate Migrations**  | `drizzle-kit generate` | Create migration files        |
-| **Apply Migrations**     | `drizzle-kit migrate`  | Update database schema        |
-| **Quick Push**           | `drizzle-kit push`     | Direct schema sync (dev only) |
-| **Prisma Integration**   | `prisma generate`      | Generate from Prisma schema   |
+PinPoint uses Drizzle migrations as the primary way to evolve the schema.
+
+| Task                     | Command                                  | Use Case                                |
+| ------------------------ | ---------------------------------------- | --------------------------------------- |
+| **Schema Introspection** | `drizzle-kit pull`                       | Import existing DB schema               |
+| **Generate Migrations**  | `npm run db:generate -- --name <change>` | Create migration files from `schema.ts` |
+| **Apply Migrations**     | `npm run db:migrate`                     | Update local/preview/prod schema        |
+| **Quick Push**           | `drizzle-kit push`                       | Legacy direct schema sync (avoid prod)  |
+| **Prisma Integration**   | `prisma generate`                        | Generate from Prisma schema             |
 
 ## Common Conversion Patterns
 
