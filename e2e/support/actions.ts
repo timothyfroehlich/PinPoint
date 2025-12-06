@@ -46,14 +46,12 @@ export async function ensureLoggedIn(
   await expect(page.getByTestId("sidebar")).toBeVisible();
   // Double check user menu
   await expect(page.getByTestId("user-menu-button")).toBeVisible();
-  await expect(page.getByTestId("sidebar")).toBeVisible();
 }
 
 /**
  * Logs out the current user via the User Menu.
  */
 export async function logout(page: Page): Promise<void> {
-  console.log("Logging out...");
   const userMenu = page.getByTestId("user-menu-button");
   await expect(userMenu).toBeVisible({ timeout: 5000 });
   await userMenu.click();
@@ -62,10 +60,8 @@ export async function logout(page: Page): Promise<void> {
   await expect(signOutItem).toBeVisible({ timeout: 5000 });
   await signOutItem.click();
 
-  console.log("Waiting for public dashboard...");
   // Wait for redirect to public dashboard
   // Increased timeout to account for potential Supabase delays
   await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
   await expect(page.getByTestId("nav-signin")).toBeVisible({ timeout: 15000 });
-  console.log("Logout complete.");
 }

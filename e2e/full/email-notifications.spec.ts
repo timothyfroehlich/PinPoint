@@ -52,14 +52,6 @@ test.describe("Email Notifications", () => {
 
     if (issueId) {
       cleanupIssues.push({ initials: "MM", number: parseInt(issueId) });
-      // Note: This is an integer ID (issue_number), but deleteTestIssue expects UUID usually?
-      // Wait, let's check schema. Issue ID is UUID or Int?
-      // Based on URL it's integer issue_number.
-      // deleteTestIssue deletes by "id" which works if we get the "id" (UUID) or if we delete by issue_number/machine_id.
-      // But we only have issue_number here.
-      // Actually, supabaseAdmin delete by "id" usually implies the primary key.
-      // Issues table: id is generic UUID? Or bigserial?
-      // Let's check schema/types.
     }
     // Wait for email to arrive in Mailpit
     const email = await mailpit.waitForEmail(TEST_USERS.admin.email, {

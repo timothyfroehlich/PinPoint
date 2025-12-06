@@ -82,7 +82,10 @@ export function getIssueSeverityStyles(severity: IssueSeverity): string {
  * Type guard for IssuePriority
  */
 export function isIssuePriority(value: unknown): value is IssuePriority {
-  return typeof value === "string" && ["low", "medium", "high"].includes(value);
+  return (
+    typeof value === "string" &&
+    ["low", "medium", "high", "critical"].includes(value)
+  );
 }
 
 /**
@@ -93,6 +96,7 @@ export function getIssuePriorityLabel(priority: IssuePriority): string {
     low: "Low",
     medium: "Medium",
     high: "High",
+    critical: "Critical",
   };
   return labels[priority];
 }
@@ -103,12 +107,15 @@ export function getIssuePriorityLabel(priority: IssuePriority): string {
  * Low -> Minor (Green/Muted)
  * Medium -> Playable (Yellow/Warning)
  * High -> Unplayable (Red/Destructive)
+ * Critical -> Destructive (Solid Red)
  */
 export function getIssuePriorityStyles(priority: IssuePriority): string {
   const styles: Record<IssuePriority, string> = {
     low: "bg-muted/50 text-muted-foreground border-border",
     medium: "bg-warning/20 text-warning border-warning glow-warning",
     high: "bg-status-unplayable/20 text-status-unplayable border-status-unplayable glow-destructive",
+    critical:
+      "bg-destructive text-destructive-foreground border-destructive font-bold",
   };
   return styles[priority];
 }

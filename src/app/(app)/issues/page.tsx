@@ -56,8 +56,8 @@ export default async function IssuesPage({
       : undefined;
 
   const priorityFilter =
-    priority && ["low", "medium", "high"].includes(priority)
-      ? (priority as "low" | "medium" | "high")
+    priority && ["low", "medium", "high", "critical"].includes(priority)
+      ? (priority as "low" | "medium" | "high" | "critical")
       : undefined;
 
   // Fetch Issues based on filters

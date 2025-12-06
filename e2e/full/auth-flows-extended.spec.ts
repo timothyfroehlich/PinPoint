@@ -19,11 +19,9 @@ test.describe("Extended Authentication", () => {
   }) => {
     // Navigate to signup page
     await page.goto("/");
-    console.log("On homepage, clicking signup...");
     const signupBtn = page.getByTestId("nav-signup");
     await expect(signupBtn).toBeVisible({ timeout: 5000 });
     await signupBtn.click();
-    console.log("Clicked signup, waiting for URL...");
 
     // Verify we're on the signup page
     await expect(page).toHaveURL(/\/signup/, { timeout: 15000 });

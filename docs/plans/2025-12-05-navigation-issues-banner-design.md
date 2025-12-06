@@ -242,7 +242,7 @@ const issuesQuery = await db.query.issues.findMany({
 
 **Add new test** for pre-beta banner:
 
-- Verify banner appears on landing page
+- Verify banner appears on public dashboard (landing page)
 - Verify banner appears on authenticated pages
 - Verify banner text matches design
 

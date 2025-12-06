@@ -8,7 +8,7 @@ export default async function MachineIssuesRedirect({
   params,
 }: {
   params: Promise<Params>;
-}): Promise<void> {
+}): Promise<never> {
   const { initials } = await params;
   redirect(`/issues?machine=${initials}`);
 }

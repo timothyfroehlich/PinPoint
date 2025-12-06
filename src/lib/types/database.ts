@@ -33,7 +33,7 @@ export type NewIssueComment = InferInsertModel<typeof issueComments>;
 export type UserRole = "guest" | "member" | "admin";
 export type IssueStatus = "new" | "in_progress" | "resolved";
 export type IssueSeverity = "minor" | "playable" | "unplayable";
-export type IssuePriority = "low" | "medium" | "high";
+export type IssuePriority = "low" | "medium" | "high" | "critical";
 
 export type Notification = InferSelectModel<typeof notifications>;
 export type NotificationPreference = InferSelectModel<
