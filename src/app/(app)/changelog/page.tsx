@@ -16,6 +16,25 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
+function parseInline(text: string): string {
+  // Handle bold (**text**)
+  let parsed = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+
+  // Handle italic (*text*)
+  parsed = parsed.replace(/\*(.*?)\*/g, "<em>$1</em>");
+
+  // Handle code (`text`)
+  parsed = parsed.replace(/`(.*?)`/g, "<code>$1</code>");
+
+  // Handle links [text](url)
+  parsed = parsed.replace(
+    /\[([^\]]+)\]\(([^)]+)\)/g,
+    '<a href="$2" class="text-primary hover:underline underline-offset-4" target="_blank" rel="noopener noreferrer">$1</a>'
+  );
+
+  return parsed;
+}
+
 function renderMarkdownToHtml(markdown: string): string {
   const lines = markdown.split("\n");
   const html: string[] = [];
@@ -38,19 +57,19 @@ function renderMarkdownToHtml(markdown: string): string {
 
     if (line.startsWith("# ")) {
       closeList();
-      html.push(`<h1>${escapeHtml(line.slice(2).trim())}</h1>`);
+      html.push(`<h1>${parseInline(escapeHtml(line.slice(2).trim()))}</h1>`);
       continue;
     }
 
     if (line.startsWith("## ")) {
       closeList();
-      html.push(`<h2>${escapeHtml(line.slice(3).trim())}</h2>`);
+      html.push(`<h2>${parseInline(escapeHtml(line.slice(3).trim()))}</h2>`);
       continue;
     }
 
     if (line.startsWith("### ")) {
       closeList();
-      html.push(`<h3>${escapeHtml(line.slice(4).trim())}</h3>`);
+      html.push(`<h3>${parseInline(escapeHtml(line.slice(4).trim()))}</h3>`);
       continue;
     }
 
@@ -59,13 +78,13 @@ function renderMarkdownToHtml(markdown: string): string {
         inList = true;
         html.push("<ul>");
       }
-      html.push(`<li>${escapeHtml(line.slice(2).trim())}</li>`);
+      html.push(`<li>${parseInline(escapeHtml(line.slice(2).trim()))}</li>`);
       continue;
     }
 
     // Fallback to paragraph
     closeList();
-    html.push(`<p>${escapeHtml(line.trim())}</p>`);
+    html.push(`<p>${parseInline(escapeHtml(line.trim()))}</p>`);
   }
 
   closeList();

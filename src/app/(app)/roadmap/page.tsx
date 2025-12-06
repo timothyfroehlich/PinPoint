@@ -26,6 +26,12 @@ function parseInline(text: string): string {
   // Handle code (`text`)
   parsed = parsed.replace(/`(.*?)`/g, "<code>$1</code>");
 
+  // Handle links [text](url)
+  parsed = parsed.replace(
+    /\[([^\]]+)\]\(([^)]+)\)/g,
+    '<a href="$2" class="text-primary hover:underline underline-offset-4" target="_blank" rel="noopener noreferrer">$1</a>'
+  );
+
   return parsed;
 }
 
