@@ -3,6 +3,7 @@ import typescriptEslint from "@typescript-eslint/eslint-plugin";
 import typescriptParser from "@typescript-eslint/parser";
 import unusedImportsPlugin from "eslint-plugin-unused-imports";
 import promisePlugin from "eslint-plugin-promise";
+import eslintCommentsPlugin from "eslint-plugin-eslint-comments";
 
 export default [
   js.configs.recommended,
@@ -25,6 +26,7 @@ export default [
       "@typescript-eslint": typescriptEslint,
       "unused-imports": unusedImportsPlugin,
       promise: promisePlugin,
+      "eslint-comments": eslintCommentsPlugin,
     },
     languageOptions: {
       parser: typescriptParser,
@@ -136,6 +138,21 @@ export default [
       "promise/no-promise-in-callback": "warn",
       "promise/no-callback-in-promise": "warn",
       "promise/no-return-wrap": "error",
+
+      // ===== ESLint Comments =====
+
+      // Prevent disabling strict type checks
+      "eslint-comments/no-restricted-disable": [
+        "error",
+        "@typescript-eslint/no-explicit-any",
+        "@typescript-eslint/no-unsafe-*",
+      ],
+
+      // Require description for all disable comments
+      "eslint-comments/require-description": ["error", { ignore: [] }],
+
+      // Remove stale disable comments
+      "eslint-comments/no-unused-disable": "error",
     },
   },
   {
@@ -179,6 +196,9 @@ export default [
       "@typescript-eslint/no-unsafe-return": "off",
       "@typescript-eslint/no-unsafe-argument": "off",
       "@typescript-eslint/unbound-method": "off",
+
+      // Allow disabling rules in tests if needed (mocking often requires it)
+      "eslint-comments/no-restricted-disable": "off",
     },
   },
   {
@@ -194,6 +214,7 @@ export default [
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/explicit-function-return-type": "off",
       "no-restricted-imports": "off",
+      "eslint-comments/no-restricted-disable": "off",
     },
   },
 ];

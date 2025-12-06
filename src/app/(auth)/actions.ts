@@ -130,7 +130,7 @@ export async function loginAction(
 
     // Defensive check - Supabase types guarantee user exists if no error,
     // but we check both for safety
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Supabase types guarantee user exists if no error, but defensive check remains
     if (error || !data.user) {
       log.warn(
         { action: "login", error: error?.message },
@@ -251,7 +251,7 @@ export async function signupAction(
     }
 
     // Check if email confirmation is required (user created but no session)
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- data.user check might be redundant by types but ensuring safety
     if (data.user && !data.session) {
       log.info(
         { userId: data.user.id, action: "signup" },

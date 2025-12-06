@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
+/* eslint-disable eslint-comments/no-restricted-disable, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call -- Auth callback requires direct Supabase client usage which returns any */
 /**
  * Auth callback route requires direct use of createServerClient with custom cookie handling
  * to properly set cookies in the response. Standard SSR wrapper cannot be used here.

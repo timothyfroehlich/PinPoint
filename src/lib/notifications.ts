@@ -1,5 +1,5 @@
 import { eq, inArray } from "drizzle-orm";
-import { db, type DbOrTx } from "~/server/db";
+import { db, type DbTransaction } from "~/server/db";
 import {
   notifications,
   notificationPreferences,
@@ -56,7 +56,7 @@ export async function createNotification(
     additionalRecipientIds,
     issueContext,
   }: CreateNotificationProps,
-  tx: DbOrTx = db
+  tx: DbTransaction = db
 ): Promise<void> {
   log.debug(
     { type, resourceId, actorId, action: "createNotification" },
