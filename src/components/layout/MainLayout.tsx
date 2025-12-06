@@ -17,7 +17,7 @@ import { UserMenu } from "./user-menu-client";
 import { ensureUserProfile } from "~/lib/auth/profile";
 import Link from "next/link";
 import { Button } from "~/components/ui/button";
-import { MessageSquarePlus } from "lucide-react";
+import { FeedbackButton } from "./FeedbackButton";
 
 export async function MainLayout({
   children,
@@ -129,15 +129,7 @@ export async function MainLayout({
                 >
                   <Link href="/report">Report Issue</Link>
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  id="feedback-trigger"
-                  className="gap-2"
-                >
-                  <MessageSquarePlus className="size-4" />
-                  Feedback
-                </Button>
+                <FeedbackButton />
                 <NotificationList notifications={enrichedNotifications} />
                 <UserMenu userName={userProfile?.name ?? "User"} />
               </>

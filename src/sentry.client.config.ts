@@ -44,7 +44,7 @@ if (dsn) {
     ],
 
     // Tracing - adjust sample rate for production
-    tracesSampleRate: 1.0,
+    tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
 
     // Session Replay
     replaysSessionSampleRate: 0.0, // Disabled to avoid costs
@@ -52,6 +52,4 @@ if (dsn) {
 
     debug: false, // Disable debug in production
   });
-
-  console.log("PinPoint Sentry Client Config Loaded");
 }

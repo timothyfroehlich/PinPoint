@@ -14,8 +14,27 @@ export async function POST(req: NextRequest): Promise<Response> {
       return new Response(null, { status: 400 });
     }
 
-    const header = JSON.parse(headerLine) as { dsn?: string };
-    const dsnString = header.dsn ?? "";
+    let header: { dsn?: string };
+    try {
+      header = JSON.parse(headerLine) as { dsn?: string };
+    } catch {
+      return new Response(null, { status: 400 });
+    }
+
+    const dsnString = header.dsn;
+    if (!dsnString) {
+      return new Response(null, { status: 400 });
+    }
+
+    // Validate DSN matches expected project
+    const expectedDsn = process.env["NEXT_PUBLIC_SENTRY_DSN"];
+    // We check if the provided DSN matches the configured one (ignoring potential protocol differences if needed, but exact match is safer)
+    // Sentry SDK sends full DSN
+    if (!expectedDsn || dsnString !== expectedDsn) {
+      console.warn("Sentry tunnel: Blocked invalid DSN", dsnString);
+      return new Response(null, { status: 403 });
+    }
+
     const dsn = new URL(dsnString);
     const projectId = dsn.pathname.replace("/", "");
 

@@ -10,10 +10,12 @@ if (dsn) {
   Sentry.init({
     dsn,
 
-    // Tracing
-    tracesSampleRate: 1.0,
+    // Tracing - adjust sample rate for production
+    // We recommend adjusting this value in production, or using tracesSampler
+    // for finer control
+    tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
 
-    // Debug
+    // Setting this option to true will print useful information to the console while you're setting up Sentry.
     debug: false,
   });
 }

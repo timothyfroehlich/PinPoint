@@ -38,9 +38,10 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   // Production: strict-dynamic (nonce-only, blocks host allowlists)
   // Preview: explicit allowlist (allows vercel.live scripts)
+  // Sentry: Allow CDN for feedback widget script lazy loading
   const scriptSrc = isProduction
-    ? `'self' 'nonce-${nonce}' 'strict-dynamic'`
-    : `'self' 'nonce-${nonce}' https://vercel.live`;
+    ? `'self' 'nonce-${nonce}' 'strict-dynamic' https://browser.sentry-cdn.com`
+    : `'self' 'nonce-${nonce}' https://vercel.live https://browser.sentry-cdn.com`;
 
   const styleSrc = isProduction
     ? "'self' 'unsafe-inline'"
@@ -54,9 +55,10 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     ? "'self' data:"
     : "'self' data: https://vercel.live https://assets.vercel.com https://fonts.gstatic.com";
 
+  // Sentry: Allow connection to Sentry ingest (fallback) and tunnel (self)
   const connectSrc = isProduction
-    ? `'self' ${supabaseUrl ?? ""} ${supabaseWsUrl ?? ""} http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:*`
-    : `'self' ${supabaseUrl ?? ""} ${supabaseWsUrl ?? ""} http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:* https://vercel.live wss://ws-us3.pusher.com`;
+    ? `'self' ${supabaseUrl ?? ""} ${supabaseWsUrl ?? ""} https://*.sentry.io http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:*`
+    : `'self' ${supabaseUrl ?? ""} ${supabaseWsUrl ?? ""} https://*.sentry.io http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:* https://vercel.live wss://ws-us3.pusher.com`;
 
   const frameSrc = isProduction ? "'none'" : "'self' https://vercel.live";
   const frameAncestors = isProduction ? "'none'" : "'self' https://vercel.live";
