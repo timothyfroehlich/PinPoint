@@ -1,5 +1,5 @@
 import type React from "react";
-import { DashboardLayout } from "~/components/layout/DashboardLayout";
+import { MainLayout } from "~/components/layout/MainLayout";
 
 /**
  * Layout for authenticated app pages (dashboard, issues, machines, etc.)
@@ -11,5 +11,5 @@ export default function AppLayout({
 }: {
   children: React.ReactNode;
 }): React.JSX.Element {
-  return <DashboardLayout>{children}</DashboardLayout>;
+  return <MainLayout>{children}</MainLayout>;
 }

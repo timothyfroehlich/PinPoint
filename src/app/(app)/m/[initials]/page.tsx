@@ -221,7 +221,10 @@ export default async function MachineDetailPage({
                     className="bg-primary text-on-primary hover:bg-primary/90"
                     asChild
                   >
-                    <Link href={`/m/${machine.initials}/report`}>
+                    <Link
+                      href={`/m/${machine.initials}/report`}
+                      data-testid="machine-report-issue"
+                    >
                       <Plus className="mr-2 size-4" />
                       Report Issue
                     </Link>

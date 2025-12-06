@@ -1,7 +1,24 @@
 import { test, expect } from "@playwright/test";
-import { ensureLoggedIn } from "../support/actions";
-import { seededMachines, TEST_USERS } from "../support/constants";
-import { createTestUser, createTestMachine } from "../support/supabase-admin";
+import { ensureLoggedIn } from "../support/actions.js";
+import { seededMachines, TEST_USERS } from "../support/constants.js";
+import {
+  createTestUser,
+  createTestMachine,
+  deleteTestUser,
+  deleteTestMachine,
+} from "../support/supabase-admin.js";
+
+const cleanupUserIds: string[] = [];
+const cleanupMachineIds: string[] = [];
+
+test.afterAll(async () => {
+  for (const machineId of cleanupMachineIds) {
+    await deleteTestMachine(machineId).catch(() => undefined);
+  }
+  for (const userId of cleanupUserIds) {
+    await deleteTestUser(userId).catch(() => undefined);
+  }
+});
 
 test.describe("Notifications", () => {
   test("should notify machine owner when public issue is reported", async ({
@@ -11,7 +28,9 @@ test.describe("Notifications", () => {
     const timestamp = Date.now();
     const ownerEmail = `owner-${timestamp}@example.com`;
     const owner = await createTestUser(ownerEmail);
+    cleanupUserIds.push(owner.id);
     const machine = await createTestMachine(owner.id);
+    cleanupMachineIds.push(machine.id);
 
     // Login as owner to setup preferences
     const ownerContext = await browser.newContext();
@@ -82,7 +101,9 @@ test.describe("Notifications", () => {
     const timestamp = Date.now();
     const adminEmail = `admin-${timestamp}@example.com`;
     const admin = await createTestUser(adminEmail); // Acts as owner/admin
+    cleanupUserIds.push(admin.id);
     const machine = await createTestMachine(admin.id);
+    cleanupMachineIds.push(machine.id);
 
     // Reporter (Member) reports an issue
     await ensureLoggedIn(page, TEST_USERS.member);
@@ -149,7 +170,8 @@ test.describe("Notifications", () => {
     // 1. Setup: New Admin User who enables "Watch All New Issues"
     const timestamp = Date.now();
     const globalWatcherEmail = `watcher-${timestamp}@example.com`;
-    await createTestUser(globalWatcherEmail);
+    const watcher = await createTestUser(globalWatcherEmail);
+    cleanupUserIds.push(watcher.id);
 
     const watcherContext = await browser.newContext();
     const watcherPage = await watcherContext.newPage();
@@ -211,7 +233,9 @@ test.describe("Notifications", () => {
     const timestamp = Date.now();
     const ownerEmail = `interact-owner-${timestamp}@example.com`;
     const owner = await createTestUser(ownerEmail);
+    cleanupUserIds.push(owner.id);
     const machine = await createTestMachine(owner.id);
+    cleanupMachineIds.push(machine.id);
 
     // Login as owner
     await page.goto("/login");
@@ -256,7 +280,9 @@ test.describe("Notifications", () => {
     const timestamp = Date.now();
     const ownerEmail = `email-test-${timestamp}@example.com`;
     const owner = await createTestUser(ownerEmail);
+    cleanupUserIds.push(owner.id);
     const machine = await createTestMachine(owner.id);
+    cleanupMachineIds.push(machine.id);
 
     await page.goto("/login");
     await page.getByLabel("Email").fill(ownerEmail);

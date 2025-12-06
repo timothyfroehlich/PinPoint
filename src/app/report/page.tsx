@@ -9,6 +9,7 @@ import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { Button } from "~/components/ui/button";
 import { submitPublicIssueAction } from "./actions";
+import { MainLayout } from "~/components/layout/MainLayout";
 
 // Avoid SSG hitting Supabase during builds that run parallel to db resets
 export const dynamic = "force-dynamic";
@@ -30,8 +31,8 @@ export default async function PublicReportPage({
   const hasMachines = machinesList.length > 0;
 
   return (
-    <main className="min-h-screen bg-surface py-12">
-      <div className="container mx-auto max-w-2xl px-4">
+    <MainLayout>
+      <div className="container mx-auto max-w-2xl py-8">
         <Card className="border-outline-variant bg-surface shadow-lg">
           <CardHeader className="space-y-3">
             <CardTitle className="text-3xl font-bold text-on-surface">
@@ -167,6 +168,6 @@ export default async function PublicReportPage({
           </CardContent>
         </Card>
       </div>
-    </main>
+    </MainLayout>
   );
 }

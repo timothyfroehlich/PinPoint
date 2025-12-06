@@ -16,6 +16,8 @@ import { Badge } from "~/components/ui/badge";
 import { Plus } from "lucide-react";
 import { cn } from "~/lib/utils";
 
+import { redirect } from "next/navigation";
+
 /**
  * Machines List Page (Protected Route)
  *
@@ -29,7 +31,9 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) throw new Error("Unauthorized");
+  if (!user) {
+    redirect("/login");
+  }
 
   // Query machines with their open issues (direct Drizzle query - no DAL)
   const allMachines = await db.query.machines.findMany({

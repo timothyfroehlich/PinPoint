@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { TEST_USERS } from "./constants";
+import { TEST_USERS } from "./constants.js";
 
 interface LoginOptions {
   email?: string;
@@ -22,7 +22,7 @@ export async function loginAs(
   await page.getByRole("button", { name: "Sign In" }).click();
 
   await expect(page).toHaveURL("/dashboard");
-  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+  await expect(page.getByTestId("sidebar")).toBeVisible();
 }
 
 /**
@@ -34,15 +34,34 @@ export async function ensureLoggedIn(
   options?: LoginOptions
 ): Promise<void> {
   await page.goto("/dashboard");
-  // Wait for any redirects or page loads to settle
   await page.waitForLoadState("domcontentloaded");
 
-  if (page.url().includes("/login")) {
+  // Check for authenticated indicator (User Menu)
+  const userMenu = page.getByTestId("user-menu-button");
+  if (!(await userMenu.isVisible())) {
     await loginAs(page, options);
-    // After login, ensure we land on dashboard and wait for it
-    await page.waitForURL("/dashboard");
-    await page.waitForLoadState("domcontentloaded");
   }
-  // Now assert we are on dashboard
-  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+
+  // Now assert we are truly logged in
+  await expect(page.getByTestId("sidebar")).toBeVisible();
+  // Double check user menu
+  await expect(page.getByTestId("user-menu-button")).toBeVisible();
+}
+
+/**
+ * Logs out the current user via the User Menu.
+ */
+export async function logout(page: Page): Promise<void> {
+  const userMenu = page.getByTestId("user-menu-button");
+  await expect(userMenu).toBeVisible({ timeout: 5000 });
+  await userMenu.click();
+
+  const signOutItem = page.getByRole("menuitem", { name: "Sign Out" });
+  await expect(signOutItem).toBeVisible({ timeout: 5000 });
+  await signOutItem.click();
+
+  // Wait for redirect to public dashboard
+  // Increased timeout to account for potential Supabase delays
+  await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
+  await expect(page.getByTestId("nav-signin")).toBeVisible({ timeout: 15000 });
 }

@@ -13,9 +13,9 @@ test.describe("Authentication Smoke", () => {
     const testEmail = "member@test.com";
     const testPassword = "TestPassword123";
 
-    // Navigate to login page
+    // Navigate to login page via dashboard header
     await page.goto("/");
-    await page.getByTestId("hero-signin").click();
+    await page.getByTestId("nav-signin").click();
 
     // Verify we're on the login page
     await expect(page).toHaveURL("/login");
@@ -36,9 +36,7 @@ test.describe("Authentication Smoke", () => {
     await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
 
     // Verify dashboard content (quick stats present)
-    await expect(
-      page.getByRole("heading", { name: "Dashboard" })
-    ).toBeVisible();
+    await expect(page.getByTestId("sidebar")).toBeVisible();
     await expect(page.getByTestId("quick-stats")).toBeVisible();
     await expect(page.getByTestId("stat-open-issues-value")).toBeVisible();
   });

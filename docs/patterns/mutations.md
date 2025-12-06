@@ -1,6 +1,6 @@
 # Mutation Patterns
 
-## Server Action + Zod Validation + Redirect
+## Server Action + Zod Validation + useActionState
 
 ```typescript
 // src/app/machines/schemas.ts
@@ -25,9 +25,17 @@ import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { machines } from "~/server/db/schema";
 import { createMachineSchema } from "./schemas";
-import { setFlash } from "~/lib/flash";
 
-export async function createMachineAction(formData: FormData): Promise<void> {
+export type CreateMachineState = {
+  ok: boolean;
+  message?: string;
+  issues?: string[];
+};
+
+export async function createMachineAction(
+  prevState: CreateMachineState | undefined,
+  formData: FormData
+): Promise<CreateMachineState> {
   // 1. Auth check (CORE-SEC-001)
   const supabase = await createClient();
   const {
@@ -35,7 +43,6 @@ export async function createMachineAction(formData: FormData): Promise<void> {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    await setFlash({ type: "error", message: "Unauthorized. Please log in." });
     redirect("/login");
   }
 
@@ -45,36 +52,33 @@ export async function createMachineAction(formData: FormData): Promise<void> {
   });
 
   if (!validation.success) {
-    const firstError = validation.error.issues[0];
-    await setFlash({
-      type: "error",
-      message: firstError?.message ?? "Invalid input",
-    });
-    redirect("/machines/new");
+    return {
+      ok: false,
+      message: "Invalid input",
+      issues: validation.error.issues.map((i) => i.message),
+    };
   }
 
   const { name } = validation.data;
 
   // 3. Database operation
+  let machineId: string;
   try {
     const [machine] = await db.insert(machines).values({ name }).returning();
 
     if (!machine) throw new Error("Machine creation failed");
-
-    // 4. Flash + revalidate + redirect on success
-    await setFlash({
-      type: "success",
-      message: `Machine "${name}" created successfully`,
-    });
-    revalidatePath("/machines");
-    redirect(`/machines/${machine.id}`);
+    machineId = machine.id;
   } catch {
-    await setFlash({
-      type: "error",
+    return {
+      ok: false,
       message: "Failed to create machine. Please try again.",
-    });
-    redirect("/machines/new");
+    };
   }
+
+  // 4. Revalidate + Redirect on success
+  // Note: Redirect must happen outside try/catch
+  revalidatePath("/machines");
+  redirect(`/machines/${machineId}`);
 }
 ```
 
@@ -82,7 +86,7 @@ export async function createMachineAction(formData: FormData): Promise<void> {
 
 - Separate Zod schemas from Server Actions (Next.js requirement)
 - Always validate and authenticate before mutations
-- Use flash messages + redirect for Post-Redirect-Get pattern
-- Revalidate affected paths after mutations
-- `redirect()` throws internally to exit the function
-- Return type is `Promise<void>` (not `Result<T>`)
+- Return a serializable state object (`ok`, `message`, `issues`)
+- Use `useActionState` hook in the client component to consume the result
+- `redirect()` throws internally, so call it after success logic is complete
+- Revalidate affected paths before redirecting

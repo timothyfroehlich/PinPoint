@@ -6,7 +6,7 @@
  */
 
 import { test, expect, type Page } from "@playwright/test";
-import { ensureLoggedIn } from "../support/actions";
+import { ensureLoggedIn } from "../support/actions.js";
 
 async function getStatNumber(page: Page, testId: string): Promise<number> {
   const rawText = await page.getByTestId(testId).innerText();
@@ -113,11 +113,15 @@ test.describe.serial("Member Dashboard", () => {
 
       // Use filter to find the specific h1 containing the title, avoiding strict mode violation
       // with the Dashboard h1
-      await expect(
-        page
-          .getByRole("main")
-          .getByRole("heading", { level: 1, name: issueTitle })
-      ).toBeVisible();
+      // Verify title matches
+      const heading = page.getByRole("main").getByRole("heading", { level: 1 });
+
+      await expect(heading).toBeVisible();
+      // Allow for some whitespace variation
+      const headingText = await heading.innerText();
+      expect(headingText.replace(/\s+/g, " ").trim()).toBe(
+        issueTitle.replace(/\s+/g, " ").trim()
+      );
     }
   });
 });

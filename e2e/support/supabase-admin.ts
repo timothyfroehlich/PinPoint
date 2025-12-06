@@ -119,6 +119,52 @@ export async function updateUserRole(
     .from("user_profiles")
     .update({ role })
     .eq("id", userId);
+  if (error) throw error;
+}
 
+/**
+ * Delete a test user by ID (admin only)
+ */
+export async function deleteTestUser(userId: string) {
+  const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+  if (error) throw error;
+}
+
+/**
+ * Delete a test issue by machine initials and issue number
+ */
+export async function deleteTestIssueByNumber(
+  machineInitials: string,
+  issueNumber: number
+) {
+  // First, get the machine ID
+  const { data: machine } = await supabaseAdmin
+    .from("machines")
+    .select("id")
+    .eq("initials", machineInitials)
+    .single();
+
+  if (!machine) {
+    // Machine might not exist (already deleted?), so ignore
+    return;
+  }
+
+  const { error } = await supabaseAdmin
+    .from("issues")
+    .delete()
+    .eq("machine_id", machine.id)
+    .eq("issue_number", issueNumber);
+
+  if (error) throw error;
+}
+
+/**
+ * Delete a test machine by ID
+ */
+export async function deleteTestMachine(machineId: string) {
+  const { error } = await supabaseAdmin
+    .from("machines")
+    .delete()
+    .eq("id", machineId);
   if (error) throw error;
 }

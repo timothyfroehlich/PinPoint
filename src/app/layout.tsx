@@ -4,6 +4,8 @@ import "./globals.css";
 import { Toaster } from "sonner";
 import { ClientLogger } from "~/components/dev/client-logger";
 
+import { PreBetaBanner } from "~/components/layout/PreBetaBanner";
+
 export const metadata: Metadata = {
   title: "PinPoint - Pinball Machine Issue Tracking",
   description:
@@ -18,10 +20,11 @@ export default function RootLayout({
   const isDevelopment = process.env.NODE_ENV === "development";
 
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" suppressHydrationWarning>
+      <body className="flex flex-col h-screen overflow-hidden">
         {isDevelopment && <ClientLogger />}
-        {children}
+        <PreBetaBanner />
+        <div className="flex-1 overflow-hidden">{children}</div>
         <Toaster />
       </body>
     </html>

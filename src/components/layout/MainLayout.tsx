@@ -15,8 +15,10 @@ import {
 } from "~/components/notifications/NotificationList";
 import { UserMenu } from "./user-menu-client";
 import { ensureUserProfile } from "~/lib/auth/profile";
+import Link from "next/link";
+import { Button } from "~/components/ui/button";
 
-export async function DashboardLayout({
+export async function MainLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -102,9 +104,9 @@ export async function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <div className="flex h-full bg-background text-foreground">
       {/* Sidebar - Hidden on mobile for MVP (or we can add a simple toggle later) */}
-      <aside className="hidden md:block">
+      <aside className="hidden md:block h-full">
         <Sidebar role={userProfile?.role} />
       </aside>
 
@@ -112,14 +114,48 @@ export async function DashboardLayout({
       <main className="flex-1 overflow-y-auto">
         {/* Header Area */}
         <header className="flex h-16 items-center justify-between border-b border-border px-6 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-          <h1 className="text-lg font-semibold text-foreground">Dashboard</h1>
+          {/* Dynamic Header Area - Title removed to allow content to breathe */}
+          <div className="flex-1" />
 
           <div className="flex items-center gap-4">
-            {user && (
+            {user ? (
               <>
+                <Button
+                  asChild
+                  variant="default"
+                  size="sm"
+                  className="hidden sm:inline-flex"
+                >
+                  <Link href="/report">Report Issue</Link>
+                </Button>
                 <NotificationList notifications={enrichedNotifications} />
                 <UserMenu userName={userProfile?.name ?? "User"} />
               </>
+            ) : (
+              <div className="flex items-center gap-3">
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className="text-primary hover:bg-primary/10"
+                  data-testid="nav-report-issue"
+                >
+                  <Link href="/report">Report Issue</Link>
+                </Button>
+                <div className="h-4 w-px bg-border mx-1" />
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-foreground"
+                  data-testid="nav-signin"
+                >
+                  <Link href="/login">Sign In</Link>
+                </Button>
+                <Button asChild size="sm" data-testid="nav-signup">
+                  <Link href="/signup">Sign Up</Link>
+                </Button>
+              </div>
             )}
           </div>
         </header>

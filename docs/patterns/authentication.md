@@ -29,20 +29,26 @@ export default async function DashboardPage() {
 
 import { createClient } from "~/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { setFlash } from "~/lib/flash";
 
-export async function updateProfileAction(formData: FormData): Promise<void> {
+export async function updateProfileAction(
+  prevState: { ok: boolean; message?: string } | undefined,
+  formData: FormData
+): Promise<{ ok: boolean; message?: string }> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    await setFlash({ type: "error", message: "Unauthorized" });
+    // Option 1: Redirect to login
     redirect("/login");
   }
 
+  // Option 2: Return error state (if handled by client)
+  // return { ok: false, message: "Unauthorized" };
+
   // Mutation logic here...
+  return { ok: true, message: "Profile updated" };
 }
 ```
 
@@ -89,37 +95,28 @@ export default async function ProtectedPage(): Promise<React.JSX.Element> {
 
 ```typescript
 // src/app/(auth)/actions.ts
-export async function logoutAction(): Promise<void> {
+export async function logoutAction(): Promise<{
+  ok: boolean;
+  message?: string;
+}> {
   try {
     const supabase = await createClient();
     const { error } = await supabase.auth.signOut();
 
     if (error) {
-      await setFlash({
-        type: "error",
-        message: "Failed to sign out",
-      });
-      return; // Early exit without redirect
+      return { ok: false, message: "Failed to sign out" };
     }
-
-    await setFlash({
-      type: "success",
-      message: "Signed out successfully",
-    });
   } catch (error) {
-    await setFlash({
-      type: "error",
-      message: "Something went wrong",
-    });
-  } finally {
-    // Always redirect to home after logout attempt
-    redirect("/");
+    return { ok: false, message: "Something went wrong" };
   }
+
+  // Redirect happens after successful logout
+  redirect("/");
 }
 ```
 
 **Key points**:
 
-- `finally` block guarantees redirect on all paths
-- Flash messages persist across redirect via secure session cookie
-- No return value needed; `redirect()` throws internally
+- `redirect` calls typically happen outside try/catch blocks or after successful logic
+- Return a state object if you need to handle errors in the UI via `useActionState`
+- If using `redirect`, the client component will simply navigate away

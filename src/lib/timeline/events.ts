@@ -5,7 +5,7 @@
  * Timeline events are stored as issue_comments with is_system: true.
  */
 
-import { db } from "~/server/db";
+import { db, type DbOrTx } from "~/server/db";
 import { issueComments } from "~/server/db/schema";
 
 /**
@@ -27,10 +27,8 @@ import { issueComments } from "~/server/db/schema";
 export async function createTimelineEvent(
   issueId: string,
   content: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  txArg: any = db
+  tx: DbOrTx = db
 ): Promise<void> {
-  const tx = txArg as typeof db;
   await tx.insert(issueComments).values({
     issueId,
     content,

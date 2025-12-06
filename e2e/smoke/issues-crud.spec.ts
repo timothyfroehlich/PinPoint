@@ -82,11 +82,8 @@ test.describe("Issues System", () => {
       await addamsFamilyCard.click();
       await expect(page).toHaveURL(/\/m\/TAF/); // Expect TAF machine detail page
 
-      // Click "Report Issue" button on machine page
-      await page
-        .getByRole("main")
-        .getByRole("link", { name: "Report Issue" })
-        .click();
+      // Click "Report Issue" button on machine page (scope to main content to avoid global header button)
+      await page.getByTestId("machine-report-issue").click();
 
       // Should be on new issue page for TAF
       await expect(page).toHaveURL(/\/m\/TAF\/report/);
