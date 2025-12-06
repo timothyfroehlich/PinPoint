@@ -6,5 +6,15 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Sentry error tracking and performance monitoring integration
+- Feedback widget for user bug reports
+- Sentry tunnel route (`/api/sentry-tunnel`) to bypass ad blockers
+- Content Security Policy (CSP) updated to allow Sentry domains
+- Centralized Sentry configuration for client, server, and edge runtimes
+- Reduced Sentry `tracesSampleRate` to 0.1 in production for cost optimization
+- Refactored feedback button to a dedicated client component (`FeedbackButton.tsx`)
+
+### Added
+
 - Initial setup of CHANGELOG.md
 - Mandatory release notes process
