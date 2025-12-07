@@ -47,7 +47,7 @@ export function UpdateMachineForm({
         <div
           className={cn(
             "mb-6 rounded-md border p-4",
-            "border-green-200 bg-green-50 text-green-800 dark:border-green-900/50 dark:bg-green-900/20 dark:text-green-300"
+            "border-green-900/50 bg-green-900/20 text-green-300"
           )}
         >
           <p className="text-sm font-medium">Machine updated successfully!</p>

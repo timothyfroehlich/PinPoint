@@ -47,7 +47,7 @@ export default async function PublicReportPage({
             {errorMessage ? (
               <div
                 role="alert"
-                className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800"
+                className="rounded-md border border-red-900/50 bg-red-900/20 px-4 py-3 text-sm text-red-300"
               >
                 {errorMessage}
               </div>
