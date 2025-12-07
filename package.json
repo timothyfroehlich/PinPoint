@@ -63,6 +63,7 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@react-email/components": "^1.0.1",
+    "@sentry/nextjs": "^10.29.0",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.84.0",
     "@types/nodemailer": "^7.0.4",
