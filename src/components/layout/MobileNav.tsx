@@ -40,7 +40,11 @@ export function MobileNav({
             Main navigation menu for accessing dashboard, issues, and machines.
           </SheetDescription>
         </div>
-        <Sidebar role={role} onNavigate={() => setOpen(false)} />
+        <Sidebar
+          role={role}
+          onNavigate={() => setOpen(false)}
+          isMobile={true}
+        />
       </SheetContent>
     </Sheet>
   );

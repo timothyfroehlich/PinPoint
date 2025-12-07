@@ -47,20 +47,23 @@ const sidebarItems = [
 export function Sidebar({
   role,
   onNavigate,
+  isMobile = false,
 }: {
   role?: "guest" | "member" | "admin" | undefined;
   onNavigate?: () => void;
+  isMobile?: boolean;
 }): React.JSX.Element {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
 
   // Load state from localStorage on mount
   useEffect(() => {
+    if (isMobile) return; // Don't load/save collapse state on mobile
     const savedState = window.localStorage.getItem("sidebar-collapsed");
     if (savedState) {
       setCollapsed(JSON.parse(savedState) as boolean);
     }
-  }, []);
+  }, [isMobile]);
 
   const toggleSidebar = (): void => {
     const newState = !collapsed;
@@ -129,7 +132,8 @@ export function Sidebar({
         data-testid="sidebar"
         className={cn(
           "flex h-full flex-col border-r border-primary/50 bg-card text-card-foreground shadow-[0_0_15px_rgba(74,222,128,0.15)] transition-all duration-300 ease-in-out overflow-x-hidden",
-          collapsed ? "w-[64px]" : "w-64"
+          collapsed ? "w-[64px]" : "w-64",
+          isMobile && "w-full border-r-0 shadow-none" // Full width and no border/shadow on mobile sheet
         )}
       >
         {/* Logo Area */}
@@ -141,6 +145,7 @@ export function Sidebar({
         >
           <Link
             href="/dashboard"
+            {...(onNavigate ? { onClick: onNavigate } : {})}
             className="flex size-full items-center justify-center"
           >
             {collapsed ? (
@@ -201,24 +206,26 @@ export function Sidebar({
             />
           </div>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={toggleSidebar}
-            className="w-full h-10 hover:bg-primary/10 hover:text-primary"
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            {collapsed ? (
-              <ChevronRight className="size-4" />
-            ) : (
-              <div className="flex items-center gap-2">
-                <ChevronLeft className="size-4" />
-                <span className="text-xs uppercase font-semibold">
-                  Collapse
-                </span>
-              </div>
-            )}
-          </Button>
+          {!isMobile && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleSidebar}
+              className="w-full h-10 hover:bg-primary/10 hover:text-primary"
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {collapsed ? (
+                <ChevronRight className="size-4" />
+              ) : (
+                <div className="flex items-center gap-2">
+                  <ChevronLeft className="size-4" />
+                  <span className="text-xs uppercase font-semibold">
+                    Collapse
+                  </span>
+                </div>
+              )}
+            </Button>
+          )}
         </div>
       </div>
     </TooltipProvider>
