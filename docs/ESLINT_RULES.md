@@ -132,6 +132,7 @@ const result = dangerousOperation() as SafeType;
 Prevents disabling critical type safety rules.
 
 Blocked rules:
+
 - `@typescript-eslint/no-explicit-any`
 - `@typescript-eslint/no-unsafe-*`
 
