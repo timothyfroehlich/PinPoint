@@ -60,7 +60,7 @@ const sentryOptions: Parameters<typeof withSentryConfig>[1] = {
   disableLogger: true,
 
   // Enables automatic instrumentation of Vercel Cron Monitors.
-  automaticVercelMonitors: true,
+  automaticVercelMonitors: false,
 };
 
 // Override org and project if defined in env vars
