@@ -932,11 +932,11 @@ git reset --hard HEAD"""
     def regenerate_test_schema(self) -> bool:
         """Regenerate test schema"""
         if self.dry_run:
-            print(f"[DRY-RUN] Would run: npm run test:generate-schema in {self.name}")
+            print(f"[DRY-RUN] Would run: npm run test:_generate-schema in {self.name}")
         else:
             try:
                 subprocess.run(
-                    ["npm", "run", "test:generate-schema", "--silent"],
+                    ["npm", "run", "test:_generate-schema", "--silent"],
                     cwd=self.path,
                     capture_output=True,
                     timeout=60

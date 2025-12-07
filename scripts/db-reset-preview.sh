@@ -98,16 +98,16 @@ fi
 echo "✅ Schema reset"
 
 echo ""
-echo "2️⃣  Pushing schema with drizzle-kit..."
+echo "2️⃣  Applying schema with drizzle-kit migrations..."
 # Uses DIRECT_URL from env (Session Mode pooler, IPv4-compatible)
-npx drizzle-kit push
+npx drizzle-kit migrate
 
 # Verify tables were created
 echo "   Verifying tables were created..."
 TABLE_COUNT=$(psql "$DATABASE_URL" -t -c "SELECT COUNT(*) FROM pg_tables WHERE schemaname = 'public';" | tr -d ' ')
 echo "   Found $TABLE_COUNT tables in public schema"
 if [ "$TABLE_COUNT" -eq 0 ]; then
-  echo "   ❌ Error: No tables created by drizzle-kit push!"
+  echo "   ❌ Error: No tables created by drizzle-kit migrate!"
   exit 1
 fi
 echo "✅ Schema pushed"
