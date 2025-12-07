@@ -59,4 +59,9 @@ if (process.env["SENTRY_PROJECT"]) {
   sentryOptions.project = process.env["SENTRY_PROJECT"];
 }
 
-export default withSentryConfig(nextConfig, sentryOptions);
+// Conditionally apply Sentry wrapper
+const SentryWrappedNextConfig = process.env["NEXT_PUBLIC_SENTRY_DSN"]
+  ? withSentryConfig(nextConfig, sentryOptions)
+  : nextConfig;
+
+export default SentryWrappedNextConfig;

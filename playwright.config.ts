@@ -33,6 +33,7 @@ const webServerStderr = process.env["PLAYWRIGHT_STDERR"] ?? "pipe";
 const healthCheckTimeoutMs = process.env["CI"] ? 1500 : 1000;
 
 console.log(`[playwright.config.ts] Resolved PORT: ${port}`);
+
 console.log(`[playwright.config.ts] Resolved baseURL: ${baseURL}`);
 
 function listPidsOnPort(targetPort: number): string[] {
@@ -156,7 +157,7 @@ export default defineConfig({
 
   // Run your local dev server before starting the tests
   webServer: {
-    command: `PORT=${port} npm run dev`,
+    command: `NEXT_PUBLIC_SENTRY_DSN="" PORT=${port} npm run dev`,
     url: baseURL,
     reuseExistingServer: !process.env["CI"],
     timeout: process.env["CI"] ? 120 * 1000 : 60 * 1000,

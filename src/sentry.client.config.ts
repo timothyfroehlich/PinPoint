@@ -6,6 +6,7 @@ import * as Sentry from "@sentry/nextjs";
 import { feedbackIntegration } from "@sentry/react";
 
 const dsn = process.env["NEXT_PUBLIC_SENTRY_DSN"];
+
 if (!dsn) {
   // In production we want to fail, but in dev/build it might not be set
   // We'll log a warning if it's missing but allow the app to run (Sentry just won't initialize)
