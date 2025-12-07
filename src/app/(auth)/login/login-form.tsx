@@ -10,7 +10,13 @@ import { loginAction, type LoginResult } from "~/app/(auth)/actions";
 import { cn } from "~/lib/utils";
 import { TestAdminButton } from "./TestAdminButton";
 
-export function LoginForm(): React.JSX.Element {
+interface LoginFormProps {
+  enableTestAdmin?: boolean;
+}
+
+export function LoginForm({
+  enableTestAdmin = false,
+}: LoginFormProps): React.JSX.Element {
   const [state, formAction] = useActionState<LoginResult | undefined, FormData>(
     loginAction,
     undefined
@@ -100,10 +106,12 @@ export function LoginForm(): React.JSX.Element {
         </Button>
       </form>
 
-      {/* Test Admin Login Button */}
-      <div className="space-y-2">
-        <TestAdminButton />
-      </div>
+      {/* Test Admin Login Button (Dev/Preview only) */}
+      {enableTestAdmin && (
+        <div className="space-y-2">
+          <TestAdminButton />
+        </div>
+      )}
 
       {/* Signup link */}
       <div className="text-center text-sm text-muted-foreground">
