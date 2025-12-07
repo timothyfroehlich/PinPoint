@@ -304,13 +304,13 @@ jobs:
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('package-lock.json') }}
+          key: ${{ runner.os }}-playwright-chromium-webkit-${{ hashFiles('package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
+            ${{ runner.os }}-playwright-chromium-webkit-
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Make E2E script executable
         run: chmod +x ./scripts/run-e2e-with-supabase.sh

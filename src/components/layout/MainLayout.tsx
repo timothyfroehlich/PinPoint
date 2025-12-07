@@ -17,6 +17,7 @@ import { UserMenu } from "./user-menu-client";
 import { ensureUserProfile } from "~/lib/auth/profile";
 import Link from "next/link";
 import { Button } from "~/components/ui/button";
+import { MobileNav } from "./MobileNav";
 import { FeedbackWidget } from "~/components/feedback/FeedbackWidget";
 
 export async function MainLayout({
@@ -106,7 +107,7 @@ export async function MainLayout({
 
   return (
     <div className="flex h-full bg-background text-foreground">
-      {/* Sidebar - Hidden on mobile for MVP (or we can add a simple toggle later) */}
+      {/* Sidebar - Hidden on mobile */}
       <aside className="hidden md:block h-full">
         <Sidebar role={userProfile?.role} />
       </aside>
@@ -115,6 +116,11 @@ export async function MainLayout({
       <main className="flex-1 overflow-y-auto">
         {/* Header Area */}
         <header className="flex h-16 items-center justify-between border-b border-border px-6 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+          {/* Mobile Menu Trigger */}
+          <div className="md:hidden mr-4">
+            <MobileNav role={userProfile?.role} />
+          </div>
+
           {/* Dynamic Header Area - Title removed to allow content to breathe */}
           <div className="flex-1" />
 

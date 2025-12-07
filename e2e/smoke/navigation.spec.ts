@@ -35,16 +35,42 @@ test.describe.serial("Navigation", () => {
     await loginAs(page);
 
     // Sidebar (navigation) should be present for authenticated pages
-    const sidebar = page.getByTestId("sidebar");
-    await expect(sidebar).toBeVisible();
+    const desktopSidebar = page.locator("aside [data-testid='sidebar']");
+    const mobileTrigger = page.getByTestId("mobile-menu-trigger");
+
+    let activeSidebar;
+
+    // If on mobile, open the menu first
+    if (await mobileTrigger.isVisible()) {
+      await mobileTrigger.click();
+      // Wait for sidebar to be visible in the sheet
+      const mobileSidebar = page.locator(
+        "[role='dialog'] [data-testid='sidebar']"
+      );
+      await expect(mobileSidebar).toBeVisible();
+      activeSidebar = mobileSidebar;
+    } else {
+      await expect(desktopSidebar).toBeVisible();
+      activeSidebar = desktopSidebar;
+    }
 
     // Verify primary navigation links exist
     // Verify Sidebar Items (Common)
     await expect(
-      sidebar.getByRole("link", { name: "Dashboard" })
+      activeSidebar.getByRole("link", { name: "Dashboard" })
     ).toBeVisible();
-    await expect(sidebar.getByRole("link", { name: "Issues" })).toBeVisible();
-    await expect(sidebar.getByRole("link", { name: "Machines" })).toBeVisible();
+    await expect(
+      activeSidebar.getByRole("link", { name: "Issues" })
+    ).toBeVisible();
+    await expect(
+      activeSidebar.getByRole("link", { name: "Machines" })
+    ).toBeVisible();
+
+    // If we opened the mobile menu, close it now so we can interact with the user menu
+    if (await mobileTrigger.isVisible()) {
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("dialog")).toBeHidden();
+    }
 
     // Verify User Menu Items
     const userMenu = page.getByTestId("user-menu-button");

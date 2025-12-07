@@ -152,12 +152,20 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
     },
+    {
+      name: "Mobile Chrome",
+      use: { ...devices["Pixel 5"] },
+    },
+    {
+      name: "Mobile Safari",
+      use: { ...devices["iPhone 12"] },
+    },
   ],
 
   // Run your local dev server before starting the tests
   webServer: {
     command: `PORT=${port} npm run dev`,
-    url: baseURL,
+    url: `${baseURL}/api/health`,
     reuseExistingServer: !process.env["CI"],
     timeout: process.env["CI"] ? 120 * 1000 : 60 * 1000,
 
