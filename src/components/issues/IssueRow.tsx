@@ -25,17 +25,16 @@ interface IssueRowProps {
 
 export function IssueRow({ issue }: IssueRowProps): React.JSX.Element {
   const statusIcon = {
-    new: <AlertCircle className="size-5 text-yellow-600" />,
-    in_progress: <CircleDot className="size-5 text-blue-600" />,
-    resolved: <CheckCircle2 className="size-5 text-green-600" />,
+    new: <AlertCircle className="size-5 text-yellow-500" />,
+    in_progress: <CircleDot className="size-5 text-blue-500" />,
+    resolved: <CheckCircle2 className="size-5 text-green-500" />,
     // closed: <CheckCircle2 className="size-5 text-gray-500" />, // closed not in DB enum
   };
 
   const severityColor = {
-    minor: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
-    playable:
-      "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300",
-    unplayable: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+    minor: "bg-blue-900/30 text-blue-300",
+    playable: "bg-yellow-900/30 text-yellow-300",
+    unplayable: "bg-red-900/30 text-red-300",
   };
 
   return (
