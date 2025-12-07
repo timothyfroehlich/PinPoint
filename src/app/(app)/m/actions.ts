@@ -172,6 +172,15 @@ export async function updateMachineAction(
     return err("UNAUTHORIZED", "Unauthorized. Please log in.");
   }
 
+  // Fetch user profile to check role
+  const profile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, user.id),
+  });
+
+  if (!profile) {
+    return err("UNAUTHORIZED", "User profile not found.");
+  }
+
   const rawData = {
     id: formData.get("id"),
     name: formData.get("name"),
@@ -191,13 +200,19 @@ export async function updateMachineAction(
   const { id, name } = validation.data;
 
   try {
+    // Admins can update any machine, non-admins can only update their own machines
+    const whereConditions =
+      profile.role === "admin"
+        ? eq(machines.id, id)
+        : and(eq(machines.id, id), eq(machines.ownerId, user.id));
+
     const [machine] = await db
       .update(machines)
       .set({
         name,
         ...(validation.data.ownerId && { ownerId: validation.data.ownerId }),
       })
-      .where(and(eq(machines.id, id), eq(machines.ownerId, user.id)))
+      .where(whereConditions)
       .returning();
 
     if (!machine) {
