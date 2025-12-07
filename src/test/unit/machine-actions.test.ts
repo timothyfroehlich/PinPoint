@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createMachineAction } from "~/app/(app)/m/actions";
+import {
+  createMachineAction,
+  updateMachineAction,
+} from "~/app/(app)/m/actions";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 
@@ -25,6 +28,13 @@ vi.mock("~/server/db", () => ({
     insert: vi.fn(() => ({
       values: vi.fn(() => ({
         returning: vi.fn(),
+      })),
+    })),
+    update: vi.fn(() => ({
+      set: vi.fn(() => ({
+        where: vi.fn(() => ({
+          returning: vi.fn(),
+        })),
       })),
     })),
     query: {
@@ -120,5 +130,162 @@ describe("createMachineAction", () => {
     if (!result.ok) {
       expect(result.code).toBe("UNAUTHORIZED");
     }
+  });
+});
+
+describe("updateMachineAction", () => {
+  const mockUser = { id: "550e8400-e29b-41d4-a716-446655440000" };
+  const mockAdminUser = { id: "550e8400-e29b-41d4-a716-446655440001" };
+  const machineId = "550e8400-e29b-41d4-a716-446655440002";
+  const newOwnerId = "550e8400-e29b-41d4-a716-446655440003";
+  const initialState = undefined;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    // Setup default successful auth
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: mockUser } }),
+      },
+    } as unknown as SupabaseClient);
+  });
+
+  it("should allow admin to update unowned machine", async () => {
+    // Update auth mock to use admin user
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: mockAdminUser } }),
+      },
+    } as unknown as SupabaseClient);
+
+    // Mock admin profile
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      id: mockAdminUser.id,
+      role: "admin",
+    } as any);
+
+    // Mock successful update
+    const mockMachine = {
+      id: machineId,
+      initials: "MM",
+      name: "Updated Name",
+      ownerId: newOwnerId,
+    };
+    const returningMock = vi.fn().mockResolvedValue([mockMachine]);
+    const whereMock = vi.fn(() => ({ returning: returningMock }));
+    const setMock = vi.fn(() => ({ where: whereMock }));
+    const updateMock = vi.fn(() => ({ set: setMock }));
+    vi.mocked(db.update).mockImplementation(updateMock as any);
+
+    const formData = new FormData();
+    formData.append("id", machineId);
+    formData.append("name", "Updated Name");
+    formData.append("ownerId", newOwnerId);
+
+    const result = await updateMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.machineId).toBe(machineId);
+    }
+    expect(db.update).toHaveBeenCalled();
+  });
+
+  it("should allow owner to update their own machine", async () => {
+    // Mock member profile (not admin)
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      id: mockUser.id,
+      role: "member",
+    } as any);
+
+    // Mock successful update
+    const mockMachine = {
+      id: machineId,
+      initials: "MM",
+      name: "Updated Name",
+      ownerId: mockUser.id,
+    };
+    const returningMock = vi.fn().mockResolvedValue([mockMachine]);
+    const whereMock = vi.fn(() => ({ returning: returningMock }));
+    const setMock = vi.fn(() => ({ where: whereMock }));
+    const updateMock = vi.fn(() => ({ set: setMock }));
+    vi.mocked(db.update).mockImplementation(updateMock as any);
+
+    const formData = new FormData();
+    formData.append("id", machineId);
+    formData.append("name", "Updated Name");
+
+    const result = await updateMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.machineId).toBe(machineId);
+    }
+    expect(db.update).toHaveBeenCalled();
+  });
+
+  it("should return NOT_FOUND when non-admin tries to update another user's machine", async () => {
+    // Mock member profile (not admin)
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      id: mockUser.id,
+      role: "member",
+    } as any);
+
+    // Mock update that returns no results (machine not found or not owned)
+    const returningMock = vi.fn().mockResolvedValue([]);
+    const whereMock = vi.fn(() => ({ returning: returningMock }));
+    const setMock = vi.fn(() => ({ where: whereMock }));
+    const updateMock = vi.fn(() => ({ set: setMock }));
+    vi.mocked(db.update).mockImplementation(updateMock as any);
+
+    const formData = new FormData();
+    formData.append("id", machineId);
+    formData.append("name", "Updated Name");
+
+    const result = await updateMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("NOT_FOUND");
+    }
+  });
+
+  it("should require authentication", async () => {
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+      },
+    } as unknown as SupabaseClient);
+
+    const formData = new FormData();
+    formData.append("id", "machine-123");
+    formData.append("name", "Updated Name");
+
+    const result = await updateMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("UNAUTHORIZED");
+    }
+  });
+
+  it("should validate input", async () => {
+    // Mock profile found
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      role: "member",
+    } as any);
+
+    const formData = new FormData();
+    formData.append("id", "not-a-uuid");
+    formData.append("name", "Updated Name");
+
+    const result = await updateMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("VALIDATION");
+    }
+    expect(db.update).not.toHaveBeenCalled();
   });
 });
