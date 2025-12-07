@@ -3,11 +3,18 @@
 import React, { useCallback } from "react";
 import { Button } from "~/components/ui/button";
 import { MessageSquarePlus } from "lucide-react";
-import { getFeedback } from "@sentry/react";
+import * as Sentry from "@sentry/nextjs";
+
+interface FeedbackIntegration {
+  createForm: () => Promise<void>;
+}
 
 export function FeedbackButton(): React.JSX.Element {
   const handleClick = useCallback(async () => {
-    const feedback = getFeedback();
+    const client = Sentry.getClient();
+    const feedback = client?.getIntegrationByName("Feedback") as unknown as
+      | FeedbackIntegration
+      | undefined;
 
     if (!feedback) {
       console.warn(
