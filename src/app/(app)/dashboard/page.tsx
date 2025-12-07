@@ -287,7 +287,12 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                     href={`/m/${issue.machineInitials}/i/${issue.issueNumber}`}
                   >
                     <Card
-                      className="border-primary/20 bg-card hover:border-primary transition-all hover:glow-primary cursor-pointer"
+                      className={cn(
+                        "transition-all h-full cursor-pointer",
+                        issue.status === "resolved"
+                          ? "border-border/40 bg-muted/30 opacity-60 hover:opacity-100 grayscale hover:grayscale-0"
+                          : "border-primary/20 bg-card hover:border-primary hover:glow-primary"
+                      )}
                       data-testid="assigned-issue-card"
                     >
                       <CardHeader>
@@ -410,7 +415,12 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                   href={`/m/${issue.machineInitials}/i/${issue.issueNumber}`}
                 >
                   <Card
-                    className="border-secondary/20 bg-card hover:border-secondary transition-all hover:glow-secondary cursor-pointer h-full"
+                    className={cn(
+                      "transition-all h-full cursor-pointer",
+                      issue.status === "resolved"
+                        ? "border-border/40 bg-muted/30 opacity-60 hover:opacity-100 grayscale hover:grayscale-0"
+                        : "border-secondary/20 bg-card hover:border-secondary hover:glow-secondary"
+                    )}
                     data-testid="recent-issue-card"
                   >
                     <CardHeader>
