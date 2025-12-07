@@ -2,14 +2,16 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
 
+// Strip surrounding quotes if present (handles both single and double quotes)
+const databaseUrl = process.env["DATABASE_URL"]
+  ? process.env["DATABASE_URL"].replace(/^["']|["']$/g, "")
+  : "postgres://default:default@localhost:5432/default"; // Fallback for build time
+
 if (!process.env["DATABASE_URL"]) {
-  throw new Error(
-    "DATABASE_URL is not set. Please set it in your .env.local file."
+  console.warn(
+    "DATABASE_URL is not set. Using dummy connection string. This is only safe during build if no queries are executed."
   );
 }
-
-// Strip surrounding quotes if present (handles both single and double quotes)
-const databaseUrl = process.env["DATABASE_URL"].replace(/^["']|["']$/g, "");
 
 // Create postgres connection
 const queryClient = postgres(databaseUrl);
