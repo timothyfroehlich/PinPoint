@@ -17,7 +17,7 @@ export function FeedbackWidget(): React.JSX.Element | null {
       formTitle?: string;
       messagePlaceholder?: string;
       tags?: Record<string, string | number | boolean>;
-    }) => Promise<void>;
+    }) => Promise<{ open: () => void } | void>; // Can return Dialog or void depending on version
     openDialog?: (options?: {
       formTitle?: string;
       messagePlaceholder?: string;
@@ -44,7 +44,7 @@ export function FeedbackWidget(): React.JSX.Element | null {
         // Allow Dropdown to close before opening Sentry modal to avoid focus/portal issues
         window.setTimeout(() => {
           try {
-            // Safe handling whether it returns Promise or void
+            console.log("[FeedbackWidget] Calling createForm...");
             const result = createFormFn({
               formTitle: type === "bug" ? "Report a Bug" : "Request a Feature",
               messagePlaceholder:
@@ -56,11 +56,21 @@ export function FeedbackWidget(): React.JSX.Element | null {
               },
             });
 
-            // If it returns a promise, verify it and catch errors
-            // Use void to mark floating promise as handled
-            void result.catch((err) => {
-              console.error("[FeedbackWidget] Failed to create form:", err);
-            });
+            // Handle Promise<Dialog> return
+            // Linter knows it returns a promise based on our interface
+            result
+              .then((dialog) => {
+                console.log(
+                  "[FeedbackWidget] createForm resolved. Dialog:",
+                  dialog
+                );
+                if (dialog && typeof dialog.open === "function") {
+                  dialog.open();
+                }
+              })
+              .catch((err) => {
+                console.error("[FeedbackWidget] Failed to create form:", err);
+              });
           } catch (err) {
             console.error("[FeedbackWidget] Error calling createForm:", err);
           }
