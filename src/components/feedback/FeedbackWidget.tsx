@@ -17,7 +17,7 @@ export function FeedbackWidget(): React.JSX.Element | null {
       formTitle?: string;
       messagePlaceholder?: string;
       tags?: Record<string, string | number | boolean>;
-    }) => Promise<{ open: () => void } | void>; // Can return Dialog or void depending on version
+    }) => Promise<{ open: () => void; appendToDom?: () => void } | void>; // Can return Dialog or void depending on version
     openDialog?: (options?: {
       formTitle?: string;
       messagePlaceholder?: string;
@@ -64,8 +64,14 @@ export function FeedbackWidget(): React.JSX.Element | null {
                   "[FeedbackWidget] createForm resolved. Dialog:",
                   dialog
                 );
-                if (dialog && typeof dialog.open === "function") {
-                  dialog.open();
+                if (dialog) {
+                  // Ensure dialog is attached to DOM before opening
+                  if (typeof dialog.appendToDom === "function") {
+                    dialog.appendToDom();
+                  }
+                  if (typeof dialog.open === "function") {
+                    dialog.open();
+                  }
                 }
               })
               .catch((err) => {
