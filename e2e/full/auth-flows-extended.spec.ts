@@ -42,9 +42,17 @@ test.describe("Extended Authentication", () => {
     // Submit form
     await page.getByRole("button", { name: "Create Account" }).click();
 
-    // With email confirmations enabled, user is created but redirected to login
-    // Wait for redirect to confirm user was created
-    await expect(page).toHaveURL("/login", { timeout: 10000 });
+    // user is created but shown a confirmation message
+    // Verify success message is displayed
+    await expect(page.getByText("Check your email")).toBeVisible({
+      timeout: 10000,
+    });
+    await expect(page.getByText("We sent a confirmation link")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Go to Login" })).toBeVisible();
+
+    // Now go to login
+    await page.getByRole("link", { name: "Go to Login" }).click();
+    await expect(page).toHaveURL("/login");
 
     // Auto-confirm the user's email using admin API
     await confirmUserEmail(testEmail);
@@ -103,8 +111,13 @@ test.describe("Extended Authentication", () => {
     await page.getByLabel("Password").fill(oldPassword);
     await page.getByRole("button", { name: "Create Account" }).click();
 
-    // With email confirmations enabled, wait for redirect to login
-    await expect(page).toHaveURL("/login", { timeout: 10000 });
+    // With email confirmations enabled, wait for confirmation message
+    await expect(page.getByText("Check your email")).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Go to login manually
+    await page.goto("/login");
 
     // Auto-confirm and login
     await confirmUserEmail(testEmail);
