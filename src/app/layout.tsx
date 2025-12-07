@@ -4,6 +4,8 @@ import "./globals.css";
 import { Toaster } from "sonner";
 import { ClientLogger } from "~/components/dev/client-logger";
 
+import { SentryInitializer } from "~/components/SentryInitializer";
+
 import { PreBetaBanner } from "~/components/layout/PreBetaBanner";
 
 export const metadata: Metadata = {
@@ -22,6 +24,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="flex flex-col h-screen overflow-hidden">
+        <SentryInitializer />
         {isDevelopment && <ClientLogger />}
         <PreBetaBanner />
         <div className="flex-1 overflow-hidden">{children}</div>
