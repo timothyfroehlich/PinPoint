@@ -2,34 +2,90 @@
 
 This guide covers the development workflow, tools, and best practices for contributing to PinPoint.
 
-## Development Workflow
+For full project rules and constraints, **always start with `AGENTS.md`**.  
+This file is a shorter, hands-on reference for day‑to‑day development.
 
-1.  **Create a Feature Branch**: Always work on a new branch for each feature or fix.
-    ```bash
-    git checkout -b feature/my-new-feature
-    ```
-2.  **Make Changes**: Implement your changes, following the coding patterns in `docs/PATTERNS.md`.
-3.  **Run Tests**: Ensure all tests pass before committing.
-    ```bash
-    npm run validate
-    ```
-4.  **Commit Changes**: Use conventional commits (e.g., `feat: add new machine form`).
-5.  **Push and PR**: Push your branch and open a Pull Request.
+## What PinPoint Is (Developer View)
 
-## Testing
+- Single‑tenant issue tracker for the **Austin Pinball Collective**
+- Focus: Fast issue reporting per machine, clear dashboards for operators
+- Core entities: **Machines**, **Issues**, **Comments**, **Notifications**
 
-We use a combination of unit, integration, and end-to-end tests.
+If you’re trying to understand what the product should do, read:
 
-- **Unit Tests**: `npm test`
-  - Located in `src/**/*.test.ts`
-  - Test pure logic and utility functions.
-- **Integration Tests**: `npm test` (included in the same command)
-  - Test database interactions and Server Actions.
-  - Use `pglite` for fast, isolated database testing.
-- **End-to-End (E2E) Tests**: `npm run smoke`
-  - Located in `e2e/`
-  - Use Playwright to test critical user flows.
-  - **Note**: Ensure the dev server is running before running E2E tests, or use `npx playwright test` which handles it.
+- `docs/PRODUCT_SPEC.md`
+- `docs/TECH_SPEC.md`
+
+If you’re trying to understand how to implement something, read:
+
+- `AGENTS.md`
+- `docs/NON_NEGOTIABLES.md`
+- `docs/PATTERNS.md`
+
+## Quickstart for Development
+
+1. **Create a Branch**
+
+   ```bash
+   git checkout -b feat/my-change
+   ```
+
+2. **Install & Configure**
+
+   ```bash
+   npm install
+   cp .env.example .env.local
+   # Fill in Supabase + database env vars
+   ```
+
+3. **Start Supabase + Dev Server**
+
+   ```bash
+   # In one terminal
+   supabase start
+
+   # In another terminal
+   npm run dev
+   ```
+
+4. **Run Fast Checks While Iterating**
+
+   ```bash
+   npm run check      # typecheck + lint + unit tests
+   ```
+
+5. **Before Pushing**
+
+   ```bash
+   npm run preflight  # full gate: typecheck, lint, format, tests, build, int tests, smoke
+   ```
+
+## Testing Overview
+
+PinPoint uses the following test types (see `docs/TESTING_PLAN.md` for details):
+
+- **Unit Tests** (`npm test`)
+  - Location: `src/test/unit/**`
+  - What: Pure logic, utilities, validation
+- **Integration Tests (PGlite)** (`npm test`)
+  - Location: `src/test/integration/**`
+  - What: Database queries, Server Actions (using worker‑scoped PGlite)
+- **Supabase Integration Tests** (`npm run test:integration`)
+  - Location: `src/test/integration/supabase/**`
+  - What: Real Supabase interactions (requires `supabase start`)
+- **E2E Tests (Playwright)** (`npm run smoke`)
+  - Location: `e2e/**`
+  - What: Critical user flows only
+
+Useful commands:
+
+```bash
+npm test                      # Unit + PGlite integration
+npm run test:integration      # Supabase-backed integration tests
+npm run smoke                 # Playwright smoke suite
+npm run test:watch            # Watch mode for unit tests
+npm run test:coverage         # Coverage for unit tests
+```
 
 ## Component Creation
 
@@ -51,13 +107,33 @@ We use **Supabase** (PostgreSQL) and **Drizzle ORM**.
 
 ### Local Development
 
-- **Reset & Sync Database**:
+- **Apply Schema Changes (Day-to-Day)**
+
+  After editing `src/server/db/schema.ts`, generate a migration and apply it:
+
+  ```bash
+  # 1. Generate a migration
+  npm run db:generate -- --name <change-name>
+
+  # 2. Apply migrations to your local database
+  npm run db:migrate
+
+  # 3. Regenerate test schema for PGlite
+  npm run test:_generate-schema
+  ```
+
+- **Reset & Seed Database (Destructive)**
 
   ```bash
   npm run db:reset
   ```
 
-  Restarts Supabase, pushes the Drizzle schema, regenerates the test schema, and seeds data/users for rapid development.
+  This will:
+  - Restart Supabase
+  - Drop application tables
+  - Apply all Drizzle migrations
+  - Regenerate the test schema
+  - Seed data and users
 
 - **View Database**:
   ```bash
@@ -67,16 +143,11 @@ We use **Supabase** (PostgreSQL) and **Drizzle ORM**.
 
 ### Production Migrations
 
-For production changes, we use migrations to ensure safe database updates.
+For preview and production, we use **Drizzle migrations** to ensure safe database updates.
 
-1.  **Generate Migration**:
-    ```bash
-    npx drizzle-kit generate
-    ```
-2.  **Apply Migration**:
-    ```bash
-    npx drizzle-kit migrate
-    ```
+1. Edit `src/server/db/schema.ts`
+2. Generate a migration locally and commit the resulting `drizzle/` files
+3. Preview/prod reset scripts (e.g. `scripts/db-reset-preview.sh`, CI via `scripts/supa-ci.sh`) apply migrations using `npm run db:migrate`
 
 ## Troubleshooting
 
