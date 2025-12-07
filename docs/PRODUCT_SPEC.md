@@ -178,10 +178,10 @@ Support multiple organizations with full data isolation.
   - Quick stats (open issues, machines needing service)
 - Issues list with filtering (status, severity, machine, assignee)
 - Machine list (simple, no search yet)
+- **Public landing page**: Dashboard serves as public landing for unauthenticated users (read-only view)
 
 **Not Included:**
 
-- ❌ Public landing page (MVP+)
 - ❌ Customizable dashboard (2.0+)
 - ❌ Analytics/charts (2.0+)
 - ❌ Export to CSV (1.0+)
@@ -212,7 +212,6 @@ These make MVP practical for daily use:
 
 ### User Experience
 
-- **Public landing page**: Show recent issues per machine (read-only)
 - **Guest accounts**: Self-service guest sign-up for public reporters
 - **Email capture**: Optional email on public reports for follow-up
 - **Recent issues per machine**: Show last 5 issues on machine page
