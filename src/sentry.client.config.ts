@@ -7,7 +7,7 @@ import { feedbackIntegration } from "@sentry/react";
 
 const dsn = process.env["NEXT_PUBLIC_SENTRY_DSN"];
 
-if (!dsn) {
+if (!dsn && process.env.NODE_ENV !== "test") {
   // In production we want to fail, but in dev/build it might not be set
   // We'll log a warning if it's missing but allow the app to run (Sentry just won't initialize)
   console.warn(
