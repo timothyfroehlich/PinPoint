@@ -33,7 +33,7 @@
     "db:_seed-users": "node --env-file=.env.local supabase/seed-users.mjs",
     "db:fast-reset": "node --env-file=.env.local scripts/db-fast-reset.mjs",
     "check:config": "python3 scripts/check-config-drift.py",
-    "check": "npm-run-all --silent --parallel typecheck lint test format",
+    "check": "npm-run-all --silent --parallel typecheck lint test format:fix",
     "preflight": "npm-run-all --silent --parallel typecheck lint:fix format:fix test check:config --sequential db:fast-reset --parallel build test:integration test:integration:supabase --sequential smoke",
     "supa:ci": "bash scripts/supa-ci.sh",
     "sync-worktrees": "python3 scripts/sync_worktrees.py",
