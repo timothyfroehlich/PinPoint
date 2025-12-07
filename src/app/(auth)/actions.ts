@@ -258,7 +258,10 @@ export async function signupAction(
         "User signed up, confirmation required"
       );
 
-      redirect("/login");
+      return err(
+        "CONFIRMATION_REQUIRED",
+        "Check your email to confirm account"
+      );
     }
 
     log.info(

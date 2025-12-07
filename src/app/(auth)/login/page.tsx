@@ -33,7 +33,10 @@ export default async function LoginPage(): Promise<React.JSX.Element> {
       </CardHeader>
 
       <CardContent className="space-y-6">
-        <LoginForm />
+        {/* Only enable test admin button in non-production environments */}
+        <LoginForm
+          enableTestAdmin={process.env["VERCEL_ENV"] !== "production"}
+        />
       </CardContent>
     </Card>
   );
