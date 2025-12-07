@@ -7,8 +7,8 @@ npm ci
 echo "Resetting Supabase database..."
 supabase db reset
 
-echo "Applying database schema..."
-npm run db:_push
+echo "Applying database schema via migrations..."
+npm run db:migrate
 
 echo "Generating test schema..."
 npm run test:_generate-schema

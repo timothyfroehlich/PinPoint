@@ -10,6 +10,16 @@ All notable changes to this project will be documented in this file.
 
 > **Note**: Entries should be added _after_ creating the PR so you have the PR number. See [AGENTS.md](AGENTS.md) for the workflow.
 
+## #588 - Validate Migration Workflow and Add Help/Changelog Pages
+
+**2025-12-06**
+
+### Added
+
+- Migration verification workflow
+- Help and Changelog pages
+- Mandatory release notes process
+
 ## #586 - Sentry Integration and Feedback Widget
 
 **2025-12-06**
@@ -34,4 +44,3 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - Initial setup of CHANGELOG.md
-- Mandatory release notes process

@@ -126,6 +126,41 @@ const result = dangerousOperation() as SafeType;
 
 ---
 
+### 🛑 ESLint Directive Control
+
+**`eslint-comments/no-restricted-disable`** - Error
+Prevents disabling critical type safety rules.
+
+Blocked rules:
+
+- `@typescript-eslint/no-explicit-any`
+- `@typescript-eslint/no-unsafe-*`
+
+```ts
+// ❌ Bad - attempting to bypass type safety
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const data: any = JSON.parse(json);
+
+// ✅ Good - handle the type safely
+const data: unknown = JSON.parse(json);
+if (isValid(data)) { ... }
+```
+
+**`eslint-comments/require-description`** - Error
+Requires an explanation for every disable comment.
+
+```ts
+// ❌ Bad
+// eslint-disable-next-line no-undef
+if (typeof window !== "undefined") { ... }
+
+// ✅ Good
+// eslint-disable-next-line no-undef -- window is a global in browser
+if (typeof window !== "undefined") { ... }
+```
+
+---
+
 ### 🎯 Promise Handling
 
 **`@typescript-eslint/no-floating-promises`** - Error
@@ -193,6 +228,7 @@ Test files have relaxed rules for pragmatic testing:
 - `@typescript-eslint/no-explicit-any`: off (mocking)
 - `@typescript-eslint/no-floating-promises`: off (test runners handle)
 - `@typescript-eslint/explicit-function-return-type`: off (concise tests)
+- `eslint-comments/no-restricted-disable`: off (allows mocking hacks)
 
 ### Config Files
 
@@ -201,6 +237,7 @@ Build and config files have relaxed type checking:
 - `@typescript-eslint/no-explicit-any`: off
 - `@typescript-eslint/explicit-function-return-type`: off
 - `no-restricted-imports`: off
+- `eslint-comments/no-restricted-disable`: off
 
 ---
 

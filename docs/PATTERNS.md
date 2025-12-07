@@ -47,6 +47,8 @@ trigger: always_on
   - Layout Patterns
 - [URL Construction](./patterns/url-construction.md)
   - Consistent Site URL Resolution
+- [Database Migrations](./patterns/database-migrations.md)
+  - Drizzle Migrations + Test Schema Export
 
 ## Adding New Patterns
 

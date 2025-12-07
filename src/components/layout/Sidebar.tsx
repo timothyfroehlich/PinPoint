@@ -13,6 +13,9 @@ import {
   ChevronRight,
   AlertTriangle,
   CircleDot,
+  HelpCircle,
+  History,
+  Map as MapIcon,
 } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
@@ -169,8 +172,32 @@ export function Sidebar({
           )}
         </div>
 
-        {/* Collapse Toggle */}
-        <div className="border-t border-border p-2 flex justify-center">
+        {/* Help / Changelog + Collapse (bottom) */}
+        <div className="border-t border-border px-2 pt-3 pb-2 space-y-2">
+          <div className="space-y-1">
+            <NavItem
+              item={{
+                title: "Help",
+                href: "/help",
+                icon: HelpCircle,
+              }}
+            />
+            <NavItem
+              item={{
+                title: "Roadmap",
+                href: "/roadmap",
+                icon: MapIcon,
+              }}
+            />
+            <NavItem
+              item={{
+                title: "Changelog",
+                href: "/changelog",
+                icon: History,
+              }}
+            />
+          </div>
+
           <Button
             variant="ghost"
             size="sm"

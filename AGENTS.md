@@ -58,13 +58,21 @@ Read these immediately before starting work:
 ### Non-Negotiable Patterns
 
 - **Memory safety**: Worker-scoped PGlite instances only (per-test instances cause system lockups)
-- **No migration files**: Pre-beta has zero users, schema changes via direct modification only
+- **Migrations for schema changes**: Use Drizzle migrations to evolve the database schema (no ad-hoc `push` to production/preview).
 - **Schema lock**: Code adapts to schema, never modify schema to fix TypeScript errors
 - **Server-first**: Default to Server Components, minimal Client Components
 - **shadcn/ui only**: No MUI components for new development
 - **Issues always per-machine**: Every issue must have exactly one machine (CHECK constraint)
 - **Severity naming**: `minor` | `playable` | `unplayable` (player-centric language)
 - **Progressive enhancement**: Forms must work without JavaScript
+
+**Migrations workflow (always follow this order):**
+
+1. Edit `src/server/db/schema.ts`
+2. Run `npm run db:generate -- --name <change-name>`
+3. Run `npm run db:migrate`
+4. Run `npm run test:_generate-schema`
+5. Commit `schema.ts`, `drizzle/`, and `src/test/setup/schema.sql`
 
 ### Library Knowledge Gap
 
@@ -133,7 +141,7 @@ PinPoint uses parallel git worktrees so multiple assistants can work without ste
 ### How It Works
 
 - Each non-main worktree edits its own `supabase/config.toml` (ports + `project_id`) and marks it `skip-worktree` so git ignores local changes.
-- **WARNING**: `scripts/sync-worktrees.sh` AUTOMATICALLY rewrites `supabase/config.toml` in secondary worktrees to prevent port conflicts. Do not manually edit ports in secondary worktrees.
+- **WARNING**: `scripts/sync_worktrees.py` AUTOMATICALLY rewrites `supabase/config.toml` in secondary worktrees to prevent port conflicts. Do not manually edit ports in secondary worktrees.
 - `.env.local` (gitignored) holds worktree-specific ports/keys.
 - CI stays on the main config/ports; no CI changes required.
 - Supabase CLI now runs Mailpit for email testing even though the config section remains `[inbucket]`; keep using the same section name but refer to it as Mailpit in docs and code.
@@ -198,21 +206,17 @@ git update-index --skip-worktree supabase/config.toml
   5. Re-apply skip flag: `git update-index --skip-worktree supabase/config.toml`.
 - **Mailpit keys required**: Ensure `[inbucket]` contains `port`, `smtp_port`, and `pop3_port` using the per-worktree offsets (see table above). Missing SMTP/POP3 ports will block syncs and Supabase start.
 
-### Worktree Sync Scripts
+### Worktree Sync Script
 
-Two scripts are available for managing worktrees:
+Worktrees are managed by a single script:
 
-1. **`scripts/sync_worktrees.py`** (recommended) - Modern Python rewrite with:
-   - Object-oriented design and better error handling
-   - Auto-manages Python environment (`.venv`)
-   - Consolidated process killing (`npm run kill:zombies`)
-   - Usage: `python3 scripts/sync_worktrees.py [--dry-run] [--all] [-y]`
+- **`scripts/sync_worktrees.py`** – Modern Python implementation
+  - Object-oriented design and better error handling
+  - Auto-manages Python environment (`.venv`)
+  - Consolidated process killing (`npm run kill:zombies`)
+  - Usage: `python3 scripts/sync_worktrees.py [--dry-run] [--all] [-y]`
 
-2. **`scripts/sync-worktrees.sh`** (legacy) - Original Bash implementation
-   - Maintained for backward compatibility
-   - Usage: `./scripts/sync-worktrees.sh [options]`
-
-Both scripts perform the same operations. See `scripts/README.md` for detailed usage.
+See `scripts/README.md` for detailed usage.
 
 ### Available Commands
 
@@ -361,7 +365,6 @@ If all Yes → ship it. Perfect is the enemy of done.
 
 - **Style**: Conventional commits (`feat:`, `fix:`, `chore:`)
 - **Before pushing**: ALWAYS run `npm run preflight` (runs typecheck, lint, format, test, build, test:integration)
-- **No migrations**: Schema changes via direct modification only
 
 ### Changelog Workflow
 

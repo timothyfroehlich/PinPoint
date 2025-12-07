@@ -5,7 +5,7 @@
  * Timeline events are stored as issue_comments with is_system: true.
  */
 
-import { db, type DbOrTx } from "~/server/db";
+import { db, type DbTransaction } from "~/server/db";
 import { issueComments } from "~/server/db/schema";
 
 /**
@@ -27,7 +27,7 @@ import { issueComments } from "~/server/db/schema";
 export async function createTimelineEvent(
   issueId: string,
   content: string,
-  tx: DbOrTx = db
+  tx: DbTransaction = db
 ): Promise<void> {
   await tx.insert(issueComments).values({
     issueId,
