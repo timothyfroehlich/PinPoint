@@ -47,11 +47,23 @@ const nextConfig: NextConfig = {
 
 // Wrap config with Sentry for error tracking and source maps
 const sentryOptions: Parameters<typeof withSentryConfig>[1] = {
-  // Suppresses source map upload logs during build
-  silent: true,
+  org: "pinpoint-nc",
+  project: "pinpoint",
+
+  // Only print logs for uploading source maps in CI
+  silent: !process.env["CI"],
+
+  // Upload a larger set of source maps for prettier stack traces (increases build time)
+  widenClientFileUpload: true,
+
+  // Automatically tree-shake Sentry logger statements to reduce bundle size
+  disableLogger: true,
+
+  // Enables automatic instrumentation of Vercel Cron Monitors.
+  automaticVercelMonitors: true,
 };
 
-// Only set org and project if defined (for source map uploads)
+// Override org and project if defined in env vars
 if (process.env["SENTRY_ORG"]) {
   sentryOptions.org = process.env["SENTRY_ORG"];
 }

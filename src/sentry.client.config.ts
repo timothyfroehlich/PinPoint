@@ -7,7 +7,7 @@ import { feedbackIntegration } from "@sentry/react";
 
 const dsn = process.env["NEXT_PUBLIC_SENTRY_DSN"];
 
-if (!dsn && process.env.NODE_ENV !== "test") {
+if (!dsn && !process.env["SENTRY_SUPPRESS_WARNING"]) {
   // In production we want to fail, but in dev/build it might not be set
   // We'll log a warning if it's missing but allow the app to run (Sentry just won't initialize)
   console.warn(
@@ -19,8 +19,15 @@ if (dsn) {
   Sentry.init({
     dsn,
 
-    // Route requests through our server to bypass ad blockers
-    tunnel: "/api/sentry-tunnel",
+    // Define how likely traces are sampled. Adjust this value in production, or use tracesSampler for greater control.
+    tracesSampleRate: 1,
+
+    // Enable logs to be sent to Sentry
+    enableLogs: true,
+
+    // Enable sending user PII (Personally Identifiable Information)
+    // https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/options/#sendDefaultPii
+    sendDefaultPii: true,
 
     // Add Feedback widget for bug reports with screenshots
     integrations: [
@@ -41,13 +48,5 @@ if (dsn) {
         successMessageText: "Thanks! We'll review your report soon.",
       }),
     ],
-    // Tracing - adjust sample rate for production
-    tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
-
-    // Session Replay
-    replaysSessionSampleRate: 0.0, // Disabled to avoid costs
-    replaysOnErrorSampleRate: 0.0, // Disabled to avoid costs
-
-    debug: false, // Disable debug in production
   });
 }

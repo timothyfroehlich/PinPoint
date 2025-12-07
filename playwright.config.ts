@@ -157,7 +157,7 @@ export default defineConfig({
 
   // Run your local dev server before starting the tests
   webServer: {
-    command: `NEXT_PUBLIC_SENTRY_DSN="" PORT=${port} npm run dev`,
+    command: `NEXT_PUBLIC_SENTRY_DSN="" SENTRY_SUPPRESS_WARNING=1 PORT=${port} npm run dev`,
     url: baseURL,
     reuseExistingServer: !process.env["CI"],
     timeout: process.env["CI"] ? 120 * 1000 : 60 * 1000,
