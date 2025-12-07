@@ -22,7 +22,16 @@ export async function loginAs(
   await page.getByRole("button", { name: "Sign In" }).click();
 
   await expect(page).toHaveURL("/dashboard");
-  await expect(page.getByTestId("sidebar")).toBeVisible();
+
+  // Check for sidebar visibility OR mobile menu trigger
+  const desktopSidebar = page.locator("aside [data-testid='sidebar']");
+  const mobileTrigger = page.getByTestId("mobile-menu-trigger");
+
+  if (await desktopSidebar.isVisible()) {
+    await expect(desktopSidebar).toBeVisible();
+  } else {
+    await expect(mobileTrigger).toBeVisible();
+  }
 }
 
 /**
@@ -42,8 +51,15 @@ export async function ensureLoggedIn(
     await loginAs(page, options);
   }
 
-  // Now assert we are truly logged in
-  await expect(page.getByTestId("sidebar")).toBeVisible();
+  // Now assert we are truly logged in (Sidebar OR Mobile Menu)
+  const desktopSidebar = page.locator("aside [data-testid='sidebar']");
+  const mobileTrigger = page.getByTestId("mobile-menu-trigger");
+
+  if (await desktopSidebar.isVisible()) {
+    await expect(desktopSidebar).toBeVisible();
+  } else {
+    await expect(mobileTrigger).toBeVisible();
+  }
   // Double check user menu
   await expect(page.getByTestId("user-menu-button")).toBeVisible();
 }

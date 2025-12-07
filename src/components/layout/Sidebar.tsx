@@ -46,8 +46,10 @@ const sidebarItems = [
 
 export function Sidebar({
   role,
+  onNavigate,
 }: {
   role?: "guest" | "member" | "admin" | undefined;
+  onNavigate?: () => void;
 }): React.JSX.Element {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
@@ -82,6 +84,7 @@ export function Sidebar({
     const content = (
       <Link
         href={item.href}
+        {...(onNavigate ? { onClick: onNavigate } : {})}
         className={cn(
           "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors relative group",
           isActive

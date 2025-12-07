@@ -36,7 +36,16 @@ test.describe("Authentication Smoke", () => {
     await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
 
     // Verify dashboard content (quick stats present)
-    await expect(page.getByTestId("sidebar")).toBeVisible();
+    // Check for sidebar visibility OR mobile menu trigger
+    const desktopSidebar = page.locator("aside [data-testid='sidebar']");
+    const mobileTrigger = page.getByTestId("mobile-menu-trigger");
+
+    if (await desktopSidebar.isVisible()) {
+      await expect(desktopSidebar).toBeVisible();
+    } else {
+      await expect(mobileTrigger).toBeVisible();
+    }
+
     await expect(page.getByTestId("quick-stats")).toBeVisible();
     await expect(page.getByTestId("stat-open-issues-value")).toBeVisible();
   });
