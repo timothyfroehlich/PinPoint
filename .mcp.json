@@ -9,6 +9,9 @@
       "command": "npx",
       "args": ["@playwright/mcp@latest"],
       "env": {}
+    },
+    "Sentry": {
+      "url": "https://mcp.sentry.dev/mcp/pinpoint-nc/pinpoint"
     }
   }
 }

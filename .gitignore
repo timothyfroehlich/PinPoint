@@ -130,3 +130,6 @@ planning_task.md
 .pytest_cache/
 __pycache__/
 *.pyc
+
+# Sentry Config File
+.env.sentry-build-plugin

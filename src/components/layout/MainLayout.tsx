@@ -17,6 +17,7 @@ import { UserMenu } from "./user-menu-client";
 import { ensureUserProfile } from "~/lib/auth/profile";
 import Link from "next/link";
 import { Button } from "~/components/ui/button";
+import { FeedbackWidget } from "~/components/feedback/FeedbackWidget";
 
 export async function MainLayout({
   children,
@@ -118,6 +119,7 @@ export async function MainLayout({
           <div className="flex-1" />
 
           <div className="flex items-center gap-4">
+            <FeedbackWidget />
             {user ? (
               <>
                 <Button
