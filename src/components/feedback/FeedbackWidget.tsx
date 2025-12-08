@@ -19,11 +19,13 @@ interface SentryFeedbackWidget {
   createForm?: (options?: {
     formTitle?: string;
     messagePlaceholder?: string;
+    submitButtonLabel?: string;
     tags?: Record<string, string | number | boolean>;
   }) => Promise<{ open: () => void; appendToDom?: () => void } | void>;
   openDialog?: (options?: {
     formTitle?: string;
     messagePlaceholder?: string;
+    submitButtonLabel?: string;
   }) => void;
   open?: () => void;
 }
@@ -57,6 +59,8 @@ function handleFeedback(type: "bug" | "feature"): void {
                 type === "bug"
                   ? "Describe the bug, what was expected, and what happened..."
                   : "Describe the feature you'd like to see...",
+              submitButtonLabel:
+                type === "bug" ? "Send Bug Report" : "Send Feature Request",
               tags: {
                 feedback_type: type,
               },
@@ -83,6 +87,8 @@ function handleFeedback(type: "bug" | "feature"): void {
           type === "bug"
             ? "Describe the bug, what was expected, and what happened..."
             : "Describe the feature you'd like to see...",
+        submitButtonLabel:
+          type === "bug" ? "Send Bug Report" : "Send Feature Request",
       });
     } else if (typeof widget.open === "function") {
       widget.open();
