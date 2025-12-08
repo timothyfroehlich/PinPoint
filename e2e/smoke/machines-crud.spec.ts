@@ -15,8 +15,8 @@ test.describe("Machines CRUD", () => {
   test.describe.configure({ mode: "serial" });
 
   // Login before each test (required for protected routes)
-  test.beforeEach(async ({ page }) => {
-    await ensureLoggedIn(page);
+  test.beforeEach(async ({ page }, testInfo) => {
+    await ensureLoggedIn(page, testInfo);
   });
 
   test.afterEach(async ({ request }) => {
