@@ -78,7 +78,7 @@ test.describe("Notifications", () => {
     await expect(bell).toContainText("1");
 
     await bell.click();
-    const notification = ownerPage.getByText("New issue reported").first();
+    const notification = ownerPage.getByText(/New report/).first();
     await expect(notification).toBeVisible();
 
     // Verify it links to the correct machine/issue (by clicking and checking title)
@@ -160,7 +160,7 @@ test.describe("Notifications", () => {
     await bell.click();
 
     // Look for specific notification
-    const notification = page.getByText("Issue status updated").first();
+    const notification = page.getByText(/Status updated for/).first();
     await expect(notification).toBeVisible();
 
     await adminContext.close();
@@ -216,7 +216,7 @@ test.describe("Notifications", () => {
     await expect(bell).toContainText("1");
     await bell.click();
 
-    const notification = watcherPage.getByText("New issue reported").first();
+    const notification = watcherPage.getByText(/New report/).first();
     await expect(notification).toBeVisible();
 
     await notification.click();
@@ -264,7 +264,7 @@ test.describe("Notifications", () => {
     await page.bringToFront();
     await page.goto("/dashboard"); // Reload to fetch
     await page.getByRole("button", { name: /notifications/i }).click();
-    const notificationItem = page.getByText("New issue reported").first();
+    const notificationItem = page.getByText(/New report/).first();
     await expect(notificationItem).toBeVisible();
 
     // 4. Action: Click Notification
@@ -317,7 +317,7 @@ test.describe("Notifications", () => {
     await expect(bell).toContainText("1");
     await bell.click();
 
-    const notification = page.getByText("New issue reported");
+    const notification = page.getByText(/New report/);
     await expect(notification).toBeVisible();
 
     await memberContext.close();
