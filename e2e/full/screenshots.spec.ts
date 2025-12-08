@@ -19,9 +19,9 @@ test.describe("Admin Screenshots", () => {
     await createTestUser(`user2_${adminTimestamp}@example.com`);
   });
 
-  test("capture admin page screenshots", async ({ page }) => {
+  test("capture admin page screenshots", async ({ page }, testInfo) => {
     // Login
-    await loginAs(page, { email: adminEmail, password: "TestPassword123" });
+    await loginAs(page, testInfo, { email: adminEmail, password: "TestPassword123" });
 
     // Navigate
     await page.goto("/admin/users");

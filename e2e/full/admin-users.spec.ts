@@ -21,9 +21,9 @@ test.describe("Admin User Management", () => {
     await createTestUser(targetEmail);
   });
 
-  test("admin can view users and change roles", async ({ page }) => {
+  test("admin can view users and change roles", async ({ page }, testInfo) => {
     // Login as Admin
-    await loginAs(page, { email: adminEmail, password: "TestPassword123" });
+    await loginAs(page, testInfo, { email: adminEmail, password: "TestPassword123" });
 
     // Navigate to Admin Users Page
     await page.goto("/admin/users");
@@ -55,9 +55,9 @@ test.describe("Admin User Management", () => {
     await expect(selectTrigger).toHaveText("Admin");
   });
 
-  test("admin cannot demote themselves", async ({ page }) => {
+  test("admin cannot demote themselves", async ({ page }, testInfo) => {
     // Login as Admin
-    await loginAs(page, { email: adminEmail, password: "TestPassword123" });
+    await loginAs(page, testInfo, { email: adminEmail, password: "TestPassword123" });
 
     // Navigate to Admin Users Page
     await page.goto("/admin/users");
@@ -71,12 +71,12 @@ test.describe("Admin User Management", () => {
     await expect(selectTrigger).toHaveText("Admin");
   });
 
-  test("non-admin cannot access admin page", async ({ page }) => {
+  test("non-admin cannot access admin page", async ({ page }, testInfo) => {
     // Create a member user to test access control be safe.
     const memberEmail = `member_${Date.now()}@example.com`;
     await createTestUser(memberEmail);
 
-    await loginAs(page, { email: memberEmail, password: "TestPassword123" });
+    await loginAs(page, testInfo, { email: memberEmail, password: "TestPassword123" });
 
     // Try to navigate to Admin Page
     await page.goto("/admin/users");

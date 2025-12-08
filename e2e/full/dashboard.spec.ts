@@ -27,8 +27,8 @@ function ensureCardsOrEmpty(
 }
 
 test.describe.serial("Member Dashboard", () => {
-  test("dashboard loads with all sections", async ({ page }) => {
-    await ensureLoggedIn(page);
+  test("dashboard loads with all sections", async ({ page }, testInfo) => {
+    await ensureLoggedIn(page, testInfo);
 
     // Quick Stats
     await expect(
@@ -94,8 +94,8 @@ test.describe.serial("Member Dashboard", () => {
     );
   });
 
-  test("dashboard issue cards link to issue detail pages", async ({ page }) => {
-    await ensureLoggedIn(page);
+  test("dashboard issue cards link to issue detail pages", async ({ page }, testInfo) => {
+    await ensureLoggedIn(page, testInfo);
 
     // Check if there are any issue cards
     const issueCards = page.getByTestId("recent-issue-card");

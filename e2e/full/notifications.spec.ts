@@ -94,7 +94,7 @@ test.describe("Notifications", () => {
   test("should notify reporter when status changes", async ({
     page,
     browser,
-  }) => {
+  }, testInfo) => {
     // 1. Setup: Use seeded member as reporter, but report on a fresh machine owned by a fresh admin
     // This isolates the "Status Changed" notification to this interaction
 
@@ -106,7 +106,7 @@ test.describe("Notifications", () => {
     cleanupMachineIds.push(machine.id);
 
     // Reporter (Member) reports an issue
-    await ensureLoggedIn(page, TEST_USERS.member);
+    await ensureLoggedIn(page, testInfo, TEST_USERS.member);
 
     await page.goto(`/m/${machine.initials}/report`);
     await expect(
@@ -275,7 +275,7 @@ test.describe("Notifications", () => {
     await expect(page.getByRole("heading", { name: issueTitle })).toBeVisible();
   });
 
-  test("email notification flow", async ({ page, browser }) => {
+  test("email notification flow", async ({ page, browser }, testInfo) => {
     // 1. Setup: Fresh Admin/Owner
     const timestamp = Date.now();
     const ownerEmail = `email-test-${timestamp}@example.com`;
@@ -296,7 +296,7 @@ test.describe("Notifications", () => {
     // 2. Action: Member reports an issue
     const memberContext = await browser.newContext();
     const memberPage = await memberContext.newPage();
-    await ensureLoggedIn(memberPage, TEST_USERS.member);
+    await ensureLoggedIn(memberPage, testInfo, TEST_USERS.member);
 
     await memberPage.goto("/report");
     await memberPage
