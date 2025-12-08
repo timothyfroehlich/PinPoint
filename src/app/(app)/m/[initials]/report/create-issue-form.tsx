@@ -92,10 +92,13 @@ export function CreateIssueForm({
           <select
             id="severity"
             name="severity"
-            defaultValue="playable"
+            defaultValue=""
             required
             className="w-full rounded-md border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface"
           >
+            <option value="" disabled>
+              Select severity...
+            </option>
             <option value="minor">
               Minor (cosmetic, doesn&apos;t affect gameplay)
             </option>
@@ -119,10 +122,13 @@ export function CreateIssueForm({
           <select
             id="priority"
             name="priority"
-            defaultValue="low"
+            defaultValue=""
             required
             className="w-full rounded-md border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface"
           >
+            <option value="" disabled>
+              Select priority...
+            </option>
             <option value="low">Low</option>
             <option value="medium">Medium</option>
             <option value="high">High</option>
