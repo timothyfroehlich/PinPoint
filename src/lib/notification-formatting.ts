@@ -76,6 +76,7 @@ export function getEmailHtml(
         /^[A-Z0-9]{2,6}$/.test(initialsPart)
       ) {
         const issueNumber = parseInt(numberPart, 10);
+        // URL encode for defense-in-depth, even though validation ensures only safe characters
         issueUrl = `${siteUrl}/m/${encodeURIComponent(initialsPart)}/i/${issueNumber}`;
       }
     }
