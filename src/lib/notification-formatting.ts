@@ -69,9 +69,15 @@ export function getEmailHtml(
     if (parts.length >= 2) {
       const numberPart = parts.pop();
       const initialsPart = parts.join("-");
-      if (numberPart && /^\d+$/.test(numberPart)) {
+      // Validate initialsPart matches schema: exactly 2-6 uppercase letters or digits
+      if (
+        numberPart &&
+        /^\d+$/.test(numberPart) &&
+        /^[A-Z0-9]{2,6}$/.test(initialsPart)
+      ) {
         const issueNumber = parseInt(numberPart, 10);
-        issueUrl = `${siteUrl}/m/${initialsPart}/i/${issueNumber}`;
+        // URL encode for defense-in-depth, even though validation ensures only safe characters
+        issueUrl = `${siteUrl}/m/${encodeURIComponent(initialsPart)}/i/${issueNumber}`;
       }
     }
   }
