@@ -1,4 +1,3 @@
-
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { FeedbackWidget } from "~/components/feedback/FeedbackWidget";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
@@ -28,7 +27,6 @@ vi.mock("lucide-react", () => ({
 
 // Mock Dropdown components
 vi.mock("~/components/ui/dropdown-menu", () => {
-  const React = require("react");
   return {
     DropdownMenu: ({ children }: any) => <div>{children}</div>,
     DropdownMenuTrigger: ({ children, asChild }: any) => (
@@ -55,8 +53,8 @@ describe("FeedbackWidget", () => {
     vi.clearAllMocks();
 
     mockCreateForm = vi.fn().mockResolvedValue({
-        open: vi.fn(),
-        appendToDom: vi.fn()
+      open: vi.fn(),
+      appendToDom: vi.fn(),
     });
     mockOpenDialog = vi.fn();
     mockOpen = vi.fn();
@@ -75,20 +73,22 @@ describe("FeedbackWidget", () => {
 
     // Simulate clicking the feature request item
     const items = screen.getAllByTestId("dropdown-item");
-    const featureItem = items.find((item) => item.textContent?.includes("Request a Feature"));
+    const featureItem = items.find((item) =>
+      item.textContent.includes("Request a Feature")
+    );
 
     if (featureItem) {
-        fireEvent.click(featureItem);
-    } else {
-        throw new Error("Feature item not found");
+      fireEvent.click(featureItem);
     }
 
     // Since calling createForm is wrapped in setTimeout
     await waitFor(() => {
-        expect(mockCreateForm).toHaveBeenCalledWith(expect.objectContaining({
-            formTitle: "Request a Feature",
-            submitButtonLabel: "Send Feature Request"
-        }));
+      expect(mockCreateForm).toHaveBeenCalledWith(
+        expect.objectContaining({
+          formTitle: "Request a Feature",
+          submitButtonLabel: "Send Feature Request",
+        })
+      );
     });
   });
 
@@ -97,19 +97,21 @@ describe("FeedbackWidget", () => {
 
     // Simulate clicking the bug report item
     const items = screen.getAllByTestId("dropdown-item");
-    const bugItem = items.find((item) => item.textContent?.includes("Report a Bug"));
+    const bugItem = items.find((item) =>
+      item.textContent.includes("Report a Bug")
+    );
 
     if (bugItem) {
-        fireEvent.click(bugItem);
-    } else {
-        throw new Error("Bug item not found");
+      fireEvent.click(bugItem);
     }
 
     await waitFor(() => {
-        expect(mockCreateForm).toHaveBeenCalledWith(expect.objectContaining({
-            formTitle: "Report a Bug",
-            submitButtonLabel: "Send Bug Report"
-        }));
+      expect(mockCreateForm).toHaveBeenCalledWith(
+        expect.objectContaining({
+          formTitle: "Report a Bug",
+          submitButtonLabel: "Send Bug Report",
+        })
+      );
     });
   });
 });
