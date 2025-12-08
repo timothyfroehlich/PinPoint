@@ -11,115 +11,91 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 
-export function FeedbackWidget(): React.JSX.Element | null {
-  interface SentryFeedbackWidget {
-    createForm?: (options?: {
-      formTitle?: string;
-      messagePlaceholder?: string;
-      tags?: Record<string, string | number | boolean>;
-    }) => Promise<{ open: () => void; appendToDom?: () => void } | void>; // Can return Dialog or void depending on version
-    openDialog?: (options?: {
-      formTitle?: string;
-      messagePlaceholder?: string;
-    }) => void;
-    open?: () => void;
-  }
+// Delay to allow dropdown menu to close before opening Sentry modal
+// to prevent focus management conflicts between Radix UI and Sentry's portal
+const DROPDOWN_CLOSE_DELAY = 100;
 
-  function handleFeedback(type: "bug" | "feature"): void {
-    const feedback = Sentry.getFeedback();
-    console.log("[FeedbackWidget] Clicked:", type);
-    console.log("[FeedbackWidget] Sentry.getFeedback():", feedback);
+interface SentryFeedbackWidget {
+  createForm?: (options?: {
+    formTitle?: string;
+    messagePlaceholder?: string;
+    tags?: Record<string, string | number | boolean>;
+  }) => Promise<{ open: () => void; appendToDom?: () => void } | void>;
+  openDialog?: (options?: {
+    formTitle?: string;
+    messagePlaceholder?: string;
+  }) => void;
+  open?: () => void;
+}
 
-    if (feedback) {
-      const widget = feedback as unknown as SentryFeedbackWidget;
+function isSentryFeedbackWidget(obj: unknown): obj is SentryFeedbackWidget {
+  return (
+    typeof obj === "object" &&
+    obj !== null &&
+    ("createForm" in obj || "openDialog" in obj || "open" in obj)
+  );
+}
 
-      console.log("[FeedbackWidget] Widget capabilities:", {
-        hasCreateForm: typeof widget.createForm === "function",
-        hasOpenDialog: typeof widget.openDialog === "function",
-        hasOpen: typeof widget.open === "function",
-      });
+function handleFeedback(type: "bug" | "feature"): void {
+  const rawFeedback = Sentry.getFeedback();
+  // Cast to unknown to allow type guard to work
+  const feedback = rawFeedback as unknown;
 
-      if (typeof widget.createForm === "function") {
-        const createFormFn = widget.createForm; // Capture for closure safety
-        // Allow Dropdown to close before opening Sentry modal to avoid focus/portal issues
-        window.setTimeout(() => {
+  if (isSentryFeedbackWidget(feedback)) {
+    const widget = feedback;
+
+    if (typeof widget.createForm === "function") {
+      // Wrap in arrow function to preserve 'this' context if needed, though bind isn't strictly required if method doesn't use 'this'
+      const createFormFn = widget.createForm;
+
+      window.setTimeout(() => {
+        void (async () => {
           try {
-            console.log("[FeedbackWidget] Calling createForm...");
-            const result = createFormFn({
+            const dialog = await createFormFn({
               formTitle: type === "bug" ? "Report a Bug" : "Request a Feature",
               messagePlaceholder:
                 type === "bug"
-                  ? "Describe the bug, what expected, and what happened..."
+                  ? "Describe the bug, what was expected, and what happened..."
                   : "Describe the feature you'd like to see...",
               tags: {
                 feedback_type: type,
               },
             });
 
-            // Handle Promise<Dialog> return
-            // Linter knows it returns a promise based on our interface
-            result
-              .then((dialog) => {
-                console.log(
-                  "[FeedbackWidget] createForm resolved. Dialog:",
-                  dialog
-                );
-                if (dialog) {
-                  // Ensure dialog is attached to DOM before opening
-                  if (typeof dialog.appendToDom === "function") {
-                    dialog.appendToDom();
-                  }
-                  if (typeof dialog.open === "function") {
-                    dialog.open();
-                  }
-                }
-              })
-              .catch((err) => {
-                console.error("[FeedbackWidget] Failed to create form:", err);
-              });
+            if (dialog) {
+              // Ensure dialog is attached to DOM before opening
+              if (typeof dialog.appendToDom === "function") {
+                dialog.appendToDom();
+              }
+              if (typeof dialog.open === "function") {
+                dialog.open();
+              }
+            }
           } catch (err) {
             console.error("[FeedbackWidget] Error calling createForm:", err);
           }
-        }, 100);
-      } else if (typeof widget.openDialog === "function") {
-        widget.openDialog({
-          formTitle: type === "bug" ? "Report a Bug" : "Request a Feature",
-          messagePlaceholder:
-            type === "bug"
-              ? "Describe the bug, what expected, and what happened..."
-              : "Describe the feature you'd like to see...",
-        });
-      } else if (typeof widget.open === "function") {
-        console.warn(
-          "[FeedbackWidget] openDialog not found, falling back to open()"
-        );
-        widget.open();
-      } else {
-        console.error(
-          "[FeedbackWidget] No suitable open method found on widget"
-        );
-      }
-    } else {
-      console.error(
-        "[FeedbackWidget] Sentry.getFeedback() returned null/undefined"
-      );
+        })();
+      }, DROPDOWN_CLOSE_DELAY);
+    } else if (typeof widget.openDialog === "function") {
+      widget.openDialog({
+        formTitle: type === "bug" ? "Report a Bug" : "Request a Feature",
+        messagePlaceholder:
+          type === "bug"
+            ? "Describe the bug, what was expected, and what happened..."
+            : "Describe the feature you'd like to see...",
+      });
+    } else if (typeof widget.open === "function") {
+      widget.open();
     }
   }
+}
 
+export function FeedbackWidget(): React.JSX.Element | null {
   useEffect(() => {
-    const feedback = Sentry.getFeedback();
-    console.log("[FeedbackWidget] Mounted. Sentry.getFeedback():", feedback);
-    if (feedback) {
-      const widget = feedback as unknown as SentryFeedbackWidget;
-      console.log("[FeedbackWidget] Mount check - capabilities:", {
-        hasCreateForm: typeof widget.createForm === "function",
-        hasOpenDialog: typeof widget.openDialog === "function",
-        hasOpen: typeof widget.open === "function",
-      });
-    } else {
-      console.warn(
-        "[FeedbackWidget] Mounted but Sentry.getFeedback() is undefined. Sentry might not be initialized yet or feedback integration is missing."
-      );
+    // Optional: Mount checks/logging if needed in dev
+    if (process.env.NODE_ENV === "development") {
+      const feedback = Sentry.getFeedback();
+      console.log("[FeedbackWidget] Mounted.", { feedback });
     }
   }, []);
 
