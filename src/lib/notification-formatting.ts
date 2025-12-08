@@ -63,9 +63,22 @@ export function getEmailHtml(
     ? sanitizeHtml(formattedIssueId)
     : "";
 
+  let issueUrl = `${siteUrl}/issues`;
+  if (formattedIssueId) {
+    const parts = formattedIssueId.split("-");
+    if (parts.length >= 2) {
+      const numberPart = parts.pop();
+      const initialsPart = parts.join("-");
+      if (numberPart && /^\d+$/.test(numberPart)) {
+        const issueNumber = parseInt(numberPart, 10);
+        issueUrl = `${siteUrl}/m/${initialsPart}/i/${issueNumber}`;
+      }
+    }
+  }
+
   return `
       <h2>${machinePrefix}${sanitizedIssueId ? `${sanitizedIssueId}: ` : ""}${sanitizedIssueTitle}</h2>
       <p>${body}</p>
-      <p><a href="${siteUrl}/issues">View Issue</a></p>
+      <p><a href="${issueUrl}">View Issue</a></p>
     `;
 }
