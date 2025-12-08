@@ -20,11 +20,7 @@ describe("Bug Reproduction: Incorrect Issue Link", () => {
   });
 
   it("should fallback to generic link if ID is missing", () => {
-    const html = getEmailHtml(
-      "new_issue",
-      "Title",
-      "Machine"
-    );
+    const html = getEmailHtml("new_issue", "Title", "Machine");
     expect(html).toContain('href="http://test.com/issues"');
   });
 });
