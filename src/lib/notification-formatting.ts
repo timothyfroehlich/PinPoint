@@ -69,7 +69,7 @@ export function getEmailHtml(
     if (parts.length >= 2) {
       const numberPart = parts.pop();
       const initialsPart = parts.join("-");
-      // Validate initialsPart matches schema: 2-6 uppercase letters or digits, no dashes
+      // Validate initialsPart matches schema: exactly 2-6 uppercase letters or digits
       if (
         numberPart &&
         /^\d+$/.test(numberPart) &&
