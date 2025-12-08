@@ -23,7 +23,10 @@ test.describe("Admin User Management", () => {
 
   test("admin can view users and change roles", async ({ page }, testInfo) => {
     // Login as Admin
-    await loginAs(page, testInfo, { email: adminEmail, password: "TestPassword123" });
+    await loginAs(page, testInfo, {
+      email: adminEmail,
+      password: "TestPassword123",
+    });
 
     // Navigate to Admin Users Page
     await page.goto("/admin/users");
@@ -57,7 +60,10 @@ test.describe("Admin User Management", () => {
 
   test("admin cannot demote themselves", async ({ page }, testInfo) => {
     // Login as Admin
-    await loginAs(page, testInfo, { email: adminEmail, password: "TestPassword123" });
+    await loginAs(page, testInfo, {
+      email: adminEmail,
+      password: "TestPassword123",
+    });
 
     // Navigate to Admin Users Page
     await page.goto("/admin/users");
@@ -76,7 +82,10 @@ test.describe("Admin User Management", () => {
     const memberEmail = `member_${Date.now()}@example.com`;
     await createTestUser(memberEmail);
 
-    await loginAs(page, testInfo, { email: memberEmail, password: "TestPassword123" });
+    await loginAs(page, testInfo, {
+      email: memberEmail,
+      password: "TestPassword123",
+    });
 
     // Try to navigate to Admin Page
     await page.goto("/admin/users");

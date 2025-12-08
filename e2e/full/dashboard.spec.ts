@@ -94,7 +94,9 @@ test.describe.serial("Member Dashboard", () => {
     );
   });
 
-  test("dashboard issue cards link to issue detail pages", async ({ page }, testInfo) => {
+  test("dashboard issue cards link to issue detail pages", async ({
+    page,
+  }, testInfo) => {
     await ensureLoggedIn(page, testInfo);
 
     // Check if there are any issue cards

@@ -30,9 +30,7 @@ export async function loginAs(
   if (isMobile) {
     await expect(page.getByTestId("mobile-menu-trigger")).toBeVisible();
   } else {
-    await expect(
-      page.locator("aside [data-testid='sidebar']")
-    ).toBeVisible();
+    await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
   }
 }
 
@@ -61,9 +59,7 @@ export async function ensureLoggedIn(
   if (isMobile) {
     await expect(page.getByTestId("mobile-menu-trigger")).toBeVisible();
   } else {
-    await expect(
-      page.locator("aside [data-testid='sidebar']")
-    ).toBeVisible();
+    await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
   }
   // Double check user menu
   await expect(page.getByTestId("user-menu-button")).toBeVisible();

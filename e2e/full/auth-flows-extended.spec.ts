@@ -16,7 +16,7 @@ import { confirmUserEmail } from "../support/supabase-admin.js";
 test.describe("Extended Authentication", () => {
   test("signup flow - create new account and access dashboard", async ({
     page,
-  }) => {
+  }, testInfo) => {
     // Navigate to signup page
     await page.goto("/");
     const signupBtn = page.getByTestId("nav-signup");
@@ -80,7 +80,9 @@ test.describe("Extended Authentication", () => {
     await expect(page.getByRole("heading", { name: "Sign In" })).toBeVisible();
   });
 
-  test("logout flow - sign out and verify redirect", async ({ page }, testInfo) => {
+  test("logout flow - sign out and verify redirect", async ({
+    page,
+  }, testInfo) => {
     // Login first using helper
     await loginAs(page, testInfo, seededMember);
 

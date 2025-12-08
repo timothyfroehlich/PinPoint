@@ -3,7 +3,9 @@ import { loginAs } from "../support/actions";
 import { TEST_USERS } from "../support/constants";
 
 test.describe("Profile Settings", () => {
-  test("should update profile and handle cancel", async ({ page }, testInfo) => {
+  test("should update profile and handle cancel", async ({
+    page,
+  }, testInfo) => {
     await loginAs(page, testInfo, TEST_USERS.member);
     await page.goto("/settings");
 

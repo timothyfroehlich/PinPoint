@@ -21,7 +21,10 @@ test.describe("Admin Screenshots", () => {
 
   test("capture admin page screenshots", async ({ page }, testInfo) => {
     // Login
-    await loginAs(page, testInfo, { email: adminEmail, password: "TestPassword123" });
+    await loginAs(page, testInfo, {
+      email: adminEmail,
+      password: "TestPassword123",
+    });
 
     // Navigate
     await page.goto("/admin/users");

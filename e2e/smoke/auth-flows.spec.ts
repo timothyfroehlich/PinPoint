@@ -44,9 +44,7 @@ test.describe("Authentication Smoke", () => {
     if (isMobile) {
       await expect(page.getByTestId("mobile-menu-trigger")).toBeVisible();
     } else {
-      await expect(
-        page.locator("aside [data-testid='sidebar']")
-      ).toBeVisible();
+      await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
     }
 
     await expect(page.getByTestId("quick-stats")).toBeVisible();
