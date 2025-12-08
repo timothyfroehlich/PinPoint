@@ -269,7 +269,7 @@ jobs:
     #   If you modify this job, you MUST ensure it remains synchronized with
     #   the logic in the script.
     # ==============================================================================
-    name: E2E Tests
+    name: E2E Tests (Smoke)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' }}
     needs: [setup, typecheck, lint, format, test-unit, test-integration]
