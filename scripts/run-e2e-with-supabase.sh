@@ -15,6 +15,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 "${SCRIPT_DIR}/supabase-init-for-tests.sh"
 
 echo "🎭 Running Playwright smoke tests..."
-npx playwright test e2e/smoke --reporter=dot
+npx playwright test e2e --reporter=dot
 
 echo "✅ E2E smoke tests completed successfully."
