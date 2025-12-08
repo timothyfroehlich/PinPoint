@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2025-12-07
+
+- feat: Enhance feedback widget with dropdown to report bugs or request features (#599)
+
 ## 2025-12-06
 
 - feat: validate migration workflow and add help/changelog pages (#588)
