@@ -20,9 +20,9 @@ const rememberIssueId = (page: Page): void => {
 };
 
 test.describe("Issues System", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
     // Login as member before each test
-    await loginAs(page);
+    await loginAs(page, testInfo);
   });
 
   test.afterEach(async ({ request }) => {

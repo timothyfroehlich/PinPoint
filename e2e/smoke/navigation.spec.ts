@@ -30,18 +30,18 @@ test.describe.serial("Navigation", () => {
 
   test("authenticated navigation - show quick links and user menu", async ({
     page,
-  }) => {
+  }, testInfo) => {
     // Login first
-    await loginAs(page);
+    await loginAs(page, testInfo);
 
-    // Sidebar (navigation) should be present for authenticated pages
-    const desktopSidebar = page.locator("aside [data-testid='sidebar']");
-    const mobileTrigger = page.getByTestId("mobile-menu-trigger");
+    // Use project name to determine mobile vs desktop layout
+    const isMobile = testInfo.project.name.includes("Mobile");
 
     let activeSidebar;
 
-    // If on mobile, open the menu first
-    if (await mobileTrigger.isVisible()) {
+    if (isMobile) {
+      // On mobile, open the menu first
+      const mobileTrigger = page.getByTestId("mobile-menu-trigger");
       await mobileTrigger.click();
       // Wait for sidebar to be visible in the sheet
       const mobileSidebar = page.locator(
@@ -50,6 +50,8 @@ test.describe.serial("Navigation", () => {
       await expect(mobileSidebar).toBeVisible();
       activeSidebar = mobileSidebar;
     } else {
+      // On desktop, sidebar should already be visible
+      const desktopSidebar = page.locator("aside [data-testid='sidebar']");
       await expect(desktopSidebar).toBeVisible();
       activeSidebar = desktopSidebar;
     }
@@ -67,7 +69,7 @@ test.describe.serial("Navigation", () => {
     ).toBeVisible();
 
     // If we opened the mobile menu, close it now so we can interact with the user menu
-    if (await mobileTrigger.isVisible()) {
+    if (isMobile) {
       await page.keyboard.press("Escape");
       await expect(page.getByRole("dialog")).toBeHidden();
     }

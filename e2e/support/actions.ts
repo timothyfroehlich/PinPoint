@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Page, type TestInfo } from "@playwright/test";
 import { TEST_USERS } from "./constants.js";
 
 interface LoginOptions {
@@ -11,6 +11,7 @@ interface LoginOptions {
  */
 export async function loginAs(
   page: Page,
+  testInfo: TestInfo,
   {
     email = TEST_USERS.member.email,
     password = TEST_USERS.member.password,
@@ -23,14 +24,15 @@ export async function loginAs(
 
   await expect(page).toHaveURL("/dashboard");
 
-  // Check for sidebar visibility OR mobile menu trigger
-  const desktopSidebar = page.locator("aside [data-testid='sidebar']");
-  const mobileTrigger = page.getByTestId("mobile-menu-trigger");
+  // Use project name to determine mobile vs desktop layout
+  const isMobile = testInfo.project.name.includes("Mobile");
 
-  if (await desktopSidebar.isVisible()) {
-    await expect(desktopSidebar).toBeVisible();
+  if (isMobile) {
+    await expect(page.getByTestId("mobile-menu-trigger")).toBeVisible();
   } else {
-    await expect(mobileTrigger).toBeVisible();
+    await expect(
+      page.locator("aside [data-testid='sidebar']")
+    ).toBeVisible();
   }
 }
 
@@ -40,6 +42,7 @@ export async function loginAs(
  */
 export async function ensureLoggedIn(
   page: Page,
+  testInfo: TestInfo,
   options?: LoginOptions
 ): Promise<void> {
   await page.goto("/dashboard");
@@ -48,17 +51,19 @@ export async function ensureLoggedIn(
   // Check for authenticated indicator (User Menu)
   const userMenu = page.getByTestId("user-menu-button");
   if (!(await userMenu.isVisible())) {
-    await loginAs(page, options);
+    await loginAs(page, testInfo, options);
   }
 
-  // Now assert we are truly logged in (Sidebar OR Mobile Menu)
-  const desktopSidebar = page.locator("aside [data-testid='sidebar']");
-  const mobileTrigger = page.getByTestId("mobile-menu-trigger");
+  // Use project name to determine mobile vs desktop layout
+  const isMobile = testInfo.project.name.includes("Mobile");
 
-  if (await desktopSidebar.isVisible()) {
-    await expect(desktopSidebar).toBeVisible();
+  // Assert we are truly logged in
+  if (isMobile) {
+    await expect(page.getByTestId("mobile-menu-trigger")).toBeVisible();
   } else {
-    await expect(mobileTrigger).toBeVisible();
+    await expect(
+      page.locator("aside [data-testid='sidebar']")
+    ).toBeVisible();
   }
   // Double check user menu
   await expect(page.getByTestId("user-menu-button")).toBeVisible();
