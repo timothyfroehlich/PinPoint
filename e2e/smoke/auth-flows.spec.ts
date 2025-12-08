@@ -8,7 +8,9 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Authentication Smoke", () => {
-  test("login flow - sign in with existing account", async ({ page }) => {
+  test("login flow - sign in with existing account", async ({
+    page,
+  }, testInfo) => {
     // Use test user created by seed.sql
     const testEmail = "member@test.com";
     const testPassword = "TestPassword123";
@@ -35,15 +37,14 @@ test.describe("Authentication Smoke", () => {
     // Should redirect to dashboard after successful login
     await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
 
-    // Verify dashboard content (quick stats present)
-    // Check for sidebar visibility OR mobile menu trigger
-    const desktopSidebar = page.locator("aside [data-testid='sidebar']");
-    const mobileTrigger = page.getByTestId("mobile-menu-trigger");
+    // Use project name to determine mobile vs desktop layout
+    const isMobile = testInfo.project.name.includes("Mobile");
 
-    if (await desktopSidebar.isVisible()) {
-      await expect(desktopSidebar).toBeVisible();
+    // Verify dashboard content based on device type
+    if (isMobile) {
+      await expect(page.getByTestId("mobile-menu-trigger")).toBeVisible();
     } else {
-      await expect(mobileTrigger).toBeVisible();
+      await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
     }
 
     await expect(page.getByTestId("quick-stats")).toBeVisible();

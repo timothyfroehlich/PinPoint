@@ -16,7 +16,7 @@ import { confirmUserEmail } from "../support/supabase-admin.js";
 test.describe("Extended Authentication", () => {
   test("signup flow - create new account and access dashboard", async ({
     page,
-  }) => {
+  }, testInfo) => {
     // Navigate to signup page
     await page.goto("/");
     const signupBtn = page.getByTestId("nav-signup");
@@ -58,7 +58,7 @@ test.describe("Extended Authentication", () => {
     await confirmUserEmail(testEmail);
 
     // Now login to establish session
-    await loginAs(page, { email: testEmail, password });
+    await loginAs(page, testInfo, { email: testEmail, password });
 
     // Should redirect to dashboard after successful login
     await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
@@ -80,9 +80,11 @@ test.describe("Extended Authentication", () => {
     await expect(page.getByRole("heading", { name: "Sign In" })).toBeVisible();
   });
 
-  test("logout flow - sign out and verify redirect", async ({ page }) => {
+  test("logout flow - sign out and verify redirect", async ({
+    page,
+  }, testInfo) => {
     // Login first using helper
-    await loginAs(page, seededMember);
+    await loginAs(page, testInfo, seededMember);
 
     // Wait for dashboard to load
     await expect(page).toHaveURL("/dashboard");

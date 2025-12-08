@@ -21,9 +21,12 @@ test.describe("Privilege Reset on Account Switch", () => {
 
   test("should reset privileges when switching from admin to member", async ({
     page,
-  }) => {
+  }, testInfo) => {
     // 1. Login as Admin
-    await loginAs(page, { email: adminEmail, password: "TestPassword123" });
+    await loginAs(page, testInfo, {
+      email: adminEmail,
+      password: "TestPassword123",
+    });
 
     // Verify Access to Admin Page
     await page.goto("/admin/users");
@@ -35,7 +38,10 @@ test.describe("Privilege Reset on Account Switch", () => {
     await logout(page);
 
     // 3. Login as Member
-    await loginAs(page, { email: memberEmail, password: "TestPassword123" });
+    await loginAs(page, testInfo, {
+      email: memberEmail,
+      password: "TestPassword123",
+    });
 
     // 4. Try to access Admin Page
     await page.goto("/admin/users");
