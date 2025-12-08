@@ -15,7 +15,6 @@ describe("Bug Reproduction: Incorrect Issue Link", () => {
     );
 
     // Assert the correct link format: /m/[initials]/i/[number]
-    // Currently, this will fail because it returns /issues
     expect(html).toContain('href="http://test.com/m/TZ/i/42"');
   });
 
