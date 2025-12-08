@@ -53,21 +53,25 @@ export function IssueFilters({
 
   return (
     <div className="flex flex-wrap items-center gap-3">
-      {/* Status Filter */}
-      <Select
-        value={currentFilters.status ?? "all"}
-        onValueChange={(val) => updateFilter("status", val)}
-      >
-        <SelectTrigger className="w-[140px] h-9 text-sm">
-          <SelectValue placeholder="Status" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Statuses</SelectItem>
-          <SelectItem value="new">New</SelectItem>
-          <SelectItem value="in_progress">In Progress</SelectItem>
-          <SelectItem value="resolved">Resolved</SelectItem>
-        </SelectContent>
-      </Select>
+      {/* Status Toggle (Open/Closed) */}
+      <div className="flex items-center rounded-md border border-input bg-transparent p-1">
+        <Button
+          variant={currentFilters.status !== "resolved" ? "secondary" : "ghost"}
+          size="sm"
+          onClick={() => updateFilter("status", null)} // Default (null) is Open
+          className="h-7 px-3 text-xs"
+        >
+          Open
+        </Button>
+        <Button
+          variant={currentFilters.status === "resolved" ? "secondary" : "ghost"}
+          size="sm"
+          onClick={() => updateFilter("status", "resolved")}
+          className="h-7 px-3 text-xs"
+        >
+          Closed
+        </Button>
+      </div>
 
       {/* Severity Filter */}
       <Select

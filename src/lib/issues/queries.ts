@@ -2,11 +2,11 @@ import { cache } from "react";
 import { type IssueListItem } from "~/lib/types";
 import { db } from "~/server/db";
 import { issues } from "~/server/db/schema";
-import { eq, and, desc, isNull, type SQL } from "drizzle-orm";
+import { eq, and, desc, isNull, inArray, type SQL } from "drizzle-orm";
 
 export interface IssueFilters {
   machineInitials?: string | undefined;
-  status?: string | undefined;
+  status?: string | string[] | undefined;
   severity?: string | undefined;
   priority?: string | undefined;
   assignedTo?: string | undefined;
@@ -23,11 +23,21 @@ export const getIssues = cache(
       conditions.push(eq(issues.machineInitials, machineInitials));
     }
 
-    if (
-      status &&
-      (status === "new" || status === "in_progress" || status === "resolved")
-    ) {
-      conditions.push(eq(issues.status, status));
+    if (status) {
+      const statuses = Array.isArray(status) ? status : [status];
+      // Filter out invalid statuses to be safe, though TS handles most
+      const validStatuses = statuses.filter((s) =>
+        ["new", "in_progress", "resolved"].includes(s)
+      );
+
+      if (validStatuses.length > 0) {
+        conditions.push(
+          inArray(
+            issues.status,
+            validStatuses as ("new" | "in_progress" | "resolved")[]
+          )
+        );
+      }
     }
 
     if (

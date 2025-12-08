@@ -23,6 +23,7 @@ vi.mock("drizzle-orm", async (importOriginal) => {
     and: vi.fn((...args) => ({ op: "and", args })),
     desc: vi.fn((col) => ({ op: "desc", col })),
     isNull: vi.fn((col) => ({ op: "isNull", col })),
+    inArray: vi.fn((col, vals) => ({ op: "inArray", col, vals })),
   };
 });
 
@@ -66,7 +67,28 @@ describe("getIssues", () => {
         where: expect.objectContaining({
           op: "and",
           args: expect.arrayContaining([
-            expect.objectContaining({ op: "eq", val: "new" }),
+            expect.objectContaining({
+              op: "inArray",
+              vals: ["new"],
+            }),
+          ]),
+        }),
+      })
+    );
+  });
+
+  it("should filter by multiple statuses", async () => {
+    await getIssues({ status: ["new", "in_progress"] });
+
+    expect(db.query.issues.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          op: "and",
+          args: expect.arrayContaining([
+            expect.objectContaining({
+              op: "inArray",
+              vals: ["new", "in_progress"],
+            }),
           ]),
         }),
       })
@@ -141,7 +163,7 @@ describe("getIssues", () => {
           op: "and",
           args: expect.arrayContaining([
             expect.objectContaining({ op: "eq", val: "MM" }),
-            expect.objectContaining({ op: "eq", val: "new" }),
+            expect.objectContaining({ op: "inArray", vals: ["new"] }),
           ]),
         }),
       })

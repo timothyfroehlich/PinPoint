@@ -1,6 +1,6 @@
 import type React from "react";
 import { type Metadata } from "next";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "~/server/db";
 import { issues } from "~/server/db/schema";
 import { IssueFilters } from "~/components/issues/IssueFilters";
@@ -45,10 +45,19 @@ export default async function IssuesPage({
   });
 
   // Safe type casting for filters
-  const statusFilter =
-    status && ["new", "in_progress", "resolved"].includes(status)
-      ? (status as "new" | "in_progress" | "resolved")
-      : undefined;
+  // Default to Open issues (new + in_progress) if no status is specified
+  // If status is 'resolved', show resolved issues
+  // If specific status (new/in_progress) is requested, respect it
+  let statusFilter: string[] | undefined;
+
+  if (status === "resolved") {
+    statusFilter = ["resolved"];
+  } else if (status === "new" || status === "in_progress") {
+    statusFilter = [status];
+  } else {
+    // Default case: Show all Open issues
+    statusFilter = ["new", "in_progress"];
+  }
 
   const severityFilter =
     severity && ["minor", "playable", "unplayable"].includes(severity)
@@ -63,7 +72,10 @@ export default async function IssuesPage({
   // Fetch Issues based on filters
   const issuesList = await db.query.issues.findMany({
     where: and(
-      statusFilter ? eq(issues.status, statusFilter) : undefined,
+      inArray(
+        issues.status,
+        statusFilter as ("new" | "in_progress" | "resolved")[]
+      ),
       severityFilter ? eq(issues.severity, severityFilter) : undefined,
       priorityFilter ? eq(issues.priority, priorityFilter) : undefined,
       machine ? eq(issues.machineInitials, machine) : undefined

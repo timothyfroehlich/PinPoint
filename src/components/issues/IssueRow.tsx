@@ -38,7 +38,14 @@ export function IssueRow({ issue }: IssueRowProps): React.JSX.Element {
   };
 
   return (
-    <div className="group flex items-start gap-3 border-b border-border p-4 hover:bg-muted/40 transition-colors">
+    <div
+      className={cn(
+        "group flex items-start gap-3 border-b border-border p-4 transition-colors",
+        issue.status === "resolved"
+          ? "bg-muted/30 opacity-60 hover:opacity-100"
+          : "hover:bg-muted/40"
+      )}
+    >
       <div className="mt-0.5 shrink-0">{statusIcon[issue.status]}</div>
 
       <div className="min-w-0 flex-1 space-y-1">
