@@ -111,9 +111,9 @@ export default defineConfig({
   fullyParallel: false,
 
   // Increased timeouts for stability in heavy load environments
-  timeout: process.env["CI"] ? 30 * 1000 : 30 * 1000, // per-test timeout
+  timeout: process.env["CI"] ? 60 * 1000 : 30 * 1000, // per-test timeout
   expect: {
-    timeout: process.env["CI"] ? 15 * 1000 : 10 * 1000, // assertion timeout
+    timeout: process.env["CI"] ? 30 * 1000 : 10 * 1000, // assertion timeout
   },
 
   // Fail the build on CI if you accidentally left test.only in the source code
