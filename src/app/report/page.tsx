@@ -27,7 +27,6 @@ export default async function PublicReportPage({
   const errorMessage = params.error
     ? decodeURIComponent(params.error)
     : undefined;
-  const firstMachineId = machinesList[0]?.id ?? "";
   const hasMachines = machinesList.length > 0;
 
   return (
@@ -76,11 +75,14 @@ export default async function PublicReportPage({
                   id="machineId"
                   name="machineId"
                   required
-                  defaultValue={firstMachineId}
+                  defaultValue=""
                   disabled={!hasMachines}
                   data-testid="machine-select"
                   className="w-full rounded-md border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface"
                 >
+                  <option value="" disabled>
+                    Select a machine...
+                  </option>
                   {hasMachines ? (
                     machinesList.map((machine) => (
                       <option key={machine.id} value={machine.id}>
@@ -133,10 +135,13 @@ export default async function PublicReportPage({
                 <select
                   id="severity"
                   name="severity"
-                  defaultValue="playable"
+                  defaultValue=""
                   required
                   className="w-full rounded-md border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface"
                 >
+                  <option value="" disabled>
+                    Select severity...
+                  </option>
                   <option value="minor">Minor (cosmetic)</option>
                   <option value="playable">
                     Playable (but needs attention)
