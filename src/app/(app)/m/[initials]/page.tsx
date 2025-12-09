@@ -22,6 +22,7 @@ import { Badge } from "~/components/ui/badge";
 import { ArrowLeft, Calendar, Plus } from "lucide-react";
 import { UpdateMachineForm } from "./update-machine-form";
 import { formatIssueId } from "~/lib/issues/utils";
+import { QrSection } from "./qr-section";
 
 /**
  * Machine Detail Page (Protected Route)
@@ -208,6 +209,14 @@ export default async function MachineDetailPage({
               </div>
             </CardContent>
           </Card>
+
+          <QrSection
+            machine={{
+              id: machine.id,
+              initials: machine.initials,
+              name: machine.name,
+            }}
+          />
 
           {/* Issues Section */}
           <Card className="border-outline-variant">

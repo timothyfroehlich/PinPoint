@@ -10,6 +10,7 @@ import { Textarea } from "~/components/ui/textarea";
 import { Button } from "~/components/ui/button";
 import { submitPublicIssueAction } from "./actions";
 import { MainLayout } from "~/components/layout/MainLayout";
+import { resolveDefaultMachineId } from "./default-machine";
 
 // Avoid SSG hitting Supabase during builds that run parallel to db resets
 export const dynamic = "force-dynamic";
@@ -17,7 +18,11 @@ export const dynamic = "force-dynamic";
 export default async function PublicReportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    machineId?: string;
+    source?: string;
+  }>;
 }): Promise<React.JSX.Element> {
   const machinesList = await db.query.machines.findMany({
     orderBy: asc(machines.name),
@@ -27,8 +32,16 @@ export default async function PublicReportPage({
   const errorMessage = params.error
     ? decodeURIComponent(params.error)
     : undefined;
-  const firstMachineId = machinesList[0]?.id ?? "";
+  const machineIdFromQuery = params.machineId;
+  const source = params.source;
   const hasMachines = machinesList.length > 0;
+  const defaultMachineId = resolveDefaultMachineId(
+    machinesList,
+    machineIdFromQuery
+  );
+  const defaultMachineName =
+    machinesList.find((machine) => machine.id === defaultMachineId)?.name ??
+    undefined;
 
   return (
     <MainLayout>
@@ -58,6 +71,9 @@ export default async function PublicReportPage({
               </p>
             ) : null}
             <form action={submitPublicIssueAction} className="space-y-5">
+              {source ? (
+                <input type="hidden" name="source" value={source} />
+              ) : null}
               {/* Honeypot field - hidden from humans, filled by bots */}
               <input
                 type="text"
@@ -76,7 +92,7 @@ export default async function PublicReportPage({
                   id="machineId"
                   name="machineId"
                   required
-                  defaultValue={firstMachineId}
+                  defaultValue={defaultMachineId}
                   disabled={!hasMachines}
                   data-testid="machine-select"
                   className="w-full rounded-md border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface"
@@ -94,6 +110,13 @@ export default async function PublicReportPage({
                 <p className="text-xs text-on-surface-variant">
                   Choose the machine that needs attention.
                 </p>
+                {source === "qr" && defaultMachineName ? (
+                  <div className="mt-2 rounded-md border border-outline-variant bg-surface-variant px-3 py-2 text-xs text-on-surface">
+                    Reporting for{" "}
+                    <span className="font-semibold">{defaultMachineName}</span>{" "}
+                    (from QR scan)
+                  </div>
+                ) : null}
               </div>
 
               <div className="space-y-2">

@@ -28,11 +28,17 @@ const redirectWithError = (message: string): never => {
 export async function submitPublicIssueAction(
   formData: FormData
 ): Promise<void> {
+  const sourceParam = formData.get("source");
+  const source = typeof sourceParam === "string" ? sourceParam : undefined;
+
   // 1. Check Honeypot
   const honeypot = formData.get("website");
   if (honeypot) {
     // Bot detected, silently reject
-    log.warn({ action: "publicIssueReport", honeypot }, "Honeypot triggered");
+    log.warn(
+      { action: "publicIssueReport", honeypot, source },
+      "Honeypot triggered"
+    );
     redirect("/report/success");
   }
 
@@ -87,6 +93,7 @@ export async function submitPublicIssueAction(
       {
         action: "publicIssueReport",
         machineId,
+        source,
         error: error instanceof Error ? error.message : "Unknown",
       },
       "Failed to submit public issue"
