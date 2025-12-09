@@ -17,8 +17,15 @@ export async function updateSession(
     request,
   });
 
-  const supabaseUrl = process.env["NEXT_PUBLIC_SUPABASE_URL"];
-  const supabaseKey = process.env["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"];
+  const {
+    NEXT_PUBLIC_SUPABASE_URL: supabaseUrl,
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: supabaseKey,
+    VERCEL_ENV,
+    NODE_ENV,
+    DEV_AUTOLOGIN_ENABLED,
+    DEV_AUTOLOGIN_EMAIL,
+    DEV_AUTOLOGIN_PASSWORD,
+  } = process.env;
 
   if (!supabaseUrl || !supabaseKey) {
     // Fail fast with a clear error during development/misconfiguration
@@ -53,9 +60,45 @@ export async function updateSession(
 
   // IMPORTANT: DO NOT REMOVE - This refreshes the auth token
   // Without this call, sessions will expire and users will be randomly logged out
-  const {
+  const shouldSkipAutologin = (): boolean => {
+    const header = request.headers.get("x-skip-autologin");
+    const cookie = request.cookies.get("skip_autologin")?.value;
+    const query = request.nextUrl.searchParams.get("autologin");
+    const isTruthy = (value: string | null | undefined): boolean =>
+      ["true", "1", "yes"].includes(value?.toLowerCase() ?? "");
+    const isOff = (value: string | null | undefined): boolean =>
+      ["off", "false", "0"].includes(value?.toLowerCase() ?? "");
+
+    return isTruthy(header) || isTruthy(cookie) || isOff(query);
+  };
+
+  const isProductionEnv =
+    VERCEL_ENV === "production" || NODE_ENV === "production";
+  const autologinEnv = DEV_AUTOLOGIN_ENABLED;
+  const autologinEnabled =
+    autologinEnv !== undefined
+      ? autologinEnv.toLowerCase() === "true"
+      : !isProductionEnv;
+
+  let {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (!user && autologinEnabled && !isProductionEnv && !shouldSkipAutologin()) {
+    const email = DEV_AUTOLOGIN_EMAIL ?? "admin@test.com";
+    const password = DEV_AUTOLOGIN_PASSWORD ?? "TestPassword123";
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (!error) {
+      ({
+        data: { user },
+      } = await supabase.auth.getUser());
+    }
+  }
 
   // Protected routes logic
   const path = request.nextUrl.pathname;

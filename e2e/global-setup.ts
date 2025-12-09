@@ -21,6 +21,21 @@ export default async function globalSetup(): Promise<void> {
   // All environment variables are already available in process.env
 
   try {
+    console.log("⚡ Attempting fast reset (npm run db:fast-reset)...");
+    execSync("npm run db:fast-reset", {
+      stdio: "inherit",
+      env: process.env,
+    });
+    console.log("✅ Fast reset complete");
+    return;
+  } catch (error) {
+    console.warn(
+      "⚠️  Fast reset failed, falling back to full Supabase reset...",
+      error
+    );
+  }
+
+  try {
     // Step 1: Reset Supabase database - clears everything
     // Use local reset (not --db-url) to avoid TLS connection issues
     execSync("supabase db reset --yes", {
