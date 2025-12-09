@@ -22,7 +22,10 @@ import { Badge } from "~/components/ui/badge";
 import { ArrowLeft, Calendar, Plus } from "lucide-react";
 import { UpdateMachineForm } from "./update-machine-form";
 import { formatIssueId } from "~/lib/issues/utils";
-import { QrSection } from "./qr-section";
+import { QrCodeDialog } from "./qr-code-dialog";
+import { buildMachineReportUrl } from "~/lib/machines/report-url";
+import { generateQrPngDataUrl } from "~/lib/machines/qr";
+import { getSiteUrl } from "~/lib/url";
 
 /**
  * Machine Detail Page (Protected Route)
@@ -89,6 +92,14 @@ export default async function MachineDetailPage({
 
   // Derive machine status
   const machineStatus = deriveMachineStatus(machine.issues as IssueForStatus[]);
+  // Generate QR data for modal
+  const reportUrl = buildMachineReportUrl({
+    siteUrl: getSiteUrl(),
+    machineInitials: machine.initials,
+    source: "qr",
+  });
+  const qrDataUrl = await generateQrPngDataUrl(reportUrl);
+
   const openIssues = machine.issues.filter(
     (issue) => issue.status !== "resolved"
   );
@@ -137,24 +148,30 @@ export default async function MachineDetailPage({
       {/* Content */}
       <div className="container mx-auto px-4 py-8">
         <div className="space-y-6">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-6">
             {/* Machine Info Card */}
-            <Card className="border-outline-variant lg:col-span-2">
-              <CardHeader>
+            <Card className="border-outline-variant">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
                 <CardTitle className="text-2xl text-on-surface">
                   Machine Information
                 </CardTitle>
+                <QrCodeDialog
+                  machineName={machine.name}
+                  machineInitials={machine.initials}
+                  qrDataUrl={qrDataUrl}
+                  reportUrl={reportUrl}
+                />
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-8">
                 <UpdateMachineForm
                   machine={machine}
                   allUsers={allUsers}
                   isAdmin={isAdmin}
                 />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-4 border-t border-outline-variant/50">
                   {/* Status */}
                   <div>
-                    <p className="text-xs text-on-surface-variant mb-1">
+                    <p className="text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wide">
                       Status
                     </p>
                     <Badge
@@ -169,11 +186,11 @@ export default async function MachineDetailPage({
 
                   {/* Open Issues Count */}
                   <div data-testid="detail-open-issues">
-                    <p className="text-xs text-on-surface-variant mb-1">
+                    <p className="text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wide">
                       Open Issues
                     </p>
                     <p
-                      className="text-lg font-semibold text-on-surface"
+                      className="text-2xl font-semibold text-on-surface"
                       data-testid="detail-open-issues-count"
                     >
                       {openIssues.length}
@@ -182,12 +199,12 @@ export default async function MachineDetailPage({
 
                   {/* Created Date */}
                   <div>
-                    <p className="text-xs text-on-surface-variant mb-1">
+                    <p className="text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wide">
                       Added Date
                     </p>
                     <div className="flex items-center gap-2">
                       <Calendar className="size-4 text-on-surface-variant" />
-                      <p className="text-sm text-on-surface">
+                      <p className="text-sm font-medium text-on-surface">
                         {new Date(machine.createdAt).toLocaleDateString(
                           undefined,
                           {
@@ -202,24 +219,16 @@ export default async function MachineDetailPage({
 
                   {/* Total Issues */}
                   <div>
-                    <p className="text-xs text-on-surface-variant mb-1">
+                    <p className="text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wide">
                       Total Issues
                     </p>
-                    <p className="text-lg font-semibold text-on-surface">
+                    <p className="text-2xl font-semibold text-on-surface">
                       {machine.issues.length}
                     </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
-
-            <QrSection
-              machine={{
-                id: machine.id,
-                initials: machine.initials,
-                name: machine.name,
-              }}
-            />
           </div>
 
           {/* Issues Section */}
