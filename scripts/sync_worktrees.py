@@ -548,6 +548,26 @@ SUPABASE_SERVICE_ROLE_KEY=
         except subprocess.CalledProcessError:
             pass  # File may not be tracked
 
+    def fetch(self) -> None:
+        """Fetch from origin"""
+        if self.dry_run:
+            print("[DRY-RUN] Would run: git fetch origin")
+        else:
+            subprocess.run(
+                ["git", "-C", str(self.path), "fetch", "origin"],
+                capture_output=True, check=True
+            )
+
+    def checkout_detached_main(self) -> None:
+        """Checkout origin/main in detached state"""
+        if self.dry_run:
+            print("[DRY-RUN] Would run: git checkout --detach origin/main")
+        else:
+            subprocess.run(
+                ["git", "-C", str(self.path), "checkout", "--detach", "origin/main"],
+                capture_output=True, check=True
+            )
+
     def stash_changes(self, branch: str) -> bool:
         """Stash uncommitted changes if present"""
         if not self.has_uncommitted_changes():
@@ -980,10 +1000,11 @@ git reset --hard HEAD"""
 class SyncManager:
     """Manages the sync process across multiple worktrees"""
 
-    def __init__(self, dry_run: bool = False, non_interactive: bool = False, validate: bool = False):
+    def __init__(self, dry_run: bool = False, non_interactive: bool = False, validate: bool = False, reset: bool = False):
         self.dry_run = dry_run
         self.non_interactive = non_interactive
         self.validate = validate
+        self.reset = reset
         self.worktrees: list[Worktree] = []
         self.main_worktree_path: Optional[Path] = None
 
@@ -1107,6 +1128,20 @@ class SyncManager:
 
         # Phase 0: Ensure clean state
         worktree.stop_supabase()
+
+        # Phase 0.5: Reset to main (if requested)
+        if self.reset:
+            print()
+            print("Phase 0.5: Reset to origin/main")
+            worktree.fetch()
+
+            if worktree.has_uncommitted_changes():
+                print_status("error", "Cannot reset: Uncommitted changes present.")
+                worktree.state.update_status(StatusLevel.ERROR)
+                return
+
+            worktree.checkout_detached_main()
+            print("  Checked out origin/main (detached)")
 
         # Phase 1: Configuration
         print()
@@ -1325,6 +1360,11 @@ Notes:
         help="Run post-merge validation (db:reset + integration tests)"
     )
     parser.add_argument(
+        "-r", "--reset",
+        action="store_true",
+        help="Fetch and reset worktree to origin/main (detached) before syncing"
+    )
+    parser.add_argument(
         "worktree_path",
         nargs="?",
         type=str,
@@ -1371,7 +1411,8 @@ Notes:
     manager = SyncManager(
         dry_run=args.dry_run,
         non_interactive=args.non_interactive,
-        validate=args.validate
+        validate=args.validate,
+        reset=args.reset
     )
 
     # Run pre-flight checks
