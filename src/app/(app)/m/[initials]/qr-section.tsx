@@ -34,25 +34,28 @@ export async function QrSection({
         </CardTitle>
         <p className="text-sm text-on-surface-variant">
           Print and place this QR on {machine.name}. Scans open the public
-          report form with this machine preselected by ID.
+          report form with this machine preselected.
         </p>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center justify-center rounded-lg border border-outline-variant bg-surface-variant p-3">
+      <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+        <div className="flex items-center justify-center rounded-lg border border-outline-variant bg-surface-variant p-2">
           <img
             src={qrDataUrl}
             alt={`QR code to report an issue for ${machine.name}`}
-            className="h-40 w-40"
+            className="h-32 w-32"
           />
         </div>
-        <div className="flex-1 space-y-3">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-on-surface-variant">
+        <div className="flex-1 space-y-2">
+          <div className="space-y-1">
+            <p className="text-[11px] uppercase tracking-wide text-on-surface-variant">
               Target URL
             </p>
-            <p className="break-all rounded-md border border-outline-variant bg-surface px-3 py-2 font-mono text-sm text-on-surface">
+            <code
+              className="block max-w-full overflow-x-auto rounded border border-outline-variant bg-surface px-2 py-1 font-mono text-xs text-on-surface"
+              title={reportUrl}
+            >
               {reportUrl}
-            </p>
+            </code>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Button
