@@ -257,19 +257,13 @@ jobs:
       - name: Run Supabase integration tests
         run: ./scripts/run-supabase-integration-tests.sh
 
-  test-e2e:
+  test-e2e-smoke:
     # ==============================================================================
-    # E2E Test Job
+    # E2E Smoke Tests (Chromium Only)
     #
-    # CI/CD Synchronization:
-    #   IMPORTANT: The core logic for this job is managed by the script at
-    #   `scripts/run-e2e-with-supabase.sh`. That script is the single source
-    #   of truth for setting up the test environment.
-    #
-    #   If you modify this job, you MUST ensure it remains synchronized with
-    #   the logic in the script.
+    # Runs smoke tests with chromium browser only for fast feedback.
     # ==============================================================================
-    name: E2E Tests (Smoke)
+    name: E2E Smoke Tests (Chromium)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' }}
     needs: [setup, typecheck, lint, format, test-unit, test-integration]
@@ -304,25 +298,229 @@ jobs:
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-webkit-${{ hashFiles('package-lock.json') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('package-lock.json') }}
           restore-keys: |
-            ${{ runner.os }}-playwright-chromium-webkit-
+            ${{ runner.os }}-playwright-chromium-
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium webkit
+        run: npx playwright install --with-deps chromium
 
       - name: Make E2E script executable
-        run: chmod +x ./scripts/run-e2e-with-supabase.sh
+        run: chmod +x ./scripts/supabase-init-for-tests.sh
 
-      - name: Run E2E Test Script
-        run: ./scripts/run-e2e-with-supabase.sh
+      - name: Initialize Supabase
+        run: ./scripts/supabase-init-for-tests.sh
+
+      - name: Run Smoke Tests (Chromium)
+        run: npx playwright test e2e/smoke --project=chromium --reporter=dot
 
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v5
         with:
-          name: playwright-report
+          name: playwright-report-smoke-chromium
+          path: playwright-report/
+          retention-days: 7
+
+  test-e2e-full-chromium:
+    # ==============================================================================
+    # E2E Full Tests (Chromium)
+    #
+    # Runs full test suite with chromium browser.
+    # ==============================================================================
+    name: E2E Full Tests (Chromium)
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' }}
+    needs: [setup, typecheck, lint, format, test-unit, test-integration]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Restore node_modules
+        id: cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies (if cache miss)
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Make E2E script executable
+        run: chmod +x ./scripts/supabase-init-for-tests.sh
+
+      - name: Initialize Supabase
+        run: ./scripts/supabase-init-for-tests.sh
+
+      - name: Run Full Tests (Chromium)
+        run: npx playwright test --config=playwright.config.full.ts --project=chromium --reporter=dot
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report-full-chromium
+          path: playwright-report/
+          retention-days: 7
+
+  test-e2e-full-mobile-chrome:
+    # ==============================================================================
+    # E2E Full Tests (Mobile Chrome)
+    #
+    # Runs full test suite with Mobile Chrome browser.
+    # ==============================================================================
+    name: E2E Full Tests (Mobile Chrome)
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' }}
+    needs: [setup, typecheck, lint, format, test-unit, test-integration]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Restore node_modules
+        id: cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies (if cache miss)
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Make E2E script executable
+        run: chmod +x ./scripts/supabase-init-for-tests.sh
+
+      - name: Initialize Supabase
+        run: ./scripts/supabase-init-for-tests.sh
+
+      - name: Run Full Tests (Mobile Chrome)
+        run: npx playwright test --config=playwright.config.full.ts --project="Mobile Chrome" --reporter=dot
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report-full-mobile-chrome
+          path: playwright-report/
+          retention-days: 7
+
+  test-e2e-full-mobile-safari:
+    # ==============================================================================
+    # E2E Full Tests (Mobile Safari)
+    #
+    # Runs full test suite with Mobile Safari (WebKit) browser.
+    # ==============================================================================
+    name: E2E Full Tests (Mobile Safari)
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' }}
+    needs: [setup, typecheck, lint, format, test-unit, test-integration]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Restore node_modules
+        id: cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies (if cache miss)
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-webkit-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-webkit-
+
+      - name: Install Playwright system dependencies
+        run: npx playwright install-deps webkit
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install webkit
+
+      - name: Make E2E script executable
+        run: chmod +x ./scripts/supabase-init-for-tests.sh
+
+      - name: Initialize Supabase
+        run: ./scripts/supabase-init-for-tests.sh
+
+      - name: Run Full Tests (Mobile Safari)
+        run: npx playwright test --config=playwright.config.full.ts --project="Mobile Safari" --reporter=dot
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report-full-mobile-safari
           path: playwright-report/
           retention-days: 7
 

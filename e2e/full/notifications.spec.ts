@@ -60,9 +60,19 @@ test.describe("Notifications", () => {
       .getByTestId("machine-select")
       .selectOption({ value: machine.id });
 
+    // Verify selection stuck (mobile chrome stability)
+    await expect(publicPage.getByTestId("machine-select")).toHaveValue(
+      machine.id
+    );
+
     const issueTitle = `Public Report ${timestamp}`;
     await publicPage.getByLabel("Issue Title").fill(issueTitle);
+
+    // Check form is filled before submit
+    await expect(publicPage.getByLabel("Issue Title")).toHaveValue(issueTitle);
     await publicPage.getByLabel("Severity").selectOption("minor");
+    await expect(publicPage.getByLabel("Severity")).toHaveValue("minor");
+
     await publicPage
       .getByRole("button", { name: "Submit Issue Report" })
       .click();
@@ -78,7 +88,7 @@ test.describe("Notifications", () => {
     await expect(bell).toContainText("1");
 
     await bell.click();
-    const notification = ownerPage.getByText("New issue reported").first();
+    const notification = ownerPage.getByText(/New report/).first();
     await expect(notification).toBeVisible();
 
     // Verify it links to the correct machine/issue (by clicking and checking title)
@@ -94,7 +104,7 @@ test.describe("Notifications", () => {
   test("should notify reporter when status changes", async ({
     page,
     browser,
-  }) => {
+  }, testInfo) => {
     // 1. Setup: Use seeded member as reporter, but report on a fresh machine owned by a fresh admin
     // This isolates the "Status Changed" notification to this interaction
 
@@ -106,7 +116,7 @@ test.describe("Notifications", () => {
     cleanupMachineIds.push(machine.id);
 
     // Reporter (Member) reports an issue
-    await ensureLoggedIn(page, TEST_USERS.member);
+    await ensureLoggedIn(page, testInfo, TEST_USERS.member);
 
     await page.goto(`/m/${machine.initials}/report`);
     await expect(
@@ -160,7 +170,7 @@ test.describe("Notifications", () => {
     await bell.click();
 
     // Look for specific notification
-    const notification = page.getByText("Issue status updated").first();
+    const notification = page.getByText(/Status updated for/).first();
     await expect(notification).toBeVisible();
 
     await adminContext.close();
@@ -203,7 +213,15 @@ test.describe("Notifications", () => {
 
     const issueTitle = `Global Watcher Test ${timestamp}`;
     await publicPage.getByLabel("Issue Title").fill(issueTitle);
+    // Verify machine selection stuck
+    await expect(publicPage.getByTestId("machine-select")).toHaveValue(
+      seededMachines.medievalMadness.id
+    );
+    await expect(publicPage.getByLabel("Issue Title")).toHaveValue(issueTitle);
+
     await publicPage.getByLabel("Severity").selectOption("unplayable");
+    await expect(publicPage.getByLabel("Severity")).toHaveValue("unplayable");
+
     await publicPage
       .getByRole("button", { name: "Submit Issue Report" })
       .click();
@@ -216,7 +234,7 @@ test.describe("Notifications", () => {
     await expect(bell).toContainText("1");
     await bell.click();
 
-    const notification = watcherPage.getByText("New issue reported").first();
+    const notification = watcherPage.getByText(/New report/).first();
     await expect(notification).toBeVisible();
 
     await notification.click();
@@ -249,11 +267,17 @@ test.describe("Notifications", () => {
     const publicContext = await browser.newContext();
     const publicPage = await publicContext.newPage();
     await publicPage.goto("/report");
+    // Select machine and verify state (Mobile Chrome hardening)
     await publicPage
       .getByTestId("machine-select")
       .selectOption({ value: machine.id });
+    await expect(publicPage.getByTestId("machine-select")).toHaveValue(
+      machine.id
+    );
     const issueTitle = `Interaction Test ${timestamp}`;
     await publicPage.getByLabel("Issue Title").fill(issueTitle);
+    await expect(publicPage.getByLabel("Issue Title")).toHaveValue(issueTitle);
+
     await publicPage
       .getByRole("button", { name: "Submit Issue Report" })
       .click();
@@ -264,7 +288,7 @@ test.describe("Notifications", () => {
     await page.bringToFront();
     await page.goto("/dashboard"); // Reload to fetch
     await page.getByRole("button", { name: /notifications/i }).click();
-    const notificationItem = page.getByText("New issue reported").first();
+    const notificationItem = page.getByText(/New report/).first();
     await expect(notificationItem).toBeVisible();
 
     // 4. Action: Click Notification
@@ -275,7 +299,7 @@ test.describe("Notifications", () => {
     await expect(page.getByRole("heading", { name: issueTitle })).toBeVisible();
   });
 
-  test("email notification flow", async ({ page, browser }) => {
+  test("email notification flow", async ({ page, browser }, testInfo) => {
     // 1. Setup: Fresh Admin/Owner
     const timestamp = Date.now();
     const ownerEmail = `email-test-${timestamp}@example.com`;
@@ -296,7 +320,7 @@ test.describe("Notifications", () => {
     // 2. Action: Member reports an issue
     const memberContext = await browser.newContext();
     const memberPage = await memberContext.newPage();
-    await ensureLoggedIn(memberPage, TEST_USERS.member);
+    await ensureLoggedIn(memberPage, testInfo, TEST_USERS.member);
 
     await memberPage.goto("/report");
     await memberPage
@@ -304,6 +328,13 @@ test.describe("Notifications", () => {
       .selectOption({ value: machine.id });
 
     await memberPage.getByLabel("Issue Title").fill("Email Test Issue");
+    await expect(memberPage.getByTestId("machine-select")).toHaveValue(
+      machine.id
+    );
+    await expect(memberPage.getByLabel("Issue Title")).toHaveValue(
+      "Email Test Issue"
+    );
+
     await memberPage
       .getByRole("button", { name: "Submit Issue Report" })
       .click();
@@ -317,7 +348,7 @@ test.describe("Notifications", () => {
     await expect(bell).toContainText("1");
     await bell.click();
 
-    const notification = page.getByText("New issue reported");
+    const notification = page.getByText(/New report/);
     await expect(notification).toBeVisible();
 
     await memberContext.close();
