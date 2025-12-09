@@ -137,86 +137,90 @@ export default async function MachineDetailPage({
       {/* Content */}
       <div className="container mx-auto px-4 py-8">
         <div className="space-y-6">
-          {/* Machine Info Card */}
-          <Card className="border-outline-variant">
-            <CardHeader>
-              <CardTitle className="text-2xl text-on-surface">
-                Machine Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <UpdateMachineForm
-                machine={machine}
-                allUsers={allUsers}
-                isAdmin={isAdmin}
-              />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Status */}
-                <div>
-                  <p className="text-xs text-on-surface-variant mb-1">Status</p>
-                  <Badge
-                    className={cn(
-                      getMachineStatusStyles(machineStatus),
-                      "border px-3 py-1 text-sm font-semibold"
-                    )}
-                  >
-                    {getMachineStatusLabel(machineStatus)}
-                  </Badge>
-                </div>
-
-                {/* Open Issues Count */}
-                <div data-testid="detail-open-issues">
-                  <p className="text-xs text-on-surface-variant mb-1">
-                    Open Issues
-                  </p>
-                  <p
-                    className="text-lg font-semibold text-on-surface"
-                    data-testid="detail-open-issues-count"
-                  >
-                    {openIssues.length}
-                  </p>
-                </div>
-
-                {/* Created Date */}
-                <div>
-                  <p className="text-xs text-on-surface-variant mb-1">
-                    Added Date
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="size-4 text-on-surface-variant" />
-                    <p className="text-sm text-on-surface">
-                      {new Date(machine.createdAt).toLocaleDateString(
-                        undefined,
-                        {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        }
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* Machine Info Card */}
+            <Card className="border-outline-variant">
+              <CardHeader>
+                <CardTitle className="text-2xl text-on-surface">
+                  Machine Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <UpdateMachineForm
+                  machine={machine}
+                  allUsers={allUsers}
+                  isAdmin={isAdmin}
+                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Status */}
+                  <div>
+                    <p className="text-xs text-on-surface-variant mb-1">
+                      Status
+                    </p>
+                    <Badge
+                      className={cn(
+                        getMachineStatusStyles(machineStatus),
+                        "border px-3 py-1 text-sm font-semibold"
                       )}
+                    >
+                      {getMachineStatusLabel(machineStatus)}
+                    </Badge>
+                  </div>
+
+                  {/* Open Issues Count */}
+                  <div data-testid="detail-open-issues">
+                    <p className="text-xs text-on-surface-variant mb-1">
+                      Open Issues
+                    </p>
+                    <p
+                      className="text-lg font-semibold text-on-surface"
+                      data-testid="detail-open-issues-count"
+                    >
+                      {openIssues.length}
+                    </p>
+                  </div>
+
+                  {/* Created Date */}
+                  <div>
+                    <p className="text-xs text-on-surface-variant mb-1">
+                      Added Date
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="size-4 text-on-surface-variant" />
+                      <p className="text-sm text-on-surface">
+                        {new Date(machine.createdAt).toLocaleDateString(
+                          undefined,
+                          {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          }
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Total Issues */}
+                  <div>
+                    <p className="text-xs text-on-surface-variant mb-1">
+                      Total Issues
+                    </p>
+                    <p className="text-lg font-semibold text-on-surface">
+                      {machine.issues.length}
                     </p>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
 
-                {/* Total Issues */}
-                <div>
-                  <p className="text-xs text-on-surface-variant mb-1">
-                    Total Issues
-                  </p>
-                  <p className="text-lg font-semibold text-on-surface">
-                    {machine.issues.length}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <QrSection
-            machine={{
-              id: machine.id,
-              initials: machine.initials,
-              name: machine.name,
-            }}
-          />
+            <QrSection
+              machine={{
+                id: machine.id,
+                initials: machine.initials,
+                name: machine.name,
+              }}
+            />
+          </div>
 
           {/* Issues Section */}
           <Card className="border-outline-variant">

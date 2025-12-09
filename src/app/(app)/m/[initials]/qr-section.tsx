@@ -34,7 +34,7 @@ export async function QrSection({
         </CardTitle>
         <p className="text-sm text-on-surface-variant">
           Print and place this QR on {machine.name}. Scans open the public
-          report form with this machine preselected.
+          report form with this machine preselected by ID.
         </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
