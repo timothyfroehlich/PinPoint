@@ -20,12 +20,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { ArrowLeft, Calendar, Plus } from "lucide-react";
+import { headers } from "next/headers";
 import { UpdateMachineForm } from "./update-machine-form";
 import { formatIssueId } from "~/lib/issues/utils";
 import { QrCodeDialog } from "./qr-code-dialog";
 import { buildMachineReportUrl } from "~/lib/machines/report-url";
 import { generateQrPngDataUrl } from "~/lib/machines/qr";
-import { getSiteUrl } from "~/lib/url";
 
 /**
  * Machine Detail Page (Protected Route)
@@ -92,9 +92,15 @@ export default async function MachineDetailPage({
 
   // Derive machine status
   const machineStatus = deriveMachineStatus(machine.issues as IssueForStatus[]);
-  // Generate QR data for modal
+
+  // Generate QR data for modal using dynamic host (better for local testing/previews)
+  const headersList = await headers();
+  const host = headersList.get("host") ?? "localhost:3000";
+  const protocol = headersList.get("x-forwarded-proto") ?? "http";
+  const dynamicSiteUrl = `${protocol}://${host}`;
+
   const reportUrl = buildMachineReportUrl({
-    siteUrl: getSiteUrl(),
+    siteUrl: dynamicSiteUrl,
     machineInitials: machine.initials,
     source: "qr",
   });
