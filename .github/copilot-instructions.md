@@ -121,4 +121,4 @@ As features stabilize (Machines CRUD, Issues workflow, Comments), patterns that 
 
 ---
 
-Last Updated: 2025-12-05 (Added release notes requirement)
+Last Updated: 2025-12-09 (Reaffirmed release notes requirement and CI guard)
