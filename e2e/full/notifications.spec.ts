@@ -60,9 +60,19 @@ test.describe("Notifications", () => {
       .getByTestId("machine-select")
       .selectOption({ value: machine.id });
 
+    // Verify selection stuck (mobile chrome stability)
+    await expect(publicPage.getByTestId("machine-select")).toHaveValue(
+      machine.id
+    );
+
     const issueTitle = `Public Report ${timestamp}`;
     await publicPage.getByLabel("Issue Title").fill(issueTitle);
+
+    // Check form is filled before submit
+    await expect(publicPage.getByLabel("Issue Title")).toHaveValue(issueTitle);
     await publicPage.getByLabel("Severity").selectOption("minor");
+    await expect(publicPage.getByLabel("Severity")).toHaveValue("minor");
+
     await publicPage
       .getByRole("button", { name: "Submit Issue Report" })
       .click();
@@ -203,7 +213,15 @@ test.describe("Notifications", () => {
 
     const issueTitle = `Global Watcher Test ${timestamp}`;
     await publicPage.getByLabel("Issue Title").fill(issueTitle);
+    // Verify machine selection stuck
+    await expect(publicPage.getByTestId("machine-select")).toHaveValue(
+      seededMachines.medievalMadness.id
+    );
+    await expect(publicPage.getByLabel("Issue Title")).toHaveValue(issueTitle);
+
     await publicPage.getByLabel("Severity").selectOption("unplayable");
+    await expect(publicPage.getByLabel("Severity")).toHaveValue("unplayable");
+
     await publicPage
       .getByRole("button", { name: "Submit Issue Report" })
       .click();
@@ -249,11 +267,17 @@ test.describe("Notifications", () => {
     const publicContext = await browser.newContext();
     const publicPage = await publicContext.newPage();
     await publicPage.goto("/report");
+    // Select machine and verify state (Mobile Chrome hardening)
     await publicPage
       .getByTestId("machine-select")
       .selectOption({ value: machine.id });
+    await expect(publicPage.getByTestId("machine-select")).toHaveValue(
+      machine.id
+    );
     const issueTitle = `Interaction Test ${timestamp}`;
     await publicPage.getByLabel("Issue Title").fill(issueTitle);
+    await expect(publicPage.getByLabel("Issue Title")).toHaveValue(issueTitle);
+
     await publicPage
       .getByRole("button", { name: "Submit Issue Report" })
       .click();
@@ -304,6 +328,13 @@ test.describe("Notifications", () => {
       .selectOption({ value: machine.id });
 
     await memberPage.getByLabel("Issue Title").fill("Email Test Issue");
+    await expect(memberPage.getByTestId("machine-select")).toHaveValue(
+      machine.id
+    );
+    await expect(memberPage.getByLabel("Issue Title")).toHaveValue(
+      "Email Test Issue"
+    );
+
     await memberPage
       .getByRole("button", { name: "Submit Issue Report" })
       .click();

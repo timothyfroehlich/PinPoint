@@ -500,9 +500,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-playwright-webkit-
 
+      - name: Install Playwright system dependencies
+        run: npx playwright install-deps webkit
+
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps webkit
+        run: npx playwright install webkit
 
       - name: Make E2E script executable
         run: chmod +x ./scripts/supabase-init-for-tests.sh
