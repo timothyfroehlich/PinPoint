@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2025-12-09
+
+- feat: add machine QR codes for reporting and standardize URL resolution (#616)
+
 ## 2025-12-07
 
 - feat: Enhance feedback widget with dropdown to report bugs or request features (#599)
