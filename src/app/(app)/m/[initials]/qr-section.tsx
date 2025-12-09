@@ -21,7 +21,7 @@ export async function QrSection({
 }): Promise<React.JSX.Element> {
   const reportUrl = buildMachineReportUrl({
     siteUrl: getSiteUrl(),
-    machineId: machine.id,
+    machineInitials: machine.initials,
     source: "qr",
   });
   const qrDataUrl = await generateQrPngDataUrl(reportUrl);
@@ -38,11 +38,11 @@ export async function QrSection({
         </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center justify-center rounded-lg border border-outline-variant bg-surface-variant p-4">
+        <div className="flex items-center justify-center rounded-lg border border-outline-variant bg-surface-variant p-3">
           <img
             src={qrDataUrl}
             alt={`QR code to report an issue for ${machine.name}`}
-            className="h-48 w-48"
+            className="h-40 w-40"
           />
         </div>
         <div className="flex-1 space-y-3">

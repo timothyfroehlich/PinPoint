@@ -20,24 +20,27 @@ export default async function PublicReportPage({
 }: {
   searchParams: Promise<{
     error?: string;
+    machine?: string;
     machineId?: string;
     source?: string;
   }>;
 }): Promise<React.JSX.Element> {
   const machinesList = await db.query.machines.findMany({
     orderBy: asc(machines.name),
-    columns: { id: true, name: true },
+    columns: { id: true, name: true, initials: true },
   });
   const params = await searchParams;
   const errorMessage = params.error
     ? decodeURIComponent(params.error)
     : undefined;
   const machineIdFromQuery = params.machineId;
+  const machineInitialsFromQuery = params.machine;
   const source = params.source;
   const hasMachines = machinesList.length > 0;
   const defaultMachineId = resolveDefaultMachineId(
     machinesList,
-    machineIdFromQuery
+    machineIdFromQuery,
+    machineInitialsFromQuery
   );
   const defaultMachineName =
     machinesList.find((machine) => machine.id === defaultMachineId)?.name ??

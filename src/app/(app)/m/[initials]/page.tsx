@@ -137,9 +137,9 @@ export default async function MachineDetailPage({
       {/* Content */}
       <div className="container mx-auto px-4 py-8">
         <div className="space-y-6">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             {/* Machine Info Card */}
-            <Card className="border-outline-variant">
+            <Card className="border-outline-variant lg:col-span-2">
               <CardHeader>
                 <CardTitle className="text-2xl text-on-surface">
                   Machine Information
