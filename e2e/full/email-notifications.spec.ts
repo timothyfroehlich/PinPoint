@@ -42,6 +42,7 @@ test.describe("Email Notifications", () => {
     await page.getByLabel("Title").fill("Test Issue for Email");
     await page.getByLabel("Description").fill("Testing email notifications");
     await page.getByLabel("Severity").selectOption("playable");
+    await page.getByLabel("Priority").selectOption("low");
     await page.getByRole("button", { name: "Report Issue" }).click();
 
     // Wait for redirect to issue page (new URL format)
@@ -80,6 +81,8 @@ test.describe("Email Notifications", () => {
     // Create issue for a specific machine (e.g., MM)
     await page.goto("/m/MM/report");
     await page.getByLabel("Title").fill("Status Change Test");
+    await page.getByLabel("Severity").selectOption("playable");
+    await page.getByLabel("Priority").selectOption("low");
     await page.getByRole("button", { name: "Report Issue" }).click();
     await expect(page).toHaveURL(/\/m\/MM\/i\/[0-9]+/);
 
