@@ -63,9 +63,28 @@ export function getEmailHtml(
     ? sanitizeHtml(formattedIssueId)
     : "";
 
+  let issueUrl = `${siteUrl}/issues`;
+  if (formattedIssueId) {
+    const parts = formattedIssueId.split("-");
+    if (parts.length >= 2) {
+      const numberPart = parts.pop();
+      const initialsPart = parts.join("-");
+      // Validate initialsPart matches schema: exactly 2-6 uppercase letters or digits
+      if (
+        numberPart &&
+        /^\d+$/.test(numberPart) &&
+        /^[A-Z0-9]{2,6}$/.test(initialsPart)
+      ) {
+        const issueNumber = parseInt(numberPart, 10);
+        // URL encode for defense-in-depth, even though validation ensures only safe characters
+        issueUrl = `${siteUrl}/m/${encodeURIComponent(initialsPart)}/i/${issueNumber}`;
+      }
+    }
+  }
+
   return `
       <h2>${machinePrefix}${sanitizedIssueId ? `${sanitizedIssueId}: ` : ""}${sanitizedIssueTitle}</h2>
       <p>${body}</p>
-      <p><a href="${siteUrl}/issues">View Issue</a></p>
+      <p><a href="${issueUrl}">View Issue</a></p>
     `;
 }
