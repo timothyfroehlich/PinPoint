@@ -21,6 +21,7 @@ import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { ArrowLeft, Calendar, Plus } from "lucide-react";
 import { headers } from "next/headers";
+import { resolveRequestUrl } from "~/lib/url";
 import { UpdateMachineForm } from "./update-machine-form";
 import { formatIssueId } from "~/lib/issues/utils";
 import { QrCodeDialog } from "./qr-code-dialog";
@@ -93,11 +94,9 @@ export default async function MachineDetailPage({
   // Derive machine status
   const machineStatus = deriveMachineStatus(machine.issues as IssueForStatus[]);
 
-  // Generate QR data for modal using dynamic host (better for local testing/previews)
+  // Generate QR data for modal using dynamic host resolution
   const headersList = await headers();
-  const host = headersList.get("host") ?? "localhost:3000";
-  const protocol = headersList.get("x-forwarded-proto") ?? "http";
-  const dynamicSiteUrl = `${protocol}://${host}`;
+  const dynamicSiteUrl = resolveRequestUrl(headersList);
 
   const reportUrl = buildMachineReportUrl({
     siteUrl: dynamicSiteUrl,
