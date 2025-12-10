@@ -8,8 +8,10 @@ import { Label } from "~/components/ui/label";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { Button } from "~/components/ui/button";
+import { Lock, QrCode, RefreshCw } from "lucide-react";
 import { submitPublicIssueAction } from "./actions";
 import { MainLayout } from "~/components/layout/MainLayout";
+import { resolveDefaultMachineId } from "./default-machine";
 
 // Avoid SSG hitting Supabase during builds that run parallel to db resets
 export const dynamic = "force-dynamic";
@@ -17,17 +19,33 @@ export const dynamic = "force-dynamic";
 export default async function PublicReportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    machine?: string;
+    machineId?: string;
+    source?: string;
+  }>;
 }): Promise<React.JSX.Element> {
   const machinesList = await db.query.machines.findMany({
     orderBy: asc(machines.name),
-    columns: { id: true, name: true },
+    columns: { id: true, name: true, initials: true },
   });
   const params = await searchParams;
   const errorMessage = params.error
     ? decodeURIComponent(params.error)
     : undefined;
+  const machineIdFromQuery = params.machineId;
+  const machineInitialsFromQuery = params.machine;
+  const source = params.source;
   const hasMachines = machinesList.length > 0;
+  const defaultMachineId = resolveDefaultMachineId(
+    machinesList,
+    machineIdFromQuery,
+    machineInitialsFromQuery
+  );
+  const defaultMachineName =
+    machinesList.find((machine) => machine.id === defaultMachineId)?.name ??
+    undefined;
 
   return (
     <MainLayout>
@@ -57,6 +75,9 @@ export default async function PublicReportPage({
               </p>
             ) : null}
             <form action={submitPublicIssueAction} className="space-y-5">
+              {source ? (
+                <input type="hidden" name="source" value={source} />
+              ) : null}
               {/* Honeypot field - hidden from humans, filled by bots */}
               <input
                 type="text"
@@ -71,31 +92,71 @@ export default async function PublicReportPage({
                 <Label htmlFor="machineId" className="text-on-surface">
                   Machine *
                 </Label>
-                <select
-                  id="machineId"
-                  name="machineId"
-                  required
-                  defaultValue=""
-                  disabled={!hasMachines}
-                  data-testid="machine-select"
-                  className="w-full rounded-md border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface"
-                >
-                  <option value="" disabled>
-                    Select a machine...
-                  </option>
-                  {hasMachines ? (
-                    machinesList.map((machine) => (
-                      <option key={machine.id} value={machine.id}>
-                        {machine.name}
+                {source === "qr" && defaultMachineName ? (
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                          <Lock className="h-4 w-4" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="font-semibold text-on-surface">
+                            {defaultMachineName}
+                          </p>
+                          <div className="flex items-center gap-1.5 text-xs text-primary">
+                            <QrCode className="h-3 w-3" />
+                            <span>Verified from QR Scan</span>
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        asChild
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto px-2 py-1 text-xs text-on-surface-variant hover:text-on-surface"
+                      >
+                        <Link href="/report">
+                          <RefreshCw className="mr-1 h-3 w-3" />
+                          Change
+                        </Link>
+                      </Button>
+                    </div>
+                    {/* Hidden input to ensure value is submitted even when select is hidden/disabled */}
+                    <input
+                      type="hidden"
+                      name="machineId"
+                      value={defaultMachineId}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <select
+                      id="machineId"
+                      name="machineId"
+                      required
+                      defaultValue={defaultMachineId}
+                      disabled={!hasMachines}
+                      data-testid="machine-select"
+                      className="w-full rounded-md border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface"
+                    >
+                      <option value="" disabled>
+                        Select a machine...
                       </option>
-                    ))
-                  ) : (
-                    <option value="">No machines available</option>
-                  )}
-                </select>
-                <p className="text-xs text-on-surface-variant">
-                  Choose the machine that needs attention.
-                </p>
+                      {hasMachines ? (
+                        machinesList.map((machine) => (
+                          <option key={machine.id} value={machine.id}>
+                            {machine.name}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="">No machines available</option>
+                      )}
+                    </select>
+                    <p className="text-xs text-on-surface-variant">
+                      Choose the machine that needs attention.
+                    </p>
+                  </>
+                )}
               </div>
 
               <div className="space-y-2">
