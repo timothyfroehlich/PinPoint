@@ -50,7 +50,7 @@ export function QrCodeDialog({
           <div className="bg-white p-4 rounded-xl shadow-sm border border-outline-variant/60">
             <img
               src={qrDataUrl}
-              alt={`QR code for ${machineName}`}
+              alt={`QR code for ${machineName} issue reporting`}
               className="size-48"
             />
           </div>

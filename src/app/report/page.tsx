@@ -110,19 +110,15 @@ export default async function PublicReportPage({
                         </div>
                       </div>
                       <Button
-                        type="button"
+                        asChild
                         variant="ghost"
                         size="sm"
                         className="h-auto px-2 py-1 text-xs text-on-surface-variant hover:text-on-surface"
-                        onClick={() => {
-                          // This is a server component, so we can't efficiently toggle state without client logic.
-                          // But we can just link to /report to clear params, effectively "unlocking" it.
-                          // However, since we are in a Transition, standard navigation is best.
-                          window.location.href = "/report";
-                        }}
                       >
-                        <RefreshCw className="mr-1 h-3 w-3" />
-                        Change
+                        <Link href="/report">
+                          <RefreshCw className="mr-1 h-3 w-3" />
+                          Change
+                        </Link>
                       </Button>
                     </div>
                     {/* Hidden input to ensure value is submitted even when select is hidden/disabled */}
