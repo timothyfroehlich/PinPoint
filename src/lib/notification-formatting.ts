@@ -65,6 +65,7 @@ export function getEmailHtml(
 
   let issueUrl = `${siteUrl}/issues`;
   if (formattedIssueId) {
+    // Format is [INITIALS]-[NUMBER]; initials are 2-6 alphanumeric chars (no hyphens)
     const parts = formattedIssueId.split("-");
     if (parts.length >= 2) {
       const numberPart = parts.pop();

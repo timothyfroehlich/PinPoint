@@ -116,10 +116,9 @@ describe("Notification Formatting", () => {
       expect(html).toContain('href="http://test.com/m/2K/i/42"');
     });
 
-    it("should URL encode initials for safety", () => {
-      const html = getEmailHtml("new_issue", "Title", "Machine", "TZ-42");
-      // The initials should be URL encoded (though TZ doesn't need it, the mechanism should be there)
-      expect(html).toContain('href="http://test.com/m/TZ/i/42"');
+    it("should fall back to issues page for invalid initials", () => {
+      const html = getEmailHtml("new_issue", "Title", "Machine", "A+B-42");
+      expect(html).toContain('href="http://test.com/issues"');
     });
   });
 });

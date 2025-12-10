@@ -146,7 +146,7 @@ export default defineConfig({
     navigationTimeout: 20 * 1000,
   },
 
-  // Configure projects for major browsers
+  // Configure projects for major browsers (Safari can be disabled locally via env)
   projects: [
     {
       name: "chromium",
@@ -156,10 +156,15 @@ export default defineConfig({
       name: "Mobile Chrome",
       use: { ...devices["Pixel 5"] },
     },
-    {
-      name: "Mobile Safari",
-      use: { ...devices["iPhone 12"] },
-    },
+    ...(process.env["PLAYWRIGHT_SKIP_SAFARI"] === "true" ||
+    process.env["PLAYWRIGHT_SKIP_SAFARI"] === "1"
+      ? []
+      : [
+          {
+            name: "Mobile Safari",
+            use: { ...devices["iPhone 12"] },
+          },
+        ]),
   ],
 
   // Run your local dev server before starting the tests

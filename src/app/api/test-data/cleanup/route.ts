@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { inArray } from "drizzle-orm";
+import { ilike, inArray, or, type SQL } from "drizzle-orm";
 
 import { db } from "~/server/db";
 import { issues, machines } from "~/server/db/schema";
@@ -7,6 +7,7 @@ import { issues, machines } from "~/server/db/schema";
 interface CleanupPayload {
   issueIds?: unknown;
   machineIds?: unknown;
+  issueTitlePrefix?: unknown;
 }
 
 const toIdArray = (value: unknown): string[] => {
@@ -23,6 +24,15 @@ const toIdArray = (value: unknown): string[] => {
   return Array.from(unique);
 };
 
+const toPrefix = (value: unknown): string | null => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : null;
+};
+
+const escapeLikePattern = (value: string): string =>
+  value.replace(/[%_\\]/g, "\\$&");
+
 export async function POST(request: Request): Promise<Response> {
   if (process.env.NODE_ENV === "production") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -37,16 +47,32 @@ export async function POST(request: Request): Promise<Response> {
 
   const issueIds = toIdArray(payload.issueIds);
   const machineIds = toIdArray(payload.machineIds);
+  const issueTitlePrefix = toPrefix(payload.issueTitlePrefix);
 
-  if (!issueIds.length && !machineIds.length) {
+  const issueConditions: SQL[] = [];
+
+  if (issueIds.length) {
+    issueConditions.push(inArray(issues.id, issueIds));
+  }
+
+  if (issueTitlePrefix) {
+    const escapedPrefix = escapeLikePattern(issueTitlePrefix);
+    issueConditions.push(ilike(issues.title, `${escapedPrefix}%`));
+  }
+
+  if (!issueConditions.length && !machineIds.length) {
     return NextResponse.json({ removedIssues: [], removedMachines: [] });
   }
 
-  const removedIssues = issueIds.length
+  const removedIssues = issueConditions.length
     ? (
         await db
           .delete(issues)
-          .where(inArray(issues.id, issueIds))
+          .where(
+            issueConditions.length === 1
+              ? issueConditions[0]
+              : or(...issueConditions)
+          )
           .returning({ id: issues.id })
       ).map((row) => row.id)
     : [];

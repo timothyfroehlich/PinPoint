@@ -3,6 +3,7 @@ import type { APIRequestContext } from "@playwright/test";
 interface CleanupRequest {
   issueIds?: string[];
   machineIds?: string[];
+  issueTitlePrefix?: string;
 }
 
 export async function cleanupTestEntities(
@@ -13,13 +14,18 @@ export async function cleanupTestEntities(
   const machineIds = Array.from(new Set(payload.machineIds ?? [])).filter(
     Boolean
   );
+  const issueTitlePrefix = payload.issueTitlePrefix?.trim();
 
-  if (!issueIds.length && !machineIds.length) {
+  if (!issueIds.length && !machineIds.length && !issueTitlePrefix) {
     return;
   }
 
   const response = await request.post("/api/test-data/cleanup", {
-    data: { issueIds, machineIds },
+    data: {
+      issueIds,
+      machineIds,
+      ...(issueTitlePrefix ? { issueTitlePrefix } : {}),
+    },
   });
 
   if (!response.ok()) {
