@@ -46,8 +46,9 @@ describe("api/test-data/cleanup", () => {
   });
 
   it("deletes issues by title prefix when requested", async () => {
-    const prefix = "E2E Public Report";
-    const expectedCondition = ilike(issues.title, `${prefix}%`);
+    const prefix = "E2E_Public Report";
+    const escaped = prefix.replace(/[%_\\]/g, "\\$&");
+    const expectedCondition = ilike(issues.title, `${escaped}%`);
     issuesReturning.mockResolvedValue([{ id: "issue-1" }]);
 
     const response = await POST(makeRequest({ issueTitlePrefix: prefix }));

@@ -30,6 +30,9 @@ const toPrefix = (value: unknown): string | null => {
   return trimmed.length ? trimmed : null;
 };
 
+const escapeLikePattern = (value: string): string =>
+  value.replace(/[%_\\]/g, "\\$&");
+
 export async function POST(request: Request): Promise<Response> {
   if (process.env.NODE_ENV === "production") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -53,7 +56,8 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   if (issueTitlePrefix) {
-    issueConditions.push(ilike(issues.title, `${issueTitlePrefix}%`));
+    const escapedPrefix = escapeLikePattern(issueTitlePrefix);
+    issueConditions.push(ilike(issues.title, `${escapedPrefix}%`));
   }
 
   if (!issueConditions.length && !machineIds.length) {
