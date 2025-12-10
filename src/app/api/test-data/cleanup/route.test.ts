@@ -10,8 +10,15 @@ const machinesWhere = vi.fn();
 const issuesReturning = vi.fn();
 const machinesReturning = vi.fn();
 
-const issuesDelete = vi.fn(() => ({ where: issuesWhere }));
-const machinesDelete = vi.fn(() => ({ where: machinesWhere }));
+interface DeleteReturn {
+  returning: typeof issuesReturning;
+}
+interface DeleteBuilder {
+  where: (condition: unknown) => DeleteReturn;
+}
+
+const issuesDelete = vi.fn((): DeleteBuilder => ({ where: issuesWhere }));
+const machinesDelete = vi.fn((): DeleteBuilder => ({ where: machinesWhere }));
 
 vi.mock("~/server/db", () => ({
   db: {

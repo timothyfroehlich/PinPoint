@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const execSyncMock = vi.hoisted(() => vi.fn());
+const execSyncMock = vi.fn();
 
 vi.mock("child_process", () => ({
   execSync: execSyncMock,

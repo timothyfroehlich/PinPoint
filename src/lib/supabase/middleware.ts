@@ -76,15 +76,14 @@ export async function updateSession(
     VERCEL_ENV === "production" || NODE_ENV === "production";
   const autologinEnv = DEV_AUTOLOGIN_ENABLED;
   const autologinEnabled =
-    autologinEnv !== undefined
-      ? autologinEnv.toLowerCase() === "true"
-      : !isProductionEnv;
+    !isProductionEnv &&
+    (autologinEnv !== undefined ? autologinEnv.toLowerCase() === "true" : true);
 
   let {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user && autologinEnabled && !isProductionEnv && !shouldSkipAutologin()) {
+  if (!user && autologinEnabled && !shouldSkipAutologin()) {
     const email = DEV_AUTOLOGIN_EMAIL ?? "admin@test.com";
     const password = DEV_AUTOLOGIN_PASSWORD ?? "TestPassword123";
 

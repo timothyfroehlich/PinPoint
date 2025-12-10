@@ -129,4 +129,17 @@ describe("updateSession autologin", () => {
     expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled();
     expect(response.headers.get("location")?.includes("/login")).toBe(true);
   });
+
+  it("never attempts autologin in production", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.DEV_AUTOLOGIN_ENABLED = "true";
+
+    const supabase = createSupabaseAuthMocks(null, null);
+    createServerClientMock.mockReturnValue(supabase);
+
+    const request = makeRequest("http://localhost/dashboard");
+    await updateSession(request);
+
+    expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled();
+  });
 });

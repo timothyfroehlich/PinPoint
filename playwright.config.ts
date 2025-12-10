@@ -156,7 +156,7 @@ export default defineConfig({
       name: "Mobile Chrome",
       use: { ...devices["Pixel 5"] },
     },
-    ...(process.env["PLAYWRIGHT_SKIP_SAFARI"]?.toLowerCase() === "true" ||
+    ...(process.env["PLAYWRIGHT_SKIP_SAFARI"] === "true" ||
     process.env["PLAYWRIGHT_SKIP_SAFARI"] === "1"
       ? []
       : [
