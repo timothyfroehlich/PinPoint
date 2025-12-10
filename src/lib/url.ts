@@ -15,8 +15,36 @@ export function getSiteUrl(): string {
     return configuredUrl;
   }
 
+  if (process.env["VERCEL_URL"]) {
+    return `https://${process.env["VERCEL_URL"]}`;
+  }
+
   const port = process.env["PORT"] ?? "3000";
   return `http://localhost:${port}`;
+}
+
+/**
+ * Resolves the absolute URL for the current request.
+ *
+ * Priority:
+ * 1. NEXT_PUBLIC_SITE_URL (Canonical/Production - if set, overrides everything)
+ * 2. X-Forwarded-Host + X-Forwarded-Proto (Proxy/Vercel Preview)
+ * 3. Host header + X-Forwarded-Proto (Direct)
+ * 4. Fallback to getSiteUrl()
+ */
+export function resolveRequestUrl(headers: Headers): string {
+  if (process.env["NEXT_PUBLIC_SITE_URL"]) {
+    return process.env["NEXT_PUBLIC_SITE_URL"];
+  }
+
+  const host = headers.get("x-forwarded-host") ?? headers.get("host");
+  const protocol = headers.get("x-forwarded-proto") ?? "http";
+
+  if (host) {
+    return `${protocol}://${host}`;
+  }
+
+  return getSiteUrl();
 }
 
 /**
