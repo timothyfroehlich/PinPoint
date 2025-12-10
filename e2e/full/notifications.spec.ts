@@ -125,6 +125,11 @@ test.describe("Notifications", () => {
 
     const issueTitle = `Status Change ${timestamp}`;
     await page.getByLabel("Issue Title").fill(issueTitle);
+    // Explicitly select severity (required)
+    await page.getByLabel("Severity").selectOption("minor");
+    // Explicitly select priority (required for logged-in users)
+    await page.getByLabel("Priority").selectOption("low");
+
     await page.getByRole("button", { name: "Report Issue" }).click();
 
     // Capture Issue URL/number (new route format /m/{initials}/i/{issueNumber})
@@ -278,6 +283,10 @@ test.describe("Notifications", () => {
     await publicPage.getByLabel("Issue Title").fill(issueTitle);
     await expect(publicPage.getByLabel("Issue Title")).toHaveValue(issueTitle);
 
+    // Explicitly select severity (required)
+    await publicPage.getByLabel("Severity").selectOption("minor");
+    await expect(publicPage.getByLabel("Severity")).toHaveValue("minor");
+
     await publicPage
       .getByRole("button", { name: "Submit Issue Report" })
       .click();
@@ -328,12 +337,16 @@ test.describe("Notifications", () => {
       .selectOption({ value: machine.id });
 
     await memberPage.getByLabel("Issue Title").fill("Email Test Issue");
+    // Explicitly select severity (required)
+    await memberPage.getByLabel("Severity").selectOption("minor");
+
     await expect(memberPage.getByTestId("machine-select")).toHaveValue(
       machine.id
     );
     await expect(memberPage.getByLabel("Issue Title")).toHaveValue(
       "Email Test Issue"
     );
+    await expect(memberPage.getByLabel("Severity")).toHaveValue("minor");
 
     await memberPage
       .getByRole("button", { name: "Submit Issue Report" })

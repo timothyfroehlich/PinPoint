@@ -48,6 +48,7 @@ test.describe("Issues System", () => {
         .getByLabel("Description")
         .fill("The right flipper does not respond when button is pressed");
       await page.getByLabel("Severity *").selectOption("playable");
+      await page.getByLabel("Priority *").selectOption("medium");
 
       // Submit form
       await page.getByRole("button", { name: "Report Issue" }).click();
@@ -99,6 +100,7 @@ test.describe("Issues System", () => {
       // Fill out remaining fields
       await page.getByLabel("Issue Title *").fill("Display flickering");
       await page.getByLabel("Severity *").selectOption("minor");
+      await page.getByLabel("Priority *").selectOption("low");
 
       // Submit
       await page.getByRole("button", { name: "Report Issue" }).click();
@@ -129,6 +131,7 @@ test.describe("Issues System", () => {
       await page.goto(`/m/${machineInitials}/report`);
       await page.getByLabel("Issue Title *").fill(issueTitle);
       await page.locator("#severity").selectOption("playable");
+      await page.locator("#priority").selectOption("medium");
       await page.getByRole("button", { name: "Report Issue" }).click();
 
       await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
