@@ -159,20 +159,13 @@ test.describe("Extended Authentication", () => {
     await page.getByLabel("Confirm Password").fill(newPassword);
     await page.getByRole("button", { name: "Update Password" }).click();
 
-    // Log in with new password (handle being auto-signed-in from reset flow)
-    // Log in with new password (handle being auto-signed-in from reset flow)
-    await page.goto("/login");
-    // Check if we were redirected to dashboard (meaning we are logged in)
-    if (page.url().includes("/dashboard")) {
-      await logout(page);
-      await page.goto("/login");
-    }
-
-    await page.getByLabel("Email").fill(testEmail);
-    await page.getByLabel("Password").fill(newPassword);
-    await page.getByRole("button", { name: "Sign In" }).click();
+    // After setting a new password, the user should be automatically logged in and redirected to the dashboard.
     await expect(page).toHaveURL("/dashboard");
     await expect(page.getByTestId("quick-stats")).toBeVisible();
+
+    // Cleanup
+    await logout(page);
+    await deleteAllMessages(testEmail);
 
     // Cleanup
     await logout(page);
