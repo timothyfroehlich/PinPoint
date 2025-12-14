@@ -24,7 +24,6 @@ test.describe("Issue Reporter Name", () => {
     // Better: Go to the machine list and pick the first one.
     await page.goto("/m");
     const machineCard = page.getByTestId("machine-card").first();
-    // const machineName = await machineCard.getByRole("heading").textContent(); // Not needed
     // Click the machine to view details
     // Click the machine to view details (the card itself is the link)
     await machineCard.click();

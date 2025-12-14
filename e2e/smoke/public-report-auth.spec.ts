@@ -1,7 +1,7 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 // import { faker } from "@faker-js/faker";
 
-async function registerUser(page: any) {
+async function registerUser(page: Page) {
   const timestamp = Date.now();
   const firstName = `Test`;
   const lastName = `User${timestamp}`;
