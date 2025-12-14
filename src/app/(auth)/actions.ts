@@ -524,6 +524,20 @@ export async function resetPasswordAction(
     await supabase.auth.signOut();
     redirect("/login");
   } catch (error) {
+    // If redirect was thrown, re-throw it
+    if (error instanceof Error && error.message === "NEXT_REDIRECT") {
+      throw error;
+    }
+    // Also check for digest property which Next.js uses
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "digest" in error &&
+      String(error.digest).startsWith("NEXT_REDIRECT")
+    ) {
+      throw error;
+    }
+
     log.error(
       {
         error: error instanceof Error ? error.message : "Unknown",
