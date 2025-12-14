@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## 2025-12-13
 
+- chore(deps): bump minor-patch-updates group with 7 updates
 - fix: resolve flaky E2E test for password reset on mobile Chrome and Safari (#626)
 
 ## 2025-12-09
