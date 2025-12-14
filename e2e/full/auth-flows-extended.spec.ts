@@ -159,15 +159,15 @@ test.describe("Extended Authentication", () => {
     await page.getByLabel("Confirm Password").fill(newPassword);
     await page.getByRole("button", { name: "Update Password" }).click();
 
-    // Log in with new password (handle being auto-signed-in from reset flow)
-    // Log in with new password (handle being auto-signed-in from reset flow)
-    await page.goto("/login");
-    // Check if we were redirected to dashboard (meaning we are logged in)
-    if (page.url().includes("/dashboard")) {
-      await logout(page);
-      await page.goto("/login");
-    }
+    // The action redirects to /login after successful password update
+    await expect(page).toHaveURL("/login", { timeout: 15000 });
 
+    // Safari ITP fix: Wait for page to fully load and stabilize after redirect
+    // This ensures cookies are properly cleared and the form is ready
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByRole("heading", { name: "Sign In" })).toBeVisible();
+
+    // Now log in with the new password
     await page.getByLabel("Email").fill(testEmail);
     await page.getByLabel("Password").fill(newPassword);
     await page.getByRole("button", { name: "Sign In" }).click();

@@ -2,9 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+<<<<<<< HEAD
+
 ## 2025-12-14
 
 - fix: ensure logged-in users are identified when reporting via public form (#627)
+  ||||||| ad03f30
+  =======
+
+## 2025-12-13
+
+- chore(deps): bump minor-patch-updates group with 7 updates
+- fix: resolve flaky E2E test for password reset on mobile Chrome and Safari (#626)
+  > > > > > > > origin/main
 
 ## 2025-12-09
 
