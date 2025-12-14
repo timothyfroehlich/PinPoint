@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { revalidatePath } from "next/cache";
 import { log } from "~/lib/logger";
+import { createClient } from "~/lib/supabase/server";
 import { createIssue } from "~/services/issues";
 import {
   checkPublicIssueLimit,
@@ -73,13 +74,19 @@ export async function submitPublicIssueAction(
     return;
   }
 
+  // 3. Check for authenticated user (optional)
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   try {
     await createIssue({
       title,
       description: description ?? null,
       machineInitials: machine.initials,
       severity,
-      reportedBy: null,
+      reportedBy: user?.id ?? null,
     });
 
     revalidatePath(`/m/${machine.initials}`);

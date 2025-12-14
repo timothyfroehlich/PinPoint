@@ -22,9 +22,9 @@ function createTransport(): EmailTransport | null {
     (!process.env["RESEND_API_KEY"] &&
       Boolean(
         process.env["MAILPIT_PORT"] ??
-        process.env["MAILPIT_SMTP_PORT"] ??
-        process.env["INBUCKET_PORT"] ??
-        process.env["INBUCKET_SMTP_PORT"]
+          process.env["MAILPIT_SMTP_PORT"] ??
+          process.env["INBUCKET_PORT"] ??
+          process.env["INBUCKET_SMTP_PORT"]
       ));
 
   if (shouldUseSmtp) {
