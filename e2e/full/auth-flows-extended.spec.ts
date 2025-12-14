@@ -162,6 +162,11 @@ test.describe("Extended Authentication", () => {
     // The action redirects to /login after successful password update
     await expect(page).toHaveURL("/login", { timeout: 15000 });
 
+    // Safari ITP fix: Wait for page to fully load and stabilize after redirect
+    // This ensures cookies are properly cleared and the form is ready
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByRole("heading", { name: "Sign In" })).toBeVisible();
+
     // Now log in with the new password
     await page.getByLabel("Email").fill(testEmail);
     await page.getByLabel("Password").fill(newPassword);
