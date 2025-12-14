@@ -159,13 +159,15 @@ test.describe("Extended Authentication", () => {
     await page.getByLabel("Confirm Password").fill(newPassword);
     await page.getByRole("button", { name: "Update Password" }).click();
 
-    // After setting a new password, the user should be automatically logged in and redirected to the dashboard.
+    // The action redirects to /login after successful password update
+    await expect(page).toHaveURL("/login", { timeout: 15000 });
+
+    // Now log in with the new password
+    await page.getByLabel("Email").fill(testEmail);
+    await page.getByLabel("Password").fill(newPassword);
+    await page.getByRole("button", { name: "Sign In" }).click();
     await expect(page).toHaveURL("/dashboard");
     await expect(page.getByTestId("quick-stats")).toBeVisible();
-
-    // Cleanup
-    await logout(page);
-    await deleteAllMessages(testEmail);
 
     // Cleanup
     await logout(page);
