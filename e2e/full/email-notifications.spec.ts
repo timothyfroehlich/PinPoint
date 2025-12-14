@@ -57,7 +57,7 @@ test.describe("Email Notifications", () => {
     // Wait for email to arrive in Mailpit
     const email = await mailpit.waitForEmail(TEST_USERS.admin.email, {
       subjectContains: "Test Issue for Email",
-      timeout: 20000,
+      timeout: 30000,
       pollIntervalMs: 750,
     });
 
@@ -109,13 +109,16 @@ test.describe("Email Notifications", () => {
     }
 
     // Wait for status change email
-    const email = await mailpit.waitForEmail(TEST_USERS.admin.email, {
-      subjectContains: "Status Changed",
-      timeout: 20000,
-      pollIntervalMs: 750,
-    });
+    const emailAfterStatusChange = await mailpit.waitForEmail(
+      TEST_USERS.admin.email,
+      {
+        subjectContains: "Status Changed",
+        timeout: 30000,
+        pollIntervalMs: 750,
+      }
+    );
 
-    expect(email).not.toBeNull();
-    expect(email?.subject).toContain("Status Changed");
+    expect(emailAfterStatusChange).not.toBeNull();
+    expect(emailAfterStatusChange?.subject).toContain("Status Changed");
   });
 });

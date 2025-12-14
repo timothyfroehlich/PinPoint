@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2025-12-13
+
+- fix: resolve flaky E2E test for password reset on mobile Chrome and Safari (#626)
+
 ## 2025-12-09
 
 - chore: speed up E2E by adding dev/preview autologin, fast-reset default, and reliable cleanup helpers (#619)

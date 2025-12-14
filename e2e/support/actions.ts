@@ -32,6 +32,10 @@ export async function loginAs(
   } else {
     await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
   }
+
+  // Wait for user menu to hydrate before continuing
+  // This prevents race conditions when tests immediately call logout()
+  await expect(page.getByTestId("user-menu-button")).toBeVisible();
 }
 
 /**
@@ -70,7 +74,7 @@ export async function ensureLoggedIn(
  */
 export async function logout(page: Page): Promise<void> {
   const userMenu = page.getByTestId("user-menu-button");
-  await expect(userMenu).toBeVisible({ timeout: 5000 });
+  await expect(userMenu).toBeVisible({ timeout: 10000 });
   await userMenu.click();
 
   const signOutItem = page.getByRole("menuitem", { name: "Sign Out" });

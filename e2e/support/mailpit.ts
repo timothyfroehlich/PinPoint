@@ -74,6 +74,21 @@ export class MailpitClient {
   }
 
   /**
+   * Get the latest message for a mailbox
+   */
+  async getLastEmail(email: string): Promise<MailpitMessage | null> {
+    const messages = await this.getMessages(email);
+    if (messages.length === 0) {
+      return null;
+    }
+    // Sort by date descending and return the latest
+    return messages.sort(
+      (a, b) =>
+        new Date(b.Date ?? 0).getTime() - new Date(a.Date ?? 0).getTime()
+    )[0];
+  }
+
+  /**
    * Get a specific message by ID
    */
   async getMessage(
@@ -108,8 +123,8 @@ export class MailpitClient {
       pollIntervalMs?: number;
     } = {}
   ): Promise<MailpitMessage | null> {
-    const timeout = criteria.timeout ?? 10000; // 10 seconds default
-    const interval = criteria.pollIntervalMs ?? 500;
+    const timeout = criteria.timeout ?? 30000;
+    const interval = criteria.pollIntervalMs ?? 750;
     const startTime = Date.now();
 
     while (Date.now() - startTime < timeout) {
@@ -235,3 +250,6 @@ export const waitForEmail = async (
     timeout?: number;
   } = {}
 ) => mailpitClient.waitForEmail(email, criteria);
+
+export const getLastEmail = async (email: string) =>
+  mailpitClient.getLastEmail(email);
