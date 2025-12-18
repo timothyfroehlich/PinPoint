@@ -30,26 +30,33 @@ import { formatIssueId } from "~/lib/issues/utils";
  * Wraps all dashboard queries to prevent duplicate execution within a single request
  */
 const getDashboardData = cache(async (userId?: string) => {
-  let userProfile;
-  let assignedIssues: {
-    id: string;
-    title: string;
-    status: string;
-    severity: string;
-    machineInitials: string;
-    issueNumber: number;
-    createdAt: Date;
-    machine: {
-      id: string;
-      name: string;
-      initials: string;
-    };
-  }[] = [];
-  let myIssuesCount = 0;
+  // Parallelize independent queries to improve dashboard load time (PERF-003)
 
-  if (userId) {
+  // Query 1: User Profile & Assigned Issues (Dependent chain)
+  const userAndAssignedIssuesPromise = (async () => {
+    if (!userId) {
+      return {
+        userProfile: undefined,
+        assignedIssues: [] as {
+          id: string;
+          title: string;
+          status: string;
+          severity: string;
+          machineInitials: string;
+          issueNumber: number;
+          createdAt: Date;
+          machine: {
+            id: string;
+            name: string;
+            initials: string;
+          };
+        }[],
+        myIssuesCount: 0,
+      };
+    }
+
     // Get user profile to get the user's database ID
-    userProfile = await db.query.userProfiles.findFirst({
+    const userProfile = await db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, userId),
       columns: {
         id: true,
@@ -57,40 +64,51 @@ const getDashboardData = cache(async (userId?: string) => {
       },
     });
 
-    if (userProfile) {
-      // Query 1: Issues assigned to current user (with machine relation)
-      assignedIssues = await db.query.issues.findMany({
-        where: and(
-          eq(issues.assignedTo, userProfile.id),
-          ne(issues.status, "resolved")
-        ),
-        orderBy: desc(issues.createdAt),
-        limit: 10,
-        with: {
-          machine: {
-            columns: {
-              id: true,
-              name: true,
-              initials: true,
-            },
+    if (!userProfile) {
+      return {
+        userProfile: undefined,
+        assignedIssues: [],
+        myIssuesCount: 0,
+      };
+    }
+
+    // Query 1: Issues assigned to current user (with machine relation)
+    const assignedIssues = await db.query.issues.findMany({
+      where: and(
+        eq(issues.assignedTo, userProfile.id),
+        ne(issues.status, "resolved")
+      ),
+      orderBy: desc(issues.createdAt),
+      limit: 10,
+      with: {
+        machine: {
+          columns: {
+            id: true,
+            name: true,
+            initials: true,
           },
         },
-        columns: {
-          id: true,
-          title: true,
-          status: true,
-          severity: true,
-          machineInitials: true,
-          issueNumber: true,
-          createdAt: true,
-        },
-      });
-      myIssuesCount = assignedIssues.length;
-    }
-  }
+      },
+      columns: {
+        id: true,
+        title: true,
+        status: true,
+        severity: true,
+        machineInitials: true,
+        issueNumber: true,
+        createdAt: true,
+      },
+    });
+
+    return {
+      userProfile,
+      assignedIssues,
+      myIssuesCount: assignedIssues.length,
+    };
+  })();
 
   // Query 2: Recently reported issues (last 10, with machine and reporter)
-  const recentIssues = await db.query.issues.findMany({
+  const recentIssuesPromise = db.query.issues.findMany({
     orderBy: desc(issues.createdAt),
     limit: 10,
     with: {
@@ -121,7 +139,7 @@ const getDashboardData = cache(async (userId?: string) => {
 
   // Query 3: Unplayable machines (database-level filtering for efficiency - PERF-002)
   // Get machines with at least one open unplayable issue using JOIN and GROUP BY
-  const unplayableMachines = await db
+  const unplayableMachinesPromise = db
     .select({
       id: machines.id,
       name: machines.name,
@@ -136,20 +154,34 @@ const getDashboardData = cache(async (userId?: string) => {
     .groupBy(machines.id, machines.name, machines.initials);
 
   // Query 4: Total open issues count
-  const totalOpenIssuesResult = await db
+  const totalOpenIssuesPromise = db
     .select({ count: sql<number>`count(*)::int` })
     .from(issues)
     .where(ne(issues.status, "resolved"));
 
-  const totalOpenIssues = totalOpenIssuesResult[0]?.count ?? 0;
-
   // Query 5: Machines needing service (machines with at least one open issue)
-  const machinesNeedingServiceResult = await db
+  const machinesNeedingServicePromise = db
     .selectDistinct({ id: machines.id })
     .from(machines)
     .innerJoin(issues, eq(issues.machineInitials, machines.initials))
     .where(ne(issues.status, "resolved"));
 
+  // Await all queries in parallel
+  const [
+    { userProfile, assignedIssues, myIssuesCount },
+    recentIssues,
+    unplayableMachines,
+    totalOpenIssuesResult,
+    machinesNeedingServiceResult,
+  ] = await Promise.all([
+    userAndAssignedIssuesPromise,
+    recentIssuesPromise,
+    unplayableMachinesPromise,
+    totalOpenIssuesPromise,
+    machinesNeedingServicePromise,
+  ]);
+
+  const totalOpenIssues = totalOpenIssuesResult[0]?.count ?? 0;
   const machinesNeedingService = machinesNeedingServiceResult.length;
 
   return {
