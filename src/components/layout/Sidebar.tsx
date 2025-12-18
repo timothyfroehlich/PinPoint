@@ -87,6 +87,7 @@ export function Sidebar({
     const content = (
       <Link
         href={item.href}
+        aria-label={collapsed ? item.title : undefined}
         {...(onNavigate ? { onClick: onNavigate } : {})}
         className={cn(
           "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors relative group",
