@@ -29,7 +29,11 @@ export const createIssueSchema = z.object({
     .min(1, "Title is required")
     .max(200, "Title must be less than 200 characters")
     .trim(),
-  description: z.string().trim().optional(),
+  description: z
+    .string()
+    .trim()
+    .max(2000, "Description is too long")
+    .optional(),
   machineInitials: z
     .string()
     .min(2, "Machine initials invalid")
@@ -86,5 +90,9 @@ export const assignIssueSchema = z.object({
  */
 export const addCommentSchema = z.object({
   issueId: uuidish,
-  comment: z.string().trim().min(1, "Comment cannot be empty"),
+  comment: z
+    .string()
+    .trim()
+    .min(1, "Comment cannot be empty")
+    .max(5000, "Comment is too long"),
 });

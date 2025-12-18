@@ -90,8 +90,8 @@ describe("addCommentSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("should accept long comments", () => {
-    const longComment = "a".repeat(10000);
+  it("should accept comments within limit", () => {
+    const longComment = "a".repeat(5000);
     const result = addCommentSchema.safeParse({
       issueId: validUuid,
       comment: longComment,
@@ -100,6 +100,19 @@ describe("addCommentSchema", () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.comment).toBe(longComment);
+    }
+  });
+
+  it("should reject too long comments", () => {
+    const longComment = "a".repeat(5001);
+    const result = addCommentSchema.safeParse({
+      issueId: validUuid,
+      comment: longComment,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toContain("Comment is too long");
     }
   });
 });

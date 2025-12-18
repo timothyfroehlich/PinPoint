@@ -33,6 +33,22 @@ describe("Issue Validation Schemas", () => {
       expect(result.success).toBe(true);
     });
 
+    it("should reject long description", () => {
+      const result = createIssueSchema.safeParse({
+        title: "Test Issue",
+        description: "a".repeat(2001),
+        machineInitials: validInitials,
+        severity: "minor",
+        priority: "low",
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0]?.message).toContain(
+          "Description is too long"
+        );
+      }
+    });
+
     it("should reject missing title", () => {
       const result = createIssueSchema.safeParse({
         description: "Test Description",
