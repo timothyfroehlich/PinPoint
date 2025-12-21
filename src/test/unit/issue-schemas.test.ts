@@ -43,6 +43,17 @@ describe("Issue Validation Schemas", () => {
       expect(result.success).toBe(false);
     });
 
+    it("should reject long description", () => {
+      const result = createIssueSchema.safeParse({
+        title: "Test Issue",
+        description: "a".repeat(5001),
+        machineInitials: validInitials,
+        severity: "minor",
+        priority: "low",
+      });
+      expect(result.success).toBe(false);
+    });
+
     it("should reject empty title", () => {
       const result = createIssueSchema.safeParse({
         title: "",
