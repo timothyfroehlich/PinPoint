@@ -123,6 +123,8 @@ export const issues = pgTable(
       t.machineInitials,
       t.issueNumber
     ),
+    assignedToIdx: index("idx_issues_assigned_to").on(t.assignedTo),
+    statusIdx: index("idx_issues_status").on(t.status),
   })
 );
 
@@ -152,21 +154,27 @@ export const issueWatchers = pgTable(
  *
  * Comments on issues, including system-generated timeline events.
  */
-export const issueComments = pgTable("issue_comments", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  issueId: uuid("issue_id")
-    .notNull()
-    .references(() => issues.id, { onDelete: "cascade" }),
-  authorId: uuid("author_id").references(() => userProfiles.id),
-  content: text("content").notNull(),
-  isSystem: boolean("is_system").notNull().default(false),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const issueComments = pgTable(
+  "issue_comments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    issueId: uuid("issue_id")
+      .notNull()
+      .references(() => issues.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id").references(() => userProfiles.id),
+    content: text("content").notNull(),
+    isSystem: boolean("is_system").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    issueIdIdx: index("idx_issue_comments_issue_id").on(t.issueId, t.createdAt),
+  })
+);
 
 /**
  * Notifications Table
