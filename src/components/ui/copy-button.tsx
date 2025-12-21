@@ -15,6 +15,7 @@ export function CopyButton({
   className,
   variant = "ghost",
   size = "icon",
+  children,
   ...props
 }: CopyButtonProps): React.JSX.Element {
   const [hasCopied, setHasCopied] = React.useState(false);
@@ -43,7 +44,8 @@ export function CopyButton({
       }}
       {...props}
     >
-      <span className="sr-only">Copy</span>
+      <span className="sr-only">{hasCopied ? "Copied" : "Copy"}</span>
+      {children}
       {hasCopied ? <Check className="size-4" /> : <Copy className="size-4" />}
     </Button>
   );
