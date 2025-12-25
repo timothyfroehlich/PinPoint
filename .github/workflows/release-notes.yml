@@ -10,6 +10,7 @@ jobs:
   changelog:
     name: Ensure CHANGELOG updated
     runs-on: ubuntu-latest
+    if: github.actor != 'dependabot[bot]'
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
