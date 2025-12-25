@@ -5,6 +5,11 @@ import { Check, Copy } from "lucide-react";
 
 import { cn } from "~/lib/utils";
 import { Button, type ButtonProps } from "~/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 
 interface CopyButtonProps extends ButtonProps {
   value: string;
@@ -30,21 +35,32 @@ export function CopyButton({
   }, [hasCopied]);
 
   return (
-    <Button
-      size={size}
-      variant={variant}
-      className={cn(
-        "relative z-10 size-8 text-on-surface-variant hover:bg-surface-variant hover:text-on-surface",
-        className
-      )}
-      onClick={() => {
-        void navigator.clipboard.writeText(value);
-        setHasCopied(true);
-      }}
-      {...props}
-    >
-      <span className="sr-only">Copy</span>
-      {hasCopied ? <Check className="size-4" /> : <Copy className="size-4" />}
-    </Button>
+    <Tooltip delayDuration={0}>
+      <TooltipTrigger asChild>
+        <Button
+          size={size}
+          variant={variant}
+          className={cn(
+            "relative z-10 size-8 text-on-surface-variant hover:bg-surface-variant hover:text-on-surface",
+            className
+          )}
+          onClick={() => {
+            void navigator.clipboard.writeText(value);
+            setHasCopied(true);
+          }}
+          {...props}
+        >
+          <span className="sr-only">{hasCopied ? "Copied" : "Copy"}</span>
+          {hasCopied ? (
+            <Check className="size-4" />
+          ) : (
+            <Copy className="size-4" />
+          )}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>{hasCopied ? "Copied!" : "Copy to clipboard"}</p>
+      </TooltipContent>
+    </Tooltip>
   );
 }

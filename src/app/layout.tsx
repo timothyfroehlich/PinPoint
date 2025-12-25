@@ -3,6 +3,7 @@ import type React from "react";
 import "./globals.css";
 import { Toaster } from "sonner";
 import { ClientLogger } from "~/components/dev/client-logger";
+import { TooltipProvider } from "~/components/ui/tooltip";
 
 import { SentryInitializer } from "~/components/SentryInitializer";
 
@@ -24,11 +25,13 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="flex flex-col h-screen overflow-hidden">
-        <SentryInitializer />
-        {isDevelopment && <ClientLogger />}
-        <PreBetaBanner />
-        <div className="flex-1 overflow-hidden">{children}</div>
-        <Toaster />
+        <TooltipProvider>
+          <SentryInitializer />
+          {isDevelopment && <ClientLogger />}
+          <PreBetaBanner />
+          <div className="flex-1 overflow-hidden">{children}</div>
+          <Toaster />
+        </TooltipProvider>
       </body>
     </html>
   );
