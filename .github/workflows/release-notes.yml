@@ -17,7 +17,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verify CHANGELOG.md modified in PR
+      - name: Check if user-facing files were changed
+        id: check-files
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
@@ -27,10 +28,49 @@ jobs:
           echo "Changed files:"
           echo "${CHANGED_FILES}"
 
+          # Patterns that indicate user-facing or significant technical changes
+          # that should be documented in CHANGELOG.md
+          USER_FACING_PATTERNS=(
+            "^src/"
+            "^middleware\.ts$"
+            "^public/"
+            "^e2e/"
+            "^package\.json$"
+            "^next\.config\.ts$"
+          )
+
+          # Check if any user-facing files were changed
+          NEEDS_CHANGELOG=false
+          for pattern in "${USER_FACING_PATTERNS[@]}"; do
+            if echo "${CHANGED_FILES}" | grep -qE "${pattern}"; then
+              echo "Found changes matching pattern: ${pattern}"
+              NEEDS_CHANGELOG=true
+              break
+            fi
+          done
+
+          if [ "${NEEDS_CHANGELOG}" = "false" ]; then
+            echo "✅ No user-facing changes detected. CHANGELOG.md update not required."
+            echo "needs_changelog=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "User-facing changes detected. Checking for CHANGELOG.md update..."
+          echo "needs_changelog=true" >> $GITHUB_OUTPUT
+
+      - name: Verify CHANGELOG.md modified in PR
+        if: steps.check-files.outputs.needs_changelog == 'true'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          CHANGED_FILES=$(git diff --name-only "${BASE_SHA}...HEAD")
+
           if echo "${CHANGED_FILES}" | grep -qx "CHANGELOG.md"; then
             echo "✅ CHANGELOG.md updated."
             exit 0
           fi
 
           echo "❌ CHANGELOG.md was not updated in this PR."
+          echo "This PR contains user-facing changes and requires a CHANGELOG.md entry."
           exit 1
