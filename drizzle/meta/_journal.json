@@ -8,13 +8,6 @@
       "when": 1765036190971,
       "tag": "0000_init-schema",
       "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1766514840836,
-      "tag": "0001_colorful_cammi",
-      "breakpoints": true
     }
   ]
 }
