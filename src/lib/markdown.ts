@@ -1,0 +1,129 @@
+import sanitizeHtml from "sanitize-html";
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function parseInline(text: string): string {
+  // Handle bold (**text**)
+  let parsed = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+
+  // Handle italic (*text*)
+  parsed = parsed.replace(/\*(.*?)\*/g, "<em>$1</em>");
+
+  // Handle code (`text`)
+  parsed = parsed.replace(/`(.*?)`/g, "<code>$1</code>");
+
+  // Handle links [text](url)
+  parsed = parsed.replace(
+    /\[([^\]]+)\]\(([^)]+)\)/g,
+    '<a href="$2" class="text-primary hover:underline underline-offset-4" target="_blank" rel="noopener noreferrer">$1</a>'
+  );
+
+  return parsed;
+}
+
+/**
+ * Renders simple markdown to HTML with sanitization.
+ *
+ * Supported features:
+ * - Headings (#, ##, ###)
+ * - Lists (-)
+ * - Bold (**text**)
+ * - Italic (*text*)
+ * - Code (`text`)
+ * - Links ([text](url))
+ * - Horizontal rules (---)
+ *
+ * Security:
+ * - Uses sanitize-html to prevent XSS
+ * - Strips dangerous protocols like javascript:
+ */
+export function renderMarkdownToHtml(markdown: string): string {
+  const lines = markdown.split("\n");
+  const html: string[] = [];
+  let inList = false;
+
+  const closeList = (): void => {
+    if (inList) {
+      html.push("</ul>");
+      inList = false;
+    }
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd();
+
+    if (line.trim() === "") {
+      closeList();
+      continue;
+    }
+
+    if (line.trim() === "---") {
+      closeList();
+      html.push("<hr />");
+      continue;
+    }
+
+    if (line.startsWith("# ")) {
+      closeList();
+      html.push(`<h1>${parseInline(escapeHtml(line.slice(2).trim()))}</h1>`);
+      continue;
+    }
+
+    if (line.startsWith("## ")) {
+      closeList();
+      html.push(`<h2>${parseInline(escapeHtml(line.slice(3).trim()))}</h2>`);
+      continue;
+    }
+
+    if (line.startsWith("### ")) {
+      closeList();
+      html.push(`<h3>${parseInline(escapeHtml(line.slice(4).trim()))}</h3>`);
+      continue;
+    }
+
+    if (line.startsWith("- ")) {
+      if (!inList) {
+        inList = true;
+        html.push("<ul>");
+      }
+      html.push(`<li>${parseInline(escapeHtml(line.slice(2).trim()))}</li>`);
+      continue;
+    }
+
+    // Fallback to paragraph
+    closeList();
+    html.push(`<p>${parseInline(escapeHtml(line.trim()))}</p>`);
+  }
+
+  closeList();
+  const dirtyHtml = html.join("\n");
+
+  return sanitizeHtml(dirtyHtml, {
+    allowedTags: [
+      "h1",
+      "h2",
+      "h3",
+      "p",
+      "ul",
+      "li",
+      "strong",
+      "em",
+      "code",
+      "hr",
+      "a",
+    ],
+    allowedAttributes: {
+      a: ["href", "class", "target", "rel"],
+    },
+    allowedClasses: {
+      a: ["text-primary", "hover:underline", "underline-offset-4"],
+    },
+  });
+}
