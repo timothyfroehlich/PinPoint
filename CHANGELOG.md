@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Security
+
+- Added max length validation (5000 chars) to issue descriptions and comments to prevent DoS attacks
+
 ## 2025-12-13
 
 - chore(deps): bump minor-patch-updates group with 7 updates
