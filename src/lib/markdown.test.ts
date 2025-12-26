@@ -27,7 +27,9 @@ describe("renderMarkdownToHtml", () => {
     const input = "[Google](https://google.com)";
     const output = renderMarkdownToHtml(input);
     expect(output).toContain('href="https://google.com"');
-    expect(output).toContain('class="text-primary hover:underline underline-offset-4"');
+    expect(output).toContain(
+      'class="text-primary hover:underline underline-offset-4"'
+    );
     expect(output).toContain("Google");
   });
 
