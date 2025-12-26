@@ -4,8 +4,8 @@ import { cn } from "~/lib/utils";
 import Link from "next/link";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { machines, userProfiles } from "~/server/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { machines, userProfiles, issues } from "~/server/db/schema";
+import { eq, asc, ne, count } from "drizzle-orm";
 import {
   deriveMachineStatus,
   getMachineStatusLabel,
@@ -50,31 +50,37 @@ export default async function MachineDetailPage({
   // Await params (Next.js 15+ requirement)
   const { initials } = await params;
 
-  // Query machine with issues (direct Drizzle query - no DAL)
-  const machine = await db.query.machines.findFirst({
-    where: eq(machines.initials, initials),
-    with: {
-      issues: {
-        columns: {
-          id: true,
-          issueNumber: true,
-          title: true,
-          status: true,
-          severity: true,
-          priority: true,
-          createdAt: true,
+  // Query machine with open issues and total count (Promise.all for concurrency)
+  const [machine, totalIssuesCountResult, currentUserProfile] =
+    await Promise.all([
+      db.query.machines.findFirst({
+        where: eq(machines.initials, initials),
+        with: {
+          issues: {
+            where: ne(issues.status, "resolved"),
+            columns: {
+              id: true,
+              issueNumber: true,
+              title: true,
+              status: true,
+              severity: true,
+              priority: true,
+              createdAt: true,
+            },
+            orderBy: (issues, { desc }) => [desc(issues.createdAt)],
+          },
+          owner: true,
         },
-        orderBy: (issues, { desc }) => [desc(issues.createdAt)],
-      },
-      owner: true,
-    },
-  });
-
-  // Fetch all users for owner selection (Admin only)
-  const currentUserProfile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-    columns: { role: true },
-  });
+      }),
+      db
+        .select({ count: count() })
+        .from(issues)
+        .where(eq(issues.machineInitials, initials)),
+      db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, user.id),
+        columns: { role: true },
+      }),
+    ]);
 
   const isAdmin = currentUserProfile?.role === "admin";
 
@@ -105,9 +111,9 @@ export default async function MachineDetailPage({
   });
   const qrDataUrl = await generateQrPngDataUrl(reportUrl);
 
-  const openIssues = machine.issues.filter(
-    (issue) => issue.status !== "resolved"
-  );
+  // Since we filter in the query, machine.issues contains only open issues
+  const openIssues = machine.issues;
+  const totalIssuesCount = totalIssuesCountResult[0]?.count ?? 0;
 
   return (
     <main className="min-h-screen bg-surface">
@@ -228,7 +234,7 @@ export default async function MachineDetailPage({
                       Total Issues
                     </p>
                     <p className="text-2xl font-semibold text-on-surface">
-                      {machine.issues.length}
+                      {totalIssuesCount}
                     </p>
                   </div>
                 </div>
@@ -256,7 +262,7 @@ export default async function MachineDetailPage({
                       Report Issue
                     </Link>
                   </Button>
-                  {machine.issues.length > 0 ? (
+                  {totalIssuesCount > 0 ? (
                     <Button
                       asChild
                       variant="outline"
