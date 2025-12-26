@@ -78,8 +78,9 @@ export const machines = pgTable(
       .notNull()
       .defaultNow(),
   },
-  () => ({
+  (t) => ({
     initialsCheck: check("initials_check", sql`initials ~ '^[A-Z0-9]{2,6}$'`),
+    ownerIdIdx: index("idx_machines_owner_id").on(t.ownerId),
   })
 );
 
@@ -125,6 +126,7 @@ export const issues = pgTable(
     ),
     assignedToIdx: index("idx_issues_assigned_to").on(t.assignedTo),
     reportedByIdx: index("idx_issues_reported_by").on(t.reportedBy),
+    statusIdx: index("idx_issues_status").on(t.status),
   })
 );
 

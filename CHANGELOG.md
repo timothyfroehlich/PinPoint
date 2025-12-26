@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+- feat: add database indexes to `issues` and `machines` tables to improve query performance
+
 ## 2025-12-13
 
 - chore(deps): bump minor-patch-updates group with 7 updates

@@ -99,5 +99,7 @@ CREATE INDEX "idx_issue_comments_issue_id" ON "issue_comments" USING btree ("iss
 CREATE INDEX "idx_issue_watchers_issue_id" ON "issue_watchers" USING btree ("issue_id");
 CREATE INDEX "idx_issues_assigned_to" ON "issues" USING btree ("assigned_to");
 CREATE INDEX "idx_issues_reported_by" ON "issues" USING btree ("reported_by");
+CREATE INDEX "idx_issues_status" ON "issues" USING btree ("status");
+CREATE INDEX "idx_machines_owner_id" ON "machines" USING btree ("owner_id");
 CREATE INDEX "idx_notif_prefs_global_watch_email" ON "notification_preferences" USING btree ("email_watch_new_issues_global");
 CREATE INDEX "idx_notifications_user_unread" ON "notifications" USING btree ("user_id","read_at","created_at");
