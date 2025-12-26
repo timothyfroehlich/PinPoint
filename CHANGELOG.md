@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+- Improved CopyButton with tooltips showing 'Copy to clipboard' / 'Copied!' feedback
+
 ## 2025-12-13
 
 - chore(deps): bump minor-patch-updates group with 7 updates
