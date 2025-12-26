@@ -1,4 +1,3 @@
-
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { execSync } from "child_process";
@@ -38,10 +37,9 @@ async function fastReset() {
     console.log("🌱 Reseding data...");
     // We execute the seed command
     // npm run db:_seed
-    execSync('npm run db:_seed', { stdio: 'inherit' });
-    execSync('npm run db:_seed-users', { stdio: 'inherit' });
+    execSync("npm run db:_seed", { stdio: "inherit" });
+    execSync("npm run db:_seed-users", { stdio: "inherit" });
     console.log("✅ Database reseeded.");
-
   } catch (error) {
     console.error("❌ Fast reset failed:", error);
     process.exit(1);
