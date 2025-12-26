@@ -87,7 +87,6 @@ export function Sidebar({
     const content = (
       <Link
         href={item.href}
-        aria-label={collapsed ? item.title : undefined}
         {...(onNavigate ? { onClick: onNavigate } : {})}
         className={cn(
           "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors relative group",
@@ -107,7 +106,7 @@ export function Sidebar({
             isReport && !collapsed ? "text-primary-foreground" : ""
           )}
         />
-        {!collapsed && <span>{item.title}</span>}
+        <span className={cn(collapsed && "sr-only")}>{item.title}</span>
       </Link>
     );
 
@@ -148,6 +147,7 @@ export function Sidebar({
             href="/dashboard"
             {...(onNavigate ? { onClick: onNavigate } : {})}
             className="flex size-full items-center justify-center"
+            aria-label={collapsed ? "Austin Pinball Collective" : undefined}
           >
             {collapsed ? (
               <CircleDot className="size-8 text-primary animate-in fade-in zoom-in duration-300" />

@@ -18,7 +18,9 @@ vi.mock("next/link", () => ({
 }));
 
 vi.mock("next/image", () => ({
-  default: ({ alt, ...props }: React.ComponentProps<"img">) => <img alt={alt} {...props} />,
+  default: ({ alt, ...props }: React.ComponentProps<"img">) => (
+    <img alt={alt} {...props} />
+  ),
 }));
 
 describe("Sidebar Accessibility", () => {
@@ -35,7 +37,9 @@ describe("Sidebar Accessibility", () => {
     expect(dashboardLink).toBeInTheDocument();
 
     // Find collapse button
-    const collapseButton = screen.getByRole("button", { name: "Collapse sidebar" });
+    const collapseButton = screen.getByRole("button", {
+      name: "Collapse sidebar",
+    });
 
     // Collapse the sidebar
     await user.click(collapseButton);

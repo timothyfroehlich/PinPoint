@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+- fix(a11y): improve sidebar accessibility by using sr-only class for nav items and adding aria-label to logo link
+
 ## 2025-12-13
 
 - chore(deps): bump minor-patch-updates group with 7 updates
