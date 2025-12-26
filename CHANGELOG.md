@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Performance
+
+- Parallelized dashboard queries for faster page load
+
 ## 2025-12-13
 
 - chore(deps): bump minor-patch-updates group with 7 updates

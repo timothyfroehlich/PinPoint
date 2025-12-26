@@ -160,7 +160,7 @@ async function seedUsersAndData() {
     `;
 
     // Update AFM next issue number
-    await sql`UPDATE machines SET next_issue_number = 2 WHERE initials = 'AFM'`
+    await sql`UPDATE machines SET next_issue_number = 2 WHERE initials = 'AFM'`;
 
     // The Addams Family: Multiple issues
     await sql`
@@ -211,10 +211,10 @@ async function seedUsersAndData() {
         NOW() - INTERVAL '1 week'
       )
       ON CONFLICT (id) DO NOTHING
-    `
+    `;
 
     // Update TAF next issue number
-    await sql`UPDATE machines SET next_issue_number = 5 WHERE initials = 'TAF'`
+    await sql`UPDATE machines SET next_issue_number = 5 WHERE initials = 'TAF'`;
 
     console.log("✅ Issues seeded.");
 
@@ -223,7 +223,7 @@ async function seedUsersAndData() {
       console.log("\n💬 Seeding comments...");
 
       // Clear existing comments for the main issue to avoid duplicates/mess
-      await sql`DELETE FROM issue_comments WHERE issue_id = '10000000-0000-4000-8000-000000000002'`
+      await sql`DELETE FROM issue_comments WHERE issue_id = '10000000-0000-4000-8000-000000000002'`;
 
       const comments = [
         {
