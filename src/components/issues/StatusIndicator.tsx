@@ -13,7 +13,9 @@ interface StatusIndicatorProps {
   status: "new" | "in_progress" | "resolved";
 }
 
-export function StatusIndicator({ status }: StatusIndicatorProps): React.JSX.Element {
+export function StatusIndicator({
+  status,
+}: StatusIndicatorProps): React.JSX.Element {
   const statusConfig = {
     new: {
       icon: <AlertCircle className="size-5 text-yellow-500" />,
@@ -49,7 +51,9 @@ export function StatusIndicator({ status }: StatusIndicatorProps): React.JSX.Ele
         <TooltipContent side="right">
           <div className="flex flex-col gap-1">
             <p className="font-semibold">{config.label}</p>
-            <p className="text-xs text-muted-foreground">{config.description}</p>
+            <p className="text-xs text-muted-foreground">
+              {config.description}
+            </p>
           </div>
         </TooltipContent>
       </Tooltip>
