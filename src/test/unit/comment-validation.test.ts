@@ -90,8 +90,23 @@ describe("addCommentSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("should accept long comments", () => {
-    const longComment = "a".repeat(10000);
+  it("should reject extremely long comments", () => {
+    const longComment = "a".repeat(5001);
+    const result = addCommentSchema.safeParse({
+      issueId: validUuid,
+      comment: longComment,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toContain(
+        "Comment must be less than 5000 characters"
+      );
+    }
+  });
+
+  it("should accept comments up to 5000 chars", () => {
+    const longComment = "a".repeat(5000);
     const result = addCommentSchema.safeParse({
       issueId: validUuid,
       comment: longComment,
