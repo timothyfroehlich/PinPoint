@@ -37,7 +37,7 @@ export function CopyButton({
 
   return (
     <TooltipProvider delayDuration={0}>
-      <Tooltip {...(hasCopied ? { open: true } : {})}>
+      <Tooltip open={hasCopied ? true : undefined}>
         <TooltipTrigger asChild>
           <Button
             size={size}
