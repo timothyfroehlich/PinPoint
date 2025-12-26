@@ -96,5 +96,9 @@ ALTER TABLE "machines" ADD CONSTRAINT "machines_owner_id_user_profiles_id_fk" FO
 ALTER TABLE "notification_preferences" ADD CONSTRAINT "notification_preferences_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE cascade ON UPDATE no action;
 ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE cascade ON UPDATE no action;
 CREATE INDEX "idx_issue_watchers_issue_id" ON "issue_watchers" USING btree ("issue_id");
+CREATE INDEX "idx_issues_machine_initials" ON "issues" USING btree ("machine_initials");
+CREATE INDEX "idx_issues_assigned_to" ON "issues" USING btree ("assigned_to");
+CREATE INDEX "idx_issues_status" ON "issues" USING btree ("status");
+CREATE INDEX "idx_issues_created_at" ON "issues" USING btree ("created_at");
 CREATE INDEX "idx_notif_prefs_global_watch_email" ON "notification_preferences" USING btree ("email_watch_new_issues_global");
 CREATE INDEX "idx_notifications_user_unread" ON "notifications" USING btree ("user_id","read_at","created_at");

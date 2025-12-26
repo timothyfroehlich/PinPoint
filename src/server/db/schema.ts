@@ -123,6 +123,12 @@ export const issues = pgTable(
       t.machineInitials,
       t.issueNumber
     ),
+    machineInitialsIdx: index("idx_issues_machine_initials").on(
+      t.machineInitials
+    ),
+    assignedToIdx: index("idx_issues_assigned_to").on(t.assignedTo),
+    statusIdx: index("idx_issues_status").on(t.status),
+    createdAtIdx: index("idx_issues_created_at").on(t.createdAt),
   })
 );
 
