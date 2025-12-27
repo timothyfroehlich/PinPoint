@@ -4,9 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### Accessibility
+### Security
 
-- Improved OwnerSelect accessibility with proper label association and helper text
+- Added max length validation (5000 chars) to issue descriptions and comments to prevent DoS attacks
 
 ## 2025-12-13
 
