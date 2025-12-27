@@ -4,7 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-- fix(a11y): improve sidebar accessibility by using sr-only class for nav items and adding aria-label to logo link
+### Security
+
+- Added max length validation (5000 chars) to issue descriptions and comments to prevent DoS attacks
 
 ## 2025-12-13
 
