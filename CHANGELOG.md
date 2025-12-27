@@ -4,7 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-- feat: add database indexes to `issues` and `machines` tables to improve query performance
+### Security
+
+- Added max length validation (5000 chars) to issue descriptions and comments to prevent DoS attacks
 
 ## 2025-12-13
 
