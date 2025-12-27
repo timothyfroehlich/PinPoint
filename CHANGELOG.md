@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Security
 
-- Fixed XSS vulnerability in markdown rendering by centralizing with sanitize-html
+- Added max length validation (5000 chars) to issue descriptions and comments to prevent DoS attacks
 
 ## 2025-12-13
 
