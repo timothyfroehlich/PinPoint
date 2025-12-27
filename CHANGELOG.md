@@ -4,8 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### Accessibility
-- Added tooltips to issue status indicators for screen reader support
+### Security
+
+- Added max length validation (5000 chars) to issue descriptions and comments to prevent DoS attacks
 
 ## 2025-12-13
 
