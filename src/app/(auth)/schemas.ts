@@ -9,8 +9,14 @@ import { z } from "zod";
  */
 
 export const loginSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(1, "Password is required"),
+  email: z
+    .string()
+    .email("Please enter a valid email address")
+    .max(1000, "Email is too long"),
+  password: z
+    .string()
+    .min(1, "Password is required")
+    .max(128, "Password is too long"),
   rememberMe: z.boolean().optional(),
 });
 
@@ -33,7 +39,10 @@ export const signupSchema = z.object({
 });
 
 export const forgotPasswordSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
+  email: z
+    .string()
+    .email("Please enter a valid email address")
+    .max(1000, "Email is too long"),
 });
 
 export const resetPasswordSchema = z
