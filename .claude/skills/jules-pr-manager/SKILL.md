@@ -45,6 +45,76 @@ Invoke this skill when:
 
 ---
 
+## Orchestration Pattern
+
+**YOU (the main agent) orchestrate the workflow. The jules-pr-manager subagent is your command executor.**
+
+### Correct Pattern ✅
+
+The main agent (YOU) makes all decisions based on the skill workflow. You launch jules-pr-manager subagent instances for specific, read-only tasks.
+
+**Example: Validate PR in parallel**
+```
+# Step 1: Launch jules-pr-manager subagents in parallel for data gathering
+pr_672_task = Task(
+    subagent_type="jules-pr-manager",
+    description="Get PR #672 status",
+    prompt="Execute these commands for PR #672:\n"
+           "1. gh pr view 672 --json status,reviews,mergeable,headRefName\n"
+           "2. gh pr diff 672\n"
+           "3. gh pr checks 672",
+    run_in_background=True
+)
+
+pr_674_task = Task(
+    subagent_type="jules-pr-manager",
+    description="Get PR #674 status",
+    prompt="Execute these commands for PR #674:\n"
+           "1. gh pr view 674 --json status,reviews,mergeable,headRefName\n"
+           "2. gh pr diff 674",
+    run_in_background=True
+)
+
+# Step 2: Wait for results
+pr_672_data = TaskOutput(pr_672_task)
+pr_674_data = TaskOutput(pr_674_task)
+
+# Step 3: Analyze and decide (main agent makes decisions!)
+if copilot_comments_found_in(pr_672_data):
+    # Launch another subagent to post comments
+    Task(
+        subagent_type="jules-pr-manager",
+        prompt="Post comment on PR #672:\n\nCopilot review comment on `file.ts:42`:\n> [comment text]\n\n@google-labs-jules please address this."
+    )
+```
+
+**Key Principles**:
+- Main agent sees skill content, understands full workflow
+- Main agent decides WHAT to do based on workflow stages
+- jules-pr-manager subagent executes HOW (specific gh/git commands)
+- Subagent is read-only: uses `git show`, `git merge-tree`, never modifies working dir
+- Parallelization via multiple subagent instances for data gathering
+- Iterate: launch subagents → analyze results → launch more as needed
+
+### Wrong Pattern ❌
+
+**DON'T DO THIS:**
+```
+# ❌ General-purpose subagent with high-level orchestration task
+Task(
+    subagent_type="general-purpose",
+    prompt="Process all Sentinel PRs through the workflow"
+)
+```
+
+**Why this is wrong**:
+- General-purpose subagent doesn't see skill content
+- Subagent makes its own decisions about workflow
+- Subagent has Write/Edit tools, may modify working directory
+- Subagent may run `git checkout`, `git merge`, leaving repo in bad state
+
+---
+
 ## GitHub Labels
 
 Each PR has exactly ONE stage label:
@@ -76,27 +146,31 @@ Each PR has exactly ONE stage label:
    └─ Close losers
 
 3. Categorize PRs
-   ├─ Scheduled: Sentinel (🛡️), Bolt (⚡), Palette (🎨)
-   ├─ Individual tasks: Everything else
-   └─ Manual review: Tagged jules:manual-review (skip for now)
+   ├─ By type: Sentinel (🛡️), Bolt (⚡), Palette (🎨), Individual tasks
+   └─ By status: Ready to process vs. Manual review needed
 
-4. Launch Parallel Subagents
-   ├─ Pre-approved command subagent (persistent, auto-approve gh/git, confirm merge)
-   ├─ 3 scheduled subagents (Sentinel/Bolt/Palette)
-   └─ N individual task subagents (one per non-scheduled PR)
+4. Launch jules-pr-manager Subagents (Parallel Data Gathering)
+   ├─ One subagent per PR for status/diff/checks
+   ├─ Wait for results via TaskOutput
+   └─ Collect all data before making decisions
 
-5. Wait for Subagent Completion
-   ├─ Collect results from all subagents
+5. Analyze Results & Make Decisions (Main Agent)
+   ├─ Evaluate each PR based on workflow stages
+   ├─ Decide which actions to take (comment, label, merge conflicts, etc.)
    └─ Identify PRs needing manual review
 
-6. Async Manual Review (one at a time)
-   ├─ Launch async subagent for first manual review PR
-   ├─ Present full context (assume user forgot)
-   ├─ Wait for user response
-   ├─ Respond to subagent
+6. Execute Actions via jules-pr-manager Subagents
+   ├─ Launch subagents for specific actions (post comments, apply labels)
+   ├─ Handle merge conflicts in temporary worktrees
+   └─ Wait for completion
+
+7. Manual Review (one at a time)
+   ├─ Present first manual review PR with full context
+   ├─ Wait for user decision
+   ├─ Execute user's decision via jules-pr-manager subagent
    └─ Move to next manual review PR
 
-7. Check for Completion
+8. Check for Completion
    ├─ No open PRs remain → DONE
    ├─ Waiting for Jules/Copilot (labeled) → Sleep 5 min, loop to step 1
    └─ Stalled PRs (30+ min) → Add to manual review queue
@@ -438,97 +512,104 @@ fi
 
 ---
 
-## Parallelization: Subagent Strategy
+## Parallelization Strategy
 
-### Pre-Approved Command Subagent (persistent)
+Launch multiple jules-pr-manager subagent instances for data gathering, then analyze results sequentially.
+
+### jules-pr-manager Subagent Configuration
 
 **Configuration**: Defined in `.claude/agents/jules-pr-manager.md`
 
-**Purpose**: Execute gh/git/bash commands without permission friction
+**Purpose**: Execute specific, read-only gh/git/bash commands
 
 **Model**: Haiku (specified in subagent config)
 
 **Tools**: Bash, Read, Glob, Grep only
 
-**Auto-approved**:
-- `gh pr view/list/diff/edit/ready/checks`
-- `git merge`, `git commit`, `git push`
-- Label updates, conflict resolution
-- `gh api` (read-only queries)
-- `jq` for JSON parsing
+**Read-Only Commands**:
+- `gh pr view/list/diff/edit/ready/checks` - PR inspection and labeling
+- `gh api` (GET requests only) - Read-only API queries
+- `git show origin/branch:path` - Read files from PR branches without checkout
+- `git merge-tree` - Check for conflicts without modifying working dir
+- `jq` - Parse JSON output
+
+**FORBIDDEN**: `git checkout`, `git merge`, `git reset`, `gh pr checkout` - Any command that modifies working directory
 
 **REQUIRES CONFIRMATION**: `gh pr merge --auto`
 
-**How to Invoke**:
-```markdown
-Use the jules-pr-manager subagent to check PR status for #672
-Use the jules-pr-manager subagent to mark PR #672 as ready
-Use the jules-pr-manager subagent to apply label jules:copilot-review to PR #672
+### Example: Validate Multiple PRs in Parallel
+
 ```
-
-**Note**: Simply reference the subagent by name in your prompt. Claude Code will automatically load the configuration from `.claude/agents/jules-pr-manager.md` and use Haiku model with restricted tools.
-
-### Scheduled PR Subagents (3 parallel)
-
-**Sentinel Subagent**: All 🛡️ security PRs
-**Bolt Subagent**: All ⚡ performance PRs
-**Palette Subagent**: All 🎨 accessibility/UX PRs
-
-**Each processes**:
-- Draft review
-- Conflict resolution
-- Copilot comment reposting
-- Label updates
-
-**Filters out**: `jules:manual-review` PRs (handled separately)
-
-**Launch**:
-```
-sentinels = [pr for pr in all_prs if "🛡️" in pr.title and "jules:manual-review" not in pr.labels]
-Task(subagent_type="general-purpose", description="Process Sentinel PRs", prompt=f"Process these Sentinel PRs: {sentinels}", run_in_background=True)
-
-# Same for Bolt (⚡) and Palette (🎨)
-```
-
-### Individual Task PR Subagents (N parallel)
-
-**Purpose**: Handle non-scheduled Jules PRs (user-initiated tasks)
-
-**Pattern**: One subagent per PR (tasks are very different)
-
-**Launch**:
-```
-individual_prs = [pr for pr in all_prs if no_emoji(pr.title) and "jules:manual-review" not in pr.labels]
-for pr in individual_prs:
-    Task(
-        subagent_type="general-purpose",
-        description=f"Process PR {pr.number}",
-        prompt=f"Process individual Jules PR #{pr.number}: {pr.title}",
-        run_in_background=True
-    )
-```
-
-### Async Manual Review Subagents (serial, one at a time)
-
-**Purpose**: Present PRs needing manual decisions
-
-**Pattern**: Present PR #1 → wait → respond → PR #2 → ...
-
-**CRITICAL**: ONE at a time (never ask about multiple PRs in same message)
-
-**Launch**:
-```
-manual_prs = [pr for pr in all_prs if "jules:manual-review" in pr.labels]
-for pr in manual_prs:
+# Launch jules-pr-manager subagents for 3 PRs in parallel
+tasks = []
+for pr_num in [672, 674, 661]:
     task = Task(
-        subagent_type="general-purpose",
-        description=f"Present PR {pr.number} for manual review",
-        prompt=f"Present PR #{pr.number} for manual review with full context (assume user forgot)",
+        subagent_type="jules-pr-manager",
+        description=f"Get PR #{pr_num} data",
+        prompt=f"Execute these commands for PR #{pr_num}:\n"
+               f"1. gh pr view {pr_num} --json status,reviews,mergeable,headRefName,title --limit 1\n"
+               f"2. gh pr diff {pr_num}\n"
+               f"3. gh pr checks {pr_num}",
         run_in_background=True
     )
-    # Present to user, wait for response
-    # Respond to subagent
-    # Move to next
+    tasks.append((pr_num, task))
+
+# Collect results
+results = {}
+for pr_num, task in tasks:
+    results[pr_num] = TaskOutput(task)
+
+# Analyze and decide next steps (main agent makes ALL decisions)
+for pr_num, data in results.items():
+    if needs_copilot_comments_reposted(data):
+        # Get review comments via another subagent
+        review_task = Task(
+            subagent_type="jules-pr-manager",
+            description=f"Get Copilot review for #{pr_num}",
+            prompt=f"Get Copilot review comments for PR #{pr_num}:\n"
+                   f"1. gh pr view {pr_num} --json reviews\n"
+                   f"2. Extract review ID from latest copilot-pull-request-reviewer review\n"
+                   f"3. gh api repos/timothyfroehlich/PinPoint/pulls/{pr_num}/reviews/REVIEW_ID/comments"
+        )
+        review_data = TaskOutput(review_task)
+
+        # Parse and repost comments (main agent decides content)
+        for comment in parse_comments(review_data):
+            Task(
+                subagent_type="jules-pr-manager",
+                prompt=f"Post comment on PR #{pr_num}:\n\n"
+                       f"Copilot review comment on `{comment.path}:{comment.line}`:\n"
+                       f"> {comment.body}\n\n"
+                       f"@google-labs-jules please address this."
+            )
+```
+
+### Reading Files from PR Branches (Without Checkout)
+
+**Problem**: Need to inspect files from PR branch without modifying working directory
+
+**Solution**: Use `git show` with remote branch references
+
+```bash
+# Get PR branch name
+BRANCH=$(gh pr view 672 --json headRefName --jq '.headRefName')
+
+# Read file from PR branch (no checkout!)
+git show origin/$BRANCH:src/path/to/file.ts
+
+# Check for merge conflicts (no working dir modification!)
+git merge-tree $(git merge-base origin/main origin/$BRANCH) origin/main origin/$BRANCH
+```
+
+**Launch subagent for this**:
+```
+Task(
+    subagent_type="jules-pr-manager",
+    description="Read file from PR #672",
+    prompt="Execute these commands:\n"
+           "1. BRANCH=$(gh pr view 672 --json headRefName --jq '.headRefName')\n"
+           "2. git show origin/$BRANCH:src/app/(auth)/schemas.ts"
+)
 ```
 
 ---
@@ -554,30 +635,58 @@ for pr in manual_prs:
 5. Wait for Jules (30min timeout)
 ```
 
-### Scenario 2: Handle CHANGELOG Conflict
+### Scenario 2: Handle CHANGELOG Conflict (Temporary Worktree)
 
 ```markdown
 **Problem**: Jules PR has CHANGELOG conflict with main
 
-**Solution**:
-1. Checkout PR branch
-2. Merge main: `git merge origin/main`
+**Solution** (using temporary worktree to avoid modifying main working directory):
+1. Create temporary worktree:
+   ```bash
+   git worktree add ../temp-pr-XXX -b temp/pr-XXX
+   cd ../temp-pr-XXX
+   ```
+2. Fetch and merge PR branch:
+   ```bash
+   BRANCH=$(gh pr view XXX --json headRefName --jq '.headRefName')
+   git fetch origin $BRANCH
+   git merge origin/$BRANCH
+   ```
 3. Resolve conflict: Keep main's version (Jules exempt)
    ```bash
    git checkout --theirs CHANGELOG.md
+   git add CHANGELOG.md
+   git commit -m "Resolve CHANGELOG conflict (Jules exempt)"
    ```
-4. Push: `git push`
-5. Remove `jules:merge-conflicts` label
+4. Push to PR branch:
+   ```bash
+   git push origin HEAD:$BRANCH
+   ```
+5. Cleanup:
+   ```bash
+   cd /home/froeht/Code/PinPoint-Secondary
+   git worktree remove ../temp-pr-XXX
+   ```
+6. Remove `jules:merge-conflicts` label via jules-pr-manager subagent
 ```
 
-### Scenario 3: Resolve `.jules/*.md` Conflict
+### Scenario 3: Resolve `.jules/*.md` Conflict (Temporary Worktree)
 
 ```markdown
 **Problem**: Both main and Jules PR updated `.jules/sentinel.md`
 
-**Solution**:
-1. Checkout PR branch
-2. Merge main: `git merge origin/main`
+**Solution** (using temporary worktree):
+1. Create temporary worktree:
+   ```bash
+   git worktree add ../temp-pr-XXX -b temp/pr-XXX
+   cd ../temp-pr-XXX
+   ```
+2. Fetch and merge PR branch:
+   ```bash
+   BRANCH=$(gh pr view XXX --json headRefName --jq '.headRefName')
+   git fetch origin $BRANCH
+   git merge origin/$BRANCH
+   ```
 3. Manually edit `.jules/sentinel.md`:
    - Keep BOTH entries
    - Order chronologically (earlier date first)
@@ -588,7 +697,20 @@ for pr in manual_prs:
    ## 2025-12-19 - Newer Entry (from Jules PR)
    ...
    ```
-4. Push: `git push`
+4. Commit and push:
+   ```bash
+   git add .jules/sentinel.md
+   git commit -m "Resolve .jules/sentinel.md conflict (keep both entries)"
+   git push origin HEAD:$BRANCH
+   ```
+5. Cleanup:
+   ```bash
+   cd /home/froeht/Code/PinPoint-Secondary
+   git worktree remove ../temp-pr-XXX
+   ```
+6. Remove `jules:merge-conflicts` label via jules-pr-manager subagent
+
+**Note**: Always process merge conflicts sequentially (one at a time) and ask user if conflict is non-trivial.
 ```
 
 ### Scenario 4: Close Duplicate PRs
@@ -626,15 +748,18 @@ for pr in manual_prs:
 - Reference other PRs in comments (Jules can't read them)
 - Ask about multiple PRs in same message during manual review
 - Create separate stages for trivial actions (just do them)
+- Use general-purpose subagents for Jules PR processing
+- Modify working directory when inspecting PR branches
 
 **DO**:
 - Validate against NON_NEGOTIABLES.md
 - Repost all Copilot comments verbatim
 - Copy code explicitly when consolidating duplicates
-- Handle merge conflicts ourselves
+- Handle merge conflicts ourselves in temporary worktrees
 - Present manual review PRs ONE at a time with full context
+- Use jules-pr-manager subagent for specific, read-only commands
+- Launch subagents in parallel for data gathering, analyze results sequentially
 - Run preflight before merge confirmation
-- Use the pre-approved command subagent for routine operations
 
 ---
 
