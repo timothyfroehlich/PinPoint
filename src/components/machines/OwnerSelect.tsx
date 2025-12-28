@@ -76,6 +76,7 @@ export function OwnerSelect({
         <SelectTrigger
           id="ownerId"
           className="border-outline bg-surface text-on-surface"
+          aria-describedby="owner-help"
         >
           <SelectValue placeholder="Select an owner" />
         </SelectTrigger>
@@ -94,7 +95,7 @@ export function OwnerSelect({
           ))}
         </SelectContent>
       </Select>
-      <p className="text-xs text-on-surface-variant">
+      <p id="owner-help" className="text-xs text-on-surface-variant">
         The owner receives notifications for new issues on this machine.
       </p>
 

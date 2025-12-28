@@ -1,6 +1,6 @@
 {
-  "id": "277d032f-4a11-401a-a0cf-56f0e64df34f",
-  "prevId": "37e0cbd4-92a2-4504-9431-7979c4fe6eda",
+  "id": "75cbbb20-95fa-4137-a951-fdd6c7008ea6",
+  "prevId": "277d032f-4a11-401a-a0cf-56f0e64df34f",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -307,6 +307,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "idx_issues_status": {
+          "name": "idx_issues_status",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -401,7 +416,23 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_machines_owner_id": {
+          "name": "idx_machines_owner_id",
+          "columns": [
+            {
+              "expression": "owner_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "machines_owner_id_user_profiles_id_fk": {
           "name": "machines_owner_id_user_profiles_id_fk",

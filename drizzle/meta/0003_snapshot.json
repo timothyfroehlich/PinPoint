@@ -1,6 +1,6 @@
 {
-  "id": "277d032f-4a11-401a-a0cf-56f0e64df34f",
-  "prevId": "37e0cbd4-92a2-4504-9431-7979c4fe6eda",
+  "id": "05bed52c-fdef-484f-bf20-73d4cc0108fa",
+  "prevId": "75cbbb20-95fa-4137-a951-fdd6c7008ea6",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -250,6 +250,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "unconfirmed_reported_by": {
+          "name": "unconfirmed_reported_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "assigned_to": {
           "name": "assigned_to",
           "type": "uuid",
@@ -307,6 +313,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "idx_issues_status": {
+          "name": "idx_issues_status",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -324,6 +345,15 @@
           "tableFrom": "issues",
           "tableTo": "user_profiles",
           "columnsFrom": ["reported_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "issues_unconfirmed_reported_by_unconfirmed_users_id_fk": {
+          "name": "issues_unconfirmed_reported_by_unconfirmed_users_id_fk",
+          "tableFrom": "issues",
+          "tableTo": "unconfirmed_users",
+          "columnsFrom": ["unconfirmed_reported_by"],
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -347,7 +377,12 @@
         }
       },
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "reporter_check": {
+          "name": "reporter_check",
+          "value": "(reported_by IS NULL OR unconfirmed_reported_by IS NULL)"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.machines": {
@@ -386,6 +421,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "unconfirmed_owner_id": {
+          "name": "unconfirmed_owner_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -401,13 +442,38 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_machines_owner_id": {
+          "name": "idx_machines_owner_id",
+          "columns": [
+            {
+              "expression": "owner_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "machines_owner_id_user_profiles_id_fk": {
           "name": "machines_owner_id_user_profiles_id_fk",
           "tableFrom": "machines",
           "tableTo": "user_profiles",
           "columnsFrom": ["owner_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "machines_unconfirmed_owner_id_unconfirmed_users_id_fk": {
+          "name": "machines_unconfirmed_owner_id_unconfirmed_users_id_fk",
+          "tableFrom": "machines",
+          "tableTo": "unconfirmed_users",
+          "columnsFrom": ["unconfirmed_owner_id"],
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -426,6 +492,10 @@
         "initials_check": {
           "name": "initials_check",
           "value": "initials ~ '^[A-Z0-9]{2,6}$'"
+        },
+        "owner_check": {
+          "name": "owner_check",
+          "value": "(owner_id IS NULL OR unconfirmed_owner_id IS NULL)"
         }
       },
       "isRLSEnabled": false
@@ -650,6 +720,80 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.unconfirmed_users": {
+      "name": "unconfirmed_users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "first_name": {
+          "name": "first_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_name": {
+          "name": "last_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "generated": {
+            "as": "first_name || ' ' || last_name",
+            "type": "stored"
+          }
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'guest'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "invite_sent_at": {
+          "name": "invite_sent_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "unconfirmed_users_email_unique": {
+          "name": "unconfirmed_users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": ["email"]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
