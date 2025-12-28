@@ -1,4 +1,3 @@
-## 2025-10-26 - [Sidebar Collapsed State Accessibility]
-
-**Learning:** Collapsed sidebars that hide text must apply `aria-label` to the navigation links, otherwise screen readers perceive them as empty links or just announce the href. Tooltips are often insufficient for accessible naming.
-**Action:** Always verify collapsed states of navigation components with a screen reader or by checking accessible names in tests.
+## 2025-10-26 - [Dynamic Accessible Names for State Toggles]
+**Learning:** Icon-only buttons that toggle state (like Copy/Copied) must update their accessible name (e.g., via `sr-only` text) to reflect the new state immediately. Static labels like "Copy" leave screen reader users unaware of the successful action.
+**Action:** When implementing toggle buttons, ensure the `sr-only` text or `aria-label` is dynamic (e.g., `{isCopied ? "Copied" : "Copy"}`).
