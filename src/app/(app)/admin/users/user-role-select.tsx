@@ -23,6 +23,10 @@ export function UserRoleSelect({
   currentUserId,
 }: UserRoleSelectProps): React.JSX.Element {
   const [isPending, startTransition] = React.useTransition();
+  const [optimisticRole, setOptimisticRole] = React.useOptimistic(
+    currentRole,
+    (_state, newRole: "guest" | "member" | "admin") => newRole
+  );
 
   const handleRoleChange = (newRole: "guest" | "member" | "admin"): void => {
     if (userId === currentUserId && newRole !== "admin") {
@@ -31,6 +35,7 @@ export function UserRoleSelect({
     }
 
     startTransition(async () => {
+      setOptimisticRole(newRole);
       try {
         await updateUserRole(userId, newRole);
         toast.success("Role updated successfully");
@@ -38,18 +43,13 @@ export function UserRoleSelect({
         toast.error(
           error instanceof Error ? error.message : "Failed to update role"
         );
-        // Ideally we would revert the optimistic update here if we were doing one manually,
-        // but since we rely on revalidatePath and the Select value is controlled by the prop (which comes from server),
-        // it might not visually revert immediately if we don't manage local state.
-        // For now, the server revalidation will fix it.
       }
     });
   };
 
   return (
     <Select
-      key={currentRole}
-      defaultValue={currentRole}
+      value={optimisticRole}
       onValueChange={handleRoleChange}
       disabled={
         isPending || (userId === currentUserId && currentRole === "admin")
