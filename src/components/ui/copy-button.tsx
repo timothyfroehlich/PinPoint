@@ -24,12 +24,16 @@ export function CopyButton({
   ...props
 }: CopyButtonProps): React.JSX.Element {
   const [hasCopied, setHasCopied] = React.useState(false);
+  const [isOpen, setIsOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (!hasCopied) return;
 
+    setIsOpen(true);
+
     const timeoutId = window.setTimeout(() => {
       setHasCopied(false);
+      setIsOpen(false);
     }, 2000);
 
     return () => window.clearTimeout(timeoutId);
@@ -37,7 +41,7 @@ export function CopyButton({
 
   return (
     <TooltipProvider delayDuration={0}>
-      <Tooltip open={hasCopied ? true : undefined}>
+      <Tooltip open={isOpen} onOpenChange={setIsOpen}>
         <TooltipTrigger asChild>
           <Button
             size={size}

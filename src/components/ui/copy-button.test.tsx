@@ -55,4 +55,8 @@ describe("CopyButton", () => {
 
     expect(screen.getByRole("button", { name: /copy/i })).toBeInTheDocument();
   });
+
+  // Note: Tooltip visibility tests are omitted as they are unreliable in JSDOM
+  // due to reliance on layout measurements (ResizeObserver, etc.) and PointerEvents.
+  // Visual verification was performed via E2E script.
 });
