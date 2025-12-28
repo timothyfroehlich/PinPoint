@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Unconfirmed users system for pre-creating owners before signup
+- Invitation emails for unconfirmed users (admin-only feature)
+- Email capture on public issue reports (optional)
+- Auto-linking of machines/issues when unconfirmed users sign up
+- Unified admin users page showing both active and unconfirmed users
+
 ### Security
 
 - Added max length validation (5000 chars) to issue descriptions and comments to prevent DoS attacks

@@ -8,42 +8,88 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Label } from "~/components/ui/label";
+import { Button } from "~/components/ui/button";
 
-interface User {
-  id: string;
-  name: string;
-}
+import React, { useState, useEffect, useRef } from "react";
+import type { UnifiedUser } from "~/lib/types";
+import { InviteUserDialog } from "~/components/users/InviteUserDialog";
+import { Plus } from "lucide-react";
 
 interface OwnerSelectProps {
-  users: User[];
+  users: UnifiedUser[];
   defaultValue?: string | null;
   disabled?: boolean;
+  onUsersChange?: (users: UnifiedUser[]) => void;
 }
-
-import React from "react";
 
 export function OwnerSelect({
   users,
   defaultValue,
   disabled,
+  onUsersChange,
 }: OwnerSelectProps): React.JSX.Element {
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState(defaultValue ?? "");
+
+  // Ref to track pending user ID to select after users list updates
+  const pendingSelectionRef = useRef<string | null>(null);
+
+  // Effect to apply pending selection after users list is updated
+  useEffect(() => {
+    if (pendingSelectionRef.current) {
+      const pendingId = pendingSelectionRef.current;
+      // Check if the pending ID now exists in the users list
+      if (users.some((u) => u.id === pendingId)) {
+        setSelectedId(pendingId);
+        pendingSelectionRef.current = null;
+      }
+    }
+  }, [users]);
+
+  const sortedUsers = [...users].sort((a, b) => a.name.localeCompare(b.name));
+
   return (
     <div className="space-y-2">
-      <Label htmlFor="ownerId" className="text-on-surface">
-        Machine Owner
-      </Label>
+      <div className="flex items-center justify-between">
+        <Label htmlFor="ownerId" className="text-on-surface">
+          Machine Owner
+        </Label>
+        {!disabled && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2 text-xs text-primary"
+            onClick={() => setInviteDialogOpen(true)}
+          >
+            <Plus className="mr-1 size-3" />
+            Invite New
+          </Button>
+        )}
+      </div>
       <Select
         name="ownerId"
-        defaultValue={defaultValue ?? ""}
+        value={selectedId}
+        onValueChange={setSelectedId}
         disabled={!!disabled}
       >
-        <SelectTrigger className="border-outline bg-surface text-on-surface">
+        <SelectTrigger
+          id="ownerId"
+          className="border-outline bg-surface text-on-surface"
+        >
           <SelectValue placeholder="Select an owner" />
         </SelectTrigger>
         <SelectContent>
-          {users.map((user) => (
+          {sortedUsers.map((user) => (
             <SelectItem key={user.id} value={user.id}>
-              {user.name}
+              <div className="flex items-center gap-2">
+                <span>{user.name}</span>
+                {user.status === "unconfirmed" && (
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-on-surface-variant/70">
+                    (Unconfirmed)
+                  </span>
+                )}
+              </div>
             </SelectItem>
           ))}
         </SelectContent>
@@ -51,6 +97,19 @@ export function OwnerSelect({
       <p className="text-xs text-on-surface-variant">
         The owner receives notifications for new issues on this machine.
       </p>
+
+      <InviteUserDialog
+        open={inviteDialogOpen}
+        onOpenChange={setInviteDialogOpen}
+        onSuccess={(newUserId, newUser) => {
+          // Store the pending selection - it will be applied after users list updates
+          pendingSelectionRef.current = newUserId;
+          // Add the new user to the list immediately (no server refresh needed)
+          if (onUsersChange) {
+            onUsersChange([...users, newUser]);
+          }
+        }}
+      />
     </div>
   );
 }

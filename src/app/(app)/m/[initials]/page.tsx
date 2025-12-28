@@ -1,11 +1,13 @@
 import type React from "react";
 import { notFound } from "next/navigation";
+import { getUnifiedUsers } from "~/lib/users/queries";
+import type { UnifiedUser } from "~/lib/types";
 import { cn } from "~/lib/utils";
 import Link from "next/link";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { machines, userProfiles } from "~/server/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import {
   deriveMachineStatus,
   getMachineStatusLabel,
@@ -78,12 +80,9 @@ export default async function MachineDetailPage({
 
   const isAdmin = currentUserProfile?.role === "admin";
 
-  let allUsers: { id: string; name: string }[] = [];
+  let allUsers: UnifiedUser[] = [];
   if (isAdmin) {
-    allUsers = await db
-      .select({ id: userProfiles.id, name: userProfiles.name })
-      .from(userProfiles)
-      .orderBy(asc(userProfiles.name));
+    allUsers = await getUnifiedUsers();
   }
 
   // 404 if machine not found

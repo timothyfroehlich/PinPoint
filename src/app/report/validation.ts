@@ -32,6 +32,9 @@ export function parsePublicIssueForm(
     title: toOptionalString(formData.get("title")),
     description: toOptionalString(formData.get("description")),
     severity: toOptionalString(formData.get("severity")),
+    firstName: toOptionalString(formData.get("firstName")),
+    lastName: toOptionalString(formData.get("lastName")),
+    email: toOptionalString(formData.get("email")),
   };
 
   const validation = publicIssueSchema.safeParse(rawData);

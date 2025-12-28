@@ -76,6 +76,7 @@ describe("signupSchema", () => {
       lastName: "Doe",
       email: "john@example.com",
       password: "SecurePass123",
+      confirmPassword: "SecurePass123",
     });
 
     expect(result.success).toBe(true);
@@ -93,6 +94,7 @@ describe("signupSchema", () => {
       lastName: "  Doe  ",
       email: "john@example.com",
       password: "SecurePass123",
+      confirmPassword: "SecurePass123",
     });
 
     expect(result.success).toBe(true);
@@ -108,6 +110,7 @@ describe("signupSchema", () => {
       lastName: "",
       email: "john@example.com",
       password: "SecurePass123",
+      confirmPassword: "SecurePass123",
     });
 
     expect(result.success).toBe(false);
@@ -124,6 +127,7 @@ describe("signupSchema", () => {
       lastName: "Doe",
       email: "john@example.com",
       password: "SecurePass123",
+      confirmPassword: "SecurePass123",
     });
 
     expect(result.success).toBe(false);
@@ -138,6 +142,7 @@ describe("signupSchema", () => {
       lastName: "Doe",
       email: "invalid-email",
       password: "SecurePass123",
+      confirmPassword: "SecurePass123",
     });
 
     expect(result.success).toBe(false);
@@ -152,6 +157,7 @@ describe("signupSchema", () => {
       lastName: "Doe",
       email: "john@example.com",
       password: "short",
+      confirmPassword: "short",
     });
 
     expect(result.success).toBe(false);
@@ -166,6 +172,7 @@ describe("signupSchema", () => {
       lastName: "Doe",
       email: "john@example.com",
       password: "a".repeat(129),
+      confirmPassword: "a".repeat(129),
     });
 
     expect(result.success).toBe(false);
@@ -180,6 +187,7 @@ describe("signupSchema", () => {
       lastName: "Doe",
       email: "john@example.com",
       password: "12345678",
+      confirmPassword: "12345678",
     });
 
     expect(result.success).toBe(true);
@@ -191,6 +199,7 @@ describe("signupSchema", () => {
       lastName: "Doe",
       email: "john@example.com",
       password: "a".repeat(128),
+      confirmPassword: "a".repeat(128),
     });
 
     expect(result.success).toBe(true);
