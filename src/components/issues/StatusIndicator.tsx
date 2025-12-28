@@ -18,17 +18,17 @@ export function StatusIndicator({
 }: StatusIndicatorProps): React.JSX.Element {
   const statusConfig = {
     new: {
-      icon: <AlertCircle className="size-5 text-yellow-500" />,
+      icon: <AlertCircle className="size-5 text-warning" />,
       label: "New",
       description: "This issue has been reported but not yet addressed.",
     },
     in_progress: {
-      icon: <CircleDot className="size-5 text-blue-500" />,
+      icon: <CircleDot className="size-5 text-status-in-progress" />,
       label: "In Progress",
       description: "Work is currently being done to resolve this issue.",
     },
     resolved: {
-      icon: <CheckCircle2 className="size-5 text-green-500" />,
+      icon: <CheckCircle2 className="size-5 text-status-resolved" />,
       label: "Resolved",
       description: "This issue has been fixed.",
     },
