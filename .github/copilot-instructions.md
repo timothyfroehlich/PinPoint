@@ -48,7 +48,7 @@ Referencing `TASKS.md` PR order:
 ## Copilot Review Priorities
 
 1. **GitHub Staging Files**: Any files in `.github-staging/` directory MUST be manually reviewed before moving to `.github/`. Never automatically move or activate these files. See `.github-staging/README.md` for review process.
-2. **Release Notes**: Verify `CHANGELOG.md` has been updated with a brief description of changes for user-facing or significant technical updates. Skip only for CI, refactoring, or test-only changes.
+2. **Release Notes**: Verify `CHANGELOG.md` has been updated with a brief description of changes for user-facing or significant technical updates. Skip only for CI plumbing, refactoring, test-only changes, and bot PRs (dependabot, Jules).
 3. Security & Data Integrity: Input validation, single-tenant assumptions honored, issue-machine relationship enforced.
 4. Server-First Compliance: Avoid unnecessary `"use client"`.
 5. Type Safety: No forbidden escapes; proper narrowing.

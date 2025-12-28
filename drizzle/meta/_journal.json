@@ -8,6 +8,20 @@
       "when": 1765036190971,
       "tag": "0000_init-schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1766428516608,
+      "tag": "0001_add_performance_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1766770560460,
+      "tag": "0002_add_more_performance_indexes",
+      "breakpoints": true
     }
   ]
 }
