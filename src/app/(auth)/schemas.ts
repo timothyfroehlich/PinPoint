@@ -12,11 +12,11 @@ export const loginSchema = z.object({
   email: z
     .string()
     .email("Please enter a valid email address")
-    .max(1000, "Email is too long"),
+    .max(500, "Email must be less than 500 characters"),
   password: z
     .string()
     .min(1, "Password is required")
-    .max(128, "Password is too long"),
+    .max(128, "Password must be less than 128 characters"),
   rememberMe: z.boolean().optional(),
 });
 
@@ -42,7 +42,7 @@ export const forgotPasswordSchema = z.object({
   email: z
     .string()
     .email("Please enter a valid email address")
-    .max(1000, "Email is too long"),
+    .max(500, "Email must be less than 500 characters"),
 });
 
 export const resetPasswordSchema = z

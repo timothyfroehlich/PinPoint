@@ -44,6 +44,7 @@ export const updateMachineSchema = z.object({
   id: z.string().uuid(),
   name: z
     .string()
+    .trim()
     .min(1, "Name is required")
     .max(100, "Machine name must be less than 100 characters"),
   ownerId: z.string().uuid().optional(),
