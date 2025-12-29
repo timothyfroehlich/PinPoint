@@ -1,8 +1,8 @@
 import type React from "react";
 import Link from "next/link";
-import { AlertCircle, CheckCircle2, CircleDot } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { Badge } from "~/components/ui/badge";
+import { StatusIndicator } from "~/components/issues/StatusIndicator";
 
 interface IssueRowProps {
   issue: {
@@ -24,13 +24,6 @@ interface IssueRowProps {
 }
 
 export function IssueRow({ issue }: IssueRowProps): React.JSX.Element {
-  const statusIcon = {
-    new: <AlertCircle className="size-5 text-yellow-500" />,
-    in_progress: <CircleDot className="size-5 text-blue-500" />,
-    resolved: <CheckCircle2 className="size-5 text-green-500" />,
-    // closed: <CheckCircle2 className="size-5 text-gray-500" />, // closed not in DB enum
-  };
-
   const severityColor = {
     minor: "bg-blue-900/30 text-blue-300",
     playable: "bg-yellow-900/30 text-yellow-300",
@@ -46,7 +39,9 @@ export function IssueRow({ issue }: IssueRowProps): React.JSX.Element {
           : "hover:bg-muted/40"
       )}
     >
-      <div className="mt-0.5 shrink-0">{statusIcon[issue.status]}</div>
+      <div className="mt-0.5 shrink-0">
+        <StatusIndicator status={issue.status} />
+      </div>
 
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-center gap-2">
