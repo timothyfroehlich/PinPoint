@@ -36,8 +36,9 @@ Invoke this skill when:
 **Stage Advancement**: Automatically performs trivial actions (mark ready, apply labels)
 
 **Parallelization**:
-- Scheduled PRs (Sentinel/Bolt/Palette): Type-specific subagents
-- Individual task PRs: One subagent per PR (very different from each other)
+- Launch ONE subagent per PR for data gathering (status, diff, checks)
+- Main agent analyzes ALL results and makes decisions
+- Launch additional subagents for specific actions (post comments, apply labels)
 - Manual review: Async subagents, present ONE at a time
 
 **30-Minute Timeout**: Check WHO acted last. If WE acted and Jules/Copilot hasn't responded >30min (excluding 👀), label as `jules:agent-stalled`. If Jules acted last, ball is in OUR court for review!
@@ -127,6 +128,12 @@ Each PR has exactly ONE stage label:
 - `jules:manual-review` - Needs manual decision, presented one-at-a-time (purple)
 - `jules:duplicate-candidate` - May be duplicate, needs comparison (yellow)
 
+**Required approval label** (independent of stage):
+
+- `jules:vetted` - User personally approved PR for processing (green)
+  - **CRITICAL**: ALL PRs must have this label before any work is done
+  - Missing this label → Auto-tag `jules:manual-review` for approval
+
 ---
 
 ## Workflow: Continuous Processing Loop
@@ -167,7 +174,10 @@ Each PR has exactly ONE stage label:
 
 7. Manual Review (one at a time)
    ├─ Present first manual review PR with full context
-   ├─ Wait for user decision
+   ├─ If missing `jules:vetted` → Ask: "Approve this PR for processing?"
+   ├─ If user approves → Apply `jules:vetted` label, continue to Stage 1
+   ├─ If user rejects → Close PR, document in `.jules/*.md`
+   ├─ Wait for user decision on other items
    ├─ Execute user's decision via jules-pr-manager subagent
    └─ Move to next manual review PR
 
@@ -184,6 +194,9 @@ Each PR has exactly ONE stage label:
 **When**: Jules creates draft PR (`isDraft: true`)
 
 **Checklist**:
+- [ ] **CRITICAL**: Check for `jules:vetted` label
+  - If missing → Tag `jules:manual-review` to get user approval FIRST
+  - If present → Proceed with review
 - [ ] Identify PR type from title emoji (🛡️/⚡/🎨)
 - [ ] Check for duplicates:
   ```bash
@@ -231,7 +244,7 @@ This should be a Server Component, not Client Component.
 Remove "use client" and use Server Action for form submission.
 ```
 
-**Wait for Jules**:
+**Wait for Jules** (Google's agent - app/google-labs-jules):
 - Jules will acknowledge with 👀 emoji
 - Jules will push commits addressing feedback
 - If >30 minutes since last update (excluding 👀): label `jules:agent-stalled`
@@ -247,27 +260,61 @@ Remove "use client" and use Server Action for form submission.
 
 **When**: Draft changes validated and good to proceed
 
-**Action**: Just do it - no separate stage needed
+**Action**: Mark as ready and wait for Copilot to finish reviewing
 ```bash
 gh pr ready <PR-number>
-gh pr edit <PR-number> --remove-label "jules:draft-review" --add-label "jules:copilot-review"
+gh pr edit <PR-number> \
+  --remove-label "jules:draft-review" \
+  --remove-label "jules:changes-requested" \
+  --remove-label "jules:copilot-comments" \
+  --remove-label "jules:agent-stalled" \
+  --add-label "jules:copilot-review"
 ```
 
-**Next**: Copilot will automatically review (usually within minutes)
+**After marking ready**:
+
+1. **Wait for Copilot to START reviewing**:
+   ```bash
+   # Poll timeline for Copilot review start (check every 30 seconds for up to 5 minutes)
+   gh pr view <PR> --json timelineItems --jq '.timelineItems[] | select(.typename == "ReviewRequestedEvent" and .requestedReviewer.login == "copilot-pull-request-reviewer")'
+   ```
+
+2. **Wait for Copilot to FINISH reviewing**:
+   ```bash
+   # Check for completed review
+   gh pr view <PR> --json reviews --jq '.reviews[] | select(.author.login == "copilot-pull-request-reviewer") | {state: .state, submitted: .submittedAt}'
+   ```
+
+3. **Only proceed to Stage 4 when**:
+   - Copilot review exists (PullRequestReview event)
+   - Review has state (COMMENTED, APPROVED, CHANGES_REQUESTED)
+   - Review has submittedAt timestamp
+
+**Timeout**: If Copilot hasn't reviewed within 10 minutes → Tag `jules:manual-review` for user decision
 
 ---
 
 ## Stage 4: Copilot Review Handling
 
-**When**: Copilot reviews PR and may leave comments
+**When**: Copilot has FINISHED reviewing (confirmed via timeline events from Stage 3)
 
-**CRITICAL**: Copilot comments are INVISIBLE to Jules - must repost them manually!
+**CRITICAL**: Wait for Copilot review to complete before checking for comments!
+
+**Verify Copilot finished reviewing**:
+```bash
+# Verify Copilot finished reviewing
+gh pr view <PR> --json reviews --jq '.reviews[] | select(.author.login == "copilot-pull-request-reviewer") | {state: .state, submitted: .submittedAt, id: .id}'
+```
+
+**CRITICAL**: GitHub Copilot (copilot-pull-request-reviewer) reviews are INVISIBLE to Jules (Google's agent)!
+
+**Two separate systems**:
+- **Copilot** = GitHub's AI code reviewer (copilot-pull-request-reviewer)
+- **Jules** = Google's AI coding agent (app/google-labs-jules)
+- They CANNOT see each other's comments!
 
 **Checklist**:
-- [ ] Check if Copilot reviewed:
-  ```bash
-  gh pr view <PR> --json reviews --jq '.reviews[] | select(.author.login == "copilot-pull-request-reviewer")'
-  ```
+- [ ] Verify Copilot finished reviewing (state + submittedAt exist)
 - [ ] If Copilot left comments:
   - [ ] Get review ID from output
   - [ ] Retrieve comments:
@@ -300,7 +347,7 @@ Copilot review comment on `src/app/schemas.ts:42`:
 
 **When**: PR has merge conflicts with main
 
-**CRITICAL**: Do NOT let Jules manage merge conflicts - handle ourselves
+**CRITICAL**: Do NOT let Jules manage merge conflicts - handle ourselves using temporary worktrees
 
 **Checklist**:
 - [ ] Check for conflicts:
@@ -308,13 +355,19 @@ Copilot review comment on `src/app/schemas.ts:42`:
   gh pr view <PR> --json mergeable --jq '.mergeable'
   ```
 - [ ] If conflicts exist:
-  - [ ] Checkout PR branch:
+  - [ ] Create temporary worktree in /tmp:
     ```bash
-    gh pr checkout <PR>
+    PR_NUM=<PR-number>
+    BRANCH=$(gh pr view $PR_NUM --json headRefName --jq '.headRefName')
+    git worktree add /tmp/pinpoint-pr-$PR_NUM -b temp/pr-$PR_NUM
+    cd /tmp/pinpoint-pr-$PR_NUM
     ```
-  - [ ] Merge main into branch:
+  - [ ] Fetch PR branch and merge main:
     ```bash
-    git fetch origin main && git merge origin/main
+    git fetch origin $BRANCH
+    git merge origin/$BRANCH
+    git fetch origin main
+    git merge origin/main
     ```
   - [ ] Resolve conflicts manually:
     - **`.jules/*.md`**: Keep BOTH changes, merge chronologically:
@@ -327,13 +380,21 @@ Copilot review comment on `src/app/schemas.ts:42`:
       ```
     - **`supabase/seed-users.mjs`**: Merge both seed data sets
     - **`scripts/db-fast-reset.mjs`**: Merge both data sets
-  - [ ] Run validation:
+  - [ ] Run LIMITED validation (not full preflight):
     ```bash
-    npm run preflight
+    npm run lint && npm run format && npm test
+    # Do NOT run: npm run preflight (too slow, requires Supabase)
     ```
   - [ ] Push resolved conflicts:
     ```bash
-    git push
+    git add .
+    git commit -m "Resolve merge conflicts from main"
+    git push origin HEAD:$BRANCH
+    ```
+  - [ ] Cleanup worktree:
+    ```bash
+    cd /home/froeht/Code/PinPoint-Secondary
+    git worktree remove /tmp/pinpoint-pr-$PR_NUM
     ```
   - [ ] Apply label `jules:merge-conflicts` → remove after resolved
 
@@ -434,7 +495,11 @@ gh pr close <PR> --comment "Closing as duplicate of #<winner> which has better i
 
 ## 30-Minute Timeout Detection
 
-**Trigger**: Jules/Copilot hasn't acted >30 min after OUR request (excluding 👀 acknowledgment)
+**Trigger**: Jules (Google) or Copilot (GitHub) hasn't acted >30 min after OUR request (excluding 👀 acknowledgment)
+
+**Note**: Jules and Copilot are separate systems:
+- Jules acts via commits/comments as app/google-labs-jules
+- Copilot acts via reviews as copilot-pull-request-reviewer
 
 **CRITICAL**: Must check WHO acted last before applying timeout labels!
 
@@ -509,6 +574,44 @@ Task(
 **Action if stalled**: Add to manual review queue, present to user
 
 **Action if Jules responded**: Remove waiting labels, review Jules's changes
+
+---
+
+## Label Transitions After Jules Responds
+
+**When Jules pushes commits** (detected via timeline events):
+
+1. **Remove waiting labels**:
+   ```bash
+   gh pr edit $PR_NUMBER \
+     --remove-label "jules:changes-requested" \
+     --remove-label "jules:copilot-comments"
+   ```
+
+2. **Back to Stage 1 (Draft Review)**:
+   - Re-review Jules's changes
+   - Decision gates:
+     - If satisfied → Mark ready (Stage 3)
+     - If still issues → Request more changes (Stage 2)
+     - If uncertain → Tag `jules:manual-review`
+
+**When Copilot comments addressed** (Jules pushed commits after copilot-comments):
+
+1. **Check CI status**:
+   ```bash
+   gh pr checks $PR_NUMBER
+   ```
+
+2. **Decision gates**:
+   - **All CI passing** → Proceed to pre-merge validation (Stage 6)
+   - **CI failing** → Post comment for Jules:
+     ```markdown
+     CI checks are failing. Please fix:
+     - [List failing checks from gh pr checks output]
+
+     @google-labs-jules please address these failures.
+     ```
+     Apply label `jules:changes-requested`
 
 ---
 
@@ -696,10 +799,10 @@ Task(
 **Problem**: Both main and Jules PR updated `.jules/sentinel.md`
 
 **Solution** (using temporary worktree):
-1. Create temporary worktree:
+1. Create temporary worktree in /tmp:
    ```bash
-   git worktree add ../temp-pr-XXX -b temp/pr-XXX
-   cd ../temp-pr-XXX
+   git worktree add /tmp/pinpoint-pr-XXX -b temp/pr-XXX
+   cd /tmp/pinpoint-pr-XXX
    ```
 2. Fetch and merge PR branch:
    ```bash
@@ -717,18 +820,23 @@ Task(
    ## 2025-12-19 - Newer Entry (from Jules PR)
    ...
    ```
-4. Commit and push:
+4. Run LIMITED validation (not full preflight):
+   ```bash
+   npm run lint && npm run format && npm test
+   # Do NOT run: npm run preflight (too slow, requires Supabase)
+   ```
+5. Commit and push:
    ```bash
    git add .jules/sentinel.md
    git commit -m "Resolve .jules/sentinel.md conflict (keep both entries)"
    git push origin HEAD:$BRANCH
    ```
-5. Cleanup:
+6. Cleanup:
    ```bash
    cd /home/froeht/Code/PinPoint-Secondary
-   git worktree remove ../temp-pr-XXX
+   git worktree remove /tmp/pinpoint-pr-XXX
    ```
-6. Remove `jules:merge-conflicts` label via jules-pr-manager subagent
+7. Remove `jules:merge-conflicts` label via jules-pr-manager subagent
 
 **Note**: Always process merge conflicts sequentially (one at a time) and ask user if conflict is non-trivial.
 ```
@@ -823,36 +931,39 @@ while True:
         print("✅ No open Jules PRs remaining!")
         break
 
-    # 2. Timeout check
+    # 2. Check WHO acted last, apply timeout logic
     for pr in all_prs:
-        if is_stalled(pr, timeout_minutes=30):
-            label_as_stalled(pr)
+        last_actor = check_who_acted_last(pr)
+
+        if last_actor == "timothyfroehlich":
+            # We acted last - check if Jules/Copilot stalled
+            if time_since_our_action(pr) > 1800:  # 30 min
+                label_as_stalled(pr)
+
+        elif last_actor == "app/google-labs-jules":
+            # Jules acted last - ball in our court!
+            remove_waiting_labels(pr)
+            # PR goes back to draft review (Stage 1)
 
     # 3. Duplicate detection
     handle_duplicates(all_prs)
 
-    # 4. Categorize
-    scheduled = categorize_scheduled(all_prs)  # Sentinel/Bolt/Palette
-    individual = categorize_individual(all_prs)  # Non-scheduled
-    manual = get_manual_review(all_prs)
+    # 4. Launch parallel subagents (ONE per PR for data gathering)
+    for pr in all_prs:
+        if not has_label(pr, "jules:manual-review"):
+            launch_subagent_for_pr_data(pr)  # ✅ One per PR
 
-    # 5. Launch parallel subagents
-    cmd_agent = launch_command_subagent()
-    for pr_type, prs in scheduled.items():
-        launch_subagent(pr_type, prs)
-    for pr in individual:
-        launch_subagent(f"individual_{pr.number}", [pr])
-
-    # 6. Wait for completion
+    # 5. Wait for completion
     wait_for_all_subagents()
 
-    # 7. Async manual review (one at a time)
+    # 6. Async manual review (one at a time)
+    manual = get_manual_review(all_prs)
     for pr in manual:
         present_with_full_context(pr)
         wait_for_user_decision()
         handle_user_response(pr)
 
-    # 8. Check completion
+    # 7. Check completion
     remaining = get_all_jules_prs()
     waiting = [pr for pr in remaining if has_waiting_label(pr)]
 
