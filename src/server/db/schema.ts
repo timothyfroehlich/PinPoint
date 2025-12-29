@@ -147,7 +147,6 @@ export const issueWatchers = pgTable(
   },
   (t) => ({
     pk: primaryKey({ columns: [t.issueId, t.userId] }),
-    userIdIdx: index("idx_issue_watchers_user_id").on(t.userId),
   })
 );
 

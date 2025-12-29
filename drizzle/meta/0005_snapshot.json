@@ -1,5 +1,5 @@
 {
-  "id": "eac6aa56-fb2d-4921-824f-70726ee9564b",
+  "id": "3bdf85ff-8fef-46a3-8eea-2ec81e67a4ce",
   "prevId": "75cbbb20-95fa-4137-a951-fdd6c7008ea6",
   "version": "7",
   "dialect": "postgresql",
@@ -102,8 +102,12 @@
           "name": "issue_comments_issue_id_issues_id_fk",
           "tableFrom": "issue_comments",
           "tableTo": "issues",
-          "columnsFrom": ["issue_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "issue_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -111,8 +115,12 @@
           "name": "issue_comments_author_id_user_profiles_id_fk",
           "tableFrom": "issue_comments",
           "tableTo": "user_profiles",
-          "columnsFrom": ["author_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "author_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -140,30 +148,18 @@
           "notNull": true
         }
       },
-      "indexes": {
-        "idx_issue_watchers_user_id": {
-          "name": "idx_issue_watchers_user_id",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "issue_watchers_issue_id_issues_id_fk": {
           "name": "issue_watchers_issue_id_issues_id_fk",
           "tableFrom": "issue_watchers",
           "tableTo": "issues",
-          "columnsFrom": ["issue_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "issue_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -171,8 +167,12 @@
           "name": "issue_watchers_user_id_user_profiles_id_fk",
           "tableFrom": "issue_watchers",
           "tableTo": "user_profiles",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -180,7 +180,10 @@
       "compositePrimaryKeys": {
         "issue_watchers_issue_id_user_id_pk": {
           "name": "issue_watchers_issue_id_user_id_pk",
-          "columns": ["issue_id", "user_id"]
+          "columns": [
+            "issue_id",
+            "user_id"
+          ]
         }
       },
       "uniqueConstraints": {},
@@ -329,8 +332,12 @@
           "name": "issues_machine_initials_machines_initials_fk",
           "tableFrom": "issues",
           "tableTo": "machines",
-          "columnsFrom": ["machine_initials"],
-          "columnsTo": ["initials"],
+          "columnsFrom": [
+            "machine_initials"
+          ],
+          "columnsTo": [
+            "initials"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -338,8 +345,12 @@
           "name": "issues_reported_by_user_profiles_id_fk",
           "tableFrom": "issues",
           "tableTo": "user_profiles",
-          "columnsFrom": ["reported_by"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "reported_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -347,8 +358,12 @@
           "name": "issues_assigned_to_user_profiles_id_fk",
           "tableFrom": "issues",
           "tableTo": "user_profiles",
-          "columnsFrom": ["assigned_to"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "assigned_to"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -358,7 +373,10 @@
         "unique_issue_number": {
           "name": "unique_issue_number",
           "nullsNotDistinct": false,
-          "columns": ["machine_initials", "issue_number"]
+          "columns": [
+            "machine_initials",
+            "issue_number"
+          ]
         }
       },
       "policies": {},
@@ -438,8 +456,12 @@
           "name": "machines_owner_id_user_profiles_id_fk",
           "tableFrom": "machines",
           "tableTo": "user_profiles",
-          "columnsFrom": ["owner_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -449,7 +471,9 @@
         "machines_initials_unique": {
           "name": "machines_initials_unique",
           "nullsNotDistinct": false,
-          "columns": ["initials"]
+          "columns": [
+            "initials"
+          ]
         }
       },
       "policies": {},
@@ -578,8 +602,12 @@
           "name": "notification_preferences_user_id_user_profiles_id_fk",
           "tableFrom": "notification_preferences",
           "tableTo": "user_profiles",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -673,8 +701,12 @@
           "name": "notifications_user_id_user_profiles_id_fk",
           "tableFrom": "notifications",
           "tableTo": "user_profiles",
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
