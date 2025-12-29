@@ -1,6 +1,7 @@
 # PinPoint Product Specification
 
-**Last Updated**: 2025-11-10
+**Last Updated**: 2025-12-27
+**Current Phase**: MVP+ (In Progress)
 **Status**: ACTIVE - Source of truth for scope decisions
 
 ## Mission
@@ -206,14 +207,14 @@ These make MVP practical for daily use:
 - **Machine model info**: Manufacturer, year, model, location
 - **Machine search**: Find machines quickly as fleet grows
 - **Machine photos**: Identify machines visually
-- **Machine ownership**: Machines owned by members, notifications to owners
+- **Machine ownership**: Machines owned by members, notifications to owners 🚧 _In Progress_
 - **Issue photos**: Upload photos with issues for better clarity
 - **QR codes**: Generate QR codes for machines, link directly to issue reporting
 
 ### User Experience
 
 - **Guest accounts**: Self-service guest sign-up for public reporters
-- **Email capture**: Optional email on public reports for follow-up
+- **Email capture**: Optional email on public reports for follow-up 🚧 _In Progress_
 - **Recent issues per machine**: Show last 5 issues on machine page
 
 ### Polish

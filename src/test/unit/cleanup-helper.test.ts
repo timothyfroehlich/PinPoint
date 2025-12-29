@@ -27,6 +27,8 @@ describe("cleanupTestEntities helper", () => {
     expect(postArgs[1]?.data).toEqual({
       issueIds: [],
       machineIds: [],
+      machineInitials: [],
+      userEmails: [],
       issueTitlePrefix: "E2E Public Report",
     });
   });
