@@ -1,0 +1,1 @@
+CREATE INDEX "issue_watchers_issue_id_user_id_idx" ON "issue_watchers" USING btree ("issue_id","user_id");

@@ -43,6 +43,13 @@
       "when": 1767024674146,
       "tag": "0005_silky_viper",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1767026823630,
+      "tag": "0006_mute_rhino",
+      "breakpoints": true
     }
   ]
 }
