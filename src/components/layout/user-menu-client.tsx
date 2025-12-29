@@ -14,6 +14,7 @@ import { logoutAction } from "~/app/(auth)/actions";
 
 interface UserMenuProps {
   userName: string;
+  email?: string | undefined;
 }
 
 /**
@@ -24,7 +25,10 @@ interface UserMenuProps {
  * - Settings (future)
  * - Sign Out
  */
-export function UserMenu({ userName }: UserMenuProps): React.JSX.Element {
+export function UserMenu({
+  userName,
+  email,
+}: UserMenuProps): React.JSX.Element {
   // Get user initials for avatar fallback
   const initials = userName
     .split(" ")
@@ -60,6 +64,15 @@ export function UserMenu({ userName }: UserMenuProps): React.JSX.Element {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-56 bg-surface-variant">
+        {/* User Info Header */}
+        <div className="flex flex-col px-2 py-1.5 outline-none">
+          <p className="text-sm font-semibold text-on-surface">{userName}</p>
+          {email && (
+            <p className="text-xs text-on-surface-variant truncate">{email}</p>
+          )}
+        </div>
+        <DropdownMenuSeparator className="bg-outline-variant" />
+
         {/* Profile - future implementation */}
         <DropdownMenuItem
           disabled
