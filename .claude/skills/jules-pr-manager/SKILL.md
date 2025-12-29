@@ -35,6 +35,19 @@ Invoke this skill when:
 
 **Stage Advancement**: Automatically performs trivial actions (mark ready, apply labels)
 
+**Maximum Parallelism** (CRITICAL):
+- **NEVER wait when you can delegate**: If you can launch a background task and continue working, DO IT
+- **Keep under 5 concurrent tasks**: Track active background tasks, stay under limit
+- **Examples of what to background**:
+  - PR status checks (gh pr view, gh pr diff, gh pr checks)
+  - Copilot review comment retrieval
+  - Merge conflict resolution in temp worktrees
+  - Posting comments, applying labels
+- **What NOT to background**:
+  - User decisions (manual review must be presented one at a time)
+  - Sequential dependencies (can't merge before CI passes)
+- **Pattern**: Launch task → Continue to next PR → Check results later via TaskOutput
+
 **Parallelization**:
 - Rolling window: Max 5 subagents running concurrently (all non-blocking)
 - Launch subagents in priority order (tier 1 → tier 6)
@@ -465,6 +478,8 @@ Copilot review comment on `src/app/schemas.ts:42`:
 - ✅ **YOU (main agent)**: Run all git commands directly using Bash tool
 - ❌ **NOT jules-pr-manager subagent**: Read-only, cannot modify working directory
 - ❌ **NOT Jules**: Cannot handle merge conflicts reliably
+
+**IMPORTANT**: Merge conflict resolution can be slow. Launch these as background tasks and continue processing other PRs while they work. Use `run_in_background=True` when launching conflict resolution tasks.
 
 **Checklist**:
 - [ ] Check for conflicts:
@@ -940,6 +955,8 @@ Task(
 - Modify working directory when inspecting PR branches
 - Launch all subagents at once (use rolling window of 5)
 - Process PRs without priority ordering (finish almost-done PRs first)
+- **Wait for background tasks when you could be working on other PRs**
+- **Block on tasks that could run in parallel (stay under 5 concurrent)**
 
 **DO**:
 - Validate against NON_NEGOTIABLES.md
@@ -952,6 +969,8 @@ Task(
 - Process PRs by priority tier (1, 2, 6, 3, 4, 5)
 - Check for duplicates during vetting (tier 6 manual review)
 - Run preflight before merge confirmation
+- **Launch background tasks and continue working (maximum parallelism)**
+- **Keep <5 concurrent tasks active at all times when work is available**
 
 ---
 
