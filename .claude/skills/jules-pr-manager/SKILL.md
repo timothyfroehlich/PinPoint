@@ -497,17 +497,13 @@ Copilot review comment on `src/app/schemas.ts:42`:
       ```
     - **`supabase/seed-users.mjs`**: Merge both seed data sets
     - **`scripts/db-fast-reset.mjs`**: Merge both data sets
-  - [ ] Run LIMITED validation (not full preflight):
-    ```bash
-    npm run lint && npm run format && npm test
-    # Do NOT run: npm run preflight (too slow, requires Supabase)
-    ```
-  - [ ] Push resolved conflicts:
+  - [ ] Commit and push resolved conflicts:
     ```bash
     git add .
     git commit -m "Resolve merge conflicts from main"
     git push origin HEAD:$BRANCH
     ```
+    **Note**: Skip validation in temp worktree (no node_modules). CI will validate after push.
   - [ ] Cleanup worktree:
     ```bash
     cd /home/froeht/Code/PinPoint-Secondary
@@ -888,23 +884,19 @@ Task(
    ## 2025-12-19 - Newer Entry (from Jules PR)
    ...
    ```
-4. Run LIMITED validation (not full preflight):
-   ```bash
-   npm run lint && npm run format && npm test
-   # Do NOT run: npm run preflight (too slow, requires Supabase)
-   ```
-5. Commit and push:
+4. Commit and push:
    ```bash
    git add .jules/sentinel.md
    git commit -m "Resolve .jules/sentinel.md conflict (keep both entries)"
    git push origin HEAD:$BRANCH
    ```
-6. Cleanup:
+   **Note**: Skip validation (no node_modules in temp worktree). CI validates after push.
+5. Cleanup:
    ```bash
    cd /home/froeht/Code/PinPoint-Secondary
    git worktree remove /tmp/pinpoint-pr-XXX
    ```
-7. Remove `jules:merge-conflicts` label via jules-pr-manager subagent
+6. Remove `jules:merge-conflicts` label via jules-pr-manager subagent
 
 **Note**: Always process merge conflicts sequentially (one at a time) and ask user if conflict is non-trivial.
 ```
