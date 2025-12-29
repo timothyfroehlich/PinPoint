@@ -40,7 +40,7 @@ Invoke this skill when:
 - Individual task PRs: One subagent per PR (very different from each other)
 - Manual review: Async subagents, present ONE at a time
 
-**30-Minute Timeout**: If Jules/Copilot hasn't acted >30min (excluding 👀), label as `jules:agent-stalled`
+**30-Minute Timeout**: Check WHO acted last. If WE acted and Jules/Copilot hasn't responded >30min (excluding 👀), label as `jules:agent-stalled`. If Jules acted last, ball is in OUR court for review!
 
 ---
 
