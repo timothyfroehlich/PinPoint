@@ -14,7 +14,6 @@ import {
   AlertTriangle,
   CircleDot,
   HelpCircle,
-  History,
   Map as MapIcon,
 } from "lucide-react";
 import { cn } from "~/lib/utils";
@@ -106,7 +105,7 @@ export function Sidebar({
             isReport && !collapsed ? "text-primary-foreground" : ""
           )}
         />
-        {!collapsed && <span>{item.title}</span>}
+        <span className={cn(collapsed && "sr-only")}>{item.title}</span>
       </Link>
     );
 
@@ -147,6 +146,7 @@ export function Sidebar({
             href="/dashboard"
             {...(onNavigate ? { onClick: onNavigate } : {})}
             className="flex size-full items-center justify-center"
+            aria-label={collapsed ? "Austin Pinball Collective" : undefined}
           >
             {collapsed ? (
               <CircleDot className="size-8 text-primary animate-in fade-in zoom-in duration-300" />
@@ -195,13 +195,6 @@ export function Sidebar({
                 title: "Roadmap",
                 href: "/roadmap",
                 icon: MapIcon,
-              }}
-            />
-            <NavItem
-              item={{
-                title: "Changelog",
-                href: "/changelog",
-                icon: History,
               }}
             />
           </div>

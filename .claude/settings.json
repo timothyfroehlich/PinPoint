@@ -1,30 +1,4 @@
 {
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node .claude/hooks/quality-check.cjs",
-            "timeout": 30000
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "matcher": ".*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node .claude/hooks/pattern-reminder.cjs",
-            "timeout": 2000
-          }
-        ]
-      }
-    ]
-  },
   "permissions": {
     "allow": [
       "WebSearch",
@@ -77,7 +51,6 @@
       "Bash(gh run view:*)",
       "Bash(supabase status:*)",
       "Bash(supabase start:*)",
-
       "Bash(./scripts/check-security-deps.sh:*)",
       "Bash(./scripts/check-file-security.sh:*)",
       "Bash(./scripts/check-db-schema.sh:*)",
@@ -96,8 +69,47 @@
       "mcp__context7__resolve-library-id",
       "mcp__context7__get-library-docs"
     ],
-    "deny": ["Bash(find:*)", "Bash(psql:*)"]
+    "deny": [
+      "Bash(find:*)",
+      "Bash(psql:*)"
+    ]
   },
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": ["playwright"]
+  "enabledMcpjsonServers": [
+    "playwright"
+  ],
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/quality-check.cjs",
+            "timeout": 30000
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/pattern-reminder.cjs",
+            "timeout": 2000
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "context7@claude-plugins-official": true,
+    "github@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true,
+    "commit-commands@claude-plugins-official": true,
+    "supabase@claude-plugins-official": true,
+    "vercel@claude-plugins-official": true
+  }
 }
