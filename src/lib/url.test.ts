@@ -36,8 +36,8 @@ describe("requireSiteUrl", () => {
 
   it("throws error in production if nothing is set (new behavior)", () => {
     vi.stubEnv("NODE_ENV", "production");
-    delete process.env.NEXT_PUBLIC_SITE_URL;
-    delete process.env.VERCEL_URL;
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", undefined);
+    vi.stubEnv("VERCEL_URL", undefined);
 
     expect(() => requireSiteUrl("test")).toThrowError(
       /Configuration Error: NEXT_PUBLIC_SITE_URL is missing/
