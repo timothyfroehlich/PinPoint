@@ -9,7 +9,6 @@ import { test, expect } from "@playwright/test";
 import { loginAs, logout } from "../support/actions.js";
 import { seededMember } from "../support/constants.js";
 import { getPasswordResetLink, deleteAllMessages } from "../support/mailpit.js";
-import { confirmUserEmail } from "../support/supabase-admin.js";
 
 // Removed local signOut helper in favor of shared action
 
@@ -43,26 +42,8 @@ test.describe("Extended Authentication", () => {
     // Submit form
     await page.getByRole("button", { name: "Create Account" }).click();
 
-    // user is created but shown a confirmation message
-    // Verify success message is displayed
-    await expect(page.getByText("Check your email")).toBeVisible({
-      timeout: 10000,
-    });
-    await expect(page.getByText("We sent a confirmation link")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Go to Login" })).toBeVisible();
-
-    // Now go to login
-    await page.getByRole("link", { name: "Go to Login" }).click();
-    await expect(page).toHaveURL("/login");
-
-    // Auto-confirm the user's email using admin API
-    await confirmUserEmail(testEmail);
-
-    // Now login to establish session
-    await loginAs(page, testInfo, { email: testEmail, password });
-
-    // Should redirect to dashboard after successful login
-    await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
+    // Local env has enable_confirmations = false, so we are redirected to dashboard immediately
+    await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
 
     // Verify dashboard content (quick stats present)
     await expect(page.getByTestId("quick-stats")).toBeVisible();
@@ -115,20 +96,7 @@ test.describe("Extended Authentication", () => {
     await page.getByLabel("Confirm Password").fill(oldPassword);
     await page.getByRole("button", { name: "Create Account" }).click();
 
-    // With email confirmations enabled, wait for confirmation message
-    await expect(page.getByText("Check your email")).toBeVisible({
-      timeout: 10000,
-    });
-
-    // Go to login manually
-    await page.goto("/login");
-
-    // Auto-confirm and login
-    await confirmUserEmail(testEmail);
-    await page.goto("/login");
-    await page.getByLabel("Email").fill(testEmail);
-    await page.getByLabel("Password", { exact: true }).fill(oldPassword);
-    await page.getByRole("button", { name: "Sign In" }).click();
+    // Local env has enable_confirmations = false, so we are redirected to dashboard immediately
     await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
 
     // Sign out to start reset journey
