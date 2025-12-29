@@ -204,4 +204,22 @@ describe("signupSchema", () => {
 
     expect(result.success).toBe(true);
   });
+
+  it("should reject mismatched passwords", () => {
+    const result = signupSchema.safeParse({
+      firstName: "John",
+      lastName: "Doe",
+      email: "john@example.com",
+      password: "SecurePass123",
+      confirmPassword: "DifferentPass456",
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toContain(
+        "Passwords do not match"
+      );
+      expect(result.error.issues[0]?.path).toContain("confirmPassword");
+    }
+  });
 });

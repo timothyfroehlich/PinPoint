@@ -142,12 +142,18 @@ export async function inviteUser(
       where: eq(userProfiles.id, user.id),
     });
 
-    await sendInviteEmail({
+    const emailResult = await sendInviteEmail({
       to: validated.email,
       firstName: validated.firstName,
       inviterName: currentUser?.name ?? "An administrator",
       siteUrl,
     });
+
+    if (!emailResult.success) {
+      throw new Error(
+        `Failed to send invitation email: ${String(emailResult.error)}`
+      );
+    }
 
     await db
       .update(unconfirmedUsers)
@@ -187,12 +193,18 @@ export async function resendInvite(userId: string): Promise<{ ok: boolean }> {
     where: eq(userProfiles.id, user.id),
   });
 
-  await sendInviteEmail({
+  const emailResult = await sendInviteEmail({
     to: unconfirmed.email,
     firstName: unconfirmed.firstName,
     inviterName: currentUser?.name ?? "An administrator",
     siteUrl,
   });
+
+  if (!emailResult.success) {
+    throw new Error(
+      `Failed to send invitation email: ${String(emailResult.error)}`
+    );
+  }
 
   await db
     .update(unconfirmedUsers)
