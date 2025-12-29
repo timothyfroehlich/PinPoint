@@ -31,15 +31,17 @@ Invoke this skill when:
 
 **Continuous Loop**: Runs until NO open Jules PRs remain (doesn't exit when waiting for agents)
 
-**Batch Processing**: Each invocation processes ALL open Jules PRs
+**Batch Processing**: Processes PRs in priority order (tiers 1-6), max 5 subagents at a time (all non-blocking)
 
 **Stage Advancement**: Automatically performs trivial actions (mark ready, apply labels)
 
 **Parallelization**:
-- Launch ONE subagent per PR for data gathering (status, diff, checks)
+- Rolling window: Max 5 subagents running concurrently (all non-blocking)
+- Launch subagents in priority order (tier 1 → tier 6)
+- When subagent finishes, launch next in queue immediately
+- All subagent launches use `run_in_background=True` (never blocking)
 - Main agent analyzes ALL results and makes decisions
-- Launch additional subagents for specific actions (post comments, apply labels)
-- Manual review: Async subagents, present ONE at a time
+- Manual review: One at a time (includes duplicate detection for tier 6)
 
 **30-Minute Timeout**: Check WHO acted last. If WE acted and Jules/Copilot hasn't responded >30min (excluding 👀), label as `jules:agent-stalled`. If Jules acted last, ball is in OUR court for review!
 
@@ -91,8 +93,9 @@ if copilot_comments_found_in(pr_672_data):
 **Key Principles**:
 - Main agent sees skill content, understands full workflow
 - Main agent decides WHAT to do based on workflow stages
-- jules-pr-manager subagent executes HOW (specific gh/git commands)
+- jules-pr-manager subagent executes HOW (specific gh/git commands for READ-ONLY operations)
 - Subagent is read-only: uses `git show`, `git merge-tree`, never modifies working dir
+- **CRITICAL**: Main agent handles ALL merge conflicts (uses Bash tool directly, NOT subagent)
 - Parallelization via multiple subagent instances for data gathering
 - Iterate: launch subagents → analyze results → launch more as needed
 
@@ -143,48 +146,119 @@ Each PR has exactly ONE stage label:
    ├─ List all open Jules PRs
    ├─ Check timeline events: WHO acted last? (us vs Jules)
    ├─ Apply timeout ONLY if we acted last >30 min ago → label stalled PRs
-   ├─ If Jules acted last → Remove waiting labels, ready for our review
-   └─ Detect duplicates
+   └─ If Jules acted last → Remove waiting labels, ready for our review
 
-2. Duplicate Detection (first pass)
-   ├─ Group PRs by similar titles/issue
-   ├─ Compare diffs (gh pr diff)
-   ├─ Evaluate .jules/*.md entries (pick better learning)
-   ├─ Comment on winner with EXPLICIT code from losers (Jules can't read other PRs)
-   └─ Close losers
+2. Sort PRs by Priority
+   ├─ Assign each PR to tier (1, 2, 6, 3, 4, 5, or 7 for manual)
+   ├─ Sort within each tier by age (oldest first)
+   └─ Create ordered list of PRs to process
 
-3. Categorize PRs
-   ├─ By type: Sentinel (🛡️), Bolt (⚡), Palette (🎨), Individual tasks
-   └─ By status: Ready to process vs. Manual review needed
+3. Launch jules-pr-manager Subagents (Rolling Window)
+   ├─ Max 5 subagents running concurrently (all non-blocking)
+   ├─ Process PRs in priority order (tier 1 → tier 5)
+   ├─ When subagent finishes, launch next in queue immediately
+   ├─ Skip PRs labeled `jules:manual-review` (handle separately)
+   └─ Collect results via TaskOutput
 
-4. Launch jules-pr-manager Subagents (Parallel Data Gathering)
-   ├─ One subagent per PR for status/diff/checks
-   ├─ Wait for results via TaskOutput
-   └─ Collect all data before making decisions
-
-5. Analyze Results & Make Decisions (Main Agent)
+4. Analyze Results & Make Decisions (Main Agent)
    ├─ Evaluate each PR based on workflow stages
    ├─ Decide which actions to take (comment, label, merge conflicts, etc.)
    └─ Identify PRs needing manual review
 
-6. Execute Actions via jules-pr-manager Subagents
+5. Execute Actions via jules-pr-manager Subagents
    ├─ Launch subagents for specific actions (post comments, apply labels)
    ├─ Handle merge conflicts in temporary worktrees
    └─ Wait for completion
 
-7. Manual Review (one at a time)
+6. Manual Review (one at a time, includes duplicate detection)
    ├─ Present first manual review PR with full context
-   ├─ If missing `jules:vetted` → Ask: "Approve this PR for processing?"
-   ├─ If user approves → Apply `jules:vetted` label, continue to Stage 1
-   ├─ If user rejects → Close PR, document in `.jules/*.md`
-   ├─ Wait for user decision on other items
-   ├─ Execute user's decision via jules-pr-manager subagent
+   ├─ **If tier 6 (missing jules:vetted):**
+   │  ├─ Run comprehensive duplicate detection
+   │  ├─ If duplicate: close or consolidate (same logic as old stage)
+   │  ├─ If not duplicate: Ask "Approve this PR for processing?"
+   │  ├─ If user approves → Apply `jules:vetted` label
+   │  └─ If user rejects → Close PR, document in `.jules/*.md`
+   ├─ **If other manual review:**
+   │  ├─ Present full context
+   │  ├─ Wait for user decision
+   │  └─ Execute user's decision
    └─ Move to next manual review PR
 
-8. Check for Completion
-   ├─ No open PRs remain → DONE
-   ├─ Waiting for Jules/Copilot (labeled) → Sleep 5 min, loop to step 1
-   └─ Stalled PRs (30+ min) → Add to manual review queue
+7. Check for Completion
+   ├─ Check ALL remaining PRs
+   ├─ If none remain → DONE
+   ├─ If ALL are waiting (check timeline) → Sleep 5 min, loop to step 1
+   └─ If any can be processed → Continue to step 2 (don't sleep)
+```
+
+---
+
+## PR Priority Ordering
+
+**Tiers** (process in this order):
+
+1. **Tier 1 (highest priority)**: Stage 6 - Pre-merge validation
+   - Label: None (between copilot-review and merge)
+   - Why: Ready to merge, finish them first
+
+2. **Tier 2**: Stage 4 - Copilot comments addressed
+   - Label: `jules:copilot-comments` with recent Jules commits
+   - Why: Close to merge, high value
+
+3. **Tier 6**: Missing `jules:vetted` approval
+   - Missing label: `jules:vetted`
+   - Why: Vet early to clear out bad PRs, avoid wasted work
+
+4. **Tier 3**: Stage 3 - Waiting for Copilot review
+   - Label: `jules:copilot-review`
+   - Why: Waiting on Copilot, can't advance yet
+
+5. **Tier 4**: Stage 2 - Waiting for Jules to address comments
+   - Label: `jules:changes-requested`
+   - Why: Waiting on Jules, can't advance yet
+
+6. **Tier 5 (lowest priority)**: Stage 1 - Draft review with vetting
+   - Label: `jules:draft-review` AND has `jules:vetted`
+   - Why: Already vetted but needs review, lower priority
+
+**Within each tier**: Sort by PR age (oldest first) to prevent starvation
+
+**Determine tier from PR data**:
+```python
+def get_pr_tier(pr):
+    # Check labels and state
+    labels = pr.labels
+    has_vetted = "jules:vetted" in labels
+
+    # Tier 6: Missing vetted approval (highest priority after 1-2)
+    if not has_vetted:
+        return 6
+
+    # Tier 1: Pre-merge validation (no stage label, passed Copilot)
+    if all(label not in labels for label in ["jules:draft-review", "jules:changes-requested",
+                                               "jules:copilot-review", "jules:copilot-comments"]):
+        if pr.reviews_approved:  # Copilot approved or no comments
+            return 1
+
+    # Tier 2: Copilot comments addressed (recent commits after copilot-comments)
+    if "jules:copilot-comments" in labels:
+        if has_recent_commits_after_label(pr, "jules:copilot-comments"):
+            return 2
+
+    # Tier 3: Waiting for Copilot review
+    if "jules:copilot-review" in labels:
+        return 3
+
+    # Tier 4: Waiting for Jules to address comments
+    if "jules:changes-requested" in labels:
+        return 4
+
+    # Tier 5: Draft review (has vetted, needs initial review)
+    if "jules:draft-review" in labels and has_vetted:
+        return 5
+
+    # Default: manual review
+    return 7  # Manual review (handled separately)
 ```
 
 ---
@@ -197,11 +271,49 @@ Each PR has exactly ONE stage label:
 - [ ] **CRITICAL**: Check for `jules:vetted` label
   - If missing → Tag `jules:manual-review` to get user approval FIRST
   - If present → Proceed with review
+
+**For PRs missing `jules:vetted` (Tier 6 - Manual Approval + Duplicate Check)**:
+
+- [ ] **Run comprehensive duplicate detection**:
+  1. Identify duplicates: PRs with similar titles/descriptions
+  2. Compare diffs:
+     ```bash
+     gh pr diff <PR1> > pr1.diff
+     gh pr diff <PR2> > pr2.diff
+     diff -u pr1.diff pr2.diff
+     ```
+  3. Evaluate `.jules/*.md` entries: Pick PR with better learning documentation
+  4. **If duplicate found**:
+     - Pick winner (better `.jules/*.md` entry, more complete implementation)
+     - Comment on winner with EXPLICIT code from losers:
+       ```markdown
+       This PR is the keeper. Please incorporate these improvements from #XXX:
+
+       **From `file.ts` (line 42):**
+       ```typescript
+       // Better implementation
+       code_here
+       ```
+
+       @google-labs-jules please add these exact changes.
+       ```
+     - Close losers:
+       ```bash
+       gh pr close <PR> --comment "Duplicate of #<winner> which has better implementation."
+       ```
+     - Move to next PR (don't vet this one, it's closed)
+  5. **If not a duplicate**:
+     - Continue to manual approval below
+
+- [ ] **Manual Approval** (if not duplicate):
+  - Present full context (title, description, diff, files changed)
+  - Ask user: "Approve this PR for processing?"
+  - If user approves → Apply `jules:vetted` label, continue to Stage 1 review
+  - If user rejects → Close PR with explanation, document in `.jules/*.md`
+
+**For PRs with `jules:vetted` (proceed with normal review)**:
+
 - [ ] Identify PR type from title emoji (🛡️/⚡/🎨)
-- [ ] Check for duplicates:
-  ```bash
-  gh pr list --search "author:app/google-labs-jules is:open [search-term]" --limit 20
-  ```
 - [ ] Read PR description and understand changes
 - [ ] Review changed files - are changes good/worth making?
 - [ ] Validate against project standards:
@@ -210,10 +322,10 @@ Each PR has exactly ONE stage label:
   - [ ] Server-first principles (Server Components default)
   - [ ] Progressive enhancement (forms work without JS)
 
-**Decision Gates**:
+**Decision Gates** (for vetted PRs):
 - **Good + no issues** → Just mark as ready (Stage 3) - no separate stage needed
 - **Good + issues** → Request changes (Stage 2)
-- **Duplicate** → Handle via duplicate detection flow
+- **Duplicate** → Already handled in tier 6 duplicate detection
 - **Anti-pattern** → Close with explanation, document in `.jules/*.md`
 - **Uncertain** → Tag `jules:manual-review`
 
@@ -347,7 +459,12 @@ Copilot review comment on `src/app/schemas.ts:42`:
 
 **When**: PR has merge conflicts with main
 
-**CRITICAL**: Do NOT let Jules manage merge conflicts - handle ourselves using temporary worktrees
+**CRITICAL**: YOU (the orchestrating agent) handle merge conflicts - do NOT delegate to jules-pr-manager subagent or Jules
+
+**Who handles conflicts**:
+- ✅ **YOU (main agent)**: Run all git commands directly using Bash tool
+- ❌ **NOT jules-pr-manager subagent**: Read-only, cannot modify working directory
+- ❌ **NOT Jules**: Cannot handle merge conflicts reliably
 
 **Checklist**:
 - [ ] Check for conflicts:
@@ -441,55 +558,6 @@ Copilot review comment on `src/app/schemas.ts:42`:
   git checkout main && git pull origin main
   ```
 - [ ] Monitor deployment
-
----
-
-## Duplicate Detection & Smart Consolidation
-
-**Problem**: Jules creates 5+ attempts on same issue
-
-**Process**:
-1. **Identify duplicates**: PRs with similar titles/descriptions
-2. **Compare diffs**:
-   ```bash
-   gh pr diff <PR1> > pr1.diff
-   gh pr diff <PR2> > pr2.diff
-   diff -u pr1.diff pr2.diff
-   ```
-3. **Evaluate `.jules/*.md` entries**: Pick PR with better learning documentation (primary criterion)
-4. **Pick winner**:
-   - Better `.jules/*.md` learning entry (MOST IMPORTANT)
-   - More complete implementation
-   - Better test coverage
-   - More recent (tiebreaker)
-
-5. **Comment on winner with EXPLICIT code** (Jules can't read other PRs):
-
-```markdown
-This PR is the keeper. Please incorporate these improvements from #XXX:
-
-**From `src/app/schemas.ts` (line 42):**
-```typescript
-// Better error message
-.max(128, "Password must be 128 characters or less for security")
-```
-
-**From `src/test/schemas.test.ts` (new test case):**
-```typescript
-test("password rejects 129+ characters", () => {
-  const longPassword = "a".repeat(129);
-  const result = schema.safeParse({ password: longPassword });
-  expect(result.success).toBe(false);
-});
-```
-
-@google-labs-jules please add these exact changes.
-```
-
-6. **Close losers**:
-```bash
-gh pr close <PR> --comment "Closing as duplicate of #<winner> which has better implementation. Valuable changes noted in #<winner> for incorporation."
-```
 
 ---
 
@@ -878,6 +946,8 @@ Task(
 - Create separate stages for trivial actions (just do them)
 - Use general-purpose subagents for Jules PR processing
 - Modify working directory when inspecting PR branches
+- Launch all subagents at once (use rolling window of 5)
+- Process PRs without priority ordering (finish almost-done PRs first)
 
 **DO**:
 - Validate against NON_NEGOTIABLES.md
@@ -886,7 +956,9 @@ Task(
 - Handle merge conflicts ourselves in temporary worktrees
 - Present manual review PRs ONE at a time with full context
 - Use jules-pr-manager subagent for specific, read-only commands
-- Launch subagents in parallel for data gathering, analyze results sequentially
+- Use rolling window of max 5 subagents (all non-blocking)
+- Process PRs by priority tier (1, 2, 6, 3, 4, 5)
+- Check for duplicates during vetting (tier 6 manual review)
 - Run preflight before merge confirmation
 
 ---
@@ -945,35 +1017,82 @@ while True:
             remove_waiting_labels(pr)
             # PR goes back to draft review (Stage 1)
 
-    # 3. Duplicate detection
-    handle_duplicates(all_prs)
-
-    # 4. Launch parallel subagents (ONE per PR for data gathering)
+    # 3. Sort PRs by priority tier (NO separate duplicate detection stage)
+    sorted_prs = []
     for pr in all_prs:
-        if not has_label(pr, "jules:manual-review"):
-            launch_subagent_for_pr_data(pr)  # ✅ One per PR
+        tier = get_pr_tier(pr)  # Returns 1-7
+        sorted_prs.append((tier, pr.created_at, pr))
 
-    # 5. Wait for completion
-    wait_for_all_subagents()
+    sorted_prs.sort()  # Sort by (tier, age)
 
-    # 6. Async manual review (one at a time)
-    manual = get_manual_review(all_prs)
+    # Split into processable vs manual review
+    processable = [pr for tier, _, pr in sorted_prs if tier <= 6 and not has_label(pr, "jules:manual-review")]
+    manual = [pr for tier, _, pr in sorted_prs if has_label(pr, "jules:manual-review")]
+
+    # 4. Launch parallel subagents (rolling window of 5)
+    active_tasks = []
+    pr_queue = processable.copy()
+
+    # Launch initial batch (up to 5)
+    while len(active_tasks) < 5 and pr_queue:
+        pr = pr_queue.pop(0)
+        task = launch_subagent_for_pr_data(pr, run_in_background=True)
+        active_tasks.append((pr, task))
+
+    # Process results as they complete
+    all_results = []
+    while active_tasks or pr_queue:
+        # Wait for next task to complete
+        completed_task = wait_for_next_completion(active_tasks)
+        pr, result = completed_task
+        all_results.append((pr, result))
+        active_tasks.remove(completed_task)
+
+        # Launch next PR in queue (rolling window)
+        if pr_queue:
+            next_pr = pr_queue.pop(0)
+            task = launch_subagent_for_pr_data(next_pr, run_in_background=True)
+            active_tasks.append((next_pr, task))
+
+    # 5. Analyze results and execute actions
+    for pr, data in all_results:
+        analyze_and_execute_actions(pr, data)
+
+    # 6. Async manual review (one at a time, includes duplicate detection for tier 6)
     for pr in manual:
+        tier = get_pr_tier(pr)
+
+        # Tier 6: Missing jules:vetted - check for duplicates first
+        if tier == 6:
+            # Run comprehensive duplicate detection
+            duplicates = find_duplicates(pr, all_prs)
+            if duplicates:
+                winner = pick_best_pr([pr] + duplicates)
+                consolidate_and_close_duplicates(winner, duplicates)
+                if pr != winner:
+                    continue  # Skip to next PR (this one was closed)
+
+        # Present for manual review
         present_with_full_context(pr)
         wait_for_user_decision()
         handle_user_response(pr)
 
-    # 7. Check completion
+    # 7. Check completion - only sleep if ALL PRs are waiting
     remaining = get_all_jules_prs()
-    waiting = [pr for pr in remaining if has_waiting_label(pr)]
-
     if not remaining:
         break  # Done!
-    elif waiting:
-        print(f"Waiting for Jules/Copilot on {len(waiting)} PRs. Checking again in 5 minutes...")
+
+    # Check if ALL remaining PRs are waiting (via timeline check)
+    all_waiting = True
+    for pr in remaining:
+        if not is_waiting_on_jules_or_copilot(pr):
+            all_waiting = False
+            break
+
+    if all_waiting:
+        print(f"All {len(remaining)} PRs waiting for Jules/Copilot. Checking again in 5 minutes...")
         sleep(300)  # 5 minutes
-        continue
     else:
-        print("All PRs processed. Manual review required for remaining.")
-        break
+        print(f"Some PRs can be processed. Continuing to next iteration...")
+        # Don't sleep, continue to next loop immediately
 ```
