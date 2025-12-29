@@ -128,12 +128,7 @@ export async function MainLayout({
             <FeedbackWidget />
             {user ? (
               <>
-                <Button
-                  asChild
-                  variant="default"
-                  size="sm"
-                  className="hidden sm:inline-flex"
-                >
+                <Button asChild variant="default" size="sm">
                   <Link href="/report">Report Issue</Link>
                 </Button>
                 <NotificationList notifications={enrichedNotifications} />
