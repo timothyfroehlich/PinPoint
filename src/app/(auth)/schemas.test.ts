@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { forgotPasswordSchema, resetPasswordSchema, loginSchema } from "./schemas";
+import {
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  loginSchema,
+} from "./schemas";
 
 /**
  * Authentication Schema Validation Tests
@@ -58,7 +62,9 @@ describe("forgotPasswordSchema", () => {
     });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues[0]?.message).toBe("Email must be less than 500 characters");
+      expect(result.error.issues[0]?.message).toBe(
+        "Email must be less than 500 characters"
+      );
     }
   });
 });
@@ -117,7 +123,9 @@ describe("loginSchema", () => {
     });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues[0]?.message).toBe("Password must be less than 128 characters");
+      expect(result.error.issues[0]?.message).toBe(
+        "Password must be less than 128 characters"
+      );
     }
   });
 
@@ -129,7 +137,9 @@ describe("loginSchema", () => {
     });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues[0]?.message).toBe("Email must be less than 500 characters");
+      expect(result.error.issues[0]?.message).toBe(
+        "Email must be less than 500 characters"
+      );
     }
   });
 });
