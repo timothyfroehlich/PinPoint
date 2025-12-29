@@ -14,7 +14,6 @@ import {
   AlertTriangle,
   CircleDot,
   HelpCircle,
-  History,
   Map as MapIcon,
 } from "lucide-react";
 import { cn } from "~/lib/utils";
@@ -196,13 +195,6 @@ export function Sidebar({
                 title: "Roadmap",
                 href: "/roadmap",
                 icon: MapIcon,
-              }}
-            />
-            <NavItem
-              item={{
-                title: "Changelog",
-                href: "/changelog",
-                icon: History,
               }}
             />
           </div>
