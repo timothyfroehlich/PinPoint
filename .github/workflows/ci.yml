@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -34,7 +34,7 @@ jobs:
         run: npm ci
 
       - name: Cache node_modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -45,7 +45,7 @@ jobs:
     needs: setup
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -55,7 +55,7 @@ jobs:
 
       - name: Restore node_modules
         id: cache-restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -73,7 +73,7 @@ jobs:
     needs: setup
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -83,7 +83,7 @@ jobs:
 
       - name: Restore node_modules
         id: cache-restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -101,7 +101,7 @@ jobs:
     needs: setup
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -111,7 +111,7 @@ jobs:
 
       - name: Restore node_modules
         id: cache-restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -129,7 +129,7 @@ jobs:
     needs: [setup, typecheck, lint, format, test-unit, test-integration]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -139,7 +139,7 @@ jobs:
 
       - name: Restore node_modules
         id: cache-restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -162,7 +162,7 @@ jobs:
     needs: setup
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -172,7 +172,7 @@ jobs:
 
       - name: Restore node_modules
         id: cache-restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -194,7 +194,7 @@ jobs:
     needs: setup
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -204,7 +204,7 @@ jobs:
 
       - name: Restore node_modules
         id: cache-restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -227,7 +227,7 @@ jobs:
     needs: [setup, typecheck, lint, format, test-unit, test-integration]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -237,7 +237,7 @@ jobs:
 
       - name: Restore node_modules
         id: cache-restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -269,7 +269,7 @@ jobs:
     needs: [setup, typecheck, lint, format, test-unit, test-integration]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -279,7 +279,7 @@ jobs:
 
       - name: Restore node_modules
         id: cache-restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -294,7 +294,7 @@ jobs:
           version: latest
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
@@ -317,7 +317,7 @@ jobs:
 
       - name: Upload Playwright report
         if: failure()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: playwright-report-smoke-chromium
           path: playwright-report/
@@ -335,7 +335,7 @@ jobs:
     needs: [setup, typecheck, lint, format, test-unit, test-integration]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -345,7 +345,7 @@ jobs:
 
       - name: Restore node_modules
         id: cache-restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -360,7 +360,7 @@ jobs:
           version: latest
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
@@ -383,7 +383,7 @@ jobs:
 
       - name: Upload Playwright report
         if: failure()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: playwright-report-full-chromium
           path: playwright-report/
@@ -401,7 +401,7 @@ jobs:
     needs: [setup, typecheck, lint, format, test-unit, test-integration]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -411,7 +411,7 @@ jobs:
 
       - name: Restore node_modules
         id: cache-restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -426,7 +426,7 @@ jobs:
           version: latest
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
@@ -449,7 +449,7 @@ jobs:
 
       - name: Upload Playwright report
         if: failure()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: playwright-report-full-mobile-chrome
           path: playwright-report/
@@ -467,7 +467,7 @@ jobs:
     needs: [setup, typecheck, lint, format, test-unit, test-integration]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -477,7 +477,7 @@ jobs:
 
       - name: Restore node_modules
         id: cache-restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -492,7 +492,7 @@ jobs:
           version: latest
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
@@ -518,7 +518,7 @@ jobs:
 
       - name: Upload Playwright report
         if: failure()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: playwright-report-full-mobile-safari
           path: playwright-report/
@@ -529,7 +529,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -544,7 +544,7 @@ jobs:
     needs: setup
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -554,7 +554,7 @@ jobs:
 
       - name: Restore node_modules
         id: cache-restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}

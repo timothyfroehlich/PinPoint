@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { useActionState, useEffect, useRef } from "react";
+import { Loader2 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
 import {
@@ -17,7 +18,7 @@ export function AddCommentForm({
   issueId,
 }: AddCommentFormProps): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
-  const [state, formAction] = useActionState<
+  const [state, formAction, isPending] = useActionState<
     AddCommentResult | undefined,
     FormData
   >(addCommentAction, undefined);
@@ -34,11 +35,20 @@ export function AddCommentForm({
       <Textarea
         name="comment"
         placeholder="Leave a comment..."
+        aria-label="Comment"
         required
+        disabled={isPending}
         className="border-outline-variant bg-surface text-on-surface"
       />
-      <Button type="submit" size="sm">
-        Add Comment
+      <Button type="submit" size="sm" disabled={isPending}>
+        {isPending ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Adding...
+          </>
+        ) : (
+          "Add Comment"
+        )}
       </Button>
       {state && !state.ok && (
         <p className="text-sm text-destructive">{state.message}</p>
