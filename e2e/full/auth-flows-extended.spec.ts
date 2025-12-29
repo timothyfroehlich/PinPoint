@@ -37,7 +37,8 @@ test.describe("Extended Authentication", () => {
     await page.getByLabel("First Name").fill("E2E Test");
     await page.getByLabel("Last Name").fill("User");
     await page.getByLabel("Email").fill(testEmail);
-    await page.getByLabel("Password").fill(password);
+    await page.getByLabel("Password", { exact: true }).fill(password);
+    await page.getByLabel("Confirm Password").fill(password);
 
     // Submit form
     await page.getByRole("button", { name: "Create Account" }).click();
@@ -110,7 +111,8 @@ test.describe("Extended Authentication", () => {
     await page.getByLabel("First Name").fill("Password Reset");
     await page.getByLabel("Last Name").fill("Test");
     await page.getByLabel("Email").fill(testEmail);
-    await page.getByLabel("Password").fill(oldPassword);
+    await page.getByLabel("Password", { exact: true }).fill(oldPassword);
+    await page.getByLabel("Confirm Password").fill(oldPassword);
     await page.getByRole("button", { name: "Create Account" }).click();
 
     // With email confirmations enabled, wait for confirmation message
@@ -125,7 +127,7 @@ test.describe("Extended Authentication", () => {
     await confirmUserEmail(testEmail);
     await page.goto("/login");
     await page.getByLabel("Email").fill(testEmail);
-    await page.getByLabel("Password").fill(oldPassword);
+    await page.getByLabel("Password", { exact: true }).fill(oldPassword);
     await page.getByRole("button", { name: "Sign In" }).click();
     await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
 
@@ -169,7 +171,7 @@ test.describe("Extended Authentication", () => {
 
     // Now log in with the new password
     await page.getByLabel("Email").fill(testEmail);
-    await page.getByLabel("Password").fill(newPassword);
+    await page.getByLabel("Password", { exact: true }).fill(newPassword);
     await page.getByRole("button", { name: "Sign In" }).click();
     await expect(page).toHaveURL("/dashboard");
     await expect(page.getByTestId("quick-stats")).toBeVisible();
