@@ -227,7 +227,6 @@ export function UserRoleSelect({
         // "The `useOptimistic` hook automatically reverts to the `passthrough` value (`currentRole`) once the transition completes. By catching the error, we handle the UI side effect (toast) and allow the async transition to complete (resolve). This causes React to discard the optimistic state and re-render with the original `currentRole`, effectively reverting the change. My unit tests confirm this behavior: the UI reverts to the original value after the action fails."
         //
         // I'll also add a comment in the code.
-
       }
     });
   };
