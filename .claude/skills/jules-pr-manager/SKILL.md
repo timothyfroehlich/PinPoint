@@ -21,8 +21,7 @@ Invoke this skill when:
 **Critical Constraints**:
 1. **Jules CANNOT read GitHub Copilot review comments** - must be manually reposted
 2. **High duplicate rate** - 5+ attempts on same issue common (consolidate intelligently)
-3. **Merge conflict handling** - we handle them, not Jules
-4. **CHANGELOG exempt** - Jules PRs skip release notes (workflow already exempts `jules[bot]`)
+3. **Merge conflict handling** - we handle them, not Jules (CHANGELOG conflicts handled by separate workflow)
 
 **Learning Journals**: Jules maintains `.jules/{sentinel,bolt,palette}.md` with findings/learnings
 
@@ -135,7 +134,9 @@ Each PR has exactly ONE stage label:
 ```
 1. Initialize
    ├─ List all open Jules PRs
-   ├─ Apply 30-minute timeout checks → label stalled PRs
+   ├─ Check timeline events: WHO acted last? (us vs Jules)
+   ├─ Apply timeout ONLY if we acted last >30 min ago → label stalled PRs
+   ├─ If Jules acted last → Remove waiting labels, ready for our review
    └─ Detect duplicates
 
 2. Duplicate Detection (first pass)
@@ -316,7 +317,6 @@ Copilot review comment on `src/app/schemas.ts:42`:
     git fetch origin main && git merge origin/main
     ```
   - [ ] Resolve conflicts manually:
-    - **CHANGELOG.md**: Keep main's version (Jules exempt, can drop their entry)
     - **`.jules/*.md`**: Keep BOTH changes, merge chronologically:
       ```markdown
       ## 2025-02-14 - Earlier Entry
@@ -434,26 +434,81 @@ gh pr close <PR> --comment "Closing as duplicate of #<winner> which has better i
 
 ## 30-Minute Timeout Detection
 
-**Trigger**: Jules/Copilot hasn't acted >30 min after request (excluding 👀 acknowledgment)
+**Trigger**: Jules/Copilot hasn't acted >30 min after OUR request (excluding 👀 acknowledgment)
 
-**Detection**:
+**CRITICAL**: Must check WHO acted last before applying timeout labels!
+
+**Detection Process**:
+
+1. **Get recent timeline events** (last 30 minutes to 24 hours):
 ```bash
-# Check if PR updated in last 30 minutes
-last_updated=$(gh pr view $PR_NUMBER --json updatedAt --jq '.updatedAt')
-current_time=$(date -u +%s)
-updated_time=$(date -d "$last_updated" +%s)
-time_diff=$((current_time - updated_time))
+# Get timeline events for PR (commits, comments, reviews)
+gh pr view $PR_NUMBER --json timelineItems --jq '
+  .timelineItems
+  | reverse
+  | .[]
+  | select(.typename == "PullRequestCommit" or .typename == "IssueComment" or .typename == "PullRequestReview")
+  | {
+      type: .typename,
+      author: (.author.login // .commit.author.name),
+      created: (.createdAt // .commit.committedDate),
+      message: (.body // .commit.message)[0:100]
+    }
+  | select(.created > "THRESHOLD_TIME")
+'
+```
 
-if [ $time_diff -gt 1800 ]; then
-  # Stalled for >30 minutes
+2. **Determine WHO acted last**:
+   - **If last event author = "timothyfroehlich"** (us) → We're waiting for Jules
+   - **If last event author = "app/google-labs-jules"** (Jules bot) → Jules responded, we need to review!
+   - **If last event typename = "PullRequestCommit"** → Check commit author
+
+3. **Apply timeout logic ONLY if we acted last**:
+```bash
+# Pseudocode decision tree
+last_actor=$(check_last_timeline_event)
+
+if [ "$last_actor" == "timothyfroehlich" ]; then
+  # We acted last - check if Jules is stalled
+  time_since_our_action=$(calculate_time_diff)
+
+  if [ $time_since_our_action -gt 1800 ]; then
+    # Jules hasn't responded in 30+ min → STALLED
+    gh pr edit $PR_NUMBER \
+      --remove-label "jules:changes-requested" \
+      --remove-label "jules:copilot-comments" \
+      --add-label "jules:agent-stalled"
+  fi
+
+elif [ "$last_actor" == "app/google-labs-jules" ]; then
+  # Jules acted last - ball is in OUR court!
+  # Remove waiting labels, ready for our review
   gh pr edit $PR_NUMBER \
     --remove-label "jules:changes-requested" \
-    --remove-label "jules:copilot-comments" \
-    --add-label "jules:agent-stalled"
+    --remove-label "jules:copilot-comments"
+
+  # This PR needs our review now, not stalled
+  echo "PR #$PR_NUMBER: Jules responded, ready for our review"
 fi
 ```
 
-**Action**: Add to manual review queue, present to user
+**Commands via jules-pr-manager subagent**:
+```
+Task(
+    subagent_type="jules-pr-manager",
+    description="Check timeout for PR #672",
+    prompt="Check who acted last on PR #672:\n\n"
+           "1. Get timeline events:\n"
+           "   gh pr view 672 --json timelineItems --jq '.timelineItems | reverse | .[0:10] | .[] | select(.typename == \"PullRequestCommit\" or .typename == \"IssueComment\" or .typename == \"PullRequestReview\") | {type: .typename, author: (.author.login // .commit.author.name), created: (.createdAt // .commit.committedDate)}'\n\n"
+           "2. Identify last actor (timothyfroehlich vs app/google-labs-jules)\n\n"
+           "3. Calculate time since last event\n\n"
+           "4. Report: Who acted last? How long ago?"
+)
+```
+
+**Action if stalled**: Add to manual review queue, present to user
+
+**Action if Jules responded**: Remove waiting labels, review Jules's changes
 
 ---
 
@@ -635,42 +690,7 @@ Task(
 5. Wait for Jules (30min timeout)
 ```
 
-### Scenario 2: Handle CHANGELOG Conflict (Temporary Worktree)
-
-```markdown
-**Problem**: Jules PR has CHANGELOG conflict with main
-
-**Solution** (using temporary worktree to avoid modifying main working directory):
-1. Create temporary worktree:
-   ```bash
-   git worktree add ../temp-pr-XXX -b temp/pr-XXX
-   cd ../temp-pr-XXX
-   ```
-2. Fetch and merge PR branch:
-   ```bash
-   BRANCH=$(gh pr view XXX --json headRefName --jq '.headRefName')
-   git fetch origin $BRANCH
-   git merge origin/$BRANCH
-   ```
-3. Resolve conflict: Keep main's version (Jules exempt)
-   ```bash
-   git checkout --theirs CHANGELOG.md
-   git add CHANGELOG.md
-   git commit -m "Resolve CHANGELOG conflict (Jules exempt)"
-   ```
-4. Push to PR branch:
-   ```bash
-   git push origin HEAD:$BRANCH
-   ```
-5. Cleanup:
-   ```bash
-   cd /home/froeht/Code/PinPoint-Secondary
-   git worktree remove ../temp-pr-XXX
-   ```
-6. Remove `jules:merge-conflicts` label via jules-pr-manager subagent
-```
-
-### Scenario 3: Resolve `.jules/*.md` Conflict (Temporary Worktree)
+### Scenario 2: Resolve `.jules/*.md` Conflict (Temporary Worktree)
 
 ```markdown
 **Problem**: Both main and Jules PR updated `.jules/sentinel.md`
@@ -713,7 +733,7 @@ Task(
 **Note**: Always process merge conflicts sequentially (one at a time) and ask user if conflict is non-trivial.
 ```
 
-### Scenario 4: Close Duplicate PRs
+### Scenario 3: Close Duplicate PRs
 
 ```markdown
 **Problem**: PRs #665, #657, #654, #632 all address CopyButton
