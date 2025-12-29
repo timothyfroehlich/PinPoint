@@ -102,12 +102,8 @@
           "name": "issue_comments_issue_id_issues_id_fk",
           "tableFrom": "issue_comments",
           "tableTo": "issues",
-          "columnsFrom": [
-            "issue_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["issue_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -115,12 +111,8 @@
           "name": "issue_comments_author_id_user_profiles_id_fk",
           "tableFrom": "issue_comments",
           "tableTo": "user_profiles",
-          "columnsFrom": [
-            "author_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["author_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -170,12 +162,8 @@
           "name": "issue_watchers_issue_id_issues_id_fk",
           "tableFrom": "issue_watchers",
           "tableTo": "issues",
-          "columnsFrom": [
-            "issue_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["issue_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -183,12 +171,8 @@
           "name": "issue_watchers_user_id_user_profiles_id_fk",
           "tableFrom": "issue_watchers",
           "tableTo": "user_profiles",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -196,10 +180,7 @@
       "compositePrimaryKeys": {
         "issue_watchers_issue_id_user_id_pk": {
           "name": "issue_watchers_issue_id_user_id_pk",
-          "columns": [
-            "issue_id",
-            "user_id"
-          ]
+          "columns": ["issue_id", "user_id"]
         }
       },
       "uniqueConstraints": {},
@@ -348,12 +329,8 @@
           "name": "issues_machine_initials_machines_initials_fk",
           "tableFrom": "issues",
           "tableTo": "machines",
-          "columnsFrom": [
-            "machine_initials"
-          ],
-          "columnsTo": [
-            "initials"
-          ],
+          "columnsFrom": ["machine_initials"],
+          "columnsTo": ["initials"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -361,12 +338,8 @@
           "name": "issues_reported_by_user_profiles_id_fk",
           "tableFrom": "issues",
           "tableTo": "user_profiles",
-          "columnsFrom": [
-            "reported_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["reported_by"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -374,12 +347,8 @@
           "name": "issues_assigned_to_user_profiles_id_fk",
           "tableFrom": "issues",
           "tableTo": "user_profiles",
-          "columnsFrom": [
-            "assigned_to"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["assigned_to"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -389,10 +358,7 @@
         "unique_issue_number": {
           "name": "unique_issue_number",
           "nullsNotDistinct": false,
-          "columns": [
-            "machine_initials",
-            "issue_number"
-          ]
+          "columns": ["machine_initials", "issue_number"]
         }
       },
       "policies": {},
@@ -472,12 +438,8 @@
           "name": "machines_owner_id_user_profiles_id_fk",
           "tableFrom": "machines",
           "tableTo": "user_profiles",
-          "columnsFrom": [
-            "owner_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -487,9 +449,7 @@
         "machines_initials_unique": {
           "name": "machines_initials_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "initials"
-          ]
+          "columns": ["initials"]
         }
       },
       "policies": {},
@@ -618,12 +578,8 @@
           "name": "notification_preferences_user_id_user_profiles_id_fk",
           "tableFrom": "notification_preferences",
           "tableTo": "user_profiles",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -717,12 +673,8 @@
           "name": "notifications_user_id_user_profiles_id_fk",
           "tableFrom": "notifications",
           "tableTo": "user_profiles",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
