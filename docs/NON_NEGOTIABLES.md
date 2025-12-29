@@ -30,7 +30,6 @@ trigger: always_on
 10. Forms work without JavaScript (progressive enhancement)
 11. Use Drizzle migrations for schema changes (no ad-hoc `push` to production/preview)
 12. Keep auth host consistent: use `localhost` everywhere (Supabase site_url, Next dev, Playwright baseURL) to prevent cookie host mismatches
-13. Update `CHANGELOG.md` for every PR (skip only for CI plumbing/test-only changes and bot PRs like dependabot/Jules); release-notes workflow will block otherwise
 
 ---
 
