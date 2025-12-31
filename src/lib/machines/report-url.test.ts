@@ -9,7 +9,7 @@ describe("buildMachineReportUrl", () => {
       source: "qr",
     });
 
-    expect(url).toBe("https://pinpoint.dev/m/TZ?source=qr");
+    expect(url).toBe("https://pinpoint.dev/report?machine=TZ&source=qr");
   });
 
   it("omits source when not provided", () => {
@@ -18,6 +18,6 @@ describe("buildMachineReportUrl", () => {
       machineInitials: "TZ",
     });
 
-    expect(url).toBe("http://localhost:3000/m/TZ");
+    expect(url).toBe("http://localhost:3000/report?machine=TZ");
   });
 });

@@ -13,7 +13,8 @@ export function buildMachineReportUrl({
   machineInitials,
   source,
 }: BuildMachineReportUrlOptions): string {
-  const url = new URL(`/m/${machineInitials}`, siteUrl);
+  const url = new URL("/report", siteUrl);
+  url.searchParams.set("machine", machineInitials);
 
   if (source) {
     url.searchParams.set("source", source);
