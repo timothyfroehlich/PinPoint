@@ -118,7 +118,7 @@ test.describe("Notifications", () => {
     // Reporter (Member) reports an issue
     await ensureLoggedIn(page, testInfo, TEST_USERS.member);
 
-    await page.goto(`/m/${machine.initials}/report`);
+    await page.goto(`/report?machine=${machine.initials}`);
     await expect(
       page.getByRole("heading", { name: "Report an Issue" })
     ).toBeVisible();
@@ -355,7 +355,7 @@ test.describe("Notifications", () => {
     await memberPage
       .getByRole("button", { name: "Submit Issue Report" })
       .click();
-    await expect(memberPage).toHaveURL("/report/success");
+    await expect(memberPage).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
 
     // 3. Assertion: Admin verifies in-app notification created
     await page.bringToFront();

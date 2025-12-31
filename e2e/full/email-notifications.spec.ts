@@ -38,7 +38,7 @@ test.describe("Email Notifications", () => {
     await expect(page.getByTestId("quick-stats")).toBeVisible();
 
     // Create an issue for a specific machine (e.g., MM)
-    await page.goto("/m/MM/report");
+    await page.goto("/report?machine=MM");
     await page.getByLabel("Issue Title *").fill("Test Issue for Email");
     await page.getByLabel("Description").fill("Testing email notifications");
     await page.getByLabel("Severity *").selectOption("playable");
@@ -79,7 +79,7 @@ test.describe("Email Notifications", () => {
     await expect(page.getByTestId("quick-stats")).toBeVisible();
 
     // Create issue for a specific machine (e.g., MM)
-    await page.goto("/m/MM/report");
+    await page.goto("/report?machine=MM");
     await page.getByLabel("Issue Title *").fill("Status Change Test");
     await page.getByLabel("Severity *").selectOption("playable");
     await page.getByLabel("Priority *").selectOption("low");
