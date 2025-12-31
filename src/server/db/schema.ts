@@ -111,6 +111,9 @@ export const machines = pgTable(
       sql`(owner_id IS NULL OR unconfirmed_owner_id IS NULL)`
     ),
     ownerIdIdx: index("idx_machines_owner_id").on(t.ownerId),
+    unconfirmedOwnerIdIdx: index("idx_machines_unconfirmed_owner_id").on(
+      t.unconfirmedOwnerId
+    ),
   })
 );
 
@@ -163,6 +166,9 @@ export const issues = pgTable(
     ),
     assignedToIdx: index("idx_issues_assigned_to").on(t.assignedTo),
     reportedByIdx: index("idx_issues_reported_by").on(t.reportedBy),
+    unconfirmedReportedByIdx: index("idx_issues_unconfirmed_reported_by").on(
+      t.unconfirmedReportedBy
+    ),
     statusIdx: index("idx_issues_status").on(t.status),
   })
 );
