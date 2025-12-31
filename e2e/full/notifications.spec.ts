@@ -120,7 +120,7 @@ test.describe("Notifications", () => {
 
     await page.goto(`/m/${machine.initials}/report`);
     await expect(
-      page.getByRole("heading", { name: "Report Issue" })
+      page.getByRole("heading", { name: "Report an Issue" })
     ).toBeVisible();
 
     const issueTitle = `Status Change ${timestamp}`;
@@ -130,7 +130,7 @@ test.describe("Notifications", () => {
     // Explicitly select priority (required for logged-in users)
     await page.getByLabel("Priority *").selectOption("low");
 
-    await page.getByRole("button", { name: "Report Issue" }).click();
+    await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
     // Capture Issue URL/number (new route format /m/{initials}/i/{issueNumber})
     await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
@@ -288,8 +288,8 @@ test.describe("Notifications", () => {
     );
 
     // Explicitly select severity (required)
-    await publicPage.getByLabel("Severity").selectOption("minor");
-    await expect(publicPage.getByLabel("Severity")).toHaveValue("minor");
+    await publicPage.getByLabel("Severity *").selectOption("minor");
+    await expect(publicPage.getByLabel("Severity *")).toHaveValue("minor");
 
     await publicPage
       .getByRole("button", { name: "Submit Issue Report" })

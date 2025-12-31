@@ -3,7 +3,7 @@ import Link from "next/link";
 import {
   getIssueStatusLabel,
   getIssueStatusStyles,
-  type IssueStatus,
+  isIssueStatus,
 } from "~/lib/issues/status";
 import { Badge } from "~/components/ui/badge";
 import { cn } from "~/lib/utils";
@@ -112,11 +112,15 @@ export async function RecentIssuesPanel({
                 </p>
                 <Badge
                   className={cn(
-                    getIssueStatusStyles(issue.status as IssueStatus),
+                    getIssueStatusStyles(
+                      isIssueStatus(issue.status) ? issue.status : "new"
+                    ),
                     "px-1.5 py-0 text-[10px] h-4 font-semibold shrink-0"
                   )}
                 >
-                  {getIssueStatusLabel(issue.status as IssueStatus)}
+                  {getIssueStatusLabel(
+                    isIssueStatus(issue.status) ? issue.status : "new"
+                  )}
                 </Badge>
               </div>
             </Link>

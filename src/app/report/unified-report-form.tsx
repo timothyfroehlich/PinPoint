@@ -1,5 +1,11 @@
 "use client";
-import React, { useState, useMemo, useActionState, useEffect } from "react";
+import React, {
+  useState,
+  useMemo,
+  useActionState,
+  useEffect,
+  useRef,
+} from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Label } from "~/components/ui/label";
@@ -50,6 +56,7 @@ export function UnifiedReportForm({
 }: UnifiedReportFormProps): React.JSX.Element {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const hasRestored = useRef(false);
   const [selectedMachineId, setSelectedMachineId] = useState(
     defaultMachineId ?? ""
   );
@@ -69,7 +76,8 @@ export function UnifiedReportForm({
 
   // Persistence: Restore from localStorage on mount
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || hasRestored.current) return;
+    hasRestored.current = true;
     const saved = window.localStorage.getItem("report_form_state");
     if (saved) {
       try {
