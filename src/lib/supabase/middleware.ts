@@ -111,6 +111,7 @@ export async function updateSession(
     path.startsWith("/reset-password") ||
     path.startsWith("/auth") ||
     path.startsWith("/report") ||
+    path.startsWith("/dashboard") ||
     path.startsWith("/api");
 
   if (!user && !isPublic) {
