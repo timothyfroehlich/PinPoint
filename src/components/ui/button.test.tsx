@@ -1,8 +1,6 @@
-
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
 import { Button } from "./button";
-import { Loader2 } from "lucide-react";
 
 // Mock Loader2 to avoid issues with icon rendering in tests if necessary,
 // though lucide-react usually behaves well.
@@ -11,7 +9,9 @@ import { Loader2 } from "lucide-react";
 describe("Button", () => {
   it("renders children correctly", () => {
     render(<Button>Click me</Button>);
-    expect(screen.getByRole("button", { name: /click me/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /click me/i })
+    ).toBeInTheDocument();
   });
 
   it("applies loading state correctly", () => {
@@ -25,12 +25,20 @@ describe("Button", () => {
   });
 
   it("handles explicit disabled prop with loading", () => {
-    render(<Button loading disabled={false}>Click me</Button>);
+    render(
+      <Button loading disabled={false}>
+        Click me
+      </Button>
+    );
     expect(screen.getByRole("button")).toBeDisabled();
   });
 
   it("does not pollute DOM with loading prop", () => {
-    render(<Button loading data-testid="btn">Click me</Button>);
+    render(
+      <Button loading data-testid="btn">
+        Click me
+      </Button>
+    );
     const button = screen.getByTestId("btn");
     expect(button).not.toHaveAttribute("loading");
   });

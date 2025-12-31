@@ -67,6 +67,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
         {...props}
+        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- We need logical OR here to correctly handle disabled={false} || loading={true}
         disabled={props.disabled || loading}
       >
         {loading && <Loader2 className="mr-2 size-4 animate-spin" />}
