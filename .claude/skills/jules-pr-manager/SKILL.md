@@ -68,39 +68,52 @@ Invoke this skill when:
 
 The main agent (YOU) makes all decisions based on the skill workflow. You launch jules-pr-manager subagent instances for specific, read-only tasks.
 
-**Example: Validate PR in parallel**
+**Example 1: Simple operations - Use Bash directly**
 ```
-# Step 1: Launch jules-pr-manager subagents in parallel for data gathering
+# ✅ CORRECT: Posting a comment is 1-2 commands, use Bash directly
+Bash(
+    command='gh pr comment 672 --body "Copilot review comment on `file.ts:42`:\n> [comment text]\n\n@google-labs-jules please address this."',
+    description="Post Copilot comment to PR #672"
+)
+
+# ✅ CORRECT: Removing labels is 1 command, use Bash directly
+Bash(
+    command='gh pr edit 690 --remove-label "jules:changes-requested"',
+    description="Remove waiting label from PR #690"
+)
+```
+
+**Example 2: Complex operations - Use subagent with background**
+```
+# ✅ CORRECT: Getting PR status requires 3+ commands, use subagent
 pr_672_task = Task(
     subagent_type="jules-pr-manager",
-    description="Get PR #672 status",
+    description="Get PR #672 full status",
     prompt="Execute these commands for PR #672:\n"
            "1. gh pr view 672 --json status,reviews,mergeable,headRefName\n"
            "2. gh pr diff 672\n"
-           "3. gh pr checks 672",
-    run_in_background=True
+           "3. gh pr checks 672\n"
+           "4. Check timeline for last actor\n"
+           "5. Get Copilot review status",
+    run_in_background=True  # ✅ ALWAYS background when using subagents
 )
 
 pr_674_task = Task(
     subagent_type="jules-pr-manager",
-    description="Get PR #674 status",
+    description="Get PR #674 full status",
     prompt="Execute these commands for PR #674:\n"
-           "1. gh pr view 674 --json status,reviews,mergeable,headRefName\n"
-           "2. gh pr diff 674",
-    run_in_background=True
+           "1. gh pr view 674 --json status,reviews,mergeable\n"
+           "2. gh pr diff 674\n"
+           "3. gh pr checks 674",
+    run_in_background=True  # ✅ Parallel execution
 )
 
-# Step 2: Wait for results
+# Wait for results
 pr_672_data = TaskOutput(pr_672_task)
 pr_674_data = TaskOutput(pr_674_task)
 
-# Step 3: Analyze and decide (main agent makes decisions!)
-if copilot_comments_found_in(pr_672_data):
-    # Launch another subagent to post comments
-    Task(
-        subagent_type="jules-pr-manager",
-        prompt="Post comment on PR #672:\n\nCopilot review comment on `file.ts:42`:\n> [comment text]\n\n@google-labs-jules please address this."
-    )
+# Analyze and decide (main agent makes ALL decisions)
+# Then execute simple actions with Bash directly
 ```
 
 **Key Principles**:
@@ -109,7 +122,11 @@ if copilot_comments_found_in(pr_672_data):
 - jules-pr-manager subagent executes HOW (specific gh/git commands for READ-ONLY operations)
 - Subagent is read-only: uses `git show`, `git merge-tree`, never modifies working dir
 - **CRITICAL**: Main agent handles ALL merge conflicts (uses Bash tool directly, NOT subagent)
-- Parallelization via multiple subagent instances for data gathering
+- **When to use subagents**: ONLY launch a subagent if you expect:
+  - Strictly MORE than 2 tool calls, OR
+  - Tool calls that involve longer round trips than posting a GitHub comment
+- **When NOT to use subagents**: For simple 1-2 command operations (posting comments, applying labels), use Bash tool directly
+- **When you DO use subagents**: ALWAYS use `run_in_background=True` for parallelization
 - Iterate: launch subagents → analyze results → launch more as needed
 
 ### Wrong Pattern ❌
@@ -636,7 +653,7 @@ elif [ "$last_actor" == "app/google-labs-jules" ]; then
 fi
 ```
 
-**Commands via jules-pr-manager subagent**:
+**Commands** (use subagent since this requires 3+ steps):
 ```
 Task(
     subagent_type="jules-pr-manager",
@@ -646,7 +663,8 @@ Task(
            "   gh pr view 672 --json timelineItems --jq '.timelineItems | reverse | .[0:10] | .[] | select(.typename == \"PullRequestCommit\" or .typename == \"IssueComment\" or .typename == \"PullRequestReview\") | {type: .typename, author: (.author.login // .commit.author.name), created: (.createdAt // .commit.committedDate)}'\n\n"
            "2. Identify last actor (timothyfroehlich vs app/google-labs-jules)\n\n"
            "3. Calculate time since last event\n\n"
-           "4. Report: Who acted last? How long ago?"
+           "4. Report: Who acted last? How long ago?",
+    run_in_background=True  # ✅ Always background
 )
 ```
 
@@ -660,8 +678,9 @@ Task(
 
 **When Jules pushes commits** (detected via timeline events):
 
-1. **Remove waiting labels**:
+1. **Remove waiting labels** (use Bash directly - simple 1 command operation):
    ```bash
+   # ✅ Use Bash tool directly for simple label operations
    gh pr edit $PR_NUMBER \
      --remove-label "jules:changes-requested" \
      --remove-label "jules:copilot-comments"
@@ -858,18 +877,22 @@ Task(
 ```markdown
 **Problem**: Copilot left 3 comments, Jules can't see them
 
-**Solution**:
-1. Get review ID: `gh pr view 672 --json reviews`
-2. Get comments: `gh api repos/.../pulls/672/reviews/123/comments`
-3. Repost each comment:
+**Solution** (requires 3+ commands, use subagent):
+1. Launch subagent to get review ID and comments:
+   Task(subagent_type="jules-pr-manager",
+        prompt="1. gh pr view 672 --json reviews\n2. gh api repos/.../pulls/672/reviews/123/comments",
+        run_in_background=True)
+2. Repost each comment (use Bash directly - 1 command per comment):
+   ```bash
+   # ✅ Use Bash for simple comment posting
+   gh pr comment 672 --body "Copilot comment on \`file.ts:42\`:\n> [text]\n\n@google-labs-jules please address this."
    ```
-   Copilot comment on `file.ts:42`:
-   > [Copilot's comment text]
-
-   @google-labs-jules please address this.
+3. Apply label (use Bash directly - 1 command):
+   ```bash
+   # ✅ Use Bash for simple label operations
+   gh pr edit 672 --add-label "jules:copilot-comments"
    ```
-4. Apply `jules:copilot-comments` label
-5. Wait for Jules (30min timeout)
+4. Wait for Jules (30min timeout)
 ```
 
 ### Scenario 2: Resolve `.jules/*.md` Conflict (Temporary Worktree)
@@ -911,7 +934,11 @@ Task(
    cd /home/froeht/Code/PinPoint-Secondary
    git worktree remove /tmp/pinpoint-pr-XXX
    ```
-6. Remove `jules:merge-conflicts` label via jules-pr-manager subagent
+6. Remove `jules:merge-conflicts` label (use Bash directly - simple 1 command):
+   ```bash
+   # ✅ Use Bash tool for simple label operations
+   gh pr edit XXX --remove-label "jules:merge-conflicts"
+   ```
 
 **Note**: Always process merge conflicts sequentially (one at a time) and ask user if conflict is non-trivial.
 ```
@@ -921,21 +948,23 @@ Task(
 ```markdown
 **Problem**: PRs #665, #657, #654, #632 all address CopyButton
 
-**Solution**:
-1. Compare diffs: `gh pr diff 665 657 654 632`
-2. Evaluate `.jules/palette.md` entries (pick best learning)
-3. Winner: #632 (better learning documentation)
-4. Comment on #632 with code from others:
-   ```markdown
-   Please also add from #665:
-   ```typescript
-   // Better tooltip text
-   <Tooltip><TooltipContent>Link copied to clipboard</TooltipContent></Tooltip>
-   ```
-   ```
-5. Close #665, #657, #654:
+**Solution** (requires 4+ commands, use subagent for initial analysis):
+1. Launch subagent to compare diffs and evaluate learning:
+   Task(subagent_type="jules-pr-manager",
+        prompt="1. gh pr diff 665 > pr665.diff\n2. gh pr diff 657 > pr657.diff\n...\n4. Compare diffs\n5. Read .jules/palette.md entries",
+        run_in_background=True)
+2. After analysis, post comment on winner (use Bash directly - 1 command):
    ```bash
-   gh pr close 665 657 654 --comment "Duplicate of #632"
+   # ✅ Use Bash for simple comment posting
+   gh pr comment 632 --body "Please also add from #665:\n\`\`\`typescript\n// Better tooltip...\n\`\`\`"
+   ```
+3. Close duplicates (use Bash directly - can do all in parallel):
+   ```bash
+   # ✅ Use Bash for simple PR operations
+   gh pr close 665 --comment "Duplicate of #632" &
+   gh pr close 657 --comment "Duplicate of #632" &
+   gh pr close 654 --comment "Duplicate of #632" &
+   wait
    ```
 ```
 
@@ -957,6 +986,8 @@ Task(
 - Process PRs without priority ordering (finish almost-done PRs first)
 - **Wait for background tasks when you could be working on other PRs**
 - **Block on tasks that could run in parallel (stay under 5 concurrent)**
+- **Use subagents for simple 1-2 command operations (posting comments, applying labels)**
+- **Launch subagents without `run_in_background=True`**
 
 **DO**:
 - Validate against NON_NEGOTIABLES.md
@@ -964,7 +995,9 @@ Task(
 - Copy code explicitly when consolidating duplicates
 - Handle merge conflicts ourselves in temporary worktrees
 - Present manual review PRs ONE at a time with full context
-- Use jules-pr-manager subagent for specific, read-only commands
+- **Use Bash tool directly for simple 1-2 command operations (comments, labels)**
+- **Use jules-pr-manager subagent ONLY for 3+ commands or long round-trips**
+- **Always use `run_in_background=True` when launching subagents**
 - Use rolling window of max 5 subagents (all non-blocking)
 - Process PRs by priority tier (1, 2, 6, 3, 4, 5)
 - Check for duplicates during vetting (tier 6 manual review)
