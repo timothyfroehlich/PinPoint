@@ -22,25 +22,13 @@ test.describe("Public Issue Reporting", () => {
     await page.goto("/report");
     await expect(
       page.getByRole("heading", {
-        name: "Report an Issue with a Pinball Machine",
+        name: "Report an Issue",
       })
     ).toBeVisible();
 
     const select = page.getByLabel("Machine *");
-    const options = await select.evaluate((element) => {
-      const selectElement = element as HTMLSelectElement;
-      return Array.from(selectElement.options).map((option) => ({
-        value: option.value,
-        text: option.text,
-      }));
-    });
-
-    // Select first available machine (avoid seed data dependency)
-    const firstMachine = options.find((opt) => opt.value !== "");
-    if (!firstMachine) {
-      throw new Error("No machines available for testing");
-    }
-    await select.selectOption({ value: firstMachine.value });
+    await expect(select).toBeVisible();
+    await select.selectOption({ index: 1 });
     const issueTitle = `${PUBLIC_PREFIX} ${Date.now()}`;
     await page.getByLabel("Issue Title *").fill(issueTitle);
     await page
@@ -52,11 +40,35 @@ test.describe("Public Issue Reporting", () => {
     await expect(page).toHaveURL("/report/success");
     await expect(
       page.getByRole("heading", {
-        name: "Thank You for Reporting This Issue!",
+        name: "Issue Sent!",
       })
     ).toBeVisible();
     await expect(
       page.getByRole("link", { name: "Report Another Issue" })
+    ).toBeVisible();
+  });
+
+  test("should show signup prompt when anonymous user provides email", async ({
+    page,
+  }) => {
+    const timestamp = Date.now();
+    const email = `newuser-${timestamp}@example.com`;
+
+    await page.goto("/report");
+    await page.getByLabel("Machine *").selectOption({ index: 1 });
+    await page.getByLabel("Issue Title *").fill(`${PUBLIC_PREFIX} with Email`);
+    await page.getByLabel("Severity *").selectOption("minor");
+
+    await page.getByLabel("First Name").fill("Test");
+    await page.getByLabel("Last Name").fill("User");
+    await page.getByLabel("Email Address").fill(email);
+
+    await page.getByRole("button", { name: "Submit Issue Report" }).click();
+
+    await expect(page).toHaveURL(/\/report\/success/);
+    await expect(page.getByText("Want to track your reports?")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Join PinPoint" })
     ).toBeVisible();
   });
 
