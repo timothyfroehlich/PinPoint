@@ -119,6 +119,7 @@ describe("Database Queries (PGlite)", () => {
 
       const testUser = {
         id: "00000000-0000-0000-0000-000000000001",
+        email: "test@example.com",
         firstName: "Test",
         lastName: "User",
         role: "member" as const,
@@ -140,6 +141,7 @@ describe("Database Queries (PGlite)", () => {
       // Create user
       const testUser = {
         id: "00000000-0000-0000-0000-000000000001",
+        email: "reporter@example.com",
         firstName: "Reporter",
         lastName: "Person",
         role: "member" as const,
@@ -177,12 +179,14 @@ describe("Database Queries (PGlite)", () => {
       // Create users
       const assigner = {
         id: "00000000-0000-0000-0000-000000000001",
+        email: "assigner@example.com",
         firstName: "Admin",
         lastName: "User",
         role: "admin" as const,
       };
       const assignee = {
         id: "00000000-0000-0000-0000-000000000002",
+        email: "assignee@example.com",
         firstName: "Member",
         lastName: "User",
         role: "member" as const,
@@ -230,6 +234,7 @@ describe("Database Queries (PGlite)", () => {
       // Create user
       const user = {
         id: "00000000-0000-0000-0000-000000000001",
+        email: "test-lib@example.com",
         firstName: "Test",
         lastName: "User",
         role: "member" as const,
@@ -297,6 +302,7 @@ describe("Database Queries (PGlite)", () => {
 
       const user = {
         id: "00000000-0000-0000-0000-000000000001",
+        email: "test-del@example.com",
         firstName: "Test",
         lastName: "User",
         role: "member" as const,

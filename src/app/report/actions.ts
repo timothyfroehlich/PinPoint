@@ -13,7 +13,7 @@ import {
 import { parsePublicIssueForm } from "./validation";
 import { db } from "~/server/db";
 import { machines, userProfiles, unconfirmedUsers } from "~/server/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import type { ActionState } from "./unified-report-form";
 
@@ -58,7 +58,8 @@ export async function submitPublicIssueAction(
 
   const parsedValue = parsePublicIssueForm(formData);
   if (!parsedValue.success) {
-    return redirectWithError(parsedValue.error);
+    redirectWithError(parsedValue.error);
+    return { error: parsedValue.error }; // Should be unreachable
   }
 
   // After the early return, parsedValue is narrowed to ParsedPublicIssue
@@ -83,73 +84,64 @@ export async function submitPublicIssueAction(
   let unconfirmedReportedBy: string | null = null;
   // 4. Resolve reporter via email if not already logged in
   if (!reportedBy && email) {
-    // security check: don't allow reporting as a confirmed user
-    const confirmedResult = (await db.execute(
-      sql`SELECT id FROM auth.users WHERE email = ${email} AND email_confirmed_at IS NOT NULL`
-    )) as unknown as { id: string }[];
+    // Check active user profiles directly
+    const activeUser = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.email, email),
+      columns: { id: true, role: true },
+    });
 
-    if (confirmedResult.length > 0) {
+    if (activeUser) {
       log.info(
         { action: "publicIssueReport", email },
         "Blocked attempt to report for confirmed account"
       );
+      // Security: Don't reveal account existence unless attempting to use it?
+      // Actually, standard behavior here is to block.
       return {
         error:
           "This email is associated with an existing account. Please log in to report this issue.",
       };
     }
 
-    // 2. Check active user profiles (for role/name info if needed, though unconfirmed is handled below)
-    const activeUser = await db.query.userProfiles.findFirst({
-      where: eq(
-        userProfiles.id,
-        sql`(SELECT id FROM auth.users WHERE email = ${email})`
-      ),
+    // 2. Check/Create unconfirmed user
+    const existingUnconfirmed = await db.query.unconfirmedUsers.findFirst({
+      where: eq(unconfirmedUsers.email, email),
     });
 
-    if (activeUser) {
-      reportedBy = String(activeUser.id);
+    if (existingUnconfirmed) {
+      log.info(
+        {
+          action: "publicIssueReport",
+          unconfirmedUserId: String(existingUnconfirmed.id),
+          email,
+        },
+        "Found existing unconfirmed user"
+      );
+      unconfirmedReportedBy = String(existingUnconfirmed.id);
     } else {
-      // 2. Check/Create unconfirmed user
-      const existingUnconfirmed = await db.query.unconfirmedUsers.findFirst({
-        where: eq(unconfirmedUsers.email, email),
-      });
+      // Create new unconfirmed user
+      const [newUnconfirmed] = await db
+        .insert(unconfirmedUsers)
+        .values({
+          email: email,
+          firstName: firstName ?? "Anonymous",
+          lastName: lastName ?? "User",
+          role: "guest",
+        })
+        .returning();
 
-      if (existingUnconfirmed) {
-        log.info(
-          {
-            action: "publicIssueReport",
-            unconfirmedUserId: String(existingUnconfirmed.id),
-            email,
-          },
-          "Found existing unconfirmed user"
-        );
-        unconfirmedReportedBy = String(existingUnconfirmed.id);
-      } else {
-        // Create new unconfirmed user
-        const [newUnconfirmed] = await db
-          .insert(unconfirmedUsers)
-          .values({
-            email: email,
-            firstName: firstName ?? "Anonymous",
-            lastName: lastName ?? "User",
-            role: "guest",
-          })
-          .returning();
-
-        if (!newUnconfirmed) {
-          throw new Error("Failed to create unconfirmed user");
-        }
-        log.info(
-          {
-            action: "publicIssueReport",
-            unconfirmedUserId: newUnconfirmed.id,
-            email,
-          },
-          "Created new unconfirmed user"
-        );
-        unconfirmedReportedBy = String(newUnconfirmed.id);
+      if (!newUnconfirmed) {
+        throw new Error("Failed to create unconfirmed user");
       }
+      log.info(
+        {
+          action: "publicIssueReport",
+          unconfirmedUserId: newUnconfirmed.id,
+          email,
+        },
+        "Created new unconfirmed user"
+      );
+      unconfirmedReportedBy = String(newUnconfirmed.id);
     }
   }
 
@@ -168,14 +160,8 @@ export async function submitPublicIssueAction(
   let isMemberOrAdmin = false;
 
   if (reportedBy) {
-    // If we already fetched activeUser (email match), we might know the role, but 'activeUser' scope is inside the block above.
-    // Simplest approach: just fetch the role for the final reportedBy ID.
-    // This adds one query for logged-in users, but effectively we probably cached it or it's fast.
-    // Actually, for logged-in users we didn't fetch profile yet in this function.
-
-    // We can optimization: check if we already have it?
-    // No, scope of activeUser is limited.
-
+    // Optimization: Check if we have the profile already?
+    // We don't have it in scope if it came from `user.id`.
     const profile = await db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, reportedBy),
       columns: { role: true },
