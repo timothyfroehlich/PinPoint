@@ -165,6 +165,7 @@ export function UnifiedReportForm({
                   <select
                     id="machineId"
                     name="machineId"
+                    data-testid="machine-select"
                     required
                     value={selectedMachineId}
                     onChange={(e) => {

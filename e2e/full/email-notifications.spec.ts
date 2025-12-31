@@ -39,7 +39,7 @@ test.describe("Email Notifications", () => {
 
     // Create an issue for a specific machine (e.g., MM)
     await page.goto("/m/MM/report");
-    await page.getByLabel("Title").fill("Test Issue for Email");
+    await page.getByLabel("Issue Title *").fill("Test Issue for Email");
     await page.getByLabel("Description").fill("Testing email notifications");
     await page.getByLabel("Severity").selectOption("playable");
     await page.getByLabel("Priority").selectOption("low");
@@ -80,7 +80,7 @@ test.describe("Email Notifications", () => {
 
     // Create issue for a specific machine (e.g., MM)
     await page.goto("/m/MM/report");
-    await page.getByLabel("Title").fill("Status Change Test");
+    await page.getByLabel("Issue Title *").fill("Status Change Test");
     await page.getByLabel("Severity").selectOption("playable");
     await page.getByLabel("Priority").selectOption("low");
     await page.getByRole("button", { name: "Report Issue" }).click();
