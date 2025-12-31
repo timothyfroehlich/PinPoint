@@ -58,9 +58,10 @@ export async function submitPublicIssueAction(
 
   const parsedValue = parsePublicIssueForm(formData);
   if (!parsedValue.success) {
-    redirectWithError(parsedValue.error);
+    return redirectWithError(parsedValue.error);
   }
 
+  // After the early return, parsedValue is narrowed to ParsedPublicIssue
   const {
     machineId,
     title,
@@ -70,21 +71,7 @@ export async function submitPublicIssueAction(
     firstName,
     lastName,
     priority,
-  } = (
-    parsedValue as unknown as {
-      success: true;
-      data: {
-        machineId: string;
-        title: string;
-        description?: string;
-        severity: "minor" | "playable" | "unplayable";
-        email?: string;
-        firstName?: string;
-        lastName?: string;
-        priority?: "low" | "medium" | "high" | "critical";
-      };
-    }
-  ).data;
+  } = parsedValue.data;
 
   // 3. Resolve reporter
   const supabase = await createClient();
@@ -146,7 +133,7 @@ export async function submitPublicIssueAction(
             email: email,
             firstName: firstName ?? "Anonymous",
             lastName: lastName ?? "User",
-            role: "guest" as "guest" | "admin" | "member",
+            role: "guest",
           })
           .returning();
 
@@ -176,8 +163,6 @@ export async function submitPublicIssueAction(
     throw new Error("Machine not found.");
   }
 
-  const validMachine = machine;
-
   log.info(
     { machineId, reportedBy, unconfirmedReportedBy },
     "Submitting unified issue report..."
@@ -186,7 +171,7 @@ export async function submitPublicIssueAction(
     const issue = await createIssue({
       title,
       description: description ?? null,
-      machineInitials: validMachine.initials,
+      machineInitials: machine.initials,
       severity,
       priority: priority,
       reportedBy,
@@ -198,8 +183,8 @@ export async function submitPublicIssueAction(
     );
 
     revalidatePath("/m");
-    revalidatePath(`/m/${validMachine.initials}`);
-    revalidatePath(`/m/${validMachine.initials}/i`);
+    revalidatePath(`/m/${machine.initials}`);
+    revalidatePath(`/m/${machine.initials}/i`);
 
     // Redirect logic:
     // 1. Authenticated users go directly to the issue detail page
@@ -207,11 +192,11 @@ export async function submitPublicIssueAction(
       log.info(
         {
           reportedBy,
-          target: `/m/${validMachine.initials}/i/${issue.issueNumber}`,
+          target: `/m/${machine.initials}/i/${issue.issueNumber}`,
         },
         "Redirecting authenticated user to issue page"
       );
-      redirect(`/m/${validMachine.initials}/i/${issue.issueNumber}`);
+      redirect(`/m/${machine.initials}/i/${issue.issueNumber}`);
     }
 
     // 2. Anonymous users go to success page

@@ -73,15 +73,18 @@ export function UnifiedReportForm({
           description: string;
           severity: string;
         }>;
-        if (parsed.machineId) setSelectedMachineId(parsed.machineId);
+        // Only restore machineId if not provided via prop
+        if (parsed.machineId && !defaultMachineId)
+          setSelectedMachineId(parsed.machineId);
         if (parsed.title) setTitle(parsed.title);
         if (parsed.description) setDescription(parsed.description);
         if (parsed.severity) setSeverity(parsed.severity);
-      } catch (e) {
-        console.error("Failed to parse saved report form state", e);
+      } catch {
+        // Clear corrupted localStorage
+        window.localStorage.removeItem("report_form_state");
       }
     }
-  }, []);
+  }, [defaultMachineId]);
 
   // Persistence: Save to localStorage on change
   useEffect(() => {
@@ -303,7 +306,11 @@ export function UnifiedReportForm({
                     <p className="text-sm text-on-surface-variant">
                       Already have an account?{" "}
                       <Link
-                        href={`/login?redirect=/report${selectedMachine ? `%3Fmachine=${selectedMachine.initials}` : ""}`}
+                        href={`/login?redirect=${encodeURIComponent(
+                          selectedMachine
+                            ? `/report?machine=${selectedMachine.initials}`
+                            : "/report"
+                        )}`}
                         className="text-primary hover:underline"
                       >
                         Log in

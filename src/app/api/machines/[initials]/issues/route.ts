@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "~/server/db";
 import { issues } from "~/server/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { log } from "~/lib/logger";
 
 export async function GET(
   _request: Request,
@@ -32,7 +33,7 @@ export async function GET(
 
     return NextResponse.json(recentIssues);
   } catch (error) {
-    console.error("Failed to fetch recent issues:", error);
+    log.error({ error, initials }, "Failed to fetch recent issues");
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
