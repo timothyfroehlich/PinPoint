@@ -22,19 +22,7 @@ function SubmitButton(): React.JSX.Element {
   );
 }
 
-interface SignupFormProps {
-  initialData?:
-    | {
-        email?: string;
-        firstName?: string;
-        lastName?: string;
-      }
-    | undefined;
-}
-
-export function SignupForm({
-  initialData,
-}: SignupFormProps): React.JSX.Element {
+export function SignupForm(): React.JSX.Element {
   const [state, formAction] = useActionState<
     SignupResult | undefined,
     FormData
@@ -101,7 +89,6 @@ export function SignupForm({
             required
             maxLength={50}
             className="bg-surface-variant"
-            defaultValue={initialData?.firstName}
           />
         </div>
 
@@ -117,7 +104,6 @@ export function SignupForm({
             required
             maxLength={50}
             className="bg-surface-variant"
-            defaultValue={initialData?.lastName}
           />
         </div>
       </div>
@@ -133,8 +119,6 @@ export function SignupForm({
           autoComplete="email"
           required
           className="bg-surface-variant"
-          defaultValue={initialData?.email}
-          readOnly={!!initialData?.email}
         />
       </div>
 
@@ -157,19 +141,6 @@ export function SignupForm({
 
         {/* Password strength indicator */}
         <PasswordStrength password={password} />
-      </div>
-
-      {/* Confirm Password */}
-      <div className="space-y-2">
-        <Label htmlFor="confirmPassword">Confirm Password</Label>
-        <Input
-          id="confirmPassword"
-          name="confirmPassword"
-          type="password"
-          autoComplete="new-password"
-          required
-          className="bg-surface-variant"
-        />
       </div>
 
       <SubmitButton />

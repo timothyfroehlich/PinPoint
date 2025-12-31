@@ -1,7 +1,6 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
 import Link from "next/link";
 import { useActionState } from "react";
 import { Button } from "~/components/ui/button";
@@ -14,10 +13,8 @@ import {
 import { cn } from "~/lib/utils";
 import { OwnerSelect } from "~/components/machines/OwnerSelect";
 
-import type { UnifiedUser } from "~/lib/types";
-
 interface CreateMachineFormProps {
-  allUsers: UnifiedUser[];
+  allUsers: { id: string; name: string }[];
   isAdmin: boolean;
 }
 
@@ -29,9 +26,6 @@ export function CreateMachineForm({
     CreateMachineResult | undefined,
     FormData
   >(createMachineAction, undefined);
-
-  // Lift users state to client so we can append new users without full refresh
-  const [users, setUsers] = useState<UnifiedUser[]>(allUsers);
 
   return (
     <>
@@ -93,7 +87,7 @@ export function CreateMachineForm({
         </div>
 
         {/* Owner Select (Admin Only) */}
-        {isAdmin && <OwnerSelect users={users} onUsersChange={setUsers} />}
+        {isAdmin && <OwnerSelect users={allUsers} />}
 
         {/* Actions */}
         <div className="flex gap-3 pt-4">

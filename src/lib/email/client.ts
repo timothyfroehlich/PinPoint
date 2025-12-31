@@ -32,12 +32,11 @@ function createTransport(): EmailTransport | null {
       const raw =
         process.env["MAILPIT_SMTP_PORT"] ??
         process.env["INBUCKET_SMTP_PORT"] ??
-        (process.env["MAILPIT_PORT"] ? "1025" : undefined) ??
-        (process.env["INBUCKET_PORT"] ? "1025" : undefined);
-      return raw ? parseInt(raw, 10) : 1025;
+        process.env["MAILPIT_PORT"] ??
+        process.env["INBUCKET_PORT"];
+      return raw ? parseInt(raw, 10) : 57325;
     })();
 
-    console.log(`[Email] Using SMTP transport on port ${port}`);
     return new SMTPTransport({ port });
   }
 
@@ -66,9 +65,5 @@ export async function sendEmail({
     return { success: false, error: "No transport configured" };
   }
 
-  const result = await transport.send({ to, subject, html });
-  if (result.success) {
-    console.log(`✅ Email sent successfully to ${to}: ${subject}`);
-  }
-  return result;
+  return transport.send({ to, subject, html });
 }

@@ -14,17 +14,20 @@ import type {
   issueComments,
 } from "~/server/db/schema";
 
+/**
+ * Create a test user profile
+ */
 export function createTestUser(
   overrides?: Partial<InferInsertModel<typeof userProfiles>>
 ): InferInsertModel<typeof userProfiles> {
   return {
-    id: randomUUID(),
-    firstName: "Test",
-    lastName: "User",
-    role: "member",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    ...overrides,
+    id: overrides?.id ?? randomUUID(),
+    firstName: overrides?.firstName ?? "Test",
+    lastName: overrides?.lastName ?? "User",
+    avatarUrl: overrides?.avatarUrl ?? null,
+    role: overrides?.role ?? "member",
+    createdAt: overrides?.createdAt ?? new Date(),
+    updatedAt: overrides?.updatedAt ?? new Date(),
   };
 }
 
@@ -35,12 +38,11 @@ export function createTestMachine(
   overrides?: Partial<InferInsertModel<typeof machines>>
 ): InferInsertModel<typeof machines> {
   return {
-    id: randomUUID(),
-    initials: "TM",
-    name: "Test Machine",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    ...overrides,
+    id: overrides?.id ?? randomUUID(),
+    initials: overrides?.initials ?? "TM",
+    name: overrides?.name ?? "Test Machine",
+    createdAt: overrides?.createdAt ?? new Date(),
+    updatedAt: overrides?.updatedAt ?? new Date(),
   };
 }
 
@@ -52,20 +54,19 @@ export function createTestIssue(
   overrides?: Partial<InferInsertModel<typeof issues>>
 ): InferInsertModel<typeof issues> {
   return {
-    id: randomUUID(),
+    id: overrides?.id ?? randomUUID(),
     machineInitials,
-    issueNumber: 1,
-    title: "Test Issue",
-    description: "Test description",
-    status: "new",
-    severity: "playable",
-    priority: "low",
-    reportedBy: null,
-    assignedTo: null,
-    resolvedAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    ...overrides,
+    issueNumber: overrides?.issueNumber ?? 1,
+    title: overrides?.title ?? "Test Issue",
+    description: overrides?.description ?? "Test description",
+    status: overrides?.status ?? "new",
+    severity: overrides?.severity ?? "playable",
+    priority: overrides?.priority ?? "low",
+    reportedBy: overrides?.reportedBy ?? null,
+    assignedTo: overrides?.assignedTo ?? null,
+    resolvedAt: overrides?.resolvedAt ?? null,
+    createdAt: overrides?.createdAt ?? new Date(),
+    updatedAt: overrides?.updatedAt ?? new Date(),
   };
 }
 
@@ -77,13 +78,12 @@ export function createTestComment(
   overrides?: Partial<InferInsertModel<typeof issueComments>>
 ): InferInsertModel<typeof issueComments> {
   return {
-    id: randomUUID(),
+    id: overrides?.id ?? randomUUID(),
     issueId,
-    authorId: null,
-    content: "Test comment",
-    isSystem: false,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    ...overrides,
+    authorId: overrides?.authorId ?? null,
+    content: overrides?.content ?? "Test comment",
+    isSystem: overrides?.isSystem ?? false,
+    createdAt: overrides?.createdAt ?? new Date(),
+    updatedAt: overrides?.updatedAt ?? new Date(),
   };
 }

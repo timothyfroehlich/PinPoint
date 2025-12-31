@@ -2,30 +2,13 @@ import { NextResponse } from "next/server";
 import { ilike, inArray, or, type SQL } from "drizzle-orm";
 
 import { db } from "~/server/db";
-import {
-  issues,
-  machines,
-  unconfirmedUsers,
-  userProfiles,
-  authUsers,
-} from "~/server/db/schema";
+import { issues, machines } from "~/server/db/schema";
 
 interface CleanupPayload {
   issueIds?: unknown;
   machineIds?: unknown;
-  machineInitials?: unknown;
   issueTitlePrefix?: unknown;
-  userEmails?: unknown;
 }
-
-const toStringArray = (value: unknown): string[] => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value.filter(
-    (v): v is string => typeof v === "string" && v.length > 0
-  );
-};
 
 const toIdArray = (value: unknown): string[] => {
   if (!Array.isArray(value)) {
@@ -64,9 +47,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const issueIds = toIdArray(payload.issueIds);
   const machineIds = toIdArray(payload.machineIds);
-  const machineInitials = toStringArray(payload.machineInitials);
   const issueTitlePrefix = toPrefix(payload.issueTitlePrefix);
-  const userEmails = toStringArray(payload.userEmails);
 
   const issueConditions: SQL[] = [];
 
@@ -74,33 +55,13 @@ export async function POST(request: Request): Promise<Response> {
     issueConditions.push(inArray(issues.id, issueIds));
   }
 
-  if (machineInitials.length) {
-    issueConditions.push(inArray(issues.machineInitials, machineInitials));
-  }
-
   if (issueTitlePrefix) {
     const escapedPrefix = escapeLikePattern(issueTitlePrefix);
     issueConditions.push(ilike(issues.title, `${escapedPrefix}%`));
   }
 
-  const machineConditions: SQL[] = [];
-  if (machineIds.length) {
-    machineConditions.push(inArray(machines.id, machineIds));
-  }
-  if (machineInitials.length) {
-    machineConditions.push(inArray(machines.initials, machineInitials));
-  }
-
-  if (
-    !issueConditions.length &&
-    !machineConditions.length &&
-    !userEmails.length
-  ) {
-    return NextResponse.json({
-      removedIssues: [],
-      removedMachines: [],
-      removedUsers: [],
-    });
+  if (!issueConditions.length && !machineIds.length) {
+    return NextResponse.json({ removedIssues: [], removedMachines: [] });
   }
 
   const removedIssues = issueConditions.length
@@ -116,50 +77,14 @@ export async function POST(request: Request): Promise<Response> {
       ).map((row) => row.id)
     : [];
 
-  const removedMachines = machineConditions.length
+  const removedMachines = machineIds.length
     ? (
         await db
           .delete(machines)
-          .where(
-            machineConditions.length === 1
-              ? machineConditions[0]
-              : or(...machineConditions)
-          )
+          .where(inArray(machines.id, machineIds))
           .returning({ id: machines.id })
       ).map((row) => row.id)
     : [];
 
-  const removedUsers: string[] = [];
-  if (userEmails.length) {
-    const deletedUnconfirmed = await db
-      .delete(unconfirmedUsers)
-      .where(inArray(unconfirmedUsers.email, userEmails))
-      .returning({ id: unconfirmedUsers.id });
-
-    removedUsers.push(...deletedUnconfirmed.map((r) => r.id));
-
-    // Note: We don't delete auth users here via Drizzle because of foreign key complexities
-    // with Supabase Auth schema in the same transaction. For auth users, the E2E cleanup
-    // should use the supabaseAdmin helper if possible.
-    // However, we can delete their profiles if they exist.
-    const deletedProfiles = await db
-      .delete(userProfiles)
-      .where(
-        inArray(
-          userProfiles.id,
-          db
-            .select({ id: authUsers.id })
-            .from(authUsers)
-            .where(inArray(authUsers.email, userEmails))
-        )
-      )
-      .returning({ id: userProfiles.id });
-    removedUsers.push(...deletedProfiles.map((r) => r.id));
-  }
-
-  return NextResponse.json({
-    removedIssues,
-    removedMachines,
-    removedUsers,
-  });
+  return NextResponse.json({ removedIssues, removedMachines });
 }

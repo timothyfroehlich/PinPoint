@@ -5,10 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { createClient } from "~/lib/supabase/server";
 import { SignupForm } from "./signup-form";
 
-import { db } from "~/server/db";
-import { unconfirmedUsers } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
-
 /**
  * Signup Page
  *
@@ -16,11 +12,7 @@ import { eq } from "drizzle-orm";
  * Progressive enhancement - works without JavaScript.
  * Password strength indicator (client-side enhancement).
  */
-export default async function SignupPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ email?: string }>;
-}): Promise<React.JSX.Element> {
+export default async function SignupPage(): Promise<React.JSX.Element> {
   // Check if already logged in
   const supabase = await createClient();
   const {
@@ -29,26 +21,6 @@ export default async function SignupPage({
 
   if (user) {
     redirect("/dashboard");
-  }
-
-  const { email } = await searchParams;
-  let initialData = undefined;
-
-  if (email) {
-    const unconfirmed = await db.query.unconfirmedUsers.findFirst({
-      where: eq(unconfirmedUsers.email, email),
-    });
-
-    if (unconfirmed) {
-      initialData = {
-        email: unconfirmed.email,
-        firstName: unconfirmed.firstName,
-        lastName: unconfirmed.lastName,
-      };
-    } else {
-      // If email is provided but no unconfirmed user found, we still pre-fill the email
-      initialData = { email };
-    }
   }
 
   return (
@@ -64,7 +36,7 @@ export default async function SignupPage({
 
       <CardContent className="space-y-4">
         {/* Signup form - Client Component for password strength */}
-        <SignupForm initialData={initialData} />
+        <SignupForm />
 
         {/* Login link */}
         <div className="text-center text-sm text-on-surface-variant">

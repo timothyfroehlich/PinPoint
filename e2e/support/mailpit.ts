@@ -82,18 +82,17 @@ export class MailpitClient {
       return null;
     }
     // Sort by date descending and return the latest
-    const sorted = messages.sort(
+    return messages.sort(
       (a, b) =>
         new Date(b.Date ?? 0).getTime() - new Date(a.Date ?? 0).getTime()
-    );
-    return sorted[0] ?? null;
+    )[0];
   }
 
   /**
    * Get a specific message by ID
    */
   async getMessage(
-    _email: string,
+    email: string,
     messageId: string
   ): Promise<MailpitMessageDetail> {
     const response = await fetch(`${this.apiUrl}/message/${messageId}`);
@@ -137,9 +136,7 @@ export class MailpitClient {
         }
         if (
           criteria.subjectContains &&
-          !msg.Subject.toLowerCase().includes(
-            criteria.subjectContains.toLowerCase()
-          )
+          !msg.Subject.includes(criteria.subjectContains)
         ) {
           return false;
         }
@@ -154,42 +151,6 @@ export class MailpitClient {
     }
 
     return null;
-  }
-
-  /**
-   * Extract signup link from the latest email for a mailbox
-   */
-  async getSignupLink(email: string): Promise<string> {
-    console.log(`[Mailpit] Looking for invite email to ${email}...`);
-    const latest = await this.waitForEmail(email, {
-      subjectContains: "Invite",
-      timeout: 30000,
-      pollIntervalMs: 750,
-    });
-
-    if (!latest) {
-      console.log(`[Mailpit] No invite email found after waiting`);
-      // Try to get ALL messages to debug
-      const allMessages = await this.getMessages(email);
-      console.log(
-        `[Mailpit] Total messages for ${email}: ${allMessages.length}`
-      );
-      allMessages.forEach((msg) => {
-        console.log(`[Mailpit]   - ${msg.Subject} (${msg.ID})`);
-      });
-      throw new Error(`No invite messages found for ${email}`);
-    }
-
-    console.log(
-      `[Mailpit] Found invite email: ${latest.Subject} (${latest.ID})`
-    );
-    const detail = await this.getMessage(email, latest.ID);
-    const html = (detail.HTML ?? detail.Text ?? "").toString();
-    const match = /href="([^"]*\/signup\?email=[^"]*)"/i.exec(html);
-    if (!match?.[1]) {
-      throw new Error("Signup link not found in email body");
-    }
-    return decodeHtmlEntities(match[1]);
   }
 
   /**
@@ -223,7 +184,7 @@ export class MailpitClient {
   /**
    * Delete all messages for a specific email
    */
-  async clearMailbox(_email: string): Promise<void> {
+  async clearMailbox(email: string): Promise<void> {
     // Mailpit does not support mailbox-scoped delete; use global delete for test isolation.
     await this.deleteAllMessages();
   }
@@ -280,9 +241,6 @@ export const deleteAllMessages = async (email?: string): Promise<void> => {
 
 export const getPasswordResetLink = async (email: string): Promise<string> =>
   mailpitClient.getPasswordResetLink(email);
-
-export const getSignupLink = async (email: string): Promise<string> =>
-  mailpitClient.getSignupLink(email);
 
 export const waitForEmail = async (
   email: string,

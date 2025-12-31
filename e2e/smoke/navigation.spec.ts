@@ -74,11 +74,6 @@ test.describe.serial("Navigation", () => {
       await expect(page.getByRole("dialog")).toBeHidden();
     }
 
-    // Verify Report Issue button is visible (desktop and mobile)
-    await expect(
-      page.getByRole("link", { name: "Report Issue" })
-    ).toBeVisible();
-
     // Verify User Menu Items
     const userMenu = page.getByTestId("user-menu-button");
     await expect(userMenu).toBeVisible();

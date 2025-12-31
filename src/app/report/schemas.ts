@@ -15,9 +15,6 @@ export const publicIssueSchema = z.object({
   severity: z.enum(["minor", "playable", "unplayable"], {
     message: "Select a severity",
   }),
-  firstName: z.string().trim().max(100, "First name too long").optional(),
-  lastName: z.string().trim().max(100, "Last name too long").optional(),
-  email: z.string().email("Invalid email").optional().or(z.literal("")),
 });
 
 export type PublicIssueInput = z.infer<typeof publicIssueSchema>;

@@ -11,18 +11,11 @@ import {
 } from "~/app/(app)/m/actions";
 import { cn } from "~/lib/utils";
 import { OwnerSelect } from "~/components/machines/OwnerSelect";
-
-import type { UnifiedUser } from "~/lib/types";
+import { type machines } from "~/server/db/schema";
 
 interface UpdateMachineFormProps {
-  machine: {
-    id: string;
-    name: string;
-    initials: string;
-    ownerId: string | null;
-    unconfirmedOwnerId: string | null;
-  };
-  allUsers: UnifiedUser[];
+  machine: typeof machines.$inferSelect & { owner?: { id: string } | null };
+  allUsers: { id: string; name: string }[];
   isAdmin: boolean;
 }
 
@@ -101,7 +94,7 @@ export function UpdateMachineForm({
       {isAdmin && (
         <OwnerSelect
           users={allUsers}
-          defaultValue={machine.ownerId ?? machine.unconfirmedOwnerId ?? null}
+          defaultValue={machine.owner?.id ?? null}
         />
       )}
 

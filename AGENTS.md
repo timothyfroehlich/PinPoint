@@ -311,7 +311,6 @@ To maintain velocity and avoid running the full `preflight` suite (~60s) for eve
 | **Targeted Unit** | `npm test -- src/path/to/file.test.ts`                 | Debugging a specific unit test failure.                                          |
 | **Targeted Int**  | `npm run test:integration -- src/path/to/file.test.ts` | Debugging a specific DB/API test failure.                                        |
 | **Targeted E2E**  | `npm run smoke -- e2e/smoke/file.spec.ts`              | Debugging a specific UI flow.                                                    |
-| **Mobile Safari** | **DO NOT RUN LOCALLY**                                 | Mobile Safari (WebKit) often fails on non-Mac environments. Rely on CI.          |
 | **Full Suite**    | `npm run <script>`                                     | Verifying no regressions in that layer.                                          |
 | **Final Gate**    | `npm run preflight`                                    | **Rule 2**: Run ONLY before submitting/finishing. Runs EVERYTHING.               |
 

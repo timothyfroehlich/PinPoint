@@ -7,10 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import { CreateMachineForm } from "./create-machine-form";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
-
-import { getUnifiedUsers } from "~/lib/users/queries";
-import type { UnifiedUser } from "~/lib/types";
+import { eq, asc } from "drizzle-orm";
 
 /**
  * Create Machine Page (Protected Route)
@@ -35,9 +32,12 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
 
   const isAdmin = currentUserProfile?.role === "admin";
 
-  let allUsers: UnifiedUser[] = [];
+  let allUsers: { id: string; name: string }[] = [];
   if (isAdmin) {
-    allUsers = await getUnifiedUsers();
+    allUsers = await db
+      .select({ id: userProfiles.id, name: userProfiles.name })
+      .from(userProfiles)
+      .orderBy(asc(userProfiles.name));
   }
 
   return (

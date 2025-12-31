@@ -61,13 +61,10 @@ export async function cleanupTestDb() {
   if (!testDb) return;
 
   // Delete in order to respect foreign key constraints
-  await testDb.delete(schema.issueWatchers); // Added
   await testDb.delete(schema.issueComments);
   await testDb.delete(schema.issues);
   await testDb.delete(schema.machines);
   await testDb.delete(schema.userProfiles);
-  await testDb.delete(schema.unconfirmedUsers); // Added
-  await testDb.delete(schema.authUsers); // Added
 }
 
 /**

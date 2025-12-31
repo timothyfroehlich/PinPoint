@@ -12,8 +12,8 @@ import {
 } from "~/lib/rate-limit";
 import { parsePublicIssueForm } from "./validation";
 import { db } from "~/server/db";
-import { machines, userProfiles, unconfirmedUsers } from "~/server/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { machines } from "~/server/db/schema";
+import { eq } from "drizzle-orm";
 
 const redirectWithError = (message: string): never => {
   const params = new URLSearchParams({ error: message });
@@ -59,74 +59,8 @@ export async function submitPublicIssueAction(
     return;
   }
 
-  const {
-    machineId,
-    title,
-    description,
-    severity,
-    email,
-    firstName,
-    lastName,
-  } = parsed.data;
-
-  // Resolve reporter if email is provided
-  let reportedBy: string | null = null;
-  let unconfirmedReportedBy: string | null = null;
-
-  if (email) {
-    // 1. Check active users
-    const activeUser = await db.query.userProfiles.findFirst({
-      where: eq(
-        userProfiles.id,
-        sql`(SELECT id FROM auth.users WHERE email = ${email})`
-      ),
-    });
-
-    if (activeUser) {
-      reportedBy = activeUser.id;
-    } else {
-      // 2. Check/Create unconfirmed user
-      const existingUnconfirmed = await db.query.unconfirmedUsers.findFirst({
-        where: eq(unconfirmedUsers.email, email),
-      });
-
-      if (existingUnconfirmed) {
-        log.info(
-          {
-            action: "publicIssueReport",
-            unconfirmedUserId: existingUnconfirmed.id,
-            email,
-          },
-          "Found existing unconfirmed user"
-        );
-        unconfirmedReportedBy = existingUnconfirmed.id;
-      } else {
-        // Create new unconfirmed user
-        const [newUnconfirmed] = await db
-          .insert(unconfirmedUsers)
-          .values({
-            email: email,
-            firstName: firstName ?? "Anonymous",
-            lastName: lastName ?? "User",
-            role: "guest",
-          })
-          .returning();
-
-        if (!newUnconfirmed) {
-          throw new Error("Failed to create unconfirmed user");
-        }
-        log.info(
-          {
-            action: "publicIssueReport",
-            unconfirmedUserId: newUnconfirmed.id,
-            email,
-          },
-          "Created new unconfirmed user"
-        );
-        unconfirmedReportedBy = newUnconfirmed.id;
-      }
-    }
-  }
+  const parsedData = parsed.data;
+  const { machineId, title, description, severity } = parsedData;
 
   // Resolve machine initials from ID
   const machine = await db.query.machines.findFirst({
@@ -145,8 +79,7 @@ export async function submitPublicIssueAction(
       description: description ?? null,
       machineInitials: machine.initials,
       severity,
-      reportedBy,
-      unconfirmedReportedBy,
+      reportedBy: null,
     });
 
     revalidatePath(`/m/${machine.initials}`);

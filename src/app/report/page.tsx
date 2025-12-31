@@ -213,64 +213,6 @@ export default async function PublicReportPage({
                 </select>
               </div>
 
-              {/* Optional Reporter Info */}
-              <div className="space-y-4">
-                <div className="space-y-1">
-                  <h3 className="text-sm font-semibold text-on-surface">
-                    Your Information (Optional)
-                  </h3>
-                  <p className="text-xs text-on-surface-variant">
-                    Provide your email to track your reports and receive
-                    updates.
-                  </p>
-                </div>
-                <div className="space-y-4 rounded-lg border border-outline-variant/50 bg-surface-container-low p-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="firstName"
-                        className="text-xs text-on-surface"
-                      >
-                        First Name
-                      </Label>
-                      <Input
-                        id="firstName"
-                        name="firstName"
-                        className="h-9 border-outline-variant bg-surface text-sm text-on-surface"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="lastName"
-                        className="text-xs text-on-surface"
-                      >
-                        Last Name
-                      </Label>
-                      <Input
-                        id="lastName"
-                        name="lastName"
-                        className="h-9 border-outline-variant bg-surface text-sm text-on-surface"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-xs text-on-surface">
-                      Email Address
-                    </Label>
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      className="h-9 border-outline-variant bg-surface text-sm text-on-surface"
-                    />
-                    <p className="text-[10px] text-on-surface-variant">
-                      Issues reported with this email will be linked to your
-                      account if you sign up later.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
               <Button
                 type="submit"
                 className="w-full bg-primary text-on-primary hover:bg-primary/90"

@@ -76,7 +76,6 @@ describe("signupSchema", () => {
       lastName: "Doe",
       email: "john@example.com",
       password: "SecurePass123",
-      confirmPassword: "SecurePass123",
     });
 
     expect(result.success).toBe(true);
@@ -94,7 +93,6 @@ describe("signupSchema", () => {
       lastName: "  Doe  ",
       email: "john@example.com",
       password: "SecurePass123",
-      confirmPassword: "SecurePass123",
     });
 
     expect(result.success).toBe(true);
@@ -110,7 +108,6 @@ describe("signupSchema", () => {
       lastName: "",
       email: "john@example.com",
       password: "SecurePass123",
-      confirmPassword: "SecurePass123",
     });
 
     expect(result.success).toBe(false);
@@ -127,7 +124,6 @@ describe("signupSchema", () => {
       lastName: "Doe",
       email: "john@example.com",
       password: "SecurePass123",
-      confirmPassword: "SecurePass123",
     });
 
     expect(result.success).toBe(false);
@@ -142,7 +138,6 @@ describe("signupSchema", () => {
       lastName: "Doe",
       email: "invalid-email",
       password: "SecurePass123",
-      confirmPassword: "SecurePass123",
     });
 
     expect(result.success).toBe(false);
@@ -157,7 +152,6 @@ describe("signupSchema", () => {
       lastName: "Doe",
       email: "john@example.com",
       password: "short",
-      confirmPassword: "short",
     });
 
     expect(result.success).toBe(false);
@@ -172,7 +166,6 @@ describe("signupSchema", () => {
       lastName: "Doe",
       email: "john@example.com",
       password: "a".repeat(129),
-      confirmPassword: "a".repeat(129),
     });
 
     expect(result.success).toBe(false);
@@ -187,7 +180,6 @@ describe("signupSchema", () => {
       lastName: "Doe",
       email: "john@example.com",
       password: "12345678",
-      confirmPassword: "12345678",
     });
 
     expect(result.success).toBe(true);
@@ -199,27 +191,8 @@ describe("signupSchema", () => {
       lastName: "Doe",
       email: "john@example.com",
       password: "a".repeat(128),
-      confirmPassword: "a".repeat(128),
     });
 
     expect(result.success).toBe(true);
-  });
-
-  it("should reject mismatched passwords", () => {
-    const result = signupSchema.safeParse({
-      firstName: "John",
-      lastName: "Doe",
-      email: "john@example.com",
-      password: "SecurePass123",
-      confirmPassword: "DifferentPass456",
-    });
-
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues[0]?.message).toContain(
-        "Passwords do not match"
-      );
-      expect(result.error.issues[0]?.path).toContain("confirmPassword");
-    }
   });
 });

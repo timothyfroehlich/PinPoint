@@ -16,7 +16,6 @@ import { type Result, ok, err } from "~/lib/result";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { userProfiles } from "~/server/db/schema";
-import console from "console";
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
 
@@ -111,34 +110,21 @@ export async function createMachineAction(
     return err("VALIDATION", firstError?.message ?? "Invalid input");
   }
 
-  const { name, initials, ownerId } = validation.data;
+  const { name, initials } = validation.data;
 
-  // Resolve owner type
-  let finalOwnerId: string | undefined = undefined;
-  let finalUnconfirmedOwnerId: string | undefined = undefined;
-
-  if (profile.role === "admin" && ownerId) {
-    const isActive = await db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, ownerId),
-    });
-    if (isActive) {
-      finalOwnerId = ownerId;
-    } else {
-      finalUnconfirmedOwnerId = ownerId;
-    }
-  } else {
-    finalOwnerId = user.id;
-  }
-
-  // Insert machine
+  // Insert machine (direct Drizzle query - no DAL)
   try {
     const [machine] = await db
       .insert(machines)
       .values({
         name,
         initials,
-        ownerId: finalOwnerId,
-        unconfirmedOwnerId: finalUnconfirmedOwnerId,
+        // Enforce role-based ownership assignment
+        // Only admins can assign machines to others
+        ownerId:
+          profile.role === "admin" && validation.data.ownerId
+            ? validation.data.ownerId
+            : user.id,
       })
       .returning();
 
@@ -211,28 +197,9 @@ export async function updateMachineAction(
     return err("VALIDATION", firstError?.message ?? "Invalid input");
   }
 
-  const { id, name, ownerId } = validation.data;
+  const { id, name } = validation.data;
 
   try {
-    // Resolve owner type if provided
-    let finalOwnerId: string | null | undefined = undefined;
-    let finalUnconfirmedOwnerId: string | null | undefined = undefined;
-    let shouldUpdateOwner = false;
-
-    if (profile.role === "admin" && ownerId) {
-      shouldUpdateOwner = true;
-      const isActive = await db.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, ownerId),
-      });
-      if (isActive) {
-        finalOwnerId = ownerId;
-        finalUnconfirmedOwnerId = null; // Reset unconfirmed if setting active
-      } else {
-        finalUnconfirmedOwnerId = ownerId;
-        finalOwnerId = null; // Reset active if setting unconfirmed
-      }
-    }
-
     // Admins can update any machine, non-admins can only update their own machines
     const whereConditions =
       profile.role === "admin"
@@ -243,10 +210,7 @@ export async function updateMachineAction(
       .update(machines)
       .set({
         name,
-        ...(shouldUpdateOwner && {
-          ownerId: finalOwnerId,
-          unconfirmedOwnerId: finalUnconfirmedOwnerId,
-        }),
+        ...(validation.data.ownerId && { ownerId: validation.data.ownerId }),
       })
       .where(whereConditions)
       .returning();
@@ -259,10 +223,7 @@ export async function updateMachineAction(
     revalidatePath(`/m/${machine.initials}`);
 
     return ok({ machineId: machine.id });
-  } catch (error: unknown) {
-    if (isNextRedirectError(error)) {
-      throw error;
-    }
+  } catch (error) {
     console.error("updateMachineAction failed", error);
     return err("SERVER", "Failed to update machine. Please try again.");
   }
