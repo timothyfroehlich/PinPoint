@@ -1,9 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  forgotPasswordSchema,
-  resetPasswordSchema,
-  loginSchema,
-} from "./schemas";
+import { forgotPasswordSchema, resetPasswordSchema, loginSchema, signupSchema } from "./schemas";
 
 /**
  * Authentication Schema Validation Tests
@@ -62,9 +58,7 @@ describe("forgotPasswordSchema", () => {
     });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues[0]?.message).toBe(
-        "Email must be less than 500 characters"
-      );
+      expect(result.error.issues[0]?.message).toBe("Email must be less than 500 characters");
     }
   });
 });
@@ -123,9 +117,7 @@ describe("loginSchema", () => {
     });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues[0]?.message).toBe(
-        "Password must be less than 128 characters"
-      );
+      expect(result.error.issues[0]?.message).toBe("Password must be less than 128 characters");
     }
   });
 
@@ -137,9 +129,24 @@ describe("loginSchema", () => {
     });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues[0]?.message).toBe(
-        "Email must be less than 500 characters"
-      );
+      expect(result.error.issues[0]?.message).toBe("Email must be less than 500 characters");
+    }
+  });
+});
+
+describe("signupSchema", () => {
+  it("should reject email longer than 500 characters", () => {
+    const longEmail = "a".repeat(490) + "@example.com";
+    const result = signupSchema.safeParse({
+      firstName: "Test",
+      lastName: "User",
+      email: longEmail,
+      password: "password123",
+      confirmPassword: "password123",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toBe("Email must be less than 500 characters");
     }
   });
 });
