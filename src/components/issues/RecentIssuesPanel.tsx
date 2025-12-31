@@ -1,6 +1,4 @@
-"use client";
-
-import React, { useEffect, useState } from "react";
+import React from "react";
 import Link from "next/link";
 import {
   getIssueStatusLabel,
@@ -9,15 +7,11 @@ import {
 } from "~/lib/issues/status";
 import { Badge } from "~/components/ui/badge";
 import { cn } from "~/lib/utils";
-import { Loader2, AlertCircle } from "lucide-react";
-
-interface RecentIssue {
-  id: string;
-  issueNumber: number;
-  title: string;
-  status: string;
-  createdAt: string;
-}
+import { AlertCircle } from "lucide-react";
+import { db } from "~/server/db";
+import { issues as issuesTable } from "~/server/db/schema";
+import { eq, desc } from "drizzle-orm";
+import { log } from "~/lib/logger";
 
 interface RecentIssuesPanelProps {
   machineInitials: string;
@@ -26,45 +20,58 @@ interface RecentIssuesPanelProps {
   limit?: number;
 }
 
-export function RecentIssuesPanel({
+export async function RecentIssuesPanel({
   machineInitials,
   machineName,
   className,
   limit = 5,
-}: RecentIssuesPanelProps): React.JSX.Element {
-  const [issues, setIssues] = useState<RecentIssue[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+}: RecentIssuesPanelProps): Promise<React.JSX.Element> {
+  if (!machineInitials) {
+    return (
+      <div
+        className={cn(
+          "rounded-xl border border-outline-variant bg-surface-container-low p-4 shadow-sm h-fit",
+          className
+        )}
+      >
+        <p className="py-2 text-center text-xs text-on-surface-variant italic">
+          Select a machine to see recent issues.
+        </p>
+      </div>
+    );
+  }
 
-  useEffect(() => {
-    async function fetchIssues(): Promise<void> {
-      if (!machineInitials) {
-        setIssues([]);
-        setIsLoading(false);
-        return;
-      }
-
-      setIsLoading(true);
-      setError(null);
-      try {
-        const response = await fetch(`/api/machines/${machineInitials}/issues`);
-        if (!response.ok) {
-          throw new Error("Failed to fetch issues");
-        }
-        const data = (await response.json()) as RecentIssue[];
-        setIssues(data);
-      } catch (err) {
-        console.error("Error fetching recent issues:", err);
-        setError("Could not load recent issues");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    void fetchIssues();
-  }, [machineInitials]);
-
-  const displayedIssues = issues.slice(0, limit);
+  let issues = [];
+  try {
+    issues = await db.query.issues.findMany({
+      where: eq(issuesTable.machineInitials, machineInitials),
+      orderBy: [desc(issuesTable.createdAt)],
+      limit: limit,
+      columns: {
+        id: true,
+        issueNumber: true,
+        title: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+  } catch (err) {
+    log.error(
+      { err, machineInitials },
+      "Error fetching recent issues in Server Component"
+    );
+    return (
+      <div
+        className={cn(
+          "rounded-xl border border-outline-variant bg-surface-container-low p-4 shadow-sm h-fit text-xs text-on-surface-variant italic flex items-center gap-2",
+          className
+        )}
+      >
+        <AlertCircle className="h-4 w-4" />
+        Could not load recent issues
+      </div>
+    );
+  }
 
   return (
     <div
@@ -87,22 +94,13 @@ export function RecentIssuesPanel({
         )}
       </div>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-5 w-5 animate-spin text-on-surface-variant" />
-        </div>
-      ) : error ? (
-        <div className="flex items-center gap-2 text-xs text-on-surface-variant py-4 italic">
-          <AlertCircle className="h-4 w-4" />
-          {error}
-        </div>
-      ) : issues.length === 0 ? (
+      {issues.length === 0 ? (
         <p className="py-4 text-center text-xs text-on-surface-variant italic">
           No recent issues reported.
         </p>
       ) : (
         <div className="space-y-2">
-          {displayedIssues.map((issue) => (
+          {issues.map((issue) => (
             <Link
               key={issue.id}
               href={`/m/${machineInitials}/i/${issue.issueNumber}`}

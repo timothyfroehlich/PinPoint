@@ -7,8 +7,8 @@ import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { Button } from "~/components/ui/button";
 import { RefreshCw, UserCheck } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { submitPublicIssueAction } from "./actions";
-import { RecentIssuesPanel } from "~/components/issues/RecentIssuesPanel";
 
 interface Machine {
   id: string;
@@ -35,6 +35,8 @@ interface UnifiedReportFormProps {
   user: User | null; // Supabase User
   userProfile?: UserProfile | undefined;
   initialError?: string | undefined;
+  recentIssuesPanelMobile?: React.ReactNode;
+  recentIssuesPanelDesktop?: React.ReactNode;
 }
 
 export function UnifiedReportForm({
@@ -43,7 +45,11 @@ export function UnifiedReportForm({
   user,
   userProfile,
   initialError,
+  recentIssuesPanelMobile,
+  recentIssuesPanelDesktop,
 }: UnifiedReportFormProps): React.JSX.Element {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [selectedMachineId, setSelectedMachineId] = useState(
     defaultMachineId ?? ""
   );
@@ -73,9 +79,17 @@ export function UnifiedReportForm({
           description: string;
           severity: string;
         }>;
-        // Only restore machineId if not provided via prop
-        if (parsed.machineId && !defaultMachineId)
+        // Only restore machineId if not provided via prop or URL already
+        if (parsed.machineId && !defaultMachineId) {
           setSelectedMachineId(parsed.machineId);
+          // Sync to URL if we restored it from localStorage
+          const machine = machinesList.find((m) => m.id === parsed.machineId);
+          if (machine) {
+            const params = new URLSearchParams(searchParams.toString());
+            params.set("machine", machine.initials);
+            router.replace(`?${params.toString()}`, { scroll: false });
+          }
+        }
         if (parsed.title) setTitle(parsed.title);
         if (parsed.description) setDescription(parsed.description);
         if (parsed.severity) setSeverity(parsed.severity);
@@ -84,7 +98,7 @@ export function UnifiedReportForm({
         window.localStorage.removeItem("report_form_state");
       }
     }
-  }, [defaultMachineId]);
+  }, [defaultMachineId, machinesList, router, searchParams]);
 
   // Persistence: Save to localStorage on change
   useEffect(() => {
@@ -107,6 +121,13 @@ export function UnifiedReportForm({
       window.localStorage.removeItem("report_form_state");
     }
   }, [state.success]);
+
+  // Sync with defaultMachineId prop when it changes (from URL)
+  useEffect(() => {
+    if (defaultMachineId) {
+      setSelectedMachineId(defaultMachineId);
+    }
+  }, [defaultMachineId]);
 
   const isAdminOrMember =
     user && (userProfile?.role === "admin" || userProfile?.role === "member");
@@ -146,7 +167,19 @@ export function UnifiedReportForm({
                     name="machineId"
                     required
                     value={selectedMachineId}
-                    onChange={(e) => setSelectedMachineId(e.target.value)}
+                    onChange={(e) => {
+                      const newId = e.target.value;
+                      setSelectedMachineId(newId);
+                      // Update URL for parent to re-render Server Components
+                      const machine = machinesList.find((m) => m.id === newId);
+                      if (machine) {
+                        const params = new URLSearchParams(
+                          searchParams.toString()
+                        );
+                        params.set("machine", machine.initials);
+                        router.push(`?${params.toString()}`, { scroll: false });
+                      }
+                    }}
                     className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
                   >
                     <option value="" disabled>
@@ -161,14 +194,7 @@ export function UnifiedReportForm({
                 </div>
 
                 {/* Mobile Recent Issues (Compact) - Visible only on small screens */}
-                <div className="lg:hidden">
-                  <RecentIssuesPanel
-                    machineInitials={selectedMachine?.initials ?? ""}
-                    machineName={selectedMachine?.name ?? ""}
-                    className="border-0 bg-surface-container-low/50 shadow-none p-3"
-                    limit={3}
-                  />
-                </div>
+                <div className="lg:hidden">{recentIssuesPanelMobile}</div>
 
                 <div className="space-y-1.5">
                   <Label htmlFor="title" className="text-on-surface">
@@ -339,12 +365,7 @@ export function UnifiedReportForm({
 
             {/* Right Sidebar: Recent Issues (Desktop) */}
             <div className="hidden lg:block lg:col-span-5 border-l border-outline-variant/50 pl-8">
-              <RecentIssuesPanel
-                machineInitials={selectedMachine?.initials ?? ""}
-                machineName={selectedMachine?.name ?? ""}
-                className="border-0 shadow-none bg-transparent p-0"
-                limit={5}
-              />
+              {recentIssuesPanelDesktop}
             </div>
           </div>
         </CardContent>

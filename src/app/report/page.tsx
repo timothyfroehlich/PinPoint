@@ -6,6 +6,7 @@ import { MainLayout } from "~/components/layout/MainLayout";
 import { resolveDefaultMachineId } from "./default-machine";
 import { UnifiedReportForm } from "./unified-report-form";
 import { createClient } from "~/lib/supabase/server";
+import { RecentIssuesPanel } from "~/components/issues/RecentIssuesPanel";
 
 // Avoid SSG hitting Supabase during builds that run parallel to db resets
 export const dynamic = "force-dynamic";
@@ -53,6 +54,8 @@ export default async function PublicReportPage({
     });
   }
 
+  const selectedMachine = machinesList.find((m) => m.id === defaultMachineId);
+
   return (
     <MainLayout>
       <div className="container mx-auto max-w-5xl py-8 px-4">
@@ -62,6 +65,22 @@ export default async function PublicReportPage({
           user={user}
           userProfile={userProfile}
           initialError={errorMessage}
+          recentIssuesPanelMobile={
+            <RecentIssuesPanel
+              machineInitials={selectedMachine?.initials ?? ""}
+              machineName={selectedMachine?.name ?? ""}
+              className="border-0 bg-surface-container-low/50 shadow-none p-3"
+              limit={3}
+            />
+          }
+          recentIssuesPanelDesktop={
+            <RecentIssuesPanel
+              machineInitials={selectedMachine?.initials ?? ""}
+              machineName={selectedMachine?.name ?? ""}
+              className="border-0 shadow-none bg-transparent p-0"
+              limit={5}
+            />
+          }
         />
       </div>
     </MainLayout>
