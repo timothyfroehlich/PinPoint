@@ -16,10 +16,7 @@ import {
   getIssueSeverityStyles,
   getIssuePriorityStyles,
 } from "~/lib/issues/status";
-import {
-  type IssueSeverity,
-  type IssuePriority,
-} from "~/lib/types";
+import { type IssueSeverity, type IssuePriority } from "~/lib/types";
 import { formatIssueId } from "~/lib/issues/utils";
 
 const severityCopy: Record<IssueSeverity, string> = {
