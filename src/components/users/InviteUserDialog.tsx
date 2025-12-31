@@ -37,9 +37,15 @@ import {
 import { Switch } from "~/components/ui/switch";
 import { inviteUser } from "~/app/(app)/admin/users/actions";
 
-const inviteUserFormSchema = z.object({
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
+export const inviteUserFormSchema = z.object({
+  firstName: z
+    .string()
+    .min(1, "First name is required")
+    .max(100, "First name too long"),
+  lastName: z
+    .string()
+    .min(1, "Last name is required")
+    .max(100, "Last name too long"),
   email: z.string().email("Invalid email address"),
   role: z.enum(["guest", "member"]),
   sendInvite: z.boolean(),

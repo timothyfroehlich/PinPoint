@@ -4,9 +4,12 @@ import { log } from "~/lib/logger";
 
 export const dynamic = "force-dynamic";
 
-const clientLogEntrySchema = z.object({
+export const clientLogEntrySchema = z.object({
   level: z.enum(["log", "info", "warn", "error", "debug"]),
-  message: z.string().min(1, "message is required"),
+  message: z
+    .string()
+    .min(1, "message is required")
+    .max(5000, "Message too long"),
   args: z.array(z.unknown()).optional(),
   timestamp: z.number().int().nonnegative(),
   userAgent: z.string().optional(),
