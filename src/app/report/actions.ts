@@ -14,6 +14,8 @@ import { parsePublicIssueForm } from "./validation";
 import { db } from "~/server/db";
 import { machines, userProfiles, unconfirmedUsers } from "~/server/db/schema";
 import { eq, sql } from "drizzle-orm";
+import { createClient } from "~/lib/supabase/server";
+import type { ActionState } from "./unified-report-form";
 
 const redirectWithError = (message: string): never => {
   const params = new URLSearchParams({ error: message });
@@ -26,8 +28,9 @@ const redirectWithError = (message: string): never => {
  * Allows unauthenticated visitors to report issues.
  */
 export async function submitPublicIssueAction(
+  _prevState: ActionState,
   formData: FormData
-): Promise<void> {
+): Promise<ActionState> {
   const sourceParam = formData.get("source");
   const source = typeof sourceParam === "string" ? sourceParam : undefined;
 
@@ -53,12 +56,12 @@ export async function submitPublicIssueAction(
     );
   }
 
-  const parsed = parsePublicIssueForm(formData);
-  if (!parsed.success) {
-    redirectWithError(parsed.error);
-    return;
+  const parsedValue = parsePublicIssueForm(formData);
+  if (!parsedValue.success) {
+    return redirectWithError(parsedValue.error);
   }
 
+  // After the early return, parsedValue is narrowed to ParsedPublicIssue
   const {
     machineId,
     title,
@@ -67,14 +70,36 @@ export async function submitPublicIssueAction(
     email,
     firstName,
     lastName,
-  } = parsed.data;
+    priority,
+  } = parsedValue.data;
 
-  // Resolve reporter if email is provided
-  let reportedBy: string | null = null;
+  // 3. Resolve reporter
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  let reportedBy: string | null = user?.id ?? null;
   let unconfirmedReportedBy: string | null = null;
+  // 4. Resolve reporter via email if not already logged in
+  if (!reportedBy && email) {
+    // security check: don't allow reporting as a confirmed user
+    const confirmedResult = (await db.execute(
+      sql`SELECT id FROM auth.users WHERE email = ${email} AND email_confirmed_at IS NOT NULL`
+    )) as unknown as { id: string }[];
 
-  if (email) {
-    // 1. Check active users
+    if (confirmedResult.length > 0) {
+      log.info(
+        { action: "publicIssueReport", email },
+        "Blocked attempt to report for confirmed account"
+      );
+      return {
+        error:
+          "This email is associated with an existing account. Please log in to report this issue.",
+      };
+    }
+
+    // 2. Check active user profiles (for role/name info if needed, though unconfirmed is handled below)
     const activeUser = await db.query.userProfiles.findFirst({
       where: eq(
         userProfiles.id,
@@ -83,7 +108,7 @@ export async function submitPublicIssueAction(
     });
 
     if (activeUser) {
-      reportedBy = activeUser.id;
+      reportedBy = String(activeUser.id);
     } else {
       // 2. Check/Create unconfirmed user
       const existingUnconfirmed = await db.query.unconfirmedUsers.findFirst({
@@ -94,12 +119,12 @@ export async function submitPublicIssueAction(
         log.info(
           {
             action: "publicIssueReport",
-            unconfirmedUserId: existingUnconfirmed.id,
+            unconfirmedUserId: String(existingUnconfirmed.id),
             email,
           },
           "Found existing unconfirmed user"
         );
-        unconfirmedReportedBy = existingUnconfirmed.id;
+        unconfirmedReportedBy = String(existingUnconfirmed.id);
       } else {
         // Create new unconfirmed user
         const [newUnconfirmed] = await db
@@ -123,7 +148,7 @@ export async function submitPublicIssueAction(
           },
           "Created new unconfirmed user"
         );
-        unconfirmedReportedBy = newUnconfirmed.id;
+        unconfirmedReportedBy = String(newUnconfirmed.id);
       }
     }
   }
@@ -135,36 +160,99 @@ export async function submitPublicIssueAction(
   });
 
   if (!machine) {
-    redirectWithError("Machine not found.");
-    return;
+    throw new Error("Machine not found.");
   }
 
+  // Enforce priority for non-members
+  let finalPriority = priority;
+  let isMemberOrAdmin = false;
+
+  if (reportedBy) {
+    // If we already fetched activeUser (email match), we might know the role, but 'activeUser' scope is inside the block above.
+    // Simplest approach: just fetch the role for the final reportedBy ID.
+    // This adds one query for logged-in users, but effectively we probably cached it or it's fast.
+    // Actually, for logged-in users we didn't fetch profile yet in this function.
+
+    // We can optimization: check if we already have it?
+    // No, scope of activeUser is limited.
+
+    const profile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, reportedBy),
+      columns: { role: true },
+    });
+
+    if (profile?.role === "admin" || profile?.role === "member") {
+      isMemberOrAdmin = true;
+    }
+  }
+
+  if (!isMemberOrAdmin) {
+    // Force medium for guests/anonymous
+    finalPriority = "medium";
+  }
+
+  log.info(
+    {
+      machineId,
+      reportedBy,
+      unconfirmedReportedBy,
+      finalPriority,
+      isMemberOrAdmin,
+    },
+    "Submitting unified issue report..."
+  );
   try {
-    await createIssue({
+    const issue = await createIssue({
       title,
       description: description ?? null,
       machineInitials: machine.initials,
       severity,
+      priority: finalPriority,
       reportedBy,
       unconfirmedReportedBy,
     });
+    log.info(
+      { issueId: issue.id, issueNumber: issue.issueNumber },
+      "Issue created, redirecting..."
+    );
 
+    revalidatePath("/m");
     revalidatePath(`/m/${machine.initials}`);
     revalidatePath(`/m/${machine.initials}/i`);
-    redirect("/report/success");
+
+    // Redirect logic:
+    // 1. Authenticated users go directly to the issue detail page
+    if (reportedBy) {
+      log.info(
+        {
+          reportedBy,
+          target: `/m/${machine.initials}/i/${issue.issueNumber}`,
+        },
+        "Redirecting authenticated user to issue page"
+      );
+      redirect(`/m/${machine.initials}/i/${issue.issueNumber}`);
+    }
+
+    // 2. Anonymous users go to success page
+    const successParams = new URLSearchParams();
+    if (unconfirmedReportedBy && !reportedBy) {
+      successParams.set("new_pending", "true");
+    }
+
+    const successUrl = successParams.toString()
+      ? `/report/success?${successParams.toString()}`
+      : "/report/success";
+
+    redirect(successUrl);
   } catch (error) {
     if (isRedirectError(error)) {
       throw error;
     }
-    log.error(
-      {
-        action: "publicIssueReport",
-        machineId,
-        source,
-        error: error instanceof Error ? error.message : "Unknown",
-      },
-      "Failed to submit public issue"
-    );
-    redirectWithError("Unable to submit the issue. Please try again.");
+    return {
+      error:
+        error instanceof Error
+          ? error.message
+          : "Unable to submit the issue. Please try again.",
+    };
   }
 }

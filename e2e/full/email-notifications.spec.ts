@@ -38,12 +38,12 @@ test.describe("Email Notifications", () => {
     await expect(page.getByTestId("quick-stats")).toBeVisible();
 
     // Create an issue for a specific machine (e.g., MM)
-    await page.goto("/m/MM/report");
-    await page.getByLabel("Title").fill("Test Issue for Email");
+    await page.goto("/report?machine=MM");
+    await page.getByLabel("Issue Title *").fill("Test Issue for Email");
     await page.getByLabel("Description").fill("Testing email notifications");
-    await page.getByLabel("Severity").selectOption("playable");
-    await page.getByLabel("Priority").selectOption("low");
-    await page.getByRole("button", { name: "Report Issue" }).click();
+    await page.getByLabel("Severity *").selectOption("playable");
+    await page.getByLabel("Priority *").selectOption("low");
+    await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
     // Wait for redirect to issue page (new URL format)
     await expect(page).toHaveURL(/\/m\/MM\/i\/[0-9]+/);
@@ -79,11 +79,11 @@ test.describe("Email Notifications", () => {
     await expect(page.getByTestId("quick-stats")).toBeVisible();
 
     // Create issue for a specific machine (e.g., MM)
-    await page.goto("/m/MM/report");
-    await page.getByLabel("Title").fill("Status Change Test");
-    await page.getByLabel("Severity").selectOption("playable");
-    await page.getByLabel("Priority").selectOption("low");
-    await page.getByRole("button", { name: "Report Issue" }).click();
+    await page.goto("/report?machine=MM");
+    await page.getByLabel("Issue Title *").fill("Status Change Test");
+    await page.getByLabel("Severity *").selectOption("playable");
+    await page.getByLabel("Priority *").selectOption("low");
+    await page.getByRole("button", { name: "Submit Issue Report" }).click();
     await expect(page).toHaveURL(/\/m\/MM\/i\/[0-9]+/);
 
     // Ensure we are on the page before interacting with sidebar

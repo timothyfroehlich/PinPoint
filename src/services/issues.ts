@@ -20,9 +20,9 @@ export interface CreateIssueParams {
   description?: string | null;
   machineInitials: string;
   severity: string;
-  priority?: string;
-  reportedBy?: string | null; // Null for anonymous
-  unconfirmedReportedBy?: string | null; // Null for anonymous
+  priority?: string | undefined;
+  reportedBy?: string | null;
+  unconfirmedReportedBy?: string | null;
 }
 
 export interface UpdateIssueStatusParams {
