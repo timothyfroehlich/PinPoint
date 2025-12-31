@@ -15,7 +15,7 @@
 - **Backend**: Drizzle ORM, PostgreSQL (Supabase)
 - **Auth**: Supabase SSR (No RLS - Single Tenant)
 - **Testing**: Vitest (unit/integration), Playwright (E2E), worker-scoped PGlite
-- **Language**: TypeScript (@tsconfig/strictest)
+- **Language**: TypeScript (strictest configuration)
 - **Knowledge Cutoff**: Jan 2025, current Dec 2025. Use Context7 MCP (`resolve-library-id` → `get-library-docs`) for latest docs.
 
 ### Worktree Port Allocation (Critical for Config)
@@ -87,7 +87,7 @@
 
 ## 4. Strict Code Patterns (Copy-Paste Ready)
 
-### Type Safety (`@tsconfig/strictest`)
+### Type Safety (strictest config)
 
 **Correct Optional Assignment:**
 
@@ -266,12 +266,12 @@ npx shadcn@latest add [component]
 
 ## 8. Documentation Index
 
-**Security**: @docs/SECURITY.md, @docs/NON*NEGOTIABLES.md#security
-**Testing**: @docs/TESTING_PLAN.md, @docs/E2E_BEST_PRACTICES.md
-**TypeScript**: @docs/TYPESCRIPT_STRICTEST_PATTERNS.md
-**UI**: @docs/UI_GUIDE.md, @docs/patterns/ui-patterns/*
-**Patterns**: @docs/PATTERNS.md, @docs/patterns/\_
-**Product**: @docs/PRODUCT_SPEC.md, @docs/TECH_SPEC.md, @docs/V2_ROADMAP.md
+**Security**: docs/SECURITY.md, docs/NON*NEGOTIABLES.md (security section)
+**Testing**: docs/TESTING_PLAN.md, docs/E2E_BEST_PRACTICES.md
+**TypeScript**: docs/TYPESCRIPT_STRICTEST_PATTERNS.md
+**UI**: docs/UI_GUIDE.md, docs/patterns/ui-patterns/*
+**Patterns**: docs/PATTERNS.md, docs/patterns/\_
+**Product**: docs/PRODUCT_SPEC.md, docs/TECH_SPEC.md, docs/V2_ROADMAP.md
 
 ## 9. Scope Control
 
@@ -310,4 +310,4 @@ npx shadcn@latest add [component]
 - **Process**: Run `npm run preflight` → commit → push
 - **Hooks**: Husky + lint-staged enforce quality gates
 
-See **@AGENTS.md** for comprehensive context that applies to all agents.
+See AGENTS.md for comprehensive context that applies to all agents.
