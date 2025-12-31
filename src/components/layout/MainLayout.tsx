@@ -128,7 +128,7 @@ export async function MainLayout({
             <FeedbackWidget />
             {user ? (
               <>
-                <Button asChild variant="default" size="sm">
+                <Button asChild variant="ghost" size="sm">
                   <Link href="/report">Report Issue</Link>
                 </Button>
                 <NotificationList notifications={enrichedNotifications} />
@@ -141,7 +141,7 @@ export async function MainLayout({
               <div className="flex items-center gap-3">
                 <Button
                   asChild
-                  variant="default"
+                  variant="ghost"
                   size="sm"
                   data-testid="nav-report-issue"
                 >

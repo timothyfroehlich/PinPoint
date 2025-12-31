@@ -163,8 +163,42 @@ export async function submitPublicIssueAction(
     throw new Error("Machine not found.");
   }
 
+  // Enforce priority for non-members
+  let finalPriority = priority;
+  let isMemberOrAdmin = false;
+
+  if (reportedBy) {
+    // If we already fetched activeUser (email match), we might know the role, but 'activeUser' scope is inside the block above.
+    // Simplest approach: just fetch the role for the final reportedBy ID.
+    // This adds one query for logged-in users, but effectively we probably cached it or it's fast.
+    // Actually, for logged-in users we didn't fetch profile yet in this function.
+
+    // We can optimization: check if we already have it?
+    // No, scope of activeUser is limited.
+
+    const profile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, reportedBy),
+      columns: { role: true },
+    });
+
+    if (profile?.role === "admin" || profile?.role === "member") {
+      isMemberOrAdmin = true;
+    }
+  }
+
+  if (!isMemberOrAdmin) {
+    // Force medium for guests/anonymous
+    finalPriority = "medium";
+  }
+
   log.info(
-    { machineId, reportedBy, unconfirmedReportedBy },
+    {
+      machineId,
+      reportedBy,
+      unconfirmedReportedBy,
+      finalPriority,
+      isMemberOrAdmin,
+    },
     "Submitting unified issue report..."
   );
   try {
@@ -173,7 +207,7 @@ export async function submitPublicIssueAction(
       description: description ?? null,
       machineInitials: machine.initials,
       severity,
-      priority: priority,
+      priority: finalPriority,
       reportedBy,
       unconfirmedReportedBy,
     });
