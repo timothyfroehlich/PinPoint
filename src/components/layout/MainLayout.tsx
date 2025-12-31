@@ -141,9 +141,8 @@ export async function MainLayout({
               <div className="flex items-center gap-3">
                 <Button
                   asChild
-                  variant="ghost"
+                  variant="default"
                   size="sm"
-                  className="text-primary hover:bg-primary/10"
                   data-testid="nav-report-issue"
                 >
                   <Link href="/report">Report Issue</Link>

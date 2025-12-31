@@ -145,6 +145,20 @@ export default async function MachineDetailPage({
                 </p>
               </div>
             </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button
+                className="bg-primary text-on-primary hover:bg-primary/90"
+                asChild
+              >
+                <Link
+                  href={`/report?machine=${machine.initials}`}
+                  data-testid="machine-report-issue"
+                >
+                  <Plus className="mr-2 size-4" />
+                  Report Issue
+                </Link>
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -243,18 +257,6 @@ export default async function MachineDetailPage({
                   Issues
                 </CardTitle>
                 <div className="flex flex-col gap-3 sm:flex-row">
-                  <Button
-                    className="bg-primary text-on-primary hover:bg-primary/90"
-                    asChild
-                  >
-                    <Link
-                      href={`/m/${machine.initials}/report`}
-                      data-testid="machine-report-issue"
-                    >
-                      <Plus className="mr-2 size-4" />
-                      Report Issue
-                    </Link>
-                  </Button>
                   {machine.issues.length > 0 ? (
                     <Button
                       asChild
