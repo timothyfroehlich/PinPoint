@@ -228,7 +228,7 @@ export function InviteUserDialog({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isPending}>
+              <Button type="submit" loading={isPending}>
                 {isPending ? "Inviting..." : "Invite User"}
               </Button>
             </DialogFooter>
