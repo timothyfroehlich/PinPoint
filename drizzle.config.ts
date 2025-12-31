@@ -4,10 +4,15 @@ import { defineConfig } from "drizzle-kit";
 // Load Next.js environment variables (respects .env.local priority)
 loadEnvConfig(process.cwd());
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl =
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_URL_NON_POOLING ||
+  process.env.POSTGRES_URL ||
+  process.env.DIRECT_URL;
+
 if (!databaseUrl) {
   throw new Error(
-    "DATABASE_URL environment variable is required for Drizzle config."
+    "Database URL environment variable (DATABASE_URL, POSTGRES_URL_NON_POOLING, etc.) is required for Drizzle config."
   );
 }
 
@@ -32,6 +37,7 @@ export default defineConfig({
     "issue_watchers",
     "notifications",
     "notification_preferences",
+    "unconfirmed_users",
   ],
   schemaFilter: ["public"],
   verbose: true,

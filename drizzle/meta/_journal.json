@@ -22,6 +22,20 @@
       "when": 1766770560460,
       "tag": "0002_add_more_performance_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1766950334432,
+      "tag": "0003_add_unconfirmed_users",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1767119720539,
+      "tag": "0004_whole_kate_bishop",
+      "breakpoints": true
     }
   ]
 }

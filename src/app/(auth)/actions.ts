@@ -183,6 +183,7 @@ export async function signupAction(
     lastName: formData.get("lastName"),
     email: formData.get("email"),
     password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword"),
   });
 
   if (!parsed.success) {

@@ -115,7 +115,7 @@ export function FeedbackWidget(): React.JSX.Element | null {
           title="Send Feedback"
         >
           <MessageSquare className="h-5 w-5" />
-          <span>Feedback</span>
+          <span className="hidden sm:inline">Feedback</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

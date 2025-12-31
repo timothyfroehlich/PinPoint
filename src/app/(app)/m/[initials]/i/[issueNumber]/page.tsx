@@ -16,11 +16,7 @@ import {
   getIssueSeverityStyles,
   getIssuePriorityStyles,
 } from "~/lib/issues/status";
-import {
-  type IssueWithAllRelations,
-  type IssueSeverity,
-  type IssuePriority,
-} from "~/lib/types";
+import { type IssueSeverity, type IssuePriority } from "~/lib/types";
 import { formatIssueId } from "~/lib/issues/utils";
 
 const severityCopy: Record<IssueSeverity, string> = {
@@ -62,9 +58,10 @@ export default async function IssueDetailPage({
     redirect(`/m/${initials}`);
   }
 
-  // Query issue with all relations
-  const issue: IssueWithAllRelations | undefined =
-    await db.query.issues.findFirst({
+  // CORE-PERF-003: Execute independent queries in parallel to avoid waterfall
+  const [issue, allUsers] = await Promise.all([
+    // Query issue with all relations
+    db.query.issues.findFirst({
       where: and(
         eq(issues.machineInitials, initials),
         eq(issues.issueNumber, issueNum)
@@ -106,22 +103,22 @@ export default async function IssueDetailPage({
           columns: { userId: true },
         },
       },
-    });
+    }),
+    // Fetch all users for assignment dropdown
+    db
+      .select({
+        id: userProfiles.id,
+        name: userProfiles.name,
+        email: authUsers.email,
+      })
+      .from(userProfiles)
+      .leftJoin(authUsers, eq(authUsers.id, userProfiles.id))
+      .orderBy(asc(userProfiles.name)),
+  ]);
 
   if (!issue) {
     redirect(`/m/${initials}`);
   }
-
-  // Fetch all users for assignment dropdown
-  const allUsers = await db
-    .select({
-      id: userProfiles.id,
-      name: userProfiles.name,
-      email: authUsers.email,
-    })
-    .from(userProfiles)
-    .leftJoin(authUsers, eq(authUsers.id, userProfiles.id))
-    .orderBy(asc(userProfiles.name));
 
   return (
     <PageShell className="space-y-8" size="wide">

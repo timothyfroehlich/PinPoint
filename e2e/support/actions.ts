@@ -22,7 +22,8 @@ export async function loginAs(
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign In" }).click();
 
-  await expect(page).toHaveURL("/dashboard");
+  await page.waitForLoadState("networkidle");
+  await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
 
   // Use project name to determine mobile vs desktop layout
   const isMobile = testInfo.project.name.includes("Mobile");
