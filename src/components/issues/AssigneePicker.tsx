@@ -2,6 +2,7 @@
 
 import React from "react";
 import { cn } from "~/lib/utils";
+import { Loader2 } from "lucide-react";
 
 interface PickerUser {
   id: string;
@@ -96,12 +97,25 @@ export function AssigneePicker({
         data-testid="assignee-picker-trigger"
       >
         <div className="flex items-center gap-2">
-          <div className="size-6 rounded-full bg-muted flex items-center justify-center text-xs text-muted-foreground">
-            {selectedUser ? selectedUser.name.slice(0, 1).toUpperCase() : "?"}
-          </div>
-          <span className="font-medium">
-            {selectedUser ? selectedUser.name : "Unassigned"}
-          </span>
+          {isPending ? (
+            <>
+              <div className="size-6 flex items-center justify-center">
+                <Loader2 className="size-4 animate-spin text-muted-foreground" />
+              </div>
+              <span className="text-muted-foreground">Updating...</span>
+            </>
+          ) : (
+            <>
+              <div className="size-6 rounded-full bg-muted flex items-center justify-center text-xs text-muted-foreground">
+                {selectedUser
+                  ? selectedUser.name.slice(0, 1).toUpperCase()
+                  : "?"}
+              </div>
+              <span className="font-medium">
+                {selectedUser ? selectedUser.name : "Unassigned"}
+              </span>
+            </>
+          )}
         </div>
         <svg
           width="15"
