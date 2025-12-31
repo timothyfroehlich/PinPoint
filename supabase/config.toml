@@ -106,7 +106,7 @@ token_verifications = 30
 enable_signup = true
 double_confirm_changes = true
 # Disable confirmations for local development
-enable_confirmations = true
+enable_confirmations = false
 secure_password_change = false
 max_frequency = "1s"
 otp_length = 6

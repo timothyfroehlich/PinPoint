@@ -15,33 +15,35 @@ interface UserRoleSelectProps {
   userId: string;
   currentRole: "guest" | "member" | "admin";
   currentUserId: string;
+  userType?: "active" | "unconfirmed";
 }
 
 export function UserRoleSelect({
   userId,
   currentRole,
   currentUserId,
+  userType = "active",
 }: UserRoleSelectProps): React.JSX.Element {
   const [isPending, startTransition] = React.useTransition();
 
   const handleRoleChange = (newRole: "guest" | "member" | "admin"): void => {
-    if (userId === currentUserId && newRole !== "admin") {
+    if (
+      userType === "active" &&
+      userId === currentUserId &&
+      newRole !== "admin"
+    ) {
       toast.error("You cannot demote yourself.");
       return;
     }
 
     startTransition(async () => {
       try {
-        await updateUserRole(userId, newRole);
+        await updateUserRole(userId, newRole, userType);
         toast.success("Role updated successfully");
       } catch (error) {
         toast.error(
           error instanceof Error ? error.message : "Failed to update role"
         );
-        // Ideally we would revert the optimistic update here if we were doing one manually,
-        // but since we rely on revalidatePath and the Select value is controlled by the prop (which comes from server),
-        // it might not visually revert immediately if we don't manage local state.
-        // For now, the server revalidation will fix it.
       }
     });
   };

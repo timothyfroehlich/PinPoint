@@ -56,18 +56,17 @@ export function resolveRequestUrl(headers: Headers): string {
 export function requireSiteUrl(action: string): string {
   const url = getSiteUrl();
 
-  // In production (implied by missing localhost), we might want to be stricter.
-  // But for now, we just return the resolved URL.
-  // The caller can decide if "localhost" is acceptable.
-
-  if (
-    !process.env["NEXT_PUBLIC_SITE_URL"] &&
-    process.env.NODE_ENV === "production"
-  ) {
-    log.warn(
-      { action },
-      "NEXT_PUBLIC_SITE_URL not set in production, falling back to localhost"
-    );
+  // In production, we must have a real domain.
+  if (process.env.NODE_ENV === "production") {
+    // If we resolved to localhost, that's definitely an error in production.
+    if (
+      url.startsWith("http://localhost") ||
+      url.startsWith("http://127.0.0.1")
+    ) {
+      const msg = `Configuration Error: NEXT_PUBLIC_SITE_URL is missing in production for action "${action}", and no valid fallback (like VERCEL_URL) was found.`;
+      log.error({ action }, msg);
+      throw new Error(msg);
+    }
   }
 
   return url;

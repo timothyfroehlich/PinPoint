@@ -22,7 +22,8 @@ describe("SignupForm", () => {
     expect(screen.getByLabelText(/first name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/last name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/confirm password/i)).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /create account/i })
     ).toBeInTheDocument();
@@ -41,7 +42,8 @@ describe("SignupForm", () => {
     await user.type(screen.getByLabelText(/first name/i), "Test");
     await user.type(screen.getByLabelText(/last name/i), "User");
     await user.type(screen.getByLabelText(/email/i), "test@example.com");
-    await user.type(screen.getByLabelText(/password/i), "Password123!");
+    await user.type(screen.getByLabelText(/^password$/i), "Password123!");
+    await user.type(screen.getByLabelText(/confirm password/i), "Password123!");
 
     const button = screen.getByRole<HTMLButtonElement>("button", {
       name: /create account/i,
@@ -65,7 +67,8 @@ describe("SignupForm", () => {
     await user.type(screen.getByLabelText(/first name/i), "Test");
     await user.type(screen.getByLabelText(/last name/i), "User");
     await user.type(screen.getByLabelText(/email/i), "test@example.com");
-    await user.type(screen.getByLabelText(/password/i), "Password123!");
+    await user.type(screen.getByLabelText(/^password$/i), "Password123!");
+    await user.type(screen.getByLabelText(/confirm password/i), "Password123!");
 
     const button = screen.getByRole("button", { name: /create account/i });
     await user.click(button);

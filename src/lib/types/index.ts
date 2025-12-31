@@ -10,14 +10,17 @@ export type {
   NewMachine,
   NewIssue,
   NewIssueComment,
-  UserRole,
   IssueStatus,
   IssueSeverity,
   IssuePriority,
 } from "./database";
+
+export type { UserRole } from "./user";
 
 export type {
   IssueCommentWithAuthor,
   IssueListItem,
   IssueWithAllRelations,
 } from "./issue";
+
+export type { UnifiedUser, UserStatus, MachineOwner } from "./user";

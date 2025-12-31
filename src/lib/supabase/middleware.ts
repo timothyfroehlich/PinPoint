@@ -77,7 +77,9 @@ export async function updateSession(
   const autologinEnv = DEV_AUTOLOGIN_ENABLED;
   const autologinEnabled =
     !isProductionEnv &&
-    (autologinEnv !== undefined ? autologinEnv.toLowerCase() === "true" : true);
+    (autologinEnv !== undefined
+      ? autologinEnv.toLowerCase() === "true"
+      : false);
 
   let {
     data: { user },
