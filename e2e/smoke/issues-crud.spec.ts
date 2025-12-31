@@ -40,7 +40,7 @@ test.describe("Issues System", () => {
       const machineInitials = seededMachines.addamsFamily.initials;
 
       // Navigate to report page for The Addams Family
-      await page.goto(`/m/${machineInitials}/report`);
+      await page.goto(`/report?machine=${machineInitials}`);
 
       // Fill out form
       await page.getByLabel("Issue Title *").fill("Test flipper not working");
@@ -51,7 +51,7 @@ test.describe("Issues System", () => {
       await page.getByLabel("Priority *").selectOption("medium");
 
       // Submit form
-      await page.getByRole("button", { name: "Report Issue" }).click();
+      await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
       // Should redirect to issue detail page in new format
       await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
@@ -83,11 +83,11 @@ test.describe("Issues System", () => {
       await addamsFamilyCard.click();
       await expect(page).toHaveURL(/\/m\/TAF/); // Expect TAF machine detail page
 
-      // Click "Report Issue" button on machine page (scope to main content to avoid global header button)
+      // Click "Submit Issue Report" button on machine page (scope to main content to avoid global header button)
       await page.getByTestId("machine-report-issue").click();
 
       // Should be on new issue page for TAF
-      await expect(page).toHaveURL(/\/m\/TAF\/report/);
+      await page.waitForURL(/\/report\?machine=TAF/);
 
       // Verify machine name is displayed
       await expect(
@@ -103,7 +103,7 @@ test.describe("Issues System", () => {
       await page.getByLabel("Priority *").selectOption("low");
 
       // Submit
-      await page.getByRole("button", { name: "Report Issue" }).click();
+      await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
       // Verify creation
       await expect(page).toHaveURL(/\/m\/TAF\/i\/[0-9]+/);
@@ -128,11 +128,11 @@ test.describe("Issues System", () => {
       // Create an issue first to navigate to via UI interaction
       machineInitials = seededMachines.addamsFamily.initials;
       issueTitle = `Test Issue for Details ${Date.now()}`;
-      await page.goto(`/m/${machineInitials}/report`);
+      await page.goto(`/report?machine=${machineInitials}`);
       await page.getByLabel("Issue Title *").fill(issueTitle);
       await page.locator("#severity").selectOption("playable");
       await page.locator("#priority").selectOption("medium");
-      await page.getByRole("button", { name: "Report Issue" }).click();
+      await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
       await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
       issueUrl = page.url();

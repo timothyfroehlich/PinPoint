@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "~/components/ui/button";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { toggleWatcherAction } from "~/app/(app)/issues/watcher-actions";
 import { cn } from "~/lib/utils";
 
@@ -45,8 +45,14 @@ export function WatchButton({
           : "text-muted-foreground"
       )}
     >
-      {isWatching ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-      {isWatching ? "Unwatch Issue" : "Watch Issue"}
+      {isPending ? (
+        <Loader2 className="size-4 animate-spin" />
+      ) : isWatching ? (
+        <EyeOff className="size-4" />
+      ) : (
+        <Eye className="size-4" />
+      )}
+      {isPending ? "Updating..." : isWatching ? "Unwatch Issue" : "Watch Issue"}
     </Button>
   );
 }

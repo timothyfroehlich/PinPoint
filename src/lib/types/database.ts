@@ -30,7 +30,8 @@ export type NewIssue = InferInsertModel<typeof issues>;
 export type NewIssueComment = InferInsertModel<typeof issueComments>;
 
 // Enum types for type safety
-export type UserRole = "guest" | "member" | "admin";
+import type { UserRole } from "./user";
+export type { UserRole };
 export type IssueStatus = "new" | "in_progress" | "resolved";
 export type IssueSeverity = "minor" | "playable" | "unplayable";
 export type IssuePriority = "low" | "medium" | "high" | "critical";

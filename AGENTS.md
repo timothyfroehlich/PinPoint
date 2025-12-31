@@ -267,9 +267,12 @@ For detailed guidance, use Agent Skills (if supported) or reference docs directl
 
 **Dev Loop**:
 
-- After any change: `npm run check` (types + lint + unit tests, ~5s)
-- Before commit: `npm run preflight` (full suite, ~60s)
-- Targeted: `npm test -- path/to/file.test.ts`
+| Command                            | When to use                      |
+| ---------------------------------- | -------------------------------- |
+| `npm run check`                    | After ANY code change (~5s)      |
+| `npm test -- path/to/file.test.ts` | Debug specific test              |
+| `npm run preflight`                | Before commit (full suite, ~60s) |
+| **Mobile Safari**                  | **DO NOT RUN LOCALLY** (CI only) |
 
 **Key Constraints**:
 

@@ -1,11 +1,13 @@
 import type React from "react";
 import { notFound } from "next/navigation";
+import { getUnifiedUsers } from "~/lib/users/queries";
+import type { UnifiedUser } from "~/lib/types";
 import { cn } from "~/lib/utils";
 import Link from "next/link";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { machines, userProfiles } from "~/server/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import {
   deriveMachineStatus,
   getMachineStatusLabel,
@@ -78,12 +80,9 @@ export default async function MachineDetailPage({
 
   const isAdmin = currentUserProfile?.role === "admin";
 
-  let allUsers: { id: string; name: string }[] = [];
+  let allUsers: UnifiedUser[] = [];
   if (isAdmin) {
-    allUsers = await db
-      .select({ id: userProfiles.id, name: userProfiles.name })
-      .from(userProfiles)
-      .orderBy(asc(userProfiles.name));
+    allUsers = await getUnifiedUsers();
   }
 
   // 404 if machine not found
@@ -145,6 +144,20 @@ export default async function MachineDetailPage({
                   Machine details and issue tracking
                 </p>
               </div>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button
+                className="bg-primary text-on-primary hover:bg-primary/90"
+                asChild
+              >
+                <Link
+                  href={`/report?machine=${machine.initials}`}
+                  data-testid="machine-report-issue"
+                >
+                  <Plus className="mr-2 size-4" />
+                  Report Issue
+                </Link>
+              </Button>
             </div>
           </div>
         </div>
@@ -244,18 +257,6 @@ export default async function MachineDetailPage({
                   Issues
                 </CardTitle>
                 <div className="flex flex-col gap-3 sm:flex-row">
-                  <Button
-                    className="bg-primary text-on-primary hover:bg-primary/90"
-                    asChild
-                  >
-                    <Link
-                      href={`/m/${machine.initials}/report`}
-                      data-testid="machine-report-issue"
-                    >
-                      <Plus className="mr-2 size-4" />
-                      Report Issue
-                    </Link>
-                  </Button>
                   {machine.issues.length > 0 ? (
                     <Button
                       asChild

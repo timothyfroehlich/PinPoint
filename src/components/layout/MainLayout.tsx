@@ -128,16 +128,14 @@ export async function MainLayout({
             <FeedbackWidget />
             {user ? (
               <>
-                <Button
-                  asChild
-                  variant="default"
-                  size="sm"
-                  className="hidden sm:inline-flex"
-                >
+                <Button asChild variant="ghost" size="sm">
                   <Link href="/report">Report Issue</Link>
                 </Button>
                 <NotificationList notifications={enrichedNotifications} />
-                <UserMenu userName={userProfile?.name ?? "User"} />
+                <UserMenu
+                  userName={userProfile?.name ?? "User"}
+                  email={user.email}
+                />
               </>
             ) : (
               <div className="flex items-center gap-3">
@@ -145,7 +143,6 @@ export async function MainLayout({
                   asChild
                   variant="ghost"
                   size="sm"
-                  className="text-primary hover:bg-primary/10"
                   data-testid="nav-report-issue"
                 >
                   <Link href="/report">Report Issue</Link>

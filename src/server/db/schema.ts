@@ -59,6 +59,29 @@ export const userProfiles = pgTable("user_profiles", {
 });
 
 /**
+ * Unconfirmed Users Table
+ *
+ * Tracks users who have been invited or reported issues but haven't signed up yet.
+ * Linked to user_profiles automatically on signup via database trigger.
+ */
+export const unconfirmedUsers = pgTable("unconfirmed_users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  name: text("name")
+    .generatedAlwaysAs(sql`first_name || ' ' || last_name`)
+    .notNull(),
+  email: text("email").notNull().unique(),
+  role: text("role", { enum: ["guest", "member", "admin"] })
+    .notNull()
+    .default("guest"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  inviteSentAt: timestamp("invite_sent_at", { withTimezone: true }),
+});
+
+/**
  * Machines Table
  *
  * Pinball machines in the collection.
@@ -71,6 +94,9 @@ export const machines = pgTable(
     nextIssueNumber: integer("next_issue_number").notNull().default(1),
     name: text("name").notNull(),
     ownerId: uuid("owner_id").references(() => userProfiles.id),
+    unconfirmedOwnerId: uuid("unconfirmed_owner_id").references(
+      () => unconfirmedUsers.id
+    ),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -80,6 +106,10 @@ export const machines = pgTable(
   },
   (t) => ({
     initialsCheck: check("initials_check", sql`initials ~ '^[A-Z0-9]{2,6}$'`),
+    ownerCheck: check(
+      "owner_check",
+      sql`(owner_id IS NULL OR unconfirmed_owner_id IS NULL)`
+    ),
     ownerIdIdx: index("idx_machines_owner_id").on(t.ownerId),
   })
 );
@@ -110,6 +140,9 @@ export const issues = pgTable(
       .notNull()
       .default("low"),
     reportedBy: uuid("reported_by").references(() => userProfiles.id),
+    unconfirmedReportedBy: uuid("unconfirmed_reported_by").references(
+      () => unconfirmedUsers.id
+    ),
     assignedTo: uuid("assigned_to").references(() => userProfiles.id),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -123,6 +156,10 @@ export const issues = pgTable(
     uniqueIssueNumber: unique("unique_issue_number").on(
       t.machineInitials,
       t.issueNumber
+    ),
+    reporterCheck: check(
+      "reporter_check",
+      sql`(reported_by IS NULL OR unconfirmed_reported_by IS NULL)`
     ),
     assignedToIdx: index("idx_issues_assigned_to").on(t.assignedTo),
     reportedByIdx: index("idx_issues_reported_by").on(t.reportedBy),
@@ -147,7 +184,7 @@ export const issueWatchers = pgTable(
   },
   (t) => ({
     pk: primaryKey({ columns: [t.issueId, t.userId] }),
-    issueIdIdx: index("idx_issue_watchers_issue_id").on(t.issueId),
+    userIdIdx: index("idx_issue_watchers_user_id").on(t.userId),
   })
 );
 
@@ -175,6 +212,7 @@ export const issueComments = pgTable(
   },
   (t) => ({
     issueIdIdx: index("idx_issue_comments_issue_id").on(t.issueId),
+    authorIdIdx: index("idx_issue_comments_author_id").on(t.authorId),
   })
 );
 
@@ -304,6 +342,11 @@ export const machinesRelations = relations(machines, ({ many, one }) => ({
     references: [userProfiles.id],
     relationName: "owner",
   }),
+  unconfirmedOwner: one(unconfirmedUsers, {
+    fields: [machines.unconfirmedOwnerId],
+    references: [unconfirmedUsers.id],
+    relationName: "unconfirmed_owner",
+  }),
 }));
 
 export const issuesRelations = relations(issues, ({ one, many }) => ({
@@ -321,9 +364,22 @@ export const issuesRelations = relations(issues, ({ one, many }) => ({
     references: [userProfiles.id],
     relationName: "assigned_to",
   }),
+  unconfirmedReporter: one(unconfirmedUsers, {
+    fields: [issues.unconfirmedReportedBy],
+    references: [unconfirmedUsers.id],
+    relationName: "unconfirmed_reporter",
+  }),
   comments: many(issueComments),
   watchers: many(issueWatchers),
 }));
+
+export const unconfirmedUsersRelations = relations(
+  unconfirmedUsers,
+  ({ many }) => ({
+    ownedMachines: many(machines, { relationName: "unconfirmed_owner" }),
+    reportedIssues: many(issues, { relationName: "unconfirmed_reporter" }),
+  })
+);
 
 export const issueCommentsRelations = relations(issueComments, ({ one }) => ({
   issue: one(issues, {

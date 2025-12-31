@@ -20,8 +20,9 @@ export interface CreateIssueParams {
   description?: string | null;
   machineInitials: string;
   severity: string;
-  priority?: string;
-  reportedBy?: string | null; // Null for anonymous
+  priority?: string | undefined;
+  reportedBy?: string | null;
+  unconfirmedReportedBy?: string | null;
 }
 
 export interface UpdateIssueStatusParams {
@@ -68,6 +69,7 @@ export async function createIssue({
   severity,
   priority,
   reportedBy,
+  unconfirmedReportedBy,
 }: CreateIssueParams): Promise<Issue> {
   return await db.transaction(async (tx) => {
     // 1. Lock machine row and get next number (Atomic increment)
@@ -99,6 +101,7 @@ export async function createIssue({
         severity: severity as "minor" | "playable" | "unplayable",
         priority: (priority ?? "low") as "low" | "medium" | "high",
         reportedBy: reportedBy ?? null,
+        unconfirmedReportedBy: unconfirmedReportedBy ?? null,
         status: "new",
       })
       .returning();
@@ -108,7 +111,9 @@ export async function createIssue({
     // 3. Create Timeline Event
     await createTimelineEvent(
       issue.id,
-      reportedBy ? "Issue created" : "Issue reported via public form",
+      reportedBy || unconfirmedReportedBy
+        ? "Issue created"
+        : "Issue reported via public form",
       tx
     );
 

@@ -106,6 +106,18 @@ describe("updateSession autologin", () => {
     expect(response.headers.get("location")?.includes("/login")).toBe(true);
   });
 
+  it("skips autologin when env var is undefined (default false)", async () => {
+    delete process.env.DEV_AUTOLOGIN_ENABLED;
+    const supabase = createSupabaseAuthMocks(null, null);
+    createServerClientMock.mockReturnValue(supabase);
+
+    const request = makeRequest("http://localhost/dashboard");
+    const response = await updateSession(request);
+
+    expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled();
+    expect(response.headers.get("location")?.includes("/login")).toBe(true);
+  });
+
   it("skips autologin when query param disables it", async () => {
     const supabase = createSupabaseAuthMocks(null, null);
     createServerClientMock.mockReturnValue(supabase);
