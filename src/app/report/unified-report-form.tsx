@@ -106,11 +106,7 @@ export function UnifiedReportForm({
         if (parsed.title) setTitle(parsed.title);
         if (parsed.description) setDescription(parsed.description);
         if (parsed.severity) setSeverity(parsed.severity);
-        if (parsed.priority) {
-          // Priority is only available for members/admins but safe to restore state
-          // We can't setState for it directly as it wasn't in top level state before?
-          // Wait, I need to add state for priority first since I'm making it controlled.
-        }
+        if (parsed.priority) setPriority(parsed.priority);
       } catch {
         // Clear corrupted localStorage
         window.localStorage.removeItem("report_form_state");
