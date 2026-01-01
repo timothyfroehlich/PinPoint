@@ -1181,7 +1181,7 @@ async function main() {
     const commands = [];
     
     if (problemCounts.typescript > 0) {
-      commands.push(`npm run typecheck:brief`);
+      commands.push(`pnpm run typecheck:brief`);
     }
     if (problemCounts.eslint > 0) {
       commands.push(`npx eslint "${relativePath}"`);
