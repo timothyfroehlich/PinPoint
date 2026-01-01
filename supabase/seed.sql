@@ -80,3 +80,15 @@ COMMENT ON CONSTRAINT user_profiles_id_fkey ON public.user_profiles IS
 -- ============================================================================
 -- Note: All seed data is now handled in supabase/seed-users.mjs to ensure
 -- proper foreign key relationships (machines need owners which are auth users).
+
+-- Ensure public schema permissions for PostgREST/Supabase roles
+-- These tables are created via Drizzle and need explicit grants
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
+
+-- Ensure default privileges for future tables created in public schema
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
