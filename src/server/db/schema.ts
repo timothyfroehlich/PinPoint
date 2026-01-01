@@ -165,6 +165,7 @@ export const issues = pgTable(
     assignedToIdx: index("idx_issues_assigned_to").on(t.assignedTo),
     reportedByIdx: index("idx_issues_reported_by").on(t.reportedBy),
     statusIdx: index("idx_issues_status").on(t.status),
+    createdAtIdx: index("idx_issues_created_at").on(t.createdAt),
   })
 );
 
