@@ -34,9 +34,11 @@ export interface RateLimitResult {
  * Check if Redis is configured via environment variables
  */
 function isRedisConfigured(): boolean {
+  const url = process.env["UPSTASH_REDIS_REST_URL"];
   return !!(
-    process.env["UPSTASH_REDIS_REST_URL"] &&
-    process.env["UPSTASH_REDIS_REST_TOKEN"]
+    url &&
+    process.env["UPSTASH_REDIS_REST_TOKEN"] &&
+    !url.includes("your-redis-instance")
   );
 }
 

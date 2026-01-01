@@ -100,9 +100,10 @@ async function seedUsersAndData() {
       // Ensure user profile exists and has correct role (Upsert)
       // This handles cases where auth.users exists but public.user_profiles was wiped
       await sql`
-        INSERT INTO user_profiles (id, first_name, last_name, role)
-        VALUES (${userId}, ${user.firstName}, ${user.lastName}, ${user.role})
+        INSERT INTO user_profiles (id, email, first_name, last_name, role)
+        VALUES (${userId}, ${user.email}, ${user.firstName}, ${user.lastName}, ${user.role})
         ON CONFLICT (id) DO UPDATE SET
+          email = ${user.email},
           role = ${user.role},
           first_name = ${user.firstName},
           last_name = ${user.lastName},
@@ -132,7 +133,7 @@ async function seedUsersAndData() {
       await sql`
         INSERT INTO machines (id, name, initials, owner_id, created_at, updated_at)
         VALUES (${machine.id}, ${machine.name}, ${machine.initials}, ${userIds.admin}, NOW(), NOW())
-        ON CONFLICT (id) DO UPDATE SET 
+        ON CONFLICT (id) DO UPDATE SET
           owner_id = ${userIds.admin},
           initials = ${machine.initials}
       `;

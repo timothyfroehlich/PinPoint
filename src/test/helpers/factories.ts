@@ -19,6 +19,7 @@ export function createTestUser(
 ): InferInsertModel<typeof userProfiles> {
   return {
     id: randomUUID(),
+    email: `test-${randomUUID()}@example.com`,
     firstName: "Test",
     lastName: "User",
     role: "member",

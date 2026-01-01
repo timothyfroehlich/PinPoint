@@ -92,13 +92,15 @@ CREATE TABLE "unconfirmed_users" (
 
 CREATE TABLE "user_profiles" (
 	"id" uuid PRIMARY KEY NOT NULL,
+	"email" text NOT NULL,
 	"first_name" text NOT NULL,
 	"last_name" text NOT NULL,
 	"name" text GENERATED ALWAYS AS (first_name || ' ' || last_name) STORED NOT NULL,
 	"avatar_url" text,
 	"role" text DEFAULT 'member' NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "user_profiles_email_unique" UNIQUE("email")
 );
 
 ALTER TABLE "issue_comments" ADD CONSTRAINT "issue_comments_issue_id_issues_id_fk" FOREIGN KEY ("issue_id") REFERENCES "public"."issues"("id") ON DELETE cascade ON UPDATE no action;
@@ -114,7 +116,8 @@ ALTER TABLE "machines" ADD CONSTRAINT "machines_unconfirmed_owner_id_unconfirmed
 ALTER TABLE "notification_preferences" ADD CONSTRAINT "notification_preferences_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE cascade ON UPDATE no action;
 ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE cascade ON UPDATE no action;
 CREATE INDEX "idx_issue_comments_issue_id" ON "issue_comments" USING btree ("issue_id");
-CREATE INDEX "idx_issue_watchers_issue_id" ON "issue_watchers" USING btree ("issue_id");
+CREATE INDEX "idx_issue_comments_author_id" ON "issue_comments" USING btree ("author_id");
+CREATE INDEX "idx_issue_watchers_user_id" ON "issue_watchers" USING btree ("user_id");
 CREATE INDEX "idx_issues_assigned_to" ON "issues" USING btree ("assigned_to");
 CREATE INDEX "idx_issues_reported_by" ON "issues" USING btree ("reported_by");
 CREATE INDEX "idx_issues_status" ON "issues" USING btree ("status");

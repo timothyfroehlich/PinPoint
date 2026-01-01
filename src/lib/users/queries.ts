@@ -1,6 +1,6 @@
 import { db } from "~/server/db";
-import { userProfiles, authUsers, unconfirmedUsers } from "~/server/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { userProfiles, unconfirmedUsers } from "~/server/db/schema";
+import { sql } from "drizzle-orm";
 import type { UnifiedUser } from "~/lib/types";
 
 export async function getUnifiedUsers(): Promise<UnifiedUser[]> {
@@ -9,14 +9,13 @@ export async function getUnifiedUsers(): Promise<UnifiedUser[]> {
     .select({
       id: userProfiles.id,
       name: userProfiles.name,
-      email: authUsers.email,
+      email: userProfiles.email,
       role: userProfiles.role,
       avatarUrl: userProfiles.avatarUrl,
       status: sql<"active">`'active'`,
       inviteSentAt: sql<null>`null`,
     })
-    .from(userProfiles)
-    .leftJoin(authUsers, eq(userProfiles.id, authUsers.id));
+    .from(userProfiles);
 
   // Fetch unconfirmed users
   const unconfirmedUsersList = await db

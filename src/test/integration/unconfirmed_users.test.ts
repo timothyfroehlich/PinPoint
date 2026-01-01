@@ -56,6 +56,7 @@ describe("Unconfirmed Users Integration", () => {
     });
     await db.insert(userProfiles).values({
       id: activeUserId,
+      email: "active@example.com",
       firstName: "Active",
       lastName: "User",
       role: "admin",
@@ -133,9 +134,12 @@ describe("Unconfirmed Users Integration", () => {
     await db
       .insert(authUsers)
       .values({ id: activeUserId, email: "active@example.com" });
-    await db
-      .insert(userProfiles)
-      .values({ id: activeUserId, firstName: "Active", lastName: "Owner" });
+    await db.insert(userProfiles).values({
+      id: activeUserId,
+      email: "active@example.com",
+      firstName: "Active",
+      lastName: "Owner",
+    });
 
     const [machine2] = await db
       .insert(machines)
@@ -191,6 +195,7 @@ describe("Unconfirmed Users Integration", () => {
 
     await db.insert(userProfiles).values({
       id: userId,
+      email: "autolink@example.com",
       firstName: "Auto",
       lastName: "Link",
       role: "guest", // Will be overwritten by trigger to "member"

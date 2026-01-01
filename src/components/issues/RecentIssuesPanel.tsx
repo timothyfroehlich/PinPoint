@@ -41,7 +41,13 @@ export async function RecentIssuesPanel({
     );
   }
 
-  let issues = [];
+  let issues: {
+    id: string;
+    issueNumber: number;
+    title: string;
+    status: "new" | "in_progress" | "resolved";
+    createdAt: Date;
+  }[] = [];
   try {
     issues = await db.query.issues.findMany({
       where: eq(issuesTable.machineInitials, machineInitials),

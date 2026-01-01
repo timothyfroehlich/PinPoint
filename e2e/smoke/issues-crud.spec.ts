@@ -21,6 +21,8 @@ const rememberIssueId = (page: Page): void => {
 
 test.describe("Issues System", () => {
   test.beforeEach(async ({ page }, testInfo) => {
+    // Increase timeout for local execution where compilation can be slow
+    test.setTimeout(60000);
     // Login as member before each test
     await loginAs(page, testInfo);
   });

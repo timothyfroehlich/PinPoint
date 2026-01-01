@@ -41,6 +41,7 @@ export const authUsers = authSchema.table("users", {
  */
 export const userProfiles = pgTable("user_profiles", {
   id: uuid("id").primaryKey(),
+  email: text("email").notNull().unique(),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   name: text("name")

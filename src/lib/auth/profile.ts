@@ -35,6 +35,7 @@ export async function ensureUserProfile(user: User): Promise<void> {
 
     await db.insert(userProfiles).values({
       id: user.id,
+      email: user.email!, // Email is required by schema
       firstName,
       lastName,
       avatarUrl,
