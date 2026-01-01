@@ -337,8 +337,8 @@ export async function logoutAction(): Promise<void> {
       "Logout server error"
     );
   } finally {
-    // Always redirect to home after logout attempt
-    redirect("/");
+    // Always redirect to dashboard after logout attempt
+    redirect("/dashboard");
   }
 }
 
