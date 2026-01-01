@@ -16,6 +16,7 @@ trigger: always_on
 
 - [Data Fetching](./patterns/data-fetching.md)
   - Server Component + Direct Drizzle Query
+  - Cached Data Fetching (React `cache()`)
 - [Mutations](./patterns/mutations.md)
   - Server Action + Zod Validation + Redirect
 - [Authentication](./patterns/authentication.md)

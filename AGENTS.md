@@ -3,410 +3,314 @@ trigger: always_on
 # For Antigravity
 ---
 
-# PinPoint Agent Guidelines
+# PinPoint - Pinball Issue Tracking
 
 ## About the User
 
-The user's name is Tim and his GitHub account is "timothyfroehlich".
+**Name**: Tim (GitHub: timothyfroehlich)
+**Context**: Learning web development via solo vibecoding. New to TypeScript/JavaScript. Explain decisions with pros/cons.
+**Guideline**: PR review comments are AI-generated suggestions - apply critical thinking, not blind acceptance.
 
-Tim is vibecoding this app by himself to learn about website design and experiment with agentic coding. Tim has never coded in Java/TypeScript before. When a decision is needed, the agent should provide some explanation about the options, pros and cons. Review comments on GitHub PRs can be assumed to have been written by coding agents. Their comments must be taken as suggestions and with a grain of salt. Don't assume that the agent who wrote the comment had the full context to fully understand the problem.
+## Critical Commands
 
-## CRITICAL: BEFORE SUBMITTING
-
-**ALWAYS run `npm run preflight` before submitting your changes.**
-This script runs type checking, linting, formatting, and tests. Pushing broken code wastes time.
-If you cannot run the full preflight (e.g., due to missing Supabase in your environment), you MUST run:
-`npm run typecheck && npm run lint && npm test && npm run build`
-
-## Critical Context Files
-
-Read these immediately before starting work:
-
-- **`docs/NON_NEGOTIABLES.md`** - Forbidden patterns and critical constraints
-- **`docs/PATTERNS.md`** - Index of project-specific code patterns (see `docs/patterns/`)
-- **`docs/TYPESCRIPT_STRICTEST_PATTERNS.md`** - Type safety patterns
-- **`docs/PRODUCT_SPEC.md`** - What we're building (MVP/MVP+/1.0/2.0)
-- **`docs/TECH_SPEC.md`** - Single-tenant architecture specification
-- **`docs/TESTING_PLAN.md`** - Testing strategy and patterns
-- **`docs/E2E_BEST_PRACTICES.md`** - E2E testing patterns with Playwright
-- **`package.json`** - Available scripts, dependencies, configuration
-
-## Project Context
-
-### Status
-
-- **Phase**: Greenfield rewrite (v2), pre-beta
-- **Users**: Zero production users
-- **Development**: Solo passion project, high risk tolerance for breaking changes
-- **Core Value**: "Allow the Austin Pinball Collective to log issues with pinball machines, track work and resolve them."
-
-### Technology Stack
-
-- **Frontend**: Next.js 16, React 19 Server Components, shadcn/ui, Tailwind CSS v4
-- **Backend**: Drizzle ORM, PostgreSQL via Supabase
-- **Authentication**: Supabase SSR (no RLS for single-tenant)
-  - **Note**: Use `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (new format: `sb_publishable_xxx`). Legacy `ANON_KEY` deprecated by July 2026.
-- **Testing**: Vitest, Playwright, worker-scoped PGlite
-- **Language**: TypeScript with strictest configuration
-
-### Architecture Type
-
-**Single-Tenant**: One organization (Austin Pinball Collective), no multi-tenant complexity, no organization scoping required, no RLS policies.
-
-## Critical Constraints
-
-### Non-Negotiable Patterns
-
-- **Memory safety**: Worker-scoped PGlite instances only (per-test instances cause system lockups)
-- **Migrations for schema changes**: Use Drizzle migrations to evolve the database schema (no ad-hoc `push` to production/preview).
-- **Schema lock**: Code adapts to schema, never modify schema to fix TypeScript errors
-- **Server-first**: Default to Server Components, minimal Client Components
-- **shadcn/ui only**: No MUI components for new development
-- **Issues always per-machine**: Every issue must have exactly one machine (CHECK constraint)
-- **Severity naming**: `minor` | `playable` | `unplayable` (player-centric language)
-- **Progressive enhancement**: Forms must work without JavaScript
-
-**Migrations workflow (always follow this order):**
-
-1. Edit `src/server/db/schema.ts`
-2. Run `npm run db:generate -- --name <change-name>`
-3. Run `npm run db:migrate`
-4. Run `npm run test:_generate-schema`
-5. Commit `schema.ts`, `drizzle/`, and `src/test/setup/schema.sql`
-
-### Library Knowledge Gap
-
-- **Training Cutoff**: January 2025, current date November 2025 - 10 months behind
-- **Required Libraries**: Drizzle, Supabase, Next.js, shadcn/ui, Server Components, Server Actions, Vitest
-- **Process**: Use Context7 (`resolve-library-id` → `get-library-docs`) before implementation
-
-## Architecture Directives
-
-### Server-First Principles
-
-- **Default**: Server Components for all new development
-- **Client Islands**: Minimal "use client" for specific interactivity only
-- **Data Flow**: Server Components → Drizzle → PostgreSQL
-- **Mutations**: Server Actions with progressive enhancement
-
-### Direct Database Queries
-
-- **Do**: Query Drizzle directly in Server Components and Server Actions
-
-- **Why**: Single-tenant simplicity, follow the Rule of Three
-
-### UI Framework & Progressive Enhancement
-
-- **Stack**: shadcn/ui + Tailwind CSS v4 + Lucide Icons
-- **Styling**:
-  - **Global**: Use `globals.css` for typography and theme variables.
-  - **Local**: Use `className` with `cn()` for component-specific styles.
-  - **Forbidden**: No `style={{ ... }}` props, no hardcoded hex colors (use CSS variables).
-- **Progressive Enhancement**:
-  - **Forms**: Must work without JavaScript. Use `<form action={serverAction}>`.
-  - **Interactivity**: Use CSS-only patterns (`group`, `peer`) where possible.
-  - **Client Components**: Push `use client` down to the leaves (buttons, inputs).
-- **Documentation Hierarchy**:
-  1.  `AGENTS.md` (High-level rules)
-  2.  `docs/UI_GUIDE.md` (The "Goto" manual for all UI work)
-  3.  `docs/ui-patterns/*` (Specific implementation patterns)
-
-## Development Guidelines
-
-### Command Recommendations
-
-| Avoid           | Prefer             | Reason                                    |
-| --------------- | ------------------ | ----------------------------------------- |
-| `npm test 2>&1` | `npm test`         | Vitest treats redirection as test filters |
-| `find`          | `rg --files`, `fd` | Safer/faster search                       |
-
-> [!WARNING]
-> **ESCAPE PARENTHESES IN PATHS**: Some directories have parentheses in their names (e.g., `src/app/(app)`). You MUST escape them in shell commands (e.g., `src/app/\(app\)`). Failure to do so will cause commands to fail.
-
-## Multi-Worktree Development Setup
-
-PinPoint uses parallel git worktrees so multiple assistants can work without stepping on each other. Each worktree runs its own Supabase instance on unique ports; changes to `supabase/config.toml` are kept local via `git update-index --skip-worktree`.
-
-### Port Allocation
-
-| Worktree    | Next.js | Supabase API | PostgreSQL | Shadow DB | Mailpit (config `[inbucket]`) | project_id           |
-| ----------- | ------- | ------------ | ---------- | --------- | ----------------------------- | -------------------- |
-| Main        | 3000    | 54321        | 54322      | 54320     | 54324                         | pinpoint             |
-| Secondary   | 3100    | 55321        | 55322      | 55320     | 55324                         | pinpoint-secondary   |
-| Review      | 3200    | 56321        | 56322      | 56320     | 56324                         | pinpoint-review      |
-| AntiGravity | 3300    | 57321        | 57322      | 57320     | 57324                         | pinpoint-antigravity |
-
-> Mailpit extra ports: SMTP is `BASE_SMTP (54325) + worktree offset`, POP3 is `BASE_POP3 (54326) + worktree offset`. Ensure both keys exist in `[inbucket]` (see Supabase Config Management).
-
-### How It Works
-
-- Each non-main worktree edits its own `supabase/config.toml` (ports + `project_id`) and marks it `skip-worktree` so git ignores local changes.
-- **WARNING**: `scripts/sync_worktrees.py` AUTOMATICALLY rewrites `supabase/config.toml` in secondary worktrees to prevent port conflicts. Do not manually edit ports in secondary worktrees.
-- `.env.local` (gitignored) holds worktree-specific ports/keys.
-- CI stays on the main config/ports; no CI changes required.
-- Supabase CLI now runs Mailpit for email testing even though the config section remains `[inbucket]`; keep using the same section name but refer to it as Mailpit in docs and code.
-
-### Starting Development
+**Run BEFORE every commit:**
 
 ```bash
-cd ~/Code/PinPoint-Secondary
-supabase start   # uses this worktree's config.toml ports/project_id
-npm run dev      # uses PORT in .env.local
+npm run preflight  # Typecheck, lint, format, test, build, integration tests
 ```
 
-All worktrees can run Supabase + Next.js simultaneously with no port collisions.
-
-**Host consistency:** Keep auth callbacks, Next dev server, Playwright `baseURL`, and Supabase `site_url` on the same host (`localhost`) to avoid cookie host mismatches. When adding new worktrees or updating `.env.local`, stick to `localhost` and only change the ports.
-
-### Adding a New Worktree
-
-1. `git worktree add ../PinPoint-<Name> -b feature/<name>` from main repo.
-2. Edit `supabase/config.toml`: bump all Supabase ports by +1000 per slot, set unique `project_id`, update auth `site_url` to the new Next.js port.
-3. Apply skip flag: `git update-index --skip-worktree supabase/config.toml`.
-4. Copy `.env.example` → `.env.local`, set `PORT`, `NEXT_PUBLIC_SUPABASE_URL`, `DATABASE_URL` to the new ports, then run `npm install`.
-
-### Updating Base Config
-
-When `supabase/config.toml` changes in the main worktree, manually refresh others:
+**Development:**
 
 ```bash
-git update-index --no-skip-worktree supabase/config.toml
-git restore supabase/config.toml   # or pull latest
-# re-apply worktree-specific ports/project_id
-git update-index --skip-worktree supabase/config.toml
+npm run dev              # Start dev server (uses PORT from .env.local)
+npm run build            # Production build
+npm run typecheck        # TypeScript validation
+npm run lint             # ESLint check
+npm test                 # Unit tests only
+npm run test:integration # DB integration tests (requires `supabase start`)
+npm run smoke            # E2E smoke tests (Playwright)
 ```
 
-### Checking Skip-Worktree Status
+**Database Migrations (ALWAYS use migrations, never `push`):**
 
-- `git ls-files -v supabase/config.toml` → prefix `S` means skip-worktree.
-- Remove skip (before deleting a worktree): `git update-index --no-skip-worktree supabase/config.toml`.
+```bash
+# 1. Edit src/server/db/schema.ts
+# 2. Generate migration:
+npm run db:generate -- --name <descriptive-name>
+# 3. Apply migration:
+npm run db:migrate
+# 4. Update test schema:
+npm run test:_generate-schema
+# 5. Commit schema.ts, drizzle/, and src/test/setup/schema.sql
+```
 
-### Troubleshooting
+**Components:**
 
-- **Port already in use:** `lsof -i :55321` then `supabase stop` in that worktree.
-- **Git shows config.toml modified:** re-apply skip-worktree.
-- **Supabase keys changed after restart:** run `supabase start`, copy new `PUBLISHABLE_KEY/SERVICE_ROLE_KEY` into `.env.local`.
+```bash
+npx shadcn@latest add [component]  # Add shadcn/ui components
+```
 
-### Supabase Config Management
+## Tech Stack
 
-**WARNING**: `supabase/config.toml` is marked `skip-worktree` to allow local port customization. However, this hides structural changes (like adding new keys) from git.
+- **Frontend**: Next.js 16, React 19 (Server Components), shadcn/ui, Tailwind CSS v4
+- **Backend**: Drizzle ORM, PostgreSQL (Supabase)
+- **Auth**: Supabase SSR (single-tenant, no RLS)
+- **Testing**: Vitest (unit/integration), Playwright (E2E), worker-scoped PGlite
+- **Language**: TypeScript (@tsconfig/strictest)
+- **Phase**: Greenfield v2, pre-beta, zero production users
 
-- **The Safety Net**: `npm run preflight` includes a `check:config` script that compares your local config keys against `main`. It will fail if you have added keys locally that aren't in git.
-- **How to Commit Config Changes**:
-  1. `git update-index --no-skip-worktree supabase/config.toml`
-  2. Revert ports to standard values (54321, 54322, etc.) but **keep your new keys**.
-  3. Commit the file.
-  4. Restore your local ports (or run `python3 scripts/sync_worktrees.py`).
-  5. `git update-index --skip-worktree supabase/config.toml`
-- **Merging with skip-worktree set**: skip-worktree blocks merges/checkout of `supabase/config.toml`.
-  1. Before merging/pulling: `git update-index --no-skip-worktree supabase/config.toml`.
-  2. Stash or commit your local config if ports differ from main.
-  3. Merge/pull.
-  4. Restore your local ports from stash or `python3 scripts/sync_worktrees.py`.
-  5. Re-apply skip flag: `git update-index --skip-worktree supabase/config.toml`.
-- **Mailpit keys required**: Ensure `[inbucket]` contains `port`, `smtp_port`, and `pop3_port` using the per-worktree offsets (see table above). Missing SMTP/POP3 ports will block syncs and Supabase start.
+**Knowledge Gap**: Training cutoff Jan 2025, current date Dec 2025. Use Context7 MCP (`resolve-library-id` → `get-library-docs`) for latest library patterns.
 
-### Worktree Sync Script
+## Top 10 Non-Negotiables
 
-Worktrees are managed by a single script:
+1. **Use migrations, never `push`**: `push` causes schema drift and data loss in production. Migrations are version-controlled.
+2. **Worker-scoped PGlite only**: Per-test PGlite instances cause system lockups. Use shared worker instance.
+3. **Server Components first**: Better performance, security, SEO. Use "use client" only for interactivity leaves.
+4. **Progressive enhancement**: Forms must work without JavaScript. Use `<form action={serverAction}>`.
+5. **useActionState for forms**: Modern React 19 pattern. Replaces cookie-based flash messages.
+6. **Supabase SSR contract**: Use `~/lib/supabase/server`, call `auth.getUser()` immediately after `createClient()`.
+7. **CSP with nonces**: Security headers required. Use `middleware.ts` for dynamic nonces, `next.config.ts` for static headers.
+8. **Type safety (strictest)**: No `any`, no `!`, no unsafe `as`. Write type guards for validation.
+9. **Path aliases (`~/`)**: Always use `~/lib/...` instead of relative imports `../../../lib/...`.
+10. **Preflight before commit**: `npm run preflight` must pass. Pre-commit hooks enforce this.
 
-- **`scripts/sync_worktrees.py`** – Modern Python implementation
-  - Object-oriented design and better error handling
-  - Auto-manages Python environment (`.venv`)
-  - Consolidated process killing (`npm run kill:zombies`)
-  - Usage: `python3 scripts/sync_worktrees.py [--dry-run] [--all] [-y]`
+## Quick Code Examples
 
-See `scripts/README.md` for detailed usage.
+### Server Action with Auth
 
-### Available Commands
+```typescript
+"use server";
+import { createClient } from "~/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 
-- **Testing**: `npm test` (unit tests), `npm run test:integration` (Supabase tests), `npm run test:watch`, `npm run smoke` (E2E)
-- **Development**: `npm run dev`, `npm run build`, `npm run lint`, `npm run typecheck`
-- **Quality Gate**: `npm run preflight` (comprehensive validation - REQUIRED before pushing)
-- **Components**: `npx shadcn@latest add [component]`
+export async function updateProfile(formData: FormData) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser(); // Call immediately!
+  if (!user) redirect("/login");
 
-### Testing Requirements
+  const name = formData.get("name");
+  if (typeof name !== "string") throw new Error("Invalid name");
 
-**Integration Tests Requiring Supabase:**
+  await db.update(users).set({ name }).where(eq(users.id, user.id));
+  revalidatePath("/profile");
+}
+```
 
-- **Location**: All integration tests requiring Supabase MUST be in `src/test/integration/supabase/`
-- **Naming**: Files must end with `.test.ts` or `.test.tsx`
-- **Purpose**: Easy filtering - integration tests can be skipped if Supabase isn't running
-- **Commands**:
-  - `npm test` - Runs unit tests only (excludes integration folder)
-  - `npm run test:integration` - Runs integration tests only (requires `supabase start`)
-  - `npm run preflight` - Runs both unit and integration tests
+### Safe Drizzle Query
 
-**Preflight Script:**
+```typescript
+import { eq } from "drizzle-orm";
+import { issues } from "~/server/db/schema";
 
-- **Purpose**: Comprehensive pre-commit validation (run before all commits)
-- **Behavior**: Fail-fast (stops on first error)
-- **Stage 1 (parallel)**: `typecheck`, `lint`, `format`, `test` (unit tests)
-- **Stage 2 (parallel, after stage 1)**: `build`, `test:integration`
-- **Output**: Minimal (`--silent` flags to avoid context spam)
+export async function getIssuesForMachine(machineId: string) {
+  if (!machineId) throw new Error("Machine ID required");
 
-### Project Structure
+  return await db.query.issues.findMany({
+    where: eq(issues.machineId, machineId),
+    orderBy: desc(issues.createdAt),
+  });
+}
+```
 
-- **Source**: `src/app` (App Router), `src/components`, `src/lib`, `src/server`
-- **Tests**: `src/test` (unit/integration), `e2e/` (Playwright)
-- **Docs**: `docs/` (specs), `docs/tech-updates/` (tech reference)
+### Type Guard for Optional Properties
 
-## Coding Standards
+```typescript
+// ✅ Correct: Conditional spread for optional properties
+const data = {
+  id: uuid(),
+  ...(name && { name }), // Only adds if name exists
+  ...(description && { description }),
+};
 
-### TypeScript
+// ❌ Wrong: Direct assignment of potentially undefined
+const data = { name: value }; // Error with exactOptionalPropertyTypes
+```
 
-- **Strictest configuration**: No `any`, no non-null `!`, no unsafe `as`
-- **Explicit return types**: Required for public functions
-- **Path aliases**: Use `~/` instead of relative imports
+### Server Component Pattern
 
-### Naming Conventions
+```typescript
+export default async function MachineIssuesPage({
+  params
+}: {
+  params: { machineId: string }
+}) {
+  const issues = await getIssuesForMachine(params.machineId);
 
-- **Components**: PascalCase files (`IssueCard.tsx`)
-- **Client Components**: Use `"use client"` directive at top
-- **Hooks**: `useThing.ts`
-- **Utilities**: kebab-case or snake_case files
+  return (
+    <div>
+      {issues.map((issue) => (
+        <IssueCard key={issue.id} issue={issue} />
+      ))}
+    </div>
+  );
+}
+```
 
-### Database
+### Form with Progressive Enhancement
 
-- **Schema**: snake_case for all table/column names
-- **Boundary**: Convert to camelCase at application boundaries
-- **Types**: Keep snake_case DB types separate from camelCase app types
+```typescript
+// ✅ Good: Direct Server Action reference
+<form action={updateProfile}>
+  <input name="name" required />
+  <button type="submit">Save</button>
+</form>
 
-## Pattern Discovery & Documentation
+// ❌ Bad: Inline wrapper (breaks Next.js form handling)
+<form action={async () => { await updateProfile(); }}>
+```
 
-**IMPORTANT**: When implementing features, always reference `docs/PATTERNS.md` (and its sub-files in `docs/patterns/`) for established patterns.
+### Dropdown with Server Action
 
-**Contributing New Patterns**:
+```typescript
+// ✅ Good: Use onSelect for Server Actions in dropdowns
+<DropdownMenuItem
+  onSelect={async () => {
+    await deleteIssue(issueId);
+  }}
+>
+  Delete
+</DropdownMenuItem>
 
-- **When**: You implement the same approach 2+ times
-- **What**: Add it to a new or existing file in `docs/patterns/` and link it in `docs/PATTERNS.md`
-- **Why**: Future agents need to follow the same conventions
-- **How**: Keep examples concise, focus on PinPoint-specific patterns (not general Next.js knowledge)
+// ❌ Bad: Form inside dropdown (unmounts before submission completes)
+<DropdownMenuItem>
+  <form action={deleteIssue}>
+    <button>Delete</button>
+  </form>
+</DropdownMenuItem>
+```
 
-**Example**: If you create two Server Actions with similar structure, add that pattern to PATTERNS.md so the third one follows the same approach.
+## Worktree Port Allocation
+
+| Worktree    | Next.js | Supabase API | PostgreSQL | project_id           |
+| ----------- | ------- | ------------ | ---------- | -------------------- |
+| Main        | 3000    | 54321        | 54322      | pinpoint             |
+| Secondary   | 3100    | 55321        | 55322      | pinpoint-secondary   |
+| Review      | 3200    | 56321        | 56322      | pinpoint-review      |
+| AntiGravity | 3300    | 57321        | 57322      | pinpoint-antigravity |
+
+**Note**: Each worktree uses `skip-worktree` for `supabase/config.toml`. Use `scripts/sync_worktrees.py` to manage.
+
+**Warning**: Escape parentheses in paths: `src/app/\(app\)` not `src/app/(app)`.
+
+## Agent Skills (Progressive Disclosure)
+
+**What are Agent Skills?**
+Agent Skills provide on-demand detailed guidance without loading everything upfront. They use progressive disclosure: metadata loads first (~100 tokens per skill), full content loads only when relevant.
+
+**Supported agents**: Claude Code, GitHub Copilot (as of Dec 18, 2025)
+**Coming soon**: gemini-cli
+
+**Available skills** (in `.claude/skills/` and `.github/skills/`):
+
+- `pinpoint-security` - CSP nonces, auth checks, input validation, Supabase SSR
+- `pinpoint-testing` - Test pyramid, PGlite patterns, Playwright best practices
+- `pinpoint-typescript` - Strictest patterns, type guards, optional properties
+- `pinpoint-ui` - shadcn/ui, progressive enhancement, Server Components
+- `pinpoint-patterns` - Server Actions, data fetching, error handling
+
+**If your agent doesn't support skills yet:**
+Read the skill files directly for full context. Each skill is a single Markdown file:
+
+```bash
+cat .claude/skills/pinpoint-security/SKILL.md    # Security patterns
+cat .claude/skills/pinpoint-testing/SKILL.md     # Testing strategy
+cat .claude/skills/pinpoint-typescript/SKILL.md  # TypeScript patterns
+cat .claude/skills/pinpoint-ui/SKILL.md          # UI/component patterns
+cat .claude/skills/pinpoint-patterns/SKILL.md    # Project patterns
+```
+
+## Documentation & Skills Reference
+
+For detailed guidance, use Agent Skills (if supported) or reference docs directly:
+
+**Security**
+
+- Skill: `pinpoint-security` (CSP, auth patterns, input validation)
+- Docs: @docs/SECURITY.md, @docs/NON_NEGOTIABLES.md#security
+
+**Testing**
+
+- Skill: `pinpoint-testing` (test pyramid, PGlite patterns, Playwright)
+- Docs: @docs/TESTING_PLAN.md, @docs/E2E_BEST_PRACTICES.md
+
+**TypeScript**
+
+- Skill: `pinpoint-typescript` (type guards, optional properties, Drizzle safety)
+- Docs: @docs/TYPESCRIPT_STRICTEST_PATTERNS.md
+
+**UI/Components**
+
+- Skill: `pinpoint-ui` (shadcn/ui, Server Components, progressive enhancement)
+- Docs: @docs/UI_GUIDE.md, @docs/patterns/ui-patterns/\*
+
+**Patterns**
+
+- Skill: `pinpoint-patterns` (Server Actions, data fetching, error handling)
+- Docs: @docs/PATTERNS.md, @docs/patterns/\*
+
+**Product/Architecture** (no skills, use docs directly):
+
+- @docs/PRODUCT_SPEC.md - Feature specifications (MVP/MVP+/1.0/2.0)
+- @docs/TECH_SPEC.md - Single-tenant architecture
+- @docs/V2_ROADMAP.md - Deferred features
 
 ## Testing Strategy
 
-**Philosophy**: Confidence, not perfection.
+**Distribution (100-150 tests total)**:
 
-**The Testing Pyramid**:
+- 70% Unit (~70-100): Pure functions, utilities, validation
+- 25% Integration (~25-35): DB queries with worker-scoped PGlite
+- 5% E2E (~5-10): Critical flows only (Playwright)
 
-```
-        /\
-       /E2E\      ← 5-10 tests (critical flows only)
-      /------\
-     /  Intg  \   ← 25-35 tests (DB + auth)
-    /----------\
-   /    Unit    \ ← 70-100 tests (pure logic)
-  /--------------\
-```
+**Dev Loop**:
 
-### Development Loop (How to Run Tests)
-
-To maintain velocity and avoid running the full `preflight` suite (~60s) for every change, use the following protocol:
-
-| Scope             | Command                                                | When to use                                                                      |
-| :---------------- | :----------------------------------------------------- | :------------------------------------------------------------------------------- |
-| **Sanity**        | `npm run check`                                        | **Rule 1**: Run after ANY code change. Checks types, lint, and unit tests (~5s). |
-| **Targeted Unit** | `npm test -- src/path/to/file.test.ts`                 | Debugging a specific unit test failure.                                          |
-| **Targeted Int**  | `npm run test:integration -- src/path/to/file.test.ts` | Debugging a specific DB/API test failure.                                        |
-| **Targeted E2E**  | `npm run smoke -- e2e/smoke/file.spec.ts`              | Debugging a specific UI flow.                                                    |
-| **Mobile Safari** | **DO NOT RUN LOCALLY**                                 | Mobile Safari (WebKit) often fails on non-Mac environments. Rely on CI.          |
-| **Full Suite**    | `npm run <script>`                                     | Verifying no regressions in that layer.                                          |
-| **Final Gate**    | `npm run preflight`                                    | **Rule 2**: Run ONLY before submitting/finishing. Runs EVERYTHING.               |
-
-**Distribution & Targets**:
-
-- **70% Unit Tests** (~70-100 tests) - Pure functions, utilities, validation
-- **25% Integration Tests** (~25-35 tests) - Database queries with worker-scoped PGlite
-- **5% E2E Tests** (5-6 tests) - Critical user journeys only (Playwright)
-- **Total Target**: ~100-150 tests (not thousands)
+| Command                            | When to use                      |
+| ---------------------------------- | -------------------------------- |
+| `npm run check`                    | After ANY code change (~5s)      |
+| `npm test -- path/to/file.test.ts` | Debug specific test              |
+| `npm run preflight`                | Before commit (full suite, ~60s) |
+| **Mobile Safari**                  | **DO NOT RUN LOCALLY** (CI only) |
 
 **Key Constraints**:
 
-- Worker-scoped PGlite only (per-test instances cause lockups)
-- No testing Server Components directly (use E2E instead)
-- Test behavior, not implementation details
+- Worker-scoped PGlite only (no per-test instances)
+- No testing Server Components directly (use E2E)
+- Test behavior, not implementation
 
-**Authority**: `docs/TESTING_PLAN.md` for detailed patterns, examples, and anti-patterns. See `docs/E2E_BEST_PRACTICES.md` for E2E-specific guidance (selector strategy, test organization, debugging).
+## Coding Standards
 
-## Scope Creep Prevention
+**TypeScript**: Strictest config - no `any`, no `!`, no unsafe `as`. Explicit return types for public functions.
 
-### The Scope Firewall (3 Questions)
+**Naming**:
+
+- Components: PascalCase files (`IssueCard.tsx`)
+- Client Components: `"use client"` directive at top
+- Hooks: `useThing.ts`
+- DB: snake_case schema, convert to camelCase at boundaries
+
+**Database**: Use migrations, not `push`. Schema is source of truth - code adapts to schema, never modify schema to fix TypeScript errors.
+
+## Scope Control
+
+**The Scope Firewall** (defer if answers are No/No/Yes):
 
 1. Does this solve a problem we have RIGHT NOW?
-2. Does this block a user from achieving the core value proposition?
+2. Does this block achieving the core value proposition?
 3. Can we ship MVP without this?
 
-If answers are No/No/Yes → defer to `docs/V2_ROADMAP.md`
+**"Done Enough" Standard** (ship if all Yes):
 
-### The "Done Enough" Standard
-
-1. Does it work for the happy path?
-2. Does it handle the most common error case?
-3. Is it tested with at least one test?
-4. Is it secure (input validation, auth checks)?
-5. Is the code readable by someone else?
-
-If all Yes → ship it. Perfect is the enemy of done.
-
-## Essential Documentation
-
-- **`docs/NON_NEGOTIABLES.md`** - Critical patterns and forbidden practices
-- **`docs/PATTERNS.md`** - Index of project patterns (living document, see `docs/patterns/`)
-- **`docs/PRODUCT_SPEC.md`** - Feature specifications (MVP/MVP+/1.0/2.0)
-- **`docs/TECH_SPEC.md`** - Single-tenant architecture
-- **`docs/TESTING_PLAN.md`** - Testing strategy and patterns
-- **`docs/E2E_BEST_PRACTICES.md`** - E2E testing patterns with Playwright
-- **`docs/V2_ROADMAP.md`** - Deferred features parking lot
-- **`docs/TYPESCRIPT_STRICTEST_PATTERNS.md`** - Practical TypeScript patterns
-- **`docs/tech-updates/INDEX.md`** - Tech stack reference
+1. Works for happy path?
+2. Handles most common error case?
+3. Has at least one test?
+4. Secure (input validation, auth checks)?
+5. Readable by someone else?
 
 ## Commit Guidelines
 
 - **Style**: Conventional commits (`feat:`, `fix:`, `chore:`)
-- **Before pushing**: ALWAYS run `npm run preflight` (runs typecheck, lint, format, test, build, test:integration)
-
-## Quality Gates
-
-- All tests pass before commits
-- Pre-commit hooks (Husky + lint-staged)
-- Server-first principles for new development
-- Progressive enhancement (forms work without JS)
-- Input validation with Zod for all user inputs
-
-## Production Bug Testing (TDD Required)
-
-**Critical**: When a bug is discovered in preview/production deployments that wasn't caught by tests, follow TDD:
-
-### RED-GREEN-REFACTOR Process
-
-1. **RED - Write failing test**
-   - Reproduce the bug locally
-   - Write a test that fails due to the bug
-   - Verify the test actually fails (don't skip this!)
-   - Commit the failing test
-
-2. **GREEN - Fix the bug**
-   - Make minimal changes to make the test pass
-   - Verify the test now passes
-   - Verify original bug is fixed in deployment preview
-
-3. **REFACTOR - Clean up if needed**
-   - Improve code quality without changing behavior
-   - Ensure tests still pass
-   - Document pattern in `docs/NON_NEGOTIABLES.md` if it's a common mistake
-
-**Examples**:
-
-- Cookie modification in Server Components → Add unit test verifying readFlash() doesn't call cookies.set()
-- Type errors in production → Add integration test for that code path
-- Runtime errors on specific routes → Add E2E test for that route
-
-**Exceptions** - Skip TDD only if:
-
-- Bug is environment-specific (e.g., deployment platform configuration)
-- Test would be flaky or unreliable
-- Already covered by existing tests (test just needs to be fixed)
-
-**Usage**: This file provides essential context for AI agents working on PinPoint. Follow all constraints in `docs/NON_NEGOTIABLES.md`.
+- **Process**: Run `npm run preflight` → commit → push
+- **Hooks**: Husky + lint-staged enforce quality gates
