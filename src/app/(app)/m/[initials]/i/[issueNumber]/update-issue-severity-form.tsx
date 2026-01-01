@@ -24,7 +24,7 @@ export function UpdateIssueSeverityForm({
   issueId,
   currentSeverity,
 }: UpdateIssueSeverityFormProps): React.JSX.Element {
-  const [state, formAction] = useActionState<
+  const [state, formAction, isPending] = useActionState<
     UpdateIssueSeverityResult | undefined,
     FormData
   >(updateIssueSeverityAction, undefined);
@@ -48,7 +48,7 @@ export function UpdateIssueSeverityForm({
           </option>
         ))}
       </select>
-      <Button type="submit" size="sm" className="w-full">
+      <Button type="submit" size="sm" className="w-full" loading={isPending}>
         Update Severity
       </Button>
       {state && !state.ok && (

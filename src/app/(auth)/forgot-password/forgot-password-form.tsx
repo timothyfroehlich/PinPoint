@@ -1,28 +1,16 @@
 "use client";
 
 import React, { useActionState } from "react";
-import { useFormStatus } from "react-dom";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { forgotPasswordAction } from "~/app/(auth)/actions";
 
-function SubmitButton(): React.JSX.Element {
-  const { pending } = useFormStatus();
-  return (
-    <Button
-      type="submit"
-      className="w-full bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container"
-      size="lg"
-      disabled={pending}
-    >
-      {pending ? "Sending..." : "Send Reset Link"}
-    </Button>
-  );
-}
-
 export function ForgotPasswordForm(): React.JSX.Element {
-  const [state, formAction] = useActionState(forgotPasswordAction, undefined);
+  const [state, formAction, isPending] = useActionState(
+    forgotPasswordAction,
+    undefined
+  );
 
   return (
     <form action={formAction} className="space-y-4">
@@ -59,7 +47,14 @@ export function ForgotPasswordForm(): React.JSX.Element {
         />
       </div>
 
-      <SubmitButton />
+      <Button
+        type="submit"
+        className="w-full bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container"
+        size="lg"
+        loading={isPending}
+      >
+        Send Reset Link
+      </Button>
     </form>
   );
 }
