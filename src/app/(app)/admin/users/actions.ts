@@ -16,9 +16,9 @@ const updateUserRoleSchema = z.object({
 });
 
 const inviteUserSchema = z.object({
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
-  email: z.string().email("Invalid email address"),
+  firstName: z.string().min(1, "First name is required").max(100),
+  lastName: z.string().min(1, "Last name is required").max(100),
+  email: z.string().email("Invalid email address").max(1000),
   role: z.enum(["guest", "member"]), // Explicitly exclude "admin"
   sendInvite: z.boolean().optional(),
 });

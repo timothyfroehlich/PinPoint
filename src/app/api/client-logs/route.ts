@@ -6,11 +6,11 @@ export const dynamic = "force-dynamic";
 
 const clientLogEntrySchema = z.object({
   level: z.enum(["log", "info", "warn", "error", "debug"]),
-  message: z.string().min(1, "message is required"),
+  message: z.string().min(1, "message is required").max(5000),
   args: z.array(z.unknown()).optional(),
   timestamp: z.number().int().nonnegative(),
-  userAgent: z.string().optional(),
-  url: z.string().optional(),
+  userAgent: z.string().max(1000).optional(),
+  url: z.string().max(2000).optional(),
 });
 
 /**
