@@ -43,6 +43,13 @@
       "when": 1767195135624,
       "tag": "0005_add_email_to_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1767465522039,
+      "tag": "0006_demonic_big_bertha",
+      "breakpoints": true
     }
   ]
 }
