@@ -9,16 +9,22 @@ import { z } from "zod";
 import { sendInviteEmail } from "~/lib/email/invite";
 import { headers } from "next/headers";
 
-const updateUserRoleSchema = z.object({
+export const updateUserRoleSchema = z.object({
   userId: z.string().uuid(),
   newRole: z.enum(["guest", "member", "admin"]),
   userType: z.enum(["active", "unconfirmed"]),
 });
 
-const inviteUserSchema = z.object({
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
-  email: z.string().email("Invalid email address"),
+export const inviteUserSchema = z.object({
+  firstName: z
+    .string()
+    .min(1, "First name is required")
+    .max(100, "First name must be 100 characters or less"),
+  lastName: z
+    .string()
+    .min(1, "Last name is required")
+    .max(100, "Last name must be 100 characters or less"),
+  email: z.string().email("Invalid email address").max(254, "Email too long"),
   role: z.enum(["guest", "member"]), // Explicitly exclude "admin"
   sendInvite: z.boolean().optional(),
 });
