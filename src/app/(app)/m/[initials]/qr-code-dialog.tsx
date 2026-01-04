@@ -80,6 +80,7 @@ export function QrCodeDialog({
                 size="icon"
                 asChild
                 title="Test Link"
+                aria-label="Open report link in new tab"
                 className="shrink-0"
               >
                 <a href={reportUrl} target="_blank" rel="noopener noreferrer">

@@ -1,4 +1,3 @@
-## 2025-10-26 - [Sidebar Collapsed State Accessibility]
-
-**Learning:** Collapsed sidebars that hide text must apply `aria-label` to the navigation links, otherwise screen readers perceive them as empty links or just announce the href. Tooltips are often insufficient for accessible naming.
-**Action:** Always verify collapsed states of navigation components with a screen reader or by checking accessible names in tests.
+## 2025-05-18 - Accessibility on `asChild` Buttons
+**Learning:** Icon-only buttons that use `asChild` to wrap an anchor tag (e.g., for external links) often miss accessible names because the inner content is just an icon.
+**Action:** Always add `aria-label` to the `Button` component when using `size="icon"` and `asChild`.
