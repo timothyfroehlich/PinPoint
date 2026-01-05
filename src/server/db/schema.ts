@@ -112,6 +112,10 @@ export const machines = pgTable(
       sql`(owner_id IS NULL OR unconfirmed_owner_id IS NULL)`
     ),
     ownerIdIdx: index("idx_machines_owner_id").on(t.ownerId),
+    // Optimization: Index for filtering machines by unconfirmed owner (used in queries)
+    unconfirmedOwnerIdIdx: index("idx_machines_unconfirmed_owner_id").on(
+      t.unconfirmedOwnerId
+    ),
   })
 );
 
@@ -164,6 +168,10 @@ export const issues = pgTable(
     ),
     assignedToIdx: index("idx_issues_assigned_to").on(t.assignedTo),
     reportedByIdx: index("idx_issues_reported_by").on(t.reportedBy),
+    // Optimization: Index for filtering issues by unconfirmed reporter (used in reporting flow)
+    unconfirmedReportedByIdx: index("idx_issues_unconfirmed_reported_by").on(
+      t.unconfirmedReportedBy
+    ),
     statusIdx: index("idx_issues_status").on(t.status),
   })
 );

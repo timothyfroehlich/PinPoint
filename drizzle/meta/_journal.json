@@ -43,6 +43,13 @@
       "when": 1767195135624,
       "tag": "0005_add_email_to_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1767638355771,
+      "tag": "0006_slow_slapstick",
+      "breakpoints": true
     }
   ]
 }
