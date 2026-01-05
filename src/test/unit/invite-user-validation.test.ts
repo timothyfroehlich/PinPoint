@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { inviteUserSchema } from "../../app/(app)/admin/users/actions";
+import { inviteUserSchema } from "~/app/(app)/admin/users/actions";
 
 describe("InviteUser Validation", () => {
   it("should fail validation for very long first name", () => {
@@ -32,15 +32,15 @@ describe("InviteUser Validation", () => {
   });
 
   it("should fail validation for very long email", () => {
-      const longEmail = "a".repeat(255) + "@example.com";
-      const result = inviteUserSchema.safeParse({
-          firstName: "John",
-          lastName: "Doe",
-          email: longEmail,
-          role: "member",
-          sendInvite: false,
-      });
-      expect(result.success).toBe(false);
+    const longEmail = "a".repeat(255) + "@example.com";
+    const result = inviteUserSchema.safeParse({
+      firstName: "John",
+      lastName: "Doe",
+      email: longEmail,
+      role: "member",
+      sendInvite: false,
+    });
+    expect(result.success).toBe(false);
   });
 
   it("should pass validation for valid inputs", () => {
