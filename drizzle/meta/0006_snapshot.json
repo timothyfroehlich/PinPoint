@@ -1,5 +1,5 @@
 {
-  "id": "62ca5785-9f6f-4277-bc3f-c23efb36a4d0",
+  "id": "bd267951-c558-4cdf-8d1d-17f588decef4",
   "prevId": "5dc5c966-cf77-418e-9fc8-cdfadc8eb47f",
   "version": "7",
   "dialect": "postgresql",
@@ -329,11 +329,11 @@
           "method": "btree",
           "with": {}
         },
-        "idx_issues_unconfirmed_reported_by": {
-          "name": "idx_issues_unconfirmed_reported_by",
+        "idx_issues_status": {
+          "name": "idx_issues_status",
           "columns": [
             {
-              "expression": "unconfirmed_reported_by",
+              "expression": "status",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -344,11 +344,11 @@
           "method": "btree",
           "with": {}
         },
-        "idx_issues_status": {
-          "name": "idx_issues_status",
+        "idx_issues_created_at": {
+          "name": "idx_issues_created_at",
           "columns": [
             {
-              "expression": "status",
+              "expression": "created_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -478,21 +478,6 @@
           "columns": [
             {
               "expression": "owner_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_machines_unconfirmed_owner_id": {
-          "name": "idx_machines_unconfirmed_owner_id",
-          "columns": [
-            {
-              "expression": "unconfirmed_owner_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

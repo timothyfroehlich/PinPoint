@@ -1,0 +1,1 @@
+CREATE INDEX "idx_issues_created_at" ON "issues" USING btree ("created_at");
