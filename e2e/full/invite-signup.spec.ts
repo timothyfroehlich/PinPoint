@@ -82,6 +82,8 @@ test.describe("User Invitation & Signup Flow", () => {
     console.log("[test] Admin logged out");
 
     // 3. Get signup link from Mailpit
+    // Add small delay to ensure email has been sent and received
+    await new Promise((resolve) => setTimeout(resolve, 2000));
     const signupLink = await getSignupLink(userEmail);
     console.log(`[test] Got signup link: ${signupLink}`);
     expect(signupLink).toContain("/signup");

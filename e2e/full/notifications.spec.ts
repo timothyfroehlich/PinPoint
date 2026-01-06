@@ -170,6 +170,9 @@ test.describe("Notifications", () => {
     await page.bringToFront();
     await page.reload();
 
+    // Wait for page to fully load after reload (ensure we're not redirecting)
+    await page.waitForLoadState("networkidle");
+
     const bell = page.getByRole("button", { name: /notifications/i });
     await expect(bell).toBeVisible();
     await bell.click();
