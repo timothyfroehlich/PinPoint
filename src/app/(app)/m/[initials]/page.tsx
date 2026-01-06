@@ -1,5 +1,5 @@
 import type React from "react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getUnifiedUsers } from "~/lib/users/queries";
 import type { UnifiedUser } from "~/lib/types";
 import { cn } from "~/lib/utils";
@@ -41,16 +41,19 @@ export default async function MachineDetailPage({
 }: {
   params: Promise<{ initials: string }>;
 }): Promise<React.JSX.Element> {
+  // Await params (Next.js 15+ requirement)
+  const { initials } = await params;
+
   // Auth guard - check if user is authenticated (CORE-SSR-002)
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) throw new Error("Unauthorized");
-
-  // Await params (Next.js 15+ requirement)
-  const { initials } = await params;
+  if (!user) {
+    const next = encodeURIComponent(`/m/${initials}`);
+    redirect(`/login?next=${next}`);
+  }
 
   // Query machine with issues (direct Drizzle query - no DAL)
   const machine = await db.query.machines.findFirst({

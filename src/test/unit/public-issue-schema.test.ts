@@ -62,7 +62,7 @@ describe("publicIssueSchema", () => {
     const result = publicIssueSchema.safeParse({
       machineId: validUuid,
       title: "Public Report",
-      description: "a".repeat(2001),
+      description: "a".repeat(5001),
       severity: "playable",
     });
     expect(result.success).toBe(false);
