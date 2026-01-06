@@ -32,7 +32,7 @@ export default async function IssuesPage({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    redirect("/login?next=%2Fissues");
   }
 
   const params = await searchParams;
