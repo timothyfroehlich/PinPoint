@@ -7,7 +7,7 @@ import {
 } from "~/lib/issues/status";
 import { Badge } from "~/components/ui/badge";
 import { cn } from "~/lib/utils";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { db } from "~/server/db";
 import { issues as issuesTable } from "~/server/db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -101,9 +101,17 @@ export async function RecentIssuesPanel({
       </div>
 
       {issues.length === 0 ? (
-        <p className="py-4 text-center text-xs text-on-surface-variant italic">
-          No recent issues reported.
-        </p>
+        <div className="flex flex-col items-center justify-center py-8 text-center animate-in fade-in zoom-in duration-300">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-variant/50 mb-3">
+            <CheckCircle2 className="h-6 w-6 text-green-600/70 dark:text-green-400/70" />
+          </div>
+          <p className="text-sm font-medium text-on-surface">
+            No recent issues
+          </p>
+          <p className="text-xs text-on-surface-variant mt-1">
+            This machine is running smoothly.
+          </p>
+        </div>
       ) : (
         <div className="space-y-2">
           {issues.map((issue) => (
