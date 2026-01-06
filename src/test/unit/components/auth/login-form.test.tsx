@@ -55,5 +55,9 @@ describe("LoginForm", () => {
     // We can check if the button contains the loader
     // Loader2 renders an SVG.
     // Since we mocked useActionState to return isPending=true, the loading prop on Button is true.
+    const button = screen.getByRole("button");
+    // Check for the spinner SVG which has the animate-spin class
+    const spinner = button.querySelector(".animate-spin");
+    expect(spinner).toBeInTheDocument();
   });
 });
