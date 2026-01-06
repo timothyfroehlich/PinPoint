@@ -222,4 +222,20 @@ describe("signupSchema", () => {
       expect(result.error.issues[0]?.path).toContain("confirmPassword");
     }
   });
+
+  it("should reject confirmPassword exceeding 128 characters", () => {
+    const result = signupSchema.safeParse({
+      firstName: "John",
+      lastName: "Doe",
+      email: "john@example.com",
+      password: "SecurePass123",
+      confirmPassword: "a".repeat(129),
+    });
+
+    expect(result.success).toBe(false);
+    const confirmPasswordError = result.error?.issues.find(
+      (i) => i.path.includes("confirmPassword") && i.code === "too_big"
+    );
+    expect(confirmPasswordError).toBeDefined();
+  });
 });
