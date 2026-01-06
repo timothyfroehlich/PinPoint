@@ -45,6 +45,9 @@ test.describe("Email Notifications", () => {
     await page.getByLabel("Priority *").selectOption("low");
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
+    // Wait for page to redirect (Safari needs explicit wait for Server Action redirects)
+    await page.waitForLoadState("networkidle");
+
     // Wait for redirect to issue page (new URL format)
     await expect(page).toHaveURL(/\/m\/MM\/i\/[0-9]+/);
     const url = page.url();
@@ -84,6 +87,10 @@ test.describe("Email Notifications", () => {
     await page.getByLabel("Severity *").selectOption("playable");
     await page.getByLabel("Priority *").selectOption("low");
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
+
+    // Wait for page to redirect (Safari needs explicit wait for Server Action redirects)
+    await page.waitForLoadState("networkidle");
+
     await expect(page).toHaveURL(/\/m\/MM\/i\/[0-9]+/);
 
     // Ensure we are on the page before interacting with sidebar
