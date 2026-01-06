@@ -55,10 +55,10 @@ test.describe("Extended Authentication", () => {
   }) => {
     // Try to access protected page (settings) without being logged in
     await page.goto("/settings");
-    await page.waitForURL("/login"); // Explicitly wait for the redirect
 
-    // Should redirect to login page
-    await expect(page).toHaveURL("/login");
+    // Should redirect to login page with next parameter
+    await expect(page).toHaveURL(/\/login/);
+    await expect(page).toHaveURL(/next=%2Fsettings/);
     await expect(page.getByRole("heading", { name: "Sign In" })).toBeVisible();
   });
 
