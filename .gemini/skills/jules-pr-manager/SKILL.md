@@ -1,7 +1,7 @@
 ---
 name: Jules PR Manager
 description: Manage Google Jules PR lifecycle - batch investigation, reverse-order processing, and tiered decision presentation.
-version: 2.0.0
+version: 2.1.0
 ---
 
 # Jules PR Manager
@@ -12,7 +12,7 @@ version: 2.0.0
 
 This skill orchestrates a **Batch-Analyze-Present-Execute** loop. It strictly prioritizes **finishing work** (merging) before **starting work** (vetting) and aggregates trivial decisions to minimize user round-trips.
 
-**Core Principle**: **Investigate ALL PRs in one turn.** Log their state, collect decisions, and present them in a tiered manner (Merge -> Vetting -> Trivial Batch).
+**Core Principle**: **Investigate ALL PRs in one turn.** Log their state, collect decisions, and present them in a tiered manner (Merge -> Vetting -> Trivial Batch). Always fetch PR activity using `gh pr view <ID> --json reviews,comments,commits` to ensure a high-fidelity understanding of the current state before presenting decisions. Vetting requests MUST be presented **one at a time** for focused consideration. Always include `@jules` in review comments to Jules for better context.
 
 ## State Machine (Reverse Order)
 
@@ -20,6 +20,7 @@ Process PRs in this order (Closest to Merge first):
 
 ### 1. Merge Candidates (The Exit)
 
+- **Definition**: PRs that have already been vetted and are now ready for a final merge decision.
 - **State**: `copilot-review` (Approved) or `changes-requested` (Resolved).
 - **Conditions**:
   - **Ready to Merge**: Copilot Approved AND CI Passed AND No Conflicts.
@@ -47,6 +48,7 @@ Process PRs in this order (Closest to Merge first):
 
 ### 4. New PRs (Unvetted / No Labels)
 
+- **Definition**: PRs that have just been created and require an initial assessment of whether the work is worth doing.
 - **Conditions**: Missing `jules:vetted`.
 - **Logic**:
   1.  **Duplicate Detection**:
@@ -55,8 +57,8 @@ Process PRs in this order (Closest to Merge first):
       - **Merge Changes**: If losers have good parts, post review on Keeper requesting them.
       - **Close Losers**: Mark as duplicates.
   2.  **Vetting**:
-      - Short Code Review: Is this worth doing?
-      - **Action**: Present **Vetting Decision** (Approve/Close).
+      - Short Code Review: Is this worth doing? Provide 2x detail on the rationale, pros/cons, and impact.
+      - **Action**: Present **Vetting Decision** (Approve/Close) **individually**.
 
 ### 5. Exceptions
 
@@ -71,39 +73,45 @@ Process PRs in this order (Closest to Merge first):
 
 - Fetch state of **ALL** open Jules PRs in one command.
 - Iterate through all PRs.
+- For each PR, fetch detailed activity: `gh pr view <ID> --json reviews,comments,commits`.
 - Maintain a **Log** of each PR's status and proposed actions for this turn.
 
 ### 2. Decision Collection
 
 - **Merge Decisions**: Collect full context for PRs ready to merge.
-- **Vetting Decisions**: Collect full context (description, duplicates, opinion) for new PRs.
+- **Vetting Decisions**: Collect full context (description, duplicates, opinion with deep rationale) for new PRs.
 - **Trivial Decisions**: Collect simple actions (Label changes, Reposting comments, CI fixes) into a batch list.
 
 ### 3. Tiered Presentation
 
 Present the collected decisions to the User in this **EXACT** order:
 
-1.  **Merge Decisions** (One at a time, strictly first).
-2.  **Vetting Decisions** (One at a time).
-3.  **Trivial Batch** (Presented as a numbered list for bulk approval).
+1.  **Merge Decisions**: Present each ready-to-merge PR one by one.
+2.  **Vetting Requests**: Present each new vetting request **one at a time**. Include detailed pros/cons and why the work is valuable.
+3.  **Trivial Batch**: Presented as a numbered list for bulk approval.
 
 ### 4. Batch Execution
 
 - Execute **ALL** approved actions in a single batch of commands/requests.
+- **Backgrounding**: Run `gh` commands in the background (using `&`) whenever possible to avoid blocking the CLI and improve perceived responsiveness.
 
 ---
 
 ## ⚠️ Critical Interaction Rules
 
-**Jules ignores regular comments.** You must use **Reviews** to trigger action.
+**Jules ignores regular comments.** You must use **Reviews** to trigger action. Always reference `@jules` in the review body.
 
 - **Requesting Changes**:
   ```bash
-  gh pr review <ID> --request-changes --body "..."
+  gh pr review <ID> --request-changes --body "@jules ..."
   ```
 - **Approving**:
   ```bash
-  gh pr review <ID> --approve --body "..."
+  gh pr review <ID> --approve --body "@jules ..."
+  ```
+- **Merging**:
+  ```bash
+  gh pr merge <ID> --squash --delete-branch
   ```
 - **DO NOT USE**: `gh pr comment` for instructing Jules. (Only use it for your own notes or if reposting Copilot comments _specifically_ as part of a review chain, but even then, a Review is preferred).
 
@@ -125,14 +133,14 @@ Present the collected decisions to the User in this **EXACT** order:
 **Action**: Merge? (y/n/close)
 ```
 
-### 2. Vetting Decision (Priority 2)
+### 2. Vetting Request (Priority 2)
 
 ```markdown
-## 🛡️ Vetting Request: PR #<ID>
+## 🛡️ Initial Vetting: PR #<ID>
 
 **Title**: <Title>
 **Summary**: <Description>
-**Worth it?**: <Agent Opinion>
+**Worth it?**: <Detailed Agent Opinion: Why is this work valuable? What are the specific pros and cons? What is the architectural impact?>
 **Duplicates**: <None | Closed #X, #Y>
 
 **Action**: Vet & Process? (y/n/close)
@@ -167,7 +175,7 @@ gh pr list \
 
 - **Duplicate Diffing**: `gh pr diff <ID> > a.diff && gh pr diff <OTHER> > b.diff && diff -u a.diff b.diff`
 - **Get Comments**: `gh api repos/:owner/:repo/pulls/<ID>/reviews/<REVIEW_ID>/comments`
-- **Review**: `gh pr review <ID> --request-changes --body "..."
+- **Review**: `gh pr review <ID> --request-changes --body "@jules ..."
 
 ---
 
