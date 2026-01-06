@@ -30,13 +30,13 @@ export async function submitFormAndWaitForRedirect(
   options?: {
     /** Path to wait for navigation away from (default: current pathname) */
     awayFrom?: string;
-    /** Maximum time to wait for redirect (default: 30000ms) */
+    /** Maximum time to wait for redirect (default: 60000ms for Safari) */
     timeout?: number;
   }
 ): Promise<void> {
   const currentUrl = page.url();
   const awayFrom = options?.awayFrom ?? new URL(currentUrl).pathname;
-  const timeout = options?.timeout ?? 30000;
+  const timeout = options?.timeout ?? 60000; // Increased from 30s to 60s for WebKit
 
   await submitButton.click();
 
