@@ -42,16 +42,19 @@ export default async function IssueDetailPage({
 }: {
   params: Promise<{ initials: string; issueNumber: string }>;
 }): Promise<React.JSX.Element> {
+  // Get params (Next.js 16: params is a Promise)
+  const { initials, issueNumber } = await params;
+
   // Auth guard
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) throw new Error("Unauthorized");
-
-  // Get params (Next.js 16: params is a Promise)
-  const { initials, issueNumber } = await params;
+  if (!user) {
+    const next = encodeURIComponent(`/m/${initials}/i/${issueNumber}`);
+    redirect(`/login?next=${next}`);
+  }
   const issueNum = parseInt(issueNumber, 10);
 
   if (isNaN(issueNum) || issueNum < 1) {

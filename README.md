@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/froeht/PinPoint/actions/workflows/ci.yml/badge.svg)](https://github.com/froeht/PinPoint/actions/workflows/ci.yml)
 
-PinPoint is an issue tracker built for the **Austin Pinball Collective**.  
+PinPoint is an issue tracker built for the **Austin Pinball Collective**.
 It helps keep games playable by making it easy to report problems, see what’s broken, and coordinate repairs.
 
 ---
@@ -124,6 +124,7 @@ npm run test         # unit + PGlite integration tests
 npm run test:integration   # Supabase-backed integration tests
 npm run smoke        # Playwright smoke E2E tests
 npm run preflight    # full local CI gate before pushing
+# See docs/E2E_DOCKER.md for running Safari tests locally via Docker
 ```
 
 For more detail, see `docs/DEVELOPMENT.md` and `docs/TESTING_PLAN.md`.
