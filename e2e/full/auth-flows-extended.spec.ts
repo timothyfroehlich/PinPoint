@@ -53,12 +53,12 @@ test.describe("Extended Authentication", () => {
   test("protected route - redirect to login when not authenticated", async ({
     page,
   }) => {
-    // Try to access protected page (issues) without being logged in
-    await page.goto("/issues");
-    await page.waitForURL("/login"); // Explicitly wait for the redirect
+    // Try to access protected page (settings) without being logged in
+    await page.goto("/settings");
 
-    // Should redirect to login page
-    await expect(page).toHaveURL("/login");
+    // Should redirect to login page with next parameter
+    await expect(page).toHaveURL(/\/login/);
+    await expect(page).toHaveURL(/next=%2Fsettings/);
     await expect(page.getByRole("heading", { name: "Sign In" })).toBeVisible();
   });
 

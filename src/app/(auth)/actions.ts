@@ -255,8 +255,8 @@ export async function signupAction(
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- data.user check might be redundant by types but ensuring safety
     if (data.user && !data.session) {
       log.info(
-        { userId: data.user.id, action: "signup" },
-        "User signed up, confirmation required"
+        { userId: data.user.id, action: "signup", email: data.user.email },
+        "User signed up, confirmation required (no session)"
       );
 
       return err(
@@ -266,8 +266,13 @@ export async function signupAction(
     }
 
     log.info(
-      { userId: data.user.id, action: "signup" },
-      "User signed up successfully"
+      {
+        userId: data.user.id,
+        action: "signup",
+        hasSession: !!data.session,
+        email: data.user.email,
+      },
+      "User signed up successfully, redirecting to dashboard"
     );
     redirect("/dashboard");
   } catch (error) {

@@ -29,6 +29,9 @@ test.describe("Public Issue Reporting", () => {
     const select = page.getByLabel("Machine *");
     await expect(select).toBeVisible();
     await select.selectOption({ index: 1 });
+    // Wait for URL refresh (router.push) to prevent race conditions on Mobile Safari
+    await expect(page).toHaveURL(/machine=/);
+
     const issueTitle = `${PUBLIC_PREFIX} ${Date.now()}`;
     await page.getByLabel("Issue Title *").fill(issueTitle);
     await page
@@ -56,6 +59,9 @@ test.describe("Public Issue Reporting", () => {
 
     await page.goto("/report");
     await page.getByLabel("Machine *").selectOption({ index: 1 });
+    // Wait for URL refresh (router.push) to prevent race conditions on Mobile Safari
+    await expect(page).toHaveURL(/machine=/);
+
     await page.getByLabel("Issue Title *").fill(`${PUBLIC_PREFIX} with Email`);
     await page.getByLabel("Severity *").selectOption("minor");
 

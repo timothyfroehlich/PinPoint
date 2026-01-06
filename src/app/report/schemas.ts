@@ -10,7 +10,7 @@ export const publicIssueSchema = z.object({
   description: z
     .string()
     .trim()
-    .max(2000, "Description is too long")
+    .max(5000, "Description is too long")
     .optional(),
   severity: z.enum(["minor", "playable", "unplayable"], {
     message: "Select a severity",
@@ -22,7 +22,12 @@ export const publicIssueSchema = z.object({
     .optional(),
   firstName: z.string().trim().max(100, "First name too long").optional(),
   lastName: z.string().trim().max(100, "Last name too long").optional(),
-  email: z.string().email("Invalid email").optional().or(z.literal("")),
+  email: z
+    .string()
+    .email("Invalid email")
+    .max(254, "Email is too long")
+    .optional()
+    .or(z.literal("")),
 });
 
 export type PublicIssueInput = z.infer<typeof publicIssueSchema>;

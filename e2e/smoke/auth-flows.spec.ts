@@ -17,7 +17,9 @@ test.describe("Authentication Smoke", () => {
 
     // Navigate to login page via dashboard header
     await page.goto("/");
-    await page.getByTestId("nav-signin").click();
+    const signInLink = page.getByTestId("nav-signin");
+    await expect(signInLink).toBeVisible();
+    await signInLink.click();
 
     // Verify we're on the login page
     await expect(page).toHaveURL("/login");
