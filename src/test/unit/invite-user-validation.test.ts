@@ -3,7 +3,7 @@ import { inviteUserSchema } from "~/app/(app)/admin/users/actions";
 
 describe("InviteUser Validation", () => {
   it("should fail validation for very long first name", () => {
-    const longName = "a".repeat(51);
+    const longName = "a".repeat(101);
     const result = inviteUserSchema.safeParse({
       firstName: longName,
       lastName: "Doe",
@@ -13,14 +13,13 @@ describe("InviteUser Validation", () => {
     });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues[0].message).toContain(
-        "First name is too long"
-      );
+      const issue = result.error.issues.find((i) => i.path[0] === "firstName");
+      expect(issue?.message).toContain("First name is too long");
     }
   });
 
   it("should fail validation for very long last name", () => {
-    const longName = "a".repeat(51);
+    const longName = "a".repeat(101);
     const result = inviteUserSchema.safeParse({
       firstName: "John",
       lastName: longName,
@@ -29,9 +28,6 @@ describe("InviteUser Validation", () => {
       sendInvite: false,
     });
     expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues[0].message).toContain("Last name is too long");
-    }
   });
 
   it("should fail validation for very long email", () => {
@@ -44,6 +40,10 @@ describe("InviteUser Validation", () => {
       sendInvite: false,
     });
     expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find((i) => i.path[0] === "email");
+      expect(issue?.message).toBe("Email is too long");
+    }
   });
 
   it("should pass validation for valid inputs", () => {

@@ -5,32 +5,10 @@ import { db } from "~/server/db";
 import { userProfiles, unconfirmedUsers, authUsers } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 import { sendInviteEmail } from "~/lib/email/invite";
 import { headers } from "next/headers";
-
-export const updateUserRoleSchema = z.object({
-  userId: z.string().uuid(),
-  newRole: z.enum(["guest", "member", "admin"]),
-  userType: z.enum(["active", "unconfirmed"]),
-});
-
-export const inviteUserSchema = z.object({
-  firstName: z
-    .string()
-    .min(1, "First name is required")
-    .max(50, "First name is too long"),
-  lastName: z
-    .string()
-    .min(1, "Last name is required")
-    .max(50, "Last name is too long"),
-  email: z
-    .string()
-    .email("Invalid email address")
-    .max(254, "Email is too long"),
-  role: z.enum(["guest", "member"]), // Explicitly exclude "admin"
-  sendInvite: z.boolean().optional(),
-});
+import { inviteUserSchema, updateUserRoleSchema } from "./schema";
+export { inviteUserSchema, updateUserRoleSchema };
 
 async function verifyAdmin(userId: string): Promise<void> {
   const currentUserProfile = await db.query.userProfiles.findFirst({
