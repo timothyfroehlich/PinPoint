@@ -3,7 +3,7 @@ import React from "react";
 import { QrCodeDialog } from "./qr-code-dialog";
 import { describe, it, expect, vi } from "vitest";
 
-// Mock dependencies
+// Mock Dialog to render content immediately
 vi.mock("~/components/ui/dialog", () => ({
   Dialog: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
@@ -25,15 +25,12 @@ vi.mock("~/components/ui/dialog", () => ({
   ),
 }));
 
-vi.mock("~/components/ui/button", () => ({
-  Button: ({ children, ...props }: React.ComponentProps<"button">) => (
-    <button {...props}>{children}</button>
-  ),
-}));
-
 vi.mock("~/components/ui/copy-button", () => ({
   CopyButton: () => <button>Copy</button>,
 }));
+
+// Note: Using real Button component to verify asChild behavior correctly forwards aria-label
+// No mock for ~/components/ui/button needed as it will use the real implementation
 
 describe("QrCodeDialog", () => {
   it("renders the external link button with accessible label", () => {
@@ -46,19 +43,10 @@ describe("QrCodeDialog", () => {
       />
     );
 
-    // Look for the external link button
-    // It should have an aria-label
-    const linkButton = screen.getByTitle("Test Link");
+    const linkButton = screen.getByRole("link", {
+      name: "Open report link in new tab",
+    });
     expect(linkButton).toBeInTheDocument();
-
-    // This is expected to fail initially or warn if we were using a11y testing tools
-    // We want to verify it has an aria-label.
-    // Currently it does NOT. So let's check for it and expect it to be missing or present depending on stage.
-    // For TDD, I'll expect it to have the label and see it fail.
-
-    expect(linkButton).toHaveAttribute(
-      "aria-label",
-      "Open report link in new tab"
-    );
+    expect(linkButton).toHaveAttribute("href", "http://example.com/report");
   });
 });
