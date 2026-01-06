@@ -46,7 +46,10 @@ test.describe("Email Notifications", () => {
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
     // Wait for page to redirect (Safari needs explicit wait for Server Action redirects)
-    await page.waitForLoadState("networkidle");
+    // Wait for URL to change away from /report first
+    await page.waitForURL((url) => !url.pathname.startsWith("/report"), {
+      timeout: 30000,
+    });
 
     // Wait for redirect to issue page (new URL format)
     await expect(page).toHaveURL(/\/m\/MM\/i\/[0-9]+/);
@@ -89,7 +92,10 @@ test.describe("Email Notifications", () => {
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
     // Wait for page to redirect (Safari needs explicit wait for Server Action redirects)
-    await page.waitForLoadState("networkidle");
+    // Wait for URL to change away from /report first
+    await page.waitForURL((url) => !url.pathname.startsWith("/report"), {
+      timeout: 30000,
+    });
 
     await expect(page).toHaveURL(/\/m\/MM\/i\/[0-9]+/);
 
