@@ -3,7 +3,6 @@
 import type React from "react";
 import Link from "next/link";
 import { useActionState } from "react";
-import { Loader2 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -102,16 +101,9 @@ export function LoginForm({
           type="submit"
           className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
           size="lg"
-          disabled={isPending}
+          loading={isPending}
         >
-          {isPending ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Signing In...
-            </>
-          ) : (
-            "Sign In"
-          )}
+          Sign In
         </Button>
       </form>
 

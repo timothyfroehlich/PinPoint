@@ -12,7 +12,7 @@ import { Label } from "~/components/ui/label";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { Button } from "~/components/ui/button";
-import { RefreshCw, UserCheck } from "lucide-react";
+import { UserCheck } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { submitPublicIssueAction } from "./actions";
 
@@ -375,12 +375,10 @@ export function UnifiedReportForm({
                 <Button
                   type="submit"
                   className="w-full bg-primary text-on-primary hover:bg-primary/90 mt-2 h-10 text-sm font-semibold"
-                  disabled={isPending || !selectedMachineId}
+                  disabled={!selectedMachineId}
+                  loading={isPending}
                 >
-                  {isPending ? (
-                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  ) : null}
-                  {isPending ? "Submitting..." : "Submit Issue Report"}
+                  Submit Issue Report
                 </Button>
               </form>
             </div>
