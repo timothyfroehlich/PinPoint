@@ -63,4 +63,25 @@ describe("AssigneePicker Accessibility", () => {
     expect(bobOption).toHaveAttribute("role", "option");
     expect(bobOption).toHaveAttribute("aria-selected", "false");
   });
+
+  it("renders loading state with accessible attributes", () => {
+    const onAssign = vi.fn();
+    render(
+      <AssigneePicker
+        assignedToId="1"
+        users={mockUsers}
+        isPending={true}
+        onAssign={onAssign}
+      />
+    );
+
+    const trigger = screen.getByTestId("assignee-picker-trigger");
+    expect(trigger).toBeDisabled();
+
+    // Ensure loader is present and accessible
+    const loader = screen.getByTestId("assignee-picker-loader");
+    expect(loader).toBeInTheDocument();
+    expect(loader).toHaveAttribute("aria-hidden", "true");
+    expect(loader).toHaveClass("animate-spin");
+  });
 });
