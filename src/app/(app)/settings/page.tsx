@@ -42,7 +42,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
   }
 
   if (!preferences) {
-    redirect("/login?next=%2Fsettings");
+    throw new Error("Failed to create notification preferences");
   }
 
   return (

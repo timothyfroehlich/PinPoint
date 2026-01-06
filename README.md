@@ -123,7 +123,6 @@ npm run check        # typecheck + lint + unit/integration tests
 npm run test         # unit + PGlite integration tests
 npm run test:integration   # Supabase-backed integration tests
 npm run smoke        # Playwright smoke E2E tests
-npm run smoke        # Playwright smoke E2E tests
 npm run preflight    # full local CI gate before pushing
 # See docs/E2E_DOCKER.md for running Safari tests locally via Docker
 ```

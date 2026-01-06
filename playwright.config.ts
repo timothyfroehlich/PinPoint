@@ -170,8 +170,8 @@ export default defineConfig({
             },
             // Increase retries for WebKit due to known flakiness
             retries: process.env["CI"] ? 3 : 1,
-            // Increase timeout for WebKit
-            timeout: 60000, // 60s vs default 30s
+            // Increase timeout for WebKit (2x base timeout, CI-aware)
+            timeout: process.env["CI"] ? 120 * 1000 : 60 * 1000,
           },
         ]),
   ],
