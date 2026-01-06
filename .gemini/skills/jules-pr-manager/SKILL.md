@@ -29,7 +29,9 @@ Process PRs in this order (Closest to Merge first):
 
 - **Conditions**:
   - **Copilot Finished (Comments)**: Copilot left unaddressed comments.
-    - **Action**: Copy comments to new review for Jules -> Set `jules:changes-requested`. (Trivial Batch)
+    - **Action**: **Validate Comments**.
+      - Filter out hallucinations or bad advice.
+      - Copy _valid_ comments to new review for Jules -> Set `jules:changes-requested`. (Trivial Batch)
   - **Copilot Finished (Approved)**: Move to Merge Candidate.
   - **CI Failed**: Post comment requesting fixes -> Set `jules:changes-requested`. (Trivial Batch)
   - **Stalled**: >30 mins since request. -> Set `jules:agent-stalled`. (Trivial Batch)
