@@ -314,3 +314,32 @@ For detailed guidance, use Agent Skills (if supported) or reference docs directl
 - **Style**: Conventional commits (`feat:`, `fix:`, `chore:`)
 - **Process**: Run `npm run preflight` → commit → push
 - **Hooks**: Husky + lint-staged enforce quality gates
+
+## GitHub Copilot Reviews
+
+When an agent or user requests a review from `@github/copilot`, the resulting inline comments may not be fully visible via basic `gh pr view` commands.
+
+**To fetch all review comments from Copilot:**
+
+```bash
+gh api graphql -f query='
+{
+  repository(owner: "timothyfroehlich", name: "PinPoint") {
+    pullRequest(number: <PR_NUMBER>) {
+      reviews(last: 5) {
+        nodes {
+          author { login }
+          state
+          comments(first: 20) {
+            nodes {
+              path
+              line
+              body
+            }
+          }
+        }
+      }
+    }
+  }
+}'
+```
