@@ -243,7 +243,7 @@ export async function signupAction(
         "Signup failed: Supabase error"
       );
 
-      return err("SERVER", "An unexpected error occurred");
+      return err("SERVER", error.message);
     }
 
     if (!data.user) {
@@ -435,7 +435,7 @@ export async function forgotPasswordAction(
         { action: "forgot-password", error: error.message },
         "Password reset email failed"
       );
-      return err("SERVER", "An unexpected error occurred");
+      return err("SERVER", error.message);
     }
 
     log.info(
@@ -515,7 +515,7 @@ export async function resetPasswordAction(
         "Password update failed"
       );
 
-      return err("SERVER", "An unexpected error occurred");
+      return err("SERVER", error.message);
     }
 
     log.info(

@@ -1,4 +1,4 @@
-## 2024-05-24 - Sensitive Information Exposure in Server Actions
+## 2026-01-06 - Sensitive Information Exposure in Server Actions
 
 **Vulnerability:** Server Actions were returning raw error messages from the backend/database directly to the client in the `SERVER` error code path.
 **Learning:** This can expose database connection strings, schema details, or other sensitive internal information to attackers if an unhandled exception occurs.
