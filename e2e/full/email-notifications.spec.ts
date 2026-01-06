@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { MailpitClient } from "../support/mailpit.js";
 import { TEST_USERS } from "../support/constants.js";
 import { deleteTestIssueByNumber } from "e2e/support/supabase-admin.js";
+import { submitFormAndWaitForRedirect } from "../support/page-helpers.js";
 
 /**
  * Email notification verification tests
@@ -43,15 +44,15 @@ test.describe("Email Notifications", () => {
     await page.getByLabel("Description").fill("Testing email notifications");
     await page.getByLabel("Severity *").selectOption("playable");
     await page.getByLabel("Priority *").selectOption("low");
-    await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
-    // Wait for page to redirect (Safari needs explicit wait for Server Action redirects)
-    // Wait for URL to change away from /report first
-    await page.waitForURL((url) => !url.pathname.startsWith("/report"), {
-      timeout: 30000,
-    });
+    // Submit form and wait for Server Action redirect (Safari-defensive)
+    await submitFormAndWaitForRedirect(
+      page,
+      page.getByRole("button", { name: "Submit Issue Report" }),
+      { awayFrom: "/report" }
+    );
 
-    // Wait for redirect to issue page (new URL format)
+    // Verify we're on the issue page
     await expect(page).toHaveURL(/\/m\/MM\/i\/[0-9]+/);
     const url = page.url();
     const issueIdMatch = /\/i\/(\d+)/.exec(url);
@@ -89,13 +90,13 @@ test.describe("Email Notifications", () => {
     await page.getByLabel("Issue Title *").fill("Status Change Test");
     await page.getByLabel("Severity *").selectOption("playable");
     await page.getByLabel("Priority *").selectOption("low");
-    await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
-    // Wait for page to redirect (Safari needs explicit wait for Server Action redirects)
-    // Wait for URL to change away from /report first
-    await page.waitForURL((url) => !url.pathname.startsWith("/report"), {
-      timeout: 30000,
-    });
+    // Submit form and wait for Server Action redirect (Safari-defensive)
+    await submitFormAndWaitForRedirect(
+      page,
+      page.getByRole("button", { name: "Submit Issue Report" }),
+      { awayFrom: "/report" }
+    );
 
     await expect(page).toHaveURL(/\/m\/MM\/i\/[0-9]+/);
 
