@@ -87,17 +87,19 @@ export async function updateSession(
 
   if (!user && autologinEnabled && !shouldSkipAutologin()) {
     const email = DEV_AUTOLOGIN_EMAIL ?? "admin@test.com";
-    const password = DEV_AUTOLOGIN_PASSWORD ?? "TestPassword123";
+    const password = DEV_AUTOLOGIN_PASSWORD;
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    if (password) {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (!error) {
-      ({
-        data: { user },
-      } = await supabase.auth.getUser());
+      if (!error) {
+        ({
+          data: { user },
+        } = await supabase.auth.getUser());
+      }
     }
   }
 

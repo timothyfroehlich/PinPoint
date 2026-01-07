@@ -5,7 +5,7 @@ import { useTransition } from "react";
 import { toast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
+import { type z } from "zod";
 import type { UnifiedUser } from "~/lib/types";
 
 import {
@@ -35,26 +35,9 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
-import { inviteUser } from "~/app/(app)/admin/users/actions";
+import { inviteUser, inviteUserSchema } from "~/app/(app)/admin/users/actions";
 
-const inviteUserFormSchema = z.object({
-  firstName: z
-    .string()
-    .min(1, "First name is required")
-    .max(50, "First name is too long"),
-  lastName: z
-    .string()
-    .min(1, "Last name is required")
-    .max(50, "Last name is too long"),
-  email: z
-    .string()
-    .email("Invalid email address")
-    .max(254, "Email is too long"),
-  role: z.enum(["guest", "member"]),
-  sendInvite: z.boolean(),
-});
-
-type InviteUserFormValues = z.infer<typeof inviteUserFormSchema>;
+type InviteUserFormValues = z.infer<typeof inviteUserSchema>;
 
 interface InviteUserDialogProps {
   open: boolean;
@@ -70,7 +53,7 @@ export function InviteUserDialog({
   const [isPending, startTransition] = useTransition();
 
   const form = useForm<InviteUserFormValues>({
-    resolver: zodResolver(inviteUserFormSchema),
+    resolver: zodResolver(inviteUserSchema),
     defaultValues: {
       firstName: "",
       lastName: "",
@@ -221,7 +204,7 @@ export function InviteUserDialog({
                   </div>
                   <FormControl>
                     <Switch
-                      checked={field.value}
+                      checked={!!field.value}
                       onCheckedChange={field.onChange}
                     />
                   </FormControl>
