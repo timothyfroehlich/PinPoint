@@ -157,7 +157,7 @@ export async function loginAction(
       "Login server error"
     );
 
-    return err("SERVER", error instanceof Error ? error.message : "Unknown", {
+    return err("SERVER", "An unexpected error occurred", {
       submittedEmail,
     });
   }
@@ -299,7 +299,7 @@ export async function signupAction(
       "Signup server error"
     );
 
-    return err("SERVER", error instanceof Error ? error.message : "Unknown");
+    return err("SERVER", "An unexpected error occurred");
   }
 }
 
@@ -460,7 +460,7 @@ export async function forgotPasswordAction(
       },
       "Forgot password server error"
     );
-    return err("SERVER", error instanceof Error ? error.message : "Unknown");
+    return err("SERVER", "An unexpected error occurred");
   }
 }
 
@@ -553,6 +553,6 @@ export async function resetPasswordAction(
       "Reset password server error"
     );
 
-    return err("SERVER", error instanceof Error ? error.message : "Unknown");
+    return err("SERVER", "An unexpected error occurred");
   }
 }
