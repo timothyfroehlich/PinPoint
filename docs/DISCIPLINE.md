@@ -240,13 +240,13 @@ Session 4: Issue filtering (DB + Action + UI) - WORKS
 
 ```bash
 # 1. Write test for current behavior
-npm test -- issue-creation
+pnpm test -- issue-creation
 
 # 2. Refactor
 # ... make changes ...
 
 # 3. Verify test still passes
-npm test -- issue-creation
+pnpm test -- issue-creation
 
 # 4. Ship if it works
 git commit -m "refactor: simplify issue creation"

@@ -328,7 +328,7 @@ tests/
 ### Development (TDD for Complex Logic)
 
 ```bash
-npm run test:watch
+pnpm run test:watch
 ```
 
 Watch mode for unit tests when building utilities or complex logic.
@@ -336,7 +336,7 @@ Watch mode for unit tests when building utilities or complex logic.
 ### Pre-Commit (Quick Validation)
 
 ```bash
-npm test                  # Run all unit + integration tests
+pnpm test                  # Run all unit + integration tests
 ```
 
 **Should complete in <10 seconds.**
@@ -344,10 +344,10 @@ npm test                  # Run all unit + integration tests
 ### Pre-Push (Full Validation)
 
 ```bash
-npm test                  # Unit + integration
-npm run e2e              # E2E tests
-npm run typecheck        # Type checking
-npm run lint             # Linting
+pnpm test                  # Unit + integration
+pnpm run e2e              # E2E tests
+pnpm run typecheck        # Type checking
+pnpm run lint             # Linting
 ```
 
 **Should complete in <60 seconds.**
@@ -366,10 +366,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run e2e
+      - run: pnpm install
+      - run: pnpm run typecheck
+      - run: pnpm test
+      - run: pnpm run e2e
 ```
 
 ---
@@ -519,13 +519,13 @@ describe("createIssueSchema", () => {
 
 ```bash
 # Run with UI mode
-npx playwright test --ui
+pnpm exec playwright test --ui
 
 # Run with headed browser
-npx playwright test --headed
+pnpm exec playwright test --headed
 
 # Debug specific test
-npx playwright test --debug issue-reporting
+pnpm exec playwright test --debug issue-reporting
 ```
 
 ---

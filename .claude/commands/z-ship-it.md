@@ -53,7 +53,7 @@ Take boring meta changes and LAUNCH THEM INTO PRODUCTION with the power of autom
 
 6. **Run the quick tests** (because we're not _completely_ reckless):
    ```bash
-   npm run check:brief
+   pnpm run check:brief
    ```
 7. **If tests fail**:
 

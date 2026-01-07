@@ -453,19 +453,19 @@ pinpoint/
 
 ```bash
 # Start Next.js dev server
-npm run dev
+pnpm run dev
 
 # Apply schema changes (no migration files)
-npm run db:reset
+pnpm run db:reset
 
 # Open Drizzle Studio
-npm run db:studio
+pnpm run db:studio
 
 # Run tests
-npm test
+pnpm test
 
 # Run E2E tests
-npm run e2e
+pnpm run e2e
 ```
 
 ### Database Changes
@@ -474,13 +474,13 @@ npm run e2e
 2. Generate a migration and apply it locally:
 
    ```bash
-   npm run db:generate -- --name <change-name>
-   npm run db:migrate
-   npm run test:_generate-schema
+   pnpm run db:generate -- --name <change-name>
+   pnpm run db:migrate
+   pnpm run test:_generate-schema
    ```
 
 3. Update seed data if needed (`supabase/seed.sql`, `supabase/seed-users.mjs`)
-4. Test locally (`npm run check`, `npm run preflight` before pushing)
+4. Test locally (`pnpm run check`, `pnpm run preflight` before pushing)
 5. Commit `schema.ts`, the `drizzle/` migration files, and the regenerated test schema
 
 `db:reset` remains a **destructive** helper for local/dev environments: it restarts Supabase, drops application tables, reapplies all migrations, regenerates the test schema, and seeds data/users.

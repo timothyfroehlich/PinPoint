@@ -15,19 +15,19 @@ This pattern keeps production/preview databases in sync via migrations while ens
 - **Generate migrations from schema**
 
   ```bash
-  npm run db:generate -- --name <change-name>
+  pnpm run db:generate -- --name <change-name>
   ```
 
 - **Apply migrations to the current database**
 
   ```bash
-  npm run db:migrate
+  pnpm run db:migrate
   ```
 
 - **Regenerate test schema for PGlite**
 
   ```bash
-  npm run test:_generate-schema
+  pnpm run test:_generate-schema
   ```
 
 ## Where It’s Used
@@ -40,10 +40,10 @@ This pattern keeps production/preview databases in sync via migrations while ens
 
 - Always edit `src/server/db/schema.ts` first.
 - Generate a migration with a descriptive name (e.g., `add-notifications-table`).
-- Run `npm run db:migrate` locally and in preview/prod via scripts.
+- Run `pnpm run db:migrate` locally and in preview/prod via scripts.
 - After structural changes, regenerate the test schema and commit both:
 
   ```bash
-  npm run test:_generate-schema
+  pnpm run test:_generate-schema
   git add src/server/db/schema.ts drizzle/ src/test/setup/schema.sql
   ```
