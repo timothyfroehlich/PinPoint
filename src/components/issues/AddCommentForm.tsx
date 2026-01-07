@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useActionState, useEffect, useRef } from "react";
-import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
 import {
@@ -25,6 +25,7 @@ export function AddCommentForm({
 
   useEffect(() => {
     if (state?.ok) {
+      toast.success("Comment added");
       formRef.current?.reset();
     }
   }, [state]);
@@ -40,15 +41,8 @@ export function AddCommentForm({
         disabled={isPending}
         className="border-outline-variant bg-surface text-on-surface"
       />
-      <Button type="submit" size="sm" disabled={isPending}>
-        {isPending ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Adding...
-          </>
-        ) : (
-          "Add Comment"
-        )}
+      <Button type="submit" size="sm" loading={isPending}>
+        Add Comment
       </Button>
       {state && !state.ok && (
         <p className="text-sm text-destructive">{state.message}</p>
