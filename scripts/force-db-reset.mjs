@@ -1,7 +1,7 @@
 /**
  * Drops application tables in the local Supabase database.
  *
- * This script is used by `npm run db:reset` (and preflight) to ensure a clean
+ * This script is used by `pnpm run db:reset` (and preflight) to ensure a clean
  * slate before reapplying the Drizzle schema. It intentionally leaves the
  * Supabase auth schema untouched.
  */

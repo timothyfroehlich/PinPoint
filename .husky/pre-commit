@@ -2,5 +2,5 @@
 set -e
 
 npx lint-staged
-npm run typecheck
-npm run format
+pnpm run typecheck
+pnpm run format

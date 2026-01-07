@@ -5,7 +5,7 @@
  * for all tests in a worker. Per-test instances cause system lockups.
  *
  * Schema is exported from src/server/db/schema.ts using drizzle-kit export.
- * Run `npm run test:_generate-schema` to regenerate when schema changes.
+ * Run `pnpm run test:_generate-schema` to regenerate when schema changes.
  */
 
 import { readFileSync } from "node:fs";

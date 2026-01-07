@@ -95,10 +95,10 @@ Refer to `docs/PATTERNS.md` index for:
 Run (or ensure CI runs) before pushing:
 
 ```bash
-npm run typecheck
-npm run lint
-npm run test
-npm run format
+pnpm run typecheck
+pnpm run lint
+pnpm run test
+pnpm run format
 ```
 
 (Use eventual `preflight` script when added.) Conventional commit messages.

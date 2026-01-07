@@ -110,8 +110,8 @@ The Python script performs comprehensive worktree management:
 
 Use `--validate` flag to run validation after merge:
 
-- Runs `npm run db:reset` to reset database
-- Runs `npm run test:integration` to verify changes
+- Runs `pnpm run db:reset` to reset database
+- Runs `pnpm run test:integration` to verify changes
 - Helps catch integration issues early
 
 ## Port Allocation

@@ -421,7 +421,7 @@ Before committing TypeScript code:
 - [ ] Optional properties use conditional spread
 - [ ] Type guards for complex narrowing
 - [ ] Path aliases (`~/`) instead of relative imports
-- [ ] `npm run typecheck` passes
+- [ ] `pnpm run typecheck` passes
 
 ## Additional Resources
 

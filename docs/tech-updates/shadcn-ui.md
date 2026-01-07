@@ -46,9 +46,9 @@ PinPoint adopting shadcn/ui during RSC Migration Phase 1A while transitioning fr
 
 ```bash
 # NEW: Pre-built component compositions
-npx shadcn@latest add block dashboard-01
-npx shadcn@latest add block authentication-01
-npx shadcn@latest add block sidebar-01
+pnpm exec shadcn@latest add block dashboard-01
+pnpm exec shadcn@latest add block authentication-01
+pnpm exec shadcn@latest add block sidebar-01
 ```
 
 **Perfect for PinPoint:**
@@ -62,8 +62,8 @@ npx shadcn@latest add block sidebar-01
 
 ```bash
 # NEW: Local file support and custom registries
-npx shadcn@latest add button --registry ./components/registry
-npx shadcn@latest add custom-issue-card --registry local
+pnpm exec shadcn@latest add button --registry ./components/registry
+pnpm exec shadcn@latest add custom-issue-card --registry local
 ```
 
 **Benefits for PinPoint:**
@@ -76,9 +76,9 @@ npx shadcn@latest add custom-issue-card --registry local
 
 ```bash
 # NEW: Component diffing and updates
-npx shadcn diff                 # Check for component updates
-npx shadcn update button        # Update specific components
-npx shadcn init --force         # Reinitialize configuration
+pnpm exec shadcn diff                 # Check for component updates
+pnpm exec shadcn update button        # Update specific components
+pnpm exec shadcn init --force         # Reinitialize configuration
 ```
 
 ---
@@ -319,12 +319,12 @@ export function IssueStatusBadge({
 # shadcn/ui components: Button, Card, Input, Avatar, Separator
 
 # Add essential components for issue management
-npx shadcn@latest add badge
-npx shadcn@latest add table
-npx shadcn@latest add select
-npx shadcn@latest add dialog
-npx shadcn@latest add form
-npx shadcn@latest add toast
+pnpm exec shadcn@latest add badge
+pnpm exec shadcn@latest add table
+pnpm exec shadcn@latest add select
+pnpm exec shadcn@latest add dialog
+pnpm exec shadcn@latest add form
+pnpm exec shadcn@latest add toast
 ```
 
 ### **Phase 1B: Data Access Integration**

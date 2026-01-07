@@ -55,7 +55,7 @@ describe("machines", () => {
 ## Forbidden Patterns
 
 - Per-test PGlite instantiation.
-- Redirecting test runner output (`npm test 2>&1`) causing filter issues.
+- Redirecting test runner output (`pnpm test 2>&1`) causing filter issues.
 - Attempting to directly unit test async Server Components (use E2E instead).
 
 ## Data & Determinism
