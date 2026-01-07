@@ -8,18 +8,18 @@ The actual configuration lives in `.github/workflows/ci.yml` and is committed to
 On pushes and pull requests to `main`:
 
 - **Install & Cache Dependencies**
-  - Runs `npm ci`
-  - Caches `node_modules` and Playwright browsers for faster subsequent runs
+  - Runs `pnpm install`
+  - Caches `pnpm` store and Playwright browsers for faster subsequent runs
 - **Quality Checks (Parallel)**
-  - `npm run typecheck`
-  - `npm run lint`
-  - `npm run format`
+  - `pnpm run typecheck`
+  - `pnpm run lint`
+  - `pnpm run format`
 - **Build**
-  - `npm run build` (runs after quality checks pass)
+  - `pnpm run build` (runs after quality checks pass)
 - **Tests**
-  - Unit tests: `npm test`
-  - Integration tests: `npm run test:integration`
-  - Smoke E2E tests: `npm run smoke` (after a successful build)
+  - Unit tests: `pnpm test`
+  - Integration tests: `pnpm run test:integration`
+  - Smoke E2E tests: `pnpm run smoke` (after a successful build)
 - **Artifacts**
   - Uploads Playwright reports on E2E failures to aid debugging
 
@@ -28,7 +28,7 @@ On pushes and pull requests to `main`:
 Before pushing, run:
 
 ```bash
-npm run preflight
+pnpm run preflight
 ```
 
 This mirrors the CI pipeline locally (typecheck, lint, format, tests, build, integration tests, smoke tests).

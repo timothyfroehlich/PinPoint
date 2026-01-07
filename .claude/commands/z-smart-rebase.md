@@ -48,7 +48,7 @@ Perform an intelligent rebase operation with the following workflow:
 
 6. **Validate the result**:
    - Ensure all conflicts are resolved
-   - Run `npm run quick` to verify code quality
+   - Run `pnpm run quick` to verify code quality
    - If validation fails, provide clear next steps
 
 7. **Complete the operation**:
@@ -94,7 +94,7 @@ Perform an intelligent rebase operation with the following workflow:
 
 - ✅ Branch is up-to-date with target (main or parent)
 - ✅ All merge conflicts resolved
-- ✅ Code quality checks pass (`npm run quick`)
+- ✅ Code quality checks pass (`pnpm run quick`)
 - ✅ User understands what changes were made
 - ✅ Clear next steps provided
 

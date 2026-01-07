@@ -90,9 +90,9 @@ createClient(); // ✅ Client utils
 
 ```bash
 # Remove deprecated packages
-npm uninstall @supabase/auth-helpers-nextjs
+pnpm remove @supabase/auth-helpers-nextjs
 # Install new SSR package
-npm install @supabase/ssr
+pnpm install @supabase/ssr
 ```
 
 ### Phase 2: Client Utilities

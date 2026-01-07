@@ -16,19 +16,19 @@ trigger: always_on
 **Run BEFORE every commit:**
 
 ```bash
-npm run preflight  # Typecheck, lint, format, test, build, integration tests
+pnpm run preflight  # Typecheck, lint, format, test, build, integration tests
 ```
 
 **Development:**
 
 ```bash
-npm run dev              # Start dev server (uses PORT from .env.local)
-npm run build            # Production build
-npm run typecheck        # TypeScript validation
-npm run lint             # ESLint check
-npm test                 # Unit tests only
-npm run test:integration # DB integration tests (requires `supabase start`)
-npm run smoke            # E2E smoke tests (Playwright)
+pnpm run dev              # Start dev server (uses PORT from .env.local)
+pnpm run build            # Production build
+pnpm run typecheck        # TypeScript validation
+pnpm run lint             # ESLint check
+pnpm test                 # Unit tests only
+pnpm run test:integration # DB integration tests (requires `supabase start`)
+pnpm run smoke            # E2E smoke tests (Playwright)
 ```
 
 **Database Migrations (ALWAYS use migrations, never `push`):**
@@ -36,18 +36,18 @@ npm run smoke            # E2E smoke tests (Playwright)
 ```bash
 # 1. Edit src/server/db/schema.ts
 # 2. Generate migration:
-npm run db:generate -- --name <descriptive-name>
+pnpm run db:generate -- --name <descriptive-name>
 # 3. Apply migration:
-npm run db:migrate
+pnpm run db:migrate
 # 4. Update test schema:
-npm run test:_generate-schema
+pnpm run test:_generate-schema
 # 5. Commit schema.ts, drizzle/, and src/test/setup/schema.sql
 ```
 
 **Components:**
 
 ```bash
-npx shadcn@latest add [component]  # Add shadcn/ui components
+pnpm dlx shadcn@latest add [component]  # Add shadcn/ui components
 ```
 
 ## Tech Stack
@@ -72,7 +72,7 @@ npx shadcn@latest add [component]  # Add shadcn/ui components
 7. **CSP with nonces**: Security headers required. Use `middleware.ts` for dynamic nonces, `next.config.ts` for static headers.
 8. **Type safety (strictest)**: No `any`, no `!`, no unsafe `as`. Write type guards for validation.
 9. **Path aliases (`~/`)**: Always use `~/lib/...` instead of relative imports `../../../lib/...`.
-10. **Preflight before commit**: `npm run preflight` must pass. Pre-commit hooks enforce this.
+10. **Preflight before commit**: `pnpm run preflight` must pass. Pre-commit hooks enforce this.
 
 ## Quick Code Examples
 
@@ -267,12 +267,12 @@ For detailed guidance, use Agent Skills (if supported) or reference docs directl
 
 **Dev Loop**:
 
-| Command                            | When to use                      |
-| ---------------------------------- | -------------------------------- |
-| `npm run check`                    | After ANY code change (~5s)      |
-| `npm test -- path/to/file.test.ts` | Debug specific test              |
-| `npm run preflight`                | Before commit (full suite, ~60s) |
-| **Mobile Safari**                  | **DO NOT RUN LOCALLY** (CI only) |
+| Command                             | When to use                      |
+| ----------------------------------- | -------------------------------- |
+| `pnpm run check`                    | After ANY code change (~5s)      |
+| `pnpm test -- path/to/file.test.ts` | Debug specific test              |
+| `pnpm run preflight`                | Before commit (full suite, ~60s) |
+| **Mobile Safari**                   | **DO NOT RUN LOCALLY** (CI only) |
 
 **Key Constraints**:
 
@@ -312,7 +312,7 @@ For detailed guidance, use Agent Skills (if supported) or reference docs directl
 ## Commit Guidelines
 
 - **Style**: Conventional commits (`feat:`, `fix:`, `chore:`)
-- **Process**: Run `npm run preflight` → commit → push
+- **Process**: Run `pnpm run preflight` → commit → push
 - **Hooks**: Husky + lint-staged enforce quality gates
 
 ## GitHub Copilot Reviews

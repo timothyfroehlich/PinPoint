@@ -486,7 +486,7 @@ await expect(page.getByText("Content loaded")).toBeVisible();
 ## Environment Defaults (Local/Preview)
 
 - **Autologin:** When `DEV_AUTOLOGIN_ENABLED=true` (default for dev/preview), middleware auto-signs in with `DEV_AUTOLOGIN_EMAIL`/`DEV_AUTOLOGIN_PASSWORD` (seeded admin by default) if no valid session exists. Opt out per-request with header `x-skip-autologin: true`, cookie `skip_autologin=true`, or query `?autologin=off`—use these for guest/public E2E scenarios.
-- **Fast DB reset:** Playwright `global-setup` now uses `npm run db:fast-reset` first. If it fails (e.g., brand-new container without tables), it falls back to the full `supabase db reset` + schema push + seeding automatically. Set `SKIP_SUPABASE_RESET=true` to bypass entirely for iterative UI-only runs.
+- **Fast DB reset:** Playwright `global-setup` now uses `pnpm run db:fast-reset` first. If it fails (e.g., brand-new container without tables), it falls back to the full `supabase db reset` + schema push + seeding automatically. Set `SKIP_SUPABASE_RESET=true` to bypass entirely for iterative UI-only runs.
 - **Cleanup API:** `/api/test-data/cleanup` accepts `issueIds`, `machineIds`, and `issueTitlePrefix`. The Playwright helper `cleanupTestEntities` now forwards `issueTitlePrefix`, so public-reporting tests stay tidy.
 
 ---
@@ -591,15 +591,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-      - run: npm ci
-      - run: npx playwright install --with-deps
+      - run: pnpm install
+      - run: pnpm exec playwright install --with-deps
 
       # Start Supabase (required for auth)
       - uses: supabase/setup-cli@v1
       - run: supabase start
 
       # Run tests
-      - run: npm run smoke
+      - run: pnpm run smoke
 
       # Upload artifacts on failure
       - uses: actions/upload-artifact@v4

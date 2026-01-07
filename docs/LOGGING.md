@@ -152,7 +152,7 @@ find logs/ -name "*.log" -exec grep '"level":"error"' {} \;
 
 - `LOG_LEVEL`: Set log level (default: `info`)
   - Options: `debug`, `info`, `warn`, `error`
-  - Example: `LOG_LEVEL=debug npm run dev`
+  - Example: `LOG_LEVEL=debug pnpm run dev`
 
 - `NODE_ENV`: Controls output mode
   - `development`: Logs to file + console
