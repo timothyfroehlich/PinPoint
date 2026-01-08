@@ -54,12 +54,17 @@ export function IssueFilters({
   return (
     <div className="flex flex-wrap items-center gap-3">
       {/* Status Toggle (Open/Closed) */}
-      <div className="flex items-center rounded-md border border-input bg-transparent p-1">
+      <div
+        className="flex items-center rounded-md border border-input bg-transparent p-1"
+        role="group"
+        aria-label="Filter by status"
+      >
         <Button
           variant={currentFilters.status !== "resolved" ? "secondary" : "ghost"}
           size="sm"
           onClick={() => updateFilter("status", null)} // Default (null) is Open
           className="h-7 px-3 text-xs"
+          aria-pressed={currentFilters.status !== "resolved"}
         >
           Open
         </Button>
@@ -68,6 +73,7 @@ export function IssueFilters({
           size="sm"
           onClick={() => updateFilter("status", "resolved")}
           className="h-7 px-3 text-xs"
+          aria-pressed={currentFilters.status === "resolved"}
         >
           Closed
         </Button>
@@ -78,7 +84,7 @@ export function IssueFilters({
         value={currentFilters.severity ?? "all"}
         onValueChange={(val) => updateFilter("severity", val)}
       >
-        <SelectTrigger className="w-[140px] h-9 text-sm">
+        <SelectTrigger aria-label="Filter by Severity" className="w-[140px] h-9 text-sm">
           <SelectValue placeholder="Severity" />
         </SelectTrigger>
         <SelectContent>
@@ -94,7 +100,7 @@ export function IssueFilters({
         value={currentFilters.priority ?? "all"}
         onValueChange={(val) => updateFilter("priority", val)}
       >
-        <SelectTrigger className="w-[140px] h-9 text-sm">
+        <SelectTrigger aria-label="Filter by Priority" className="w-[140px] h-9 text-sm">
           <SelectValue placeholder="Priority" />
         </SelectTrigger>
         <SelectContent>
@@ -111,7 +117,7 @@ export function IssueFilters({
         value={currentFilters.machine ?? "all"}
         onValueChange={(val) => updateFilter("machine", val)}
       >
-        <SelectTrigger className="w-[160px] h-9 text-sm">
+        <SelectTrigger aria-label="Filter by Machine" className="w-[160px] h-9 text-sm">
           <SelectValue placeholder="Machine" />
         </SelectTrigger>
         <SelectContent>
