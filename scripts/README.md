@@ -89,7 +89,7 @@ The Python script performs comprehensive worktree management:
 
 ### Phase 5: Dependency & Database Sync
 
-- Runs `npm ci` to sync dependencies
+- Runs `pnpm install --frozen-lockfile` to sync dependencies
 - Restarts Supabase with fresh database
 - Regenerates test schema
 
@@ -146,7 +146,7 @@ Scripts manage ports according to AGENTS.md:
 ### Testing Best Practices
 
 - Unit tests for pure logic (port calculations, state updates)
-- Mock external commands (git, docker, npm) in tests
+- Mock external commands (git, docker, pnpm) in tests
 - Integration tests only when necessary
 - Always test dry-run mode
 
