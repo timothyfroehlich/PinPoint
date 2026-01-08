@@ -38,12 +38,6 @@ export default async function IssuesPage({
   const params = await searchParams;
   const { status, severity, priority, machine } = params;
 
-  // Fetch machines for filter dropdown
-  const allMachines = await db.query.machines.findMany({
-    orderBy: (machines, { asc }) => [asc(machines.name)],
-    columns: { initials: true, name: true },
-  });
-
   // Safe type casting for filters
   // Default to Open issues (new + in_progress) if no status is specified
   // If status is 'resolved', show resolved issues
@@ -69,28 +63,36 @@ export default async function IssuesPage({
       ? (priority as "low" | "medium" | "high" | "critical")
       : undefined;
 
-  // Fetch Issues based on filters
-  const issuesList = await db.query.issues.findMany({
-    where: and(
-      inArray(
-        issues.status,
-        statusFilter as ("new" | "in_progress" | "resolved")[]
+  // Fetch machines and issues in parallel
+  const [allMachines, issuesList] = await Promise.all([
+    // Fetch machines for filter dropdown
+    db.query.machines.findMany({
+      orderBy: (machines, { asc }) => [asc(machines.name)],
+      columns: { initials: true, name: true },
+    }),
+    // Fetch Issues based on filters
+    db.query.issues.findMany({
+      where: and(
+        inArray(
+          issues.status,
+          statusFilter as ("new" | "in_progress" | "resolved")[]
+        ),
+        severityFilter ? eq(issues.severity, severityFilter) : undefined,
+        priorityFilter ? eq(issues.priority, priorityFilter) : undefined,
+        machine ? eq(issues.machineInitials, machine) : undefined
       ),
-      severityFilter ? eq(issues.severity, severityFilter) : undefined,
-      priorityFilter ? eq(issues.priority, priorityFilter) : undefined,
-      machine ? eq(issues.machineInitials, machine) : undefined
-    ),
-    orderBy: desc(issues.createdAt),
-    with: {
-      machine: {
-        columns: { name: true },
+      orderBy: desc(issues.createdAt),
+      with: {
+        machine: {
+          columns: { name: true },
+        },
+        reportedByUser: {
+          columns: { name: true },
+        },
       },
-      reportedByUser: {
-        columns: { name: true },
-      },
-    },
-    limit: 100, // Reasonable limit for now
-  });
+      limit: 100, // Reasonable limit for now
+    }),
+  ]);
 
   return (
     <div className="container mx-auto max-w-5xl py-8 px-4 sm:px-6">
