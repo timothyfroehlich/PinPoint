@@ -58,10 +58,10 @@ importers:
         version: 4.4.5
       '@upstash/ratelimit':
         specifier: ^2.0.7
-        version: 2.0.7(@upstash/redis@1.35.8)
+        version: 2.0.7(@upstash/redis@1.36.0)
       '@upstash/redis':
-        specifier: ^1.35.8
-        version: 1.35.8
+        specifier: ^1.36.0
+        version: 1.36.0
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -73,7 +73,7 @@ importers:
         version: 4.1.0
       drizzle-orm:
         specifier: ^0.45.1
-        version: 0.45.1(@electric-sql/pglite@0.3.14)(@opentelemetry/api@1.9.0)(@types/pg@8.15.6)(@upstash/redis@1.35.8)(postgres@3.4.7)
+        version: 0.45.1(@electric-sql/pglite@0.3.14)(@opentelemetry/api@1.9.0)(@types/pg@8.15.6)(@upstash/redis@1.36.0)(postgres@3.4.7)
       lucide-react:
         specifier: ^0.562.0
         version: 0.562.0(react@19.2.3)
@@ -2995,8 +2995,8 @@ packages:
     peerDependencies:
       '@upstash/redis': ^1.34.3
 
-  '@upstash/redis@1.35.8':
-    resolution: {integrity: sha512-QqLpVCD9PCPE6hlRzOkz864nfijSdazxtyJLIy9ZeTh6kU2nBIKKfjT5HMHjIRD4BCm6TK1dbUT9pxhFjcvpng==}
+  '@upstash/redis@1.36.0':
+    resolution: {integrity: sha512-9zN2UV9QJGPnXfWU3yZBLVQaqqENDh7g+Y4J2vJuSxBCi9FQ0aUOtaXlzuFhnsiZvCqM+eS27ic+tgmkWUsfOg==}
 
   '@vitejs/plugin-react@5.1.2':
     resolution: {integrity: sha512-EcA07pHJouywpzsoTUqNh5NwGayl2PPVEJKUSinGGSxFGYn+shYbqMGBg6FXDqgXum9Ou/ecb+411ssw8HImJQ==}
@@ -3261,8 +3261,8 @@ packages:
     resolution: {integrity: sha512-Sg0xJUNDU1sJNGdfGWhVHX0kkZ+HWcvmVymJbj6NSgZZmW/8S9Y2HQ5euytnIgakgxN6papOAWiwDo1ctFDcoQ==}
     hasBin: true
 
-  baseline-browser-mapping@2.9.12:
-    resolution: {integrity: sha512-Mij6Lij93pTAIsSYy5cyBQ975Qh9uLEc5rwGTpomiZeXZL9yIS6uORJakb3ScHgfs0serMMfIbXzokPMuEiRyw==}
+  baseline-browser-mapping@2.9.13:
+    resolution: {integrity: sha512-WhtvB2NG2wjr04+h77sg3klAIwrgOqnjS49GGudnUPGFFgg7G17y7Qecqp+2Dr5kUDxNRBca0SK7cG8JwzkWDQ==}
     hasBin: true
 
   bidi-js@1.0.3:
@@ -3320,6 +3320,9 @@ packages:
 
   caniuse-lite@1.0.30001762:
     resolution: {integrity: sha512-PxZwGNvH7Ak8WX5iXzoK1KPZttBXNPuaOvI2ZYU7NrlM+d9Ov+TUvlLOBNGzVXAntMSMMlJPd+jY6ovrVjSmUw==}
+
+  caniuse-lite@1.0.30001763:
+    resolution: {integrity: sha512-mh/dGtq56uN98LlNX9qdbKnzINhX0QzhiWBFEkFfsFO4QyCvL8YegrJAazCwXIeqkIob8BlZPGM3xdnY+sgmvQ==}
 
   chai@6.2.2:
     resolution: {integrity: sha512-NUPRluOfOiTKBKvWPtSD4PhFvWCqOi0BGStNWs57X9js7XGTprSmFoz5F0tWhR4WPjNeR9jXqdC7/UpSJTnlRg==}
@@ -8830,14 +8833,14 @@ snapshots:
 
   '@upstash/core-analytics@0.0.10':
     dependencies:
-      '@upstash/redis': 1.35.8
+      '@upstash/redis': 1.36.0
 
-  '@upstash/ratelimit@2.0.7(@upstash/redis@1.35.8)':
+  '@upstash/ratelimit@2.0.7(@upstash/redis@1.36.0)':
     dependencies:
       '@upstash/core-analytics': 0.0.10
-      '@upstash/redis': 1.35.8
+      '@upstash/redis': 1.36.0
 
-  '@upstash/redis@1.35.8':
+  '@upstash/redis@1.36.0':
     dependencies:
       uncrypto: 0.1.3
 
@@ -9175,7 +9178,7 @@ snapshots:
 
   baseline-browser-mapping@2.9.11: {}
 
-  baseline-browser-mapping@2.9.12: {}
+  baseline-browser-mapping@2.9.13: {}
 
   bidi-js@1.0.3:
     dependencies:
@@ -9208,8 +9211,8 @@ snapshots:
 
   browserslist@4.28.1:
     dependencies:
-      baseline-browser-mapping: 2.9.12
-      caniuse-lite: 1.0.30001762
+      baseline-browser-mapping: 2.9.13
+      caniuse-lite: 1.0.30001763
       electron-to-chromium: 1.5.267
       node-releases: 2.0.27
       update-browserslist-db: 1.2.3(browserslist@4.28.1)
@@ -9238,6 +9241,8 @@ snapshots:
   camelcase@5.3.1: {}
 
   caniuse-lite@1.0.30001762: {}
+
+  caniuse-lite@1.0.30001763: {}
 
   chai@6.2.2: {}
 
@@ -9448,12 +9453,12 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  drizzle-orm@0.45.1(@electric-sql/pglite@0.3.14)(@opentelemetry/api@1.9.0)(@types/pg@8.15.6)(@upstash/redis@1.35.8)(postgres@3.4.7):
+  drizzle-orm@0.45.1(@electric-sql/pglite@0.3.14)(@opentelemetry/api@1.9.0)(@types/pg@8.15.6)(@upstash/redis@1.36.0)(postgres@3.4.7):
     optionalDependencies:
       '@electric-sql/pglite': 0.3.14
       '@opentelemetry/api': 1.9.0
       '@types/pg': 8.15.6
-      '@upstash/redis': 1.35.8
+      '@upstash/redis': 1.36.0
       postgres: 3.4.7
 
   dunder-proto@1.0.1:
