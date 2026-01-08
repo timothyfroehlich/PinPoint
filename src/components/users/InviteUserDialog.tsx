@@ -35,7 +35,8 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
-import { inviteUser, inviteUserSchema } from "~/app/(app)/admin/users/actions";
+import { inviteUser } from "~/app/(app)/admin/users/actions";
+import { inviteUserSchema } from "~/app/(app)/admin/users/schema";
 
 type InviteUserFormValues = z.infer<typeof inviteUserSchema>;
 

@@ -825,8 +825,8 @@ git reset --hard HEAD"""
 
         return True
 
-    def run_npm_install(self, non_interactive: bool = False) -> bool:
-        """Run npm ci to sync dependencies"""
+    def run_pnpm_install(self, non_interactive: bool = False) -> bool:
+        """Run pnpm install to sync dependencies"""
         if self.state.conflicts_present:
             return False
 
@@ -835,11 +835,11 @@ git reset --hard HEAD"""
             pass
 
         if self.dry_run:
-            print(f"[DRY-RUN] Would run: npm ci --silent in {self.name}")
+            print(f"[DRY-RUN] Would run: pnpm install --frozen-lockfile --silent in {self.name}")
         else:
             try:
                 subprocess.run(
-                    ["npm", "ci", "--silent"],
+                    ["pnpm", "install", "--frozen-lockfile", "--silent"],
                     cwd=self.path,
                     capture_output=True,
                     check=True,
@@ -936,7 +936,7 @@ git reset --hard HEAD"""
 
                 # Reset database
                 subprocess.run(
-                    ["npm", "run", "db:reset", "--silent"],
+                    ["pnpm", "run", "db:reset", "--silent"],
                     cwd=self.path,
                     capture_output=True,
                     timeout=60
@@ -952,11 +952,11 @@ git reset --hard HEAD"""
     def regenerate_test_schema(self) -> bool:
         """Regenerate test schema"""
         if self.dry_run:
-            print(f"[DRY-RUN] Would run: npm run test:_generate-schema in {self.name}")
+            print(f"[DRY-RUN] Would run: pnpm run test:_generate-schema in {self.name}")
         else:
             try:
                 subprocess.run(
-                    ["npm", "run", "test:_generate-schema", "--silent"],
+                    ["pnpm", "run", "test:_generate-schema", "--silent"],
                     cwd=self.path,
                     capture_output=True,
                     timeout=60
@@ -975,14 +975,14 @@ git reset --hard HEAD"""
         print("Running post-merge validation...")
 
         if self.dry_run:
-            print("[DRY-RUN] Would run: npm run db:reset && npm run test:integration")
+            print("[DRY-RUN] Would run: pnpm run db:reset && pnpm run test:integration")
             return True
 
         try:
             # Run consolidated check script
-            print("  Running validation (npm run check)...")
+            print("  Running validation (pnpm run check)...")
             subprocess.run(
-                ["npm", "run", "check"],
+                ["pnpm", "run", "check"],
                 cwd=self.path,
                 capture_output=True,
                 check=True,
@@ -1179,7 +1179,7 @@ class SyncManager:
             print()
             print("Phase 5: Dependency & Database Sync")
             worktree.sync_python_env()
-            worktree.run_npm_install(self.non_interactive)
+            worktree.run_pnpm_install(self.non_interactive)
             worktree.restart_supabase(self.non_interactive)
             worktree.regenerate_test_schema()
         else:
@@ -1269,7 +1269,7 @@ class SyncManager:
             print()
             print("For worktrees with restarted Supabase:")
             print("  1. Copy new Supabase keys to .env.local (from 'supabase status')")
-            print("  2. Test: npm run dev")
+            print("  2. Test: pnpm run dev")
             print("  3. Verify correct ports in browser")
 
         print()

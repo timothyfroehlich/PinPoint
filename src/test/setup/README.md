@@ -12,7 +12,7 @@ The `schema.sql` file is generated from `src/server/db/schema.ts` using `drizzle
 
 ## When to Regenerate
 
-Run `npm run test:_generate-schema` whenever you modify `src/server/db/schema.ts`:
+Run `pnpm run test:_generate-schema` whenever you modify `src/server/db/schema.ts`:
 
 - Add/remove tables
 - Add/remove columns
@@ -46,10 +46,10 @@ Run `npm run test:_generate-schema` whenever you modify `src/server/db/schema.ts
 vim src/server/db/schema.ts
 
 # 2. Regenerate test schema
-npm run test:_generate-schema
+pnpm run test:_generate-schema
 
 # 3. Run tests to verify
-npm test
+pnpm test
 
 # 4. Commit both schema.ts and schema.sql
 git add src/server/db/schema.ts src/test/setup/schema.sql
@@ -60,12 +60,12 @@ git commit -m "feat: add new column to machines table"
 
 **Tests fail with "table does not exist"**
 
-- Run `npm run test:_generate-schema` to regenerate schema
+- Run `pnpm run test:_generate-schema` to regenerate schema
 - Ensure `schema.sql` exists in this directory
 
 **Schema mismatch between test and production**
 
-- Regenerate: `npm run test:_generate-schema`
+- Regenerate: `pnpm run test:_generate-schema`
 - The test schema should always match `src/server/db/schema.ts`
 
 ## Relationship to Migrations

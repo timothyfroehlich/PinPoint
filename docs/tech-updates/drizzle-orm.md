@@ -73,7 +73,7 @@ _Migration-focused updates for Prisma → Drizzle direct conversion_
 
 ```bash
 # Generate Drizzle schema from existing Prisma
-npx drizzle-kit pull
+pnpm exec drizzle-kit pull
 # Or use Prisma generator for hybrid approach
 prisma generate
 ```
@@ -89,7 +89,7 @@ prisma generate
 
 ```bash
 # Generate migrations for testing
-npx drizzle-kit generate
+pnpm exec drizzle-kit generate
 # Mock with PGlite in vitest.setup.ts
 ```
 

@@ -2,21 +2,21 @@
 set -e
 
 echo "Running clean install..."
-npm ci
+pnpm install --frozen-lockfile
 
 echo "Resetting Supabase database..."
 supabase db reset
 
 echo "Applying database schema via migrations..."
-npm run db:migrate
+pnpm run db:migrate
 
 echo "Generating test schema..."
-npm run test:_generate-schema
+pnpm run test:_generate-schema
 
 echo "Seeding database..."
-npm run db:_seed
+pnpm run db:_seed
 
 echo "Seeding users..."
-npm run db:_seed-users
+pnpm run db:_seed-users
 
 echo "Done."

@@ -394,7 +394,7 @@ test("signup creates new account", async ({ page }) => {
 ### 1. Run in UI Mode
 
 ```bash
-npx playwright test --ui
+pnpm exec playwright test --ui
 ```
 
 **Shows**: Test execution step-by-step, screenshots, network calls.
@@ -402,7 +402,7 @@ npx playwright test --ui
 ### 2. Run in Headed Mode
 
 ```bash
-npx playwright test --headed --debug
+pnpm exec playwright test --headed --debug
 ```
 
 **Opens**: Real browser window, pauses at failures.
@@ -418,7 +418,7 @@ export default defineConfig({
 });
 ```
 
-**View Trace**: `npx playwright show-trace trace.zip`
+**View Trace**: `pnpm exec playwright show-trace trace.zip`
 
 ### 4. Add Console Logs
 

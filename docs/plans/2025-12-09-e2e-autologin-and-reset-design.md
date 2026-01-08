@@ -25,7 +25,7 @@
 
 **Step 2: Run tests to verify they fail**
 
-- Command: `npm test -- src/lib/supabase/middleware.test.ts`
+- Command: `pnpm test -- src/lib/supabase/middleware.test.ts`
 - Expect RED: missing implementation causes failing assertions.
 
 ### Task 2: Implement autologin in middleware with opt-outs
@@ -43,7 +43,7 @@
 
 **Step 2: Re-run test**
 
-- Command: `npm test -- src/lib/supabase/middleware.test.ts`
+- Command: `pnpm test -- src/lib/supabase/middleware.test.ts`
 - Expect GREEN.
 
 **Step 3: Refactor if needed**
@@ -65,7 +65,7 @@
 
 **Step 2: Run tests to see RED**
 
-- Command: `npm test -- src/app/api/test-data/cleanup/route.test.ts e2e/support/cleanup.ts`
+- Command: `pnpm test -- src/app/api/test-data/cleanup/route.test.ts e2e/support/cleanup.ts`
 
 **Step 3: Implement minimal code**
 
@@ -74,7 +74,7 @@
 
 **Step 4: Re-run tests**
 
-- Command: `npm test -- src/app/api/test-data/cleanup/route.test.ts`
+- Command: `pnpm test -- src/app/api/test-data/cleanup/route.test.ts`
 - Expect GREEN.
 
 ### Task 4: Switch Playwright global setup to fast reset with safe fallback
@@ -85,11 +85,11 @@
 
 **Step 1: Write failing test or assertion?**
 
-- Add minimal test in `src/test/unit/global-setup.test.ts` that stubs `execSync` and asserts command ordering: prefers `npm run db:fast-reset`; on thrown error, falls back to the current heavy flow (supabase db reset + db:\_push + test:\_generate-schema + db:\_seed + db:\_seed-users). Write failing tests accordingly.
+- Add minimal test in `src/test/unit/global-setup.test.ts` that stubs `execSync` and asserts command ordering: prefers `pnpm run db:fast-reset`; on thrown error, falls back to the current heavy flow (supabase db reset + db:\_push + test:\_generate-schema + db:\_seed + db:\_seed-users). Write failing tests accordingly.
 
 **Step 2: Run tests to confirm RED**
 
-- Command: `npm test -- e2e/global-setup.test.ts`
+- Command: `pnpm test -- e2e/global-setup.test.ts`
 
 **Step 3: Implement code**
 
@@ -97,7 +97,7 @@
 
 **Step 4: Re-run tests**
 
-- Command: `npm test -- e2e/global-setup.test.ts`
+- Command: `pnpm test -- e2e/global-setup.test.ts`
 - Expect GREEN.
 
 ### Task 5: Update documentation
@@ -118,6 +118,6 @@
 
 ### Verification
 
-- Run targeted tests: `npm test -- src/lib/supabase/middleware.test.ts src/app/api/test-data/cleanup/route.test.ts e2e/global-setup.test.ts`
-- Run lint/typecheck: `npm run check`
-- (If time) Run smoke: `npm run smoke`
+- Run targeted tests: `pnpm test -- src/lib/supabase/middleware.test.ts src/app/api/test-data/cleanup/route.test.ts e2e/global-setup.test.ts`
+- Run lint/typecheck: `pnpm run check`
+- (If time) Run smoke: `pnpm run smoke`

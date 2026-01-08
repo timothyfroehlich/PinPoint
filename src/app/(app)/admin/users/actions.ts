@@ -8,7 +8,6 @@ import { revalidatePath } from "next/cache";
 import { sendInviteEmail } from "~/lib/email/invite";
 import { headers } from "next/headers";
 import { inviteUserSchema, updateUserRoleSchema } from "./schema";
-export { inviteUserSchema, updateUserRoleSchema };
 
 async function verifyAdmin(userId: string): Promise<void> {
   const currentUserProfile = await db.query.userProfiles.findFirst({

@@ -15,13 +15,13 @@ if [[ "$(docker images -q $IMAGE_NAME 2> /dev/null)" == "" ]]; then
 fi
 
 echo "🧹 Resetting database on host..."
-npm run db:fast-reset
+pnpm run db:fast-reset
 
 echo "🚀 Running tests..."
 # --network host: Access the host's localhost:3000
 # --ipc=host: Prevent Chrome crashing
 # -v $(pwd):/work/: Map current directory
-# npm ci: Ensure dependencies match the container OS
+# pnpm install --frozen-lockfile: Ensure dependencies match the container OS
 docker run --rm \
   --network host \
   --ipc=host \
@@ -30,4 +30,4 @@ docker run --rm \
   -v "$(pwd):/work/" \
   -w /work/ \
   -it $IMAGE_NAME \
-  /bin/bash -c "npm ci && npx playwright test --project='Mobile Safari' $@"
+  /bin/bash -c "pnpm install --frozen-lockfile && pnpm exec playwright test --project='Mobile Safari' $@"

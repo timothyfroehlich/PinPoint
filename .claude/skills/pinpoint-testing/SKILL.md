@@ -23,12 +23,12 @@ Use this skill when:
 
 ### Commands
 ```bash
-npm run check          # Quick: types + lint + unit (~5s)
-npm test               # Unit tests only
-npm test -- path/to/file.test.ts  # Targeted unit test
-npm run test:integration          # DB integration tests (requires supabase start)
-npm run smoke                     # E2E smoke tests (Playwright)
-npm run preflight                 # Full suite (~60s) - run before commit
+pnpm run check          # Quick: types + lint + unit (~5s)
+pnpm test               # Unit tests only
+pnpm test -- path/to/file.test.ts  # Targeted unit test
+pnpm run test:integration          # DB integration tests (requires supabase start)
+pnpm run smoke                     # E2E smoke tests (Playwright)
+pnpm run preflight                 # Full suite (~60s) - run before commit
 ```
 
 ### Critical Rules
@@ -301,7 +301,7 @@ Before committing tests:
 - [ ] No arbitrary `waitForTimeout()` in E2E tests
 - [ ] Tests are independent (no shared state)
 - [ ] Testing behavior, not implementation
-- [ ] `npm run preflight` passes (includes all test suites)
+- [ ] `pnpm run preflight` passes (includes all test suites)
 
 ## Additional Resources
 
