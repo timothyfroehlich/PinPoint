@@ -26,7 +26,7 @@ test.describe("Public Issue Reporting", () => {
       })
     ).toBeVisible();
 
-    const select = page.getByLabel("Machine *");
+    const select = page.getByTestId("machine-select");
     await expect(select).toBeVisible();
     await select.selectOption({ index: 1 });
     // Wait for URL refresh (router.push) to prevent race conditions on Mobile Safari
@@ -37,7 +37,7 @@ test.describe("Public Issue Reporting", () => {
     await page
       .getByLabel("Description")
       .fill("Playfield gets stuck during multiball.");
-    await page.getByLabel("Severity *").selectOption("playable");
+    await page.getByTestId("severity-select").selectOption("playable");
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
     await expect(page).toHaveURL("/report/success");
@@ -58,12 +58,12 @@ test.describe("Public Issue Reporting", () => {
     const email = `newuser-${timestamp}@example.com`;
 
     await page.goto("/report");
-    await page.getByLabel("Machine *").selectOption({ index: 1 });
+    await page.getByTestId("machine-select").selectOption({ index: 1 });
     // Wait for URL refresh (router.push) to prevent race conditions on Mobile Safari
     await expect(page).toHaveURL(/machine=/);
 
     await page.getByLabel("Issue Title *").fill(`${PUBLIC_PREFIX} with Email`);
-    await page.getByLabel("Severity *").selectOption("minor");
+    await page.getByTestId("severity-select").selectOption("minor");
 
     await page.getByLabel("First Name").fill("Test");
     await page.getByLabel("Last Name").fill("User");

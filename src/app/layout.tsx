@@ -6,8 +6,6 @@ import { ClientLogger } from "~/components/dev/client-logger";
 
 import { SentryInitializer } from "~/components/SentryInitializer";
 
-import { PreBetaBanner } from "~/components/layout/PreBetaBanner";
-
 export const metadata: Metadata = {
   title: "PinPoint - Pinball Machine Issue Tracking",
   description:
@@ -26,7 +24,6 @@ export default function RootLayout({
       <body className="flex flex-col h-screen overflow-hidden">
         <SentryInitializer />
         {isDevelopment && <ClientLogger />}
-        <PreBetaBanner />
         <div className="flex-1 overflow-hidden">{children}</div>
         <Toaster />
       </body>

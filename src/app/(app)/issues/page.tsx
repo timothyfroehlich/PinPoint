@@ -8,6 +8,13 @@ import { IssueRow } from "~/components/issues/IssueRow";
 import { AlertTriangle } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { redirect } from "next/navigation";
+import type {
+  Issue,
+  IssueStatus,
+  IssueSeverity,
+  IssuePriority,
+} from "~/lib/types";
+import { OPEN_STATUSES, CLOSED_STATUSES } from "~/lib/issues/status";
 
 export const metadata: Metadata = {
   title: "Issues | PinPoint",
@@ -44,38 +51,40 @@ export default async function IssuesPage({
     columns: { initials: true, name: true },
   });
 
-  // Safe type casting for filters
-  // Default to Open issues (new + in_progress) if no status is specified
-  // If status is 'resolved', show resolved issues
-  // If specific status (new/in_progress) is requested, respect it
-  let statusFilter: string[] | undefined;
+  // Safe type casting for filters using imported constants from single source of truth
+  // Based on _issue-status-redesign/README.md - Final design with 11 statuses
+  let statusFilter: IssueStatus[];
 
-  if (status === "resolved") {
-    statusFilter = ["resolved"];
-  } else if (status === "new" || status === "in_progress") {
-    statusFilter = [status];
+  if (status === "closed") {
+    statusFilter = [...CLOSED_STATUSES];
+  } else if (
+    (OPEN_STATUSES as readonly IssueStatus[]).includes(status as IssueStatus)
+  ) {
+    statusFilter = [status as IssueStatus];
+  } else if (
+    (CLOSED_STATUSES as readonly IssueStatus[]).includes(status as IssueStatus)
+  ) {
+    statusFilter = [status as IssueStatus];
   } else {
     // Default case: Show all Open issues
-    statusFilter = ["new", "in_progress"];
+    statusFilter = [...OPEN_STATUSES];
   }
 
-  const severityFilter =
-    severity && ["minor", "playable", "unplayable"].includes(severity)
-      ? (severity as "minor" | "playable" | "unplayable")
+  const severityFilter: IssueSeverity | undefined =
+    severity && ["cosmetic", "minor", "major", "unplayable"].includes(severity)
+      ? (severity as IssueSeverity)
       : undefined;
 
-  const priorityFilter =
-    priority && ["low", "medium", "high", "critical"].includes(priority)
-      ? (priority as "low" | "medium" | "high" | "critical")
+  const priorityFilter: IssuePriority | undefined =
+    priority && ["low", "medium", "high"].includes(priority)
+      ? (priority as IssuePriority)
       : undefined;
 
   // Fetch Issues based on filters
-  const issuesList = await db.query.issues.findMany({
+  // Type assertion needed because Drizzle infers status as string, not IssueStatus
+  const issuesList = (await db.query.issues.findMany({
     where: and(
-      inArray(
-        issues.status,
-        statusFilter as ("new" | "in_progress" | "resolved")[]
-      ),
+      inArray(issues.status, statusFilter),
       severityFilter ? eq(issues.severity, severityFilter) : undefined,
       priorityFilter ? eq(issues.priority, priorityFilter) : undefined,
       machine ? eq(issues.machineInitials, machine) : undefined
@@ -90,7 +99,21 @@ export default async function IssuesPage({
       },
     },
     limit: 100, // Reasonable limit for now
-  });
+  })) as (Pick<
+    Issue,
+    | "id"
+    | "createdAt"
+    | "machineInitials"
+    | "issueNumber"
+    | "title"
+    | "status"
+    | "severity"
+    | "priority"
+    | "consistency"
+  > & {
+    machine: { name: string } | null;
+    reportedByUser: { name: string } | null;
+  })[];
 
   return (
     <div className="container mx-auto max-w-5xl py-8 px-4 sm:px-6">

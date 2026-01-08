@@ -15,8 +15,9 @@ interface UpdateIssueSeverityFormProps {
 }
 
 const severityOptions: { value: IssueSeverity; label: string }[] = [
+  { value: "cosmetic", label: "Cosmetic" },
   { value: "minor", label: "Minor" },
-  { value: "playable", label: "Playable" },
+  { value: "major", label: "Major" },
   { value: "unplayable", label: "Unplayable" },
 ];
 
@@ -35,6 +36,7 @@ export function UpdateIssueSeverityForm({
       <select
         name="severity"
         defaultValue={currentSeverity}
+        aria-label="Update Issue Severity"
         className="w-full rounded-md border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface"
         data-testid="issue-severity-select"
       >

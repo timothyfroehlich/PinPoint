@@ -50,8 +50,8 @@ test.describe("Email Notifications", () => {
     await page.goto("/report?machine=MM");
     await page.getByLabel("Issue Title *").fill("Test Issue for Email");
     await page.getByLabel("Description").fill("Testing email notifications");
-    await page.getByLabel("Severity *").selectOption("playable");
-    await page.getByLabel("Priority *").selectOption("low");
+    await page.getByLabel("Select Severity").selectOption("minor");
+    await page.getByLabel("Select Priority").selectOption("low");
 
     // Submit form and wait for Server Action redirect (Safari-defensive)
     await submitFormAndWaitForRedirect(
@@ -104,8 +104,8 @@ test.describe("Email Notifications", () => {
     // Create issue for a specific machine (e.g., MM)
     await page.goto("/report?machine=MM");
     await page.getByLabel("Issue Title *").fill("Status Change Test");
-    await page.getByLabel("Severity *").selectOption("playable");
-    await page.getByLabel("Priority *").selectOption("low");
+    await page.getByLabel("Select Severity").selectOption("minor");
+    await page.getByLabel("Select Priority").selectOption("low");
 
     // Submit form and wait for Server Action redirect (Safari-defensive)
     await submitFormAndWaitForRedirect(

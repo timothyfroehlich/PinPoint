@@ -12,17 +12,11 @@ import { cn } from "~/lib/utils";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { issues, machines, userProfiles } from "~/server/db/schema";
-import { desc, eq, sql, and, ne } from "drizzle-orm";
+import { desc, eq, sql, and, notInArray } from "drizzle-orm";
+import type { Issue } from "~/lib/types";
+import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Badge } from "~/components/ui/badge";
-import {
-  getIssueStatusStyles,
-  getIssueSeverityStyles,
-  getIssueStatusLabel,
-  getIssueSeverityLabel,
-  isIssueStatus,
-  isIssueSeverity,
-} from "~/lib/issues/status";
+import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
 import { formatIssueId } from "~/lib/issues/utils";
 
 /**
@@ -48,7 +42,7 @@ const getDashboardData = cache(async (userId?: string) => {
     ? db.query.issues.findMany({
         where: and(
           eq(issues.assignedTo, userId),
-          ne(issues.status, "resolved")
+          notInArray(issues.status, [...CLOSED_STATUSES])
         ),
         orderBy: desc(issues.createdAt),
         limit: 10,
@@ -66,6 +60,8 @@ const getDashboardData = cache(async (userId?: string) => {
           title: true,
           status: true,
           severity: true,
+          priority: true,
+          consistency: true,
           machineInitials: true,
           issueNumber: true,
           createdAt: true,
@@ -79,7 +75,10 @@ const getDashboardData = cache(async (userId?: string) => {
         .select({ count: sql<number>`count(*)::int` })
         .from(issues)
         .where(
-          and(eq(issues.assignedTo, userId), ne(issues.status, "resolved"))
+          and(
+            eq(issues.assignedTo, userId),
+            notInArray(issues.status, [...CLOSED_STATUSES])
+          )
         )
     : Promise.resolve([{ count: 0 }]);
 
@@ -107,6 +106,8 @@ const getDashboardData = cache(async (userId?: string) => {
       title: true,
       status: true,
       severity: true,
+      priority: true,
+      consistency: true,
       machineInitials: true,
       issueNumber: true,
       createdAt: true,
@@ -125,7 +126,10 @@ const getDashboardData = cache(async (userId?: string) => {
     .from(machines)
     .innerJoin(issues, eq(issues.machineInitials, machines.initials))
     .where(
-      and(eq(issues.severity, "unplayable"), ne(issues.status, "resolved"))
+      and(
+        eq(issues.severity, "unplayable"),
+        notInArray(issues.status, [...CLOSED_STATUSES])
+      )
     )
     .groupBy(machines.id, machines.name, machines.initials);
 
@@ -133,7 +137,7 @@ const getDashboardData = cache(async (userId?: string) => {
   const totalOpenIssuesPromise = db
     .select({ count: sql<number>`count(*)::int` })
     .from(issues)
-    .where(ne(issues.status, "resolved"));
+    .where(notInArray(issues.status, [...CLOSED_STATUSES]));
 
   // Query 6: Machines needing service (machines with at least one open issue)
   // Optimized to use count(distinct) instead of fetching all IDs
@@ -141,7 +145,7 @@ const getDashboardData = cache(async (userId?: string) => {
     .select({ count: sql<number>`count(distinct ${machines.id})::int` })
     .from(machines)
     .innerJoin(issues, eq(issues.machineInitials, machines.initials))
-    .where(ne(issues.status, "resolved"));
+    .where(notInArray(issues.status, [...CLOSED_STATUSES]));
 
   // Execute all queries in parallel
   const [
@@ -303,7 +307,9 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                     <Card
                       className={cn(
                         "transition-all h-full cursor-pointer",
-                        issue.status === "resolved"
+                        (CLOSED_STATUSES as readonly string[]).includes(
+                          issue.status
+                        )
                           ? "border-border/40 bg-muted/30 opacity-60 hover:opacity-100 grayscale hover:grayscale-0"
                           : "border-primary/20 bg-card hover:border-primary hover:glow-primary"
                       )}
@@ -325,30 +331,19 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                               {issue.machine.name}
                             </p>
                           </div>
-                          <div className="flex gap-2">
-                            {/* Status Badge */}
-                            {isIssueStatus(issue.status) && (
-                              <Badge
-                                className={cn(
-                                  "px-2 py-1 text-xs font-semibold",
-                                  getIssueStatusStyles(issue.status)
-                                )}
+                          <IssueBadgeGrid
+                            issue={
+                              issue as unknown as Pick<
+                                Issue,
+                                | "status"
+                                | "severity"
+                                | "priority"
+                                | "consistency"
                               >
-                                {getIssueStatusLabel(issue.status)}
-                              </Badge>
-                            )}
-                            {/* Severity Badge */}
-                            {isIssueSeverity(issue.severity) && (
-                              <Badge
-                                className={cn(
-                                  "px-2 py-1 text-xs font-semibold",
-                                  getIssueSeverityStyles(issue.severity)
-                                )}
-                              >
-                                {getIssueSeverityLabel(issue.severity)}
-                              </Badge>
-                            )}
-                          </div>
+                            }
+                            variant="half"
+                            showPriority={true}
+                          />
                         </div>
                       </CardHeader>
                     </Card>
@@ -431,7 +426,9 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                   <Card
                     className={cn(
                       "transition-all h-full cursor-pointer",
-                      issue.status === "resolved"
+                      (CLOSED_STATUSES as readonly string[]).includes(
+                        issue.status
+                      )
                         ? "border-border/40 bg-muted/30 opacity-60 hover:opacity-100 grayscale hover:grayscale-0"
                         : "border-secondary/20 bg-card hover:border-secondary hover:glow-secondary"
                     )}
@@ -460,28 +457,19 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                           </div>
                         </div>
                         <div className="flex flex-col gap-2">
-                          {/* Status Badge */}
-                          {isIssueStatus(issue.status) && (
-                            <Badge
-                              className={cn(
-                                "px-2 py-1 text-xs font-semibold",
-                                getIssueStatusStyles(issue.status)
-                              )}
-                            >
-                              {getIssueStatusLabel(issue.status)}
-                            </Badge>
-                          )}
-                          {/* Severity Badge */}
-                          {isIssueSeverity(issue.severity) && (
-                            <Badge
-                              className={cn(
-                                "px-2 py-1 text-xs font-semibold",
-                                getIssueSeverityStyles(issue.severity)
-                              )}
-                            >
-                              {getIssueSeverityLabel(issue.severity)}
-                            </Badge>
-                          )}
+                          <IssueBadgeGrid
+                            issue={
+                              issue as unknown as Pick<
+                                Issue,
+                                | "status"
+                                | "severity"
+                                | "priority"
+                                | "consistency"
+                              >
+                            }
+                            variant="half"
+                            showPriority={true}
+                          />
                         </div>
                       </div>
                     </CardHeader>

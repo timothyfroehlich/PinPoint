@@ -7,14 +7,16 @@ import {
   updateIssueStatusAction,
   type UpdateIssueStatusResult,
 } from "~/app/(app)/issues/actions";
-import { type IssueStatus } from "~/lib/types";
+import {
+  getIssueStatusLabel,
+  STATUS_OPTIONS as statusOptions,
+} from "~/lib/issues/status";
+import type { IssueStatus } from "~/lib/types";
 
 interface UpdateIssueStatusFormProps {
   issueId: string;
   currentStatus: IssueStatus;
 }
-
-const statusOptions: IssueStatus[] = ["new", "in_progress", "resolved"];
 
 export function UpdateIssueStatusForm({
   issueId,
@@ -31,6 +33,7 @@ export function UpdateIssueStatusForm({
       <select
         name="status"
         defaultValue={currentStatus}
+        aria-label="Update Issue Status"
         className="w-full rounded-md border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface"
         data-testid="issue-status-select"
       >
@@ -40,9 +43,7 @@ export function UpdateIssueStatusForm({
             value={status}
             data-testid={`status-option-${status}`}
           >
-            {status === "in_progress"
-              ? "In Progress"
-              : status.charAt(0).toUpperCase() + status.slice(1)}
+            {getIssueStatusLabel(status)}
           </option>
         ))}
       </select>

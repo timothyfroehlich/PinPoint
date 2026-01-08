@@ -70,8 +70,8 @@ test.describe("Notifications", () => {
     await expect(publicPage.getByLabel("Issue Title *")).toHaveValue(
       issueTitle
     );
-    await publicPage.getByLabel("Severity *").selectOption("minor");
-    await expect(publicPage.getByLabel("Severity *")).toHaveValue("minor");
+    await publicPage.getByLabel("Select Severity").selectOption("minor");
+    await expect(publicPage.getByLabel("Select Severity")).toHaveValue("minor");
 
     await publicPage
       .getByRole("button", { name: "Submit Issue Report" })
@@ -134,9 +134,9 @@ test.describe("Notifications", () => {
     const issueTitle = `Status Change ${timestamp}`;
     await page.getByLabel("Issue Title *").fill(issueTitle);
     // Explicitly select severity (required)
-    await page.getByLabel("Severity *").selectOption("minor");
+    await page.getByLabel("Select Severity").selectOption("minor");
     // Explicitly select priority (required for logged-in users)
-    await page.getByLabel("Priority *").selectOption("low");
+    await page.getByLabel("Select Priority").selectOption("low");
 
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
@@ -237,8 +237,10 @@ test.describe("Notifications", () => {
       issueTitle
     );
 
-    await publicPage.getByLabel("Severity *").selectOption("unplayable");
-    await expect(publicPage.getByLabel("Severity *")).toHaveValue("unplayable");
+    await publicPage.getByLabel("Select Severity").selectOption("unplayable");
+    await expect(publicPage.getByLabel("Select Severity")).toHaveValue(
+      "unplayable"
+    );
 
     await publicPage
       .getByRole("button", { name: "Submit Issue Report" })
@@ -299,8 +301,8 @@ test.describe("Notifications", () => {
     );
 
     // Explicitly select severity (required)
-    await publicPage.getByLabel("Severity *").selectOption("minor");
-    await expect(publicPage.getByLabel("Severity *")).toHaveValue("minor");
+    await publicPage.getByLabel("Select Severity").selectOption("minor");
+    await expect(publicPage.getByLabel("Select Severity")).toHaveValue("minor");
 
     await publicPage
       .getByRole("button", { name: "Submit Issue Report" })
@@ -353,7 +355,7 @@ test.describe("Notifications", () => {
 
     await memberPage.getByLabel("Issue Title *").fill("Email Test Issue");
     // Explicitly select severity (required)
-    await memberPage.getByLabel("Severity *").selectOption("minor");
+    await memberPage.getByLabel("Select Severity").selectOption("minor");
 
     await expect(memberPage.getByTestId("machine-select")).toHaveValue(
       machine.id
@@ -361,7 +363,7 @@ test.describe("Notifications", () => {
     await expect(memberPage.getByLabel("Issue Title *")).toHaveValue(
       "Email Test Issue"
     );
-    await expect(memberPage.getByLabel("Severity *")).toHaveValue("minor");
+    await expect(memberPage.getByLabel("Select Severity")).toHaveValue("minor");
 
     await memberPage
       .getByRole("button", { name: "Submit Issue Report" })

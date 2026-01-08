@@ -1,79 +1,62 @@
 import { describe, it, expect } from "vitest";
 import {
-  isIssueStatus,
-  isIssueSeverity,
   getIssueStatusLabel,
-  getIssueSeverityLabel,
-  getIssueStatusStyles,
-  getIssueSeverityStyles,
+  getIssueStatusIcon,
+  STATUS_STYLES,
+  SEVERITY_STYLES,
+  ALL_STATUS_OPTIONS,
+  ISSUE_STATUSES,
 } from "~/lib/issues/status";
+import { Circle, CircleDot, Disc } from "lucide-react";
 
 describe("Issue Status Utilities", () => {
-  describe("isIssueStatus", () => {
-    it("should return true for valid statuses", () => {
-      expect(isIssueStatus("new")).toBe(true);
-      expect(isIssueStatus("in_progress")).toBe(true);
-      expect(isIssueStatus("resolved")).toBe(true);
+  describe("getIssueStatusIcon", () => {
+    it("should return Circle for new statuses", () => {
+      expect(getIssueStatusIcon("new")).toBe(Circle);
+      expect(getIssueStatusIcon("confirmed")).toBe(Circle);
     });
 
-    it("should return false for invalid statuses", () => {
-      expect(isIssueStatus("archived")).toBe(false);
-      expect(isIssueStatus("")).toBe(false);
-      expect(isIssueStatus(null)).toBe(false);
-      expect(isIssueStatus(undefined)).toBe(false);
-      expect(isIssueStatus(123)).toBe(false);
-    });
-  });
-
-  describe("isIssueSeverity", () => {
-    it("should return true for valid severities", () => {
-      expect(isIssueSeverity("minor")).toBe(true);
-      expect(isIssueSeverity("playable")).toBe(true);
-      expect(isIssueSeverity("unplayable")).toBe(true);
+    it("should return CircleDot for in-progress statuses", () => {
+      expect(getIssueStatusIcon(ISSUE_STATUSES.IN_PROGRESS)).toBe(CircleDot);
+      expect(getIssueStatusIcon(ISSUE_STATUSES.WAITING_ON_OWNER)).toBe(
+        CircleDot
+      );
     });
 
-    it("should return false for invalid severities", () => {
-      expect(isIssueSeverity("critical")).toBe(false);
-      expect(isIssueSeverity("")).toBe(false);
-      expect(isIssueSeverity(null)).toBe(false);
+    it("should return Disc for closed statuses", () => {
+      expect(getIssueStatusIcon("fixed")).toBe(Disc);
+      expect(getIssueStatusIcon("duplicate")).toBe(Disc);
     });
   });
 
   describe("getIssueStatusLabel", () => {
     it("should return correct labels", () => {
       expect(getIssueStatusLabel("new")).toBe("New");
-      expect(getIssueStatusLabel("in_progress")).toBe("In Progress");
-      expect(getIssueStatusLabel("resolved")).toBe("Resolved");
+      expect(getIssueStatusLabel("confirmed")).toBe("Confirmed");
+      expect(getIssueStatusLabel("in_progress")).toBe("Work in Progress");
+      expect(getIssueStatusLabel("fixed")).toBe("Fixed");
     });
   });
 
-  describe("getIssueSeverityLabel", () => {
-    it("should return correct labels", () => {
-      expect(getIssueSeverityLabel("minor")).toBe("Minor");
-      expect(getIssueSeverityLabel("playable")).toBe("Playable");
-      expect(getIssueSeverityLabel("unplayable")).toBe("Unplayable");
+  describe("Constants", () => {
+    it("ALL_STATUS_OPTIONS should contain all statuses", () => {
+      expect(ALL_STATUS_OPTIONS).toContain("new");
+      expect(ALL_STATUS_OPTIONS).toContain("fixed");
+      expect(ALL_STATUS_OPTIONS.length).toBe(11);
     });
-  });
 
-  describe("getIssueStatusStyles", () => {
-    it("should return styles for all statuses", () => {
-      expect(getIssueStatusStyles("new")).toContain("bg-status-new/20");
-      expect(getIssueStatusStyles("in_progress")).toContain(
-        "bg-status-in-progress/20"
-      );
-      expect(getIssueStatusStyles("resolved")).toContain(
-        "bg-status-resolved/20"
-      );
+    it("STATUS_STYLES should have styles for all statuses", () => {
+      ALL_STATUS_OPTIONS.forEach((status) => {
+        expect(STATUS_STYLES[status]).toBeDefined();
+        expect(typeof STATUS_STYLES[status]).toBe("string");
+      });
     });
-  });
 
-  describe("getIssueSeverityStyles", () => {
-    it("should return styles for all severities", () => {
-      expect(getIssueSeverityStyles("minor")).toContain("bg-muted/50");
-      expect(getIssueSeverityStyles("playable")).toContain("bg-warning/20");
-      expect(getIssueSeverityStyles("unplayable")).toContain(
-        "bg-status-unplayable/20"
-      );
+    it("SEVERITY_STYLES should have styles for all severities", () => {
+      const severities = ["cosmetic", "minor", "major", "unplayable"] as const;
+      severities.forEach((sev) => {
+        expect(SEVERITY_STYLES[sev]).toBeDefined();
+      });
     });
   });
 });

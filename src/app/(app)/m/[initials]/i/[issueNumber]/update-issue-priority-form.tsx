@@ -35,6 +35,7 @@ export function UpdateIssuePriorityForm({
       <select
         name="priority"
         defaultValue={currentPriority}
+        aria-label="Update Issue Priority"
         className="w-full rounded-md border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface"
         data-testid="issue-priority-select"
       >

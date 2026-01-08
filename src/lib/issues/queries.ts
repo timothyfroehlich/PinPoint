@@ -1,5 +1,11 @@
 import { cache } from "react";
-import { type IssueListItem } from "~/lib/types";
+import type {
+  IssueListItem,
+  IssueStatus,
+  IssueSeverity,
+  IssuePriority,
+} from "~/lib/types";
+import { ALL_ISSUE_STATUSES } from "~/lib/issues/status";
 import { db } from "~/server/db";
 import { issues } from "~/server/db/schema";
 import { eq, and, desc, isNull, inArray, type SQL } from "drizzle-orm";
@@ -25,35 +31,25 @@ export const getIssues = cache(
 
     if (status) {
       const statuses = Array.isArray(status) ? status : [status];
-      // Filter out invalid statuses to be safe, though TS handles most
-      const validStatuses = statuses.filter((s) =>
-        ["new", "in_progress", "resolved"].includes(s)
+      // Type-safe filtering using imported constants from single source of truth
+      const validStatuses = statuses.filter((s): s is IssueStatus =>
+        ALL_ISSUE_STATUSES.includes(s as IssueStatus)
       );
 
       if (validStatuses.length > 0) {
-        conditions.push(
-          inArray(
-            issues.status,
-            validStatuses as ("new" | "in_progress" | "resolved")[]
-          )
-        );
+        conditions.push(inArray(issues.status, validStatuses));
       }
     }
 
     if (
       severity &&
-      (severity === "minor" ||
-        severity === "playable" ||
-        severity === "unplayable")
+      ["cosmetic", "minor", "major", "unplayable"].includes(severity)
     ) {
-      conditions.push(eq(issues.severity, severity));
+      conditions.push(eq(issues.severity, severity as IssueSeverity));
     }
 
-    if (
-      priority &&
-      (priority === "low" || priority === "medium" || priority === "high")
-    ) {
-      conditions.push(eq(issues.priority, priority));
+    if (priority && ["low", "medium", "high"].includes(priority)) {
+      conditions.push(eq(issues.priority, priority as IssuePriority));
     }
 
     if (assignedTo === "unassigned") {
@@ -63,7 +59,8 @@ export const getIssues = cache(
     }
 
     // Query issues with filters
-    return await db.query.issues.findMany({
+    // Type assertion needed because Drizzle infers status as string, not IssueStatus
+    return (await db.query.issues.findMany({
       where: conditions.length > 0 ? and(...conditions) : undefined,
       orderBy: desc(issues.createdAt),
       with: {
@@ -87,6 +84,6 @@ export const getIssues = cache(
           },
         },
       },
-    });
+    })) as IssueListItem[];
   }
 );

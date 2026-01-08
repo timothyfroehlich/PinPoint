@@ -12,11 +12,11 @@ describe("deriveMachineStatus", () => {
     expect(deriveMachineStatus(issues)).toBe("operational");
   });
 
-  it("should return 'operational' when all issues are resolved", () => {
+  it("should return 'operational' when all issues are fixed", () => {
     const issues: IssueForStatus[] = [
-      { status: "resolved", severity: "unplayable" },
-      { status: "resolved", severity: "playable" },
-      { status: "resolved", severity: "minor" },
+      { status: "fixed", severity: "unplayable" },
+      { status: "fixed", severity: "major" },
+      { status: "fixed", severity: "minor" },
     ];
     expect(deriveMachineStatus(issues)).toBe("operational");
   });
@@ -36,10 +36,10 @@ describe("deriveMachineStatus", () => {
     expect(deriveMachineStatus(issues)).toBe("unplayable");
   });
 
-  it("should return 'needs_service' when there are only playable issues", () => {
+  it("should return 'needs_service' when there are only major issues", () => {
     const issues: IssueForStatus[] = [
-      { status: "new", severity: "playable" },
-      { status: "in_progress", severity: "playable" },
+      { status: "new", severity: "major" },
+      { status: "in_progress", severity: "major" },
     ];
     expect(deriveMachineStatus(issues)).toBe("needs_service");
   });
@@ -52,17 +52,22 @@ describe("deriveMachineStatus", () => {
     expect(deriveMachineStatus(issues)).toBe("needs_service");
   });
 
-  it("should return 'needs_service' when there are mixed playable and minor issues", () => {
+  it("should return 'needs_service' when there are only cosmetic issues", () => {
+    const issues: IssueForStatus[] = [{ status: "new", severity: "cosmetic" }];
+    expect(deriveMachineStatus(issues)).toBe("needs_service");
+  });
+
+  it("should return 'needs_service' when there are mixed major and minor issues", () => {
     const issues: IssueForStatus[] = [
-      { status: "new", severity: "playable" },
+      { status: "new", severity: "major" },
       { status: "new", severity: "minor" },
     ];
     expect(deriveMachineStatus(issues)).toBe("needs_service");
   });
 
-  it("should ignore resolved issues when determining status", () => {
+  it("should ignore fixed issues when determining status", () => {
     const issues: IssueForStatus[] = [
-      { status: "resolved", severity: "unplayable" },
+      { status: "fixed", severity: "unplayable" },
       { status: "new", severity: "minor" },
     ];
     expect(deriveMachineStatus(issues)).toBe("needs_service");
@@ -71,9 +76,9 @@ describe("deriveMachineStatus", () => {
   it("should prioritize unplayable over other severities", () => {
     const issues: IssueForStatus[] = [
       { status: "new", severity: "minor" },
-      { status: "new", severity: "playable" },
+      { status: "new", severity: "major" },
       { status: "new", severity: "unplayable" },
-      { status: "resolved", severity: "unplayable" },
+      { status: "fixed", severity: "unplayable" },
     ];
     expect(deriveMachineStatus(issues)).toBe("unplayable");
   });

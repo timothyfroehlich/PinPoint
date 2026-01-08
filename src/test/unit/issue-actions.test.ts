@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   addCommentAction,
   updateIssueStatusAction,
+  updateIssueConsistencyAction,
 } from "~/app/(app)/issues/actions";
 import { canUpdateIssue } from "~/lib/permissions";
 
@@ -52,9 +53,11 @@ vi.mock("~/lib/notifications", () => ({
 
 // Mock services
 vi.mock("~/services/issues", () => ({
-  addIssueComment: vi.fn(),
-  createIssue: vi.fn(),
   updateIssueStatus: vi.fn(),
+  updateIssueSeverity: vi.fn(),
+  updateIssuePriority: vi.fn(),
+  updateIssueConsistency: vi.fn(),
+  addIssueComment: vi.fn(),
 }));
 
 // Mock permissions
@@ -64,7 +67,11 @@ vi.mock("~/lib/permissions", () => ({
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "~/lib/supabase/server";
-import { addIssueComment, updateIssueStatus } from "~/services/issues";
+import {
+  addIssueComment,
+  updateIssueStatus,
+  updateIssueConsistency,
+} from "~/services/issues";
 import { db } from "~/server/db";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
@@ -182,11 +189,9 @@ describe("updateIssueStatusAction", () => {
       status: "new",
       machineInitials: "MM",
       issueNumber: 1,
-      machineId: "machine-123", // Still needed? Schema changed but maybe tests mock it loosely?
-      // Actually, query selects machineInitials.
       reportedBy: "user-123",
       assignedTo: null,
-      machine: { ownerId: "owner-123" },
+      machine: { ownerId: "owner-123", name: "Test Machine" },
     } as any);
 
     // Mock user profile
@@ -248,5 +253,42 @@ describe("updateIssueStatusAction", () => {
     }
     expect(canUpdateIssue).toHaveBeenCalled();
     expect(updateIssueStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe("updateIssueConsistencyAction", () => {
+  const validUuid = "123e4567-e89b-12d3-a456-426614174000";
+  const mockUser = { id: "user-123" };
+  const initialState = undefined;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: mockUser } }),
+      },
+    } as any);
+  });
+
+  it("should successfully update consistency", async () => {
+    vi.mocked(db.query.issues.findFirst).mockResolvedValue({
+      machineInitials: "MM",
+      issueNumber: 1,
+      reportedBy: mockUser.id,
+    } as any);
+    vi.mocked(updateIssueConsistency).mockResolvedValue({
+      issueId: validUuid,
+      oldConsistency: "intermittent",
+      newConsistency: "constant",
+    });
+
+    const formData = new FormData();
+    formData.append("issueId", validUuid);
+    formData.append("consistency", "constant");
+
+    const result = await updateIssueConsistencyAction(initialState, formData);
+
+    expect(result.ok).toBe(true);
+    expect(updateIssueConsistency).toHaveBeenCalled();
   });
 });

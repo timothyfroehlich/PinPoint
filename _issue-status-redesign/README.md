@@ -1,5 +1,18 @@
 # Issue Status System Redesign - Final Implementation Plan
 
+## Current Status (January 8, 2026)
+
+We are in the final stages of the status overhaul. Key updates include:
+
+- **Terminology Standardization**: Consistently using **"Fixed"** instead of "resolved" across the application, logic, and tests.
+- **Badge Integration**: The `IssueBadgeGrid` (vibrant, icon-based badges) is now integrated into the Dashboard, Issue List, and Recent Issues panel.
+- **Schema Alignment**: The database schema and TypeScript types have been reconciled to follow the 11-status specification (New, Confirmed, Waiting on Owner, Work in Progress, Needs Parts, Needs Expert Help, Fixed, Works as Intended, Won't Fix, Not Reproducible, Duplicate).
+- **Seed Data Enhancement**: `supabase/seed-users.mjs` has been updated to use the new status/severity system and includes detailed timeline historical events (comments) for test machines like _The Addams Family_.
+- **ARIA & Accessibility**: All status/severity/priority update forms now include proper `aria-label` attributes for accessibility and reliable E2E testing.
+- **Migration Consolidation**: All previous migrations (0000-0007) have been consolidated into a single clean `0000_init-schema.sql` for the V2 launch.
+
+---
+
 **Last Updated**: January 7, 2026
 **Status**: Ready for Implementation
 
@@ -9,12 +22,12 @@
 
 Redesigning the issue status system to provide richer metadata through **four key fields**:
 
-| Field | Purpose | Values | Public Report Form |
-|-------|---------|--------|--------------------|
-| **Status** | Lifecycle state | 11 statuses in 3 groups | No (defaults to "New") |
-| **Severity** | Gameplay impact | Cosmetic, Minor, Major, Unplayable | Yes |
-| **Priority** | Work urgency | Low, Medium, High | No (defaults to "Medium") |
-| **Consistency** | How often it happens | Intermittent, Frequent, Constant | Yes |
+| Field           | Purpose              | Values                             | Public Report Form        |
+| --------------- | -------------------- | ---------------------------------- | ------------------------- |
+| **Status**      | Lifecycle state      | 11 statuses in 3 groups            | No (defaults to "New")    |
+| **Severity**    | Gameplay impact      | Cosmetic, Minor, Major, Unplayable | Yes                       |
+| **Priority**    | Work urgency         | Low, Medium, High                  | No (defaults to "Medium") |
+| **Consistency** | How often it happens | Intermittent, Frequent, Constant   | Yes                       |
 
 > **Note**: The "Public Report Form" column indicates which fields are available when the public reports a new issue. Members and admins can edit **all fields** after issue creation (same permissions as editing issues).
 
@@ -54,52 +67,53 @@ Status dropdown uses `<optgroup>` tags to visually separate groups.
 
 ### Status Field (11 values in 3 groups)
 
-| Group | Icon | Values |
-|-------|------|--------|
-| **New** | `Circle` | New, Confirmed |
+| Group           | Icon        | Values                                                             |
+| --------------- | ----------- | ------------------------------------------------------------------ |
+| **New**         | `Circle`    | New, Confirmed                                                     |
 | **In Progress** | `CircleDot` | Waiting on Owner, Work in Progress, Needs Parts, Needs Expert Help |
-| **Closed** | `Disc` | Fixed, Works as Intended, Won't Fix, Not Reproducible, Duplicate |
+| **Closed**      | `Disc`      | Fixed, Works as Intended, Won't Fix, Not Reproducible, Duplicate   |
 
 **Status Descriptions**:
 
-| Status | Description |
-|--------|-------------|
-| New | Just reported, needs triage |
-| Confirmed | Verified as a real issue |
-| Waiting on Owner | Blocked on machine owner decision/action |
-| Work in Progress | Active repair underway |
-| Needs Parts | Waiting on new parts |
-| Needs Expert Help | Escalated to expert |
-| Fixed | Issue is resolved |
-| Works as Intended | Not a bug, it's a feature |
-| Won't Fix | Too minor or risky to fix |
-| Not Reproducible | Couldn't make it happen again |
-| Duplicate | Already reported elsewhere |
+| Status            | Description                              |
+| ----------------- | ---------------------------------------- |
+| New               | Just reported, needs triage              |
+| Confirmed         | Verified as a real issue                 |
+| Waiting on Owner  | Blocked on machine owner decision/action |
+| Work in Progress  | Active repair underway                   |
+| Needs Parts       | Waiting on new parts                     |
+| Needs Expert Help | Escalated to expert                      |
+| Fixed             | Issue is resolved                        |
+| Works as Intended | Not a bug, it's a feature                |
+| Won't Fix         | Too minor or risky to fix                |
+| Not Reproducible  | Couldn't make it happen again            |
+| Duplicate         | Already reported elsewhere               |
 
 **Rules**:
+
 - Default: "New"
 - Issues marked "Duplicate" are hidden from public "Recent Issues" panels
 - Each status has its own border color matching the status color
 
 ### Severity Field (4 values)
 
-| Value | Intensity |
-|-------|-----------|
-| Cosmetic | Lightest amber |
-| Minor | Light amber |
-| Major | Medium amber |
-| Unplayable | Darkest amber |
+| Value      | Intensity      |
+| ---------- | -------------- |
+| Cosmetic   | Lightest amber |
+| Minor      | Light amber    |
+| Major      | Medium amber   |
+| Unplayable | Darkest amber  |
 
 **Default**: Minor
 **Border**: Consistent `border-amber-500`
 
 ### Priority Field (3 values)
 
-| Value | Intensity |
-|-------|-----------|
-| Low | Darkest purple |
-| Medium | Medium purple |
-| High | Brightest purple |
+| Value  | Intensity        |
+| ------ | ---------------- |
+| Low    | Darkest purple   |
+| Medium | Medium purple    |
+| High   | Brightest purple |
 
 **Default**: Medium
 **Border**: Consistent `border-purple-500`
@@ -107,11 +121,11 @@ Status dropdown uses `<optgroup>` tags to visually separate groups.
 
 ### Consistency Field (3 values)
 
-| Value | Intensity |
-|-------|-----------|
-| Intermittent | Darkest cyan |
-| Frequent | Medium cyan |
-| Constant | Brightest cyan |
+| Value        | Intensity      |
+| ------------ | -------------- |
+| Intermittent | Darkest cyan   |
+| Frequent     | Medium cyan    |
+| Constant     | Brightest cyan |
 
 **Default**: Intermittent
 **Border**: Consistent `border-cyan-500`
@@ -140,6 +154,7 @@ Normal variant: min-w-[110px]
 ### Tooltips (Accessibility)
 
 All badges must include tooltips identifying the field type:
+
 - Format: "Status: In Progress", "Severity: Major", etc.
 - Use `title` attribute or shadcn/ui Tooltip component
 
@@ -155,25 +170,41 @@ export const issues = pgTable("issues", {
   status: text("status", {
     enum: [
       // New group
-      "new", "confirmed",
+      "new",
+      "confirmed",
       // In Progress group
-      "waiting_on_owner", "in_progress", "needs_parts", "needs_expert",
+      "waiting_on_owner",
+      "in_progress",
+      "needs_parts",
+      "needs_expert",
       // Closed group
-      "fixed", "wont_fix", "works_as_intended", "not_reproducible", "duplicate"
-    ]
-  }).notNull().default("new"),
+      "fixed",
+      "wont_fix",
+      "works_as_intended",
+      "not_reproducible",
+      "duplicate",
+    ],
+  })
+    .notNull()
+    .default("new"),
 
   severity: text("severity", {
-    enum: ["cosmetic", "minor", "major", "unplayable"]
-  }).notNull().default("minor"),
+    enum: ["cosmetic", "minor", "major", "unplayable"],
+  })
+    .notNull()
+    .default("minor"),
 
   priority: text("priority", {
-    enum: ["low", "medium", "high"]
-  }).notNull().default("medium"),
+    enum: ["low", "medium", "high"],
+  })
+    .notNull()
+    .default("medium"),
 
   consistency: text("consistency", {
-    enum: ["intermittent", "frequent", "constant"]
-  }).notNull().default("intermittent"),
+    enum: ["intermittent", "frequent", "constant"],
+  })
+    .notNull()
+    .default("intermittent"),
 });
 ```
 
@@ -193,9 +224,17 @@ export const issues = pgTable("issues", {
 // src/lib/types/database.ts
 
 export type IssueStatus =
-  | "new" | "confirmed"
-  | "waiting_on_owner" | "in_progress" | "needs_parts" | "needs_expert"
-  | "fixed" | "wont_fix" | "works_as_intended" | "not_reproducible" | "duplicate";
+  | "new"
+  | "confirmed"
+  | "waiting_on_owner"
+  | "in_progress"
+  | "needs_parts"
+  | "needs_expert"
+  | "fixed"
+  | "wont_fix"
+  | "works_as_intended"
+  | "not_reproducible"
+  | "duplicate";
 
 export type IssueStatusGroup = "new" | "in_progress" | "closed";
 
@@ -215,8 +254,19 @@ import { Circle, CircleDot, Disc } from "lucide-react";
 
 export const STATUS_GROUPS = {
   new: ["new", "confirmed"],
-  in_progress: ["waiting_on_owner", "in_progress", "needs_parts", "needs_expert"],
-  closed: ["fixed", "wont_fix", "works_as_intended", "not_reproducible", "duplicate"],
+  in_progress: [
+    "waiting_on_owner",
+    "in_progress",
+    "needs_parts",
+    "needs_expert",
+  ],
+  closed: [
+    "fixed",
+    "wont_fix",
+    "works_as_intended",
+    "not_reproducible",
+    "duplicate",
+  ],
 } as const;
 
 export function getIssueStatusIcon(status: IssueStatus) {
@@ -342,21 +392,26 @@ export function IssueBadgeGrid({ issue, variant }: IssueBadgeGridProps) {
 ## Files to Update
 
 ### Components
+
 - `src/components/issues/IssueRow.tsx` - Use `<IssueBadgeGrid variant="normal" />`
 - `src/components/issues/RecentIssuesPanel.tsx` - Use `<IssueBadgeGrid variant="mini" />`
 
 ### Pages
+
 - `src/app/(app)/dashboard/page.tsx` - Use `<IssueBadgeGrid variant="half" />`
 - `src/app/(app)/m/[initials]/i/[issueNumber]/page.tsx` - Add consistency, use 1x4 strip
 - `src/app/report/unified-report-form.tsx` - Add severity/consistency dropdowns
 
 ### Forms
+
 - `src/app/(app)/m/[initials]/i/[issueNumber]/update-issue-*-form.tsx` - Update dropdowns
 
 ### Seed Data
+
 - `supabase/seed-users.mjs` - Use new enum values
 
 ### Styles
+
 - `src/app/globals.css` - Add color CSS variables
 
 ---
@@ -364,28 +419,33 @@ export function IssueBadgeGrid({ issue, variant }: IssueBadgeGridProps) {
 ## Verification Checklist
 
 ### Phase 1: Visual Review
+
 - [ ] Review mockup pages for consistency
 - [ ] Confirm border colors per field type
 - [ ] Verify shading (High/Constant = brightest)
 
 ### Phase 2: Schema & Types
+
 - [ ] `npm run typecheck` passes
 - [ ] Migration generates correctly
 - [ ] DB reset completes
 
 ### Phase 3: Components
+
 - [ ] Mini variant works (Recent Issues)
 - [ ] Half variant works (Dashboard)
 - [ ] Normal variant works (Issue List)
 - [ ] 1x4 strip works (Issue Detail)
 
 ### Phase 4: Forms
+
 - [ ] Public: Severity + Consistency dropdowns
 - [ ] Members: Priority dropdown visible
 - [ ] Status dropdown: optgroup separation
 - [ ] Progressive enhancement (works without JS)
 
 ### Phase 5: Integration
+
 - [ ] `npm run preflight` passes
 - [ ] Smoke test all CRUD operations
 - [ ] Duplicate issues hidden from Recent Issues
@@ -403,6 +463,7 @@ export function IssueBadgeGrid({ issue, variant }: IssueBadgeGridProps) {
 ## Live Preview
 
 The presentation mockup is available at:
+
 ```
 /dev/badge-preview/presentation
 ```

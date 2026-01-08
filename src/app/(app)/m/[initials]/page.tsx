@@ -1,7 +1,7 @@
 import type React from "react";
 import { notFound, redirect } from "next/navigation";
 import { getUnifiedUsers } from "~/lib/users/queries";
-import type { UnifiedUser } from "~/lib/types";
+import type { UnifiedUser, IssueStatus } from "~/lib/types";
 import { cn } from "~/lib/utils";
 import Link from "next/link";
 import { createClient } from "~/lib/supabase/server";
@@ -17,6 +17,7 @@ import {
 import {
   getIssuePriorityLabel,
   getIssuePriorityStyles,
+  CLOSED_STATUSES,
 } from "~/lib/issues/status";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
@@ -108,7 +109,10 @@ export default async function MachineDetailPage({
   const qrDataUrl = await generateQrPngDataUrl(reportUrl);
 
   const openIssues = machine.issues.filter(
-    (issue) => issue.status !== "resolved"
+    (issue) =>
+      !(CLOSED_STATUSES as readonly string[]).includes(
+        issue.status as IssueStatus
+      )
   );
 
   return (

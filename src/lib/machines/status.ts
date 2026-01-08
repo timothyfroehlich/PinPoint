@@ -1,31 +1,26 @@
-/**
- * Machine Status Derivation
- *
- * Derives machine operational status from open issues.
- * Status hierarchy: unplayable > needs_service > operational
- */
+import type { IssueStatus, IssueSeverity } from "~/lib/types";
+import { CLOSED_STATUSES } from "~/lib/issues/status";
 
 export type MachineStatus = "unplayable" | "needs_service" | "operational";
 
 export interface IssueForStatus {
-  status: "new" | "in_progress" | "resolved";
-  severity: "minor" | "playable" | "unplayable";
+  status: IssueStatus;
+  severity: IssueSeverity;
 }
 
 /**
  * Derive machine status from its issues
  *
  * Logic:
- * - `unplayable`: At least one unplayable issue that's not resolved
- * - `needs_service`: At least one playable/minor issue that's not resolved, no unplayable
+ * - `unplayable`: At least one unplayable issue that's not closed
+ * - `needs_service`: At least one non-closed issue (major/minor/cosmetic), or a major issue
  * - `operational`: No open issues
- *
- * @param issues - Array of issues for the machine
- * @returns Derived machine status
  */
 export function deriveMachineStatus(issues: IssueForStatus[]): MachineStatus {
-  // Filter to only open issues (not resolved)
-  const openIssues = issues.filter((issue) => issue.status !== "resolved");
+  // Filter to only open issues (not in CLOSED_STATUSES)
+  const openIssues = issues.filter(
+    (issue) => !(CLOSED_STATUSES as readonly string[]).includes(issue.status)
+  );
 
   // No open issues = operational
   if (openIssues.length === 0) {

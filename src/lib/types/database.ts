@@ -17,10 +17,35 @@ import type {
   issueWatchers,
 } from "~/server/db/schema";
 
+// Enum types for type safety (import/define before using in Issue type)
+// Based on _issue-status-redesign/README.md - Final design with 11 statuses
+import type { UserRole } from "./user";
+import type { IssueStatus } from "~/lib/issues/status";
+
+// Re-export types (IssueStatus comes from single source of truth)
+export type { UserRole, IssueStatus };
+
+export type IssueSeverity = "cosmetic" | "minor" | "major" | "unplayable";
+export type IssuePriority = "low" | "medium" | "high";
+export type IssueConsistency = "intermittent" | "frequent" | "constant";
+
 // Select types (full row from database)
 export type UserProfile = InferSelectModel<typeof userProfiles>;
 export type Machine = InferSelectModel<typeof machines>;
-export type Issue = InferSelectModel<typeof issues>;
+
+// Issue type with proper enum types (Drizzle infers text columns as string)
+type DrizzleIssue = InferSelectModel<typeof issues>;
+export type Issue = Omit<
+  DrizzleIssue,
+  "status" | "severity" | "priority" | "consistency" | "closedAt"
+> & {
+  status: IssueStatus;
+  severity: IssueSeverity;
+  priority: IssuePriority;
+  consistency: IssueConsistency;
+  closedAt: Date | null;
+};
+
 export type IssueComment = InferSelectModel<typeof issueComments>;
 
 // Insert types (for creating new rows)
@@ -28,13 +53,6 @@ export type NewUserProfile = InferInsertModel<typeof userProfiles>;
 export type NewMachine = InferInsertModel<typeof machines>;
 export type NewIssue = InferInsertModel<typeof issues>;
 export type NewIssueComment = InferInsertModel<typeof issueComments>;
-
-// Enum types for type safety
-import type { UserRole } from "./user";
-export type { UserRole };
-export type IssueStatus = "new" | "in_progress" | "resolved";
-export type IssueSeverity = "minor" | "playable" | "unplayable";
-export type IssuePriority = "low" | "medium" | "high" | "critical";
 
 export type Notification = InferSelectModel<typeof notifications>;
 export type NotificationPreference = InferSelectModel<

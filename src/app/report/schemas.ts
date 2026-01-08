@@ -12,14 +12,17 @@ export const publicIssueSchema = z.object({
     .trim()
     .max(5000, "Description is too long")
     .optional(),
-  severity: z.enum(["minor", "playable", "unplayable"], {
+  severity: z.enum(["cosmetic", "minor", "major", "unplayable"], {
     message: "Select a severity",
   }),
   priority: z
-    .enum(["low", "medium", "high", "critical"], {
+    .enum(["low", "medium", "high"], {
       message: "Select a priority",
     })
     .optional(),
+  consistency: z.enum(["intermittent", "frequent", "constant"], {
+    message: "Select consistency",
+  }),
   firstName: z.string().trim().max(100, "First name too long").optional(),
   lastName: z.string().trim().max(100, "Last name too long").optional(),
   email: z

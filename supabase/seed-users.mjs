@@ -143,17 +143,19 @@ async function seedUsersAndData() {
     // 3. Seed Issues
     console.log("\n🔧 Seeding issues...");
 
-    // Attack from Mars: 1 playable issue
+    // Attack from Mars: 1 issue
     await sql`
-      INSERT INTO issues (id, machine_initials, issue_number, title, description, status, severity, created_at, updated_at)
+      INSERT INTO issues (id, machine_initials, issue_number, title, description, status, severity, priority, consistency, created_at, updated_at)
       VALUES (
         '10000000-0000-4000-8000-000000000001',
         'AFM',
         1,
         'Right flipper feels weak',
         'The right flipper doesn\''t have full strength. Can still play but makes ramp shots difficult.',
-        'new',
-        'playable',
+        'confirmed',
+        'minor',
+        'medium',
+        'constant',
         NOW() - INTERVAL '2 days',
         NOW() - INTERVAL '2 days'
       )
@@ -165,7 +167,7 @@ async function seedUsersAndData() {
 
     // The Addams Family: Multiple issues
     await sql`
-      INSERT INTO issues (id, machine_initials, issue_number, title, description, status, severity, created_at, updated_at)
+      INSERT INTO issues (id, machine_initials, issue_number, title, description, status, severity, priority, consistency, created_at, updated_at)
       VALUES
       (
         '10000000-0000-4000-8000-000000000002',
@@ -173,8 +175,10 @@ async function seedUsersAndData() {
         1,
         'Ball stuck in Thing\''s box',
         'Extended sample issue with many timeline updates.',
-        'new',
+        'in_progress',
         'unplayable',
+        'high',
+        'constant',
         NOW() - INTERVAL '1 day',
         NOW() - INTERVAL '1 day'
       ),
@@ -184,8 +188,10 @@ async function seedUsersAndData() {
         2,
         'Bookcase not registering hits',
         'The bookcase target doesn\''t registering when hit.',
-        'in_progress',
-        'playable',
+        'needs_parts',
+        'major',
+        'high',
+        'frequent',
         NOW() - INTERVAL '3 days',
         NOW() - INTERVAL '1 day'
       ),
@@ -196,7 +202,9 @@ async function seedUsersAndData() {
         'Dim GI lighting on left side',
         'General illumination bulbs on left side are dim.',
         'new',
-        'minor',
+        'cosmetic',
+        'low',
+        'constant',
         NOW() - INTERVAL '5 days',
         NOW() - INTERVAL '5 days'
       ),
@@ -206,16 +214,31 @@ async function seedUsersAndData() {
         4,
         'Bear Kick opto not working',
         'Bear Kick feature not detecting ball.',
-        'new',
-        'playable',
+        'waiting_on_owner',
+        'major',
+        'medium',
+        'intermittent',
         NOW() - INTERVAL '1 week',
         NOW() - INTERVAL '1 week'
+      ),
+      (
+        '10000000-0000-4000-8000-000000000006',
+        'TAF',
+        5,
+        'Magnet throwing ball to Drain',
+        'The Power magnet seems too strong or mistimed.',
+        'wont_fix',
+        'minor',
+        'low',
+        'frequent',
+        NOW() - INTERVAL '2 weeks',
+        NOW() - INTERVAL '2 weeks'
       )
       ON CONFLICT (id) DO NOTHING
     `;
 
     // Update TAF next issue number
-    await sql`UPDATE machines SET next_issue_number = 5 WHERE initials = 'TAF'`;
+    await sql`UPDATE machines SET next_issue_number = 6 WHERE initials = 'TAF'`;
 
     console.log("✅ Issues seeded.");
 
@@ -271,13 +294,13 @@ async function seedUsersAndData() {
         },
         {
           author: userIds.member,
-          content: "Status changed from in_progress to resolved",
+          content: "Status changed from in_progress to fixed",
           isSystem: true,
           daysAgo: 2,
         },
         {
           author: userIds.member,
-          content: "Severity changed from unplayable to playable",
+          content: "Severity changed from unplayable to minor",
           isSystem: true,
           daysAgo: 1.5,
         },

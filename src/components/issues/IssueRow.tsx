@@ -1,19 +1,23 @@
 import type React from "react";
 import Link from "next/link";
 import { cn } from "~/lib/utils";
-import { Badge } from "~/components/ui/badge";
-import { StatusIndicator } from "~/components/issues/StatusIndicator";
+import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
+import { CLOSED_STATUSES } from "~/lib/issues/status";
+import type { Issue } from "~/lib/types";
 
 interface IssueRowProps {
-  issue: {
-    id: string;
-    issueNumber: number;
-    title: string;
-    status: "new" | "in_progress" | "resolved";
-    severity: "minor" | "playable" | "unplayable";
-    priority: "low" | "medium" | "high" | "critical";
-    createdAt: Date;
-    machineInitials: string;
+  issue: Pick<
+    Issue,
+    | "id"
+    | "issueNumber"
+    | "title"
+    | "status"
+    | "severity"
+    | "priority"
+    | "consistency"
+    | "createdAt"
+    | "machineInitials"
+  > & {
     machine: {
       name: string;
     } | null;
@@ -24,23 +28,19 @@ interface IssueRowProps {
 }
 
 export function IssueRow({ issue }: IssueRowProps): React.JSX.Element {
-  const severityColor = {
-    minor: "bg-blue-900/30 text-blue-300",
-    playable: "bg-yellow-900/30 text-yellow-300",
-    unplayable: "bg-red-900/30 text-red-300",
-  };
-
   return (
     <div
       className={cn(
-        "group flex items-start gap-3 border-b border-border p-4 transition-colors",
-        issue.status === "resolved"
+        "group flex items-start gap-4 border-b border-border p-4 transition-colors",
+        (CLOSED_STATUSES as readonly string[]).includes(issue.status)
           ? "bg-muted/30 opacity-60 hover:opacity-100"
           : "hover:bg-muted/40"
       )}
+      role="article"
+      aria-label={`Issue: ${issue.title} (${issue.status})`}
     >
       <div className="mt-0.5 shrink-0">
-        <StatusIndicator status={issue.status} />
+        <IssueBadgeGrid issue={issue} variant="normal" />
       </div>
 
       <div className="min-w-0 flex-1 space-y-1">
@@ -51,23 +51,6 @@ export function IssueRow({ issue }: IssueRowProps): React.JSX.Element {
           >
             {issue.title}
           </Link>
-          <Badge
-            variant="secondary"
-            className={cn(
-              "text-[10px] px-1.5 py-0 h-5 font-medium border-0",
-              severityColor[issue.severity]
-            )}
-          >
-            {issue.severity}
-          </Badge>
-          {issue.priority === "critical" && (
-            <Badge
-              variant="destructive"
-              className="text-[10px] px-1.5 py-0 h-5 font-medium"
-            >
-              critical
-            </Badge>
-          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
