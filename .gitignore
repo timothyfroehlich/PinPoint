@@ -60,6 +60,7 @@ logs/
 
 # Temporary files
 /tmp
+.gemini/tmp/
 .recycle_bin/
 /data/
 #index.html
