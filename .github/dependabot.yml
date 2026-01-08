@@ -33,7 +33,7 @@ updates:
           - "patch"
     labels:
       - "dependencies"
-      - "npm"
+      - "pnpm"
 
   # GitHub Actions with 2-week cooldown
   - package-ecosystem: "github-actions"

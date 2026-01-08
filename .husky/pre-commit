@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 set -e
 
-npx lint-staged
+pnpm exec lint-staged
 pnpm run typecheck
 pnpm run format
