@@ -308,7 +308,7 @@ class FileDebouncer {
   shouldCheck(filePath) {
     const now = Date.now();
     const lastCheck = this.recentChecks.get(filePath) || 0;
-    
+
     // If we checked this file recently (within debounce window), skip
     if (now - lastCheck < this.debounceMs) {
       log.debug(`Debouncing check for ${path.basename(filePath)} (last check ${now - lastCheck}ms ago)`);
@@ -371,7 +371,7 @@ class FileDebouncer {
       clearTimeout(timeoutId);
     }
     this.pendingChecks.clear();
-    
+
     // Clear cleanup interval
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
@@ -541,8 +541,8 @@ function analyzeFileContext(filePath, content) {
   // Check for incomplete import patterns
   const lines = content.split('\n');
   const importLines = lines.filter(line => line.trim().startsWith('import '));
-  const nonImportLines = lines.filter(line => 
-    line.trim() && 
+  const nonImportLines = lines.filter(line =>
+    line.trim() &&
     !line.trim().startsWith('import ') &&
     !line.trim().startsWith('//') &&
     !line.trim().startsWith('/*')
@@ -599,7 +599,7 @@ function analyzeFileContext(filePath, content) {
       }
       return false;
     });
-    
+
     if (hasActualEmptyFunctions) {
       reasons.push('Found functions with empty or TODO-marked bodies');
       shouldSkip = true;
@@ -1100,7 +1100,7 @@ function isSourceFile(filePath) {
  */
 function printSummary(problemCounts, autofixes) {
   const problems = [];
-  
+
   if (problemCounts.typescript > 0) {
     problems.push(`TypeScript: ${problemCounts.typescript} error${problemCounts.typescript > 1 ? 's' : ''}`);
   }
@@ -1113,7 +1113,7 @@ function printSummary(problemCounts, autofixes) {
   if (problemCounts.common > 0) {
     problems.push(`Code issues: ${problemCounts.common} problem${problemCounts.common > 1 ? 's' : ''}`);
   }
-  
+
   if (problems.length > 0) {
     console.error(problems.join(', '));
   }
@@ -1175,25 +1175,25 @@ async function main() {
   if (totalProblems > 0) {
     printSummary(problemCounts, autofixes);
     console.error(`${colors.yellow}💡 Remember to resolve the issues before moving on to another file${colors.reset}`);
-    
+
     // Generate specific commands for this file
     const relativePath = path.relative(projectRoot, filePath);
     const commands = [];
-    
+
     if (problemCounts.typescript > 0) {
       commands.push(`pnpm run typecheck:brief`);
     }
     if (problemCounts.eslint > 0) {
-      commands.push(`npx eslint "${relativePath}"`);
+      commands.push(`pnpm exec eslint "${relativePath}"`);
     }
     if (problemCounts.prettier > 0) {
-      commands.push(`npx prettier --check "${relativePath}"`);
+      commands.push(`pnpm exec prettier --check "${relativePath}"`);
     }
-    
+
     if (commands.length > 0) {
       console.error(`${colors.blue}💡 Run: ${commands.join(' && ')}${colors.reset}`);
     }
-    
+
     console.error(`${colors.yellow}⚠ ${path.basename(filePath)} - has issues to resolve${colors.reset}`);
     process.exit(0); // Advisory only - don't block workflow
   } else {

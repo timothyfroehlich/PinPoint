@@ -21,7 +21,7 @@
 
 1. Adjust builder signature to accept `machineInitials` (string) instead of `machineId` and generate `/report?machineInitials=ABC[&source=qr]`.
 2. Update tests to expect initials-based URLs.
-3. Run targeted tests: `npm test -- src/lib/machines/report-url.test.ts`.
+3. Run targeted tests: `pnpm test -- src/lib/machines/report-url.test.ts`.
 
 ---
 
@@ -39,7 +39,7 @@
 2. Update tests to cover initials selection and fallback behavior.
 3. In `page.tsx`, parse `machineInitials` from `searchParams` and pass both `machineId` and `machineInitials` into resolver; keep `source` handling.
 4. Keep form submission field `machineId` unchanged; only default selection changes.
-5. Run targeted tests: `npm test -- src/app/report/default-machine.test.ts`.
+5. Run targeted tests: `pnpm test -- src/app/report/default-machine.test.ts`.
 
 ---
 
@@ -63,9 +63,9 @@
 
 **Steps:**
 
-1. Targeted: `npm test -- src/lib/machines/report-url.test.ts src/app/report/default-machine.test.ts`.
-2. Quick gate: `npm run check`.
-3. If time, rerun `npm run preflight` (already clean, but preferred before PR update).
+1. Targeted: `pnpm test -- src/lib/machines/report-url.test.ts src/app/report/default-machine.test.ts`.
+2. Quick gate: `pnpm run check`.
+3. If time, rerun `pnpm run preflight` (already clean, but preferred before PR update).
 
 ---
 

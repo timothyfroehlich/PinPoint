@@ -178,7 +178,7 @@ export default defineConfig({
 
   // Run your local dev server before starting the tests
   webServer: {
-    command: `PORT=${port} npm run dev`,
+    command: `PORT=${port} pnpm run dev`,
     url: `${baseURL}/api/health`,
     reuseExistingServer: !process.env["CI"],
     timeout: process.env["CI"] ? 120 * 1000 : 60 * 1000,

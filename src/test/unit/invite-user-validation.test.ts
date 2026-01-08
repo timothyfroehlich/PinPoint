@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { inviteUserSchema } from "~/app/(app)/admin/users/actions";
+import { inviteUserSchema } from "~/app/(app)/admin/users/schema";
 
 describe("InviteUser Validation", () => {
   it("should fail validation for very long first name", () => {

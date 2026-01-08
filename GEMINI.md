@@ -39,9 +39,9 @@
   - _Why_: SQL standard is snake_case; JS standard is camelCase. Mixing them causes confusion.
 - **Workflow**:
   1. Edit `src/server/db/schema.ts`.
-  2. `npm run db:generate -- --name <desc>`
-  3. `npm run db:migrate`
-  4. `npm run test:_generate-schema`
+  2. `pnpm run db:generate -- --name <desc>`
+  3. `pnpm run db:migrate`
+  4. `pnpm run test:_generate-schema`
   5. Commit `schema.ts`, `drizzle/`, and `src/test/setup/schema.sql`
 - **Rule**: `handle_new_user()` trigger for profiles.
   - _Why_: Client-side profile creation fails with OAuth. DB triggers are atomic and reliable.
@@ -61,11 +61,11 @@
 
 ### Testing Strategy
 
-- **Unit (70%)**: Pure logic. `npm test`.
-- **Integration (25%)**: DB queries. **MUST use worker-scoped PGlite**. `npm run test:integration`.
+- **Unit (70%)**: Pure logic. `pnpm test`.
+- **Integration (25%)**: DB queries. **MUST use worker-scoped PGlite**. `pnpm run test:integration`.
   - _Why_: Per-test PGlite instances cause system lockups and memory leaks.
-- **E2E (5%)**: Critical flows. `npm run smoke`.
-- **Preflight**: `npm run preflight` before ALL commits.
+- **E2E (5%)**: Critical flows. `pnpm run smoke`.
+- **Preflight**: `pnpm run preflight` before ALL commits.
   - _Why_: Comprehensive validation (typecheck, lint, format, test, build, integration tests).
 
 ### Security
@@ -215,33 +215,33 @@ beforeEach(async () => {
 **Critical (Before Commit):**
 
 ```bash
-npm run preflight  # Typecheck, lint, format, test, build, integration tests
+pnpm run preflight  # Typecheck, lint, format, test, build, integration tests
 ```
 
 **Development:**
 
 ```bash
-npm run dev              # Start dev server
-npm run build            # Production build
-npm run typecheck        # TypeScript validation
-npm run lint             # ESLint
-npm test                 # Unit tests only
-npm run test:integration # DB tests (requires supabase start)
-npm run smoke            # E2E tests (Playwright)
+pnpm run dev              # Start dev server
+pnpm run build            # Production build
+pnpm run typecheck        # TypeScript validation
+pnpm run lint             # ESLint
+pnpm test                 # Unit tests only
+pnpm run test:integration # DB tests (requires supabase start)
+pnpm run smoke            # E2E tests (Playwright)
 ```
 
 **Database Migrations:**
 
 ```bash
-npm run db:generate -- --name <change-name>
-npm run db:migrate
-npm run test:_generate-schema
+pnpm run db:generate -- --name <change-name>
+pnpm run db:migrate
+pnpm run test:_generate-schema
 ```
 
 **Components:**
 
 ```bash
-npx shadcn@latest add [component]
+pnpm exec shadcn@latest add [component]
 ```
 
 ## 7. Testing Requirements
@@ -260,9 +260,9 @@ npx shadcn@latest add [component]
 
 **Dev Loop**:
 
-- After any change: `npm run check` (~5s)
-- Before commit: `npm run preflight` (~60s)
-- Targeted: `npm test -- path/to/file.test.ts`
+- After any change: `pnpm run check` (~5s)
+- Before commit: `pnpm run preflight` (~60s)
+- Targeted: `pnpm test -- path/to/file.test.ts`
 
 ## 8. Documentation Index
 
@@ -307,7 +307,7 @@ npx shadcn@latest add [component]
 ## 11. Commit Guidelines
 
 - **Style**: Conventional commits (`feat:`, `fix:`, `chore:`)
-- **Process**: Run `npm run preflight` → commit → push
+- **Process**: Run `pnpm run preflight` → commit → push
 - **Hooks**: Husky + lint-staged enforce quality gates
 
 See AGENTS.md for comprehensive context that applies to all agents.

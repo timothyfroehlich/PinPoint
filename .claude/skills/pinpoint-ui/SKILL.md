@@ -28,7 +28,7 @@ Use this skill when:
 
 ### Adding Components
 ```bash
-npx shadcn@latest add [component]
+pnpm exec shadcn@latest add [component]
 ```
 
 ## Detailed Documentation

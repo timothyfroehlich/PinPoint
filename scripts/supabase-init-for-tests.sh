@@ -100,15 +100,15 @@ EOF
 fi
 
 echo "📦 Applying database schema with Drizzle (db:_push)..."
-npm run db:_push
+pnpm run db:_push
 
 echo "🧪 Generating test schema..."
-npm run test:_generate-schema
+pnpm run test:_generate-schema
 
 echo "🌱 Seeding database tables..."
-npm run db:_seed
+pnpm run db:_seed
 
 echo "🌱 Seeding test users..."
-npm run db:_seed-users
+pnpm run db:_seed-users
 
 echo "✅ Supabase initialization for tests completed."

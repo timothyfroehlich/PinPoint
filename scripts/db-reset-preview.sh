@@ -100,7 +100,7 @@ echo "✅ Schema reset"
 echo ""
 echo "2️⃣  Applying schema with drizzle-kit migrations..."
 # Uses DIRECT_URL from env (Session Mode pooler, IPv4-compatible)
-npx drizzle-kit migrate
+pnpm exec drizzle-kit migrate
 
 # Verify tables were created
 echo "   Verifying tables were created..."

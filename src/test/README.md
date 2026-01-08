@@ -25,7 +25,7 @@ src/test/
 
 Test pure functions, utilities, and validation logic without external dependencies.
 
-**Run**: `npm test` (included by default)
+**Run**: `pnpm test` (included by default)
 
 **Examples**:
 
@@ -38,7 +38,7 @@ Test pure functions, utilities, and validation logic without external dependenci
 
 Test database queries and Server Actions using **PGlite** (worker-scoped).
 
-**Run**: `npm test` (included by default)
+**Run**: `pnpm test` (included by default)
 
 **Key Points**:
 
@@ -69,7 +69,7 @@ describe("My Feature", () => {
 
 Tests that require a **real Supabase instance** (authentication, SSR, etc.).
 
-**Run**: `npm run test:integration` (requires `supabase start`)
+**Run**: `pnpm run test:integration` (requires `supabase start`)
 
 **Key Points**:
 
@@ -89,22 +89,22 @@ Tests that require a **real Supabase instance** (authentication, SSR, etc.).
 
 ```bash
 # Unit + PGlite integration tests (fast)
-npm test
+pnpm test
 
 # Supabase integration tests (requires supabase start)
-npm run test:integration
+pnpm run test:integration
 
 # All tests (unit + integration + supabase)
-npm test && npm run test:integration
+pnpm test && pnpm run test:integration
 
 # Watch mode (unit tests only)
-npm run test:watch
+pnpm run test:watch
 
 # Coverage report
-npm run test:coverage
+pnpm run test:coverage
 
 # E2E tests (requires dev server running)
-npm run smoke
+pnpm run smoke
 ```
 
 ## Writing Tests
@@ -166,7 +166,7 @@ Target: **80% coverage** for critical paths
 - Server Components (`src/app/**`)
 - Client Components (basic interactivity)
 
-**Run coverage**: `npm run test:coverage`
+**Run coverage**: `pnpm run test:coverage`
 
 ## Anti-Patterns
 

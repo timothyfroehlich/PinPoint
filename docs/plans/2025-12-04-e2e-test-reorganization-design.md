@@ -170,14 +170,14 @@ test-e2e-full:
   steps:
     # ... same setup as test-e2e-smoke ...
     - name: Run E2E Full Tests
-      run: npx playwright test --config=playwright.config.full.ts
+      run: pnpm exec playwright test --config=playwright.config.full.ts
 ```
 
 **Update existing smoke job:**
 
 ```yaml
 - name: Run E2E Smoke Tests
-  run: npx playwright test --config=playwright.config.smoke.ts
+  run: pnpm exec playwright test --config=playwright.config.smoke.ts
 ```
 
 **CI Optimization:**
@@ -196,8 +196,8 @@ test-e2e-full:
 4. Create `auth-flows-extended.spec.ts` with signup/password-reset/logout
 5. Create `playwright.config.smoke.ts` with `workers: 1` (sequential)
 6. Create `playwright.config.full.ts` with `workers: 1`
-7. Run `npm run smoke` - verify all 5 pass
-8. Run `npm run e2e:full` - verify all 5 pass
+7. Run `pnpm run smoke` - verify all 5 pass
+8. Run `pnpm run e2e:full` - verify all 5 pass
 
 ### Phase 2: Enable Parallelization Gradually
 

@@ -33,7 +33,7 @@ If you’re trying to understand how to implement something, read:
 2. **Install & Configure**
 
    ```bash
-   npm install
+   pnpm install
    cp .env.example .env.local
    # Fill in Supabase + database env vars
    ```
@@ -45,46 +45,46 @@ If you’re trying to understand how to implement something, read:
    supabase start
 
    # In another terminal
-   npm run dev
+   pnpm run dev
    ```
 
 4. **Run Fast Checks While Iterating**
 
    ```bash
-   npm run check      # typecheck + lint + unit tests
+   pnpm run check      # typecheck + lint + unit tests
    ```
 
 5. **Before Pushing**
 
    ```bash
-   npm run preflight  # full gate: typecheck, lint, format, tests, build, int tests, smoke
+   pnpm run preflight  # full gate: typecheck, lint, format, tests, build, int tests, smoke
    ```
 
 ## Testing Overview
 
 PinPoint uses the following test types (see `docs/TESTING_PLAN.md` for details):
 
-- **Unit Tests** (`npm test`)
+- **Unit Tests** (`pnpm test`)
   - Location: `src/test/unit/**`
   - What: Pure logic, utilities, validation
-- **Integration Tests (PGlite)** (`npm test`)
+- **Integration Tests (PGlite)** (`pnpm test`)
   - Location: `src/test/integration/**`
   - What: Database queries, Server Actions (using worker‑scoped PGlite)
-- **Supabase Integration Tests** (`npm run test:integration`)
+- **Supabase Integration Tests** (`pnpm run test:integration`)
   - Location: `src/test/integration/supabase/**`
   - What: Real Supabase interactions (requires `supabase start`)
-- **E2E Tests (Playwright)** (`npm run smoke`)
+- **E2E Tests (Playwright)** (`pnpm run smoke`)
   - Location: `e2e/**`
   - What: Critical user flows only
 
 Useful commands:
 
 ```bash
-npm test                      # Unit + PGlite integration
-npm run test:integration      # Supabase-backed integration tests
-npm run smoke                 # Playwright smoke suite
-npm run test:watch            # Watch mode for unit tests
-npm run test:coverage         # Coverage for unit tests
+pnpm test                      # Unit + PGlite integration
+pnpm run test:integration      # Supabase-backed integration tests
+pnpm run smoke                 # Playwright smoke suite
+pnpm run test:watch            # Watch mode for unit tests
+pnpm run test:coverage         # Coverage for unit tests
 ```
 
 ## Component Creation
@@ -94,10 +94,10 @@ We use **shadcn/ui** for our component library.
 To add a new component:
 
 ```bash
-npx shadcn@latest add [component-name]
+pnpm exec shadcn@latest add [component-name]
 ```
 
-Example: `npx shadcn@latest add button`
+Example: `pnpm exec shadcn@latest add button`
 
 This will install the component source code into `src/components/ui`. You can then customize it as needed.
 
@@ -113,19 +113,19 @@ We use **Supabase** (PostgreSQL) and **Drizzle ORM**.
 
   ```bash
   # 1. Generate a migration
-  npm run db:generate -- --name <change-name>
+  pnpm run db:generate -- --name <change-name>
 
   # 2. Apply migrations to your local database
-  npm run db:migrate
+  pnpm run db:migrate
 
   # 3. Regenerate test schema for PGlite
-  npm run test:_generate-schema
+  pnpm run test:_generate-schema
   ```
 
 - **Reset & Seed Database (Destructive)**
 
   ```bash
-  npm run db:reset
+  pnpm run db:reset
   ```
 
   This will:
@@ -137,7 +137,7 @@ We use **Supabase** (PostgreSQL) and **Drizzle ORM**.
 
 - **View Database**:
   ```bash
-  npm run db:studio
+  pnpm run db:studio
   ```
   Opens Drizzle Studio to view and edit data.
 
@@ -147,7 +147,7 @@ For preview and production, we use **Drizzle migrations** to ensure safe databas
 
 1. Edit `src/server/db/schema.ts`
 2. Generate a migration locally and commit the resulting `drizzle/` files
-3. Preview/prod reset scripts (e.g. `scripts/db-reset-preview.sh`, CI via `scripts/supa-ci.sh`) apply migrations using `npm run db:migrate`
+3. Preview/prod reset scripts (e.g. `scripts/db-reset-preview.sh`, CI via `scripts/supa-ci.sh`) apply migrations using `pnpm run db:migrate`
 
 ## Troubleshooting
 
@@ -170,8 +170,8 @@ For preview and production, we use **Drizzle migrations** to ensure safe databas
 
 Before merging a PR, the following checks must pass:
 
-- `npm run typecheck`: No TypeScript errors.
-- `npm run lint`: No ESLint errors.
-- `npm run format`: Code is formatted with Prettier.
-- `npm test`: All unit and integration tests pass.
-- `npm run smoke`: Critical E2E flows pass.
+- `pnpm run typecheck`: No TypeScript errors.
+- `pnpm run lint`: No ESLint errors.
+- `pnpm run format`: Code is formatted with Prettier.
+- `pnpm test`: All unit and integration tests pass.
+- `pnpm run smoke`: Critical E2E flows pass.

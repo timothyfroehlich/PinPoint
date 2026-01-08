@@ -86,14 +86,14 @@ color: red
 ### Migration File Creation
 
 - **Pre-Beta Constraint**: NO migration files in `supabase/migrations/`
-- **Forbidden Commands**: `drizzle-kit generate`, `npm run db:generate`
+- **Forbidden Commands**: `drizzle-kit generate`, `pnpm run db:generate`
 - **Context**: Zero users, schema in flux, velocity over safety
 
 ### Vitest Command Issues
 
-- **Redirection Breaks Vitest**: `npm test 2>&1`, `vitest >>`
+- **Redirection Breaks Vitest**: `pnpm test 2>&1`, `vitest >>`
 - **Cause**: Vitest interprets redirection as test name filters
-- **Required**: Use `npm run test:brief`, `npm run test:verbose`
+- **Required**: Use `pnpm run test:brief`, `pnpm run test:verbose`
 
 ### Schema Modification Lock
 

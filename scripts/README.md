@@ -89,7 +89,7 @@ The Python script performs comprehensive worktree management:
 
 ### Phase 5: Dependency & Database Sync
 
-- Runs `npm ci` to sync dependencies
+- Runs `pnpm install --frozen-lockfile` to sync dependencies
 - Restarts Supabase with fresh database
 - Regenerates test schema
 
@@ -110,8 +110,8 @@ The Python script performs comprehensive worktree management:
 
 Use `--validate` flag to run validation after merge:
 
-- Runs `npm run db:reset` to reset database
-- Runs `npm run test:integration` to verify changes
+- Runs `pnpm run db:reset` to reset database
+- Runs `pnpm run test:integration` to verify changes
 - Helps catch integration issues early
 
 ## Port Allocation
@@ -146,7 +146,7 @@ Scripts manage ports according to AGENTS.md:
 ### Testing Best Practices
 
 - Unit tests for pure logic (port calculations, state updates)
-- Mock external commands (git, docker, npm) in tests
+- Mock external commands (git, docker, pnpm) in tests
 - Integration tests only when necessary
 - Always test dry-run mode
 
