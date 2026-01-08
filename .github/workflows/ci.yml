@@ -358,7 +358,7 @@ jobs:
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Make E2E script executable
         run: chmod +x ./scripts/supabase-init-for-tests.sh
@@ -367,7 +367,7 @@ jobs:
         run: ./scripts/supabase-init-for-tests.sh
 
       - name: Run Smoke Tests (Chromium)
-        run: npx playwright test e2e/smoke --project=chromium --reporter=dot
+        run: pnpm exec playwright test e2e/smoke --project=chromium --reporter=dot
 
       - name: Upload Playwright report
         if: failure()
@@ -430,7 +430,7 @@ jobs:
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Make E2E script executable
         run: chmod +x ./scripts/supabase-init-for-tests.sh
@@ -439,7 +439,7 @@ jobs:
         run: ./scripts/supabase-init-for-tests.sh
 
       - name: Run Full Tests (Chromium)
-        run: npx playwright test --config=playwright.config.full.ts --project=chromium --reporter=dot
+        run: pnpm exec playwright test --config=playwright.config.full.ts --project=chromium --reporter=dot
 
       - name: Upload Playwright report
         if: failure()
@@ -502,7 +502,7 @@ jobs:
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Make E2E script executable
         run: chmod +x ./scripts/supabase-init-for-tests.sh
@@ -511,7 +511,7 @@ jobs:
         run: ./scripts/supabase-init-for-tests.sh
 
       - name: Run Full Tests (Mobile Chrome)
-        run: npx playwright test --config=playwright.config.full.ts --project="Mobile Chrome" --reporter=dot
+        run: pnpm exec playwright test --config=playwright.config.full.ts --project="Mobile Chrome" --reporter=dot
 
       - name: Upload Playwright report
         if: failure()
@@ -573,11 +573,11 @@ jobs:
             ${{ runner.os }}-playwright-webkit-
 
       - name: Install Playwright system dependencies
-        run: npx playwright install-deps webkit
+        run: pnpm exec playwright install-deps webkit
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install webkit
+        run: pnpm exec playwright install webkit
 
       - name: Make E2E script executable
         run: chmod +x ./scripts/supabase-init-for-tests.sh
@@ -586,7 +586,7 @@ jobs:
         run: ./scripts/supabase-init-for-tests.sh
 
       - name: Run Full Tests (Mobile Safari)
-        run: npx playwright test --config=playwright.config.full.ts --project="Mobile Safari" --reporter=dot
+        run: pnpm exec playwright test --config=playwright.config.full.ts --project="Mobile Safari" --reporter=dot
 
       - name: Upload Playwright report
         if: failure()
