@@ -54,12 +54,17 @@ export function IssueFilters({
   return (
     <div className="flex flex-wrap items-center gap-3">
       {/* Status Toggle (Open/Closed) */}
-      <div className="flex items-center rounded-md border border-input bg-transparent p-1">
+      <div
+        className="flex items-center rounded-md border border-input bg-transparent p-1"
+        role="group"
+        aria-label="Filter by status"
+      >
         <Button
           variant={currentFilters.status !== "resolved" ? "secondary" : "ghost"}
           size="sm"
           onClick={() => updateFilter("status", null)} // Default (null) is Open
           className="h-7 px-3 text-xs"
+          aria-pressed={currentFilters.status !== "resolved"}
         >
           Open
         </Button>
@@ -68,6 +73,7 @@ export function IssueFilters({
           size="sm"
           onClick={() => updateFilter("status", "resolved")}
           className="h-7 px-3 text-xs"
+          aria-pressed={currentFilters.status === "resolved"}
         >
           Closed
         </Button>
