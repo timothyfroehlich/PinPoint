@@ -48,10 +48,10 @@ test.describe("Status Overhaul E2E", () => {
 
     // 4. Verify status change in badge and timeline
     await expect(page.getByTestId("issue-status-badge")).toHaveText(
-      /In Progress/i
+      /Work in Progress/i
     );
     await expect(
-      page.getByText("Status changed from New to In Progress")
+      page.getByText("Status changed from New to Work in Progress")
     ).toBeVisible();
   });
 });
