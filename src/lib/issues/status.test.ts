@@ -31,7 +31,7 @@ describe("Issue Status Utilities", () => {
     it("should return correct labels", () => {
       expect(getIssueStatusLabel("new")).toBe("New");
       expect(getIssueStatusLabel("confirmed")).toBe("Confirmed");
-      expect(getIssueStatusLabel("in_progress")).toBe("In Progress");
+      expect(getIssueStatusLabel("in_progress")).toBe("Work in Progress");
       expect(getIssueStatusLabel("fixed")).toBe("Fixed");
       expect(getIssueStatusLabel("wai")).toBe("As Intended");
     });
