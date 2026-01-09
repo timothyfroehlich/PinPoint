@@ -47,13 +47,13 @@ export function WatchButton({
     >
       {isWatching ? (
         <>
-          <EyeOff className="size-4" />
-          Unwatch Issue
+          {!isPending && <EyeOff className="size-4" />}
+          {isPending ? "Unwatching..." : "Unwatch Issue"}
         </>
       ) : (
         <>
-          <Eye className="size-4" />
-          Watch Issue
+          {!isPending && <Eye className="size-4" />}
+          {isPending ? "Watching..." : "Watch Issue"}
         </>
       )}
     </Button>
