@@ -124,7 +124,7 @@ export default defineConfig({
   retries: process.env["CI"] ? 2 : 0,
 
   // Parallel workers: 2 in CI (conservative for shared DB), 1 locally for easier debugging
-  // Each worker gets a unique TEST_WORKER_INDEX for test isolation
+  // Each worker gets a unique TEST_PARALLEL_INDEX for test isolation
   workers: process.env["CI"] ? 2 : 1,
 
   // Reporters: print progress locally; keep CI quiet; never block on HTML

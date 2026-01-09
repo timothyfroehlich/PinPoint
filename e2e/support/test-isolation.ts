@@ -10,18 +10,21 @@
  * - getTestMachineInitials(): Generate unique machine initials
  */
 
-// Worker index from Playwright (0-N based on workers config)
-const workerIndex = process.env.TEST_WORKER_INDEX ?? "0";
-
-// Unique run identifier (changes every test run)
-const runId = Date.now().toString(36).slice(-4);
+// Worker index from Playwright (0-based index of the worker)
+const workerIndex = process.env.TEST_PARALLEL_INDEX ?? "0";
 
 /**
  * Get a unique prefix for this test worker/run combination
  *
  * Example output: "w0_kg5x" (worker 0, run ID kg5x)
+ *
+ * The identifier includes the worker index plus a short timestamp- and
+ * randomness-based suffix to avoid collisions when workers start together.
  */
 export function getTestPrefix(): string {
+  const timestampPart = Date.now().toString(36).slice(-4);
+  const randomPart = Math.random().toString(36).slice(2, 6);
+  const runId = `${timestampPart}${randomPart}`;
   return `w${workerIndex}_${runId}`;
 }
 
@@ -48,16 +51,15 @@ export function getTestEmail(base: string): string {
 /**
  * Generate unique machine initials for test-created machines
  *
- * Uses uppercase letters to ensure valid machine initials format.
- * Example output: "TW0" (Test Worker 0) or "TXY" (random)
+ * Combines the worker index with a random character for uniqueness.
+ * Example output: "T0X" (Test Worker 0 with random suffix)
  */
 export function getTestMachineInitials(): string {
-  // Use worker index + random chars for uniqueness
+  // Use worker index + random char for uniqueness across workers
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const randomChar1 = chars[Math.floor(Math.random() * chars.length)];
-  const randomChar2 = chars[Math.floor(Math.random() * chars.length)];
+  const randomChar = chars[Math.floor(Math.random() * chars.length)];
 
-  return `T${randomChar1}${randomChar2}`;
+  return `T${workerIndex}${randomChar}`;
 }
 
 /**

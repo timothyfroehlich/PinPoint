@@ -50,7 +50,7 @@ export default async function globalSetup(): Promise<void> {
       stdio: "inherit",
       env: process.env,
     });
-    console.log("✅ Schema pushed");
+    console.log("✅ Migrations applied");
 
     console.log("🧪 Regenerating test schema...");
     execSync("pnpm run test:_generate-schema", {
