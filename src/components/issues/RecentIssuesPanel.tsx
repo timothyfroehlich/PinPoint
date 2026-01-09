@@ -1,6 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
+import { IssueBadge } from "~/components/issues/IssueBadge";
 import { cn } from "~/lib/utils";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { db } from "~/server/db";
@@ -136,7 +136,7 @@ export async function RecentIssuesPanel({
                 <p className="truncate text-xs font-medium text-on-surface group-hover:text-primary transition-colors">
                   {issue.title}
                 </p>
-                <IssueBadgeGrid issue={issue} variant="mini" />
+                <IssueBadge type="status" value={issue.status} />
               </div>
             </Link>
           ))}

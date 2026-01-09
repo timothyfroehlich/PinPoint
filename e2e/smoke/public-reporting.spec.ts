@@ -37,7 +37,7 @@ test.describe("Public Issue Reporting", () => {
     await page
       .getByLabel("Description")
       .fill("Playfield gets stuck during multiball.");
-    await page.getByTestId("severity-select").selectOption("playable");
+    await page.getByTestId("severity-select").selectOption("minor");
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
     await expect(page).toHaveURL("/report/success");

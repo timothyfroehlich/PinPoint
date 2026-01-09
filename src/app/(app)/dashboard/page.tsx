@@ -8,16 +8,14 @@ import {
   Wrench,
   XCircle,
 } from "lucide-react";
-import { cn } from "~/lib/utils";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { issues, machines, userProfiles } from "~/server/db/schema";
 import { desc, eq, sql, and, notInArray } from "drizzle-orm";
-import type { Issue } from "~/lib/types";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
+import type { Issue } from "~/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
-import { formatIssueId } from "~/lib/issues/utils";
+import { IssueCard } from "~/components/issues/IssueCard";
 
 /**
  * Cached dashboard data fetcher (CORE-PERF-001)
@@ -300,54 +298,13 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
             ) : (
               <div className="space-y-3" data-testid="assigned-issues-list">
                 {assignedIssues.map((issue) => (
-                  <Link
+                  <IssueCard
                     key={issue.id}
-                    href={`/m/${issue.machineInitials}/i/${issue.issueNumber}`}
-                  >
-                    <Card
-                      className={cn(
-                        "transition-all h-full cursor-pointer",
-                        (CLOSED_STATUSES as readonly string[]).includes(
-                          issue.status
-                        )
-                          ? "border-border/40 bg-muted/30 opacity-60 hover:opacity-100 grayscale hover:grayscale-0"
-                          : "border-primary/20 bg-card hover:border-primary hover:glow-primary"
-                      )}
-                      data-testid="assigned-issue-card"
-                    >
-                      <CardHeader>
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1">
-                            <CardTitle className="text-base text-foreground mb-1">
-                              <span className="text-muted-foreground font-mono mr-2">
-                                {formatIssueId(
-                                  issue.machineInitials,
-                                  issue.issueNumber
-                                )}
-                              </span>{" "}
-                              {issue.title}
-                            </CardTitle>
-                            <p className="text-sm text-muted-foreground">
-                              {issue.machine.name}
-                            </p>
-                          </div>
-                          <IssueBadgeGrid
-                            issue={
-                              issue as unknown as Pick<
-                                Issue,
-                                | "status"
-                                | "severity"
-                                | "priority"
-                                | "consistency"
-                              >
-                            }
-                            variant="half"
-                            showPriority={true}
-                          />
-                        </div>
-                      </CardHeader>
-                    </Card>
-                  </Link>
+                    issue={issue as unknown as Issue}
+                    machine={{ name: issue.machine.name }}
+                    variant="compact"
+                    dataTestId="assigned-issue-card"
+                  />
                 ))}
               </div>
             )}
@@ -419,62 +376,16 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
               data-testid="recent-issues-list"
             >
               {recentIssues.map((issue) => (
-                <Link
+                <IssueCard
                   key={issue.id}
-                  href={`/m/${issue.machineInitials}/i/${issue.issueNumber}`}
-                >
-                  <Card
-                    className={cn(
-                      "transition-all h-full cursor-pointer",
-                      (CLOSED_STATUSES as readonly string[]).includes(
-                        issue.status
-                      )
-                        ? "border-border/40 bg-muted/30 opacity-60 hover:opacity-100 grayscale hover:grayscale-0"
-                        : "border-secondary/20 bg-card hover:border-secondary hover:glow-secondary"
-                    )}
-                    data-testid="recent-issue-card"
-                  >
-                    <CardHeader>
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <CardTitle className="text-base text-foreground mb-1">
-                            <span className="text-muted-foreground font-mono mr-2">
-                              {formatIssueId(
-                                issue.machineInitials,
-                                issue.issueNumber
-                              )}
-                            </span>{" "}
-                            {issue.title}
-                          </CardTitle>
-                          <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            <span>{issue.machine.name}</span>
-                            <span>
-                              Reported by{" "}
-                              {issue.reportedByUser?.name ??
-                                "Anonymous Reporter"}{" "}
-                              • {new Date(issue.createdAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex flex-col gap-2">
-                          <IssueBadgeGrid
-                            issue={
-                              issue as unknown as Pick<
-                                Issue,
-                                | "status"
-                                | "severity"
-                                | "priority"
-                                | "consistency"
-                              >
-                            }
-                            variant="half"
-                            showPriority={true}
-                          />
-                        </div>
-                      </div>
-                    </CardHeader>
-                  </Card>
-                </Link>
+                  issue={issue as unknown as Issue}
+                  machine={{ name: issue.machine.name }}
+                  showReporter={true}
+                  reporterName={
+                    issue.reportedByUser?.name ?? "Anonymous Reporter"
+                  }
+                  dataTestId="recent-issue-card"
+                />
               ))}
             </div>
           )}

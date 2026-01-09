@@ -25,7 +25,7 @@ test.describe("Status Overhaul E2E", () => {
 
     // 1. Create Issue
     await page.goto(`/report?machine=${machine.initials}`);
-    await page.getByTestId("machine-select").selectOption({ index: 1 });
+    await page.getByTestId("machine-select").selectOption(machine.id);
     await page.getByLabel("Issue Title *").fill("E2E Status Overhaul Test");
     await page.getByTestId("severity-select").selectOption("major");
     await page.getByTestId("priority-select").selectOption("high");
@@ -51,7 +51,7 @@ test.describe("Status Overhaul E2E", () => {
       /In Progress/i
     );
     await expect(
-      page.getByText("Status changed from New to Work in Progress")
+      page.getByText("Status changed from New to In Progress")
     ).toBeVisible();
   });
 });

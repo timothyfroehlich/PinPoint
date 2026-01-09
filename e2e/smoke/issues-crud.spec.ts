@@ -49,7 +49,7 @@ test.describe("Issues System", () => {
       await page
         .getByLabel("Description")
         .fill("The right flipper does not respond when button is pressed");
-      await page.getByTestId("severity-select").selectOption("playable");
+      await page.getByTestId("severity-select").selectOption("minor");
       await page.getByTestId("priority-select").selectOption("medium");
 
       // Submit form
@@ -131,7 +131,7 @@ test.describe("Issues System", () => {
       issueTitle = `Test Issue for Details ${Date.now()}`;
       await page.goto(`/report?machine=${machineInitials}`);
       await page.getByLabel("Issue Title *").fill(issueTitle);
-      await page.getByTestId("severity-select").selectOption("playable");
+      await page.getByTestId("severity-select").selectOption("minor");
       await page.getByTestId("priority-select").selectOption("medium");
       await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
@@ -173,7 +173,7 @@ test.describe("Issues System", () => {
       // Should show status and severity badges
       await expect(page.getByTestId("issue-status-badge")).toHaveText(/New/i);
       await expect(page.getByTestId("issue-severity-badge")).toHaveText(
-        /Playable/i
+        /Minor/i
       );
 
       // Should show timeline

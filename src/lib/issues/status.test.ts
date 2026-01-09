@@ -18,9 +18,7 @@ describe("Issue Status Utilities", () => {
 
     it("should return CircleDot for in-progress statuses", () => {
       expect(getIssueStatusIcon(ISSUE_STATUSES.IN_PROGRESS)).toBe(CircleDot);
-      expect(getIssueStatusIcon(ISSUE_STATUSES.WAITING_ON_OWNER)).toBe(
-        CircleDot
-      );
+      expect(getIssueStatusIcon(ISSUE_STATUSES.WAIT_OWNER)).toBe(CircleDot);
     });
 
     it("should return Disc for closed statuses", () => {
@@ -33,8 +31,9 @@ describe("Issue Status Utilities", () => {
     it("should return correct labels", () => {
       expect(getIssueStatusLabel("new")).toBe("New");
       expect(getIssueStatusLabel("confirmed")).toBe("Confirmed");
-      expect(getIssueStatusLabel("in_progress")).toBe("Work in Progress");
+      expect(getIssueStatusLabel("in_progress")).toBe("In Progress");
       expect(getIssueStatusLabel("fixed")).toBe("Fixed");
+      expect(getIssueStatusLabel("wai")).toBe("As Intended");
     });
   });
 

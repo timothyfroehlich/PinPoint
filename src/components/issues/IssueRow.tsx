@@ -3,6 +3,7 @@ import Link from "next/link";
 import { cn } from "~/lib/utils";
 import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
+import { formatIssueId } from "~/lib/issues/utils";
 import type { Issue } from "~/lib/types";
 
 interface IssueRowProps {
@@ -55,7 +56,7 @@ export function IssueRow({ issue }: IssueRowProps): React.JSX.Element {
 
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           <span className="font-mono">
-            {issue.machineInitials}-{issue.issueNumber}
+            {formatIssueId(issue.machineInitials, issue.issueNumber)}
           </span>
           <span>•</span>
           <span className="font-medium text-foreground/80">

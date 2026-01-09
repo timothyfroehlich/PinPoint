@@ -28,16 +28,16 @@ export const ISSUE_STATUSES = {
   CONFIRMED: "confirmed",
 
   // In Progress group (4)
-  WAITING_ON_OWNER: "waiting_on_owner",
+  WAIT_OWNER: "wait_owner",
   IN_PROGRESS: "in_progress",
-  NEEDS_PARTS: "needs_parts",
-  NEEDS_EXPERT: "needs_expert",
+  NEED_PARTS: "need_parts",
+  NEED_HELP: "need_help",
 
   // Closed group (5)
   FIXED: "fixed",
   WONT_FIX: "wont_fix",
-  WORKS_AS_INTENDED: "works_as_intended",
-  NOT_REPRODUCIBLE: "not_reproducible",
+  WAI: "wai",
+  NO_REPRO: "no_repro",
   DUPLICATE: "duplicate",
 } as const;
 
@@ -48,34 +48,38 @@ export const ALL_ISSUE_STATUSES = Object.values(ISSUE_STATUSES);
 export const ISSUE_STATUS_VALUES = [
   "new",
   "confirmed",
-  "waiting_on_owner",
   "in_progress",
-  "needs_parts",
-  "needs_expert",
+  "need_parts",
+  "need_help",
+  "wait_owner",
   "fixed",
   "wont_fix",
-  "works_as_intended",
-  "not_reproducible",
+  "wai",
+  "no_repro",
   "duplicate",
 ] as const;
 
 // Derive the type from the array (this is the canonical IssueStatus type)
 export type IssueStatus = (typeof ISSUE_STATUS_VALUES)[number];
 
+// Shared styling constants
+export const ISSUE_BADGE_WIDTH = "w-[120px]";
+export const ISSUE_BADGE_MIN_WIDTH_STRIP = "min-w-[100px]";
+
 // Status groups (using constants)
 export const STATUS_GROUPS = {
   new: [ISSUE_STATUSES.NEW, ISSUE_STATUSES.CONFIRMED],
   in_progress: [
-    ISSUE_STATUSES.WAITING_ON_OWNER,
     ISSUE_STATUSES.IN_PROGRESS,
-    ISSUE_STATUSES.NEEDS_PARTS,
-    ISSUE_STATUSES.NEEDS_EXPERT,
+    ISSUE_STATUSES.NEED_PARTS,
+    ISSUE_STATUSES.NEED_HELP,
+    ISSUE_STATUSES.WAIT_OWNER,
   ],
   closed: [
     ISSUE_STATUSES.FIXED,
     ISSUE_STATUSES.WONT_FIX,
-    ISSUE_STATUSES.WORKS_AS_INTENDED,
-    ISSUE_STATUSES.NOT_REPRODUCIBLE,
+    ISSUE_STATUSES.WAI,
+    ISSUE_STATUSES.NO_REPRO,
     ISSUE_STATUSES.DUPLICATE,
   ],
 } as const;
@@ -100,108 +104,258 @@ export const ALL_STATUS_OPTIONS: IssueStatus[] = [
 
 export const STATUS_OPTIONS = ALL_STATUS_OPTIONS; // Alias for form use
 
+/**
+ * Field Configuration: One place to rule them all.
+ * Contains labels, descriptions, icons, and styles for all issue metadata.
+ */
+
+export const STATUS_CONFIG: Record<
+  IssueStatus,
+  { label: string; description: string; styles: string; icon: LucideIcon }
+> = {
+  new: {
+    label: "New",
+    description: "Just reported, needs triage",
+    styles: "bg-cyan-500/20 text-cyan-400 border-cyan-500",
+    icon: Circle,
+  },
+  confirmed: {
+    label: "Confirmed",
+    description: "Verified as a actual issue",
+    styles: "bg-teal-500/20 text-teal-400 border-teal-500",
+    icon: Circle,
+  },
+  in_progress: {
+    label: "In Progress",
+    description: "Active repair underway",
+    styles: "bg-fuchsia-500/20 text-fuchsia-400 border-fuchsia-500",
+    icon: CircleDot,
+  },
+  need_parts: {
+    label: "Need Parts",
+    description: "Waiting on new parts",
+    styles: "bg-purple-600/20 text-purple-300 border-purple-600",
+    icon: CircleDot,
+  },
+  need_help: {
+    label: "Need Help",
+    description: "Escalated to expert help",
+    styles: "bg-pink-500/20 text-pink-400 border-pink-500",
+    icon: CircleDot,
+  },
+  wait_owner: {
+    label: "Pending Owner",
+    description: "Pending owner decision/action",
+    styles: "bg-purple-500/20 text-purple-400 border-purple-500",
+    icon: CircleDot,
+  },
+  fixed: {
+    label: "Fixed",
+    description: "Issue is resolved",
+    styles: "bg-green-500/20 text-green-400 border-green-500",
+    icon: Disc,
+  },
+  wai: {
+    label: "As Intended",
+    description: "Working as intended, no action required",
+    styles: "bg-zinc-500/20 text-zinc-400 border-zinc-500",
+    icon: Disc,
+  },
+  wont_fix: {
+    label: "Won't Fix",
+    description: "Issue can't or won't be fixed",
+    styles: "bg-zinc-500/20 text-zinc-400 border-zinc-500",
+    icon: Disc,
+  },
+  no_repro: {
+    label: "No Repro",
+    description: "Couldn't make it happen again",
+    styles: "bg-slate-500/20 text-slate-400 border-slate-500",
+    icon: Disc,
+  },
+  duplicate: {
+    label: "Duplicate",
+    description: "Already reported elsewhere",
+    styles: "bg-neutral-600/20 text-neutral-400 border-neutral-600",
+    icon: Disc,
+  },
+};
+
+export const SEVERITY_CONFIG: Record<
+  IssueSeverity,
+  { label: string; styles: string; icon: LucideIcon }
+> = {
+  cosmetic: {
+    label: "Cosmetic",
+    styles: "bg-amber-200/20 text-amber-300 border-amber-500",
+    icon: AlertTriangle,
+  },
+  minor: {
+    label: "Minor",
+    styles: "bg-amber-400/20 text-amber-400 border-amber-500",
+    icon: AlertTriangle,
+  },
+  major: {
+    label: "Major",
+    styles: "bg-amber-500/20 text-amber-500 border-amber-500",
+    icon: AlertTriangle,
+  },
+  unplayable: {
+    label: "Unplayable",
+    styles: "bg-amber-600/20 text-amber-600 border-amber-500",
+    icon: AlertTriangle,
+  },
+};
+
+export const PRIORITY_CONFIG: Record<
+  IssuePriority,
+  { label: string; styles: string; icon: LucideIcon }
+> = {
+  low: {
+    label: "Low",
+    styles: "bg-purple-950/50 text-purple-600 border-purple-500",
+    icon: TrendingUp,
+  },
+  medium: {
+    label: "Medium",
+    styles: "bg-purple-900/50 text-purple-400 border-purple-500",
+    icon: TrendingUp,
+  },
+  high: {
+    label: "High",
+    styles: "bg-purple-500/20 text-purple-200 border-purple-500",
+    icon: TrendingUp,
+  },
+};
+
+export const CONSISTENCY_CONFIG: Record<
+  IssueConsistency,
+  { label: string; styles: string; icon: LucideIcon }
+> = {
+  intermittent: {
+    label: "Intermittent",
+    styles: "bg-cyan-950/50 text-cyan-600 border-cyan-500",
+    icon: Repeat,
+  },
+  frequent: {
+    label: "Frequent",
+    styles: "bg-cyan-900/50 text-cyan-400 border-cyan-500",
+    icon: Repeat,
+  },
+  constant: {
+    label: "Constant",
+    styles: "bg-cyan-500/20 text-cyan-200 border-cyan-500",
+    icon: Repeat,
+  },
+};
+
+// Getter functions updated to use config
+interface ConfigValue {
+  label: string;
+  description: string;
+  styles: string;
+  icon: LucideIcon;
+}
+
 export function getIssueStatusIcon(status: IssueStatus): LucideIcon {
-  if ((NEW_STATUSES as readonly string[]).includes(status)) return Circle;
-  if ((IN_PROGRESS_STATUSES as readonly string[]).includes(status))
-    return CircleDot;
-  return Disc;
+  const config = (STATUS_CONFIG as Record<string, ConfigValue | undefined>)[
+    status
+  ];
+  return config ? config.icon : Circle;
 }
 
 export function getIssueStatusLabel(status: IssueStatus): string {
-  const labels: Record<IssueStatus, string> = {
-    new: "New",
-    confirmed: "Confirmed",
-    waiting_on_owner: "Waiting on Owner",
-    in_progress: "Work in Progress",
-    needs_parts: "Needs Parts",
-    needs_expert: "Needs Expert Help",
-    fixed: "Fixed",
-    wont_fix: "Won't Fix",
-    works_as_intended: "Works as Intended",
-    not_reproducible: "Not Reproducible",
-    duplicate: "Duplicate",
-  };
-  return labels[status];
+  const config = (STATUS_CONFIG as Record<string, ConfigValue | undefined>)[
+    status
+  ];
+  return config ? config.label : (status as string);
 }
 
-export const STATUS_STYLES: Record<IssueStatus, string> = {
-  // New group - Cyan
-  new: "bg-cyan-500/20 text-cyan-400 border-cyan-500",
-  confirmed: "bg-teal-500/20 text-teal-400 border-teal-500",
-  // In Progress group - Purple/Fuchsia
-  waiting_on_owner: "bg-purple-500/20 text-purple-400 border-purple-500",
-  in_progress: "bg-fuchsia-500/20 text-fuchsia-400 border-fuchsia-500",
-  needs_parts: "bg-purple-600/20 text-purple-300 border-purple-600",
-  needs_expert: "bg-pink-500/20 text-pink-400 border-pink-500",
-  // Closed group - Green/Gray
-  fixed: "bg-green-500/20 text-green-400 border-green-500",
-  works_as_intended: "bg-emerald-500/20 text-emerald-400 border-emerald-500",
-  wont_fix: "bg-zinc-500/20 text-zinc-400 border-zinc-500",
-  not_reproducible: "bg-slate-500/20 text-slate-400 border-slate-500",
-  duplicate: "bg-neutral-600/20 text-neutral-400 border-neutral-600",
-};
+export function getIssueStatusDescription(status: IssueStatus): string {
+  const config = (STATUS_CONFIG as Record<string, ConfigValue | undefined>)[
+    status
+  ];
+  return config ? config.description : "Unknown status";
+}
 
-export const SEVERITY_STYLES: Record<IssueSeverity, string> = {
-  cosmetic: "bg-amber-100/15 text-amber-200 border-amber-500/30",
-  minor: "bg-amber-300/20 text-amber-300 border-amber-500/50",
-  major: "bg-amber-500/25 text-amber-400 border-amber-500/70",
-  unplayable: "bg-amber-600/30 text-amber-500 border-amber-600",
-};
-
-export const PRIORITY_STYLES: Record<IssuePriority, string> = {
-  low: "bg-purple-950/40 text-purple-500 border-purple-500/30",
-  medium: "bg-purple-900/40 text-purple-300 border-purple-500/50",
-  high: "bg-purple-500/20 text-purple-100 border-purple-500/70",
-};
+export function getIssueStatusStyles(status: IssueStatus): string {
+  const config = (STATUS_CONFIG as Record<string, ConfigValue | undefined>)[
+    status
+  ];
+  return config
+    ? config.styles
+    : "bg-slate-500/20 text-slate-400 border-slate-500";
+}
 
 export function getIssueSeverityLabel(severity: IssueSeverity): string {
-  const labels: Record<IssueSeverity, string> = {
-    cosmetic: "Cosmetic",
-    minor: "Minor",
-    major: "Major",
-    unplayable: "Unplayable",
-  };
-  return labels[severity];
+  const config = (
+    SEVERITY_CONFIG as Record<string, { label: string } | undefined>
+  )[severity];
+  return config ? config.label : (severity as string);
 }
 
 export function getIssuePriorityLabel(priority: IssuePriority): string {
-  const labels: Record<IssuePriority, string> = {
-    low: "Low",
-    medium: "Medium",
-    high: "High",
-  };
-  return labels[priority];
+  const config = (
+    PRIORITY_CONFIG as Record<string, { label: string } | undefined>
+  )[priority];
+  return config ? config.label : (priority as string);
 }
 
 export function getIssueConsistencyLabel(
   consistency: IssueConsistency
 ): string {
-  const labels: Record<IssueConsistency, string> = {
-    intermittent: "Intermittent",
-    frequent: "Frequent",
-    constant: "Constant",
-  };
-  return labels[consistency];
+  const config = (
+    CONSISTENCY_CONFIG as Record<string, { label: string } | undefined>
+  )[consistency];
+  return config ? config.label : (consistency as string);
 }
 
 export function getIssueSeverityStyles(severity: IssueSeverity): string {
-  return SEVERITY_STYLES[severity];
+  return SEVERITY_CONFIG[severity].styles;
 }
 
 export function getIssuePriorityStyles(priority: IssuePriority): string {
-  return PRIORITY_STYLES[priority];
+  return PRIORITY_CONFIG[priority].styles;
 }
 
 export function getIssueConsistencyStyles(
   consistency: IssueConsistency
 ): string {
-  return CONSISTENCY_STYLES[consistency];
+  return CONSISTENCY_CONFIG[consistency].styles;
 }
 
+// Manual export for component use (easier for Tim to read/change)
+export const STATUS_STYLES: Record<IssueStatus, string> = {
+  new: STATUS_CONFIG.new.styles,
+  confirmed: STATUS_CONFIG.confirmed.styles,
+  wait_owner: STATUS_CONFIG.wait_owner.styles,
+  in_progress: STATUS_CONFIG.in_progress.styles,
+  need_parts: STATUS_CONFIG.need_parts.styles,
+  need_help: STATUS_CONFIG.need_help.styles,
+  fixed: STATUS_CONFIG.fixed.styles,
+  wai: STATUS_CONFIG.wai.styles,
+  wont_fix: STATUS_CONFIG.wont_fix.styles,
+  no_repro: STATUS_CONFIG.no_repro.styles,
+  duplicate: STATUS_CONFIG.duplicate.styles,
+};
+
+export const SEVERITY_STYLES: Record<IssueSeverity, string> = {
+  cosmetic: SEVERITY_CONFIG.cosmetic.styles,
+  minor: SEVERITY_CONFIG.minor.styles,
+  major: SEVERITY_CONFIG.major.styles,
+  unplayable: SEVERITY_CONFIG.unplayable.styles,
+};
+
+export const PRIORITY_STYLES: Record<IssuePriority, string> = {
+  low: PRIORITY_CONFIG.low.styles,
+  medium: PRIORITY_CONFIG.medium.styles,
+  high: PRIORITY_CONFIG.high.styles,
+};
+
 export const CONSISTENCY_STYLES: Record<IssueConsistency, string> = {
-  intermittent: "bg-cyan-950/40 text-cyan-500 border-cyan-500/30",
-  frequent: "bg-cyan-900/40 text-cyan-300 border-cyan-500/50",
-  constant: "bg-cyan-500/20 text-cyan-100 border-cyan-500/70",
+  intermittent: CONSISTENCY_CONFIG.intermittent.styles,
+  frequent: CONSISTENCY_CONFIG.frequent.styles,
+  constant: CONSISTENCY_CONFIG.constant.styles,
 };
 
 export const ISSUE_FIELD_ICONS = {

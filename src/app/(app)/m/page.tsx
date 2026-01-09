@@ -11,13 +11,7 @@ import {
   getMachineStatusStyles,
   type IssueForStatus,
 } from "~/lib/machines/status";
-const CLOSED_STATUSES = [
-  "fixed",
-  "wont_fix",
-  "works_as_intended",
-  "not_reproducible",
-  "duplicate",
-] as const;
+import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
