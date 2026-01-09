@@ -1,5 +1,6 @@
 import type React from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { machines } from "~/server/db/schema";
@@ -16,8 +17,6 @@ import { Badge } from "~/components/ui/badge";
 import { Plus } from "lucide-react";
 import { cn } from "~/lib/utils";
 
-import { redirect } from "next/navigation";
-
 /**
  * Machines List Page (Protected Route)
  *
@@ -32,7 +31,7 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    redirect("/login?next=%2Fm");
   }
 
   // Query machines with their open issues (direct Drizzle query - no DAL)

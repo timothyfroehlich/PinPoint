@@ -1,52 +1,91 @@
 # PinPoint Development Instructions (Claude Code)
 
-@AGENTS.md
+## Essential Context
 
-## Claude Code Specific Features
+**Primary**: @AGENTS.md - Universal baseline for all agents
+**Gemini**: @GEMINI.md - Gemini-specific context
+**Skills**: Use Agent Skills in `.claude/skills/` for on-demand detailed guidance
 
-### Mandatory Context7 Usage
+## Claude Code-Specific Features
 
-- **When**: Working with any library/framework (Drizzle, Supabase, Next.js, shadcn/ui, Server Components, Server Actions, Vitest)
-- **Why**: Training cutoff January 2025, current date November 2025 - 10+ months behind
+### Context7 MCP Integration
+
+- **When**: Working with libraries (Drizzle, Supabase, Next.js, shadcn/ui, Server Components, Server Actions, Vitest)
+- **Why**: Training cutoff January 2025, current December 2025 - need latest docs
 - **Process**: `resolve-library-id` → `get-library-docs` → Apply current patterns
 
-### Essential Documentation (Auto-Load)
+### Agent Skills (On-Demand Loading)
 
-- **@docs/NON_NEGOTIABLES.md** - Static analysis patterns
-- **@docs/TYPESCRIPT_STRICTEST_PATTERNS.md** - Type safety patterns
-- **@package.json** - Available scripts, dependencies, and project configuration
+Claude Code automatically loads skills when relevant. Available skills:
 
-## Claude Code Command Guidance
+- **pinpoint-security** - CSP, auth, input validation, Supabase SSR
+- **pinpoint-testing** - Test pyramid, PGlite, Playwright, E2E
+- **pinpoint-typescript** - Strictest patterns, type guards, optional properties
+- **pinpoint-ui** - shadcn/ui, progressive enhancement, Server Components
+- **pinpoint-patterns** - Server Actions, data fetching, file organization
 
-### Safe Command Alternatives
+Skills load ~100 tokens of metadata always, full content only when needed.
+
+### Specialized Subagents
+
+- **enforcer** - Code review with XML-guided workflows
+- **investigator** - Deep read-only analysis and diagnostics
+- **Explore** - Fast codebase exploration and search
+
+Use Task tool to launch these agents when appropriate.
+
+### Safe Command Patterns
 
 - **Search**: `rg --files | rg "pattern"`, `rg -l "content" --type js`
 - **Discovery**: `fd "*.js"`, `fd --type f --changed-within 1day`
 - **Repository**: `git ls-files | grep "\.js$"`
 
-### Tool Usage Patterns
+### Tool Usage Best Practices
 
-- **Task Management**: Use TodoWrite tool for complex multi-step tasks
-- **Investigation**: Use investigator agent for comprehensive read-only analysis
-- **Enforcement**: Use enforcer agent for systematic code review validation
+- **TodoWrite**: Use for complex multi-step tasks to track progress
+- **Task**: Launch specialized agents for deep analysis or systematic work
+- **Skills**: Loaded automatically when context matches (security, testing, UI, etc.)
 
-## Specialized Agents
+## Documentation Structure
 
-### Available Subagents
+**Auto-loaded by Claude Code**:
 
-- **enforcer** - Comprehensive code review analysis with XML-guided workflows
-- **investigator** - Deep systematic analysis and issue identification (read-only)
-- **Explore** - Fast agent for codebase exploration and search
+- This file (CLAUDE.md)
+- AGENTS.md (via @AGENTS.md reference)
+- package.json
+- Skills metadata (~500 tokens for 5 skills)
 
-### Available Commands
+**On-demand via Skills**:
 
-- **check-non-negotiables** - Automated pattern violation detection
+- docs/SECURITY.md (via `pinpoint-security` skill)
+- docs/TESTING_PLAN.md (via `pinpoint-testing` skill)
+- docs/TYPESCRIPT_STRICTEST_PATTERNS.md (via `pinpoint-typescript` skill)
+- docs/UI_GUIDE.md (via `pinpoint-ui` skill)
+- docs/PATTERNS.md (via `pinpoint-patterns` skill)
 
-## Documentation Philosophy
+**Explicit @-mentions**:
 
-- Actionable information only, no justifications or selling points
-- Focus on "what" and "how", not "why" something is beneficial
-- Designed for efficient LLM consumption, context reminders without persuasion
-- Don't commit with --no-verify unless explicitly instructed
+- @docs/NON_NEGOTIABLES.md
+- @docs/PRODUCT_SPEC.md
+- @docs/TECH_SPEC.md
+- etc.
 
-**Usage**: This serves as the Claude Code specific context. The @AGENTS.md file provides general project context for any AI agent.
+## Commit Best Practices
+
+- **Always run**: `pnpm run preflight` before committing
+- **Never skip**: Pre-commit hooks (unless explicitly instructed)
+- **Verify**: All tests pass, type check passes, lint clean
+
+## Working with Multiple Worktrees
+
+Each worktree has its own ports and Supabase instance. See AGENTS.md for port allocation table.
+
+**Sync script**: `python3 scripts/sync_worktrees.py`
+**Config**: `supabase/config.toml` is marked `skip-worktree` in non-main worktrees
+
+## Philosophy
+
+- Actionable information only
+- Focus on "what" and "how", not "why"
+- Designed for efficient LLM consumption
+- Let skills provide deep dives on-demand

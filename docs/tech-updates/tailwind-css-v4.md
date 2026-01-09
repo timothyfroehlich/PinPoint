@@ -161,8 +161,8 @@ Incremental: ~0.008s (100x faster)
 
 ```bash
 # Current setup with v3 compatibility during RSC migration
-npm install tailwindcss@^4.0.0
-npm install @tailwindcss/postcss@^4.0.0
+pnpm install tailwindcss@^4.0.0
+pnpm install @tailwindcss/postcss@^4.0.0
 
 # Remove old v3 config
 rm tailwind.config.js
@@ -260,7 +260,7 @@ module.exports = {
 
 ### **Migration Steps**
 
-- [ ] **Install Tailwind v4**: `npm install tailwindcss@^4.0.0`
+- [ ] **Install Tailwind v4**: `pnpm install tailwindcss@^4.0.0`
 - [ ] **Remove config file**: Delete existing `tailwind.config.ts`
 - [ ] **Update CSS imports**: Replace v3 imports with single v4 import
 - [ ] **Migrate configuration**: Convert config patterns to CSS-based

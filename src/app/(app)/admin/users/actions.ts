@@ -5,23 +5,9 @@ import { db } from "~/server/db";
 import { userProfiles, unconfirmedUsers, authUsers } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 import { sendInviteEmail } from "~/lib/email/invite";
 import { headers } from "next/headers";
-
-const updateUserRoleSchema = z.object({
-  userId: z.string().uuid(),
-  newRole: z.enum(["guest", "member", "admin"]),
-  userType: z.enum(["active", "unconfirmed"]),
-});
-
-const inviteUserSchema = z.object({
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
-  email: z.string().email("Invalid email address"),
-  role: z.enum(["guest", "member"]), // Explicitly exclude "admin"
-  sendInvite: z.boolean().optional(),
-});
+import { inviteUserSchema, updateUserRoleSchema } from "./schema";
 
 async function verifyAdmin(userId: string): Promise<void> {
   const currentUserProfile = await db.query.userProfiles.findFirst({

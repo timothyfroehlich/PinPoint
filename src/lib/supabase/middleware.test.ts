@@ -84,7 +84,8 @@ describe("updateSession autologin", () => {
     const supabase = createSupabaseAuthMocks(null, null);
     createServerClientMock.mockReturnValue(supabase);
 
-    const request = makeRequest("http://localhost/dashboard", {
+    // Use a protected route to ensure redirect happens
+    const request = makeRequest("http://localhost/settings", {
       "x-skip-autologin": "true",
     });
 
@@ -99,7 +100,8 @@ describe("updateSession autologin", () => {
     const supabase = createSupabaseAuthMocks(null, null);
     createServerClientMock.mockReturnValue(supabase);
 
-    const request = makeRequest("http://localhost/dashboard");
+    // Use a protected route to ensure redirect happens
+    const request = makeRequest("http://localhost/settings");
     const response = await updateSession(request);
 
     expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled();
@@ -111,7 +113,8 @@ describe("updateSession autologin", () => {
     const supabase = createSupabaseAuthMocks(null, null);
     createServerClientMock.mockReturnValue(supabase);
 
-    const request = makeRequest("http://localhost/dashboard");
+    // Use a protected route to ensure redirect happens
+    const request = makeRequest("http://localhost/settings");
     const response = await updateSession(request);
 
     expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled();
@@ -122,7 +125,8 @@ describe("updateSession autologin", () => {
     const supabase = createSupabaseAuthMocks(null, null);
     createServerClientMock.mockReturnValue(supabase);
 
-    const request = makeRequest("http://localhost/dashboard?autologin=off");
+    // Use a protected route to ensure redirect happens
+    const request = makeRequest("http://localhost/settings?autologin=off");
     const response = await updateSession(request);
 
     expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled();
@@ -133,7 +137,8 @@ describe("updateSession autologin", () => {
     const supabase = createSupabaseAuthMocks(null, null);
     createServerClientMock.mockReturnValue(supabase);
 
-    const request = makeRequest("http://localhost/dashboard");
+    // Use a protected route to ensure redirect happens
+    const request = makeRequest("http://localhost/settings");
     request.cookies.set("skip_autologin", "true");
 
     const response = await updateSession(request);

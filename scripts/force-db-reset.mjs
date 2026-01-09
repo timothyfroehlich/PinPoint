@@ -1,7 +1,7 @@
 /**
  * Drops application tables in the local Supabase database.
  *
- * This script is used by `npm run db:reset` (and preflight) to ensure a clean
+ * This script is used by `pnpm run db:reset` (and preflight) to ensure a clean
  * slate before reapplying the Drizzle schema. It intentionally leaves the
  * Supabase auth schema untouched.
  */
@@ -24,6 +24,7 @@ const tables = [
   "issues",
   "machines",
   "user_profiles",
+  "unconfirmed_users",
 ];
 
 const client = postgres(databaseUrl);
@@ -35,6 +36,9 @@ async function dropTables() {
     // Use unsafe here only for static table names defined above
     await client.unsafe(`DROP TABLE IF EXISTS "${table}" CASCADE;`);
   }
+
+  // Drop Drizzle migrations schema to force re-migration
+  await client.unsafe(`DROP SCHEMA IF EXISTS drizzle CASCADE;`);
 
   console.log("✅ Tables dropped.");
 }

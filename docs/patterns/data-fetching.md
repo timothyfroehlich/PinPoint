@@ -2,7 +2,7 @@
 
 ## Server Component + Direct Drizzle Query
 
-```typescript
+````typescript
 // src/app/machines/[machineId]/page.tsx
 import { db } from "~/server/db";
 import { issues } from "~/server/db/schema";
@@ -34,6 +34,31 @@ export default async function MachineDetailPage({
 
   return <MachineDetailView machine={machine} />;
 }
+
+## Cached Data Fetching
+
+Use React's `cache()` to deduplicate requests for the same data within a single render pass (e.g., fetching the current user in both a layout and a page).
+
+```typescript
+// src/lib/data/user.ts
+import { cache } from "react";
+import { db } from "~/server/db";
+import { eq } from "drizzle-orm";
+import { userProfiles } from "~/server/db/schema";
+
+export const getCachedUser = cache(async (userId: string) => {
+  return db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, userId),
+  });
+});
+````
+
+**Key points:**
+
+- Wraps an async function to memoize the result for the duration of the request.
+- Essential for data needed in multiple components (Layout + Page) to avoid double DB hits.
+- Only works in Server Components.
+
 ```
 
 **Key points**:
@@ -42,3 +67,4 @@ export default async function MachineDetailPage({
 - Use `with` for relations instead of separate queries
 - Select specific columns to avoid over-fetching
 - Next.js 16: `params` is a Promise, must `await` before accessing properties
+```

@@ -42,7 +42,7 @@ const FORBIDDEN_PATTERNS = {
     patterns: [
       /supabase\/migrations\//g,
       /drizzle-kit generate/g,
-      /npm run db:generate/g
+      /pnpm run db:generate/g
     ],
     severity: 'CRITICAL', 
     message: 'Migration files forbidden in pre-beta phase (zero users, schema in flux)',
@@ -52,13 +52,13 @@ const FORBIDDEN_PATTERNS = {
   // Vitest Command Issues (HIGH)
   'Vitest Redirection': {
     patterns: [
-      /npm test.*2>&1/g,
+      /pnpm test.*2>&1/g,
       /vitest.*>>/g,
-      /npm test.*>/g
+      /pnpm test.*>/g
     ],
     severity: 'HIGH',
     message: 'Vitest interprets redirection as test name filters, breaking execution', 
-    solution: 'Use npm run test:brief or npm run test:verbose instead'
+    solution: 'Use pnpm run test:brief or pnpm run test:verbose instead'
   },
   
   // Database Naming Conventions (HIGH)

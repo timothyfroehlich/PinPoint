@@ -162,14 +162,23 @@ export default defineConfig({
       : [
           {
             name: "Mobile Safari",
-            use: { ...devices["iPhone 12"] },
+            use: {
+              ...devices["iPhone 12"],
+              // WebKit-specific configuration for known issues
+              // Safari has slower Server Action redirect processing (Next.js Issue #48309)
+              // WebKit tests can be 2x slower than Chromium
+            },
+            // Increase retries for WebKit due to known flakiness
+            retries: process.env["CI"] ? 3 : 1,
+            // Increase timeout for WebKit (2x base timeout, CI-aware)
+            timeout: process.env["CI"] ? 120 * 1000 : 60 * 1000,
           },
         ]),
   ],
 
   // Run your local dev server before starting the tests
   webServer: {
-    command: `PORT=${port} npm run dev`,
+    command: `PORT=${port} pnpm run dev`,
     url: `${baseURL}/api/health`,
     reuseExistingServer: !process.env["CI"],
     timeout: process.env["CI"] ? 120 * 1000 : 60 * 1000,

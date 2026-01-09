@@ -41,6 +41,7 @@ export const authUsers = authSchema.table("users", {
  */
 export const userProfiles = pgTable("user_profiles", {
   id: uuid("id").primaryKey(),
+  email: text("email").notNull().unique(),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   name: text("name")
@@ -111,6 +112,9 @@ export const machines = pgTable(
       sql`(owner_id IS NULL OR unconfirmed_owner_id IS NULL)`
     ),
     ownerIdIdx: index("idx_machines_owner_id").on(t.ownerId),
+    unconfirmedOwnerIdIdx: index("idx_machines_unconfirmed_owner_id").on(
+      t.unconfirmedOwnerId
+    ),
   })
 );
 
@@ -164,6 +168,10 @@ export const issues = pgTable(
     assignedToIdx: index("idx_issues_assigned_to").on(t.assignedTo),
     reportedByIdx: index("idx_issues_reported_by").on(t.reportedBy),
     statusIdx: index("idx_issues_status").on(t.status),
+    createdAtIdx: index("idx_issues_created_at").on(t.createdAt),
+    unconfirmedReportedByIdx: index("idx_issues_unconfirmed_reported_by").on(
+      t.unconfirmedReportedBy
+    ),
   })
 );
 

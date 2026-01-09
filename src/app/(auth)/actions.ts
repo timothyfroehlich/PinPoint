@@ -157,7 +157,7 @@ export async function loginAction(
       "Login server error"
     );
 
-    return err("SERVER", error instanceof Error ? error.message : "Unknown", {
+    return err("SERVER", "An unexpected error occurred", {
       submittedEmail,
     });
   }
@@ -255,8 +255,8 @@ export async function signupAction(
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- data.user check might be redundant by types but ensuring safety
     if (data.user && !data.session) {
       log.info(
-        { userId: data.user.id, action: "signup" },
-        "User signed up, confirmation required"
+        { userId: data.user.id, action: "signup", email: data.user.email },
+        "User signed up, confirmation required (no session)"
       );
 
       return err(
@@ -266,8 +266,13 @@ export async function signupAction(
     }
 
     log.info(
-      { userId: data.user.id, action: "signup" },
-      "User signed up successfully"
+      {
+        userId: data.user.id,
+        action: "signup",
+        hasSession: !!data.session,
+        email: data.user.email,
+      },
+      "User signed up successfully, redirecting to dashboard"
     );
     redirect("/dashboard");
   } catch (error) {
@@ -294,7 +299,7 @@ export async function signupAction(
       "Signup server error"
     );
 
-    return err("SERVER", error instanceof Error ? error.message : "Unknown");
+    return err("SERVER", "An unexpected error occurred");
   }
 }
 
@@ -337,8 +342,8 @@ export async function logoutAction(): Promise<void> {
       "Logout server error"
     );
   } finally {
-    // Always redirect to home after logout attempt
-    redirect("/");
+    // Always redirect to dashboard after logout attempt
+    redirect("/dashboard");
   }
 }
 
@@ -455,7 +460,7 @@ export async function forgotPasswordAction(
       },
       "Forgot password server error"
     );
-    return err("SERVER", error instanceof Error ? error.message : "Unknown");
+    return err("SERVER", "An unexpected error occurred");
   }
 }
 
@@ -548,6 +553,6 @@ export async function resetPasswordAction(
       "Reset password server error"
     );
 
-    return err("SERVER", error instanceof Error ? error.message : "Unknown");
+    return err("SERVER", "An unexpected error occurred");
   }
 }

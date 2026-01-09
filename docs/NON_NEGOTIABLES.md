@@ -123,6 +123,14 @@ trigger: always_on
 - **Do:** Create `handle_new_user()` trigger on `auth.users` table (AFTER INSERT)
 - **Don't:** Create user profiles manually in signup Server Actions (won't work for OAuth)
 
+**CORE-SSR-007:** Never query `auth.users` directly in application code
+
+- **Severity:** Critical
+- **Why:** Internal Supabase schema; breaks abstraction, couples to implementation details, may break with Supabase updates
+- **Do:** Query `user_profiles` table (which mirrors necessary auth data via database triggers)
+- **Don't:** Use raw SQL or Drizzle queries against `auth.users` in Server Actions or services
+- **Exception:** Database triggers (`supabase/seed.sql`) and test setup (`pglite.ts`) may reference `auth.users` for bootstrapping
+
 ---
 
 ## Security
@@ -323,6 +331,7 @@ trigger: always_on
 - **Forms in dropdown menus**: Don't use `<form>` inside `DropdownMenuItem` (dropdown closes before submission completes)
 - **Flash messages**: Don't use `setFlash()`/`readFlash()` for form feedback (use `useActionState` instead)
 - **Playwright arbitrary waits**: No `page.waitForTimeout()` in tests; assert on real UI state (add `data-testid` hooks if needed)
+- **Direct auth.users queries**: Never query Supabase's internal `auth.users` table in application code (use `user_profiles` instead)
 
 ---
 

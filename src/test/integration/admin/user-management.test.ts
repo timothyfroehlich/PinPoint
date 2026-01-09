@@ -69,6 +69,7 @@ describe("Admin User Management Integration", () => {
     // Manually insert profile.
     const adminProfileData = createTestUser({
       id: adminId,
+      email: adminEmail,
       firstName: "Admin",
       lastName: "User",
       role: "admin",
@@ -90,6 +91,7 @@ describe("Admin User Management Integration", () => {
 
     const targetProfileData = createTestUser({
       id: targetId,
+      email: targetEmail,
       firstName: "Target",
       lastName: "User",
       role: "member",

@@ -14,7 +14,9 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) throw new Error("Unauthorized");
+  if (!user) {
+    redirect("/login?next=%2Fsettings");
+  }
 
   // Fetch user profile
   const profile = await db.query.userProfiles.findFirst({
@@ -40,7 +42,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
   }
 
   if (!preferences) {
-    throw new Error("Failed to load notification preferences");
+    throw new Error("Failed to create notification preferences");
   }
 
   return (

@@ -66,7 +66,7 @@ describe("generateQrPngDataUrl", () => {
 
 **Step 3: Run targeted unit tests (expect failures)**
 
-- Command: `npm test -- src/lib/machines/report-url.test.ts src/lib/machines/qr.test.ts`
+- Command: `pnpm test -- src/lib/machines/report-url.test.ts src/lib/machines/qr.test.ts`
 
 **Step 4: Add helpers + dependency**
 
@@ -76,7 +76,7 @@ describe("generateQrPngDataUrl", () => {
 
 **Step 5: Re-run tests (expect pass)**
 
-- Command: `npm test -- src/lib/machines/report-url.test.ts src/lib/machines/qr.test.ts`
+- Command: `pnpm test -- src/lib/machines/report-url.test.ts src/lib/machines/qr.test.ts`
 
 ---
 
@@ -117,7 +117,7 @@ describe("resolveDefaultMachineId", () => {
 
 **Step 2: Run tests (expect fail)**
 
-- Command: `npm test -- src/app/report/default-machine.test.ts`
+- Command: `pnpm test -- src/app/report/default-machine.test.ts`
 
 **Step 3: Implement helper + apply in page**
 
@@ -132,7 +132,7 @@ describe("resolveDefaultMachineId", () => {
 
 **Step 5: Re-run tests (expect pass)**
 
-- Command: `npm test -- src/app/report/default-machine.test.ts`
+- Command: `pnpm test -- src/app/report/default-machine.test.ts`
 
 ---
 
@@ -167,7 +167,7 @@ describe("resolveDefaultMachineId", () => {
 
 **Step 5: Smoke test in browser**
 
-- Run `npm run dev`, open `/m/{initials}`, verify QR renders and download works.
+- Run `pnpm run dev`, open `/m/{initials}`, verify QR renders and download works.
 
 ---
 
@@ -175,15 +175,15 @@ describe("resolveDefaultMachineId", () => {
 
 **Step 1: Targeted tests**
 
-- `npm test -- src/lib/machines/report-url.test.ts src/lib/machines/qr.test.ts src/app/report/default-machine.test.ts`
+- `pnpm test -- src/lib/machines/report-url.test.ts src/lib/machines/qr.test.ts src/app/report/default-machine.test.ts`
 
 **Step 2: Lint/typecheck quick pass**
 
-- `npm run check`
+- `pnpm run check`
 
 **Step 3: Full gate before submit**
 
-- `npm run preflight` (required by repo rules)
+- `pnpm run preflight` (required by repo rules)
 
 **Step 4: Summarize changes**
 

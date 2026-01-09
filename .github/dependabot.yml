@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # npm dependencies with different cooldowns per update type
+  # pnpm dependencies with different cooldowns per update type
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
@@ -33,7 +33,7 @@ updates:
           - "patch"
     labels:
       - "dependencies"
-      - "npm"
+      - "pnpm"
 
   # GitHub Actions with 2-week cooldown
   - package-ecosystem: "github-actions"

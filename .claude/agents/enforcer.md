@@ -86,14 +86,14 @@ color: red
 ### Migration File Creation
 
 - **Pre-Beta Constraint**: NO migration files in `supabase/migrations/`
-- **Forbidden Commands**: `drizzle-kit generate`, `npm run db:generate`
+- **Forbidden Commands**: `drizzle-kit generate`, `pnpm run db:generate`
 - **Context**: Zero users, schema in flux, velocity over safety
 
 ### Vitest Command Issues
 
-- **Redirection Breaks Vitest**: `npm test 2>&1`, `vitest >>`
+- **Redirection Breaks Vitest**: `pnpm test 2>&1`, `vitest >>`
 - **Cause**: Vitest interprets redirection as test name filters
-- **Required**: Use `npm run test:brief`, `npm run test:verbose`
+- **Required**: Use `pnpm run test:brief`, `pnpm run test:verbose`
 
 ### Schema Modification Lock
 
@@ -146,7 +146,7 @@ color: red
   </memory-safety-check>
 
   <migration-prevention>
-    <scan-for patterns="supabase/migrations/|drizzle-kit generate|npm run db:generate">
+    <scan-for patterns="supabase/migrations/|drizzle-kit generate|pnpm run db:generate">
       <severity>CRITICAL</severity>
       <action>BLOCK_PR</action>
       <message>Migration files forbidden in pre-beta phase</message>
@@ -154,7 +154,7 @@ color: red
   </migration-prevention>
 
   <vitest-safety>
-    <scan-for patterns="npm test.*2>&1|vitest.*>>|npm test.*>">
+    <scan-for patterns="pnpm test.*2>&1|vitest.*>>|pnpm test.*>">
       <severity>CRITICAL</severity>
       <action>BLOCK_PR</action>
       <message>Vitest redirection breaks test execution</message>
@@ -239,25 +239,25 @@ color: red
 ```xml
 <quality-gates>
   <compilation>
-    <command>npm run typecheck</command>
+      <command>pnpm run typecheck</command>
     <requirement>MUST pass without errors</requirement>
     <failure-action>BLOCK_PR</failure-action>
   </compilation>
 
   <linting>
-    <command>npm run lint</command>
+      <command>pnpm run lint</command>
     <requirement>MUST pass without violations</requirement>
     <failure-action>BLOCK_PR</failure-action>
   </linting>
 
   <testing>
-    <command>npm run test:brief</command>
+      <command>pnpm run test:brief</command>
     <requirement>All relevant tests pass</requirement>
     <failure-action>INVESTIGATE_FAILURES</failure-action>
   </testing>
 
   <build>
-    <command>npm run build</command>
+      <command>pnpm run build</command>
     <requirement>Successful completion</requirement>
     <failure-action>BLOCK_PR</failure-action>
   </build>

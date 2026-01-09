@@ -51,7 +51,7 @@ color: blue
 
 ### Error Analysis Workflow
 
-1. **Quality Assessment**: Run `npm run typecheck:verbose`, `npm run lint:verbose`, `npm run test`
+1. **Quality Assessment**: Run `pnpm run typecheck:verbose`, `pnpm run lint:verbose`, `pnpm run test`
 2. **Pattern Detection**: Use `rg` searches for systematic issues and anti-patterns
 3. **Context Analysis**: Analyze related files, imports, and dependencies
 4. **Historical Analysis**: Review git history and GitHub issues for correlation
@@ -78,33 +78,33 @@ color: blue
 
 ```bash
 # TypeScript Analysis (Brief & Verbose)
-npm run typecheck
-npm run typecheck:brief
-npm run typecheck:verbose
+pnpm run typecheck
+pnpm run typecheck:brief
+pnpm run typecheck:verbose
 
 # Linting Analysis (Brief & Verbose)
-npm run lint
-npm run lint:brief
-npm run lint:verbose
-npm run lint:eslint:verbose
+pnpm run lint
+pnpm run lint:brief
+pnpm run lint:verbose
+pnpm run lint:eslint:verbose
 
 # Format Checking (Read-Only)
-npm run format
-npm run format:brief
+pnpm run format
+pnpm run format:brief
 
 # Build Analysis
-npm run build
+pnpm run build
 ```
 
 ### Test Analysis
 
 ```bash
 # Test Execution & Analysis
-npm run test
-npm run test:watch
-npm run test:brief
-npm run test:rls
-npm run test:all
+pnpm run test
+pnpm run test:watch
+pnpm run test:brief
+pnpm run test:rls
+pnpm run test:all
 ```
 
 ### Search & Pattern Detection

@@ -73,7 +73,7 @@ _Migration-focused updates for Prisma → Drizzle direct conversion_
 
 ```bash
 # Generate Drizzle schema from existing Prisma
-npx drizzle-kit pull
+pnpm exec drizzle-kit pull
 # Or use Prisma generator for hybrid approach
 prisma generate
 ```
@@ -89,7 +89,7 @@ prisma generate
 
 ```bash
 # Generate migrations for testing
-npx drizzle-kit generate
+pnpm exec drizzle-kit generate
 # Mock with PGlite in vitest.setup.ts
 ```
 
@@ -97,13 +97,13 @@ npx drizzle-kit generate
 
 PinPoint uses Drizzle migrations as the primary way to evolve the schema.
 
-| Task                     | Command                                  | Use Case                                |
-| ------------------------ | ---------------------------------------- | --------------------------------------- |
-| **Schema Introspection** | `drizzle-kit pull`                       | Import existing DB schema               |
-| **Generate Migrations**  | `npm run db:generate -- --name <change>` | Create migration files from `schema.ts` |
-| **Apply Migrations**     | `npm run db:migrate`                     | Update local/preview/prod schema        |
-| **Quick Push**           | `drizzle-kit push`                       | Legacy direct schema sync (avoid prod)  |
-| **Prisma Integration**   | `prisma generate`                        | Generate from Prisma schema             |
+| Task                     | Command                                   | Use Case                                |
+| ------------------------ | ----------------------------------------- | --------------------------------------- |
+| **Schema Introspection** | `drizzle-kit pull`                        | Import existing DB schema               |
+| **Generate Migrations**  | `pnpm run db:generate -- --name <change>` | Create migration files from `schema.ts` |
+| **Apply Migrations**     | `pnpm run db:migrate`                     | Update local/preview/prod schema        |
+| **Quick Push**           | `drizzle-kit push`                        | Legacy direct schema sync (avoid prod)  |
+| **Prisma Integration**   | `prisma generate`                         | Generate from Prisma schema             |
 
 ## Common Conversion Patterns
 

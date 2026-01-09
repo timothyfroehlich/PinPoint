@@ -28,7 +28,7 @@ describe("e2e/global-setup", () => {
     await setup();
 
     expect(execSyncMock).toHaveBeenCalledTimes(1);
-    expect(execSyncMock).toHaveBeenCalledWith("npm run db:fast-reset", {
+    expect(execSyncMock).toHaveBeenCalledWith("pnpm run db:fast-reset", {
       stdio: "inherit",
       env: process.env,
     });
@@ -44,7 +44,7 @@ describe("e2e/global-setup", () => {
 
     await setup();
 
-    expect(execSyncMock).toHaveBeenCalledWith("npm run db:fast-reset", {
+    expect(execSyncMock).toHaveBeenCalledWith("pnpm run db:fast-reset", {
       stdio: "inherit",
       env: process.env,
     });
@@ -52,19 +52,22 @@ describe("e2e/global-setup", () => {
       stdio: "inherit",
       env: process.env,
     });
-    expect(execSyncMock).toHaveBeenCalledWith("npm run db:_push", {
+    expect(execSyncMock).toHaveBeenCalledWith("pnpm run db:_push", {
       stdio: "inherit",
       env: process.env,
     });
-    expect(execSyncMock).toHaveBeenCalledWith("npm run test:_generate-schema", {
+    expect(execSyncMock).toHaveBeenCalledWith(
+      "pnpm run test:_generate-schema",
+      {
+        stdio: "inherit",
+        env: process.env,
+      }
+    );
+    expect(execSyncMock).toHaveBeenCalledWith("pnpm run db:_seed", {
       stdio: "inherit",
       env: process.env,
     });
-    expect(execSyncMock).toHaveBeenCalledWith("npm run db:_seed", {
-      stdio: "inherit",
-      env: process.env,
-    });
-    expect(execSyncMock).toHaveBeenCalledWith("npm run db:_seed-users", {
+    expect(execSyncMock).toHaveBeenCalledWith("pnpm run db:_seed-users", {
       stdio: "inherit",
       env: process.env,
     });

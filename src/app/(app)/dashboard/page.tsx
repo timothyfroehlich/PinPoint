@@ -73,6 +73,16 @@ const getDashboardData = cache(async (userId?: string) => {
       })
     : Promise.resolve([]);
 
+  // Query 2b: Count of issues assigned to current user (Fixes capped count bug & optimizes)
+  const assignedIssuesCountPromise = userId
+    ? db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(issues)
+        .where(
+          and(eq(issues.assignedTo, userId), ne(issues.status, "resolved"))
+        )
+    : Promise.resolve([{ count: 0 }]);
+
   // Query 3: Recently reported issues (last 10, with machine and reporter)
   const recentIssuesPromise = db.query.issues.findMany({
     orderBy: desc(issues.createdAt),
@@ -137,6 +147,7 @@ const getDashboardData = cache(async (userId?: string) => {
   const [
     userProfile,
     assignedIssues,
+    assignedIssuesCountResult,
     recentIssues,
     unplayableMachines,
     totalOpenIssuesResult,
@@ -144,6 +155,7 @@ const getDashboardData = cache(async (userId?: string) => {
   ] = await Promise.all([
     userProfilePromise,
     assignedIssuesPromise,
+    assignedIssuesCountPromise,
     recentIssuesPromise,
     unplayableMachinesPromise,
     totalOpenIssuesPromise,
@@ -152,7 +164,7 @@ const getDashboardData = cache(async (userId?: string) => {
 
   const totalOpenIssues = totalOpenIssuesResult[0]?.count ?? 0;
   const machinesNeedingService = machinesNeedingServiceResult[0]?.count ?? 0;
-  const myIssuesCount = assignedIssues.length;
+  const myIssuesCount = assignedIssuesCountResult[0]?.count ?? 0;
 
   return {
     userProfile,
