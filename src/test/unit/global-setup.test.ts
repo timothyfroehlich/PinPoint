@@ -52,7 +52,7 @@ describe("e2e/global-setup", () => {
       stdio: "inherit",
       env: process.env,
     });
-    expect(execSyncMock).toHaveBeenCalledWith("pnpm run db:_push", {
+    expect(execSyncMock).toHaveBeenCalledWith("pnpm run db:migrate", {
       stdio: "inherit",
       env: process.env,
     });

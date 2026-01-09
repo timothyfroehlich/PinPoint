@@ -99,8 +99,8 @@ EMAIL_TRANSPORT=smtp
 EOF
 fi
 
-echo "📦 Applying database schema with Drizzle (db:_push)..."
-pnpm run db:_push
+echo "📦 Applying database schema with Drizzle migrations..."
+pnpm run db:migrate
 
 echo "🧪 Generating test schema..."
 pnpm run test:_generate-schema

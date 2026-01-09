@@ -107,8 +107,9 @@ export default defineConfig({
   // Global setup: Reset database before all tests
   globalSetup: "./e2e/global-setup.ts",
 
-  // Run tests sequentially for stability (Supabase + Next dev server)
-  fullyParallel: false,
+  // Run tests in parallel - tests use unique prefixes from e2e/support/test-isolation.ts
+  // to avoid conflicts when sharing the same database
+  fullyParallel: true,
 
   // Increased timeouts for stability in heavy load environments
   timeout: process.env["CI"] ? 60 * 1000 : 30 * 1000, // per-test timeout
@@ -122,8 +123,9 @@ export default defineConfig({
   // Retry on CI only
   retries: process.env["CI"] ? 2 : 0,
 
-  // Keep a single worker for stability across environments
-  workers: 1,
+  // Parallel workers: 2 in CI (conservative for shared DB), 1 locally for easier debugging
+  // Each worker gets a unique TEST_PARALLEL_INDEX for test isolation
+  workers: process.env["CI"] ? 2 : 1,
 
   // Reporters: print progress locally; keep CI quiet; never block on HTML
   reporter: process.env["CI"]
@@ -151,6 +153,10 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "firefox",
+      use: { ...devices["Desktop Firefox"] },
     },
     {
       name: "Mobile Chrome",
