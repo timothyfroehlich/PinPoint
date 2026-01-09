@@ -44,14 +44,13 @@ export default async function globalSetup(): Promise<void> {
     });
     console.log("✅ Database reset complete");
 
-    // Step 2: Push Drizzle schema - creates tables
-    // Note: This project doesn't use migration files, schema is managed by Drizzle
-    console.log("📋 Pushing Drizzle schema...");
-    execSync("pnpm run db:_push", {
+    // Step 2: Apply Drizzle migrations - creates tables via migration files
+    console.log("📋 Applying Drizzle migrations...");
+    execSync("pnpm run db:migrate", {
       stdio: "inherit",
       env: process.env,
     });
-    console.log("✅ Schema pushed");
+    console.log("✅ Migrations applied");
 
     console.log("🧪 Regenerating test schema...");
     execSync("pnpm run test:_generate-schema", {
