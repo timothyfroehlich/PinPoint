@@ -13,6 +13,9 @@ import type {
   IssueConsistency,
 } from "~/lib/types";
 
+// Re-export types for convenience
+export type { IssueSeverity, IssuePriority, IssueConsistency };
+
 /**
  * Single Source of Truth for Issue Status Values
  * Based on _issue-status-redesign/README.md - Final design with 11 statuses

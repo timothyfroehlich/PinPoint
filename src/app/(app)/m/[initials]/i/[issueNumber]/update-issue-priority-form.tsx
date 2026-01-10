@@ -1,20 +1,19 @@
 "use client";
 
 import type React from "react";
-import { useActionState } from "react";
+import { useState, useActionState } from "react";
 import { Loader2 } from "lucide-react";
 import {
   updateIssuePriorityAction,
   type UpdateIssuePriorityResult,
 } from "~/app/(app)/issues/actions";
+import { PrioritySelect } from "~/components/issues/fields/PrioritySelect";
 import { type IssuePriority } from "~/lib/types";
 
 interface UpdateIssuePriorityFormProps {
   issueId: string;
   currentPriority: IssuePriority;
 }
-
-const priorityOptions: IssuePriority[] = ["low", "medium", "high"];
 
 /**
  * Form component for updating issue priority with progressive enhancement.
@@ -24,36 +23,34 @@ export function UpdateIssuePriorityForm({
   issueId,
   currentPriority,
 }: UpdateIssuePriorityFormProps): React.JSX.Element {
+  const [selectedPriority, setSelectedPriority] =
+    useState<IssuePriority>(currentPriority);
   const [state, formAction, isPending] = useActionState<
     UpdateIssuePriorityResult | undefined,
     FormData
   >(updateIssuePriorityAction, undefined);
 
+  const handleValueChange = (newPriority: IssuePriority): void => {
+    setSelectedPriority(newPriority);
+    // Auto-submit form on value change
+    const form = document.querySelector('form[data-form="update-priority"]');
+    if (form instanceof HTMLFormElement) {
+      form.requestSubmit();
+    }
+  };
+
   return (
-    <form action={formAction} className="space-y-2">
+    <form action={formAction} className="space-y-2" data-form="update-priority">
       <input type="hidden" name="issueId" value={issueId} />
+      <input type="hidden" name="priority" value={selectedPriority} />
       <div className="relative">
-        <select
-          name="priority"
-          defaultValue={currentPriority}
-          aria-label="Update Issue Priority"
-          className="w-full rounded-md border border-outline-variant bg-surface px-3 py-2 pr-10 text-sm text-on-surface disabled:opacity-50"
-          data-testid="issue-priority-select"
+        <PrioritySelect
+          value={selectedPriority}
+          onValueChange={handleValueChange}
           disabled={isPending}
-          onChange={(e) => e.currentTarget.form?.requestSubmit()}
-        >
-          {priorityOptions.map((priority) => (
-            <option
-              key={priority}
-              value={priority}
-              data-testid={`priority-option-${priority}`}
-            >
-              {priority.charAt(0).toUpperCase() + priority.slice(1)}
-            </option>
-          ))}
-        </select>
+        />
         {isPending && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+          <div className="absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none">
             <Loader2 className="size-4 animate-spin text-muted-foreground" />
           </div>
         )}

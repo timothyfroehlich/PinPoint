@@ -1,12 +1,13 @@
 "use client";
 
 import type React from "react";
-import { useActionState } from "react";
+import { useState, useActionState } from "react";
 import { Loader2 } from "lucide-react";
 import {
   updateIssueSeverityAction,
   type UpdateIssueSeverityResult,
 } from "~/app/(app)/issues/actions";
+import { SeveritySelect } from "~/components/issues/fields/SeveritySelect";
 import { type IssueSeverity } from "~/lib/types";
 
 interface UpdateIssueSeverityFormProps {
@@ -14,47 +15,38 @@ interface UpdateIssueSeverityFormProps {
   currentSeverity: IssueSeverity;
 }
 
-const severityOptions: { value: IssueSeverity; label: string }[] = [
-  { value: "cosmetic", label: "Cosmetic" },
-  { value: "minor", label: "Minor" },
-  { value: "major", label: "Major" },
-  { value: "unplayable", label: "Unplayable" },
-];
-
 export function UpdateIssueSeverityForm({
   issueId,
   currentSeverity,
 }: UpdateIssueSeverityFormProps): React.JSX.Element {
+  const [selectedSeverity, setSelectedSeverity] =
+    useState<IssueSeverity>(currentSeverity);
   const [state, formAction, isPending] = useActionState<
     UpdateIssueSeverityResult | undefined,
     FormData
   >(updateIssueSeverityAction, undefined);
 
+  const handleValueChange = (newSeverity: IssueSeverity): void => {
+    setSelectedSeverity(newSeverity);
+    // Auto-submit form on value change
+    const form = document.querySelector('form[data-form="update-severity"]');
+    if (form instanceof HTMLFormElement) {
+      form.requestSubmit();
+    }
+  };
+
   return (
-    <form action={formAction} className="space-y-2">
+    <form action={formAction} className="space-y-2" data-form="update-severity">
       <input type="hidden" name="issueId" value={issueId} />
+      <input type="hidden" name="severity" value={selectedSeverity} />
       <div className="relative">
-        <select
-          name="severity"
-          defaultValue={currentSeverity}
-          aria-label="Update Issue Severity"
-          className="w-full rounded-md border border-outline-variant bg-surface px-3 py-2 pr-10 text-sm text-on-surface disabled:opacity-50"
-          data-testid="issue-severity-select"
+        <SeveritySelect
+          value={selectedSeverity}
+          onValueChange={handleValueChange}
           disabled={isPending}
-          onChange={(e) => e.currentTarget.form?.requestSubmit()}
-        >
-          {severityOptions.map((option) => (
-            <option
-              key={option.value}
-              value={option.value}
-              data-testid={`severity-option-${option.value}`}
-            >
-              {option.label}
-            </option>
-          ))}
-        </select>
+        />
         {isPending && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+          <div className="absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none">
             <Loader2 className="size-4 animate-spin text-muted-foreground" />
           </div>
         )}
