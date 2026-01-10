@@ -169,7 +169,7 @@ export const STATUS_CONFIG: Record<
   },
   no_repro: {
     label: "No Repro",
-    description: "Couldn't make it happen again",
+    description: "Couldn't reproduce",
     styles: "bg-slate-500/20 text-slate-400 border-slate-500",
     icon: Disc,
   },
