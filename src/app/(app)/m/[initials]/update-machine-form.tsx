@@ -31,7 +31,7 @@ export function UpdateMachineForm({
   allUsers,
   isAdmin,
 }: UpdateMachineFormProps): React.JSX.Element {
-  const [state, formAction] = useActionState<
+  const [state, formAction, isPending] = useActionState<
     UpdateMachineResult | undefined,
     FormData
   >(updateMachineAction, undefined);
@@ -110,6 +110,7 @@ export function UpdateMachineForm({
         <Button
           type="submit"
           className="flex-1 bg-primary text-on-primary hover:bg-primary/90"
+          loading={isPending}
         >
           Update Machine
         </Button>
