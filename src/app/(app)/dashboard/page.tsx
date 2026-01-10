@@ -8,22 +8,14 @@ import {
   Wrench,
   XCircle,
 } from "lucide-react";
-import { cn } from "~/lib/utils";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { issues, machines, userProfiles } from "~/server/db/schema";
-import { desc, eq, sql, and, ne } from "drizzle-orm";
+import { desc, eq, sql, and, notInArray } from "drizzle-orm";
+import { CLOSED_STATUSES } from "~/lib/issues/status";
+import type { Issue } from "~/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Badge } from "~/components/ui/badge";
-import {
-  getIssueStatusStyles,
-  getIssueSeverityStyles,
-  getIssueStatusLabel,
-  getIssueSeverityLabel,
-  isIssueStatus,
-  isIssueSeverity,
-} from "~/lib/issues/status";
-import { formatIssueId } from "~/lib/issues/utils";
+import { IssueCard } from "~/components/issues/IssueCard";
 
 /**
  * Cached dashboard data fetcher (CORE-PERF-001)
@@ -48,7 +40,7 @@ const getDashboardData = cache(async (userId?: string) => {
     ? db.query.issues.findMany({
         where: and(
           eq(issues.assignedTo, userId),
-          ne(issues.status, "resolved")
+          notInArray(issues.status, [...CLOSED_STATUSES])
         ),
         orderBy: desc(issues.createdAt),
         limit: 10,
@@ -66,6 +58,8 @@ const getDashboardData = cache(async (userId?: string) => {
           title: true,
           status: true,
           severity: true,
+          priority: true,
+          consistency: true,
           machineInitials: true,
           issueNumber: true,
           createdAt: true,
@@ -79,7 +73,10 @@ const getDashboardData = cache(async (userId?: string) => {
         .select({ count: sql<number>`count(*)::int` })
         .from(issues)
         .where(
-          and(eq(issues.assignedTo, userId), ne(issues.status, "resolved"))
+          and(
+            eq(issues.assignedTo, userId),
+            notInArray(issues.status, [...CLOSED_STATUSES])
+          )
         )
     : Promise.resolve([{ count: 0 }]);
 
@@ -107,6 +104,8 @@ const getDashboardData = cache(async (userId?: string) => {
       title: true,
       status: true,
       severity: true,
+      priority: true,
+      consistency: true,
       machineInitials: true,
       issueNumber: true,
       createdAt: true,
@@ -125,7 +124,10 @@ const getDashboardData = cache(async (userId?: string) => {
     .from(machines)
     .innerJoin(issues, eq(issues.machineInitials, machines.initials))
     .where(
-      and(eq(issues.severity, "unplayable"), ne(issues.status, "resolved"))
+      and(
+        eq(issues.severity, "unplayable"),
+        notInArray(issues.status, [...CLOSED_STATUSES])
+      )
     )
     .groupBy(machines.id, machines.name, machines.initials);
 
@@ -133,7 +135,7 @@ const getDashboardData = cache(async (userId?: string) => {
   const totalOpenIssuesPromise = db
     .select({ count: sql<number>`count(*)::int` })
     .from(issues)
-    .where(ne(issues.status, "resolved"));
+    .where(notInArray(issues.status, [...CLOSED_STATUSES]));
 
   // Query 6: Machines needing service (machines with at least one open issue)
   // Optimized to use count(distinct) instead of fetching all IDs
@@ -141,7 +143,7 @@ const getDashboardData = cache(async (userId?: string) => {
     .select({ count: sql<number>`count(distinct ${machines.id})::int` })
     .from(machines)
     .innerJoin(issues, eq(issues.machineInitials, machines.initials))
-    .where(ne(issues.status, "resolved"));
+    .where(notInArray(issues.status, [...CLOSED_STATUSES]));
 
   // Execute all queries in parallel
   const [
@@ -296,63 +298,13 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
             ) : (
               <div className="space-y-3" data-testid="assigned-issues-list">
                 {assignedIssues.map((issue) => (
-                  <Link
+                  <IssueCard
                     key={issue.id}
-                    href={`/m/${issue.machineInitials}/i/${issue.issueNumber}`}
-                  >
-                    <Card
-                      className={cn(
-                        "transition-all h-full cursor-pointer",
-                        issue.status === "resolved"
-                          ? "border-border/40 bg-muted/30 opacity-60 hover:opacity-100 grayscale hover:grayscale-0"
-                          : "border-primary/20 bg-card hover:border-primary hover:glow-primary"
-                      )}
-                      data-testid="assigned-issue-card"
-                    >
-                      <CardHeader>
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1">
-                            <CardTitle className="text-base text-foreground mb-1">
-                              <span className="text-muted-foreground font-mono mr-2">
-                                {formatIssueId(
-                                  issue.machineInitials,
-                                  issue.issueNumber
-                                )}
-                              </span>{" "}
-                              {issue.title}
-                            </CardTitle>
-                            <p className="text-sm text-muted-foreground">
-                              {issue.machine.name}
-                            </p>
-                          </div>
-                          <div className="flex gap-2">
-                            {/* Status Badge */}
-                            {isIssueStatus(issue.status) && (
-                              <Badge
-                                className={cn(
-                                  "px-2 py-1 text-xs font-semibold",
-                                  getIssueStatusStyles(issue.status)
-                                )}
-                              >
-                                {getIssueStatusLabel(issue.status)}
-                              </Badge>
-                            )}
-                            {/* Severity Badge */}
-                            {isIssueSeverity(issue.severity) && (
-                              <Badge
-                                className={cn(
-                                  "px-2 py-1 text-xs font-semibold",
-                                  getIssueSeverityStyles(issue.severity)
-                                )}
-                              >
-                                {getIssueSeverityLabel(issue.severity)}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </CardHeader>
-                    </Card>
-                  </Link>
+                    issue={issue as unknown as Issue}
+                    machine={{ name: issue.machine.name }}
+                    variant="compact"
+                    dataTestId="assigned-issue-card"
+                  />
                 ))}
               </div>
             )}
@@ -424,69 +376,16 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
               data-testid="recent-issues-list"
             >
               {recentIssues.map((issue) => (
-                <Link
+                <IssueCard
                   key={issue.id}
-                  href={`/m/${issue.machineInitials}/i/${issue.issueNumber}`}
-                >
-                  <Card
-                    className={cn(
-                      "transition-all h-full cursor-pointer",
-                      issue.status === "resolved"
-                        ? "border-border/40 bg-muted/30 opacity-60 hover:opacity-100 grayscale hover:grayscale-0"
-                        : "border-secondary/20 bg-card hover:border-secondary hover:glow-secondary"
-                    )}
-                    data-testid="recent-issue-card"
-                  >
-                    <CardHeader>
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <CardTitle className="text-base text-foreground mb-1">
-                            <span className="text-muted-foreground font-mono mr-2">
-                              {formatIssueId(
-                                issue.machineInitials,
-                                issue.issueNumber
-                              )}
-                            </span>{" "}
-                            {issue.title}
-                          </CardTitle>
-                          <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            <span>{issue.machine.name}</span>
-                            <span>
-                              Reported by{" "}
-                              {issue.reportedByUser?.name ??
-                                "Anonymous Reporter"}{" "}
-                              • {new Date(issue.createdAt).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex flex-col gap-2">
-                          {/* Status Badge */}
-                          {isIssueStatus(issue.status) && (
-                            <Badge
-                              className={cn(
-                                "px-2 py-1 text-xs font-semibold",
-                                getIssueStatusStyles(issue.status)
-                              )}
-                            >
-                              {getIssueStatusLabel(issue.status)}
-                            </Badge>
-                          )}
-                          {/* Severity Badge */}
-                          {isIssueSeverity(issue.severity) && (
-                            <Badge
-                              className={cn(
-                                "px-2 py-1 text-xs font-semibold",
-                                getIssueSeverityStyles(issue.severity)
-                              )}
-                            >
-                              {getIssueSeverityLabel(issue.severity)}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    </CardHeader>
-                  </Card>
-                </Link>
+                  issue={issue as unknown as Issue}
+                  machine={{ name: issue.machine.name }}
+                  showReporter={true}
+                  reporterName={
+                    issue.reportedByUser?.name ?? "Anonymous Reporter"
+                  }
+                  dataTestId="recent-issue-card"
+                />
               ))}
             </div>
           )}

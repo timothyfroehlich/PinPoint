@@ -11,6 +11,7 @@ import {
   getMachineStatusStyles,
   type IssueForStatus,
 } from "~/lib/machines/status";
+import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
@@ -57,7 +58,7 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
   const machinesWithStatus = allMachines.map((machine) => {
     const status = deriveMachineStatus(machine.issues as IssueForStatus[]);
     const openIssuesCount = machine.issues.filter(
-      (issue) => issue.status !== "resolved"
+      (issue) => !(CLOSED_STATUSES as readonly string[]).includes(issue.status)
     ).length;
 
     return {
@@ -155,7 +156,9 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
                             machine.issues.some(
                               (i) =>
                                 i.severity === "unplayable" &&
-                                i.status !== "resolved"
+                                !(
+                                  CLOSED_STATUSES as readonly string[]
+                                ).includes(i.status)
                             )
                               ? "text-destructive"
                               : "text-muted-foreground"

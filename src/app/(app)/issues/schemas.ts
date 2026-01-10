@@ -6,6 +6,7 @@
  */
 
 import { z } from "zod";
+import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
 
 const uuidish = z
   .string()
@@ -39,20 +40,25 @@ export const createIssueSchema = z.object({
     .min(2, "Machine initials invalid")
     .max(6, "Machine initials invalid")
     .regex(/^[A-Z0-9]+$/, "Machine initials invalid"),
-  severity: z.enum(["minor", "playable", "unplayable"], {
+  severity: z.enum(["cosmetic", "minor", "major", "unplayable"], {
     message: "Invalid severity level",
   }),
   priority: z.enum(["low", "medium", "high"], {
     message: "Invalid priority level",
   }),
+  consistency: z.enum(["intermittent", "frequent", "constant"], {
+    message: "Invalid consistency level",
+  }),
 });
 
 /**
  * Schema for updating issue status
+ * Based on _issue-status-redesign/README.md - Final design with 11 statuses
+ * Status values imported from single source of truth
  */
 export const updateIssueStatusSchema = z.object({
   issueId: uuidish,
-  status: z.enum(["new", "in_progress", "resolved"], {
+  status: z.enum(ISSUE_STATUS_VALUES, {
     message: "Invalid status",
   }),
 });
@@ -62,7 +68,7 @@ export const updateIssueStatusSchema = z.object({
  */
 export const updateIssueSeveritySchema = z.object({
   issueId: uuidish,
-  severity: z.enum(["minor", "playable", "unplayable"], {
+  severity: z.enum(["cosmetic", "minor", "major", "unplayable"], {
     message: "Invalid severity level",
   }),
 });
@@ -74,6 +80,16 @@ export const updateIssuePrioritySchema = z.object({
   issueId: uuidish,
   priority: z.enum(["low", "medium", "high"], {
     message: "Invalid priority level",
+  }),
+});
+
+/**
+ * Schema for updating issue consistency
+ */
+export const updateIssueConsistencySchema = z.object({
+  issueId: uuidish,
+  consistency: z.enum(["intermittent", "frequent", "constant"], {
+    message: "Invalid consistency level",
   }),
 });
 

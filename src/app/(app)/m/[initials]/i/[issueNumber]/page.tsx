@@ -1,36 +1,17 @@
 import type React from "react";
 import { redirect } from "next/navigation";
-import { cn } from "~/lib/utils";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { issues, userProfiles, authUsers } from "~/server/db/schema";
 import { eq, asc, and } from "drizzle-orm";
-import { Badge } from "~/components/ui/badge";
 import { PageShell } from "~/components/layout/PageShell";
 import { IssueTimeline } from "~/components/issues/IssueTimeline";
 import { IssueSidebar } from "~/components/issues/IssueSidebar";
-import {
-  getIssueStatusStyles,
-  getIssueSeverityStyles,
-  getIssuePriorityStyles,
-} from "~/lib/issues/status";
-import { type IssueSeverity, type IssuePriority } from "~/lib/types";
+import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
 import { formatIssueId } from "~/lib/issues/utils";
-
-const severityCopy: Record<IssueSeverity, string> = {
-  minor: "Minor",
-  playable: "Playable",
-  unplayable: "Unplayable",
-};
-
-const priorityCopy: Record<IssuePriority, string> = {
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-  critical: "Critical",
-};
+import type { Issue, IssueWithAllRelations } from "~/lib/types";
 
 /**
  * Issue Detail Page (Protected Route)
@@ -150,37 +131,16 @@ export default async function IssueDetailPage({
             {issue.title}
           </h1>
           <div className="flex flex-wrap items-center gap-2">
-            <Badge
-              data-testid="issue-status-badge"
-              className={cn(
-                "px-3 py-1 text-xs font-semibold border",
-                getIssueStatusStyles(issue.status)
-              )}
-            >
-              {issue.status === "in_progress"
-                ? "In Progress"
-                : issue.status.charAt(0).toUpperCase() + issue.status.slice(1)}
-            </Badge>
-
-            <Badge
-              data-testid="issue-severity-badge"
-              className={cn(
-                "px-3 py-1 text-xs font-semibold border",
-                getIssueSeverityStyles(issue.severity)
-              )}
-            >
-              {severityCopy[issue.severity]}
-            </Badge>
-
-            <Badge
-              data-testid="issue-priority-badge"
-              className={cn(
-                "px-3 py-1 text-xs font-semibold border",
-                getIssuePriorityStyles(issue.priority)
-              )}
-            >
-              {priorityCopy[issue.priority]}
-            </Badge>
+            <IssueBadgeGrid
+              issue={
+                issue as unknown as Pick<
+                  Issue,
+                  "status" | "severity" | "priority" | "consistency"
+                >
+              }
+              variant="strip"
+              size="lg"
+            />
           </div>
         </div>
       </div>
@@ -190,12 +150,12 @@ export default async function IssueDetailPage({
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             Activity
           </h2>
-          <IssueTimeline issue={issue} />
+          <IssueTimeline issue={issue as unknown as IssueWithAllRelations} />
         </section>
 
         {/* Sticky Sidebar */}
         <IssueSidebar
-          issue={issue}
+          issue={issue as unknown as IssueWithAllRelations}
           allUsers={allUsers}
           currentUserId={user.id}
         />

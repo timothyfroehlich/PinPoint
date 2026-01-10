@@ -62,8 +62,8 @@ export default withSentryConfig(nextConfig, {
   tunnelRoute: "/monitoring",
 
   // Automatically tree-shake Sentry logger statements to reduce bundle size
-  disableLogger: true,
-
-  // Enables automatic instrumentation of Vercel Cron Monitors.
-  automaticVercelMonitors: true,
+  // @ts-ignore - treeshake is a valid but potentially untyped property in some versions
+  treeshake: {
+    removeDebugLogging: true,
+  },
 });

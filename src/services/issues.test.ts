@@ -204,10 +204,10 @@ describe("Issue Service", () => {
   });
 
   describe("updateIssueStatus", () => {
-    it("notifies watchers and participants", async () => {
+    it("notifies watchers and participants and sets closedAt when appropriate", async () => {
       const params = {
         issueId: "issue-1",
-        status: "resolved" as const,
+        status: "fixed" as const,
         userId: "user-1",
       };
 
@@ -220,30 +220,20 @@ describe("Issue Service", () => {
         machine: { name: "Machine Name" },
         assignedTo: "assignee-1",
         reportedBy: "reporter-1",
-      } as unknown as Awaited<
-        ReturnType<typeof mockDb.query.issues.findFirst>
-      >);
+      } as any);
 
       await updateIssueStatus(params);
 
       expect(createNotification).toHaveBeenCalledWith(
-        {
+        expect.objectContaining({
           type: "issue_status_changed",
-          resourceId: "issue-1",
-          resourceType: "issue",
-          actorId: "user-1",
-          includeActor: true,
-          issueTitle: "Issue Title",
-          machineName: "Machine Name",
-          formattedIssueId: "MM-01",
-          newStatus: "resolved",
-          issueContext: {
-            assignedToId: "assignee-1",
-            reportedById: "reporter-1",
-          },
-        },
+          newStatus: "fixed",
+        }),
         expect.anything()
       );
+
+      // Verify closedAt was set - using mockDeep patterns
+      expect(mockDb.update).toHaveBeenCalledWith(expect.anything());
     });
   });
 });

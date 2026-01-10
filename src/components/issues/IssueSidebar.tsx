@@ -48,8 +48,9 @@ export function IssueSidebar({
                 <span className="text-sm text-muted-foreground">Reporter</span>
                 <div className="flex min-w-0 items-center gap-2">
                   <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-medium text-muted-foreground">
-                    {issue.reportedByUser?.name.slice(0, 1).toUpperCase() ??
-                      "U"}
+                    {(issue.reportedByUser?.name ?? "U")
+                      .slice(0, 1)
+                      .toUpperCase()}
                   </div>
                   <span className="max-w-[160px] truncate text-sm text-foreground">
                     {issue.reportedByUser?.name ?? "Unknown user"}

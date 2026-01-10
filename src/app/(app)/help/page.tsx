@@ -46,12 +46,17 @@ export default function HelpPage(): React.JSX.Element {
         </p>
         <ul className="space-y-2 text-sm text-muted-foreground">
           <li>
-            <span className="font-semibold">minor</span> – cosmetic or small
-            issues that do not change how the game plays.
+            <span className="font-semibold">cosmetic</span> – very minor issues
+            that do not affect gameplay at all (dirty playfield, minor bulb
+            out).
           </li>
           <li>
-            <span className="font-semibold">playable</span> – the game plays,
-            but something is clearly wrong (shots not registering, features
+            <span className="font-semibold">minor</span> – small issues that do
+            not change how the game plays, but might be noticeable.
+          </li>
+          <li>
+            <span className="font-semibold">major</span> – the game plays, but
+            something significant is wrong (shots not registering, features
             disabled, audio glitches).
           </li>
           <li>
@@ -76,8 +81,8 @@ export default function HelpPage(): React.JSX.Element {
             Comments can be added to track troubleshooting steps and fixes.
           </li>
           <li>
-            When the issue is resolved, the machine&apos;s status updates based
-            on its remaining open issues.
+            When the issue is <strong>fixed</strong>, the machine&apos;s status
+            updates based on its remaining open issues.
           </li>
         </ul>
       </section>

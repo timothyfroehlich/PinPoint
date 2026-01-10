@@ -149,14 +149,14 @@ describe("Machine CRUD Operations (PGlite)", () => {
         .values(testMachine)
         .returning();
 
-      // Create only resolved issues
+      // Create only fixed issues
       await db.insert(issues).values([
         createTestIssue(machine.initials, {
           title: "Fixed issue",
           issueNumber: 1,
           severity: "unplayable",
-          status: "resolved",
-          resolvedAt: new Date(),
+          status: "fixed",
+          closedAt: new Date(),
         }),
       ]);
 
@@ -191,12 +191,12 @@ describe("Machine CRUD Operations (PGlite)", () => {
         .values(testMachine)
         .returning();
 
-      // Create playable and minor issues
+      // Create major and minor issues
       await db.insert(issues).values([
         createTestIssue(machine.initials, {
-          title: "Playable issue",
+          title: "Major issue",
           issueNumber: 1,
-          severity: "playable",
+          severity: "major",
           status: "new",
         }),
         createTestIssue(machine.initials, {
@@ -272,12 +272,12 @@ describe("Machine CRUD Operations (PGlite)", () => {
       expect(status).toBe("unplayable");
     });
 
-    it("should ignore resolved issues when deriving status", async () => {
+    it("should ignore fixed issues when deriving status", async () => {
       const db = await getTestDb();
 
       // Create machine
       const testMachine = createTestMachine({
-        name: "Machine with resolved unplayable",
+        name: "Machine with fixed unplayable",
         initials: "MR",
       });
       const [machine] = await db
@@ -285,14 +285,14 @@ describe("Machine CRUD Operations (PGlite)", () => {
         .values(testMachine)
         .returning();
 
-      // Create resolved unplayable issue and open minor issue
+      // Create fixed unplayable issue and open minor issue
       await db.insert(issues).values([
         createTestIssue(machine.initials, {
           title: "Fixed unplayable issue",
           issueNumber: 1,
           severity: "unplayable",
-          status: "resolved",
-          resolvedAt: new Date(),
+          status: "fixed",
+          closedAt: new Date(),
         }),
         createTestIssue(machine.initials, {
           title: "Current minor issue",
