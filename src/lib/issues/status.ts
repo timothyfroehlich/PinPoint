@@ -249,65 +249,35 @@ export const CONSISTENCY_CONFIG: Record<
   },
 };
 
-// Getter functions updated to use config
-interface ConfigValue {
-  label: string;
-  description: string;
-  styles: string;
-  icon: LucideIcon;
-}
-
+// Getter functions - direct config access (type-safe, no assertions needed)
 export function getIssueStatusIcon(status: IssueStatus): LucideIcon {
-  const config = (STATUS_CONFIG as Record<string, ConfigValue | undefined>)[
-    status
-  ];
-  return config ? config.icon : Circle;
+  return STATUS_CONFIG[status].icon;
 }
 
 export function getIssueStatusLabel(status: IssueStatus): string {
-  const config = (STATUS_CONFIG as Record<string, ConfigValue | undefined>)[
-    status
-  ];
-  return config ? config.label : (status as string);
+  return STATUS_CONFIG[status].label;
 }
 
 export function getIssueStatusDescription(status: IssueStatus): string {
-  const config = (STATUS_CONFIG as Record<string, ConfigValue | undefined>)[
-    status
-  ];
-  return config ? config.description : "Unknown status";
+  return STATUS_CONFIG[status].description;
 }
 
 export function getIssueStatusStyles(status: IssueStatus): string {
-  const config = (STATUS_CONFIG as Record<string, ConfigValue | undefined>)[
-    status
-  ];
-  return config
-    ? config.styles
-    : "bg-slate-500/20 text-slate-400 border-slate-500";
+  return STATUS_CONFIG[status].styles;
 }
 
 export function getIssueSeverityLabel(severity: IssueSeverity): string {
-  const config = (
-    SEVERITY_CONFIG as Record<string, { label: string } | undefined>
-  )[severity];
-  return config ? config.label : (severity as string);
+  return SEVERITY_CONFIG[severity].label;
 }
 
 export function getIssuePriorityLabel(priority: IssuePriority): string {
-  const config = (
-    PRIORITY_CONFIG as Record<string, { label: string } | undefined>
-  )[priority];
-  return config ? config.label : (priority as string);
+  return PRIORITY_CONFIG[priority].label;
 }
 
 export function getIssueConsistencyLabel(
   consistency: IssueConsistency
 ): string {
-  const config = (
-    CONSISTENCY_CONFIG as Record<string, { label: string } | undefined>
-  )[consistency];
-  return config ? config.label : (consistency as string);
+  return CONSISTENCY_CONFIG[consistency].label;
 }
 
 export function getIssueSeverityStyles(severity: IssueSeverity): string {

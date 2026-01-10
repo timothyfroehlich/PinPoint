@@ -277,7 +277,13 @@ describe("updateIssueConsistencyAction", () => {
       machineInitials: "MM",
       issueNumber: 1,
       reportedBy: mockUser.id,
+      assignedTo: null,
+      machine: { ownerId: "owner-123" },
     } as any);
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      role: "member",
+    } as any);
+    vi.mocked(canUpdateIssue).mockReturnValue(true);
     vi.mocked(updateIssueConsistency).mockResolvedValue({
       issueId: validUuid,
       oldConsistency: "intermittent",
@@ -291,6 +297,7 @@ describe("updateIssueConsistencyAction", () => {
     const result = await updateIssueConsistencyAction(initialState, formData);
 
     expect(result.ok).toBe(true);
+    expect(canUpdateIssue).toHaveBeenCalled();
     expect(updateIssueConsistency).toHaveBeenCalled();
   });
 });

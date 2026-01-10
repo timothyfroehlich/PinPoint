@@ -415,10 +415,39 @@ export async function updateIssueConsistencyAction(
   try {
     const currentIssue = await db.query.issues.findFirst({
       where: eq(issues.id, issueId),
-      columns: { machineInitials: true, issueNumber: true },
+      columns: {
+        machineInitials: true,
+        issueNumber: true,
+        reportedBy: true,
+        assignedTo: true,
+      },
+      with: {
+        machine: {
+          columns: { ownerId: true },
+        },
+      },
     });
 
     if (!currentIssue) return err("NOT_FOUND", "Issue not found");
+
+    // Permission check
+    const userProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true },
+    });
+
+    if (
+      !canUpdateIssue(
+        { id: user.id, role: userProfile?.role ?? "guest" },
+        currentIssue,
+        currentIssue.machine
+      )
+    ) {
+      return err(
+        "UNAUTHORIZED",
+        "You do not have permission to update this issue"
+      );
+    }
 
     // Update consistency
     await updateIssueConsistency({
