@@ -89,23 +89,18 @@ set -a
 source "$ENV_FILE"
 set +a
 
+# Use DIRECT_URL if DATABASE_URL is empty (Vercel production case)
+if [ -z "$DATABASE_URL" ] && [ -n "$DIRECT_URL" ]; then
+  echo "   Using DIRECT_URL (DATABASE_URL is empty)"
+  DATABASE_URL="$DIRECT_URL"
+fi
+
 if [ -z "$DATABASE_URL" ]; then
-  echo -e "${RED}Error: DATABASE_URL not found in $ENV_FILE${NC}"
+  echo -e "${RED}Error: Neither DATABASE_URL nor DIRECT_URL found in $ENV_FILE${NC}"
   exit 1
 fi
 
-# Extract password from DATABASE_URL using Node.js for safety
-DB_PASSWORD=$(node -e 'try { console.log(new URL(process.env.DATABASE_URL).password) } catch (e) { console.error(e); process.exit(1) }')
-
-if [ -z "$DB_PASSWORD" ]; then
-  echo -e "${RED}Error: Could not extract password from DATABASE_URL${NC}"
-  exit 1
-fi
-
-# Construct Session Pool URL (IPv4-compatible)
-DATABASE_URL="postgresql://postgres.gjmpvmelowpgsveupbcy:${DB_PASSWORD}@aws-0-us-east-2.pooler.supabase.com:5432/postgres"
-
-# Update DIRECT_URL to match
+# Export for use by drizzle-kit and psql
 export DATABASE_URL
 export DIRECT_URL="$DATABASE_URL"
 
