@@ -146,7 +146,15 @@ export async function loginAction(
       { userId: data.user.id, action: "login" },
       "User logged in successfully"
     );
-    redirect("/dashboard");
+
+    // Get redirect destination from form data
+    const nextParam = formData.get("next");
+    const next =
+      typeof nextParam === "string" && nextParam.length > 0
+        ? nextParam
+        : "/dashboard";
+
+    redirect(next);
   } catch (error) {
     log.error(
       {
