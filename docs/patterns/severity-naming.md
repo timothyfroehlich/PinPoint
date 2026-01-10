@@ -3,18 +3,19 @@
 ## Player-Centric Language
 
 ```typescript
-// Always use these three severity levels
-type Severity = "minor" | "playable" | "unplayable";
+// Always use these four severity levels
+type Severity = "cosmetic" | "minor" | "major" | "unplayable";
 
 // Examples:
-// - minor: Cosmetic issues (light out, worn art)
-// - playable: Affects gameplay but machine is playable (shot not registering)
-// - unplayable: Machine cannot be played (display dead, ball stuck)
+// - cosmetic: Visual issues that don't affect play (dirty glass, minor bulb out)
+// - minor: Small issues that don't change gameplay (e.g., sound slightly distorted)
+// - major: Plays, but significant feature broken (shot not registering, flipper weak)
+// - unplayable: Machine cannot be played (ball stuck, flippers dead, no power)
 ```
 
 **Key points**:
 
 - Use player-centric language, not technical terms
-- Three levels only: minor, playable, unplayable
-- Never use: low/medium/high, critical, or other severity names
+- Four levels: cosmetic, minor, major, unplayable
+- Never use technical terms like low/medium/high, or technical severity names like critical
 - Defined in schema enum for type safety
