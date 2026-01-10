@@ -47,8 +47,8 @@ export function UpdateIssueStatusForm({
           </option>
         ))}
       </select>
-      <Button type="submit" size="sm" className="w-full" disabled={isPending}>
-        {isPending ? "Updating..." : "Update Status"}
+      <Button type="submit" size="sm" className="w-full" loading={isPending}>
+        Update Status
       </Button>
       {state?.ok && (
         <p className="text-sm text-success" data-testid="status-update-success">

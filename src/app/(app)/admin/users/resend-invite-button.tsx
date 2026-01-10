@@ -35,10 +35,10 @@ export function ResendInviteButton({
       size="sm"
       className="h-8 text-xs"
       onClick={handleResend}
-      disabled={isPending}
+      loading={isPending}
     >
       <MailCheck className="mr-2 size-3" />
-      {isPending ? "Sending..." : "Resend Invite"}
+      Resend Invite
     </Button>
   );
 }
