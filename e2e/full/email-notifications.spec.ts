@@ -129,7 +129,6 @@ test.describe("Email Notifications", () => {
 
     // Update status
     await page.getByTestId("issue-status-select").selectOption("in_progress");
-    await page.getByRole("button", { name: "Update Status" }).click();
     await expect(page.getByTestId("status-update-success")).toBeVisible();
 
     const url = page.url();

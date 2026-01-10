@@ -39,7 +39,6 @@ test.describe("Status Overhaul E2E", () => {
 
     // 3. Update Status
     await page.getByLabel("Update Issue Status").selectOption("in_progress");
-    await page.getByRole("button", { name: "Update Status" }).click();
 
     // 4. Verify status change in badge and timeline
     await expect(page.getByTestId("issue-status-badge")).toHaveText(

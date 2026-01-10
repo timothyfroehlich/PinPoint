@@ -170,7 +170,6 @@ test.describe("Notifications", () => {
     await adminPage
       .getByTestId("issue-status-select")
       .selectOption("in_progress");
-    await adminPage.getByRole("button", { name: "Update Status" }).click();
 
     await expect(adminPage.getByTestId("status-update-success")).toBeVisible();
 

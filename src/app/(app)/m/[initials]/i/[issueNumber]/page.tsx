@@ -139,6 +139,7 @@ export default async function IssueDetailPage({
                 >
               }
               variant="strip"
+              size="lg"
             />
           </div>
         </div>

@@ -32,6 +32,7 @@ import {
 
 type IssueBadgeProps = {
   variant?: "normal" | "strip";
+  size?: "normal" | "lg";
   className?: string;
   showTooltip?: boolean;
 } & (
@@ -45,6 +46,7 @@ export function IssueBadge({
   type,
   value,
   variant = "normal",
+  size = "normal",
   className,
   showTooltip = true,
 }: IssueBadgeProps): React.JSX.Element {
@@ -78,18 +80,29 @@ export function IssueBadge({
   const badgeElement = (
     <Badge
       className={cn(
-        "relative flex items-center justify-center px-2 py-1 text-[10px] font-bold border rounded-full",
+        "relative flex items-center justify-center border rounded-full font-bold",
+        size === "lg" ? "text-xs px-3 py-1.5" : "text-[10px] px-2 py-1",
         variant === "strip"
-          ? ["w-auto", ISSUE_BADGE_MIN_WIDTH_STRIP]
-          : ISSUE_BADGE_WIDTH,
+          ? [
+              "w-auto",
+              size === "lg" ? "min-w-[125px]" : ISSUE_BADGE_MIN_WIDTH_STRIP,
+            ]
+          : [size === "lg" ? "w-[150px]" : ISSUE_BADGE_WIDTH],
         styles,
         className
       )}
       aria-label={`${type}: ${label}`}
       data-testid={`issue-${type}-badge`}
     >
-      <div className="absolute left-1.5 flex items-center">
-        <Icon className="size-3 shrink-0" />
+      <div
+        className={cn(
+          "absolute flex items-center",
+          size === "lg" ? "left-2" : "left-1.5"
+        )}
+      >
+        <Icon
+          className={cn("shrink-0", size === "lg" ? "size-[15px]" : "size-3")}
+        />
       </div>
       <span className="truncate capitalize px-1">{label}</span>
     </Badge>

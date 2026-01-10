@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useActionState } from "react";
-import { Button } from "~/components/ui/button";
+import { Loader2 } from "lucide-react";
 import {
   updateIssueConsistencyAction,
   type UpdateIssueConsistencyResult,
@@ -32,26 +32,32 @@ export function UpdateIssueConsistencyForm({
   return (
     <form action={formAction} className="space-y-2">
       <input type="hidden" name="issueId" value={issueId} />
-      <select
-        name="consistency"
-        defaultValue={currentConsistency}
-        aria-label="Update Issue Consistency"
-        className="w-full rounded-md border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface"
-        data-testid="issue-consistency-select"
-      >
-        {consistencyOptions.map((option) => (
-          <option
-            key={option.value}
-            value={option.value}
-            data-testid={`consistency-option-${option.value}`}
-          >
-            {option.label}
-          </option>
-        ))}
-      </select>
-      <Button type="submit" size="sm" className="w-full" disabled={isPending}>
-        {isPending ? "Updating..." : "Update Consistency"}
-      </Button>
+      <div className="relative">
+        <select
+          name="consistency"
+          defaultValue={currentConsistency}
+          aria-label="Update Issue Consistency"
+          className="w-full rounded-md border border-outline-variant bg-surface px-3 py-2 pr-10 text-sm text-on-surface disabled:opacity-50"
+          data-testid="issue-consistency-select"
+          disabled={isPending}
+          onChange={(e) => e.currentTarget.form?.requestSubmit()}
+        >
+          {consistencyOptions.map((option) => (
+            <option
+              key={option.value}
+              value={option.value}
+              data-testid={`consistency-option-${option.value}`}
+            >
+              {option.label}
+            </option>
+          ))}
+        </select>
+        {isPending && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+            <Loader2 className="size-4 animate-spin text-muted-foreground" />
+          </div>
+        )}
+      </div>
       {state && !state.ok && (
         <p className="text-sm text-destructive">{state.message}</p>
       )}

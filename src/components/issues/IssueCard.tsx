@@ -52,14 +52,19 @@ export function IssueCard({
     >
       <Card
         className={cn(
-          "transition-all h-full cursor-pointer border-outline-variant hover:border-primary/50",
+          "transition-all h-full cursor-pointer border-outline-variant hover:border-primary/50 relative overflow-hidden",
           isClosed ? "bg-surface-variant/30" : "bg-surface hover:glow-primary",
           className
         )}
         data-testid={dataTestId ?? "issue-card"}
       >
-        <CardHeader className={cn(variant === "compact" ? "p-3" : "p-4")}>
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+        <CardHeader
+          className={cn(
+            "h-full !flex !flex-col justify-center",
+            variant === "compact" ? "p-3" : "p-4"
+          )}
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
             <div className="flex-1 min-w-0">
               <CardTitle
                 className={cn(
