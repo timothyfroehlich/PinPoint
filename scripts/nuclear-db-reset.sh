@@ -165,7 +165,8 @@ echo ""
 
 # Step 1: Drop and recreate schema
 echo -e "${BLUE}1️⃣  Dropping and recreating schema...${NC}"
-psql "$DATABASE_URL" -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres; GRANT ALL ON SCHEMA public TO public;" 2>&1 | grep -v "^NOTICE:" | grep -v "^DETAIL:" || true
+# Drop both public and drizzle schemas to ensure clean migration state
+psql "$DATABASE_URL" -c "DROP SCHEMA IF EXISTS public CASCADE; DROP SCHEMA IF EXISTS drizzle CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres; GRANT ALL ON SCHEMA public TO public;" 2>&1 | grep -v "^NOTICE:" | grep -v "^DETAIL:" || true
 
 # Verify schema is empty
 echo "   Verifying schema is empty..."
