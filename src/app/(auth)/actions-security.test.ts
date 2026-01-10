@@ -57,12 +57,10 @@ describe("Auth Actions Security - Error Handling", () => {
   it("signupAction should return generic error message on server error", async () => {
     vi.mocked(createClient).mockResolvedValue({
       auth: {
-        signUp: vi
-          .fn()
-          .mockResolvedValue({
-            error: { message: "Database connection failed: 5432" },
-            data: { user: null },
-          }),
+        signUp: vi.fn().mockResolvedValue({
+          error: { message: "Database connection failed: 5432" },
+          data: { user: null },
+        }),
         getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
       },
     } as any);
@@ -87,12 +85,10 @@ describe("Auth Actions Security - Error Handling", () => {
   it("signupAction should return specific error for duplicate email", async () => {
     vi.mocked(createClient).mockResolvedValue({
       auth: {
-        signUp: vi
-          .fn()
-          .mockResolvedValue({
-            error: { message: "User already registered" },
-            data: { user: null },
-          }),
+        signUp: vi.fn().mockResolvedValue({
+          error: { message: "User already registered" },
+          data: { user: null },
+        }),
         getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
       },
     } as any);
@@ -142,11 +138,9 @@ describe("Auth Actions Security - Error Handling", () => {
         getUser: vi
           .fn()
           .mockResolvedValue({ data: { user: { id: "user-123" } } }),
-        updateUser: vi
-          .fn()
-          .mockResolvedValue({
-            error: { message: "Constraint violation: password_history" },
-          }),
+        updateUser: vi.fn().mockResolvedValue({
+          error: { message: "Constraint violation: password_history" },
+        }),
         signOut: vi.fn(),
       },
     } as any);
