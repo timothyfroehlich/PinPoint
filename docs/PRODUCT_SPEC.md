@@ -106,11 +106,12 @@ Support multiple organizations with full data isolation.
 **Included:**
 
 - Create issue with: title, description, machine (required), severity
-- **Severity levels:** `minor` | `playable` | `unplayable`
-  - **minor**: Cosmetic or very minor issues (e.g., light out)
-  - **playable**: Affects gameplay but machine is still playable (e.g., shot not registering)
-  - **unplayable**: Machine cannot be played
-- Issue status: `new` → `in_progress` → `resolved`
+- **Severity levels:** `cosmetic` | `minor` | `major` | `unplayable`
+  - **cosmetic**: Very minor issues that do not affect gameplay (e.g., dirty playfield, minor bulb out)
+  - **minor**: Small issues that do not change how the game plays
+  - **major**: The game plays, but something significant is wrong (e.g., shots not registering, features disabled)
+  - **unplayable**: Machine cannot be played (e.g., ball stuck, flippers dead)
+- Issue status: `new` → `in_progress` → `fixed` (and others like `wont_fix`, `duplicate`, etc.)
 - Assign issue to a member
 - Add comments to issues
 - Issue timeline (status changes, assignments, comments)
@@ -396,16 +397,16 @@ A feature is **NOT** "done" when:
 
 ## Decisions Log
 
-| Date       | Question                   | Decision                  | Rationale                               |
-| ---------- | -------------------------- | ------------------------- | --------------------------------------- |
-| 2025-11-10 | Support multiple orgs?     | 2.0                       | Single tenant simplifies architecture   |
-| 2025-11-10 | Issue severity levels?     | minor/playable/unplayable | Clear, player-centric language          |
-| 2025-11-10 | Issues per-machine always? | Yes                       | Aligns with reality, simplifies queries |
-| 2025-11-10 | Email notifications?       | 1.0                       | Important but not required for MVP      |
-| 2025-11-10 | Photo attachments?         | MVP+                      | Adds clarity but text works initially   |
-| 2025-11-10 | QR codes?                  | MVP+                      | High impact but not blocking            |
-| 2025-11-10 | Machine model info?        | MVP+                      | Name is sufficient to start             |
-| 2025-11-10 | Next.js version?           | 16 (latest)               | Use latest stable release               |
+| Date       | Question                   | Decision                        | Rationale                               |
+| ---------- | -------------------------- | ------------------------------- | --------------------------------------- |
+| 2025-11-10 | Support multiple orgs?     | 2.0                             | Single tenant simplifies architecture   |
+| 2025-11-10 | Issue severity levels?     | cosmetic/minor/major/unplayable | Clear, player-centric language          |
+| 2025-11-10 | Issues per-machine always? | Yes                             | Aligns with reality, simplifies queries |
+| 2025-11-10 | Email notifications?       | 1.0                             | Important but not required for MVP      |
+| 2025-11-10 | Photo attachments?         | MVP+                            | Adds clarity but text works initially   |
+| 2025-11-10 | QR codes?                  | MVP+                            | High impact but not blocking            |
+| 2025-11-10 | Machine model info?        | MVP+                            | Name is sufficient to start             |
+| 2025-11-10 | Next.js version?           | 16 (latest)                     | Use latest stable release               |
 
 ---
 
