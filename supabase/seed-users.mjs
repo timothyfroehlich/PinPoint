@@ -258,7 +258,7 @@ async function seedUsersAndData() {
         },
         {
           author: userIds.admin,
-          content: "Severity changed from playable to unplayable",
+          content: "Severity changed from minor to unplayable",
           isSystem: true,
           daysAgo: 8,
         },
@@ -270,7 +270,7 @@ async function seedUsersAndData() {
         },
         {
           author: userIds.admin,
-          content: "Status changed from new to in_progress",
+          content: "Status changed from New to In Progress",
           isSystem: true,
           daysAgo: 6,
         },
@@ -294,13 +294,13 @@ async function seedUsersAndData() {
         },
         {
           author: userIds.member,
-          content: "Status changed from in_progress to fixed",
+          content: "Status changed from In Progress to Fixed",
           isSystem: true,
           daysAgo: 2,
         },
         {
           author: userIds.member,
-          content: "Severity changed from unplayable to minor",
+          content: "Severity changed from Unplayable to Minor",
           isSystem: true,
           daysAgo: 1.5,
         },

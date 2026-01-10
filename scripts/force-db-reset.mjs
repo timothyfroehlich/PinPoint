@@ -8,10 +8,10 @@
 
 import postgres from "postgres";
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
 
 if (!databaseUrl) {
-  console.error("❌ DATABASE_URL is not defined in .env.local");
+  console.error("❌ DATABASE_URL or DIRECT_URL is not defined");
   process.exit(1);
 }
 

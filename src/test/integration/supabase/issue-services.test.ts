@@ -136,7 +136,7 @@ describe("Issue Service Functions (Integration)", () => {
       e.content.includes("Status changed")
     );
     expect(statusEvent).toBeDefined();
-    expect(statusEvent?.content).toContain("from New to Work in Progress");
+    expect(statusEvent?.content).toContain("from New to In Progress");
     expect(statusEvent?.isSystem).toBe(true);
   });
 

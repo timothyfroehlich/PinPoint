@@ -31,9 +31,15 @@ describe("Issue Status Utilities", () => {
     it("should return correct labels", () => {
       expect(getIssueStatusLabel("new")).toBe("New");
       expect(getIssueStatusLabel("confirmed")).toBe("Confirmed");
-      expect(getIssueStatusLabel("in_progress")).toBe("Work in Progress");
+      expect(getIssueStatusLabel("in_progress")).toBe("In Progress");
+      expect(getIssueStatusLabel("need_parts")).toBe("Need Parts");
+      expect(getIssueStatusLabel("need_help")).toBe("Need Help");
+      expect(getIssueStatusLabel("wait_owner")).toBe("Pending Owner");
       expect(getIssueStatusLabel("fixed")).toBe("Fixed");
       expect(getIssueStatusLabel("wai")).toBe("As Intended");
+      expect(getIssueStatusLabel("wont_fix")).toBe("Won't Fix");
+      expect(getIssueStatusLabel("no_repro")).toBe("No Repro");
+      expect(getIssueStatusLabel("duplicate")).toBe("Duplicate");
     });
   });
 

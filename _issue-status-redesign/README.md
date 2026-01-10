@@ -6,7 +6,7 @@ We are in the final stages of the status overhaul. Key updates include:
 
 - **Terminology Standardization**: Consistently using **"Fixed"** instead of "resolved" across the application, logic, and tests.
 - **Badge Integration**: The `IssueBadgeGrid` (vibrant, icon-based badges) is now integrated into the Dashboard, Issue List, and Recent Issues panel.
-- **Schema Alignment**: The database schema and TypeScript types have been reconciled to follow the 11-status specification (New, Confirmed, Waiting on Owner, Work in Progress, Needs Parts, Needs Expert Help, Fixed, Works as Intended, Won't Fix, Not Reproducible, Duplicate).
+- **Schema Alignment**: The database schema and TypeScript types have been reconciled to follow the 11-status specification (New, Confirmed, Pending Owner, In Progress, Need Parts, Need Help, Fixed, As Intended, Won't Fix, No Repro, Duplicate).
 - **Seed Data Enhancement**: `supabase/seed-users.mjs` has been updated to use the new status/severity system and includes detailed timeline historical events (comments) for test machines like _The Addams Family_.
 - **ARIA & Accessibility**: All status/severity/priority update forms now include proper `aria-label` attributes for accessibility and reliable E2E testing.
 - **Migration Consolidation**: All previous migrations (0000-0007) have been consolidated into a single clean `0000_init-schema.sql` for the V2 launch.
@@ -67,27 +67,27 @@ Status dropdown uses `<optgroup>` tags to visually separate groups.
 
 ### Status Field (11 values in 3 groups)
 
-| Group           | Icon        | Values                                                             |
-| --------------- | ----------- | ------------------------------------------------------------------ |
-| **New**         | `Circle`    | New, Confirmed                                                     |
-| **In Progress** | `CircleDot` | Waiting on Owner, Work in Progress, Needs Parts, Needs Expert Help |
-| **Closed**      | `Disc`      | Fixed, Works as Intended, Won't Fix, Not Reproducible, Duplicate   |
+| Group           | Icon        | Values                                             |
+| --------------- | ----------- | -------------------------------------------------- |
+| **New**         | `Circle`    | New, Confirmed                                     |
+| **In Progress** | `CircleDot` | Pending Owner, In Progress, Need Parts, Need Help  |
+| **Closed**      | `Disc`      | Fixed, As Intended, Won't Fix, No Repro, Duplicate |
 
 **Status Descriptions**:
 
-| Status            | Description                              |
-| ----------------- | ---------------------------------------- |
-| New               | Just reported, needs triage              |
-| Confirmed         | Verified as a real issue                 |
-| Waiting on Owner  | Blocked on machine owner decision/action |
-| Work in Progress  | Active repair underway                   |
-| Needs Parts       | Waiting on new parts                     |
-| Needs Expert Help | Escalated to expert                      |
-| Fixed             | Issue is resolved                        |
-| Works as Intended | Not a bug, it's a feature                |
-| Won't Fix         | Too minor or risky to fix                |
-| Not Reproducible  | Couldn't make it happen again            |
-| Duplicate         | Already reported elsewhere               |
+| Status        | Description                              |
+| ------------- | ---------------------------------------- |
+| New           | Just reported, needs triage              |
+| Confirmed     | Verified as a real issue                 |
+| Pending Owner | Blocked on machine owner decision/action |
+| In Progress   | Active repair underway                   |
+| Need Parts    | Waiting on new parts                     |
+| Need Help     | Escalated to expert                      |
+| Fixed         | Issue is resolved                        |
+| As Intended   | Not a bug, it's a feature                |
+| Won't Fix     | Too minor or risky to fix                |
+| No Repro      | Couldn't make it happen again            |
+| Duplicate     | Already reported elsewhere               |
 
 **Rules**:
 
@@ -226,14 +226,14 @@ export const issues = pgTable("issues", {
 export type IssueStatus =
   | "new"
   | "confirmed"
-  | "waiting_on_owner"
+  | "wait_owner"
   | "in_progress"
-  | "needs_parts"
-  | "needs_expert"
+  | "need_parts"
+  | "need_help"
   | "fixed"
   | "wont_fix"
-  | "works_as_intended"
-  | "not_reproducible"
+  | "wai"
+  | "no_repro"
   | "duplicate";
 
 export type IssueStatusGroup = "new" | "in_progress" | "closed";
@@ -254,19 +254,8 @@ import { Circle, CircleDot, Disc } from "lucide-react";
 
 export const STATUS_GROUPS = {
   new: ["new", "confirmed"],
-  in_progress: [
-    "waiting_on_owner",
-    "in_progress",
-    "needs_parts",
-    "needs_expert",
-  ],
-  closed: [
-    "fixed",
-    "wont_fix",
-    "works_as_intended",
-    "not_reproducible",
-    "duplicate",
-  ],
+  in_progress: ["wait_owner", "in_progress", "need_parts", "need_help"],
+  closed: ["fixed", "wont_fix", "wai", "no_repro", "duplicate"],
 } as const;
 
 export function getIssueStatusIcon(status: IssueStatus) {
@@ -279,14 +268,14 @@ export function getIssueStatusLabel(status: IssueStatus): string {
   const labels: Record<IssueStatus, string> = {
     new: "New",
     confirmed: "Confirmed",
-    waiting_on_owner: "Waiting on Owner",
-    in_progress: "Work in Progress",
-    needs_parts: "Needs Parts",
-    needs_expert: "Needs Expert Help",
+    wait_owner: "Pending Owner",
+    in_progress: "In Progress",
+    need_parts: "Need Parts",
+    need_help: "Need Help",
     fixed: "Fixed",
     wont_fix: "Won't Fix",
-    works_as_intended: "Works as Intended",
-    not_reproducible: "Not Reproducible",
+    wai: "As Intended",
+    no_repro: "No Repro",
     duplicate: "Duplicate",
   };
   return labels[status];
@@ -304,15 +293,15 @@ const STATUS_STYLES = {
   new: "bg-cyan-500/20 text-cyan-400 border-cyan-500",
   confirmed: "bg-teal-500/20 text-teal-400 border-teal-500",
   // In Progress group - Purple/Fuchsia
-  waiting_on_owner: "bg-purple-500/20 text-purple-400 border-purple-500",
+  wait_owner: "bg-purple-500/20 text-purple-400 border-purple-500",
   in_progress: "bg-fuchsia-500/20 text-fuchsia-400 border-fuchsia-500",
-  needs_parts: "bg-purple-600/20 text-purple-300 border-purple-600",
-  needs_expert: "bg-pink-500/20 text-pink-400 border-pink-500",
+  need_parts: "bg-purple-600/20 text-purple-300 border-purple-600",
+  need_help: "bg-pink-500/20 text-pink-400 border-pink-500",
   // Closed group - Green/Gray
   fixed: "bg-green-500/20 text-green-400 border-green-500",
-  works_as_intended: "bg-emerald-500/20 text-emerald-400 border-emerald-500",
+  wai: "bg-emerald-500/20 text-emerald-400 border-emerald-500",
   wont_fix: "bg-zinc-500/20 text-zinc-400 border-zinc-500",
-  not_reproducible: "bg-slate-500/20 text-slate-400 border-slate-500",
+  no_repro: "bg-slate-500/20 text-slate-400 border-slate-500",
   duplicate: "bg-neutral-600/20 text-neutral-400 border-neutral-600",
 };
 
