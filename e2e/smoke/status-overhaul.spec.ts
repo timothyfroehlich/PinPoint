@@ -4,20 +4,15 @@ import { cleanupTestEntities } from "../support/cleanup";
 import { seededMachines } from "../support/constants";
 
 test.describe("Status Overhaul E2E", () => {
-  let createdIssueId: string | null = null;
-
   test.beforeEach(async ({ page }, testInfo) => {
     test.setTimeout(60000);
     await loginAs(page, testInfo);
   });
 
   test.afterEach(async ({ request }) => {
-    if (createdIssueId) {
-      await cleanupTestEntities(request, {
-        issueIds: [createdIssueId],
-      });
-      createdIssueId = null;
-    }
+    await cleanupTestEntities(request, {
+      issueTitlePrefix: "E2E Status Overhaul Test",
+    });
   });
 
   test("should create issue and verify all 4 badges", async ({ page }) => {
