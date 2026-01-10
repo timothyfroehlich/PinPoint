@@ -126,7 +126,7 @@ export const STATUS_CONFIG: Record<
     icon: Circle,
   },
   in_progress: {
-    label: "Work in Progress",
+    label: "In Progress",
     description: "Active repair underway",
     styles: "bg-fuchsia-500/20 text-fuchsia-400 border-fuchsia-500",
     icon: CircleDot,
