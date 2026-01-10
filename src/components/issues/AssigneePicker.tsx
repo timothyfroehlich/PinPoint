@@ -87,8 +87,7 @@ export function AssigneePicker({
         type="button"
         className={cn(
           "flex w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-left text-sm text-foreground transition",
-          "hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          isPending && "opacity-70"
+          "hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         )}
         onClick={() => setIsOpen((prev) => !prev)}
         aria-haspopup="listbox"
@@ -97,12 +96,25 @@ export function AssigneePicker({
         data-testid="assignee-picker-trigger"
       >
         <div className="flex items-center gap-2">
-          <div className="size-6 rounded-full bg-muted flex items-center justify-center text-xs text-muted-foreground">
-            {selectedUser ? selectedUser.name.slice(0, 1).toUpperCase() : "?"}
-          </div>
-          <span className="font-medium">
-            {selectedUser ? selectedUser.name : "Unassigned"}
-          </span>
+          {isPending ? (
+            <>
+              <Loader2 className="size-6 animate-spin p-1 text-muted-foreground" />
+              <span className="font-medium text-muted-foreground">
+                Updating...
+              </span>
+            </>
+          ) : (
+            <>
+              <div className="size-6 rounded-full bg-muted flex items-center justify-center text-xs text-muted-foreground">
+                {selectedUser
+                  ? selectedUser.name.slice(0, 1).toUpperCase()
+                  : "?"}
+              </div>
+              <span className="font-medium">
+                {selectedUser ? selectedUser.name : "Unassigned"}
+              </span>
+            </>
+          )}
         </div>
         {isPending ? (
           <Loader2

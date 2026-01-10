@@ -11,7 +11,7 @@ import {
 } from "~/app/(auth)/actions";
 
 export function ResetPasswordForm(): React.JSX.Element {
-  const [state, formAction] = useActionState<
+  const [state, formAction, isPending] = useActionState<
     ResetPasswordResult | undefined,
     FormData
   >(resetPasswordAction, undefined);
@@ -66,6 +66,7 @@ export function ResetPasswordForm(): React.JSX.Element {
         type="submit"
         className="w-full bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container"
         size="lg"
+        loading={isPending}
       >
         Update Password
       </Button>

@@ -24,7 +24,7 @@ export function UpdateIssuePriorityForm({
   issueId,
   currentPriority,
 }: UpdateIssuePriorityFormProps): React.JSX.Element {
-  const [state, formAction] = useActionState<
+  const [state, formAction, isPending] = useActionState<
     UpdateIssuePriorityResult | undefined,
     FormData
   >(updateIssuePriorityAction, undefined);
@@ -49,7 +49,7 @@ export function UpdateIssuePriorityForm({
           </option>
         ))}
       </select>
-      <Button type="submit" size="sm" className="w-full">
+      <Button type="submit" size="sm" className="w-full" loading={isPending}>
         Update Priority
       </Button>
       {state && !state.ok && (

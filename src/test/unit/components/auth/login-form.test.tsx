@@ -43,14 +43,21 @@ describe("LoginForm", () => {
 
     render(<LoginForm />);
 
-    // Check if button text changes to "Signing In..."
-    expect(screen.getByRole("button")).toHaveTextContent("Signing In...");
-
     // Check if button is disabled
     expect(screen.getByRole("button")).toBeDisabled();
 
-    // Check if spinner is present (Loader2 usually has 'lucide-loader-2' or similar class,
-    // but we can check if the svg is there or just rely on text for now as we can't easily check for the icon component itself in this setup without deeper inspection)
-    // However, the text content check + disabled check confirms the ternary branch was taken.
+    // With standardized Button component, text remains "Sign In" but a spinner is added.
+    // However, looking at the code: <Button ... loading={isPending}>Sign In</Button>
+    // The Button component logic is: {loading && <Loader2 ... />} {children}
+    // So the text "Sign In" is still there.
+    expect(screen.getByRole("button")).toHaveTextContent("Sign In");
+
+    // We can check if the button contains the loader
+    // Loader2 renders an SVG.
+    // Since we mocked useActionState to return isPending=true, the loading prop on Button is true.
+    const button = screen.getByRole("button");
+    // Check for the spinner SVG which has the animate-spin class
+    const spinner = button.querySelector(".animate-spin");
+    expect(spinner).toBeInTheDocument();
   });
 });
