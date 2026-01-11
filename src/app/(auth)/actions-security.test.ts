@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
+  loginAction,
   signupAction,
   forgotPasswordAction,
   resetPasswordAction,
@@ -156,6 +157,30 @@ describe("Auth Actions Security - Error Handling", () => {
       expect(result.code).toBe("SERVER");
       expect(result.message).toBe("Failed to update password"); // Generic message
       expect(result.message).not.toContain("Constraint violation"); // No leak
+    }
+  });
+
+  it("loginAction should return generic error message on server error", async () => {
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        signInWithPassword: vi.fn().mockResolvedValue({
+          error: { message: "Internal Server Error: Connection reset by peer" },
+          data: { user: null },
+        }),
+      },
+    } as any);
+
+    const formData = new FormData();
+    formData.set("email", "test@example.com");
+    formData.set("password", "Password123!");
+
+    const result = await loginAction(undefined, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("AUTH");
+      expect(result.message).toBe("Invalid email or password"); // Sanitized message
+      expect(result.message).not.toContain("Connection reset"); // No leak
     }
   });
 });
