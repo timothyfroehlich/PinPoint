@@ -73,8 +73,8 @@ test.describe("Extended Authentication", () => {
     await expect(page).toHaveURL(/next=%2Fsettings/);
 
     // Fill out login form with seeded test user
-    const testEmail = "member@test.com";
-    const testPassword = "TestPassword123";
+    const testEmail = seededMember.email;
+    const testPassword = seededMember.password;
 
     await page.getByLabel("Email").fill(testEmail);
     await page.getByLabel("Password").fill(testPassword);
@@ -84,7 +84,9 @@ test.describe("Extended Authentication", () => {
 
     // Should redirect back to original destination (settings) after successful login
     await expect(page).toHaveURL("/settings", { timeout: 10000 });
-    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Settings", exact: true })
+    ).toBeVisible();
   });
 
   test("logout flow - sign out and verify redirect", async ({
