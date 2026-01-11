@@ -4,19 +4,24 @@ export type IssueCommentWithAuthor = Pick<
   IssueComment,
   "id" | "content" | "createdAt" | "isSystem"
 > & {
-  author?: Pick<UserProfile, "id" | "name"> | null;
+  author?: Pick<UserProfile, "id" | "name" | "email"> | null;
 };
 
 export type IssueListItem = Issue & {
   machine: Pick<Machine, "id" | "name">;
-  reportedByUser?: Pick<UserProfile, "id" | "name"> | null;
-  assignedToUser?: Pick<UserProfile, "id" | "name"> | null;
+  reportedByUser?: Pick<UserProfile, "id" | "name" | "email"> | null;
+  assignedToUser?: Pick<UserProfile, "id" | "name" | "email"> | null;
 };
 
 export type IssueWithAllRelations = Issue & {
   machine: Pick<Machine, "id" | "name">;
-  reportedByUser?: Pick<UserProfile, "id" | "name"> | null;
-  assignedToUser?: Pick<UserProfile, "id" | "name"> | null;
+  reportedByUser?: Pick<UserProfile, "id" | "name" | "email"> | null;
+  unconfirmedReporter?: {
+    id: string;
+    name: string;
+    email: string | null;
+  } | null;
+  assignedToUser?: Pick<UserProfile, "id" | "name" | "email"> | null;
   comments: IssueCommentWithAuthor[];
   watchers: { userId: string }[];
 };

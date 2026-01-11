@@ -53,6 +53,16 @@ export default async function MachineDetailPage({
     redirect(`/login?next=${next}`);
   }
 
+  // Fetch current user profile to check role
+  const currentUserProfile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, user.id),
+    columns: { role: true },
+  });
+
+  const isMemberOrAdmin =
+    currentUserProfile?.role === "member" ||
+    currentUserProfile?.role === "admin";
+
   // Query machine with issues (direct Drizzle query - no DAL)
   const machine = await db.query.machines.findFirst({
     where: eq(machines.initials, initials),
@@ -71,14 +81,22 @@ export default async function MachineDetailPage({
         },
         orderBy: (issues, { desc }) => [desc(issues.createdAt)],
       },
-      owner: true,
+      owner: {
+        columns: {
+          id: true,
+          name: true,
+          avatarUrl: true,
+          ...(isMemberOrAdmin && { email: true }),
+        },
+      },
+      unconfirmedOwner: {
+        columns: {
+          id: true,
+          name: true,
+          ...(isMemberOrAdmin && { email: true }),
+        },
+      },
     },
-  });
-
-  // Fetch all users for owner selection (Admin only)
-  const currentUserProfile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-    columns: { role: true },
   });
 
   const isAdmin = currentUserProfile?.role === "admin";

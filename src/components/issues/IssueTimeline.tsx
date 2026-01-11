@@ -17,6 +17,7 @@ interface TimelineEvent {
   author: {
     name: string;
     avatarFallback: string;
+    email?: string | null | undefined;
   };
   createdAt: Date;
   content: string | null;
@@ -73,9 +74,16 @@ function TimelineItem({ event }: { event: TimelineEvent }): React.JSX.Element {
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="flex flex-col">
-                  <span className="font-semibold text-foreground">
-                    {event.author.name}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-foreground">
+                      {event.author.name}
+                    </span>
+                    {event.author.email && (
+                      <span className="text-xs text-muted-foreground font-normal">
+                        &lt;{event.author.email}&gt;
+                      </span>
+                    )}
+                  </div>
                   {isIssue ? (
                     <span className="text-xs uppercase tracking-wide text-primary">
                       Initial report
@@ -117,13 +125,20 @@ export function IssueTimeline({
   issue,
 }: IssueTimelineProps): React.JSX.Element {
   // 1. Normalize Issue as the first event
+  const reporterName =
+    issue.reportedByUser?.name ??
+    issue.unconfirmedReporter?.name ??
+    "Unknown User";
+  const reporterEmail =
+    issue.reportedByUser?.email ?? issue.unconfirmedReporter?.email;
+
   const issueEvent: TimelineEvent = {
     id: `issue-${issue.id}`,
     type: "issue",
     author: {
-      name: issue.reportedByUser?.name ?? "Unknown User",
-      avatarFallback:
-        issue.reportedByUser?.name.slice(0, 2).toUpperCase() ?? "U",
+      name: reporterName,
+      avatarFallback: reporterName.slice(0, 2).toUpperCase(),
+      email: reporterEmail,
     },
     createdAt: new Date(issue.createdAt),
     content: issue.description,
@@ -136,6 +151,7 @@ export function IssueTimeline({
     author: {
       name: c.author?.name ?? "System",
       avatarFallback: c.author?.name.slice(0, 2).toUpperCase() ?? "S",
+      email: c.author?.email,
     },
     createdAt: new Date(c.createdAt),
     content: c.content,
