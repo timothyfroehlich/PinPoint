@@ -3,6 +3,7 @@ import { MailpitClient } from "../support/mailpit.js";
 import { TEST_USERS } from "../support/constants.js";
 import { deleteTestIssueByNumber } from "e2e/support/supabase-admin.js";
 import { submitFormAndWaitForRedirect } from "../support/page-helpers.js";
+import { selectOption } from "../support/actions.js";
 
 /**
  * Email notification verification tests
@@ -50,8 +51,10 @@ test.describe("Email Notifications", () => {
     await page.goto("/report?machine=MM");
     await page.getByLabel("Issue Title *").fill("Test Issue for Email");
     await page.getByLabel("Description").fill("Testing email notifications");
-    await page.getByLabel("Select Severity").selectOption("minor");
-    await page.getByLabel("Select Priority").selectOption("low");
+    // Wait for severity select to be visible
+    await expect(page.getByTestId("severity-select")).toBeVisible();
+    await selectOption(page, "severity-select", "minor");
+    await selectOption(page, "priority-select", "low");
 
     // Submit form and wait for Server Action redirect (Safari-defensive)
     await submitFormAndWaitForRedirect(
@@ -104,8 +107,8 @@ test.describe("Email Notifications", () => {
     // Create issue for a specific machine (e.g., MM)
     await page.goto("/report?machine=MM");
     await page.getByLabel("Issue Title *").fill("Status Change Test");
-    await page.getByLabel("Select Severity").selectOption("minor");
-    await page.getByLabel("Select Priority").selectOption("low");
+    await selectOption(page, "severity-select", "minor");
+    await selectOption(page, "priority-select", "low");
 
     // Submit form and wait for Server Action redirect (Safari-defensive)
     await submitFormAndWaitForRedirect(
@@ -128,7 +131,7 @@ test.describe("Email Notifications", () => {
     await mailpit.clearMailbox(TEST_USERS.admin.email);
 
     // Update status
-    await page.getByTestId("issue-status-select").selectOption("in_progress");
+    await selectOption(page, "issue-status-select", "in_progress");
     await expect(page.getByTestId("status-update-success")).toBeVisible();
 
     const url = page.url();

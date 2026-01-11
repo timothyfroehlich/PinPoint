@@ -15,6 +15,7 @@ interface SeveritySelectProps {
   onValueChange: (value: IssueSeverity) => void;
   disabled?: boolean;
   name?: string;
+  testId?: string;
 }
 
 const severityOptions: IssueSeverity[] = [
@@ -29,6 +30,7 @@ export function SeveritySelect({
   onValueChange,
   disabled = false,
   name = "severity",
+  testId = "issue-severity-select",
 }: SeveritySelectProps): React.JSX.Element {
   return (
     <Select
@@ -40,7 +42,7 @@ export function SeveritySelect({
       <SelectTrigger
         className="w-full border-outline-variant bg-surface text-on-surface"
         aria-label="Select Severity"
-        data-testid="issue-severity-select"
+        data-testid={testId}
       >
         <SelectValue>
           {(() => {

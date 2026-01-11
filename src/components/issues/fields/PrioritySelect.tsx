@@ -15,6 +15,7 @@ interface PrioritySelectProps {
   onValueChange: (value: IssuePriority) => void;
   disabled?: boolean;
   name?: string;
+  testId?: string;
 }
 
 const priorityOptions: IssuePriority[] = ["low", "medium", "high"];
@@ -24,6 +25,7 @@ export function PrioritySelect({
   onValueChange,
   disabled = false,
   name = "priority",
+  testId = "issue-priority-select",
 }: PrioritySelectProps): React.JSX.Element {
   return (
     <Select
@@ -35,7 +37,7 @@ export function PrioritySelect({
       <SelectTrigger
         className="w-full border-outline-variant bg-surface text-on-surface"
         aria-label="Select Priority"
-        data-testid="issue-priority-select"
+        data-testid={testId}
       >
         <SelectValue>
           {(() => {

@@ -271,6 +271,7 @@ export function UnifiedReportForm({
                     <SeveritySelect
                       value={severity}
                       onValueChange={setSeverity}
+                      testId="severity-select"
                     />
                   </div>
 
@@ -286,6 +287,7 @@ export function UnifiedReportForm({
                     <ConsistencySelect
                       value={consistency}
                       onValueChange={setConsistency}
+                      testId="consistency-select"
                     />
                   </div>
 
@@ -298,6 +300,7 @@ export function UnifiedReportForm({
                       <PrioritySelect
                         value={priority}
                         onValueChange={setPriority}
+                        testId="priority-select"
                       />
                     </div>
                   )}

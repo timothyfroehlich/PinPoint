@@ -15,6 +15,7 @@ interface ConsistencySelectProps {
   onValueChange: (value: IssueConsistency) => void;
   disabled?: boolean;
   name?: string;
+  testId?: string;
 }
 
 const consistencyOptions: IssueConsistency[] = [
@@ -28,6 +29,7 @@ export function ConsistencySelect({
   onValueChange,
   disabled = false,
   name = "consistency",
+  testId = "issue-consistency-select",
 }: ConsistencySelectProps): React.JSX.Element {
   return (
     <Select
@@ -39,7 +41,7 @@ export function ConsistencySelect({
       <SelectTrigger
         className="w-full border-outline-variant bg-surface text-on-surface"
         aria-label="Select Consistency"
-        data-testid="issue-consistency-select"
+        data-testid={testId}
       >
         <SelectValue>
           {(() => {

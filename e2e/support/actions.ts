@@ -87,3 +87,41 @@ export async function logout(page: Page): Promise<void> {
   await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
   await expect(page.getByTestId("nav-signin")).toBeVisible({ timeout: 15000 });
 }
+
+/**
+ * Selects an option from a shadcn/ui Select component.
+ * Clicks the trigger, waits for the dropdown, then clicks the option.
+ */
+export async function selectOption(
+  page: Page,
+  triggerTestId: string,
+  optionValue: string
+): Promise<void> {
+  // Wait for and click the Select trigger
+  const trigger = page.getByTestId(triggerTestId);
+  await expect(trigger).toBeVisible({ timeout: 10000 });
+  await trigger.click();
+
+  // Wait for the dropdown to appear and find the option
+  // Option test IDs follow pattern: {type}-option-{value}
+  // For report form: severity-select -> severity-option-{value}
+  // For issue forms: issue-severity-select -> severity-option-{value} (note: no "issue-" prefix)
+  // Status: issue-status-select -> status-option-{value}
+  let optionTestId: string;
+  if (triggerTestId === "issue-status-select") {
+    optionTestId = `status-option-${optionValue}`;
+  } else if (triggerTestId.startsWith("issue-")) {
+    // issue-severity-select -> severity-option-{value}
+    optionTestId = `${triggerTestId.replace("issue-", "").replace("-select", "")}-option-${optionValue}`;
+  } else {
+    // severity-select -> severity-option-{value}
+    optionTestId = `${triggerTestId.replace("-select", "")}-option-${optionValue}`;
+  }
+
+  const option = page.getByTestId(optionTestId);
+  await expect(option).toBeVisible({ timeout: 5000 });
+  await option.click();
+
+  // Wait for dropdown to close
+  await expect(option).toBeHidden({ timeout: 5000 });
+}
