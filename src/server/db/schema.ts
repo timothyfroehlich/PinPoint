@@ -61,12 +61,12 @@ export const userProfiles = pgTable("user_profiles", {
 });
 
 /**
- * Unconfirmed Users Table
+ * Invited Users Table
  *
- * Tracks users who have been invited or reported issues but haven't signed up yet.
+ * Tracks users who have been invited to join the platform but haven't signed up yet.
  * Linked to user_profiles automatically on signup via database trigger.
  */
-export const unconfirmedUsers = pgTable("unconfirmed_users", {
+export const invitedUsers = pgTable("invited_users", {
   id: uuid("id").primaryKey().defaultRandom(),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
@@ -96,9 +96,7 @@ export const machines = pgTable(
     nextIssueNumber: integer("next_issue_number").notNull().default(1),
     name: text("name").notNull(),
     ownerId: uuid("owner_id").references(() => userProfiles.id),
-    unconfirmedOwnerId: uuid("unconfirmed_owner_id").references(
-      () => unconfirmedUsers.id
-    ),
+    invitedOwnerId: uuid("invited_owner_id").references(() => invitedUsers.id),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -110,11 +108,11 @@ export const machines = pgTable(
     initialsCheck: check("initials_check", sql`initials ~ '^[A-Z0-9]{2,6}$'`),
     ownerCheck: check(
       "owner_check",
-      sql`(owner_id IS NULL OR unconfirmed_owner_id IS NULL)`
+      sql`(owner_id IS NULL OR invited_owner_id IS NULL)`
     ),
     ownerIdIdx: index("idx_machines_owner_id").on(t.ownerId),
-    unconfirmedOwnerIdIdx: index("idx_machines_unconfirmed_owner_id").on(
-      t.unconfirmedOwnerId
+    invitedOwnerIdIdx: index("idx_machines_invited_owner_id").on(
+      t.invitedOwnerId
     ),
   })
 );
@@ -156,9 +154,11 @@ export const issues = pgTable(
       .notNull()
       .default("intermittent"),
     reportedBy: uuid("reported_by").references(() => userProfiles.id),
-    unconfirmedReportedBy: uuid("unconfirmed_reported_by").references(
-      () => unconfirmedUsers.id
+    invitedReportedBy: uuid("invited_reported_by").references(
+      () => invitedUsers.id
     ),
+    reporterName: text("reporter_name"),
+    reporterEmail: text("reporter_email"),
     assignedTo: uuid("assigned_to").references(() => userProfiles.id),
     closedAt: timestamp("closed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -175,14 +175,16 @@ export const issues = pgTable(
     ),
     reporterCheck: check(
       "reporter_check",
-      sql`(reported_by IS NULL OR unconfirmed_reported_by IS NULL)`
+      sql`(${t.reportedBy} IS NULL AND ${t.invitedReportedBy} IS NULL) OR
+          (${t.reportedBy} IS NOT NULL AND ${t.invitedReportedBy} IS NULL AND ${t.reporterName} IS NULL AND ${t.reporterEmail} IS NULL) OR
+          (${t.reportedBy} IS NULL AND ${t.invitedReportedBy} IS NOT NULL AND ${t.reporterName} IS NULL AND ${t.reporterEmail} IS NULL)`
     ),
     assignedToIdx: index("idx_issues_assigned_to").on(t.assignedTo),
     reportedByIdx: index("idx_issues_reported_by").on(t.reportedBy),
     statusIdx: index("idx_issues_status").on(t.status),
     createdAtIdx: index("idx_issues_created_at").on(t.createdAt),
-    unconfirmedReportedByIdx: index("idx_issues_unconfirmed_reported_by").on(
-      t.unconfirmedReportedBy
+    invitedReportedByIdx: index("idx_issues_invited_reported_by").on(
+      t.invitedReportedBy
     ),
   })
 );
@@ -362,10 +364,10 @@ export const machinesRelations = relations(machines, ({ many, one }) => ({
     references: [userProfiles.id],
     relationName: "owner",
   }),
-  unconfirmedOwner: one(unconfirmedUsers, {
-    fields: [machines.unconfirmedOwnerId],
-    references: [unconfirmedUsers.id],
-    relationName: "unconfirmed_owner",
+  invitedOwner: one(invitedUsers, {
+    fields: [machines.invitedOwnerId],
+    references: [invitedUsers.id],
+    relationName: "invited_owner",
   }),
 }));
 
@@ -384,22 +386,19 @@ export const issuesRelations = relations(issues, ({ one, many }) => ({
     references: [userProfiles.id],
     relationName: "assigned_to",
   }),
-  unconfirmedReporter: one(unconfirmedUsers, {
-    fields: [issues.unconfirmedReportedBy],
-    references: [unconfirmedUsers.id],
-    relationName: "unconfirmed_reporter",
+  invitedReporter: one(invitedUsers, {
+    fields: [issues.invitedReportedBy],
+    references: [invitedUsers.id],
+    relationName: "invited_reporter",
   }),
   comments: many(issueComments),
   watchers: many(issueWatchers),
 }));
 
-export const unconfirmedUsersRelations = relations(
-  unconfirmedUsers,
-  ({ many }) => ({
-    ownedMachines: many(machines, { relationName: "unconfirmed_owner" }),
-    reportedIssues: many(issues, { relationName: "unconfirmed_reporter" }),
-  })
-);
+export const invitedUsersRelations = relations(invitedUsers, ({ many }) => ({
+  ownedMachines: many(machines, { relationName: "invited_owner" }),
+  reportedIssues: many(issues, { relationName: "invited_reporter" }),
+}));
 
 export const issueCommentsRelations = relations(issueComments, ({ one }) => ({
   issue: one(issues, {

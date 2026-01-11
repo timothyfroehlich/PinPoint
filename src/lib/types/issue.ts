@@ -16,7 +16,7 @@ export type IssueListItem = Issue & {
 export type IssueWithAllRelations = Issue & {
   machine: Pick<Machine, "id" | "name">;
   reportedByUser?: Pick<UserProfile, "id" | "name" | "email"> | null;
-  unconfirmedReporter?: {
+  invitedReporter?: {
     id: string;
     name: string;
     email: string | null;

@@ -81,7 +81,7 @@ test.describe("Machine with Inline Invite (Smoke)", () => {
     // Verify the Select component shows the new user
     const ownerSelect = page.getByRole("combobox", { name: /Machine Owner/i });
     await expect(ownerSelect).toContainText(userName);
-    await expect(ownerSelect).toContainText("(Unconfirmed)");
+    await expect(ownerSelect).toContainText("(Invited)");
 
     // 5. Submit machine creation
     await page.getByRole("button", { name: /Create Machine/i }).click();

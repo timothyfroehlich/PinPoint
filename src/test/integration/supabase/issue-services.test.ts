@@ -20,6 +20,7 @@ import {
   updateIssueSeverity,
   updateIssuePriority,
   updateIssueConsistency,
+  createIssue,
 } from "~/services/issues";
 
 // Mock the database to use the PGlite instance
@@ -89,6 +90,7 @@ describe("Issue Service Functions (Integration)", () => {
         name: "Service Test Machine",
         initials: "STM",
         ownerId: testUser.id,
+        nextIssueNumber: 2,
       })
       .returning();
     testMachine = machine;
@@ -210,5 +212,93 @@ describe("Issue Service Functions (Integration)", () => {
 
     expect(event?.content).toContain("Consistency changed");
     expect(event?.content).toContain("from Intermittent to Constant");
+  });
+
+  describe("createIssue with reporter variations", () => {
+    it("should create an issue with guest reporter info and correct timeline message", async () => {
+      const db = await getTestDb();
+
+      const guestInfo = {
+        title: "Guest Issue",
+        description: "Guest reported this",
+        machineInitials: testMachine.initials,
+        severity: "minor" as const,
+        reporterName: "Guest User",
+        reporterEmail: "guest@example.com",
+      };
+
+      const issue = await createIssue(guestInfo);
+
+      expect(issue.reporterName).toBe(guestInfo.reporterName);
+      expect(issue.reporterEmail).toBe(guestInfo.reporterEmail);
+      expect(issue.reportedBy).toBeNull();
+
+      // Verify timeline event
+      const events = await db.query.issueComments.findMany({
+        where: eq(issueComments.issueId, issue.id),
+        orderBy: desc(issueComments.createdAt),
+      });
+
+      const reportEvent = events.find(
+        (e: any) => e.isSystem && e.content.includes("Issue reported by")
+      );
+      expect(reportEvent).toBeDefined();
+      expect(reportEvent?.content).toBe(
+        `Issue reported by ${guestInfo.reporterName}`
+      );
+    });
+
+    it("should create an anonymous issue and correct timeline message", async () => {
+      const db = await getTestDb();
+
+      const anonInfo = {
+        title: "Anon Issue",
+        machineInitials: testMachine.initials,
+        severity: "major" as const,
+      };
+
+      const issue = await createIssue(anonInfo);
+
+      expect(issue.reporterName).toBeNull();
+      expect(issue.reporterEmail).toBeNull();
+      expect(issue.reportedBy).toBeNull();
+
+      const events = await db.query.issueComments.findMany({
+        where: eq(issueComments.issueId, issue.id),
+        orderBy: desc(issueComments.createdAt),
+      });
+
+      const reportEvent = events.find(
+        (e: any) => e.isSystem && e.content.includes("Issue reported by")
+      );
+      expect(reportEvent?.content).toBe("Issue reported by Guest");
+    });
+
+    it("should create a member issue and correct timeline message", async () => {
+      const db = await getTestDb();
+
+      const memberInfo = {
+        title: "Member Issue",
+        machineInitials: testMachine.initials,
+        severity: "unplayable" as const,
+        reportedBy: testUser.id,
+      };
+
+      const issue = await createIssue(memberInfo);
+
+      expect(issue.reportedBy).toBe(testUser.id);
+      expect(issue.reporterName).toBeNull();
+      expect(issue.reporterEmail).toBeNull();
+
+      const events = await db.query.issueComments.findMany({
+        where: eq(issueComments.issueId, issue.id),
+        orderBy: desc(issueComments.createdAt),
+      });
+
+      const reportEvent = events.find(
+        (e: any) => e.isSystem && e.content.includes("Issue reported by")
+      );
+      expect(reportEvent?.content).toBe("Issue reported by Member");
+    });
   });
 });

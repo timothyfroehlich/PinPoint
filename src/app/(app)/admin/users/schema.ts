@@ -3,7 +3,7 @@ import { z } from "zod";
 export const updateUserRoleSchema = z.object({
   userId: z.string().uuid(),
   newRole: z.enum(["guest", "member", "admin"]),
-  userType: z.enum(["active", "unconfirmed"]),
+  userType: z.enum(["active", "invited"]),
 });
 
 export const inviteUserSchema = z.object({

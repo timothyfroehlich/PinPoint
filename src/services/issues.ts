@@ -36,7 +36,8 @@ export interface CreateIssueParams {
   priority?: IssuePriority | undefined;
   consistency?: IssueConsistency | undefined;
   reportedBy?: string | null;
-  unconfirmedReportedBy?: string | null;
+  reporterName?: string | null;
+  reporterEmail?: string | null;
 }
 
 export interface UpdateIssueStatusParams {
@@ -89,7 +90,8 @@ export async function createIssue({
   priority,
   consistency,
   reportedBy,
-  unconfirmedReportedBy,
+  reporterName,
+  reporterEmail,
 }: CreateIssueParams): Promise<Issue> {
   return await db.transaction(async (tx) => {
     // 1. Lock machine row and get next number (Atomic increment)
@@ -122,7 +124,8 @@ export async function createIssue({
         priority: priority ?? "medium",
         consistency: consistency ?? "intermittent",
         reportedBy: reportedBy ?? null,
-        unconfirmedReportedBy: unconfirmedReportedBy ?? null,
+        reporterName: reporterName ?? null,
+        reporterEmail: reporterEmail ?? null,
         status: "new",
       })
       .returning();
@@ -130,11 +133,11 @@ export async function createIssue({
     if (!issue) throw new Error("Issue creation failed");
 
     // 3. Create Timeline Event
+    const reporterDesc =
+      reporterName ?? reporterEmail ?? (reportedBy ? "Member" : "Guest");
     await createTimelineEvent(
       issue.id,
-      reportedBy || unconfirmedReportedBy
-        ? "Issue created"
-        : "Issue reported via public form",
+      `Issue reported by ${reporterDesc}`,
       tx
     );
 

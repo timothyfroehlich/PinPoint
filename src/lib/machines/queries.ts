@@ -3,7 +3,7 @@ import {
   machines,
   authUsers,
   userProfiles,
-  unconfirmedUsers,
+  invitedUsers,
 } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import type { MachineOwner } from "~/lib/types";
@@ -16,17 +16,14 @@ export async function getMachineOwner(
       ownerId: machines.ownerId,
       ownerName: userProfiles.name,
       ownerEmail: authUsers.email,
-      unconfirmedOwnerId: machines.unconfirmedOwnerId,
-      unconfirmedOwnerName: unconfirmedUsers.name,
-      unconfirmedOwnerEmail: unconfirmedUsers.email,
+      invitedOwnerId: machines.invitedOwnerId,
+      invitedOwnerName: invitedUsers.name,
+      invitedOwnerEmail: invitedUsers.email,
     })
     .from(machines)
     .leftJoin(userProfiles, eq(machines.ownerId, userProfiles.id))
     .leftJoin(authUsers, eq(userProfiles.id, authUsers.id))
-    .leftJoin(
-      unconfirmedUsers,
-      eq(machines.unconfirmedOwnerId, unconfirmedUsers.id)
-    )
+    .leftJoin(invitedUsers, eq(machines.invitedOwnerId, invitedUsers.id))
     .where(eq(machines.id, machineId))
     .limit(1);
 
@@ -43,13 +40,13 @@ export async function getMachineOwner(
     };
   }
 
-  // Check for unconfirmed owner
-  if (row.unconfirmedOwnerId && row.unconfirmedOwnerName) {
+  // Check for invited owner
+  if (row.invitedOwnerId && row.invitedOwnerName) {
     return {
-      id: row.unconfirmedOwnerId,
-      name: row.unconfirmedOwnerName,
-      email: row.unconfirmedOwnerEmail ?? "",
-      status: "unconfirmed",
+      id: row.invitedOwnerId,
+      name: row.invitedOwnerName,
+      email: row.invitedOwnerEmail ?? "",
+      status: "invited",
     };
   }
 

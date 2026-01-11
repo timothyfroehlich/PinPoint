@@ -8,6 +8,20 @@
       "when": 1767922624191,
       "tag": "0000_initv2",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1768170240258,
+      "tag": "0001_direct-reporter-fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1768171706340,
+      "tag": "0002_invited-users-rename",
+      "breakpoints": true
     }
   ]
 }

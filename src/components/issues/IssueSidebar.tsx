@@ -50,8 +50,9 @@ export function IssueSidebar({
                   <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-medium text-muted-foreground">
                     {(
                       issue.reportedByUser?.name ??
-                      issue.unconfirmedReporter?.name ??
-                      "U"
+                      issue.invitedReporter?.name ??
+                      issue.reporterName ??
+                      "A"
                     )
                       .slice(0, 1)
                       .toUpperCase()}
@@ -59,14 +60,17 @@ export function IssueSidebar({
                   <div className="flex flex-col min-w-0 overflow-hidden">
                     <span className="truncate text-sm font-medium text-foreground">
                       {issue.reportedByUser?.name ??
-                        issue.unconfirmedReporter?.name ??
-                        "Unknown user"}
+                        issue.invitedReporter?.name ??
+                        issue.reporterName ??
+                        "Anonymous"}
                     </span>
                     {(issue.reportedByUser?.email ??
-                      issue.unconfirmedReporter?.email) && (
+                      issue.invitedReporter?.email ??
+                      issue.reporterEmail) && (
                       <span className="truncate text-xs text-muted-foreground">
                         {issue.reportedByUser?.email ??
-                          issue.unconfirmedReporter?.email}
+                          issue.invitedReporter?.email ??
+                          issue.reporterEmail}
                       </span>
                     )}
                   </div>

@@ -127,10 +127,13 @@ export function IssueTimeline({
   // 1. Normalize Issue as the first event
   const reporterName =
     issue.reportedByUser?.name ??
-    issue.unconfirmedReporter?.name ??
-    "Unknown User";
+    issue.invitedReporter?.name ??
+    issue.reporterName ??
+    "Anonymous";
   const reporterEmail =
-    issue.reportedByUser?.email ?? issue.unconfirmedReporter?.email;
+    issue.reportedByUser?.email ??
+    issue.invitedReporter?.email ??
+    issue.reporterEmail;
 
   const issueEvent: TimelineEvent = {
     id: `issue-${issue.id}`,
@@ -145,17 +148,20 @@ export function IssueTimeline({
   };
 
   // 2. Normalize Comments
-  const commentEvents: TimelineEvent[] = issue.comments.map((c) => ({
-    id: c.id,
-    type: c.isSystem ? "system" : "comment",
-    author: {
-      name: c.author?.name ?? "System",
-      avatarFallback: c.author?.name.slice(0, 2).toUpperCase() ?? "S",
-      email: c.author?.email,
-    },
-    createdAt: new Date(c.createdAt),
-    content: c.content,
-  }));
+  const commentEvents: TimelineEvent[] = issue.comments.map((c) => {
+    const authorName = c.author?.name ?? "System";
+    return {
+      id: c.id,
+      type: c.isSystem ? "system" : "comment",
+      author: {
+        name: authorName,
+        avatarFallback: authorName.slice(0, 2).toUpperCase(),
+        email: c.author?.email,
+      },
+      createdAt: new Date(c.createdAt),
+      content: c.content,
+    };
+  });
 
   // 3. Combine
   const allEvents = [issueEvent, ...commentEvents];

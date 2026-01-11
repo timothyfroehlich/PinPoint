@@ -89,7 +89,7 @@ export default async function MachineDetailPage({
           ...(isMemberOrAdmin && { email: true }),
         },
       },
-      unconfirmedOwner: {
+      invitedOwner: {
         columns: {
           id: true,
           name: true,

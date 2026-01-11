@@ -53,7 +53,7 @@ function UserRow({
               variant="outline"
               className="w-fit border-amber-600/30 text-amber-600"
             >
-              Unconfirmed
+              Invited
             </Badge>
             {user.inviteSentAt && (
               <span className="truncate text-[10px] text-muted-foreground">
@@ -72,9 +72,7 @@ function UserRow({
         />
       </TableCell>
       <TableCell className="text-right">
-        {user.status === "unconfirmed" && (
-          <ResendInviteButton userId={user.id} />
-        )}
+        {user.status === "invited" && <ResendInviteButton userId={user.id} />}
       </TableCell>
     </TableRow>
   );
@@ -90,7 +88,7 @@ export default async function AdminUsersPage(): Promise<React.JSX.Element> {
     return <></>; // Layout handles redirect
   }
 
-  // Fetch all users (active and unconfirmed)
+  // Fetch all users (active and invited)
   const users = await getUnifiedUsers();
 
   return (

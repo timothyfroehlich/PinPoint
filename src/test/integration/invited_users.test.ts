@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import {
-  unconfirmedUsers,
+  invitedUsers,
   userProfiles,
   machines,
   authUsers,
@@ -20,16 +20,16 @@ vi.mock("~/server/db", async () => {
   };
 });
 
-describe("Unconfirmed Users Integration", () => {
+describe("Invited Users Integration", () => {
   setupTestDb();
 
-  it("should insert and query an unconfirmed user", async () => {
+  it("should insert and query an invited user", async () => {
     const db = await getTestDb();
 
     const [user] = await db
-      .insert(unconfirmedUsers)
+      .insert(invitedUsers)
       .values({
-        firstName: "Unconfirmed",
+        firstName: "Invited",
         lastName: "User",
         email: "test-query@example.com",
         role: "member",
@@ -37,15 +37,15 @@ describe("Unconfirmed Users Integration", () => {
       .returning();
 
     expect(user).toBeDefined();
-    expect(user.name).toBe("Unconfirmed User");
+    expect(user.name).toBe("Invited User");
 
-    const result = await db.query.unconfirmedUsers.findFirst({
-      where: eq(unconfirmedUsers.id, user.id),
+    const result = await db.query.invitedUsers.findFirst({
+      where: eq(invitedUsers.id, user.id),
     });
     expect(result?.email).toBe("test-query@example.com");
   });
 
-  it("should fetch unified users (active + unconfirmed)", async () => {
+  it("should fetch unified users (active + invited)", async () => {
     const db = await getTestDb();
 
     // 1. Create active user (requires authUser too for the join in getUnifiedUsers)
@@ -62,9 +62,9 @@ describe("Unconfirmed Users Integration", () => {
       role: "admin",
     });
 
-    // 2. Create unconfirmed user
-    await db.insert(unconfirmedUsers).values({
-      firstName: "Unconfirmed",
+    // 2. Create invited user
+    await db.insert(invitedUsers).values({
+      firstName: "Invited",
       lastName: "User",
       email: "unified@example.com",
       role: "member",
@@ -76,23 +76,23 @@ describe("Unconfirmed Users Integration", () => {
     expect(unifiedUsers.find((u: any) => u.status === "active")?.email).toBe(
       "active@example.com"
     );
-    expect(
-      unifiedUsers.find((u: any) => u.status === "unconfirmed")?.email
-    ).toBe("unified@example.com");
+    expect(unifiedUsers.find((u: any) => u.status === "invited")?.email).toBe(
+      "unified@example.com"
+    );
   });
 
   it("should enforce ownerCheck constraint on machines", async () => {
     const db = await getTestDb();
 
     const activeUserId = randomUUID();
-    const unconfirmedUserId = randomUUID();
+    const invitedUserId = randomUUID();
 
     // NOTE: PGlite may not enforce CHECK constraints in all environments.
     // If this fails, it indicates the constraint is not being enforced by PGllite.
     // We'll skip this assertion if it doesn't work as expected in the test runner.
     const machine = createTestMachine({
       ownerId: activeUserId,
-      unconfirmedOwnerId: unconfirmedUserId,
+      invitedOwnerId: invitedUserId,
     });
     try {
       await db.insert(machines).values(machine);
@@ -107,9 +107,9 @@ describe("Unconfirmed Users Integration", () => {
   it("should get correct machine owner via getMachineOwner helper", async () => {
     const db = await getTestDb();
 
-    // 1. Unconfirmed owner
+    // 1. Invited owner
     const [ucUser] = await db
-      .insert(unconfirmedUsers)
+      .insert(invitedUsers)
       .values({
         firstName: "UC",
         lastName: "Owner",
@@ -119,14 +119,12 @@ describe("Unconfirmed Users Integration", () => {
 
     const [machine1] = await db
       .insert(machines)
-      .values(
-        createTestMachine({ initials: "UC1", unconfirmedOwnerId: ucUser.id })
-      )
+      .values(createTestMachine({ initials: "UC1", invitedOwnerId: ucUser.id }))
       .returning();
 
     const owner1 = await getMachineOwner(machine1.id);
 
-    expect(owner1?.status).toBe("unconfirmed");
+    expect(owner1?.status).toBe("invited");
     expect(owner1?.name).toBe("UC Owner");
 
     // 2. Active owner
@@ -158,9 +156,9 @@ describe("Unconfirmed Users Integration", () => {
     // PGlite does not support triggers, so this test will log a warning but not fail.
     // The trigger is tested in Supabase-based integration tests.
 
-    // 1. Create unconfirmed user
-    const [unconfirmed] = await db
-      .insert(unconfirmedUsers)
+    // 1. Create invited user
+    const [invited] = await db
+      .insert(invitedUsers)
       .values({
         firstName: "Auto",
         lastName: "Link",
@@ -170,15 +168,15 @@ describe("Unconfirmed Users Integration", () => {
       .returning();
 
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Safe check, returning() might be empty
-    if (!unconfirmed) throw new Error("Failed to create unconfirmed user");
+    if (!invited) throw new Error("Failed to create invited user");
 
-    // 2. Create machine owned by unconfirmed user
+    // 2. Create machine owned by invited user
     const [machine] = await db
       .insert(machines)
       .values(
         createTestMachine({
           initials: "AUTO",
-          unconfirmedOwnerId: unconfirmed.id,
+          invitedOwnerId: invited.id,
         })
       )
       .returning();
@@ -215,20 +213,20 @@ describe("Unconfirmed Users Integration", () => {
     }
 
     expect(updatedMachine.ownerId).toBe(userId);
-    expect(updatedMachine.unconfirmedOwnerId).toBeNull();
+    expect(updatedMachine.invitedOwnerId).toBeNull();
 
-    // 5. Verify role transferred from unconfirmed user
+    // 5. Verify role transferred from invited user
     const profile = await db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, userId),
     });
 
-    expect(profile?.role).toBe("member"); // From unconfirmed user, not "guest"
+    expect(profile?.role).toBe("member"); // From invited user, not "guest"
 
-    // 6. Verify cleanup - unconfirmed user should be deleted
-    const deletedUnconfirmed = await db.query.unconfirmedUsers.findFirst({
-      where: eq(unconfirmedUsers.id, unconfirmed.id),
+    // 6. Verify cleanup - invited user should be deleted
+    const deletedInvited = await db.query.invitedUsers.findFirst({
+      where: eq(invitedUsers.id, invited.id),
     });
 
-    expect(deletedUnconfirmed).toBeNull();
+    expect(deletedInvited).toBeNull();
   });
 });

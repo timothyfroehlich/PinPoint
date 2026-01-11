@@ -75,7 +75,7 @@ export default async function IssueDetailPage({
             ...(isMemberOrAdmin && { email: true }),
           },
         },
-        unconfirmedReporter: {
+        invitedReporter: {
           columns: {
             id: true,
             name: true,

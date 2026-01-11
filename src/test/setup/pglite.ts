@@ -66,7 +66,7 @@ export async function cleanupTestDb() {
   await testDb.delete(schema.issues);
   await testDb.delete(schema.machines);
   await testDb.delete(schema.userProfiles);
-  await testDb.delete(schema.unconfirmedUsers); // Added
+  await testDb.delete(schema.invitedUsers); // Added
   await testDb.delete(schema.authUsers); // Added
 }
 
