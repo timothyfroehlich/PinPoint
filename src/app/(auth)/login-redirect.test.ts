@@ -136,6 +136,20 @@ describe("loginAction - Redirect Logic", () => {
     expect(vi.mocked(redirect)).toHaveBeenCalledWith("/dashboard");
   });
 
+  it("should redirect to /dashboard when next parameter is an external/unsafe URL", async () => {
+    const mockSupabase = createMockSupabase();
+    mockCreateClient(mockSupabase);
+
+    const formData = new FormData();
+    formData.set("email", "test@example.com");
+    formData.set("password", "TestPassword123");
+    formData.set("next", "https://malicious-site.com");
+
+    await loginAction(undefined, formData);
+
+    expect(vi.mocked(redirect)).toHaveBeenCalledWith("/dashboard");
+  });
+
   it("should handle various protected routes in next parameter", async () => {
     const mockSupabase = createMockSupabase();
     mockCreateClient(mockSupabase);

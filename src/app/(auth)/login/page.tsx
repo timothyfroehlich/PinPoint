@@ -2,6 +2,7 @@ import type React from "react";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { createClient } from "~/lib/supabase/server";
+import { getSafeRedirect } from "~/lib/url";
 import { LoginForm } from "./login-form";
 
 /**
@@ -24,7 +25,7 @@ export default async function LoginPage({
   const { next } = await searchParams;
 
   if (user) {
-    redirect(next ?? "/dashboard");
+    redirect(getSafeRedirect(next));
   }
 
   return (

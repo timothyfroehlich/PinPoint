@@ -1,20 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { isInternalUrl, resolveRedirectPath } from "~/app/auth/callback/route";
-
-/**
- * Security-Critical Unit Tests for Auth Callback Route
- *
- * Tests URL validation helpers to prevent:
- * - Open redirect vulnerabilities
- * - Protocol-relative URL attacks
- * - Path traversal attempts
- *
- * These tests validate the internal security logic used by the auth callback route
- * to ensure users are only redirected to safe, internal URLs after authentication.
- *
- * Note: These are pure function tests - no mocking required since we're testing
- * helper functions extracted from route.ts for testability.
- */
+import { resolveRedirectPath } from "./route";
+import { isInternalUrl } from "~/lib/url";
 
 describe("isInternalUrl", () => {
   it("should return true for root path", () => {

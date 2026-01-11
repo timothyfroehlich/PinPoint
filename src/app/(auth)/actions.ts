@@ -18,7 +18,7 @@ import {
   getClientIp,
   formatResetTime,
 } from "~/lib/rate-limit";
-import { getSiteUrl } from "~/lib/url";
+import { getSiteUrl, getSafeRedirect } from "~/lib/url";
 
 /**
  * Result Types
@@ -147,12 +147,11 @@ export async function loginAction(
       "User logged in successfully"
     );
 
-    // Get redirect destination from form data
+    // Get redirect destination from form data and ensure it's safe
     const nextParam = formData.get("next");
-    const next =
-      typeof nextParam === "string" && nextParam.length > 0
-        ? nextParam
-        : "/dashboard";
+    const next = getSafeRedirect(
+      typeof nextParam === "string" ? nextParam : undefined
+    );
 
     redirect(next);
   } catch (error) {
