@@ -17,3 +17,9 @@
 **Vulnerability:** Server Actions were returning raw error messages from the backend/database directly to the client in the `SERVER` error code path.
 **Learning:** This can expose database connection strings, schema details, or other sensitive internal information to attackers if an unhandled exception occurs.
 **Prevention:** Always catch errors in Server Actions and return a generic "An unexpected error occurred" message to the client, while logging the full error details on the server for debugging.
+
+## 2026-01-20 - Host Header Injection in Email Invites
+
+**Vulnerability:** Admin invitation emails were constructing links using `headers().get("host")`. This allows attackers to spoof the Host header and generate password reset or invite links pointing to malicious domains.
+**Learning:** Never trust the `Host` header for constructing absolute URLs, especially for security-critical flows like authentication or invitations.
+**Prevention:** Use a configured, static site URL (via `NEXT_PUBLIC_SITE_URL`) enforced by utilities like `requireSiteUrl()` to generate absolute links.
