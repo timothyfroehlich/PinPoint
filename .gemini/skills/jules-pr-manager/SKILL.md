@@ -21,6 +21,7 @@ Process PRs in this order (closest to completion first):
 ### 1. Merge Candidates (The Exit)
 
 - **Definition**: PRs vetted, Copilot Approved, CI Passed, No Conflicts.
+- **MANDATORY**: Before running merge, you MUST present a detailed summary of the PR to the User and wait for explicit confirmation.
 - **Action**: Run `./merge.sh <ID> ["message"]`.
 
 ### 2. Copilot Review (`jules:copilot-review`)
@@ -82,7 +83,7 @@ Process PRs in this order (closest to completion first):
 
 Present decisions to the User in this EXACT order:
 
-1. **Merge Decisions**: One by one.
+1. **Merge Decisions**: One by one. You MUST provide a detailed summary of each PR (logic changes, impact, vetting results) and request explicit confirmation before merging.
 2. **Vetting Requests**: One by one (include deep opinion on rationale/impact).
 3. **Trivial Batch**: As a numbered list for bulk approval.
 
