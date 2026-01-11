@@ -242,7 +242,7 @@ export async function signupAction(
           "Signup failed: email already registered"
         );
 
-        return err("EMAIL_TAKEN", error.message);
+        return err("EMAIL_TAKEN", "This email is already registered");
       }
 
       log.error(
@@ -250,7 +250,7 @@ export async function signupAction(
         "Signup failed: Supabase error"
       );
 
-      return err("SERVER", error.message);
+      return err("SERVER", "An unexpected error occurred during signup");
     }
 
     if (!data.user) {
@@ -447,7 +447,7 @@ export async function forgotPasswordAction(
         { action: "forgot-password", error: error.message },
         "Password reset email failed"
       );
-      return err("SERVER", error.message);
+      return err("SERVER", "Failed to send password reset email");
     }
 
     log.info(
@@ -527,7 +527,7 @@ export async function resetPasswordAction(
         "Password update failed"
       );
 
-      return err("SERVER", error.message);
+      return err("SERVER", "Failed to update password");
     }
 
     log.info(
