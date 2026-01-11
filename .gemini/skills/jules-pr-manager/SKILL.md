@@ -35,12 +35,13 @@ Process PRs in this order (closest to completion first):
   - Run `./label.sh <ID> add jules:changes-requested`.
 - **Condition: Approved**: Move to Merge Candidate.
 
-### 3. Transition to Copilot Review
+### 3. Transition to Copilot Review (CRITICAL STEP)
 
 - **Condition**: `jules:vetted` AND CI Passed AND NOT `jules:copilot-review`.
-- **Action**:
-  - Run `./mark-ready.sh <ID>`.
-  - Run `./label.sh <ID> add jules:copilot-review`.
+- **MANDATORY ACTION**:
+  1. Run `./mark-ready.sh <ID>`. **(This converts Draft to PR; Copilot will ignore Drafts.)**
+  2. Run `./label.sh <ID> add jules:copilot-review`.
+- **Why**: This is the primary trigger for the automated audit pipeline. If you skip `mark-ready.sh`, the PR will stall indefinitely in the Copilot queue.
 
 ### 4. Changes Requested (`jules:changes-requested`)
 
