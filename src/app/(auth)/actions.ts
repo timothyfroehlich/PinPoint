@@ -137,7 +137,7 @@ export async function loginAction(
         "Login authentication failed"
       );
 
-      return err("AUTH", error?.message ?? "Authentication failed", {
+      return err("AUTH", "Invalid email or password", {
         submittedEmail,
       });
     }
