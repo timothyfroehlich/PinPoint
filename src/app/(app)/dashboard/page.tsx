@@ -146,11 +146,12 @@ const getDashboardData = cache(async (userId?: string) => {
     .where(notInArray(issues.status, [...CLOSED_STATUSES]));
 
   // Query 6: Machines needing service (machines with at least one open issue)
-  // Optimized to use count(distinct) instead of fetching all IDs
+  // Optimized to use count(distinct) on issues table, removing unnecessary JOIN with machines
   const machinesNeedingServicePromise = db
-    .select({ count: sql<number>`count(distinct ${machines.id})::int` })
-    .from(machines)
-    .innerJoin(issues, eq(issues.machineInitials, machines.initials))
+    .select({
+      count: sql<number>`count(distinct ${issues.machineInitials})::int`,
+    })
+    .from(issues)
     .where(notInArray(issues.status, [...CLOSED_STATUSES]));
 
   // Execute all queries in parallel
