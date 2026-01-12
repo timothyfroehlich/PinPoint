@@ -298,7 +298,7 @@ describe("Issue Service Functions (Integration)", () => {
       const reportEvent = events.find(
         (e: any) => e.isSystem && e.content.includes("Issue reported by")
       );
-      expect(reportEvent?.content).toBe("Issue reported by Member");
+      expect(reportEvent?.content).toBe("Issue reported by Test User");
     });
   });
 });
