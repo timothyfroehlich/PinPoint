@@ -132,15 +132,6 @@ export async function createIssue({
 
     if (!issue) throw new Error("Issue creation failed");
 
-    // 3. Create Timeline Event
-    const reporterDesc =
-      reporterName ?? reporterEmail ?? (reportedBy ? "Member" : "Guest");
-    await createTimelineEvent(
-      issue.id,
-      `Issue reported by ${reporterDesc}`,
-      tx
-    );
-
     log.info(
       {
         issueId: issue.id,

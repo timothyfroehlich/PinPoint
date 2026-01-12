@@ -35,9 +35,6 @@ test.describe("Reporter Variations E2E", () => {
 
     await expect(sidebar).toContainText("John Guest");
     await expect(sidebar).toContainText("john@guest.com");
-
-    // Timeline event for guest
-    await expect(page.getByText("Issue reported by John Guest")).toBeVisible();
   });
 
   test("should display guest with name only correctly", async ({ page }) => {
@@ -46,7 +43,6 @@ test.describe("Reporter Variations E2E", () => {
     const sidebar = page.getByTestId("issue-sidebar");
 
     await expect(sidebar).toContainText("Only Name");
-    await expect(page.getByText("Issue reported by Only Name")).toBeVisible();
   });
 
   test("should display guest with email only correctly", async ({ page }) => {
@@ -56,9 +52,6 @@ test.describe("Reporter Variations E2E", () => {
 
     await expect(sidebar).toContainText("Anonymous");
     await expect(sidebar).toContainText("only@email.com");
-    await expect(
-      page.getByText("Issue reported by only@email.com")
-    ).toBeVisible();
   });
 
   test("should display fully anonymous reporter correctly", async ({
@@ -69,7 +62,6 @@ test.describe("Reporter Variations E2E", () => {
     const sidebar = page.getByTestId("issue-sidebar");
 
     await expect(sidebar).toContainText("Anonymous");
-    await expect(page.getByText("Issue reported by Guest")).toBeVisible();
   });
 
   test("should display invited user reporter correctly (legacy logic)", async ({

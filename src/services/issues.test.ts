@@ -8,7 +8,6 @@ import {
 } from "./issues";
 import { db } from "~/server/db";
 import { createNotification } from "~/lib/notifications";
-import { createTimelineEvent } from "~/lib/timeline/events";
 
 vi.mock("~/server/db", () => ({
   db: mockDeep(),
@@ -143,7 +142,6 @@ describe("Issue Service", () => {
 
       await createIssue(params);
 
-      expect(createTimelineEvent).toHaveBeenCalled();
       expect(createNotification).toHaveBeenCalledWith(
         {
           type: "new_issue",
