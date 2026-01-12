@@ -103,8 +103,8 @@ CREATE TABLE issues (
   machine_id UUID NOT NULL REFERENCES machines(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   description TEXT,
-  status TEXT NOT NULL DEFAULT 'new',  -- 'new' | 'in_progress' | 'resolved'
-  severity TEXT NOT NULL DEFAULT 'playable',  -- 'minor' | 'playable' | 'unplayable'
+  status TEXT NOT NULL DEFAULT 'new',  -- 'new' | 'confirmed' | 'in_progress' | 'fixed' | etc.
+  severity TEXT NOT NULL DEFAULT 'minor',  -- 'cosmetic' | 'minor' | 'major' | 'unplayable'
   reported_by UUID REFERENCES auth.users(id),  -- NULL for anonymous reports
   assigned_to UUID REFERENCES auth.users(id),
   resolved_at TIMESTAMPTZ,
@@ -223,7 +223,7 @@ export async function createIssue(formData: FormData) {
     title,
     machineId,
     reportedBy: user.id,
-    severity: "playable", // default
+    severity: "minor", // default
     status: "new",
   });
 
@@ -301,8 +301,9 @@ export function IssueForm({ machines }: { machines: Machine[] }) {
         ))}
       </select>
       <select name="severity" required>
+        <option value="cosmetic">Cosmetic</option>
         <option value="minor">Minor</option>
-        <option value="playable">Playable Issue</option>
+        <option value="major">Major</option>
         <option value="unplayable">Unplayable</option>
       </select>
       <textarea name="description" />
@@ -343,8 +344,16 @@ export interface Issue {
   machineId: string;
   title: string;
   description: string | null;
-  status: "new" | "in_progress" | "resolved";
-  severity: "minor" | "playable" | "unplayable";
+  status:
+    | "new"
+    | "confirmed"
+    | "in_progress"
+    | "fixed"
+    | "wont_fix"
+    | "wai"
+    | "no_repro"
+    | "duplicate";
+  severity: "cosmetic" | "minor" | "major" | "unplayable";
   reportedBy: string | null;
   assignedTo: string | null;
   resolvedAt: Date | null;
@@ -455,7 +464,10 @@ pinpoint/
 # Start Next.js dev server
 pnpm run dev
 
-# Apply schema changes (no migration files)
+# Apply pending migrations to your local database
+pnpm run db:migrate
+
+# Full reset: restarts Supabase, reapplies all migrations, seeds data (DESTRUCTIVE)
 pnpm run db:reset
 
 # Open Drizzle Studio
@@ -483,7 +495,11 @@ pnpm run e2e
 4. Test locally (`pnpm run check`, `pnpm run preflight` before pushing)
 5. Commit `schema.ts`, the `drizzle/` migration files, and the regenerated test schema
 
-`db:reset` remains a **destructive** helper for local/dev environments: it restarts Supabase, drops application tables, reapplies all migrations, regenerates the test schema, and seeds data/users.
+**Migration vs. Reset**:
+
+- **`db:migrate`**: Safely applies new migration files. Use this for routine schema updates.
+- **`db:reset`**: A **destructive** helper for local/dev environments. It restarts Supabase, drops application tables, reapplies ALL migrations from scratch, regenerates the test schema, and seeds data/users. Use this when your local environment is out of sync or you want a clean slate.
+- **Production/Preview**: NEVER use `db:reset` or `drizzle-kit push` on production or preview databases. ALWAYS use `db:migrate`.
 
 ---
 
@@ -520,16 +536,16 @@ pnpm run e2e
 
 ## Tech Stack Decisions
 
-| Date       | Decision                            | Rationale                                                |
-| ---------- | ----------------------------------- | -------------------------------------------------------- | --- |
-| 2025-11-10 | Next.js 16                          | Use latest stable release                                |
-| 2025-11-10 | No real-time subscriptions          | MVP doesn't need it                                      |
-| 2025-11-10 | Service layer allowed where helpful | Use when coordinating workflows, avoid needless wrappers |
-| 2025-11-10 | Issues always per-machine           | Aligns with reality, simplifies schema                   |
-| 2025-11-10 | Severity: minor/playable/unplayable | Clear, player-centric language                           |
-| 2025-11-10 | Role: guest/member/admin            | Simple, extensible permission model                      |
-| 2025-11-10 | Two Supabase projects               | Preview/prod separation                                  |
-| 2025-11-20 | Drizzle migrations                  | Schema version control, production safety                |     |
+| Date       | Decision                                  | Rationale                                                |
+| ---------- | ----------------------------------------- | -------------------------------------------------------- | --- |
+| 2025-11-10 | Next.js 16                                | Use latest stable release                                |
+| 2025-11-10 | No real-time subscriptions                | MVP doesn't need it                                      |
+| 2025-11-10 | Service layer allowed where helpful       | Use when coordinating workflows, avoid needless wrappers |
+| 2025-11-10 | Issues always per-machine                 | Aligns with reality, simplifies schema                   |
+| 2025-11-10 | Severity: cosmetic/minor/major/unplayable | Clear, player-centric language                           |
+| 2025-11-10 | Role: guest/member/admin                  | Simple, extensible permission model                      |
+| 2025-11-10 | Two Supabase projects                     | Preview/prod separation                                  |
+| 2025-11-20 | Drizzle migrations                        | Schema version control, production safety                |     |
 
 ---
 

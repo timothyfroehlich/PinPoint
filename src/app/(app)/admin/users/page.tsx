@@ -66,6 +66,7 @@ function UserRow({
       <TableCell>
         <UserRoleSelect
           userId={user.id}
+          userName={user.name}
           currentRole={user.role}
           currentUserId={currentUserId}
           userType={user.status}
@@ -73,7 +74,7 @@ function UserRow({
       </TableCell>
       <TableCell className="text-right">
         {user.status === "unconfirmed" && (
-          <ResendInviteButton userId={user.id} />
+          <ResendInviteButton userId={user.id} userName={user.name} />
         )}
       </TableCell>
     </TableRow>

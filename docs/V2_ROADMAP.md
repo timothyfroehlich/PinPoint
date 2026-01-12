@@ -225,12 +225,12 @@ Major features that complete the vision:
 
 ### Issue Management (1.0+)
 
-**Custom Issue Statuses**
+**Custom Issue Statuses** - ✅ COMPLETED
 
-- Beyond new/in_progress/resolved
-- Examples: needs_parts, waiting_for_approval, deferred
-- Admin can configure
-- Effort: Medium (3 days)
+- Problem: Simple new/in_progress/resolved is not enough for complex repairs
+- Solution: 11 distinct statuses across New, In Progress, and Closed groups
+- Status: Implemented (new, confirmed, in_progress, need_parts, need_help, wait_owner, fixed, wont_fix, wai, no_repro, duplicate)
+- Impact: Precise tracking of repair lifecycle
 
 **Saved Filters**
 

@@ -15,6 +15,14 @@ import { Button } from "~/components/ui/button";
 import { UserCheck } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { submitPublicIssueAction } from "./actions";
+import { SeveritySelect } from "~/components/issues/fields/SeveritySelect";
+import { ConsistencySelect } from "~/components/issues/fields/ConsistencySelect";
+import { PrioritySelect } from "~/components/issues/fields/PrioritySelect";
+import type {
+  IssueSeverity,
+  IssueConsistency,
+  IssuePriority,
+} from "~/lib/types";
 
 interface Machine {
   id: string;
@@ -62,9 +70,10 @@ export function UnifiedReportForm({
   );
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [severity, setSeverity] = useState("minor");
-  const [priority, setPriority] = useState("medium");
-  const [consistency, setConsistency] = useState("intermittent");
+  const [severity, setSeverity] = useState<IssueSeverity>("minor");
+  const [priority, setPriority] = useState<IssuePriority>("medium");
+  const [consistency, setConsistency] =
+    useState<IssueConsistency>("intermittent");
 
   const [state, formAction, isPending] = useActionState(
     submitPublicIssueAction,
@@ -87,9 +96,9 @@ export function UnifiedReportForm({
           machineId: string;
           title: string;
           description: string;
-          severity: string;
-          priority: string;
-          consistency: string;
+          severity: IssueSeverity;
+          priority: IssuePriority;
+          consistency: IssueConsistency;
         }>;
 
         // Only restore machineId if not provided via prop or URL already
@@ -258,53 +267,28 @@ export function UnifiedReportForm({
                     <Label htmlFor="severity" className="text-on-surface">
                       Severity *
                     </Label>
-                    <select
-                      id="severity"
-                      name="severity"
-                      data-testid="severity-select"
-                      aria-label="Select Severity"
+                    <input type="hidden" name="severity" value={severity} />
+                    <SeveritySelect
                       value={severity}
-                      onChange={(e) => setSeverity(e.target.value)}
-                      required
-                      className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-on-surface"
-                    >
-                      <option value="cosmetic">
-                        Cosmetic (minor visual issue)
-                      </option>
-                      <option value="minor">
-                        Minor (gameplay affected, still playable)
-                      </option>
-                      <option value="major">
-                        Major (major issues, barely playable)
-                      </option>
-                      <option value="unplayable">
-                        Unplayable (machine down)
-                      </option>
-                    </select>
+                      onValueChange={setSeverity}
+                      testId="severity-select"
+                    />
                   </div>
 
                   <div className="space-y-1.5">
                     <Label htmlFor="consistency" className="text-on-surface">
                       Consistency *
                     </Label>
-                    <select
-                      id="consistency"
+                    <input
+                      type="hidden"
                       name="consistency"
-                      data-testid="consistency-select"
-                      aria-label="Select Consistency"
                       value={consistency}
-                      onChange={(e) => setConsistency(e.target.value)}
-                      required
-                      className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-on-surface"
-                    >
-                      <option value="intermittent">
-                        Intermittent (happens sometimes)
-                      </option>
-                      <option value="frequent">Frequent (happens often)</option>
-                      <option value="constant">
-                        Constant (happens every time)
-                      </option>
-                    </select>
+                    />
+                    <ConsistencySelect
+                      value={consistency}
+                      onValueChange={setConsistency}
+                      testId="consistency-select"
+                    />
                   </div>
 
                   {isAdminOrMember && (
@@ -312,20 +296,12 @@ export function UnifiedReportForm({
                       <Label htmlFor="priority" className="text-on-surface">
                         Priority *
                       </Label>
-                      <select
-                        id="priority"
-                        name="priority"
-                        data-testid="priority-select"
-                        aria-label="Select Priority"
+                      <input type="hidden" name="priority" value={priority} />
+                      <PrioritySelect
                         value={priority}
-                        onChange={(e) => setPriority(e.target.value)}
-                        required
-                        className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-on-surface"
-                      >
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                      </select>
+                        onValueChange={setPriority}
+                        testId="priority-select"
+                      />
                     </div>
                   )}
                 </div>

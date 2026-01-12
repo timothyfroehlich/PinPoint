@@ -9,15 +9,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import { type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
-
-/**
- * Validates that a redirect URL is safe (internal to the application)
- * Prevents open redirect vulnerabilities
- */
-export function isInternalUrl(url: string): boolean {
-  // Allow paths starting with / but not // (absolute protocol-relative)
-  return url.startsWith("/") && !url.startsWith("//");
-}
+import { isInternalUrl } from "~/lib/url";
 
 export function resolveRedirectPath(options: {
   nextParam: string | null;

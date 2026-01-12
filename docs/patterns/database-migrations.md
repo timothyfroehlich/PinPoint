@@ -24,26 +24,30 @@ This pattern keeps production/preview databases in sync via migrations while ens
   pnpm run db:migrate
   ```
 
-- **Regenerate test schema for PGlite**
+- **Reset local database (DESTRUCTIVE)**
 
+  ```bash
+  pnpm run db:reset
+  ```
+
+- **Regenerate test schema for PGlite**
   ```bash
   pnpm run test:_generate-schema
   ```
 
 ## Where It’s Used
 
-- Local development (`db:migrate` after editing `schema.ts`)
-- CI reset scripts (`scripts/supa-ci.sh`, `scripts/db-reset-preview.sh`)
-- Test setup (`src/test/setup/schema.sql` is regenerated from the same schema)
+- **`db:migrate`**: Used daily during local development and automatically in CI/CD for Preview and Production updates.
+- **`db:reset`**: Used **locally only** when you need a clean slate (restarts Supabase, reapplies all migrations, seeds data).
+- **`test:_generate-schema`**: Used after any schema change to keep PGlite integration tests in sync.
 
 ## Guidelines
 
-- Always edit `src/server/db/schema.ts` first.
-- Generate a migration with a descriptive name (e.g., `add-notifications-table`).
-- Run `pnpm run db:migrate` locally and in preview/prod via scripts.
-- After structural changes, regenerate the test schema and commit both:
+- **Always migrations**: NEVER use `drizzle-kit push`. ALWAYS generate and apply migrations.
+- **Descriptive names**: Use clear names for migrations (e.g., `add-notifications-table`).
+- **Commit everything**: When you change the schema, commit `schema.ts`, the new `drizzle/` files, AND the updated `src/test/setup/schema.sql`.
 
-  ```bash
-  pnpm run test:_generate-schema
-  git add src/server/db/schema.ts drizzle/ src/test/setup/schema.sql
-  ```
+## Safety Rules
+
+- **Production/Preview**: NEVER run `db:reset` or `drizzle-kit push` on these environments. They must only ever be updated via `db:migrate`.
+- **Destructive Action**: `db:reset` is local-only and will wipe all data in your local database. Use it with caution.
