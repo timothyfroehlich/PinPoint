@@ -6,8 +6,8 @@ _Migration-focused updates for Prisma → Drizzle direct conversion_
 
 ### **🚀 2025 Integration Improvements**
 
-**Enhanced PGlite Integration**: Better memory management and query optimization  
-**Generated Columns Performance**: Improved database-level computation patterns  
+**Enhanced PGlite Integration**: Better memory management and query optimization
+**Generated Columns Performance**: Improved database-level computation patterns
 **Real-world Examples**: Production patterns for complex schema migrations
 
 ### 🎯 **Critical for Direct Conversion**
@@ -51,7 +51,26 @@ _Migration-focused updates for Prisma → Drizzle direct conversion_
 
 ### ⚡ Performance & Developer Experience
 
-...
+**Relational Queries at Scale**
+
+- **DO:** Define relations with `relations()` and ensure both sides of the relationship are declared.
+- **DO:** Import all related schema files in the module where you run relational queries to avoid missing-join issues.
+- **DON'T:** Rely on ad-hoc `sql` fragments for common joins that can be expressed via `relations()`.
+- **Performance Impact:** Drizzle can generate more efficient queries and maintain type safety when relations are explicitly modeled.
+
+**Validator Integrations (Zod/Valibot/etc.)**
+
+- **DO:** Validate input at the API boundary and map validated objects to Drizzle `insert` / `update` shapes.
+- **DO:** Reuse shared schemas for both router validation and DB operations where possible (e.g., pick/omit DB-only fields.
+- **DON'T:** Duplicate validation logic inside migrations; keep migrations focused on schema changes.
+- **Migration Benefit:** Clear separation between runtime validation and schema evolution simplifies direct Prisma → Drizzle conversion.
+
+**Migration Workflow & DX**
+
+- **DO:** Treat `schema.ts` as the single source of truth and run `db:generate` before committing structural changes.
+- **DO:** Apply migrations with `db:migrate` in all non-local environments for predictable, reviewable changes.
+- **DON'T:** Use `db:reset` on shared databases (preview/prod); it is only safe for local development.
+- **Developer Experience:** Consistent commands and schema-driven migrations reduce merge conflicts and make rollouts safer.
 
 ## Migration Commands Reference
 
@@ -65,7 +84,7 @@ PinPoint uses Drizzle migrations as the primary way to evolve the schema.
 | **Schema Introspection** | `drizzle-kit pull`                        | Import existing DB schema               |
 
 **SAFETY**: NEVER use `db:reset` or `drizzle-kit push` on production or preview environments. Always use `db:migrate` to evolve the schema safely.
-...
+For detailed migration patterns, edge cases, and example flows, see [tech-stack-research-catchup.md](../tech-stack-research-catchup.md).
 **Generated Columns Limitations**
 
 - Cannot reference other generated columns

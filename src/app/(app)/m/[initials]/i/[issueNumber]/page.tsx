@@ -112,7 +112,9 @@ export default async function IssueDetailPage({
       .select({
         id: userProfiles.id,
         name: userProfiles.name,
-        email: isMemberOrAdmin ? authUsers.email : sql<null>`null`,
+        email: isMemberOrAdmin
+          ? sql<string | null>`COALESCE(${authUsers.email}, null)`
+          : sql<null>`null`,
       })
       .from(userProfiles)
       .leftJoin(authUsers, eq(authUsers.id, userProfiles.id))

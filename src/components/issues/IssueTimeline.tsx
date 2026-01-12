@@ -80,7 +80,9 @@ function TimelineItem({ event }: { event: TimelineEvent }): React.JSX.Element {
                     </span>
                     {event.author.email && (
                       <span className="text-xs text-muted-foreground font-normal">
-                        &lt;{event.author.email}&gt;
+                        {"<"}
+                        {event.author.email}
+                        {">"}
                       </span>
                     )}
                   </div>
