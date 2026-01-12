@@ -97,27 +97,30 @@ export async function selectOption(
   triggerTestId: string,
   optionValue: string
 ): Promise<void> {
+  // Mapping of trigger test IDs to option test ID patterns
+  const triggerToOptionTestIdMap: Record<string, (value: string) => string> = {
+    "issue-status-select": (value) => `status-option-${value}`,
+    "issue-severity-select": (value) => `severity-option-${value}`,
+    "issue-priority-select": (value) => `priority-option-${value}`,
+    "issue-consistency-select": (value) => `consistency-option-${value}`,
+    "severity-select": (value) => `severity-option-${value}`,
+    "priority-select": (value) => `priority-option-${value}`,
+    "consistency-select": (value) => `consistency-option-${value}`,
+  };
+
+  // Get the test ID generator function, or create a default one
+  const getOptionTestId =
+    triggerToOptionTestIdMap[triggerTestId] ??
+    ((value: string) =>
+      `${triggerTestId.replace("issue-", "").replace("-select", "")}-option-${value}`);
+
   // Wait for and click the Select trigger
   const trigger = page.getByTestId(triggerTestId);
   await expect(trigger).toBeVisible({ timeout: 10000 });
   await trigger.click();
 
   // Wait for the dropdown to appear and find the option
-  // Option test IDs follow pattern: {type}-option-{value}
-  // For report form: severity-select -> severity-option-{value}
-  // For issue forms: issue-severity-select -> severity-option-{value} (note: no "issue-" prefix)
-  // Status: issue-status-select -> status-option-{value}
-  let optionTestId: string;
-  if (triggerTestId === "issue-status-select") {
-    optionTestId = `status-option-${optionValue}`;
-  } else if (triggerTestId.startsWith("issue-")) {
-    // issue-severity-select -> severity-option-{value}
-    optionTestId = `${triggerTestId.replace("issue-", "").replace("-select", "")}-option-${optionValue}`;
-  } else {
-    // severity-select -> severity-option-{value}
-    optionTestId = `${triggerTestId.replace("-select", "")}-option-${optionValue}`;
-  }
-
+  const optionTestId = getOptionTestId(optionValue);
   const option = page.getByTestId(optionTestId);
   await expect(option).toBeVisible({ timeout: 5000 });
   await option.click();

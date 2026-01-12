@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useActionState } from "react";
+import { useState, useActionState, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import {
   updateIssueConsistencyAction,
@@ -19,6 +19,7 @@ export function UpdateIssueConsistencyForm({
   issueId,
   currentConsistency,
 }: UpdateIssueConsistencyFormProps): React.JSX.Element {
+  const formRef = useRef<HTMLFormElement>(null);
   const [selectedConsistency, setSelectedConsistency] =
     useState<IssueConsistency>(currentConsistency);
   const [state, formAction, isPending] = useActionState<
@@ -29,14 +30,14 @@ export function UpdateIssueConsistencyForm({
   const handleValueChange = (newConsistency: IssueConsistency): void => {
     setSelectedConsistency(newConsistency);
     // Auto-submit form on value change
-    const form = document.querySelector('form[data-form="update-consistency"]');
-    if (form instanceof HTMLFormElement) {
-      form.requestSubmit();
+    if (formRef.current) {
+      formRef.current.requestSubmit();
     }
   };
 
   return (
     <form
+      ref={formRef}
       action={formAction}
       className="space-y-2"
       data-form="update-consistency"

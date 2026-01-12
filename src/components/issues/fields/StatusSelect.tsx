@@ -53,7 +53,7 @@ export function StatusSelect({
             const Icon = config.icon;
             return (
               <div className="flex items-center gap-2">
-                <Icon className={`size-4 ${config.styles.split(" ")[1]}`} />
+                <Icon className={`size-4 ${config.iconColor}`} />
                 <span>{config.label}</span>
               </div>
             );
@@ -77,9 +77,7 @@ export function StatusSelect({
                       value={status}
                       data-testid={`status-option-${status}`}
                     >
-                      <Icon
-                        className={`size-4 ${config.styles.split(" ")[1]}`}
-                      />
+                      <Icon className={`size-4 ${config.iconColor}`} />
                       <span>{config.label}</span>
                     </SelectItem>
                   </TooltipTrigger>
@@ -110,9 +108,7 @@ export function StatusSelect({
                       value={status}
                       data-testid={`status-option-${status}`}
                     >
-                      <Icon
-                        className={`size-4 ${config.styles.split(" ")[1]}`}
-                      />
+                      <Icon className={`size-4 ${config.iconColor}`} />
                       <span>{config.label}</span>
                     </SelectItem>
                   </TooltipTrigger>
@@ -143,9 +139,7 @@ export function StatusSelect({
                       value={status}
                       data-testid={`status-option-${status}`}
                     >
-                      <Icon
-                        className={`size-4 ${config.styles.split(" ")[1]}`}
-                      />
+                      <Icon className={`size-4 ${config.iconColor}`} />
                       <span>{config.label}</span>
                     </SelectItem>
                   </TooltipTrigger>

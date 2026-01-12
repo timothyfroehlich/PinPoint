@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useActionState } from "react";
+import { useState, useActionState, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import {
   updateIssueStatusAction,
@@ -19,6 +19,7 @@ export function UpdateIssueStatusForm({
   issueId,
   currentStatus,
 }: UpdateIssueStatusFormProps): React.JSX.Element {
+  const formRef = useRef<HTMLFormElement>(null);
   const [selectedStatus, setSelectedStatus] =
     useState<IssueStatus>(currentStatus);
   const [state, formAction, isPending] = useActionState<
@@ -29,14 +30,18 @@ export function UpdateIssueStatusForm({
   const handleValueChange = (newStatus: IssueStatus): void => {
     setSelectedStatus(newStatus);
     // Auto-submit form on value change
-    const form = document.querySelector('form[data-form="update-status"]');
-    if (form instanceof HTMLFormElement) {
-      form.requestSubmit();
+    if (formRef.current) {
+      formRef.current.requestSubmit();
     }
   };
 
   return (
-    <form action={formAction} className="space-y-2" data-form="update-status">
+    <form
+      ref={formRef}
+      action={formAction}
+      className="space-y-2"
+      data-form="update-status"
+    >
       <input type="hidden" name="issueId" value={issueId} />
       <input type="hidden" name="status" value={selectedStatus} />
       <div className="relative">

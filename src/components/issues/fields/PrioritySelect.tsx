@@ -8,7 +8,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { PRIORITY_CONFIG, type IssuePriority } from "~/lib/issues/status";
+import { PRIORITY_CONFIG } from "~/lib/issues/status";
+import { type IssuePriority } from "~/lib/types";
 
 interface PrioritySelectProps {
   value: IssuePriority;
@@ -45,7 +46,7 @@ export function PrioritySelect({
             const Icon = config.icon;
             return (
               <div className="flex items-center gap-2">
-                <Icon className={`size-4 ${config.styles.split(" ")[1]}`} />
+                <Icon className={`size-4 ${config.iconColor}`} />
                 <span>{config.label}</span>
               </div>
             );
@@ -62,7 +63,7 @@ export function PrioritySelect({
               value={priority}
               data-testid={`priority-option-${priority}`}
             >
-              <Icon className={`size-4 ${config.styles.split(" ")[1]}`} />
+              <Icon className={`size-4 ${config.iconColor}`} />
               <span>{config.label}</span>
             </SelectItem>
           );

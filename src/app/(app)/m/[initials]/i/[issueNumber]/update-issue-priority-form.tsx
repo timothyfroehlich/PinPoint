@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useActionState } from "react";
+import { useState, useActionState, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import {
   updateIssuePriorityAction,
@@ -23,6 +23,7 @@ export function UpdateIssuePriorityForm({
   issueId,
   currentPriority,
 }: UpdateIssuePriorityFormProps): React.JSX.Element {
+  const formRef = useRef<HTMLFormElement>(null);
   const [selectedPriority, setSelectedPriority] =
     useState<IssuePriority>(currentPriority);
   const [state, formAction, isPending] = useActionState<
@@ -33,14 +34,18 @@ export function UpdateIssuePriorityForm({
   const handleValueChange = (newPriority: IssuePriority): void => {
     setSelectedPriority(newPriority);
     // Auto-submit form on value change
-    const form = document.querySelector('form[data-form="update-priority"]');
-    if (form instanceof HTMLFormElement) {
-      form.requestSubmit();
+    if (formRef.current) {
+      formRef.current.requestSubmit();
     }
   };
 
   return (
-    <form action={formAction} className="space-y-2" data-form="update-priority">
+    <form
+      ref={formRef}
+      action={formAction}
+      className="space-y-2"
+      data-form="update-priority"
+    >
       <input type="hidden" name="issueId" value={issueId} />
       <input type="hidden" name="priority" value={selectedPriority} />
       <div className="relative">

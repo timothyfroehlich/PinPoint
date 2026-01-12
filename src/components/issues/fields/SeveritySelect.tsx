@@ -8,7 +8,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { SEVERITY_CONFIG, type IssueSeverity } from "~/lib/issues/status";
+import { SEVERITY_CONFIG } from "~/lib/issues/status";
+import { type IssueSeverity } from "~/lib/types";
 
 interface SeveritySelectProps {
   value: IssueSeverity;
@@ -50,7 +51,7 @@ export function SeveritySelect({
             const Icon = config.icon;
             return (
               <div className="flex items-center gap-2">
-                <Icon className={`size-4 ${config.styles.split(" ")[1]}`} />
+                <Icon className={`size-4 ${config.iconColor}`} />
                 <span>{config.label}</span>
               </div>
             );
@@ -67,7 +68,7 @@ export function SeveritySelect({
               value={severity}
               data-testid={`severity-option-${severity}`}
             >
-              <Icon className={`size-4 ${config.styles.split(" ")[1]}`} />
+              <Icon className={`size-4 ${config.iconColor}`} />
               <span>{config.label}</span>
             </SelectItem>
           );

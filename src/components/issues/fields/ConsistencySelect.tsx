@@ -8,7 +8,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { CONSISTENCY_CONFIG, type IssueConsistency } from "~/lib/issues/status";
+import { CONSISTENCY_CONFIG } from "~/lib/issues/status";
+import { type IssueConsistency } from "~/lib/types";
 
 interface ConsistencySelectProps {
   value: IssueConsistency;
@@ -49,7 +50,7 @@ export function ConsistencySelect({
             const Icon = config.icon;
             return (
               <div className="flex items-center gap-2">
-                <Icon className={`size-4 ${config.styles.split(" ")[1]}`} />
+                <Icon className={`size-4 ${config.iconColor}`} />
                 <span>{config.label}</span>
               </div>
             );
@@ -66,7 +67,7 @@ export function ConsistencySelect({
               value={consistency}
               data-testid={`consistency-option-${consistency}`}
             >
-              <Icon className={`size-4 ${config.styles.split(" ")[1]}`} />
+              <Icon className={`size-4 ${config.iconColor}`} />
               <span>{config.label}</span>
             </SelectItem>
           );

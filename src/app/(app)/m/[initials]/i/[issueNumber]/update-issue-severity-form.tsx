@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useActionState } from "react";
+import { useState, useActionState, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import {
   updateIssueSeverityAction,
@@ -19,6 +19,7 @@ export function UpdateIssueSeverityForm({
   issueId,
   currentSeverity,
 }: UpdateIssueSeverityFormProps): React.JSX.Element {
+  const formRef = useRef<HTMLFormElement>(null);
   const [selectedSeverity, setSelectedSeverity] =
     useState<IssueSeverity>(currentSeverity);
   const [state, formAction, isPending] = useActionState<
@@ -29,14 +30,18 @@ export function UpdateIssueSeverityForm({
   const handleValueChange = (newSeverity: IssueSeverity): void => {
     setSelectedSeverity(newSeverity);
     // Auto-submit form on value change
-    const form = document.querySelector('form[data-form="update-severity"]');
-    if (form instanceof HTMLFormElement) {
-      form.requestSubmit();
+    if (formRef.current) {
+      formRef.current.requestSubmit();
     }
   };
 
   return (
-    <form action={formAction} className="space-y-2" data-form="update-severity">
+    <form
+      ref={formRef}
+      action={formAction}
+      className="space-y-2"
+      data-form="update-severity"
+    >
       <input type="hidden" name="issueId" value={issueId} />
       <input type="hidden" name="severity" value={selectedSeverity} />
       <div className="relative">

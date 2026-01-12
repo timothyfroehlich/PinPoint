@@ -13,9 +13,6 @@ import type {
   IssueConsistency,
 } from "~/lib/types";
 
-// Re-export types for convenience
-export type { IssueSeverity, IssuePriority, IssueConsistency };
-
 /**
  * Single Source of Truth for Issue Status Values
  * Based on _issue-status-redesign/README.md - Final design with 11 statuses
@@ -114,140 +111,167 @@ export const STATUS_OPTIONS = ALL_STATUS_OPTIONS; // Alias for form use
 
 export const STATUS_CONFIG: Record<
   IssueStatus,
-  { label: string; description: string; styles: string; icon: LucideIcon }
+  {
+    label: string;
+    description: string;
+    styles: string;
+    iconColor: string;
+    icon: LucideIcon;
+  }
 > = {
   new: {
     label: "New",
     description: "Just reported, needs triage",
     styles: "bg-cyan-500/20 text-cyan-400 border-cyan-500",
+    iconColor: "text-cyan-400",
     icon: Circle,
   },
   confirmed: {
     label: "Confirmed",
     description: "Verified as a actual issue",
     styles: "bg-teal-500/20 text-teal-400 border-teal-500",
+    iconColor: "text-teal-400",
     icon: Circle,
   },
   in_progress: {
     label: "In Progress",
     description: "Active repair underway",
     styles: "bg-fuchsia-500/20 text-fuchsia-400 border-fuchsia-500",
+    iconColor: "text-fuchsia-400",
     icon: CircleDot,
   },
   need_parts: {
     label: "Need Parts",
     description: "Waiting on new parts",
     styles: "bg-purple-600/20 text-purple-300 border-purple-600",
+    iconColor: "text-purple-300",
     icon: CircleDot,
   },
   need_help: {
     label: "Need Help",
     description: "Escalated to expert help",
     styles: "bg-pink-500/20 text-pink-400 border-pink-500",
+    iconColor: "text-pink-400",
     icon: CircleDot,
   },
   wait_owner: {
     label: "Pending Owner",
     description: "Pending owner decision/action",
     styles: "bg-purple-500/20 text-purple-400 border-purple-500",
+    iconColor: "text-purple-400",
     icon: CircleDot,
   },
   fixed: {
     label: "Fixed",
     description: "Issue is resolved",
     styles: "bg-green-500/20 text-green-400 border-green-500",
+    iconColor: "text-green-400",
     icon: Disc,
   },
   wai: {
     label: "As Intended",
     description: "Working as intended, no action required",
     styles: "bg-zinc-500/20 text-zinc-400 border-zinc-500",
+    iconColor: "text-zinc-400",
     icon: Disc,
   },
   wont_fix: {
     label: "Won't Fix",
     description: "Issue can't or won't be fixed",
     styles: "bg-zinc-500/20 text-zinc-400 border-zinc-500",
+    iconColor: "text-zinc-400",
     icon: Disc,
   },
   no_repro: {
     label: "No Repro",
     description: "Couldn't reproduce",
     styles: "bg-slate-500/20 text-slate-400 border-slate-500",
+    iconColor: "text-slate-400",
     icon: Disc,
   },
   duplicate: {
     label: "Duplicate",
     description: "Already reported elsewhere",
     styles: "bg-neutral-600/20 text-neutral-400 border-neutral-600",
+    iconColor: "text-neutral-400",
     icon: Disc,
   },
 };
 
 export const SEVERITY_CONFIG: Record<
   IssueSeverity,
-  { label: string; styles: string; icon: LucideIcon }
+  { label: string; styles: string; iconColor: string; icon: LucideIcon }
 > = {
   cosmetic: {
     label: "Cosmetic",
     styles: "bg-amber-200/20 text-amber-300 border-amber-500",
+    iconColor: "text-amber-300",
     icon: AlertTriangle,
   },
   minor: {
     label: "Minor",
     styles: "bg-amber-400/20 text-amber-400 border-amber-500",
+    iconColor: "text-amber-400",
     icon: AlertTriangle,
   },
   major: {
     label: "Major",
     styles: "bg-amber-500/20 text-amber-500 border-amber-500",
+    iconColor: "text-amber-500",
     icon: AlertTriangle,
   },
   unplayable: {
     label: "Unplayable",
     styles: "bg-amber-600/20 text-amber-600 border-amber-500",
+    iconColor: "text-amber-600",
     icon: AlertTriangle,
   },
 };
 
 export const PRIORITY_CONFIG: Record<
   IssuePriority,
-  { label: string; styles: string; icon: LucideIcon }
+  { label: string; styles: string; iconColor: string; icon: LucideIcon }
 > = {
   low: {
     label: "Low",
     styles: "bg-purple-950/50 text-purple-600 border-purple-500",
+    iconColor: "text-purple-600",
     icon: TrendingUp,
   },
   medium: {
     label: "Medium",
     styles: "bg-purple-900/50 text-purple-400 border-purple-500",
+    iconColor: "text-purple-400",
     icon: TrendingUp,
   },
   high: {
     label: "High",
     styles: "bg-purple-500/20 text-purple-200 border-purple-500",
+    iconColor: "text-purple-200",
     icon: TrendingUp,
   },
 };
 
 export const CONSISTENCY_CONFIG: Record<
   IssueConsistency,
-  { label: string; styles: string; icon: LucideIcon }
+  { label: string; styles: string; iconColor: string; icon: LucideIcon }
 > = {
   intermittent: {
     label: "Intermittent",
     styles: "bg-cyan-950/50 text-cyan-600 border-cyan-500",
+    iconColor: "text-cyan-600",
     icon: Repeat,
   },
   frequent: {
     label: "Frequent",
     styles: "bg-cyan-900/50 text-cyan-400 border-cyan-500",
+    iconColor: "text-cyan-400",
     icon: Repeat,
   },
   constant: {
     label: "Constant",
     styles: "bg-cyan-500/20 text-cyan-200 border-cyan-500",
+    iconColor: "text-cyan-200",
     icon: Repeat,
   },
 };
