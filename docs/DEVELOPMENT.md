@@ -2,7 +2,7 @@
 
 This guide covers the development workflow, tools, and best practices for contributing to PinPoint.
 
-For full project rules and constraints, **always start with `AGENTS.md`**.  
+For full project rules and constraints, **always start with `AGENTS.md`**.
 This file is a shorter, hands-on reference for day‑to‑day development.
 
 ## What PinPoint Is (Developer View)
@@ -145,11 +145,17 @@ We use **Supabase** (PostgreSQL) and **Drizzle ORM**.
 
 ### Production & Preview Updates
 
-For preview and production, we **ALWAYS** use migrations. NEVER use `db:reset` or `drizzle-kit push` on these environments.
+For preview and production, we use **Automated Migrations** via Vercel build hooks.
 
-1. Edit `src/server/db/schema.ts`
-2. Generate a migration locally and commit the resulting `drizzle/` files.
-3. CI/CD pipelines and deployment scripts will run `pnpm run db:migrate` to apply the changes safely.
+1. **Local Development**:
+   - Edit `src/server/db/schema.ts`
+   - Generate a migration locally: `pnpm run db:generate -- --name <change-name>`
+   - Commit the resulting `drizzle/` files
+
+2. **Automated Deployment**:
+   - When you push to Vercel (Preview or Production), the build pipeline automatically runs `pnpm run migrate:production` via the `vercel-build` script.
+   - This applies pending migrations _before_ the new code is built and deployed.
+   - Requires `DATABASE_URL` (or `DIRECT_URL` / `POSTGRES_URL`) to be set in the Vercel environment.
 
 ## Troubleshooting
 

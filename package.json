@@ -40,6 +40,8 @@
     "supa:ci": "bash scripts/supa-ci.sh",
     "sync-worktrees": "python3 scripts/sync_worktrees.py",
     "kill:zombies": "node --env-file=.env.local scripts/kill-zombies.mjs",
+    "migrate:production": "tsx scripts/migrate-production.ts",
+    "vercel-build": "pnpm run migrate:production && next build",
     "prepare": "husky"
   },
   "repository": {
