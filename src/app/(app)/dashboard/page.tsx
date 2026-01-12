@@ -390,12 +390,6 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                   issue={issue as unknown as Issue}
                   machine={{ name: issue.machine.name }}
                   showReporter={true}
-                  reporterName={
-                    issue.reportedByUser?.name ??
-                    issue.invitedReporter?.name ??
-                    issue.reporterName ??
-                    "Anonymous"
-                  }
                   dataTestId="recent-issue-card"
                 />
               ))}

@@ -115,6 +115,22 @@ export default async function IssuesPage({
         reportedByUser: {
           columns: { name: true },
         },
+        invitedReporter: {
+          columns: { name: true },
+        },
+      },
+      columns: {
+        id: true,
+        createdAt: true,
+        machineInitials: true,
+        issueNumber: true,
+        title: true,
+        status: true,
+        severity: true,
+        priority: true,
+        consistency: true,
+        reporterName: true,
+        reporterEmail: true,
       },
       limit: PAGE_SIZE,
       offset: offset,
@@ -139,9 +155,12 @@ export default async function IssuesPage({
     | "severity"
     | "priority"
     | "consistency"
+    | "reporterName"
+    | "reporterEmail"
   > & {
     machine: { name: string } | null;
     reportedByUser: { name: string } | null;
+    invitedReporter: { name: string } | null;
   })[];
 
   return (

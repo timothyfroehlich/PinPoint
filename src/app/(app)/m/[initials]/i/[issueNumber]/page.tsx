@@ -72,14 +72,14 @@ export default async function IssueDetailPage({
           columns: {
             id: true,
             name: true,
-            ...(isMemberOrAdmin && { email: true }),
+            email: true,
           },
         },
         invitedReporter: {
           columns: {
             id: true,
             name: true,
-            ...(isMemberOrAdmin && { email: true }),
+            email: true,
           },
         },
         assignedToUser: {
@@ -105,6 +105,21 @@ export default async function IssueDetailPage({
         watchers: {
           columns: { userId: true },
         },
+      },
+      columns: {
+        id: true,
+        createdAt: true,
+        updatedAt: true,
+        title: true,
+        description: true,
+        status: true,
+        severity: true,
+        priority: true,
+        consistency: true,
+        issueNumber: true,
+        machineInitials: true,
+        reporterName: true,
+        reporterEmail: true,
       },
     }),
     // Fetch all members/admins for assignment dropdown (Restrict to actual users)
