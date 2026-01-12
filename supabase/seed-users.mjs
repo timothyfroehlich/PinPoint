@@ -247,14 +247,23 @@ async function seedUsersAndData() {
       `;
 
       // Add "Issue reported by..." system comment to match service logic
-      const reporterDesc =
-        issue.reporterName ??
-        issue.reporterEmail ??
-        (issue.reportedBy
-          ? "Member"
-          : issue.invitedUserId
-            ? "Invited User"
-            : "Guest");
+      let reporterDesc = issue.reporterName ?? issue.reporterEmail ?? "Guest";
+
+      if (issue.reportedBy) {
+        // In real app, we fetch the user name. Here we can check the user map.
+        // Or just default to "Member" if we don't want to lookup.
+        // But to be consistent with new service logic, let's try to be specific if possible.
+        // For seed simplicity, "Member" is often used, but let's try a realistic fallback.
+        const memberRole = Object.keys(userIds).find(
+          (role) => userIds[role] === issue.reportedBy
+        );
+        reporterDesc = memberRole
+          ? `${memberRole.charAt(0).toUpperCase() + memberRole.slice(1)} User`
+          : "Member";
+      } else if (issue.invitedUserId) {
+        // For seeding, we know the invited user is 'Jane Doe'
+        reporterDesc = "Invited User";
+      }
 
       await sql`
         INSERT INTO issue_comments (issue_id, author_id, content, is_system, created_at, updated_at)

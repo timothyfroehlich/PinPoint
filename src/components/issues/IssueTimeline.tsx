@@ -6,6 +6,7 @@ import { OwnerBadge } from "~/components/issues/OwnerBadge";
 import { isUserMachineOwner } from "~/lib/issues/owner";
 import { type IssueWithAllRelations } from "~/lib/types";
 import { cn } from "~/lib/utils";
+import { resolveIssueReporter } from "~/lib/issues/utils";
 
 // ----------------------------------------------------------------------
 // Types
@@ -144,26 +145,16 @@ export function IssueTimeline({
   issue,
 }: IssueTimelineProps): React.JSX.Element {
   // 1. Normalize Issue as the first event
-  const reporterName =
-    issue.reportedByUser?.name ??
-    issue.invitedReporter?.name ??
-    issue.reporterName ??
-    "Anonymous";
-  const reporterEmail =
-    issue.reportedByUser?.email ??
-    issue.invitedReporter?.email ??
-    issue.reporterEmail;
-  const reporterId =
-    issue.reportedByUser?.id ?? issue.invitedReporter?.id ?? null;
+  const reporter = resolveIssueReporter(issue);
 
   const issueEvent: TimelineEvent = {
     id: `issue-${issue.id}`,
     type: "issue",
     author: {
-      id: reporterId,
-      name: reporterName,
-      avatarFallback: reporterName.slice(0, 2).toUpperCase(),
-      email: reporterEmail,
+      id: reporter.id ?? null,
+      name: reporter.name,
+      avatarFallback: reporter.initial,
+      email: reporter.email,
     },
     createdAt: new Date(issue.createdAt),
     content: issue.description,
