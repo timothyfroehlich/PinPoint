@@ -21,6 +21,7 @@ Process PRs in this order (closest to completion first):
 ### 1. Merge Candidates (The Exit)
 
 - **Definition**: PRs vetted, Copilot Approved, CI Passed, No Conflicts.
+- **MANDATORY**: Before running merge, you MUST present a detailed summary of the PR to the User and wait for explicit confirmation.
 - **Action**: Run `./merge.sh <ID> ["message"]`.
 
 ### 2. Copilot Review (`jules:copilot-review`)
@@ -35,12 +36,13 @@ Process PRs in this order (closest to completion first):
   - Run `./label.sh <ID> add jules:changes-requested`.
 - **Condition: Approved**: Move to Merge Candidate.
 
-### 3. Transition to Copilot Review
+### 3. Transition to Copilot Review (CRITICAL STEP)
 
 - **Condition**: `jules:vetted` AND CI Passed AND NOT `jules:copilot-review`.
-- **Action**:
-  - Run `./mark-ready.sh <ID>`.
-  - Run `./label.sh <ID> add jules:copilot-review`.
+- **MANDATORY ACTION**:
+  1. Run `./mark-ready.sh <ID>`. **(This converts Draft to PR; Copilot will ignore Drafts.)**
+  2. Run `./label.sh <ID> add jules:copilot-review`.
+- **Why**: This is the primary trigger for the automated audit pipeline. If you skip `mark-ready.sh`, the PR will stall indefinitely in the Copilot queue.
 
 ### 4. Changes Requested (`jules:changes-requested`)
 
@@ -81,7 +83,7 @@ Process PRs in this order (closest to completion first):
 
 Present decisions to the User in this EXACT order:
 
-1. **Merge Decisions**: One by one.
+1. **Merge Decisions**: One by one. You MUST provide a detailed summary of each PR (logic changes, impact, vetting results) and request explicit confirmation before merging.
 2. **Vetting Requests**: One by one (include deep opinion on rationale/impact).
 3. **Trivial Batch**: As a numbered list for bulk approval.
 
