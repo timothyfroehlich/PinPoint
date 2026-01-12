@@ -9,7 +9,7 @@ export interface IssueReporterInfo {
   reporterEmail?: string | null;
 }
 
-export function getIssueReporter(issue: IssueReporterInfo): {
+export function resolveIssueReporter(issue: IssueReporterInfo): {
   name: string;
   email?: string | null;
   initial: string;

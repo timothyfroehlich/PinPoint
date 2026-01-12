@@ -3,7 +3,7 @@ import Link from "next/link";
 import { cn } from "~/lib/utils";
 import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
-import { formatIssueId, getIssueReporter } from "~/lib/issues/utils";
+import { formatIssueId, resolveIssueReporter } from "~/lib/issues/utils";
 import type { Issue } from "~/lib/types";
 
 interface IssueRowProps {
@@ -33,7 +33,7 @@ interface IssueRowProps {
 }
 
 export function IssueRow({ issue }: IssueRowProps): React.JSX.Element {
-  const reporter = getIssueReporter(issue);
+  const reporter = resolveIssueReporter(issue);
 
   return (
     <div

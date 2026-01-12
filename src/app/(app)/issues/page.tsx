@@ -112,6 +112,7 @@ export default async function IssuesPage({
       priority: true,
       consistency: true,
       reporterName: true,
+      reporterEmail: true,
     },
     limit: 100, // Reasonable limit for now
   });
@@ -135,6 +136,7 @@ export default async function IssuesPage({
     | "priority"
     | "consistency"
     | "reporterName"
+    | "reporterEmail"
   > & {
     machine: { name: string } | null;
     reportedByUser: { name: string } | null;

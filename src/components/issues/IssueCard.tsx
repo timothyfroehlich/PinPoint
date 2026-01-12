@@ -5,7 +5,7 @@ import Link from "next/link";
 import { cn } from "~/lib/utils";
 import { Card, CardHeader, CardTitle } from "~/components/ui/card";
 import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
-import { formatIssueId, getIssueReporter } from "~/lib/issues/utils";
+import { formatIssueId, resolveIssueReporter } from "~/lib/issues/utils";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
 import type { Issue } from "~/lib/types";
 
@@ -46,7 +46,7 @@ export function IssueCard({
   );
 
   const initials = issue.machineInitials;
-  const reporter = getIssueReporter(issue);
+  const reporter = resolveIssueReporter(issue);
 
   return (
     <Link

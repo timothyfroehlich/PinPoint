@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { AddCommentForm } from "~/components/issues/AddCommentForm";
 import { type IssueWithAllRelations } from "~/lib/types";
 import { cn } from "~/lib/utils";
-import { getIssueReporter } from "~/lib/issues/utils";
+import { resolveIssueReporter } from "~/lib/issues/utils";
 
 // ----------------------------------------------------------------------
 // Types
@@ -134,7 +134,7 @@ export function IssueTimeline({
   issue,
 }: IssueTimelineProps): React.JSX.Element {
   // 1. Normalize Issue as the first event
-  const reporter = getIssueReporter(issue);
+  const reporter = resolveIssueReporter(issue);
 
   const issueEvent: TimelineEvent = {
     id: `issue-${issue.id}`,

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { SidebarActions } from "~/components/issues/SidebarActions";
 import { WatchButton } from "~/components/issues/WatchButton";
 import { type IssueWithAllRelations } from "~/lib/types";
-import { getIssueReporter } from "~/lib/issues/utils";
+import { resolveIssueReporter } from "~/lib/issues/utils";
 
 interface SidebarUser {
   id: string;
@@ -24,7 +24,7 @@ export function IssueSidebar({
   currentUserId,
 }: IssueSidebarProps): React.JSX.Element {
   const isWatching = issue.watchers.some((w) => w.userId === currentUserId);
-  const reporter = getIssueReporter(issue);
+  const reporter = resolveIssueReporter(issue);
 
   return (
     <div className="w-full shrink-0 lg:w-80">
