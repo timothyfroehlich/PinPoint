@@ -123,6 +123,7 @@ export function UpdateMachineForm({
                 <span className="text-sm text-on-surface">
                   {machine.owner?.name ?? machine.invitedOwner?.name}
                 </span>
+                {/* Show invited badge only for truly invited owners (not yet accepted) */}
                 {machine.invitedOwner && !machine.owner && (
                   <span className="text-[10px] font-medium uppercase tracking-wider text-on-surface-variant/70">
                     (Invited)
