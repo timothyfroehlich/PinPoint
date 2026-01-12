@@ -2,6 +2,7 @@
 
 import type React from "react";
 import { useActionState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
 import {
@@ -24,6 +25,7 @@ export function AddCommentForm({
 
   useEffect(() => {
     if (state?.ok) {
+      toast.success("Comment added");
       formRef.current?.reset();
     }
   }, [state]);

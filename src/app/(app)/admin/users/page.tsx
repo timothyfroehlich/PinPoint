@@ -66,13 +66,16 @@ function UserRow({
       <TableCell>
         <UserRoleSelect
           userId={user.id}
+          userName={user.name}
           currentRole={user.role}
           currentUserId={currentUserId}
           userType={user.status}
         />
       </TableCell>
       <TableCell className="text-right">
-        {user.status === "invited" && <ResendInviteButton userId={user.id} />}
+        {user.status === "invited" && (
+          <ResendInviteButton userId={user.id} userName={user.name} />
+        )}
       </TableCell>
     </TableRow>
   );

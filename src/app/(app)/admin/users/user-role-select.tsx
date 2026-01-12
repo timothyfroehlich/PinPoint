@@ -13,6 +13,7 @@ import { toast } from "sonner";
 
 interface UserRoleSelectProps {
   userId: string;
+  userName: string;
   currentRole: "guest" | "member" | "admin";
   currentUserId: string;
   userType?: "active" | "invited";
@@ -20,6 +21,7 @@ interface UserRoleSelectProps {
 
 export function UserRoleSelect({
   userId,
+  userName,
   currentRole,
   currentUserId,
   userType = "active",
@@ -57,7 +59,10 @@ export function UserRoleSelect({
         isPending || (userId === currentUserId && currentRole === "admin")
       }
     >
-      <SelectTrigger className="w-[120px]">
+      <SelectTrigger
+        className="w-[120px]"
+        aria-label={`Change role for ${userName}`}
+      >
         <SelectValue placeholder="Select role" />
       </SelectTrigger>
       <SelectContent>
