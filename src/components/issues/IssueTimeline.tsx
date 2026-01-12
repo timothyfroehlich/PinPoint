@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { AddCommentForm } from "~/components/issues/AddCommentForm";
 import { type IssueWithAllRelations } from "~/lib/types";
 import { cn } from "~/lib/utils";
+import { getIssueReporter } from "~/lib/issues/utils";
 
 // ----------------------------------------------------------------------
 // Types
@@ -133,23 +134,15 @@ export function IssueTimeline({
   issue,
 }: IssueTimelineProps): React.JSX.Element {
   // 1. Normalize Issue as the first event
-  const reporterName =
-    issue.reportedByUser?.name ??
-    issue.invitedReporter?.name ??
-    issue.reporterName ??
-    "Anonymous";
-  const reporterEmail =
-    issue.reportedByUser?.email ??
-    issue.invitedReporter?.email ??
-    issue.reporterEmail;
+  const reporter = getIssueReporter(issue);
 
   const issueEvent: TimelineEvent = {
     id: `issue-${issue.id}`,
     type: "issue",
     author: {
-      name: reporterName,
-      avatarFallback: reporterName.slice(0, 2).toUpperCase(),
-      email: reporterEmail,
+      name: reporter.name,
+      avatarFallback: reporter.initial,
+      email: reporter.email,
     },
     createdAt: new Date(issue.createdAt),
     content: issue.description,

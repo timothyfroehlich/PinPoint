@@ -3,7 +3,7 @@ import Link from "next/link";
 import { cn } from "~/lib/utils";
 import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
-import { formatIssueId } from "~/lib/issues/utils";
+import { formatIssueId, getIssueReporter } from "~/lib/issues/utils";
 import type { Issue } from "~/lib/types";
 
 interface IssueRowProps {
@@ -18,6 +18,7 @@ interface IssueRowProps {
     | "consistency"
     | "createdAt"
     | "machineInitials"
+    | "reporterName"
   > & {
     machine: {
       name: string;
@@ -25,10 +26,15 @@ interface IssueRowProps {
     reportedByUser: {
       name: string;
     } | null;
+    invitedReporter: {
+      name: string;
+    } | null;
   };
 }
 
 export function IssueRow({ issue }: IssueRowProps): React.JSX.Element {
+  const reporter = getIssueReporter(issue);
+
   return (
     <div
       className={cn(
@@ -66,7 +72,7 @@ export function IssueRow({ issue }: IssueRowProps): React.JSX.Element {
           <span>
             opened on {new Date(issue.createdAt).toLocaleDateString()}
           </span>
-          <span>by {issue.reportedByUser?.name ?? "Unknown"}</span>
+          <span>by {reporter.name}</span>
         </div>
       </div>
     </div>
