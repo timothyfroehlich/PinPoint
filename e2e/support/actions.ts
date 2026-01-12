@@ -87,3 +87,44 @@ export async function logout(page: Page): Promise<void> {
   await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
   await expect(page.getByTestId("nav-signin")).toBeVisible({ timeout: 15000 });
 }
+
+/**
+ * Selects an option from a shadcn/ui Select component.
+ * Clicks the trigger, waits for the dropdown, then clicks the option.
+ */
+export async function selectOption(
+  page: Page,
+  triggerTestId: string,
+  optionValue: string
+): Promise<void> {
+  // Mapping of trigger test IDs to option test ID patterns
+  const triggerToOptionTestIdMap: Record<string, (value: string) => string> = {
+    "issue-status-select": (value) => `status-option-${value}`,
+    "issue-severity-select": (value) => `severity-option-${value}`,
+    "issue-priority-select": (value) => `priority-option-${value}`,
+    "issue-consistency-select": (value) => `consistency-option-${value}`,
+    "severity-select": (value) => `severity-option-${value}`,
+    "priority-select": (value) => `priority-option-${value}`,
+    "consistency-select": (value) => `consistency-option-${value}`,
+  };
+
+  // Get the test ID generator function, or create a default one
+  const getOptionTestId =
+    triggerToOptionTestIdMap[triggerTestId] ??
+    ((value: string) =>
+      `${triggerTestId.replace("issue-", "").replace("-select", "")}-option-${value}`);
+
+  // Wait for and click the Select trigger
+  const trigger = page.getByTestId(triggerTestId);
+  await expect(trigger).toBeVisible({ timeout: 10000 });
+  await trigger.click();
+
+  // Wait for the dropdown to appear and find the option
+  const optionTestId = getOptionTestId(optionValue);
+  const option = page.getByTestId(optionTestId);
+  await expect(option).toBeVisible({ timeout: 5000 });
+  await option.click();
+
+  // Wait for dropdown to close
+  await expect(option).toBeHidden({ timeout: 5000 });
+}
