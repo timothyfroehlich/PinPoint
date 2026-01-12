@@ -109,7 +109,7 @@ We use **Supabase** (PostgreSQL) and **Drizzle ORM**.
 
 - **Apply Schema Changes (Day-to-Day)**
 
-  After editing `src/server/db/schema.ts`, generate a migration and apply it:
+  After editing `src/server/db/schema.ts`, generate a migration and apply it. This is the **preferred** way to update your schema without losing local data.
 
   ```bash
   # 1. Generate a migration
@@ -124,6 +124,8 @@ We use **Supabase** (PostgreSQL) and **Drizzle ORM**.
 
 - **Reset & Seed Database (Destructive)**
 
+  If your local environment is out of sync or you want a clean slate, use the reset command. **Warning: This wipes all application data.**
+
   ```bash
   pnpm run db:reset
   ```
@@ -131,7 +133,7 @@ We use **Supabase** (PostgreSQL) and **Drizzle ORM**.
   This will:
   - Restart Supabase
   - Drop application tables
-  - Apply all Drizzle migrations
+  - Apply all Drizzle migrations from scratch
   - Regenerate the test schema
   - Seed data and users
 
@@ -141,13 +143,13 @@ We use **Supabase** (PostgreSQL) and **Drizzle ORM**.
   ```
   Opens Drizzle Studio to view and edit data.
 
-### Production Migrations
+### Production & Preview Updates
 
-For preview and production, we use **Drizzle migrations** to ensure safe database updates.
+For preview and production, we **ALWAYS** use migrations. NEVER use `db:reset` or `drizzle-kit push` on these environments.
 
 1. Edit `src/server/db/schema.ts`
-2. Generate a migration locally and commit the resulting `drizzle/` files
-3. Preview/prod reset scripts (e.g. `scripts/db-reset-preview.sh`, CI via `scripts/supa-ci.sh`) apply migrations using `pnpm run db:migrate`
+2. Generate a migration locally and commit the resulting `drizzle/` files.
+3. CI/CD pipelines and deployment scripts will run `pnpm run db:migrate` to apply the changes safely.
 
 ## Troubleshooting
 

@@ -2,6 +2,7 @@ import type React from "react";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { createClient } from "~/lib/supabase/server";
+import { getSafeRedirect } from "~/lib/url";
 import { LoginForm } from "./login-form";
 
 /**
@@ -10,15 +11,21 @@ import { LoginForm } from "./login-form";
  * Email/password authentication with "Remember Me" option.
  * Progressive enhancement - works without JavaScript.
  */
-export default async function LoginPage(): Promise<React.JSX.Element> {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}): Promise<React.JSX.Element> {
   // Check if already logged in
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const { next } = await searchParams;
+
   if (user) {
-    redirect("/dashboard");
+    redirect(getSafeRedirect(next));
   }
 
   return (
@@ -36,6 +43,7 @@ export default async function LoginPage(): Promise<React.JSX.Element> {
         {/* Only enable test admin button in non-production environments */}
         <LoginForm
           enableTestAdmin={process.env["VERCEL_ENV"] !== "production"}
+          next={next}
         />
       </CardContent>
     </Card>

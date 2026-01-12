@@ -71,3 +71,27 @@ export function requireSiteUrl(action: string): string {
 
   return url;
 }
+
+/**
+ * Validates that a redirect URL is safe (internal to the application).
+ * Prevents open redirect vulnerabilities by ensuring it starts with / but not //.
+ */
+export function isInternalUrl(url: string | null | undefined): url is string {
+  if (!url) return false;
+  // Allow paths starting with / but not // (absolute protocol-relative)
+  return url.startsWith("/") && !url.startsWith("//");
+}
+
+/**
+ * Safely resolves a redirect destination, falling back to a default if unsafe.
+ * Centralizes the logic for choosing between a requested redirect and a fallback.
+ */
+export function getSafeRedirect(
+  url: string | null | undefined,
+  fallback = "/dashboard"
+): string {
+  if (isInternalUrl(url)) {
+    return url;
+  }
+  return fallback;
+}

@@ -62,6 +62,33 @@ test.describe("Extended Authentication", () => {
     await expect(page.getByRole("heading", { name: "Sign In" })).toBeVisible();
   });
 
+  test("protected route redirect - login and redirect to original destination", async ({
+    page,
+  }) => {
+    // Try to access protected page (settings) without being logged in
+    await page.goto("/settings");
+
+    // Should redirect to login page with next parameter
+    await expect(page).toHaveURL(/\/login/);
+    await expect(page).toHaveURL(/next=%2Fsettings/);
+
+    // Fill out login form with seeded test user
+    const testEmail = seededMember.email;
+    const testPassword = seededMember.password;
+
+    await page.getByLabel("Email").fill(testEmail);
+    await page.getByLabel("Password").fill(testPassword);
+
+    // Submit form
+    await page.getByRole("button", { name: "Sign In" }).click();
+
+    // Should redirect back to original destination (settings) after successful login
+    await expect(page).toHaveURL("/settings", { timeout: 10000 });
+    await expect(
+      page.getByRole("heading", { name: "Settings", exact: true })
+    ).toBeVisible();
+  });
+
   test("logout flow - sign out and verify redirect", async ({
     page,
   }, testInfo) => {

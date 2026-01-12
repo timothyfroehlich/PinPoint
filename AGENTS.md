@@ -57,7 +57,7 @@ pnpm dlx shadcn@latest add [component]  # Add shadcn/ui components
 - **Auth**: Supabase SSR (single-tenant, no RLS)
 - **Testing**: Vitest (unit/integration), Playwright (E2E), worker-scoped PGlite
 - **Language**: TypeScript (@tsconfig/strictest)
-- **Phase**: Greenfield v2, pre-beta, zero production users
+- **Phase**: Greenfield v2, Beta, early production users
 
 **Knowledge Gap**: Training cutoff Jan 2025, current date Dec 2025. Use Context7 MCP (`resolve-library-id` → `get-library-docs`) for latest library patterns.
 

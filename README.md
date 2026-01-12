@@ -15,27 +15,23 @@ It helps keep games playable by making it easy to report problems, see what’s 
 - Report issues in seconds from your phone:
   - Pick a machine
   - Describe the problem
-  - Choose a severity: `minor`, `playable`, or `unplayable`
+  - Choose a severity: `cosmetic`, `minor`, `major`, or `unplayable`
+  - Indicate consistency: `intermittent`, `frequent`, or `constant`
+  - (Optional) Provide contact info for updates
 
 ### For Operators & Techs
 
-- Get a clear view of:
-  - Which machines are down
-  - Which issues are most urgent
-  - What’s assigned to whom
-- Track the full history of each machine:
-  - Issues
-  - Comments
-  - Status changes
+...
 
 ### Core Concepts
 
 - **Machine** – a specific physical game in the collection.
 - **Issue** – a problem on a machine, always tied to exactly one machine.
 - **Severity** – how bad it is from a player’s perspective:
-  - `minor` – cosmetic / nice-to-fix
-  - `playable` – affects gameplay but you can still play
-  - `unplayable` – game is effectively down
+  - `cosmetic` – very minor / nice-to-fix (e.g. dirty playfield, minor bulb out)
+  - `minor` – small issues that do not change how the game plays
+  - `major` – the game plays, but something significant is wrong (shots not registering, features disabled)
+  - `unplayable` – game is effectively down (ball stuck, flippers dead)
 
 ---
 
@@ -148,9 +144,9 @@ CI is configured via `.github/workflows/ci.yml` and mirrors the `pnpm run prefli
 
 Short‑term focus:
 
-- Alpha hardening for the Austin Pinball Collective
-- Better dashboards for operators
-- Smoother public reporting flow
+- Beta hardening and user onboarding for the Austin Pinball Collective
+- More refined dashboards for operators
+- Expanding the machine registry with OPDB integration
 
 Future ideas:
 

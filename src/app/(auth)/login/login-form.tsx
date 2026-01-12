@@ -12,10 +12,12 @@ import { TestAdminButton } from "./TestAdminButton";
 
 interface LoginFormProps {
   enableTestAdmin?: boolean;
+  next?: string | undefined;
 }
 
 export function LoginForm({
   enableTestAdmin = false,
+  next,
 }: LoginFormProps): React.JSX.Element {
   const [state, formAction, isPending] = useActionState<
     LoginResult | undefined,
@@ -39,6 +41,9 @@ export function LoginForm({
 
       {/* Login form */}
       <form action={formAction} className="space-y-6">
+        {/* Hidden field for redirect destination */}
+        {next && <input type="hidden" name="next" value={next} />}
+
         {/* Email */}
         <div className="space-y-3">
           <Label htmlFor="email">Email</Label>
