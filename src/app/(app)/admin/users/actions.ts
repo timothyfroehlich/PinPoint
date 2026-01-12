@@ -6,7 +6,7 @@ import { userProfiles, unconfirmedUsers, authUsers } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { sendInviteEmail } from "~/lib/email/invite";
-import { headers } from "next/headers";
+import { requireSiteUrl } from "~/lib/url";
 import { inviteUserSchema, updateUserRoleSchema } from "./schema";
 
 async function verifyAdmin(userId: string): Promise<void> {
@@ -120,9 +120,8 @@ export async function inviteUser(
   }
 
   if (validated.sendInvite) {
-    const host = (await headers()).get("host") ?? "localhost:3000";
-    const protocol = host.includes("localhost") ? "http" : "https";
-    const siteUrl = `${protocol}://${host}`;
+    // Security: Use configured site URL to prevent Host Header Injection
+    const siteUrl = requireSiteUrl("invite-user");
 
     const currentUser = await db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, user.id),
@@ -171,9 +170,8 @@ export async function resendInvite(userId: string): Promise<{ ok: boolean }> {
     throw new Error("Unconfirmed user not found");
   }
 
-  const host = (await headers()).get("host") ?? "localhost:3000";
-  const protocol = host.includes("localhost") ? "http" : "https";
-  const siteUrl = `${protocol}://${host}`;
+  // Security: Use configured site URL to prevent Host Header Injection
+  const siteUrl = requireSiteUrl("resend-invite");
 
   const currentUser = await db.query.userProfiles.findFirst({
     where: eq(userProfiles.id, user.id),
