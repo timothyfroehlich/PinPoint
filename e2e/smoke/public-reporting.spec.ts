@@ -111,6 +111,43 @@ test.describe("Public Issue Reporting", () => {
     await expect(page.getByLabel(/Last Name/i)).toHaveValue("Reporter");
   });
 
+  test("should pre-fill name and email on signup when both provided", async ({
+    page,
+  }) => {
+    const timestamp = Date.now();
+    const email = `reporter-${timestamp}@example.com`;
+
+    await page.goto("/report");
+    await page.getByTestId("machine-select").selectOption({ index: 1 });
+    // Wait for URL refresh (router.push) to prevent race conditions on Mobile Safari
+    await expect(page).toHaveURL(/machine=/);
+
+    await page
+      .getByLabel("Issue Title *")
+      .fill(`${PUBLIC_PREFIX} with Name and Email`);
+    await selectOption(page, "severity-select", "minor");
+
+    // Provide name and email
+    await page.getByLabel("First Name").fill("John");
+    await page.getByLabel("Last Name").fill("Smith");
+    await page.getByLabel("Email Address").fill(email);
+
+    await page.getByRole("button", { name: "Submit Issue Report" }).click();
+
+    // Should redirect to success page with new_pending flag
+    await expect(page).toHaveURL(/\/report\/success/);
+    await expect(page.getByText("Want to track your reports?")).toBeVisible();
+
+    // Click the signup link
+    await page.getByRole("link", { name: "Join PinPoint" }).click();
+
+    // Should redirect to signup page with name and email pre-filled
+    await expect(page).toHaveURL(/\/signup\?/);
+    await expect(page.getByLabel(/First Name/i)).toHaveValue("John");
+    await expect(page.getByLabel(/Last Name/i)).toHaveValue("Smith");
+    await expect(page.getByLabel(/Email/i)).toHaveValue(email);
+  });
+
   test("should allow reporting another issue from success page", async ({
     page,
   }) => {

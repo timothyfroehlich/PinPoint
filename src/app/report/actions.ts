@@ -195,12 +195,15 @@ export async function submitPublicIssueAction(
     // We can use reporterEmail or reporterName to decide if they provided info
     if ((reporterEmail || reporterName) && !reportedBy) {
       successParams.set("new_pending", "true");
-      // Pass name information to success page for signup pre-fill
+      // Pass name and email information to success page for signup pre-fill
       if (firstName) {
         successParams.set("firstName", firstName);
       }
       if (lastName) {
         successParams.set("lastName", lastName);
+      }
+      if (reporterEmail) {
+        successParams.set("email", reporterEmail);
       }
     }
 

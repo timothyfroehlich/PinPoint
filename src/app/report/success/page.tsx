@@ -11,18 +11,22 @@ export default async function ReportSuccessPage({
     new_pending?: string;
     firstName?: string;
     lastName?: string;
+    email?: string;
   }>;
 }): Promise<React.JSX.Element> {
   const params = await searchParams;
   const isNewPending = params.new_pending === "true";
 
-  // Build signup URL with pre-filled name data
+  // Build signup URL with pre-filled name and email data
   const signupParams = new URLSearchParams();
   if (params.firstName) {
     signupParams.set("firstName", params.firstName);
   }
   if (params.lastName) {
     signupParams.set("lastName", params.lastName);
+  }
+  if (params.email) {
+    signupParams.set("email", params.email);
   }
   const signupUrl =
     signupParams.toString() !== ""
