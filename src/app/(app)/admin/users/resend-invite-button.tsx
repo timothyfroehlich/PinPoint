@@ -9,10 +9,12 @@ import { toast } from "sonner";
 
 interface ResendInviteButtonProps {
   userId: string;
+  userName: string;
 }
 
 export function ResendInviteButton({
   userId,
+  userName,
 }: ResendInviteButtonProps): React.JSX.Element {
   const [isPending, startTransition] = useTransition();
 
@@ -36,6 +38,7 @@ export function ResendInviteButton({
       className="h-8 text-xs"
       onClick={handleResend}
       loading={isPending}
+      aria-label={`Resend invite to ${userName}`}
     >
       <MailCheck className="mr-2 size-3" />
       Resend Invite
