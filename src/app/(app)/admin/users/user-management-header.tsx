@@ -14,7 +14,7 @@ export function UserManagementHeader(): React.JSX.Element {
       <div>
         <h2 className="text-2xl font-bold tracking-tight">User Management</h2>
         <p className="text-muted-foreground">
-          Manage activated and unconfirmed users.
+          Manage activated and invited users.
         </p>
       </div>
       <Button onClick={() => setInviteDialogOpen(true)}>

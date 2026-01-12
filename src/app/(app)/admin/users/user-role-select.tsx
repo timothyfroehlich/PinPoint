@@ -16,7 +16,7 @@ interface UserRoleSelectProps {
   userName: string;
   currentRole: "guest" | "member" | "admin";
   currentUserId: string;
-  userType?: "active" | "unconfirmed";
+  userType?: "active" | "invited";
 }
 
 export function UserRoleSelect({

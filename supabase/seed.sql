@@ -19,7 +19,10 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  v_invited_user_id uuid;
 BEGIN
+  -- Create user profile
   INSERT INTO public.user_profiles (id, email, first_name, last_name, avatar_url, role)
   VALUES (
     NEW.id,
@@ -30,7 +33,6 @@ BEGIN
     'member'
   );
 
-  -- Create default notification preferences
   -- Create default notification preferences
   INSERT INTO public.notification_preferences (
     user_id,
@@ -57,6 +59,46 @@ BEGIN
     false, false -- Global watch
   );
 
+  -- Transfer guest issues to newly created account
+  -- Link issues where reporter_email matches the new user's email
+  UPDATE public.issues
+  SET
+    reported_by = NEW.id,
+    reporter_name = NULL,
+    reporter_email = NULL
+  WHERE reporter_email = NEW.email
+    AND reported_by IS NULL
+    AND invited_reported_by IS NULL;
+
+  -- Handle legacy invited_users (if any exist)
+  -- Find matching invited user by email
+  SELECT id INTO v_invited_user_id
+  FROM public.invited_users
+  WHERE email = NEW.email
+  LIMIT 1;
+
+  IF v_invited_user_id IS NOT NULL THEN
+    -- Transfer machines owned by invited user
+    UPDATE public.machines
+    SET
+      owner_id = NEW.id,
+      invited_owner_id = NULL
+    WHERE invited_owner_id = v_invited_user_id;
+
+    -- Transfer issues reported by invited user
+    UPDATE public.issues
+    SET
+      reported_by = NEW.id,
+      invited_reported_by = NULL,
+      reporter_name = NULL,
+      reporter_email = NULL
+    WHERE invited_reported_by = v_invited_user_id;
+
+    -- Delete the invited user record (no longer needed)
+    DELETE FROM public.invited_users
+    WHERE id = v_invited_user_id;
+  END IF;
+
   RETURN NEW;
 END;
 $$;
@@ -70,7 +112,7 @@ CREATE TRIGGER on_auth_user_created
 
 -- Add helpful comments
 COMMENT ON FUNCTION public.handle_new_user() IS
-  'Automatically creates a user_profile and notification_preferences when a new user signs up via Supabase Auth. Works for both email/password and OAuth (Google, GitHub).';
+  'Automatically creates a user_profile and notification_preferences when a new user signs up via Supabase Auth. Works for both email/password and OAuth (Google, GitHub). Also transfers guest issues (by reporter_email) and handles legacy invited_users cleanup by transferring their machines/issues and removing the invited_users record.';
 
 COMMENT ON CONSTRAINT user_profiles_id_fkey ON public.user_profiles IS
   'Foreign key constraint to auth.users. Ensures user_profiles.id always references a valid auth.users.id. CASCADE delete removes profile when auth user is deleted.';

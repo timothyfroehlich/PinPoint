@@ -5,7 +5,7 @@ import { db } from "~/server/db";
 import {
   issues,
   machines,
-  unconfirmedUsers,
+  invitedUsers,
   userProfiles,
   authUsers,
 } from "~/server/db/schema";
@@ -131,12 +131,12 @@ export async function POST(request: Request): Promise<Response> {
 
   const removedUsers: string[] = [];
   if (userEmails.length) {
-    const deletedUnconfirmed = await db
-      .delete(unconfirmedUsers)
-      .where(inArray(unconfirmedUsers.email, userEmails))
-      .returning({ id: unconfirmedUsers.id });
+    const deletedInvited = await db
+      .delete(invitedUsers)
+      .where(inArray(invitedUsers.email, userEmails))
+      .returning({ id: invitedUsers.id });
 
-    removedUsers.push(...deletedUnconfirmed.map((r) => r.id));
+    removedUsers.push(...deletedInvited.map((r) => r.id));
 
     // Note: We don't delete auth users here via Drizzle because of foreign key complexities
     // with Supabase Auth schema in the same transaction. For auth users, the E2E cleanup

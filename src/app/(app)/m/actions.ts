@@ -115,7 +115,7 @@ export async function createMachineAction(
 
   // Resolve owner type
   let finalOwnerId: string | undefined = undefined;
-  let finalUnconfirmedOwnerId: string | undefined = undefined;
+  let finalInvitedOwnerId: string | undefined = undefined;
 
   if (profile.role === "admin" && ownerId) {
     const isActive = await db.query.userProfiles.findFirst({
@@ -124,7 +124,7 @@ export async function createMachineAction(
     if (isActive) {
       finalOwnerId = ownerId;
     } else {
-      finalUnconfirmedOwnerId = ownerId;
+      finalInvitedOwnerId = ownerId;
     }
   } else {
     finalOwnerId = user.id;
@@ -138,7 +138,7 @@ export async function createMachineAction(
         name,
         initials,
         ownerId: finalOwnerId,
-        unconfirmedOwnerId: finalUnconfirmedOwnerId,
+        invitedOwnerId: finalInvitedOwnerId,
       })
       .returning();
 
@@ -216,7 +216,7 @@ export async function updateMachineAction(
   try {
     // Resolve owner type if provided
     let finalOwnerId: string | null | undefined = undefined;
-    let finalUnconfirmedOwnerId: string | null | undefined = undefined;
+    let finalInvitedOwnerId: string | null | undefined = undefined;
     let shouldUpdateOwner = false;
 
     if (profile.role === "admin" && ownerId) {
@@ -226,10 +226,10 @@ export async function updateMachineAction(
       });
       if (isActive) {
         finalOwnerId = ownerId;
-        finalUnconfirmedOwnerId = null; // Reset unconfirmed if setting active
+        finalInvitedOwnerId = null; // Reset invited if setting active
       } else {
-        finalUnconfirmedOwnerId = ownerId;
-        finalOwnerId = null; // Reset active if setting unconfirmed
+        finalInvitedOwnerId = ownerId;
+        finalOwnerId = null; // Reset active if setting invited
       }
     }
 
@@ -245,7 +245,7 @@ export async function updateMachineAction(
         name,
         ...(shouldUpdateOwner && {
           ownerId: finalOwnerId,
-          unconfirmedOwnerId: finalUnconfirmedOwnerId,
+          invitedOwnerId: finalInvitedOwnerId,
         }),
       })
       .where(whereConditions)

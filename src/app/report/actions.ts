@@ -12,7 +12,7 @@ import {
 } from "~/lib/rate-limit";
 import { parsePublicIssueForm } from "./validation";
 import { db } from "~/server/db";
-import { machines, userProfiles, unconfirmedUsers } from "~/server/db/schema";
+import { machines, userProfiles } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import type { ActionState } from "./unified-report-form";
@@ -82,67 +82,34 @@ export async function submitPublicIssueAction(
   } = await supabase.auth.getUser();
 
   let reportedBy: string | null = user?.id ?? null;
-  let unconfirmedReportedBy: string | null = null;
-  // 4. Resolve reporter via email if not already logged in
-  if (!reportedBy && email) {
-    // Check active user profiles directly
-    const activeUser = await db.query.userProfiles.findFirst({
-      where: eq(userProfiles.email, email),
-      columns: { id: true, role: true },
-    });
+  let reporterName: string | null = null;
+  let reporterEmail: string | null = null;
 
-    if (activeUser) {
-      log.info(
-        { action: "publicIssueReport", email },
-        "Blocked attempt to report for confirmed account"
-      );
-      // Security: Don't reveal account existence unless attempting to use it?
-      // Actually, standard behavior here is to block.
-      return {
-        error:
-          "This email is associated with an existing account. Please log in to report this issue.",
-      };
+  // 4. Resolve reporter via name/email if not already logged in
+  if (!reportedBy) {
+    if (email) {
+      // Check active user profiles directly to prevent spoofing
+      const activeUser = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.email, email),
+        columns: { id: true },
+      });
+
+      if (activeUser) {
+        log.info(
+          { action: "publicIssueReport", email },
+          "Blocked attempt to report for confirmed account"
+        );
+        return {
+          error:
+            "This email is associated with an existing account. Please log in to report this issue.",
+        };
+      }
+      reporterEmail = email;
     }
 
-    // 2. Check/Create unconfirmed user
-    const existingUnconfirmed = await db.query.unconfirmedUsers.findFirst({
-      where: eq(unconfirmedUsers.email, email),
-    });
-
-    if (existingUnconfirmed) {
-      log.info(
-        {
-          action: "publicIssueReport",
-          unconfirmedUserId: String(existingUnconfirmed.id),
-          email,
-        },
-        "Found existing unconfirmed user"
-      );
-      unconfirmedReportedBy = String(existingUnconfirmed.id);
-    } else {
-      // Create new unconfirmed user
-      const [newUnconfirmed] = await db
-        .insert(unconfirmedUsers)
-        .values({
-          email: email,
-          firstName: firstName ?? "Anonymous",
-          lastName: lastName ?? "User",
-          role: "guest",
-        })
-        .returning();
-
-      if (!newUnconfirmed) {
-        throw new Error("Failed to create unconfirmed user");
-      }
-      log.info(
-        {
-          action: "publicIssueReport",
-          unconfirmedUserId: newUnconfirmed.id,
-          email,
-        },
-        "Created new unconfirmed user"
-      );
-      unconfirmedReportedBy = String(newUnconfirmed.id);
+    // Capture provided name regardless of email
+    if (firstName || lastName) {
+      reporterName = [firstName, lastName].filter(Boolean).join(" ");
     }
   }
 
@@ -182,7 +149,8 @@ export async function submitPublicIssueAction(
     {
       machineId,
       reportedBy,
-      unconfirmedReportedBy,
+      reporterName,
+      reporterEmail,
       finalPriority,
       isMemberOrAdmin,
     },
@@ -197,7 +165,8 @@ export async function submitPublicIssueAction(
       priority: finalPriority,
       consistency,
       reportedBy,
-      unconfirmedReportedBy,
+      reporterName,
+      reporterEmail,
     });
     log.info(
       { issueId: issue.id, issueNumber: issue.issueNumber },
@@ -223,7 +192,8 @@ export async function submitPublicIssueAction(
 
     // 2. Anonymous users go to success page
     const successParams = new URLSearchParams();
-    if (unconfirmedReportedBy && !reportedBy) {
+    // We can use reporterEmail or reporterName to decide if they provided info
+    if ((reporterEmail || reporterName) && !reportedBy) {
       successParams.set("new_pending", "true");
     }
 
@@ -236,6 +206,7 @@ export async function submitPublicIssueAction(
     if (isRedirectError(error)) {
       throw error;
     }
+    log.error({ error }, "Failed to submit issue");
     return {
       error:
         error instanceof Error

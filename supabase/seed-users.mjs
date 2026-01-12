@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable no-undef */
 /**
  * Seed Test Users and Data for Local Development
  *
@@ -123,7 +124,27 @@ async function seedUsersAndData() {
     }
   }
 
-  // 2. Seed Machines (Owned by Admin)
+  // 2. Seed Invited Users (for testing invited reporter display)
+  console.log("\n👤 Seeding invited users...");
+
+  const invitedUserId = await sql`
+    INSERT INTO invited_users (first_name, last_name, email, role)
+    VALUES ('Jane', 'Doe', 'jane.doe@example.com', 'guest')
+    ON CONFLICT (email) DO UPDATE SET
+      first_name = 'Jane',
+      last_name = 'Doe'
+    RETURNING id
+  `.then((rows) => rows[0]?.id);
+
+  if (invitedUserId) {
+    console.log(
+      `✅ Invited user seeded: jane.doe@example.com (ID: ${invitedUserId})`
+    );
+  } else {
+    console.warn("⚠️ Could not seed invited user");
+  }
+
+  // 3. Seed Machines (Owned by Admin)
   if (userIds.admin) {
     console.log("\n🎰 Seeding machines...");
 
@@ -143,101 +164,113 @@ async function seedUsersAndData() {
     // 3. Seed Issues
     console.log("\n🔧 Seeding issues...");
 
-    // Attack from Mars: 1 issue
-    await sql`
-      INSERT INTO issues (id, machine_initials, issue_number, title, description, status, severity, priority, consistency, created_at, updated_at)
-      VALUES (
-        '10000000-0000-4000-8000-000000000001',
-        'AFM',
-        1,
-        'Right flipper feels weak',
-        'The right flipper doesn\''t have full strength. Can still play but makes ramp shots difficult.',
-        'confirmed',
-        'minor',
-        'medium',
-        'constant',
-        NOW() - INTERVAL '2 days',
-        NOW() - INTERVAL '2 days'
-      )
-      ON CONFLICT (id) DO NOTHING
-    `;
+    const issueSeed = [
+      {
+        id: "10000000-0000-4000-8000-000000000001",
+        initials: "AFM",
+        num: 1,
+        title: "Right flipper feels weak",
+        desc: "The right flipper doesn't have full strength. Can still play but makes ramp shots difficult.",
+        status: "confirmed",
+        severity: "minor",
+        reportedBy: userIds.member,
+      },
+      {
+        id: "10000000-0000-4000-8000-000000000002",
+        initials: "TAF",
+        num: 1,
+        title: "Ball stuck in Thing's box",
+        desc: "Extended sample issue with many timeline updates.",
+        status: "in_progress",
+        severity: "unplayable",
+        reporterName: "John Guest",
+        reporterEmail: "john@guest.com",
+      },
+      {
+        id: "10000000-0000-4000-8000-000000000003",
+        initials: "TAF",
+        num: 2,
+        title: "Bookcase not registering hits",
+        desc: "The bookcase target doesn't registering when hit.",
+        status: "need_parts",
+        severity: "major",
+        reporterName: "Only Name",
+      },
+      {
+        id: "10000000-0000-4000-8000-000000000004",
+        initials: "TAF",
+        num: 3,
+        title: "Dim GI lighting on left side",
+        desc: "General illumination bulbs on left side are dim.",
+        status: "new",
+        severity: "cosmetic",
+        reporterEmail: "only@email.com",
+      },
+      {
+        id: "10000000-0000-4000-8000-000000000005",
+        initials: "TAF",
+        num: 4,
+        title: "Bear Kick opto not working",
+        desc: "Bear Kick feature not detecting ball.",
+        status: "wait_owner",
+        severity: "major",
+        // Anonymous
+      },
+      {
+        id: "10000000-0000-4000-8000-000000000006",
+        initials: "TAF",
+        num: 5,
+        title: "Magnet throwing ball to Drain",
+        desc: "The Power magnet seems too strong or mistimed.",
+        status: "wont_fix",
+        severity: "minor",
+        invitedUserId: invitedUserId,
+      },
+    ];
 
-    // Update AFM next issue number
+    for (const issue of issueSeed) {
+      await sql`
+        INSERT INTO issues (
+          id, machine_initials, issue_number, title, description,
+          status, severity, reported_by, invited_reported_by,
+          reporter_name, reporter_email, created_at, updated_at
+        ) VALUES (
+          ${issue.id}, ${issue.initials}, ${issue.num}, ${issue.title}, ${issue.desc},
+          ${issue.status}, ${issue.severity}, ${issue.reportedBy ?? null}, ${issue.invitedUserId ?? null},
+          ${issue.reporterName ?? null}, ${issue.reporterEmail ?? null}, NOW(), NOW()
+        ) ON CONFLICT (id) DO UPDATE SET
+          reported_by = EXCLUDED.reported_by,
+          invited_reported_by = EXCLUDED.invited_reported_by,
+          reporter_name = EXCLUDED.reporter_name,
+          reporter_email = EXCLUDED.reporter_email,
+          updated_at = NOW()
+      `;
+
+      // Add "Issue reported by..." system comment to match service logic
+      const reporterDesc =
+        issue.reporterName ??
+        issue.reporterEmail ??
+        (issue.reportedBy
+          ? "Member"
+          : issue.invitedUserId
+            ? "Invited User"
+            : "Guest");
+
+      await sql`
+        INSERT INTO issue_comments (issue_id, author_id, content, is_system, created_at, updated_at)
+        VALUES (
+          ${issue.id},
+          null,
+          ${`Issue reported by ${reporterDesc}`},
+          true,
+          NOW(),
+          NOW()
+        ) ON CONFLICT DO NOTHING
+      `;
+    }
+
+    // Update next issue numbers
     await sql`UPDATE machines SET next_issue_number = 2 WHERE initials = 'AFM'`;
-
-    // The Addams Family: Multiple issues
-    await sql`
-      INSERT INTO issues (id, machine_initials, issue_number, title, description, status, severity, priority, consistency, created_at, updated_at)
-      VALUES
-      (
-        '10000000-0000-4000-8000-000000000002',
-        'TAF',
-        1,
-        'Ball stuck in Thing\''s box',
-        'Extended sample issue with many timeline updates.',
-        'in_progress',
-        'unplayable',
-        'high',
-        'constant',
-        NOW() - INTERVAL '1 day',
-        NOW() - INTERVAL '1 day'
-      ),
-      (
-        '10000000-0000-4000-8000-000000000003',
-        'TAF',
-        2,
-        'Bookcase not registering hits',
-        'The bookcase target doesn\''t registering when hit.',
-        'need_parts',
-        'major',
-        'high',
-        'frequent',
-        NOW() - INTERVAL '3 days',
-        NOW() - INTERVAL '1 day'
-      ),
-      (
-        '10000000-0000-4000-8000-000000000004',
-        'TAF',
-        3,
-        'Dim GI lighting on left side',
-        'General illumination bulbs on left side are dim.',
-        'new',
-        'cosmetic',
-        'low',
-        'constant',
-        NOW() - INTERVAL '5 days',
-        NOW() - INTERVAL '5 days'
-      ),
-      (
-        '10000000-0000-4000-8000-000000000005',
-        'TAF',
-        4,
-        'Bear Kick opto not working',
-        'Bear Kick feature not detecting ball.',
-        'wait_owner',
-        'major',
-        'medium',
-        'intermittent',
-        NOW() - INTERVAL '1 week',
-        NOW() - INTERVAL '1 week'
-      ),
-      (
-        '10000000-0000-4000-8000-000000000006',
-        'TAF',
-        5,
-        'Magnet throwing ball to Drain',
-        'The Power magnet seems too strong or mistimed.',
-        'wont_fix',
-        'minor',
-        'low',
-        'frequent',
-        NOW() - INTERVAL '2 weeks',
-        NOW() - INTERVAL '2 weeks'
-      )
-      ON CONFLICT (id) DO NOTHING
-    `;
-
-    // Update TAF next issue number
     await sql`UPDATE machines SET next_issue_number = 6 WHERE initials = 'TAF'`;
 
     console.log("✅ Issues seeded.");
@@ -247,9 +280,15 @@ async function seedUsersAndData() {
       console.log("\n💬 Seeding comments...");
 
       // Clear existing comments for the main issue to avoid duplicates/mess
-      await sql`DELETE FROM issue_comments WHERE issue_id = '10000000-0000-4000-8000-000000000002'`;
+      // await sql`DELETE FROM issue_comments WHERE issue_id = '10000000-0000-4000-8000-000000000002'`;
 
       const comments = [
+        // {
+        //   author: null,
+        //   content: "Issue reported by John Guest",
+        //   isSystem: true,
+        //   daysAgo: 10,
+        // },
         {
           author: userIds.member,
           content: "Initial report logged from the front desk.",

@@ -80,7 +80,7 @@ const getDashboardData = cache(async (userId?: string) => {
         )
     : Promise.resolve([{ count: 0 }]);
 
-  // Query 3: Recently reported issues (last 10, with machine and reporter)
+  // Query 3: Recently reported issues (last 10, with machine and all reporter types)
   const recentIssuesPromise = db.query.issues.findMany({
     orderBy: desc(issues.createdAt),
     limit: 10,
@@ -98,6 +98,12 @@ const getDashboardData = cache(async (userId?: string) => {
           name: true,
         },
       },
+      invitedReporter: {
+        columns: {
+          id: true,
+          name: true,
+        },
+      },
     },
     columns: {
       id: true,
@@ -109,6 +115,8 @@ const getDashboardData = cache(async (userId?: string) => {
       machineInitials: true,
       issueNumber: true,
       createdAt: true,
+      reporterName: true,
+      reporterEmail: true,
     },
   });
 
@@ -383,7 +391,10 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                   machine={{ name: issue.machine.name }}
                   showReporter={true}
                   reporterName={
-                    issue.reportedByUser?.name ?? "Anonymous Reporter"
+                    issue.reportedByUser?.name ??
+                    issue.invitedReporter?.name ??
+                    issue.reporterName ??
+                    "Anonymous"
                   }
                   dataTestId="recent-issue-card"
                 />

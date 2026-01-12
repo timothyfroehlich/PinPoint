@@ -85,9 +85,9 @@ export function OwnerSelect({
             <SelectItem key={user.id} value={user.id}>
               <div className="flex items-center gap-2">
                 <span>{user.name}</span>
-                {user.status === "unconfirmed" && (
+                {user.status === "invited" && (
                   <span className="text-[10px] font-medium uppercase tracking-wider text-on-surface-variant/70">
-                    (Unconfirmed)
+                    (Invited)
                   </span>
                 )}
               </div>
