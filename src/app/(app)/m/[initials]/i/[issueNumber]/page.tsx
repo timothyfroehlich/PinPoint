@@ -142,6 +142,10 @@ export default async function IssueDetailPage({
     redirect(`/m/${initials}`);
   }
 
+  // Cast issue to IssueWithAllRelations for type safety
+  const issueWithRelations = issue as unknown as IssueWithAllRelations;
+  const ownerName = getMachineOwnerName(issueWithRelations);
+
   return (
     <PageShell className="space-y-8" size="wide">
       {/* Back button */}
@@ -162,13 +166,11 @@ export default async function IssueDetailPage({
           >
             {issue.machine.name}
           </Link>
-          {getMachineOwnerName(issue as unknown as IssueWithAllRelations) && (
+          {ownerName && (
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <span>•</span>
               <span>Owner:</span>
-              <span className="font-medium text-foreground">
-                {getMachineOwnerName(issue as unknown as IssueWithAllRelations)}
-              </span>
+              <span className="font-medium text-foreground">{ownerName}</span>
               <OwnerBadge size="sm" />
             </div>
           )}
@@ -200,12 +202,12 @@ export default async function IssueDetailPage({
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             Activity
           </h2>
-          <IssueTimeline issue={issue as unknown as IssueWithAllRelations} />
+          <IssueTimeline issue={issueWithRelations} />
         </section>
 
         {/* Sticky Sidebar */}
         <IssueSidebar
-          issue={issue as unknown as IssueWithAllRelations}
+          issue={issueWithRelations}
           allUsers={allUsers}
           currentUserId={user.id}
         />
