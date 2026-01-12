@@ -40,6 +40,8 @@
     "supa:ci": "bash scripts/supa-ci.sh",
     "sync-worktrees": "python3 scripts/sync_worktrees.py",
     "kill:zombies": "node --env-file=.env.local scripts/kill-zombies.mjs",
+    "migrate:production": "tsx scripts/migrate-production.ts",
+    "vercel-build": "pnpm run migrate:production && next build",
     "prepare": "husky"
   },
   "repository": {
@@ -129,9 +131,10 @@
     "postcss": "^8.5.6",
     "prettier": "^3.7.4",
     "tailwindcss": "^4.0.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.8",
     "vite": "^7.3.0",
+    "vitest": "^4.0.8",
     "vitest-mock-extended": "^3.1.0"
   },
   "lint-staged": {
