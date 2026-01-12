@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useActionState, useRef } from "react";
+import { useState, useActionState, useRef, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import {
   updateIssueStatusAction,
@@ -22,17 +22,23 @@ export function UpdateIssueStatusForm({
   const formRef = useRef<HTMLFormElement>(null);
   const [selectedStatus, setSelectedStatus] =
     useState<IssueStatus>(currentStatus);
+  const [pendingStatus, setPendingStatus] = useState<IssueStatus | null>(null);
   const [state, formAction, isPending] = useActionState<
     UpdateIssueStatusResult | undefined,
     FormData
   >(updateIssueStatusAction, undefined);
 
+  // Auto-submit form when pending status changes
+  useEffect(() => {
+    if (pendingStatus !== null && formRef.current) {
+      formRef.current.requestSubmit();
+      setPendingStatus(null);
+    }
+  }, [pendingStatus]);
+
   const handleValueChange = (newStatus: IssueStatus): void => {
     setSelectedStatus(newStatus);
-    // Auto-submit form on value change
-    if (formRef.current) {
-      formRef.current.requestSubmit();
-    }
+    setPendingStatus(newStatus);
   };
 
   return (

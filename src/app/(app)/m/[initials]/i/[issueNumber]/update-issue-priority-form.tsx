@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useActionState, useRef } from "react";
+import { useState, useActionState, useRef, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import {
   updateIssuePriorityAction,
@@ -26,17 +26,25 @@ export function UpdateIssuePriorityForm({
   const formRef = useRef<HTMLFormElement>(null);
   const [selectedPriority, setSelectedPriority] =
     useState<IssuePriority>(currentPriority);
+  const [pendingPriority, setPendingPriority] = useState<IssuePriority | null>(
+    null
+  );
   const [state, formAction, isPending] = useActionState<
     UpdateIssuePriorityResult | undefined,
     FormData
   >(updateIssuePriorityAction, undefined);
 
+  // Auto-submit form when pending priority changes
+  useEffect(() => {
+    if (pendingPriority !== null && formRef.current) {
+      formRef.current.requestSubmit();
+      setPendingPriority(null);
+    }
+  }, [pendingPriority]);
+
   const handleValueChange = (newPriority: IssuePriority): void => {
     setSelectedPriority(newPriority);
-    // Auto-submit form on value change
-    if (formRef.current) {
-      formRef.current.requestSubmit();
-    }
+    setPendingPriority(newPriority);
   };
 
   return (

@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useActionState, useRef } from "react";
+import { useState, useActionState, useRef, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import {
   updateIssueSeverityAction,
@@ -22,17 +22,25 @@ export function UpdateIssueSeverityForm({
   const formRef = useRef<HTMLFormElement>(null);
   const [selectedSeverity, setSelectedSeverity] =
     useState<IssueSeverity>(currentSeverity);
+  const [pendingSeverity, setPendingSeverity] = useState<IssueSeverity | null>(
+    null
+  );
   const [state, formAction, isPending] = useActionState<
     UpdateIssueSeverityResult | undefined,
     FormData
   >(updateIssueSeverityAction, undefined);
 
+  // Auto-submit form when pending severity changes
+  useEffect(() => {
+    if (pendingSeverity !== null && formRef.current) {
+      formRef.current.requestSubmit();
+      setPendingSeverity(null);
+    }
+  }, [pendingSeverity]);
+
   const handleValueChange = (newSeverity: IssueSeverity): void => {
     setSelectedSeverity(newSeverity);
-    // Auto-submit form on value change
-    if (formRef.current) {
-      formRef.current.requestSubmit();
-    }
+    setPendingSeverity(newSeverity);
   };
 
   return (
