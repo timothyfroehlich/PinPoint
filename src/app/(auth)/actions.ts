@@ -18,7 +18,7 @@ import {
   getClientIp,
   formatResetTime,
 } from "~/lib/rate-limit";
-import { getSiteUrl } from "~/lib/url";
+import { getSiteUrl, getSafeRedirect } from "~/lib/url";
 
 /**
  * Result Types
@@ -137,7 +137,7 @@ export async function loginAction(
         "Login authentication failed"
       );
 
-      return err("AUTH", error?.message ?? "Authentication failed", {
+      return err("AUTH", "Invalid email or password", {
         submittedEmail,
       });
     }
@@ -146,7 +146,14 @@ export async function loginAction(
       { userId: data.user.id, action: "login" },
       "User logged in successfully"
     );
-    redirect("/dashboard");
+
+    // Get redirect destination from form data and ensure it's safe
+    const nextParam = formData.get("next");
+    const next = getSafeRedirect(
+      typeof nextParam === "string" ? nextParam : undefined
+    );
+
+    redirect(next);
   } catch (error) {
     log.error(
       {
@@ -235,7 +242,7 @@ export async function signupAction(
           "Signup failed: email already registered"
         );
 
-        return err("EMAIL_TAKEN", error.message);
+        return err("EMAIL_TAKEN", "This email is already registered");
       }
 
       log.error(
@@ -243,7 +250,7 @@ export async function signupAction(
         "Signup failed: Supabase error"
       );
 
-      return err("SERVER", error.message);
+      return err("SERVER", "An unexpected error occurred during signup");
     }
 
     if (!data.user) {
@@ -440,7 +447,7 @@ export async function forgotPasswordAction(
         { action: "forgot-password", error: error.message },
         "Password reset email failed"
       );
-      return err("SERVER", error.message);
+      return err("SERVER", "Failed to send password reset email");
     }
 
     log.info(
@@ -520,7 +527,7 @@ export async function resetPasswordAction(
         "Password update failed"
       );
 
-      return err("SERVER", error.message);
+      return err("SERVER", "Failed to update password");
     }
 
     log.info(

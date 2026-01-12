@@ -62,3 +62,50 @@ describe("requireSiteUrl", () => {
     );
   });
 });
+
+describe("isInternalUrl", () => {
+  it("returns true for valid internal paths", async () => {
+    const { isInternalUrl } = await import("./url");
+    expect(isInternalUrl("/")).toBe(true);
+    expect(isInternalUrl("/dashboard")).toBe(true);
+    expect(isInternalUrl("/machines/123")).toBe(true);
+    expect(isInternalUrl("/settings?param=value")).toBe(true);
+  });
+
+  it("returns false for external URLs", async () => {
+    const { isInternalUrl } = await import("./url");
+    expect(isInternalUrl("https://example.com")).toBe(false);
+    expect(isInternalUrl("http://example.com")).toBe(false);
+    expect(isInternalUrl("//example.com")).toBe(false);
+  });
+
+  it("returns false for null, undefined, or empty string", async () => {
+    const { isInternalUrl } = await import("./url");
+    expect(isInternalUrl(null)).toBe(false);
+    expect(isInternalUrl(undefined)).toBe(false);
+    expect(isInternalUrl("")).toBe(false);
+  });
+});
+
+describe("getSafeRedirect", () => {
+  it("returns the URL if it is internal", async () => {
+    const { getSafeRedirect } = await import("./url");
+    expect(getSafeRedirect("/settings")).toBe("/settings");
+  });
+
+  it("returns the fallback if URL is external", async () => {
+    const { getSafeRedirect } = await import("./url");
+    expect(getSafeRedirect("https://example.com")).toBe("/dashboard");
+  });
+
+  it("returns a custom fallback if provided", async () => {
+    const { getSafeRedirect } = await import("./url");
+    expect(getSafeRedirect("https://example.com", "/custom")).toBe("/custom");
+  });
+
+  it("returns the fallback if URL is null/undefined", async () => {
+    const { getSafeRedirect } = await import("./url");
+    expect(getSafeRedirect(null)).toBe("/dashboard");
+    expect(getSafeRedirect(undefined)).toBe("/dashboard");
+  });
+});
