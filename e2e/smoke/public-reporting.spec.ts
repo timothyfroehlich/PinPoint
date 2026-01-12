@@ -6,6 +6,7 @@
 
 import { test, expect } from "@playwright/test";
 import { cleanupTestEntities } from "../support/cleanup";
+import { selectOption } from "../support/actions";
 
 const PUBLIC_PREFIX = "E2E Public Report";
 
@@ -37,7 +38,7 @@ test.describe("Public Issue Reporting", () => {
     await page
       .getByLabel("Description")
       .fill("Playfield gets stuck during multiball.");
-    await page.getByTestId("severity-select").selectOption("minor");
+    await selectOption(page, "severity-select", "minor");
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
     await expect(page).toHaveURL("/report/success");
@@ -63,7 +64,7 @@ test.describe("Public Issue Reporting", () => {
     await expect(page).toHaveURL(/machine=/);
 
     await page.getByLabel("Issue Title *").fill(`${PUBLIC_PREFIX} with Email`);
-    await page.getByTestId("severity-select").selectOption("minor");
+    await selectOption(page, "severity-select", "minor");
 
     await page.getByLabel("First Name").fill("Test");
     await page.getByLabel("Last Name").fill("User");
