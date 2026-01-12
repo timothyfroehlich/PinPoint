@@ -130,7 +130,7 @@ export default defineConfig({
   // Reporters: print progress locally; keep CI quiet; never block on HTML
   reporter: process.env["CI"]
     ? [["dot"], ["html", { open: "never" }]]
-    : [["list"], ["html", { open: "never" }]],
+    : [["line"], ["html", { open: "never" }]],
 
   // Shared settings for all the projects below
   use: {

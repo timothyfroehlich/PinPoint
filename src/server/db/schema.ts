@@ -12,6 +12,7 @@ import {
   check,
   unique,
 } from "drizzle-orm/pg-core";
+import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
 
 /**
  * ⚠️ IMPORTANT: When adding new tables to this schema file,
@@ -134,21 +135,32 @@ export const issues = pgTable(
     issueNumber: integer("issue_number").notNull(),
     title: text("title").notNull(),
     description: text("description"),
-    status: text("status", { enum: ["new", "in_progress", "resolved"] })
+    // Status values imported from single source of truth
+    // Based on _issue-status-redesign/README.md - Final design with 11 statuses
+    status: text("status", {
+      enum: ISSUE_STATUS_VALUES as unknown as [string, ...string[]],
+    })
       .notNull()
       .default("new"),
-    severity: text("severity", { enum: ["minor", "playable", "unplayable"] })
+    severity: text("severity", {
+      enum: ["cosmetic", "minor", "major", "unplayable"],
+    })
       .notNull()
-      .default("playable"),
-    priority: text("priority", { enum: ["low", "medium", "high", "critical"] })
+      .default("minor"),
+    priority: text("priority", { enum: ["low", "medium", "high"] })
       .notNull()
-      .default("low"),
+      .default("medium"),
+    consistency: text("consistency", {
+      enum: ["intermittent", "frequent", "constant"],
+    })
+      .notNull()
+      .default("intermittent"),
     reportedBy: uuid("reported_by").references(() => userProfiles.id),
     unconfirmedReportedBy: uuid("unconfirmed_reported_by").references(
       () => unconfirmedUsers.id
     ),
     assignedTo: uuid("assigned_to").references(() => userProfiles.id),
-    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

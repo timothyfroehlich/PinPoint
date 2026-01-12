@@ -19,6 +19,7 @@ trigger: always_on
   - Cached Data Fetching (React `cache()`)
 - [Mutations](./patterns/mutations.md)
   - Server Action + Zod Validation + Redirect
+  - Server Action Error Handling
 - [Authentication](./patterns/authentication.md)
   - Auth Check in Server Components
   - Auth Check in Server Actions
@@ -39,6 +40,7 @@ trigger: always_on
 - [Testing Patterns](./patterns/testing-patterns.md)
   - Playwright E2E Tests
   - Integration Tests with PGlite
+  - Integration Tests with Module Mocking
   - Unit Tests
   - Vitest Deep Mocks (vitest-mock-extended)
 - [Logging](./patterns/logging.md)
@@ -50,6 +52,14 @@ trigger: always_on
   - Consistent Site URL Resolution
 - [Database Migrations](./patterns/database-migrations.md)
   - Drizzle Migrations + Test Schema Export
+- [Config-Driven Enums](./patterns/config-driven-enums.md) ⭐ **NEW**
+  - Single Source of Truth for Domain Enums
+  - Rich Metadata (labels, icons, styles, descriptions)
+- [Service Layer Transactions](./patterns/service-layer-transactions.md) ⭐ **NEW**
+  - Transactional Updates with Timeline Events
+  - Notification Error Handling
+- [Discriminated Union Props](./patterns/ui-patterns/discriminated-union-props.md) ⭐ **NEW**
+  - Type-Safe Component Props for Multi-Type Components
 
 ## Adding New Patterns
 

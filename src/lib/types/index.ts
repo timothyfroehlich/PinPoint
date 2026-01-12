@@ -13,6 +13,7 @@ export type {
   IssueStatus,
   IssueSeverity,
   IssuePriority,
+  IssueConsistency,
 } from "./database";
 
 export type { UserRole } from "./user";

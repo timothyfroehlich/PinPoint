@@ -1,26 +1,11 @@
 "use client";
 
 import React, { useState, useActionState } from "react";
-import { useFormStatus } from "react-dom";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { PasswordStrength } from "~/components/password-strength";
 import { signupAction, type SignupResult } from "~/app/(auth)/actions";
-
-function SubmitButton(): React.JSX.Element {
-  const { pending } = useFormStatus();
-  return (
-    <Button
-      type="submit"
-      className="w-full bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container"
-      size="lg"
-      disabled={pending}
-    >
-      {pending ? "Creating Account..." : "Create Account"}
-    </Button>
-  );
-}
 
 interface SignupFormProps {
   initialData?:
@@ -35,7 +20,7 @@ interface SignupFormProps {
 export function SignupForm({
   initialData,
 }: SignupFormProps): React.JSX.Element {
-  const [state, formAction] = useActionState<
+  const [state, formAction, isPending] = useActionState<
     SignupResult | undefined,
     FormData
   >(signupAction, undefined);
@@ -172,7 +157,14 @@ export function SignupForm({
         />
       </div>
 
-      <SubmitButton />
+      <Button
+        type="submit"
+        className="w-full bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container"
+        size="lg"
+        loading={isPending}
+      >
+        Create Account
+      </Button>
     </form>
   );
 }

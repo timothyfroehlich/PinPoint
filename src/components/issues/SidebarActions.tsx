@@ -7,6 +7,7 @@ import { AssignIssueForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/assign
 import { UpdateIssueStatusForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/update-issue-status-form";
 import { UpdateIssueSeverityForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/update-issue-severity-form";
 import { UpdateIssuePriorityForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/update-issue-priority-form";
+import { UpdateIssueConsistencyForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/update-issue-consistency-form";
 
 interface SidebarActionsProps {
   issue: IssueWithAllRelations;
@@ -60,6 +61,17 @@ export function SidebarActions({
           <UpdateIssuePriorityForm
             issueId={issue.id}
             currentPriority={issue.priority}
+          />
+        </div>
+      </div>
+
+      {/* Update Consistency */}
+      <div className="grid grid-cols-[110px,1fr] items-center gap-3">
+        <Label className="text-sm text-muted-foreground">Consistency</Label>
+        <div className="min-w-0">
+          <UpdateIssueConsistencyForm
+            issueId={issue.id}
+            currentConsistency={issue.consistency}
           />
         </div>
       </div>

@@ -11,11 +11,18 @@ if (!process.env["DATABASE_URL"]) {
 // Strip surrounding quotes if present (handles both single and double quotes)
 const databaseUrl = process.env["DATABASE_URL"].replace(/^["']|["']$/g, "");
 
-// Create postgres connection
-const queryClient = postgres(databaseUrl);
+/**
+ * Persist the database connection across hot reloads in development.
+ * This prevents reaching the connection limit (CORE-TEST-001).
+ */
+const globalForDb = globalThis as unknown as {
+  conn: postgres.Sql | undefined;
+};
 
-// Create Drizzle instance with schema
-export const db = drizzle(queryClient, { schema });
+const conn = globalForDb.conn ?? postgres(databaseUrl);
+if (process.env.NODE_ENV !== "production") globalForDb.conn = conn;
+
+export const db = drizzle(conn, { schema });
 
 export type Db = typeof db;
 export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];

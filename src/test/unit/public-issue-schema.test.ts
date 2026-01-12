@@ -10,6 +10,7 @@ describe("publicIssueSchema", () => {
       title: "Public Report",
       description: "Something is wrong",
       severity: "minor",
+      consistency: "intermittent",
     });
     expect(result.success).toBe(true);
   });
@@ -18,7 +19,8 @@ describe("publicIssueSchema", () => {
     const result = publicIssueSchema.safeParse({
       machineId: validUuid,
       title: "Public Report",
-      severity: "playable",
+      severity: "minor",
+      consistency: "constant",
     });
     expect(result.success).toBe(true);
   });

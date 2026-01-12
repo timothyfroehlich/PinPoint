@@ -31,7 +31,6 @@
   /* Status Specific */
   --color-status-new: #4ade80;
   --color-status-in-progress: #d946ef;
-  --color-status-resolved: #22c55e;
   --color-status-unplayable: #ef4444;
 
   /* Semantic Status Colors */
@@ -124,7 +123,7 @@
     @apply text-xl font-semibold tracking-tight;
   }
   p {
-    @apply leading-7 [&:not(:first-child)]:mt-4;
+    @apply leading-7 not-first:mt-4;
   }
   a {
     @apply transition-colors;

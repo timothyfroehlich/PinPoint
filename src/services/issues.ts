@@ -12,6 +12,19 @@ import { createTimelineEvent } from "~/lib/timeline/events";
 import { createNotification } from "~/lib/notifications";
 import { log } from "~/lib/logger";
 import { formatIssueId } from "~/lib/issues/utils";
+import {
+  type IssueSeverity,
+  type IssuePriority,
+  type IssueConsistency,
+  type IssueStatus,
+} from "~/lib/types";
+import {
+  CLOSED_STATUSES,
+  getIssueConsistencyLabel,
+  getIssuePriorityLabel,
+  getIssueSeverityLabel,
+  getIssueStatusLabel,
+} from "~/lib/issues/status";
 
 // --- Types ---
 
@@ -19,15 +32,16 @@ export interface CreateIssueParams {
   title: string;
   description?: string | null;
   machineInitials: string;
-  severity: string;
-  priority?: string | undefined;
+  severity: IssueSeverity;
+  priority?: IssuePriority | undefined;
+  consistency?: IssueConsistency | undefined;
   reportedBy?: string | null;
   unconfirmedReportedBy?: string | null;
 }
 
 export interface UpdateIssueStatusParams {
   issueId: string;
-  status: "new" | "in_progress" | "resolved";
+  status: IssueStatus;
   userId: string;
 }
 
@@ -45,12 +59,17 @@ export interface AssignIssueParams {
 
 export interface UpdateIssueSeverityParams {
   issueId: string;
-  severity: string;
+  severity: IssueSeverity;
 }
 
 export interface UpdateIssuePriorityParams {
   issueId: string;
-  priority: string;
+  priority: IssuePriority;
+}
+
+export interface UpdateIssueConsistencyParams {
+  issueId: string;
+  consistency: IssueConsistency;
 }
 
 export type Issue = InferSelectModel<typeof issues>;
@@ -68,6 +87,7 @@ export async function createIssue({
   machineInitials,
   severity,
   priority,
+  consistency,
   reportedBy,
   unconfirmedReportedBy,
 }: CreateIssueParams): Promise<Issue> {
@@ -98,8 +118,9 @@ export async function createIssue({
         issueNumber,
         title,
         description: description ?? null,
-        severity: severity as "minor" | "playable" | "unplayable",
-        priority: (priority ?? "low") as "low" | "medium" | "high",
+        severity,
+        priority: priority ?? "medium",
+        consistency: consistency ?? "intermittent",
         reportedBy: reportedBy ?? null,
         unconfirmedReportedBy: unconfirmedReportedBy ?? null,
         status: "new",
@@ -219,18 +240,22 @@ export async function updateIssueStatus({
     const oldStatus = currentIssue.status;
 
     // 1. Update Status
+    const isClosed = (CLOSED_STATUSES as readonly string[]).includes(status);
     await tx
       .update(issues)
       .set({
         status,
         updatedAt: new Date(),
+        closedAt: isClosed ? new Date() : null,
       })
       .where(eq(issues.id, issueId));
 
     // 2. Create Timeline Event
+    const oldLabel = getIssueStatusLabel(oldStatus as IssueStatus);
+    const newLabel = getIssueStatusLabel(status);
     await createTimelineEvent(
       issueId,
-      `Status changed from ${oldStatus} to ${status}`,
+      `Status changed from ${oldLabel} to ${newLabel}`,
       tx
     );
 
@@ -509,15 +534,17 @@ export async function updateIssueSeverity({
   await db
     .update(issues)
     .set({
-      severity: severity as "minor" | "playable" | "unplayable",
+      severity,
       updatedAt: new Date(),
     })
     .where(eq(issues.id, issueId));
 
   // Create timeline event
+  const oldLabel = getIssueSeverityLabel(oldSeverity as IssueSeverity);
+  const newLabel = getIssueSeverityLabel(severity);
   await createTimelineEvent(
     issueId,
-    `Severity changed from ${oldSeverity} to ${severity}`
+    `Severity changed from ${oldLabel} to ${newLabel}`
   );
 
   log.info(
@@ -560,15 +587,17 @@ export async function updateIssuePriority({
   await db
     .update(issues)
     .set({
-      priority: priority as "low" | "medium" | "high",
+      priority,
       updatedAt: new Date(),
     })
     .where(eq(issues.id, issueId));
 
   // Create timeline event
+  const oldLabel = getIssuePriorityLabel(oldPriority as IssuePriority);
+  const newLabel = getIssuePriorityLabel(priority);
   await createTimelineEvent(
     issueId,
-    `Priority changed from ${oldPriority} to ${priority}`
+    `Priority changed from ${oldLabel} to ${newLabel}`
   );
 
   log.info(
@@ -582,4 +611,57 @@ export async function updateIssuePriority({
   );
 
   return { issueId, oldPriority, newPriority: priority };
+}
+
+/**
+ * Update issue consistency
+ */
+export async function updateIssueConsistency({
+  issueId,
+  consistency,
+}: UpdateIssueConsistencyParams): Promise<{
+  issueId: string;
+  oldConsistency: string;
+  newConsistency: string;
+}> {
+  // Get current issue to check old consistency
+  const currentIssue = await db.query.issues.findFirst({
+    where: eq(issues.id, issueId),
+    columns: { consistency: true, machineInitials: true },
+  });
+
+  if (!currentIssue) {
+    throw new Error("Issue not found");
+  }
+
+  const oldConsistency = currentIssue.consistency;
+
+  // Update consistency
+  await db
+    .update(issues)
+    .set({
+      consistency,
+      updatedAt: new Date(),
+    })
+    .where(eq(issues.id, issueId));
+
+  // Create timeline event
+  const oldLabel = getIssueConsistencyLabel(oldConsistency as IssueConsistency);
+  const newLabel = getIssueConsistencyLabel(consistency);
+  await createTimelineEvent(
+    issueId,
+    `Consistency changed from ${oldLabel} to ${newLabel}`
+  );
+
+  log.info(
+    {
+      issueId,
+      oldConsistency,
+      newConsistency: consistency,
+      action: "updateIssueConsistency",
+    },
+    "Issue consistency updated"
+  );
+
+  return { issueId, oldConsistency, newConsistency: consistency };
 }

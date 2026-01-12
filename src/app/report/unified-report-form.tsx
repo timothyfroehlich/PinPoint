@@ -12,7 +12,7 @@ import { Label } from "~/components/ui/label";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { Button } from "~/components/ui/button";
-import { RefreshCw, UserCheck } from "lucide-react";
+import { UserCheck } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { submitPublicIssueAction } from "./actions";
 
@@ -62,8 +62,9 @@ export function UnifiedReportForm({
   );
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [severity, setSeverity] = useState("");
+  const [severity, setSeverity] = useState("minor");
   const [priority, setPriority] = useState("medium");
+  const [consistency, setConsistency] = useState("intermittent");
 
   const [state, formAction, isPending] = useActionState(
     submitPublicIssueAction,
@@ -88,6 +89,7 @@ export function UnifiedReportForm({
           description: string;
           severity: string;
           priority: string;
+          consistency: string;
         }>;
 
         // Only restore machineId if not provided via prop or URL already
@@ -107,6 +109,7 @@ export function UnifiedReportForm({
         if (parsed.description) setDescription(parsed.description);
         if (parsed.severity) setSeverity(parsed.severity);
         if (parsed.priority) setPriority(parsed.priority);
+        if (parsed.consistency) setConsistency(parsed.consistency);
       } catch {
         // Clear corrupted localStorage
         window.localStorage.removeItem("report_form_state");
@@ -123,12 +126,13 @@ export function UnifiedReportForm({
       description,
       severity,
       priority,
+      consistency,
     };
     window.localStorage.setItem(
       "report_form_state",
       JSON.stringify(stateToSave)
     );
-  }, [selectedMachineId, title, description, severity, priority]);
+  }, [selectedMachineId, title, description, severity, priority, consistency]);
 
   // Cleanup: Clear storage on success (handled by redirect usually, but good for robust logic if no redirect)
   // Actually, review says: "cleanup effect will never execute because action redirects".
@@ -186,6 +190,7 @@ export function UnifiedReportForm({
                     id="machineId"
                     name="machineId"
                     data-testid="machine-select"
+                    aria-label="Select Machine"
                     required
                     value={selectedMachineId}
                     onChange={(e) => {
@@ -256,20 +261,48 @@ export function UnifiedReportForm({
                     <select
                       id="severity"
                       name="severity"
+                      data-testid="severity-select"
+                      aria-label="Select Severity"
                       value={severity}
                       onChange={(e) => setSeverity(e.target.value)}
                       required
                       className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-on-surface"
                     >
-                      <option value="" disabled>
-                        Select severity...
+                      <option value="cosmetic">
+                        Cosmetic (minor visual issue)
                       </option>
-                      <option value="minor">Minor (cosmetic)</option>
-                      <option value="playable">
-                        Playable (needs attention)
+                      <option value="minor">
+                        Minor (gameplay affected, still playable)
+                      </option>
+                      <option value="major">
+                        Major (major issues, barely playable)
                       </option>
                       <option value="unplayable">
                         Unplayable (machine down)
+                      </option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="consistency" className="text-on-surface">
+                      Consistency *
+                    </Label>
+                    <select
+                      id="consistency"
+                      name="consistency"
+                      data-testid="consistency-select"
+                      aria-label="Select Consistency"
+                      value={consistency}
+                      onChange={(e) => setConsistency(e.target.value)}
+                      required
+                      className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-on-surface"
+                    >
+                      <option value="intermittent">
+                        Intermittent (happens sometimes)
+                      </option>
+                      <option value="frequent">Frequent (happens often)</option>
+                      <option value="constant">
+                        Constant (happens every time)
                       </option>
                     </select>
                   </div>
@@ -282,6 +315,8 @@ export function UnifiedReportForm({
                       <select
                         id="priority"
                         name="priority"
+                        data-testid="priority-select"
+                        aria-label="Select Priority"
                         value={priority}
                         onChange={(e) => setPriority(e.target.value)}
                         required
@@ -290,7 +325,6 @@ export function UnifiedReportForm({
                         <option value="low">Low</option>
                         <option value="medium">Medium</option>
                         <option value="high">High</option>
-                        <option value="critical">Critical</option>
                       </select>
                     </div>
                   )}
@@ -375,12 +409,10 @@ export function UnifiedReportForm({
                 <Button
                   type="submit"
                   className="w-full bg-primary text-on-primary hover:bg-primary/90 mt-2 h-10 text-sm font-semibold"
-                  disabled={isPending || !selectedMachineId}
+                  disabled={!selectedMachineId}
+                  loading={isPending}
                 >
-                  {isPending ? (
-                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  ) : null}
-                  {isPending ? "Submitting..." : "Submit Issue Report"}
+                  Submit Issue Report
                 </Button>
               </form>
             </div>

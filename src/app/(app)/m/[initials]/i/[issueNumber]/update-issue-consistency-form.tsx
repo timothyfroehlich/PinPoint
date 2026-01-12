@@ -4,49 +4,51 @@ import type React from "react";
 import { useActionState } from "react";
 import { Loader2 } from "lucide-react";
 import {
-  updateIssueStatusAction,
-  type UpdateIssueStatusResult,
+  updateIssueConsistencyAction,
+  type UpdateIssueConsistencyResult,
 } from "~/app/(app)/issues/actions";
-import {
-  getIssueStatusLabel,
-  STATUS_OPTIONS as statusOptions,
-} from "~/lib/issues/status";
-import type { IssueStatus } from "~/lib/types";
+import { type IssueConsistency } from "~/lib/types";
 
-interface UpdateIssueStatusFormProps {
+interface UpdateIssueConsistencyFormProps {
   issueId: string;
-  currentStatus: IssueStatus;
+  currentConsistency: IssueConsistency;
 }
 
-export function UpdateIssueStatusForm({
+const consistencyOptions: { value: IssueConsistency; label: string }[] = [
+  { value: "intermittent", label: "Intermittent" },
+  { value: "frequent", label: "Frequent" },
+  { value: "constant", label: "Constant" },
+];
+
+export function UpdateIssueConsistencyForm({
   issueId,
-  currentStatus,
-}: UpdateIssueStatusFormProps): React.JSX.Element {
+  currentConsistency,
+}: UpdateIssueConsistencyFormProps): React.JSX.Element {
   const [state, formAction, isPending] = useActionState<
-    UpdateIssueStatusResult | undefined,
+    UpdateIssueConsistencyResult | undefined,
     FormData
-  >(updateIssueStatusAction, undefined);
+  >(updateIssueConsistencyAction, undefined);
 
   return (
     <form action={formAction} className="space-y-2">
       <input type="hidden" name="issueId" value={issueId} />
       <div className="relative">
         <select
-          name="status"
-          defaultValue={currentStatus}
-          aria-label="Update Issue Status"
+          name="consistency"
+          defaultValue={currentConsistency}
+          aria-label="Update Issue Consistency"
           className="w-full rounded-md border border-outline-variant bg-surface px-3 py-2 pr-10 text-sm text-on-surface disabled:opacity-50"
-          data-testid="issue-status-select"
+          data-testid="issue-consistency-select"
           disabled={isPending}
           onChange={(e) => e.currentTarget.form?.requestSubmit()}
         >
-          {statusOptions.map((status) => (
+          {consistencyOptions.map((option) => (
             <option
-              key={status}
-              value={status}
-              data-testid={`status-option-${status}`}
+              key={option.value}
+              value={option.value}
+              data-testid={`consistency-option-${option.value}`}
             >
-              {getIssueStatusLabel(status)}
+              {option.label}
             </option>
           ))}
         </select>
@@ -56,11 +58,6 @@ export function UpdateIssueStatusForm({
           </div>
         )}
       </div>
-      {state?.ok && (
-        <p className="text-sm text-success" data-testid="status-update-success">
-          Status updated successfully
-        </p>
-      )}
       {state && !state.ok && (
         <p className="text-sm text-destructive">{state.message}</p>
       )}

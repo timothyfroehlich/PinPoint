@@ -105,7 +105,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
       expect(issue.status).toBe("new");
     });
 
-    it("should default severity to 'playable' if not provided", async () => {
+    it("should default severity to 'minor' if not provided", async () => {
       const db = await getTestDb();
 
       const [issue] = await db
@@ -118,7 +118,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
         })
         .returning();
 
-      expect(issue.severity).toBe("playable");
+      expect(issue.severity).toBe("minor");
     });
   });
 
@@ -149,7 +149,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
           machineInitials: testMachine.initials,
           issueNumber: 3,
           severity: "minor",
-          status: "resolved",
+          status: "fixed",
           reportedBy: testUser.id,
         },
       ]);
@@ -260,21 +260,21 @@ describe("Issues CRUD Operations (PGlite)", () => {
       expect(updated?.severity).toBe("unplayable");
     });
 
-    it("should set resolvedAt when status is resolved", async () => {
+    it("should set closedAt when status is fixed", async () => {
       const db = await getTestDb();
 
-      const resolvedDate = new Date();
+      const closedDate = new Date();
       await db
         .update(issues)
-        .set({ status: "resolved", resolvedAt: resolvedDate })
+        .set({ status: "fixed", closedAt: closedDate })
         .where(eq(issues.id, testIssue.id));
 
       const updated = await db.query.issues.findFirst({
         where: eq(issues.id, testIssue.id),
       });
 
-      expect(updated?.status).toBe("resolved");
-      expect(updated?.resolvedAt).toBeDefined();
+      expect(updated?.status).toBe("fixed");
+      expect(updated?.closedAt).toBeDefined();
     });
 
     it("should assign issue to user", async () => {

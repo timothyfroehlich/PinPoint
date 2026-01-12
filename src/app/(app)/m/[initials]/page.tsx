@@ -1,7 +1,7 @@
 import type React from "react";
 import { notFound, redirect } from "next/navigation";
 import { getUnifiedUsers } from "~/lib/users/queries";
-import type { UnifiedUser } from "~/lib/types";
+import type { UnifiedUser, IssueStatus } from "~/lib/types";
 import { cn } from "~/lib/utils";
 import Link from "next/link";
 import { createClient } from "~/lib/supabase/server";
@@ -14,10 +14,8 @@ import {
   getMachineStatusStyles,
   type IssueForStatus,
 } from "~/lib/machines/status";
-import {
-  getIssuePriorityLabel,
-  getIssuePriorityStyles,
-} from "~/lib/issues/status";
+import { CLOSED_STATUSES } from "~/lib/issues/status";
+import type { Issue } from "~/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
@@ -25,10 +23,10 @@ import { ArrowLeft, Calendar, Plus } from "lucide-react";
 import { headers } from "next/headers";
 import { resolveRequestUrl } from "~/lib/url";
 import { UpdateMachineForm } from "./update-machine-form";
-import { formatIssueId } from "~/lib/issues/utils";
 import { QrCodeDialog } from "./qr-code-dialog";
 import { buildMachineReportUrl } from "~/lib/machines/report-url";
 import { generateQrPngDataUrl } from "~/lib/machines/qr";
+import { IssueCard } from "~/components/issues/IssueCard";
 
 /**
  * Machine Detail Page (Protected Route)
@@ -67,6 +65,8 @@ export default async function MachineDetailPage({
           status: true,
           severity: true,
           priority: true,
+          consistency: true,
+          machineInitials: true,
           createdAt: true,
         },
         orderBy: (issues, { desc }) => [desc(issues.createdAt)],
@@ -108,7 +108,10 @@ export default async function MachineDetailPage({
   const qrDataUrl = await generateQrPngDataUrl(reportUrl);
 
   const openIssues = machine.issues.filter(
-    (issue) => issue.status !== "resolved"
+    (issue) =>
+      !(CLOSED_STATUSES as readonly string[]).includes(
+        issue.status as IssueStatus
+      )
   );
 
   return (
@@ -168,12 +171,12 @@ export default async function MachineDetailPage({
 
       {/* Content */}
       <div className="container mx-auto px-4 py-8">
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 gap-6">
-            {/* Machine Info Card */}
-            <Card className="border-outline-variant">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Sidebar - Machine Info (4 cols) */}
+          <div className="lg:col-span-4 space-y-6">
+            <Card className="border-outline-variant bg-surface sticky top-24">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
-                <CardTitle className="text-2xl text-on-surface">
+                <CardTitle className="text-xl text-on-surface">
                   Machine Information
                 </CardTitle>
                 <QrCodeDialog
@@ -183,160 +186,135 @@ export default async function MachineDetailPage({
                   reportUrl={reportUrl}
                 />
               </CardHeader>
-              <CardContent className="space-y-8">
+              <CardContent className="space-y-6">
                 <UpdateMachineForm
                   machine={machine}
                   allUsers={allUsers}
                   isAdmin={isAdmin}
                 />
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-4 border-t border-outline-variant/50">
-                  {/* Status */}
-                  <div>
-                    <p className="text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wide">
-                      Status
-                    </p>
-                    <Badge
-                      className={cn(
-                        getMachineStatusStyles(machineStatus),
-                        "border px-3 py-1 text-sm font-semibold"
-                      )}
-                    >
-                      {getMachineStatusLabel(machineStatus)}
-                    </Badge>
-                  </div>
 
-                  {/* Open Issues Count */}
-                  <div data-testid="detail-open-issues">
-                    <p className="text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wide">
-                      Open Issues
-                    </p>
-                    <p
-                      className="text-2xl font-semibold text-on-surface"
-                      data-testid="detail-open-issues-count"
-                    >
-                      {openIssues.length}
-                    </p>
-                  </div>
-
-                  {/* Created Date */}
-                  <div>
-                    <p className="text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wide">
-                      Added Date
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="size-4 text-on-surface-variant" />
-                      <p className="text-sm font-medium text-on-surface">
-                        {new Date(machine.createdAt).toLocaleDateString(
-                          undefined,
-                          {
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                          }
+                <div className="pt-6 border-t border-outline-variant/50 space-y-4">
+                  {/* Status & Issues Count Row */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-[10px] font-bold text-on-surface-variant mb-1 uppercase tracking-wider">
+                        Status
+                      </p>
+                      <Badge
+                        className={cn(
+                          getMachineStatusStyles(machineStatus),
+                          "border px-2 py-0.5 text-[10px] font-bold"
                         )}
+                      >
+                        {getMachineStatusLabel(machineStatus)}
+                      </Badge>
+                    </div>
+
+                    <div data-testid="detail-open-issues">
+                      <p className="text-[10px] font-bold text-on-surface-variant mb-1 uppercase tracking-wider">
+                        Open Issues
+                      </p>
+                      <p
+                        className="text-xl font-bold text-on-surface"
+                        data-testid="detail-open-issues-count"
+                      >
+                        {openIssues.length}
                       </p>
                     </div>
                   </div>
 
-                  {/* Total Issues */}
-                  <div>
-                    <p className="text-xs font-medium text-on-surface-variant mb-1.5 uppercase tracking-wide">
-                      Total Issues
-                    </p>
-                    <p className="text-2xl font-semibold text-on-surface">
-                      {machine.issues.length}
-                    </p>
+                  {/* Date & Total Row */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-[10px] font-bold text-on-surface-variant mb-1 uppercase tracking-wider">
+                        Added Date
+                      </p>
+                      <div className="flex items-center gap-1.5 text-on-surface-variant">
+                        <Calendar className="size-3" />
+                        <p className="text-xs font-medium">
+                          {new Date(machine.createdAt).toLocaleDateString(
+                            undefined,
+                            {
+                              month: "short",
+                              year: "numeric",
+                            }
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] font-bold text-on-surface-variant mb-1 uppercase tracking-wider">
+                        Total Issues
+                      </p>
+                      <p className="text-xl font-bold text-on-surface">
+                        {machine.issues.length}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Issues Section */}
-          <Card className="border-outline-variant">
-            <CardHeader>
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <CardTitle className="text-2xl text-on-surface">
+          {/* Main Content - Issues (8 cols) */}
+          <div className="lg:col-span-8">
+            <Card className="border-outline-variant bg-surface">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-2xl text-on-surface font-bold">
                   Issues
                 </CardTitle>
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  {machine.issues.length > 0 ? (
+                <div className="flex gap-2">
+                  {machine.issues.length > 5 && (
                     <Button
                       asChild
-                      variant="outline"
-                      className="border-outline-variant text-on-surface"
+                      variant="ghost"
+                      size="sm"
+                      className="text-primary hover:text-primary hover:bg-primary/5"
                     >
                       <Link href={`/m/${machine.initials}/i`}>
-                        View All Issues for {machine.name}
+                        View All ({machine.issues.length})
                       </Link>
                     </Button>
-                  ) : null}
+                  )}
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {openIssues.length === 0 ? (
-                // Empty state
-                <div className="py-12 text-center">
-                  <p className="text-lg text-on-surface-variant mb-2">
-                    No issues reported yet
-                  </p>
-                  <p className="text-sm text-on-surface-variant">
-                    Report an issue to get started
-                  </p>
-                </div>
-              ) : (
-                // Issues list
-                <div className="space-y-3">
-                  {openIssues.map((issue) => (
-                    <Link
-                      key={issue.id}
-                      href={`/m/${machine.initials}/i/${issue.issueNumber}`}
-                      className="block"
-                    >
-                      <div
-                        data-testid="issue-card"
-                        className="flex items-center justify-between p-4 rounded-lg border border-outline-variant bg-surface-variant hover:border-primary/50 transition-colors"
-                      >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-mono text-sm font-bold text-primary">
-                              {formatIssueId(
-                                machine.initials,
-                                issue.issueNumber
-                              )}
-                            </span>
-                            <h3 className="font-medium text-on-surface">
-                              {issue.title}
-                            </h3>
-                          </div>
-                          <div className="flex items-center gap-3 text-xs text-on-surface-variant">
-                            <span>
-                              {new Date(issue.createdAt).toLocaleDateString()}
-                            </span>
-                            <Badge variant="outline" className="text-xs">
-                              {issue.severity}
-                            </Badge>
-                            <Badge
-                              className={cn(
-                                getIssuePriorityStyles(issue.priority),
-                                "border px-2 py-0.5 text-xs font-semibold"
-                              )}
-                            >
-                              {getIssuePriorityLabel(issue.priority)}
-                            </Badge>
-                            <Badge variant="outline" className="text-xs">
-                              {issue.status}
-                            </Badge>
-                          </div>
-                        </div>
+              </CardHeader>
+              <CardContent>
+                {openIssues.length === 0 ? (
+                  <div className="py-16 text-center">
+                    <div className="inline-flex size-12 items-center justify-center rounded-full bg-surface-variant mb-4">
+                      <Plus className="size-6 text-on-surface-variant" />
+                    </div>
+                    <p className="text-lg font-medium text-on-surface mb-1">
+                      No open issues
+                    </p>
+                    <p className="text-sm text-on-surface-variant">
+                      The game is operational. Great job!
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {openIssues.slice(0, 50).map((issue) => (
+                      <IssueCard
+                        key={issue.id}
+                        issue={issue as unknown as Issue}
+                        machine={{ name: machine.name }}
+                      />
+                    ))}
+
+                    {openIssues.length > 5 && (
+                      <div className="pt-2 text-center">
+                        <p className="text-xs text-on-surface-variant italic">
+                          Showing top 5 issues. Use "View All" to see the full
+                          list.
+                        </p>
                       </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </main>
