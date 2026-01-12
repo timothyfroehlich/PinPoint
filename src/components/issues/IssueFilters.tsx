@@ -43,6 +43,8 @@ export function IssueFilters({
     } else {
       params.delete(key);
     }
+    // Reset to page 1 when filters change
+    params.delete("page");
     router.push(`?${params.toString()}`);
   };
 

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Issues List**: Pagination support with 25 issues per page. Features include Previous/Next navigation, page number links, URL state persistence (e.g., `/issues?page=2`), and a total issue count display (e.g., "Showing 1-25 of 197 issues"). Filters (status, severity, priority, machine) are preserved when navigating between pages.
+
 ### Changed
 
 - **UI/Components**: Redesigned issue status and priority dropdowns with rich shadcn/ui Select components, replacing native HTML elements. Includes grouped status options, tooltips, and improved visual hierarchy with Material Design 3 colors.
