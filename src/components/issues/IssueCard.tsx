@@ -5,7 +5,7 @@ import Link from "next/link";
 import { cn } from "~/lib/utils";
 import { Card, CardHeader, CardTitle } from "~/components/ui/card";
 import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
-import { formatIssueId } from "~/lib/issues/utils";
+import { formatIssueId, resolveIssueReporter } from "~/lib/issues/utils";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
 import type { Issue } from "~/lib/types";
 
@@ -21,12 +21,16 @@ interface IssueCardProps {
     | "machineInitials"
     | "issueNumber"
     | "createdAt"
-  >;
+    | "reporterName"
+    | "reporterEmail"
+  > & {
+    reportedByUser?: { name: string; email?: string | null } | null;
+    invitedReporter?: { name: string; email?: string | null } | null;
+  };
   machine: { name: string };
   variant?: "normal" | "compact";
   className?: string;
   showReporter?: boolean;
-  reporterName?: string;
   dataTestId?: string;
 }
 
@@ -36,7 +40,6 @@ export function IssueCard({
   variant = "normal",
   className,
   showReporter = false,
-  reporterName,
   dataTestId,
 }: IssueCardProps): React.JSX.Element {
   const isClosed = (CLOSED_STATUSES as readonly string[]).includes(
@@ -44,6 +47,7 @@ export function IssueCard({
   );
 
   const initials = issue.machineInitials;
+  const reporter = resolveIssueReporter(issue);
 
   return (
     <Link
@@ -83,7 +87,7 @@ export function IssueCard({
                 </span>
                 {showReporter && (
                   <span>
-                    Reported by {reporterName ?? "Anonymous"} •{" "}
+                    Reported by {reporter.name} •{" "}
                     {new Date(issue.createdAt).toLocaleDateString()}
                   </span>
                 )}

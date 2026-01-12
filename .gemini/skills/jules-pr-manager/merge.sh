@@ -17,4 +17,4 @@ echo "Posting approval review for #$PR_ID..."
 gh pr review "$PR_ID" --approve --body "$MSG"
 
 echo "Merging #$PR_ID..."
-gh pr merge "$PR_ID" --squash --delete-branch
+gh pr merge "$PR_ID" --squash --delete-branch --auto

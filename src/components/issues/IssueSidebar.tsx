@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { SidebarActions } from "~/components/issues/SidebarActions";
 import { WatchButton } from "~/components/issues/WatchButton";
 import { type IssueWithAllRelations } from "~/lib/types";
+import { resolveIssueReporter } from "~/lib/issues/utils";
 
 interface SidebarUser {
   id: string;
@@ -23,6 +24,8 @@ export function IssueSidebar({
   currentUserId,
 }: IssueSidebarProps): React.JSX.Element {
   const isWatching = issue.watchers.some((w) => w.userId === currentUserId);
+  const reporter = resolveIssueReporter(issue);
+
   return (
     <div className="w-full shrink-0 lg:w-80">
       <div className="sticky top-4 space-y-4">
@@ -48,29 +51,15 @@ export function IssueSidebar({
                 <span className="text-sm text-muted-foreground">Reporter</span>
                 <div className="flex min-w-0 items-center gap-2">
                   <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-medium text-muted-foreground">
-                    {(
-                      issue.reportedByUser?.name ??
-                      issue.invitedReporter?.name ??
-                      issue.reporterName ??
-                      "A"
-                    )
-                      .slice(0, 1)
-                      .toUpperCase()}
+                    {reporter.initial}
                   </div>
                   <div className="flex flex-col min-w-0 overflow-hidden">
                     <span className="truncate text-sm font-medium text-foreground">
-                      {issue.reportedByUser?.name ??
-                        issue.invitedReporter?.name ??
-                        issue.reporterName ??
-                        "Anonymous"}
+                      {reporter.name}
                     </span>
-                    {(issue.reportedByUser?.email ??
-                      issue.invitedReporter?.email ??
-                      issue.reporterEmail) && (
+                    {reporter.email && (
                       <span className="truncate text-xs text-muted-foreground">
-                        {issue.reportedByUser?.email ??
-                          issue.invitedReporter?.email ??
-                          issue.reporterEmail}
+                        {reporter.email}
                       </span>
                     )}
                   </div>
