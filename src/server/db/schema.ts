@@ -177,7 +177,8 @@ export const issues = pgTable(
       "reporter_check",
       sql`(${t.reportedBy} IS NULL AND ${t.invitedReportedBy} IS NULL) OR
           (${t.reportedBy} IS NOT NULL AND ${t.invitedReportedBy} IS NULL AND ${t.reporterName} IS NULL AND ${t.reporterEmail} IS NULL) OR
-          (${t.reportedBy} IS NULL AND ${t.invitedReportedBy} IS NOT NULL AND ${t.reporterName} IS NULL AND ${t.reporterEmail} IS NULL)`
+          (${t.reportedBy} IS NULL AND ${t.invitedReportedBy} IS NOT NULL AND ${t.reporterName} IS NULL AND ${t.reporterEmail} IS NULL) OR
+          (${t.reportedBy} IS NULL AND ${t.invitedReportedBy} IS NULL AND (${t.reporterName} IS NOT NULL OR ${t.reporterEmail} IS NOT NULL))`
     ),
     assignedToIdx: index("idx_issues_assigned_to").on(t.assignedTo),
     reportedByIdx: index("idx_issues_reported_by").on(t.reportedBy),

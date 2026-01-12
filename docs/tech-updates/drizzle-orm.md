@@ -61,7 +61,7 @@ _Migration-focused updates for Prisma → Drizzle direct conversion_
 **Validator Integrations (Zod/Valibot/etc.)**
 
 - **DO:** Validate input at the API boundary and map validated objects to Drizzle `insert` / `update` shapes.
-- **DO:** Reuse shared schemas for both router validation and DB operations where possible (e.g., pick/omit DB-only fields.
+- **DO:** Reuse shared schemas for both router validation and DB operations where possible (e.g., pick/omit DB-only fields).
 - **DON'T:** Duplicate validation logic inside migrations; keep migrations focused on schema changes.
 - **Migration Benefit:** Clear separation between runtime validation and schema evolution simplifies direct Prisma → Drizzle conversion.
 

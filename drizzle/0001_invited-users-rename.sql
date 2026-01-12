@@ -11,6 +11,7 @@ ALTER TABLE "issues" ADD COLUMN "reporter_name" text;--> statement-breakpoint
 ALTER TABLE "issues" ADD COLUMN "reporter_email" text;--> statement-breakpoint
 ALTER TABLE "issues" ADD CONSTRAINT "reporter_check" CHECK (("issues"."reported_by" IS NULL AND "issues"."invited_reported_by" IS NULL) OR
           ("issues"."reported_by" IS NOT NULL AND "issues"."invited_reported_by" IS NULL AND "issues"."reporter_name" IS NULL AND "issues"."reporter_email" IS NULL) OR
-          ("issues"."reported_by" IS NULL AND "issues"."invited_reported_by" IS NOT NULL AND "issues"."reporter_name" IS NULL AND "issues"."reporter_email" IS NULL));--> statement-breakpoint
+          ("issues"."reported_by" IS NULL AND "issues"."invited_reported_by" IS NOT NULL AND "issues"."reporter_name" IS NULL AND "issues"."reporter_email" IS NULL) OR
+          ("issues"."reported_by" IS NULL AND "issues"."invited_reported_by" IS NULL AND ("issues"."reporter_name" IS NOT NULL OR "issues"."reporter_email" IS NOT NULL)));--> statement-breakpoint
 ALTER TABLE "machines" DROP CONSTRAINT "owner_check";--> statement-breakpoint
 ALTER TABLE "machines" ADD CONSTRAINT "owner_check" CHECK ( (owner_id IS NULL OR invited_owner_id IS NULL) );

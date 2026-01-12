@@ -52,7 +52,8 @@ CREATE TABLE "issues" (
 	CONSTRAINT "unique_issue_number" UNIQUE("machine_initials","issue_number"),
 	CONSTRAINT "reporter_check" CHECK (("issues"."reported_by" IS NULL AND "issues"."invited_reported_by" IS NULL) OR
           ("issues"."reported_by" IS NOT NULL AND "issues"."invited_reported_by" IS NULL AND "issues"."reporter_name" IS NULL AND "issues"."reporter_email" IS NULL) OR
-          ("issues"."reported_by" IS NULL AND "issues"."invited_reported_by" IS NOT NULL AND "issues"."reporter_name" IS NULL AND "issues"."reporter_email" IS NULL))
+          ("issues"."reported_by" IS NULL AND "issues"."invited_reported_by" IS NOT NULL AND "issues"."reporter_name" IS NULL AND "issues"."reporter_email" IS NULL) OR
+          ("issues"."reported_by" IS NULL AND "issues"."invited_reported_by" IS NULL AND ("issues"."reporter_name" IS NOT NULL OR "issues"."reporter_email" IS NOT NULL)))
 );
 
 CREATE TABLE "machines" (

@@ -250,7 +250,11 @@ async function seedUsersAndData() {
       const reporterDesc =
         issue.reporterName ??
         issue.reporterEmail ??
-        (issue.reportedBy ? "Member" : "Guest");
+        (issue.reportedBy
+          ? "Member"
+          : issue.invitedUserId
+            ? "Invited User"
+            : "Guest");
 
       await sql`
         INSERT INTO issue_comments (issue_id, author_id, content, is_system, created_at, updated_at)
