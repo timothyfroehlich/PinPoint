@@ -19,6 +19,7 @@ describe("Issue Validation Schemas", () => {
         machineInitials: validInitials,
         severity: "minor",
         priority: "low",
+        consistency: "intermittent",
       });
       expect(result.success).toBe(true);
     });
@@ -27,8 +28,9 @@ describe("Issue Validation Schemas", () => {
       const result = createIssueSchema.safeParse({
         title: "Test Issue",
         machineInitials: validInitials,
-        severity: "playable",
+        severity: "cosmetic",
         priority: "medium",
+        consistency: "constant",
       });
       expect(result.success).toBe(true);
     });

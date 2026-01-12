@@ -12,7 +12,7 @@
       "WebFetch(domain:prettier.io)",
       "WebFetch(domain:docs.npmjs.com)",
       "Bash(pnpm test:*)",
-      "Bash(npx jest:*)",
+      "Bash(pnpm test:*)",
       "Bash(pnpm run typecheck:*)",
       "Bash(pnpm run typecheck:brief:*)",
       "Bash(pnpm run build:*)",
@@ -22,16 +22,16 @@
       "Bash(pnpm run lint:*)",
       "Bash(pnpm run check:brief:*)",
       "Bash(pnpm run smoke:*)",
-      "Bash(npx eslint:*)",
-      "Bash(npx prettier:*)",
-      "Bash(npx next:*)",
+      "Bash(pnpm exec eslint:*)",
+      "Bash(pnpm exec prettier:*)",
+      "Bash(pnpm exec next:*)",
       "Bash(pnpm dlx shadcn:*)",
       "WebFetch(domain:ui.shadcn.com)",
       "Bash(pnpm exec playwright test:*)",
       "Bash(pnpm exec playwright show-trace:*)",
       "Bash(PLAYWRIGHT_PORT=3001 pnpm run smoke)",
       "Bash(./scripts/safe-curl.sh:*)",
-      "Bash(npx tsc:*)",
+      "Bash(pnpm exec tsc:*)",
       "Bash(ls:*)",
       "Bash(grep:*)",
       "Bash(gitleaks detect:*)",
@@ -110,6 +110,7 @@
     "code-review@claude-plugins-official": true,
     "commit-commands@claude-plugins-official": true,
     "supabase@claude-plugins-official": true,
-    "vercel@claude-plugins-official": true
+    "vercel@claude-plugins-official": true,
+    "code-simplifier@claude-plugins-official": true
   }
 }

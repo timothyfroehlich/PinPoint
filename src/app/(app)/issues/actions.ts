@@ -19,6 +19,7 @@ import {
   updateIssueStatusSchema,
   updateIssueSeveritySchema,
   updateIssuePrioritySchema,
+  updateIssueConsistencySchema,
   assignIssueSchema,
   addCommentSchema,
 } from "./schemas";
@@ -30,6 +31,7 @@ import {
   assignIssue,
   updateIssueSeverity,
   updateIssuePriority,
+  updateIssueConsistency,
 } from "~/services/issues";
 import { canUpdateIssue } from "~/lib/permissions";
 import { userProfiles } from "~/server/db/schema";
@@ -66,6 +68,11 @@ export type UpdateIssueSeverityResult = Result<
 >;
 
 export type UpdateIssuePriorityResult = Result<
+  { issueId: string },
+  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+>;
+
+export type UpdateIssueConsistencyResult = Result<
   { issueId: string },
   "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
 >;
@@ -111,6 +118,7 @@ export async function createIssueAction(
     machineInitials: toOptionalString(formData.get("machineInitials")),
     severity: toOptionalString(formData.get("severity")),
     priority: toOptionalString(formData.get("priority")),
+    consistency: toOptionalString(formData.get("consistency")),
   };
 
   const validation = createIssueSchema.safeParse(rawData);
@@ -127,8 +135,14 @@ export async function createIssueAction(
     return err("VALIDATION", firstError?.message ?? "Invalid input");
   }
 
-  const { title, description, machineInitials, severity, priority } =
-    validation.data;
+  const {
+    title,
+    description,
+    machineInitials,
+    severity,
+    priority,
+    consistency,
+  } = validation.data;
 
   // Create issue via service
   try {
@@ -138,6 +152,7 @@ export async function createIssueAction(
       machineInitials,
       severity,
       priority,
+      consistency,
       reportedBy: user.id,
     });
 
@@ -148,7 +163,7 @@ export async function createIssueAction(
 
     // Redirect to new issue page
     redirect(`/m/${machineInitials}/i/${issue.issueNumber}`);
-  } catch (error) {
+  } catch (error: unknown) {
     if (isNextRedirectError(error)) {
       throw error;
     }
@@ -366,6 +381,93 @@ export async function updateIssueSeverityAction(
       "Update issue severity error"
     );
     return err("SERVER", "Failed to update severity");
+  }
+}
+
+/**
+ * Update Issue Consistency Action
+ */
+export async function updateIssueConsistencyAction(
+  _prevState: UpdateIssueConsistencyResult | undefined,
+  formData: FormData
+): Promise<UpdateIssueConsistencyResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return err("UNAUTHORIZED", "Unauthorized");
+
+  const rawData = {
+    issueId: toOptionalString(formData.get("issueId")),
+    consistency: toOptionalString(formData.get("consistency")),
+  };
+
+  const validation = updateIssueConsistencySchema.safeParse(rawData);
+  if (!validation.success) {
+    return err(
+      "VALIDATION",
+      validation.error.issues[0]?.message ?? "Invalid input"
+    );
+  }
+
+  const { issueId, consistency } = validation.data;
+
+  try {
+    const currentIssue = await db.query.issues.findFirst({
+      where: eq(issues.id, issueId),
+      columns: {
+        machineInitials: true,
+        issueNumber: true,
+        reportedBy: true,
+        assignedTo: true,
+      },
+      with: {
+        machine: {
+          columns: { ownerId: true },
+        },
+      },
+    });
+
+    if (!currentIssue) return err("NOT_FOUND", "Issue not found");
+
+    // Permission check
+    const userProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true },
+    });
+
+    if (
+      !canUpdateIssue(
+        { id: user.id, role: userProfile?.role ?? "guest" },
+        currentIssue,
+        currentIssue.machine
+      )
+    ) {
+      return err(
+        "UNAUTHORIZED",
+        "You do not have permission to update this issue"
+      );
+    }
+
+    // Update consistency
+    await updateIssueConsistency({
+      issueId,
+      consistency,
+    });
+
+    revalidatePath(
+      `/m/${currentIssue.machineInitials}/i/${currentIssue.issueNumber}`
+    );
+    return ok({ issueId });
+  } catch (error: unknown) {
+    log.error(
+      {
+        error: error instanceof Error ? error.message : "Unknown",
+        action: "updateIssueConsistency",
+      },
+      "Update issue consistency error"
+    );
+    return err("SERVER", "Failed to update consistency");
   }
 }
 

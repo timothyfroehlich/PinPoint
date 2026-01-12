@@ -8,8 +8,10 @@ import { db } from "~/server/db";
 
 // Mock Next.js modules
 vi.mock("next/navigation", () => ({
-  redirect: vi.fn(() => {
-    throw new Error("NEXT_REDIRECT");
+  redirect: vi.fn((url: string) => {
+    const error = new Error("NEXT_REDIRECT");
+    (error as any).digest = `NEXT_REDIRECT;replace;${url};`;
+    throw error;
   }),
 }));
 

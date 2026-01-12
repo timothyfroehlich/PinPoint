@@ -24,20 +24,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "22"
-          cache: "npm"
+          cache: "pnpm"
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Cache node_modules
         uses: actions/cache@v5
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
   typecheck:
     name: TypeScript Type Check
@@ -47,25 +52,30 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "22"
-          cache: "npm"
+          cache: "pnpm"
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@v5
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Run type checking
-        run: npm run typecheck
+        run: pnpm run typecheck
 
   lint:
     name: ESLint
@@ -75,25 +85,30 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "22"
-          cache: "npm"
+          cache: "pnpm"
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@v5
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Run linting
-        run: npm run lint
+        run: pnpm run lint
 
   format:
     name: Prettier Format Check
@@ -103,25 +118,30 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "22"
-          cache: "npm"
+          cache: "pnpm"
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@v5
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Check formatting
-        run: npm run format
+        run: pnpm run format
 
   build:
     name: Build
@@ -131,22 +151,27 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "22"
-          cache: "npm"
+          cache: "pnpm"
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@v5
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build application
         run: |
@@ -154,7 +179,7 @@ jobs:
           set -a
           source .env.ci
           set +a
-          npm run build
+          pnpm run build
 
   test-unit:
     name: Unit Tests
@@ -164,29 +189,34 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "22"
-          cache: "npm"
+          cache: "pnpm"
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@v5
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Run unit tests
         run: |
           set -a
           source .env.ci
           set +a
-          npm test -- --reporter=verbose
+          pnpm test -- --reporter=verbose
 
   test-integration:
     name: Integration Tests
@@ -196,55 +226,129 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "22"
-          cache: "npm"
+          cache: "pnpm"
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@v5
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Run integration tests
         run: |
           set -a
           source .env.ci
           set +a
-          npm run test:integration -- --reporter=verbose
+          pnpm run test:integration -- --reporter=verbose
 
-  test-integration-supabase:
-    name: Supabase Integration Tests
+  # ==============================================================================
+  # Migration Verification
+  #
+  # Validates that Drizzle migrations can apply cleanly to a fresh database.
+  # Uses Supabase CLI since migrations reference auth.users (Supabase-specific).
+  # This catches broken migrations before they reach production.
+  # ==============================================================================
+  test-migrations:
+    name: Verify Migrations
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' }}
-    needs: [setup, typecheck, lint, format, test-unit, test-integration]
+    needs: setup
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "22"
-          cache: "npm"
+          cache: "pnpm"
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@v5
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: npm ci
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase (minimal services for migrations)
+        run: |
+          supabase start -x "studio,realtime,storage-api,edge-runtime,logflare,vector,imgproxy,supavisor,postgres-meta"
+
+      - name: Export Supabase environment
+        run: |
+          eval "$(supabase status -o env | sed 's/=/=\"/;s/$/\"/')"
+          echo "DATABASE_URL=${DB_URL}" >> $GITHUB_ENV
+          echo "DIRECT_URL=${DB_URL}" >> $GITHUB_ENV
+
+      - name: Apply migrations to fresh database
+        run: pnpm run db:migrate
+
+      - name: Verify schema matches exported SQL
+        run: |
+          pnpm run test:_generate-schema
+          git diff --exit-code src/test/setup/schema.sql || {
+            echo "❌ Schema mismatch! The exported test schema doesn't match the migration result."
+            echo "Run 'pnpm run test:_generate-schema' locally and commit the updated schema.sql"
+            exit 1
+          }
+
+  test-integration-supabase:
+    name: Supabase Integration Tests
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' }}
+    needs: [setup, typecheck, lint, format, test-unit, test-integration, test-migrations]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Restore node_modules
+        id: cache-restore
+        uses: actions/cache/restore@v5
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install dependencies (if cache miss)
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
@@ -266,27 +370,32 @@ jobs:
     name: E2E Smoke Tests (Chromium)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' }}
-    needs: [setup, typecheck, lint, format, test-unit, test-integration]
+    needs: [setup, typecheck, lint, format, test-unit, test-integration, test-migrations]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "22"
-          cache: "npm"
+          cache: "pnpm"
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@v5
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
@@ -298,13 +407,13 @@ jobs:
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('package-lock.json') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Make E2E script executable
         run: chmod +x ./scripts/supabase-init-for-tests.sh
@@ -313,7 +422,7 @@ jobs:
         run: ./scripts/supabase-init-for-tests.sh
 
       - name: Run Smoke Tests (Chromium)
-        run: npx playwright test e2e/smoke --project=chromium --reporter=dot
+        run: pnpm exec playwright test e2e/smoke --project=chromium --reporter=dot
 
       - name: Upload Playwright report
         if: failure()
@@ -332,27 +441,32 @@ jobs:
     name: E2E Full Tests (Chromium)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' }}
-    needs: [setup, typecheck, lint, format, test-unit, test-integration]
+    needs: [setup, typecheck, lint, format, test-unit, test-integration, test-migrations]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "22"
-          cache: "npm"
+          cache: "pnpm"
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@v5
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
@@ -364,13 +478,13 @@ jobs:
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('package-lock.json') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Make E2E script executable
         run: chmod +x ./scripts/supabase-init-for-tests.sh
@@ -379,7 +493,7 @@ jobs:
         run: ./scripts/supabase-init-for-tests.sh
 
       - name: Run Full Tests (Chromium)
-        run: npx playwright test --config=playwright.config.full.ts --project=chromium --reporter=dot
+        run: pnpm exec playwright test --config=playwright.config.full.ts --project=chromium --reporter=dot
 
       - name: Upload Playwright report
         if: failure()
@@ -398,27 +512,32 @@ jobs:
     name: E2E Full Tests (Mobile Chrome)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' }}
-    needs: [setup, typecheck, lint, format, test-unit, test-integration]
+    needs: [setup, typecheck, lint, format, test-unit, test-integration, test-migrations]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "22"
-          cache: "npm"
+          cache: "pnpm"
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@v5
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
@@ -430,13 +549,13 @@ jobs:
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('package-lock.json') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Make E2E script executable
         run: chmod +x ./scripts/supabase-init-for-tests.sh
@@ -445,7 +564,7 @@ jobs:
         run: ./scripts/supabase-init-for-tests.sh
 
       - name: Run Full Tests (Mobile Chrome)
-        run: npx playwright test --config=playwright.config.full.ts --project="Mobile Chrome" --reporter=dot
+        run: pnpm exec playwright test --config=playwright.config.full.ts --project="Mobile Chrome" --reporter=dot
 
       - name: Upload Playwright report
         if: failure()
@@ -464,27 +583,32 @@ jobs:
     name: E2E Full Tests (Mobile Safari)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' }}
-    needs: [setup, typecheck, lint, format, test-unit, test-integration]
+    needs: [setup, typecheck, lint, format, test-unit, test-integration, test-migrations]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "22"
-          cache: "npm"
+          cache: "pnpm"
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@v5
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
@@ -496,16 +620,16 @@ jobs:
         id: playwright-cache
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-webkit-${{ hashFiles('package-lock.json') }}
+          key: ${{ runner.os }}-playwright-webkit-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-webkit-
 
       - name: Install Playwright system dependencies
-        run: npx playwright install-deps webkit
+        run: pnpm exec playwright install-deps webkit
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install webkit
+        run: pnpm exec playwright install webkit
 
       - name: Make E2E script executable
         run: chmod +x ./scripts/supabase-init-for-tests.sh
@@ -514,7 +638,7 @@ jobs:
         run: ./scripts/supabase-init-for-tests.sh
 
       - name: Run Full Tests (Mobile Safari)
-        run: npx playwright test --config=playwright.config.full.ts --project="Mobile Safari" --reporter=dot
+        run: pnpm exec playwright test --config=playwright.config.full.ts --project="Mobile Safari" --reporter=dot
 
       - name: Upload Playwright report
         if: failure()
@@ -538,30 +662,35 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  npm-audit:
-    name: npm audit
+  pnpm-audit:
+    name: pnpm audit
     runs-on: ubuntu-latest
     needs: setup
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "22"
-          cache: "npm"
+          cache: "pnpm"
 
       - name: Restore node_modules
         id: cache-restore
         uses: actions/cache/restore@v5
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
-      - name: Run npm audit
-        run: npm audit --audit-level=high
+      - name: Run pnpm audit
+        run: pnpm audit --audit-level=high

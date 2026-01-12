@@ -22,7 +22,8 @@ vi.mock("react", async (importOriginal) => {
   const actual = await importOriginal<typeof React>();
   return {
     ...actual,
-    useActionState: (fn: unknown, initialState: unknown) => mockUseActionState(fn, initialState),
+    useActionState: (fn: unknown, initialState: unknown) =>
+      mockUseActionState(fn, initialState),
   };
 });
 
@@ -36,7 +37,9 @@ describe("AddCommentForm", () => {
   it("renders correctly", () => {
     render(<AddCommentForm issueId="123" />);
     // "Add Comment" text is present when not pending
-    expect(screen.getByRole("button", { name: "Add Comment" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Add Comment" })
+    ).toBeInTheDocument();
   });
 
   it("shows loading state when pending (using standard loading prop)", () => {
@@ -58,7 +61,7 @@ describe("AddCommentForm", () => {
     render(<AddCommentForm issueId="123" />);
 
     await waitFor(() => {
-       expect(toast.success).toHaveBeenCalledWith("Comment added");
+      expect(toast.success).toHaveBeenCalledWith("Comment added");
     });
   });
 });

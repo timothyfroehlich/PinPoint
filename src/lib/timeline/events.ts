@@ -21,7 +21,7 @@ import { issueComments } from "~/server/db/schema";
  * ```ts
  * await createTimelineEvent(issueId, "Status changed from new to in_progress");
  * await createTimelineEvent(issueId, "Assigned to John Doe");
- * await createTimelineEvent(issueId, "Marked as resolved");
+ * await createTimelineEvent(issueId, "Marked as closed");
  * ```
  */
 export async function createTimelineEvent(

@@ -72,6 +72,99 @@ describe("Machine CRUD Operations (PGlite)", () => {
 - Test database operations, not Server Components
 - Integration tests in `src/test/integration/`
 
+### Integration Tests with Module Mocking
+
+For testing service layer functions that import `~/server/db`, use module mocking to redirect to PGlite:
+
+```typescript
+// src/test/integration/supabase/issue-services.test.ts
+import { describe, it, expect, beforeEach, vi, beforeAll } from "vitest";
+import { getTestDb, setupTestDb } from "~/test/setup/pglite";
+import { updateIssueStatus } from "~/services/issues";
+
+// Mock the database module to use PGlite instance
+vi.mock("~/server/db", () => ({
+  db: {
+    insert: vi.fn((...args: any[]) =>
+      (globalThis as any).testDb.insert(...args)
+    ),
+    update: vi.fn((...args: any[]) =>
+      (globalThis as any).testDb.update(...args)
+    ),
+    query: {
+      issues: {
+        findFirst: vi.fn((...args: any[]) =>
+          (globalThis as any).testDb.query.issues.findFirst(...args)
+        ),
+      },
+    },
+    transaction: vi.fn((cb: any) => cb((globalThis as any).testDb)),
+  },
+}));
+
+describe("Issue Service Functions", () => {
+  setupTestDb();
+
+  let testIssue: any;
+
+  beforeAll(async () => {
+    (globalThis as any).testDb = await getTestDb();
+  });
+
+  beforeEach(async () => {
+    const db = await getTestDb();
+    // Set up test data
+    const [issue] = await db
+      .insert(issues)
+      .values({
+        /*...*/
+      })
+      .returning();
+    testIssue = issue;
+  });
+
+  it("should update status and create timeline event", async () => {
+    await updateIssueStatus({
+      issueId: testIssue.id,
+      status: "in_progress",
+      userId: "test-user",
+    });
+
+    const db = await getTestDb();
+    const updated = await db.query.issues.findFirst({
+      where: eq(issues.id, testIssue.id),
+    });
+
+    expect(updated?.status).toBe("in_progress");
+
+    // Verify timeline event was created
+    const events = await db.query.issueComments.findMany({
+      where: eq(issueComments.issueId, testIssue.id),
+    });
+    expect(events.some((e) => e.content.includes("Status changed"))).toBe(true);
+  });
+});
+```
+
+**Key points**:
+
+- Mock `~/server/db` module at file level with `vi.mock()`
+- Forward all calls to `(globalThis as any).testDb`
+- Set `globalThis.testDb` in `beforeAll`
+- Allows testing actual service functions (not mocked logic)
+- Verifies transactions and side effects (timeline events, notifications)
+- **Use `any` types in mock setup** (acceptable for test infrastructure)
+
+**When to use**:
+
+✅ Testing service layer functions that import `db` from `~/server/db`
+✅ Verifying transaction behavior
+✅ Testing timeline events and notifications
+✅ Integration tests that need full database interaction
+
+❌ Don't mock individual database methods (prefer this full module mock)
+❌ Don't use for unit tests (those should test pure functions)
+
 ## Unit Tests
 
 ```typescript

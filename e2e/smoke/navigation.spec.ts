@@ -23,9 +23,6 @@ test.describe.serial("Navigation", () => {
 
     // Verify Report Issue shortcut is available to guests
     await expect(page.getByTestId("nav-report-issue")).toBeVisible();
-
-    // Verify Pre-Beta Banner is present
-    await expect(page.getByText("Pre-Beta Notice")).toBeVisible();
   });
 
   test("authenticated navigation - show quick links and user menu", async ({

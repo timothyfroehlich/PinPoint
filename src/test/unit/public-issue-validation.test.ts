@@ -19,7 +19,8 @@ describe("parsePublicIssueForm", () => {
       machineId: "123e4567-e89b-12d3-a456-426614174000",
       title: "Flipper stuck",
       description: "Left flipper sometimes sticks halfway.",
-      severity: "playable",
+      severity: "minor",
+      consistency: "intermittent",
     });
 
     const result = parsePublicIssueForm(formData);
@@ -27,7 +28,8 @@ describe("parsePublicIssueForm", () => {
     expect(result).toHaveProperty("success", true);
     if (result.success) {
       expect(result.data.title).toBe("Flipper stuck");
-      expect(result.data.severity).toBe("playable");
+      expect(result.data.severity).toBe("minor");
+      expect(result.data.consistency).toBe("intermittent");
     }
   });
 

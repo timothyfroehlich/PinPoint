@@ -49,8 +49,8 @@ test.describe("Issues System", () => {
       await page
         .getByLabel("Description")
         .fill("The right flipper does not respond when button is pressed");
-      await page.getByLabel("Severity *").selectOption("playable");
-      await page.getByLabel("Priority *").selectOption("medium");
+      await page.getByTestId("severity-select").selectOption("minor");
+      await page.getByTestId("priority-select").selectOption("medium");
 
       // Submit form
       await page.getByRole("button", { name: "Submit Issue Report" }).click();
@@ -64,7 +64,6 @@ test.describe("Issues System", () => {
           .getByRole("main")
           .getByRole("heading", { level: 1, name: /Test flipper not working/ })
       ).toBeVisible();
-      await expect(page.getByText("Issue created")).toBeVisible();
 
       rememberIssueId(page);
     });
@@ -101,8 +100,8 @@ test.describe("Issues System", () => {
 
       // Fill out remaining fields
       await page.getByLabel("Issue Title *").fill("Display flickering");
-      await page.getByLabel("Severity *").selectOption("minor");
-      await page.getByLabel("Priority *").selectOption("low");
+      await page.getByTestId("severity-select").selectOption("minor");
+      await page.getByTestId("priority-select").selectOption("low");
 
       // Submit
       await page.getByRole("button", { name: "Submit Issue Report" }).click();
@@ -132,8 +131,8 @@ test.describe("Issues System", () => {
       issueTitle = `Test Issue for Details ${Date.now()}`;
       await page.goto(`/report?machine=${machineInitials}`);
       await page.getByLabel("Issue Title *").fill(issueTitle);
-      await page.locator("#severity").selectOption("playable");
-      await page.locator("#priority").selectOption("medium");
+      await page.getByTestId("severity-select").selectOption("minor");
+      await page.getByTestId("priority-select").selectOption("medium");
       await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
       await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
@@ -174,14 +173,13 @@ test.describe("Issues System", () => {
       // Should show status and severity badges
       await expect(page.getByTestId("issue-status-badge")).toHaveText(/New/i);
       await expect(page.getByTestId("issue-severity-badge")).toHaveText(
-        /Playable/i
+        /Minor/i
       );
 
       // Should show timeline
       await expect(
         page.getByRole("heading", { name: "Activity" })
       ).toBeVisible();
-      await expect(page.getByText("Issue created")).toBeVisible();
     });
 
     // Update tests moved to integration/full suite

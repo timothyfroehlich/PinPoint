@@ -5,50 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1765036190971,
-      "tag": "0000_init-schema",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1766428516608,
-      "tag": "0001_add_performance_indexes",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1766770560460,
-      "tag": "0002_add_more_performance_indexes",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1766950334432,
-      "tag": "0003_add_unconfirmed_users",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1767119720539,
-      "tag": "0004_whole_kate_bishop",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1767195135624,
-      "tag": "0005_add_email_to_profiles",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1767581078756,
-      "tag": "0006_add_performance_indexes",
+      "when": 1767922624191,
+      "tag": "0000_initv2",
       "breakpoints": true
     }
   ]

@@ -25,7 +25,7 @@ export function CreateMachineForm({
   allUsers,
   isAdmin,
 }: CreateMachineFormProps): React.JSX.Element {
-  const [state, formAction] = useActionState<
+  const [state, formAction, isPending] = useActionState<
     CreateMachineResult | undefined,
     FormData
   >(createMachineAction, undefined);
@@ -100,6 +100,7 @@ export function CreateMachineForm({
           <Button
             type="submit"
             className="flex-1 bg-primary text-on-primary hover:bg-primary/90"
+            loading={isPending}
           >
             Create Machine
           </Button>

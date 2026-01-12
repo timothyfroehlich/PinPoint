@@ -2,10 +2,10 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { execSync } from "child_process";
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
 
 if (!databaseUrl) {
-  console.error("❌ DATABASE_URL is not defined in .env.local");
+  console.error("❌ DATABASE_URL or DIRECT_URL is not defined");
   process.exit(1);
 }
 
@@ -20,13 +20,13 @@ async function fastReset() {
     // Truncate all tables except migrations/schema-related if any
     // We cascade to handle foreign keys
     await client`
-      TRUNCATE TABLE 
-        "issue_comments", 
-        "issue_watchers", 
-        "issues", 
-        "machines", 
-        "notifications", 
-        "notification_preferences", 
+      TRUNCATE TABLE
+        "issue_comments",
+        "issue_watchers",
+        "issues",
+        "machines",
+        "notifications",
+        "notification_preferences",
         "user_profiles",
         "auth"."users"
       CASCADE;
@@ -36,9 +36,9 @@ async function fastReset() {
     // Reseed
     console.log("🌱 Reseding data...");
     // We execute the seed command
-    // npm run db:_seed
-    execSync("npm run db:_seed", { stdio: "inherit" });
-    execSync("npm run db:_seed-users", { stdio: "inherit" });
+    // pnpm run db:_seed
+    execSync("pnpm run db:_seed", { stdio: "inherit" });
+    execSync("pnpm run db:_seed-users", { stdio: "inherit" });
     console.log("✅ Database reseeded.");
   } catch (error) {
     console.error("❌ Fast reset failed:", error);

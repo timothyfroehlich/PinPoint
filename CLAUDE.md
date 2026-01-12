@@ -72,7 +72,7 @@ Use Task tool to launch these agents when appropriate.
 
 ## Commit Best Practices
 
-- **Always run**: `npm run preflight` before committing
+- **Always run**: `pnpm run preflight` before committing
 - **Never skip**: Pre-commit hooks (unless explicitly instructed)
 - **Verify**: All tests pass, type check passes, lint clean
 

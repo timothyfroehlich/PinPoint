@@ -78,7 +78,7 @@ If you’re changing code, **start here**:
 ### Prerequisites
 
 - Node.js **22+**
-- npm
+- pnpm
 - Supabase account (for local dev / preview / prod)
 
 ### Local Setup (Short Version)
@@ -87,11 +87,11 @@ If you’re changing code, **start here**:
 git clone https://github.com/timothyfroehlich/PinPoint.git
 cd PinPoint
 
-npm install
+pnpm install
 cp .env.example .env.local   # then fill in Supabase + DB vars
 
 supabase start               # in one terminal
-npm run dev                  # in another
+pnpm run dev                  # in another
 ```
 
 Open `http://localhost:<PORT>` (see `.env.local`) to use the app.
@@ -102,15 +102,15 @@ Schema lives in `src/server/db/schema.ts` and is managed through **Drizzle migra
 
 ```bash
 # After editing schema.ts
-npm run db:generate -- --name <change-name>   # create migration
-npm run db:migrate                            # apply migrations locally
-npm run test:_generate-schema                 # refresh PGlite schema
+pnpm run db:generate -- --name <change-name>   # create migration
+pnpm run db:migrate                            # apply migrations locally
+pnpm run test:_generate-schema                 # refresh PGlite schema
 ```
 
 For a full local reset (destructive – wipes app data):
 
 ```bash
-npm run db:reset
+pnpm run db:reset
 ```
 
 This restarts Supabase, drops app tables, reapplies all migrations, regenerates the test schema, and seeds users/data.
@@ -118,12 +118,12 @@ This restarts Supabase, drops app tables, reapplies all migrations, regenerates 
 ### Everyday Commands
 
 ```bash
-npm run dev          # start dev server
-npm run check        # typecheck + lint + unit/integration tests
-npm run test         # unit + PGlite integration tests
-npm run test:integration   # Supabase-backed integration tests
-npm run smoke        # Playwright smoke E2E tests
-npm run preflight    # full local CI gate before pushing
+pnpm run dev          # start dev server
+pnpm run check        # typecheck + lint + unit/integration tests
+pnpm run test         # unit + PGlite integration tests
+pnpm run test:integration   # Supabase-backed integration tests
+pnpm run smoke        # Playwright smoke E2E tests
+pnpm run preflight    # full local CI gate before pushing
 # See docs/E2E_DOCKER.md for running Safari tests locally via Docker
 ```
 
@@ -140,7 +140,7 @@ PinPoint is designed to run on **Vercel + Supabase**:
 3. Configure environment variables in Vercel to match your `.env.local`.
 4. Point the app at your Supabase project (preview and production projects recommended).
 
-CI is configured via `.github/workflows/ci.yml` and mirrors the `npm run preflight` pipeline.
+CI is configured via `.github/workflows/ci.yml` and mirrors the `pnpm run preflight` pipeline.
 
 ---
 

@@ -50,7 +50,7 @@ describe("Dashboard Queries (PGlite)", () => {
         .values(testMachine)
         .returning();
 
-      // Create issues: 2 for user1 (1 open, 1 resolved), 1 for user2
+      // Create issues: 2 for user1 (1 open, 1 fixed), 1 for user2
       await db.insert(issues).values([
         createTestIssue(machine.initials, {
           title: "Issue 1 for User 1",
@@ -59,10 +59,10 @@ describe("Dashboard Queries (PGlite)", () => {
           status: "new",
         }),
         createTestIssue(machine.initials, {
-          title: "Issue 2 for User 1 (resolved)",
+          title: "Issue 2 for User 1 (fixed)",
           issueNumber: 2,
           assignedTo: testUser1.id,
-          status: "resolved",
+          status: "fixed",
         }),
         createTestIssue(machine.initials, {
           title: "Issue for User 2",
@@ -76,7 +76,7 @@ describe("Dashboard Queries (PGlite)", () => {
       const assignedIssues = await db.query.issues.findMany({
         where: and(
           eq(issues.assignedTo, testUser1.id),
-          ne(issues.status, "resolved")
+          ne(issues.status, "fixed")
         ),
         orderBy: desc(issues.createdAt),
         with: {
@@ -101,10 +101,7 @@ describe("Dashboard Queries (PGlite)", () => {
 
       // Query with no data
       const assignedIssues = await db.query.issues.findMany({
-        where: and(
-          eq(issues.assignedTo, userId),
-          ne(issues.status, "resolved")
-        ),
+        where: and(eq(issues.assignedTo, userId), ne(issues.status, "fixed")),
       });
 
       expect(assignedIssues).toHaveLength(0);
@@ -198,12 +195,12 @@ describe("Dashboard Queries (PGlite)", () => {
         })
       );
 
-      // Machine 3: unplayable issue (resolved - should NOT appear)
+      // Machine 3: unplayable issue (fixed - should NOT appear)
       await db.insert(issues).values(
         createTestIssue(machine3.initials, {
           issueNumber: 1,
           severity: "unplayable",
-          status: "resolved",
+          status: "fixed",
         })
       );
 
@@ -227,7 +224,7 @@ describe("Dashboard Queries (PGlite)", () => {
           );
           const unplayableIssuesCount = machine.issues.filter(
             (issue: { severity: string; status: string }) =>
-              issue.severity === "unplayable" && issue.status !== "resolved"
+              issue.severity === "unplayable" && issue.status !== "fixed"
           ).length;
 
           return {
@@ -257,7 +254,7 @@ describe("Dashboard Queries (PGlite)", () => {
         .values(testMachine)
         .returning();
 
-      // Create 3 open issues, 2 resolved
+      // Create 3 open issues, 2 fixed
       await db.insert(issues).values([
         createTestIssue(machine.initials, { issueNumber: 1, status: "new" }),
         createTestIssue(machine.initials, {
@@ -267,11 +264,11 @@ describe("Dashboard Queries (PGlite)", () => {
         createTestIssue(machine.initials, { issueNumber: 3, status: "new" }),
         createTestIssue(machine.initials, {
           issueNumber: 4,
-          status: "resolved",
+          status: "fixed",
         }),
         createTestIssue(machine.initials, {
           issueNumber: 5,
-          status: "resolved",
+          status: "fixed",
         }),
       ]);
 
@@ -279,7 +276,7 @@ describe("Dashboard Queries (PGlite)", () => {
       const totalOpenIssuesResult = await db
         .select({ count: sql<number>`count(*)::int` })
         .from(issues)
-        .where(ne(issues.status, "resolved"));
+        .where(ne(issues.status, "fixed"));
 
       const totalOpenIssues = totalOpenIssuesResult[0]?.count ?? 0;
 
@@ -316,11 +313,11 @@ describe("Dashboard Queries (PGlite)", () => {
         })
       );
 
-      // Machine 3: only resolved issues (operational)
+      // Machine 3: only fixed issues (operational)
       await db.insert(issues).values(
         createTestIssue(machine3.initials, {
           issueNumber: 1,
-          status: "resolved",
+          status: "fixed",
         })
       );
 
@@ -361,7 +358,7 @@ describe("Dashboard Queries (PGlite)", () => {
         .values(testMachine)
         .returning();
 
-      // Create 2 open assigned issues, 1 resolved assigned issue
+      // Create 2 open assigned issues, 1 fixed assigned issue
       await db.insert(issues).values([
         createTestIssue(machine.initials, {
           issueNumber: 1,
@@ -376,16 +373,13 @@ describe("Dashboard Queries (PGlite)", () => {
         createTestIssue(machine.initials, {
           issueNumber: 3,
           assignedTo: user.id,
-          status: "resolved",
+          status: "fixed",
         }),
       ]);
 
       // Query assigned issues count (dashboard pattern)
       const assignedIssues = await db.query.issues.findMany({
-        where: and(
-          eq(issues.assignedTo, user.id),
-          ne(issues.status, "resolved")
-        ),
+        where: and(eq(issues.assignedTo, user.id), ne(issues.status, "fixed")),
       });
 
       const myIssuesCount = assignedIssues.length;

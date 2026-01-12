@@ -10,11 +10,11 @@ export PATH="$HOME/.local/bin:$PATH"
 
 # Install Claude Code CLI
 echo "📦 Installing Claude Code CLI..."
-npm install -g @anthropic-ai/claude-code
+pnpm install -g @anthropic-ai/claude-code
 
 # Install project dependencies
 echo "📦 Installing project dependencies..."
-npm install
+pnpm install
 
 # Check if .env.local exists, if not create from example
 if [ ! -f .env.local ]; then
@@ -45,5 +45,5 @@ echo ""
 echo "📝 Next steps:"
 echo "   1. Authenticate Claude Code: claude auth login"
 echo "   2. Update .env.local with your Supabase credentials"
-echo "   3. Run 'npm run dev' to start the development server"
+echo "   3. Run 'pnpm run dev' to start the development server"
 echo ""

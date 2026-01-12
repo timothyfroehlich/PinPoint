@@ -150,7 +150,7 @@ export const issuesRelations = relations(issues, ({ one, many }) => ({
 
 ### Step 5: Generate migration
 
-Run: `npm run db:generate -- --name add_unconfirmed_users`
+Run: `pnpm run db:generate -- --name add_unconfirmed_users`
 Expected: Migration file created in `drizzle/migrations/`
 
 ### Step 6: Add auto-linking trigger to migration
@@ -215,12 +215,12 @@ Check if `tablesFilter` exists and add `"unconfirmed_users"` to array.
 
 ### Step 8: Run migration
 
-Run: `npm run db:migrate`
+Run: `pnpm run db:migrate`
 Expected: Migration applied successfully
 
 ### Step 9: Regenerate test schema
 
-Run: `npm run test:_generate-schema`
+Run: `pnpm run test:_generate-schema`
 Expected: `src/test/setup/schema.sql` updated with new tables
 
 ### Step 10: Commit schema changes
@@ -285,7 +285,7 @@ describe("UnifiedUser type", () => {
 
 ### Step 2: Run test to verify it fails
 
-Run: `npm test -- src/lib/types/user.test.ts`
+Run: `pnpm test -- src/lib/types/user.test.ts`
 Expected: FAIL - Module not found
 
 ### Step 3: Create user types
@@ -324,7 +324,7 @@ export type { UnifiedUser, UserRole, UserStatus, MachineOwner } from "./user";
 
 ### Step 5: Run test to verify it passes
 
-Run: `npm test -- src/lib/types/user.test.ts`
+Run: `pnpm test -- src/lib/types/user.test.ts`
 Expected: PASS
 
 ### Step 6: Commit type definitions
@@ -458,7 +458,7 @@ describe("getUnifiedUsers", () => {
 
 ### Step 2: Run test to verify it fails
 
-Run: `npm test -- src/lib/users/queries.test.ts`
+Run: `pnpm test -- src/lib/users/queries.test.ts`
 Expected: FAIL - Module not found
 
 ### Step 3: Implement getUnifiedUsers
@@ -509,7 +509,7 @@ export async function getUnifiedUsers(): Promise<UnifiedUser[]> {
 
 ### Step 4: Run test to verify it passes
 
-Run: `npm test -- src/lib/users/queries.test.ts`
+Run: `pnpm test -- src/lib/users/queries.test.ts`
 Expected: PASS
 
 ### Step 5: Commit query helper
@@ -643,7 +643,7 @@ describe("getMachineOwner", () => {
 
 ### Step 2: Run test to verify it fails
 
-Run: `npm test -- src/lib/machines/queries.test.ts`
+Run: `pnpm test -- src/lib/machines/queries.test.ts`
 Expected: FAIL - Function not found
 
 ### Step 3: Implement getMachineOwner
@@ -703,7 +703,7 @@ export async function getMachineOwner(
 
 ### Step 4: Run test to verify it passes
 
-Run: `npm test -- src/lib/machines/queries.test.ts`
+Run: `pnpm test -- src/lib/machines/queries.test.ts`
 Expected: PASS
 
 ### Step 5: Commit machine owner query
@@ -772,7 +772,7 @@ describe("Invite email templates", () => {
 
 ### Step 2: Run test to verify it fails
 
-Run: `npm test -- src/lib/email/invite.test.ts`
+Run: `pnpm test -- src/lib/email/invite.test.ts`
 Expected: FAIL - Module not found
 
 ### Step 3: Create HTML template
@@ -917,7 +917,7 @@ export function renderInviteEmailText(params: InviteEmailParams): string {
 
 ### Step 6: Run test to verify it passes
 
-Run: `npm test -- src/lib/email/invite.test.ts`
+Run: `pnpm test -- src/lib/email/invite.test.ts`
 Expected: PASS
 
 ### Step 7: Commit email templates
@@ -1016,7 +1016,7 @@ describe("inviteUserAction", () => {
 
 ### Step 2: Run test to verify it fails
 
-Run: `npm test -- src/app/(app)/admin/users/actions.test.ts`
+Run: `pnpm test -- src/app/(app)/admin/users/actions.test.ts`
 Expected: FAIL - Module not found
 
 ### Step 3: Implement inviteUserAction
@@ -1153,7 +1153,7 @@ export async function inviteUserAction(
 
 ### Step 4: Run test to verify it passes
 
-Run: `npm test -- src/app/(app)/admin/users/actions.test.ts`
+Run: `pnpm test -- src/app/(app)/admin/users/actions.test.ts`
 Expected: PASS
 
 ### Step 5: Commit server action
@@ -1349,7 +1349,7 @@ describe("Unconfirmed user auto-linking", () => {
 
 ### Step 2: Run test to verify it passes (trigger exists)
 
-Run: `npm run test:integration -- src/test/integration/supabase/unconfirmed-users.test.ts`
+Run: `pnpm run test:integration -- src/test/integration/supabase/unconfirmed-users.test.ts`
 Expected: PASS (trigger should work)
 
 ### Step 3: Commit integration tests
@@ -1418,7 +1418,7 @@ test("public form works without email", async ({ page }) => {
 
 ### Step 2: Run E2E test to verify it fails
 
-Run: `npm run smoke -- e2e/smoke/public-reporting.spec.ts`
+Run: `pnpm run smoke -- e2e/smoke/public-reporting.spec.ts`
 Expected: FAIL - Email field not found
 
 ### Step 3: Add email field to report form
@@ -1539,7 +1539,7 @@ export async function createIssue(input: CreateIssueInput): Promise<Issue> {
 
 ### Step 7: Run E2E test to verify it passes
 
-Run: `npm run smoke -- e2e/smoke/public-reporting.spec.ts`
+Run: `pnpm run smoke -- e2e/smoke/public-reporting.spec.ts`
 Expected: PASS
 
 ### Step 8: Commit public report updates
@@ -1567,27 +1567,27 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
 
 ### Step 1: Run unit tests
 
-Run: `npm test`
+Run: `pnpm test`
 Expected: All unit tests pass
 
 ### Step 2: Run integration tests
 
-Run: `npm run test:integration`
+Run: `pnpm run test:integration`
 Expected: All integration tests pass
 
 ### Step 3: Run type check
 
-Run: `npm run typecheck`
+Run: `pnpm run typecheck`
 Expected: No TypeScript errors
 
 ### Step 4: Run build
 
-Run: `npm run build`
+Run: `pnpm run build`
 Expected: Build succeeds
 
 ### Step 5: Run smoke tests
 
-Run: `npm run smoke`
+Run: `pnpm run smoke`
 Expected: All E2E tests pass
 
 ### Step 6: Commit if any fixes needed

@@ -21,8 +21,8 @@ export default async function globalSetup(): Promise<void> {
   // All environment variables are already available in process.env
 
   try {
-    console.log("⚡ Attempting fast reset (npm run db:fast-reset)...");
-    execSync("npm run db:fast-reset", {
+    console.log("⚡ Attempting fast reset (pnpm run db:fast-reset)...");
+    execSync("pnpm run db:fast-reset", {
       stdio: "inherit",
       env: process.env,
     });
@@ -44,17 +44,16 @@ export default async function globalSetup(): Promise<void> {
     });
     console.log("✅ Database reset complete");
 
-    // Step 2: Push Drizzle schema - creates tables
-    // Note: This project doesn't use migration files, schema is managed by Drizzle
-    console.log("📋 Pushing Drizzle schema...");
-    execSync("npm run db:_push", {
+    // Step 2: Apply Drizzle migrations - creates tables via migration files
+    console.log("📋 Applying Drizzle migrations...");
+    execSync("pnpm run db:migrate", {
       stdio: "inherit",
       env: process.env,
     });
-    console.log("✅ Schema pushed");
+    console.log("✅ Migrations applied");
 
     console.log("🧪 Regenerating test schema...");
-    execSync("npm run test:_generate-schema", {
+    execSync("pnpm run test:_generate-schema", {
       stdio: "inherit",
       env: process.env,
     });
@@ -62,7 +61,7 @@ export default async function globalSetup(): Promise<void> {
 
     // Step 3: Seed test data (machines and issues)
     console.log("🌱 Seeding test data...");
-    execSync("npm run db:_seed", {
+    execSync("pnpm run db:_seed", {
       stdio: "inherit",
       env: process.env,
     });
@@ -71,7 +70,7 @@ export default async function globalSetup(): Promise<void> {
     // Step 4: Create test users via Supabase Auth API
     // Note: Users must be created this way (not via SQL) so passwords work with signInWithPassword()
     console.log("👤 Creating test users...");
-    execSync("npm run db:_seed-users", {
+    execSync("pnpm run db:_seed-users", {
       stdio: "inherit",
       env: process.env,
     });
