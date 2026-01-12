@@ -22,6 +22,7 @@ interface IssueCardProps {
     | "issueNumber"
     | "createdAt"
     | "reporterName"
+    | "reporterEmail"
   > & {
     reportedByUser?: { name: string; email?: string | null } | null;
     invitedReporter?: { name: string; email?: string | null } | null;
