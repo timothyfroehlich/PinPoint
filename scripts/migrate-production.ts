@@ -2,6 +2,22 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
+import { readFileSync } from "fs";
+import { join } from "path";
+
+interface MigrationEntry {
+  idx: number;
+  version: string;
+  when: number;
+  tag: string;
+  breakpoints: boolean;
+}
+
+interface MigrationJournal {
+  version: string;
+  dialect: string;
+  entries: MigrationEntry[];
+}
 
 // Vercel uses POSTGRES_URL or DATABASE_URL, Supabase uses DIRECT_URL
 const connectionString =
@@ -26,11 +42,77 @@ async function main() {
   console.log("🔄 Running production migrations...");
 
   try {
-    // Look for migrations in the 'drizzle' folder in the root
+    // Read migration journal to show what migrations exist
+    const journalPath = join(process.cwd(), "drizzle", "meta", "_journal.json");
+    const journal = JSON.parse(
+      readFileSync(journalPath, "utf-8")
+    ) as MigrationJournal;
+
+    console.log(`📋 Found ${journal.entries.length} migration(s) in journal:`);
+    journal.entries.forEach((entry) => {
+      console.log(`   ${entry.idx}: ${entry.tag}`);
+    });
+
+    // Check current migration state
+    const appliedMigrations = await sql`
+      SELECT hash, created_at
+      FROM drizzle.__drizzle_migrations
+      ORDER BY created_at ASC
+    `;
+
+    console.log(
+      `\n✓ ${appliedMigrations.length} migration(s) already applied:`
+    );
+    appliedMigrations.forEach((migration) => {
+      if ("hash" in migration && "created_at" in migration) {
+        console.log(
+          `   - ${migration["hash"]} (applied: ${migration["created_at"]})`
+        );
+      }
+    });
+
+    const pendingCount = journal.entries.length - appliedMigrations.length;
+    if (pendingCount > 0) {
+      console.log(`\n⏳ ${pendingCount} pending migration(s) to apply...`);
+    } else {
+      console.log("\n✅ All migrations already applied, nothing to do");
+    }
+
+    // Run migrations
     await migrate(db, { migrationsFolder: "./drizzle" });
-    console.log("✅ Migrations completed successfully");
+
+    if (pendingCount > 0) {
+      console.log("✅ Migrations completed successfully");
+    }
   } catch (error) {
-    console.error("❌ Migration failed:", error);
+    console.error("\n❌ Migration failed:");
+
+    if (error instanceof Error) {
+      console.error(`   Error: ${error.message}`);
+
+      // Check if this is a "relation does not exist" error
+      if (error.message.includes("does not exist")) {
+        console.error("\n💡 Recovery Instructions:");
+        console.error(
+          "   This error usually means a migration was manually applied"
+        );
+        console.error("   but not tracked in the migrations table.");
+        console.error("\n   To fix:");
+        console.error(
+          "   1. Identify which migration failed (check error above)"
+        );
+        console.error(
+          "   2. Run: DATABASE_URL=<url> tsx scripts/mark-migration-applied.ts <number>"
+        );
+        console.error("   3. Redeploy to retry migrations");
+        console.error(
+          "\n   Example: tsx scripts/mark-migration-applied.ts 0001"
+        );
+      }
+    } else {
+      console.error(error);
+    }
+
     process.exit(1);
   } finally {
     await sql.end();
