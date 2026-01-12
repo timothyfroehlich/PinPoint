@@ -1,5 +1,5 @@
 import { test, expect, type TestInfo, type Page } from "@playwright/test";
-import { loginAs } from "../support/actions";
+import { loginAs } from "../support/actions.js";
 
 test.describe("Reporter Variations E2E", () => {
   test.beforeEach(async ({ page }: { page: Page }, testInfo: TestInfo) => {
@@ -20,7 +20,9 @@ test.describe("Reporter Variations E2E", () => {
 
     // Check timeline initial report
     await expect(
-      page.locator("span.font-semibold", { hasText: "Member User" })
+      page
+        .getByTestId("timeline-author-name")
+        .filter({ hasText: "Member User" })
     ).toBeVisible();
   });
 
@@ -80,7 +82,7 @@ test.describe("Reporter Variations E2E", () => {
     await expect(sidebar).toContainText("Jane Doe");
     await expect(sidebar).toContainText("jane.doe@example.com");
     await expect(
-      page.locator("span.font-semibold", { hasText: "Jane Doe" })
+      page.getByTestId("timeline-author-name").filter({ hasText: "Jane Doe" })
     ).toBeVisible();
   });
 });

@@ -6,9 +6,9 @@
  */
 
 import { test, expect, type Page } from "@playwright/test";
-import { loginAs, selectOption } from "../support/actions";
-import { cleanupTestEntities, extractIdFromUrl } from "../support/cleanup";
-import { seededMachines } from "../support/constants";
+import { loginAs, selectOption } from "../support/actions.js";
+import { cleanupTestEntities, extractIdFromUrl } from "../support/cleanup.js";
+import { seededMachines } from "../support/constants.js";
 
 const createdIssueIds = new Set<string>();
 
@@ -51,6 +51,7 @@ test.describe("Issues System", () => {
         .fill("The right flipper does not respond when button is pressed");
       await selectOption(page, "severity-select", "minor");
       await selectOption(page, "priority-select", "medium");
+      await selectOption(page, "consistency-select", "intermittent");
 
       // Submit form
       await page.getByRole("button", { name: "Submit Issue Report" }).click();
@@ -102,6 +103,7 @@ test.describe("Issues System", () => {
       await page.getByLabel("Issue Title *").fill("Display flickering");
       await selectOption(page, "severity-select", "minor");
       await selectOption(page, "priority-select", "low");
+      await selectOption(page, "consistency-select", "intermittent");
 
       // Submit
       await page.getByRole("button", { name: "Submit Issue Report" }).click();
@@ -133,6 +135,7 @@ test.describe("Issues System", () => {
       await page.getByLabel("Issue Title *").fill(issueTitle);
       await selectOption(page, "severity-select", "minor");
       await selectOption(page, "priority-select", "medium");
+      await selectOption(page, "consistency-select", "intermittent");
       await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
       await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);

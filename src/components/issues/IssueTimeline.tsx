@@ -52,7 +52,10 @@ function TimelineItem({ event }: { event: TimelineEvent }): React.JSX.Element {
       <div className="flex-1">
         {isSystem ? (
           <div className="flex items-center gap-2 py-1 text-xs leading-snug text-muted-foreground">
-            <span className="font-medium text-foreground/80">
+            <span
+              className="font-medium text-foreground/80"
+              data-testid="timeline-system-author"
+            >
               {event.author.name}
             </span>
             <span>{event.content}</span>
@@ -75,7 +78,10 @@ function TimelineItem({ event }: { event: TimelineEvent }): React.JSX.Element {
               <div className="flex items-center gap-2">
                 <div className="flex flex-col">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-foreground">
+                    <span
+                      className="font-semibold text-foreground"
+                      data-testid="timeline-author-name"
+                    >
                       {event.author.name}
                     </span>
                     {event.author.email && (

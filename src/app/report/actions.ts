@@ -206,6 +206,7 @@ export async function submitPublicIssueAction(
     if (isRedirectError(error)) {
       throw error;
     }
+    log.error({ error }, "Failed to submit issue");
     return {
       error:
         error instanceof Error

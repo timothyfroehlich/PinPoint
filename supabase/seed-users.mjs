@@ -280,15 +280,15 @@ async function seedUsersAndData() {
       console.log("\n💬 Seeding comments...");
 
       // Clear existing comments for the main issue to avoid duplicates/mess
-      await sql`DELETE FROM issue_comments WHERE issue_id = '10000000-0000-4000-8000-000000000002'`;
+      // await sql`DELETE FROM issue_comments WHERE issue_id = '10000000-0000-4000-8000-000000000002'`;
 
       const comments = [
-        {
-          author: null,
-          content: "Issue reported by John Guest",
-          isSystem: true,
-          daysAgo: 10,
-        },
+        // {
+        //   author: null,
+        //   content: "Issue reported by John Guest",
+        //   isSystem: true,
+        //   daysAgo: 10,
+        // },
         {
           author: userIds.member,
           content: "Initial report logged from the front desk.",
