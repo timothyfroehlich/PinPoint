@@ -1,10 +1,11 @@
 import type React from "react";
 import { type Metadata } from "next";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import { issues } from "~/server/db/schema";
 import { IssueFilters } from "~/components/issues/IssueFilters";
 import { IssueRow } from "~/components/issues/IssueRow";
+import { IssuesPagination } from "~/components/issues/IssuesPagination";
 import { AlertTriangle } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -21,12 +22,15 @@ export const metadata: Metadata = {
   description: "View and filter all pinball machine issues.",
 };
 
+const PAGE_SIZE = 25;
+
 interface IssuesPageProps {
   searchParams: Promise<{
     status?: string;
     severity?: string;
     priority?: string;
     machine?: string;
+    page?: string;
   }>;
 }
 
@@ -49,7 +53,10 @@ export default async function IssuesPage({
   });
 
   const params = await searchParams;
-  const { status, severity, priority, machine } = params;
+  const { status, severity, priority, machine, page } = params;
+
+  // Parse page number (default to 1, ensure it's at least 1)
+  const currentPage = Math.max(1, parseInt(page ?? "1", 10) || 1);
 
   // Safe type casting for filters using imported constants from single source of truth
   // Based on _issue-status-redesign/README.md - Final design with 11 statuses
@@ -80,33 +87,46 @@ export default async function IssuesPage({
       ? (priority as IssuePriority)
       : undefined;
 
-  // 2. Fetch Issues based on filters (depends on params)
-  // Type assertion needed because Drizzle infers status as string, not IssueStatus
-  const issuesPromise = db.query.issues.findMany({
-    where: and(
-      inArray(issues.status, statusFilter),
-      severityFilter ? eq(issues.severity, severityFilter) : undefined,
-      priorityFilter ? eq(issues.priority, priorityFilter) : undefined,
-      machine ? eq(issues.machineInitials, machine) : undefined
-    ),
-    orderBy: desc(issues.createdAt),
-    with: {
-      machine: {
-        columns: { name: true },
-      },
-      reportedByUser: {
-        columns: { name: true },
-      },
-    },
-    limit: 100, // Reasonable limit for now
-  });
+  // Build the where condition for queries
+  const whereCondition = and(
+    inArray(issues.status, statusFilter),
+    severityFilter ? eq(issues.severity, severityFilter) : undefined,
+    priorityFilter ? eq(issues.priority, priorityFilter) : undefined,
+    machine ? eq(issues.machineInitials, machine) : undefined
+  );
 
-  // 3. Await all promises in parallel
-  // This reduces TTFB by fetching machines and issues concurrently
-  const [allMachines, issuesListRaw] = await Promise.all([
-    machinesPromise,
-    issuesPromise,
+  // Calculate offset for pagination
+  const offset = (currentPage - 1) * PAGE_SIZE;
+
+  // 2. Fetch total count and issues in parallel
+  // Type assertion needed because Drizzle infers status as string, not IssueStatus
+  const [totalCountResult, issuesListRaw] = await Promise.all([
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(issues)
+      .where(whereCondition),
+    db.query.issues.findMany({
+      where: whereCondition,
+      orderBy: desc(issues.createdAt),
+      with: {
+        machine: {
+          columns: { name: true },
+        },
+        reportedByUser: {
+          columns: { name: true },
+        },
+      },
+      limit: PAGE_SIZE,
+      offset: offset,
+    }),
   ]);
+
+  // 3. Await all promises in parallel (machines was started earlier)
+  // This reduces TTFB by fetching machines, count, and issues concurrently
+  const allMachines = await machinesPromise;
+
+  const totalCount = totalCountResult[0]?.count ?? 0;
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   const issuesList = issuesListRaw as (Pick<
     Issue,
@@ -144,11 +164,19 @@ export default async function IssuesPage({
         {/* Issues List */}
         <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
           {issuesList.length > 0 ? (
-            <div className="divide-y divide-border">
-              {issuesList.map((issue) => (
-                <IssueRow key={issue.id} issue={issue} />
-              ))}
-            </div>
+            <>
+              <div className="divide-y divide-border">
+                {issuesList.map((issue) => (
+                  <IssueRow key={issue.id} issue={issue} />
+                ))}
+              </div>
+              <IssuesPagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalCount={totalCount}
+                pageSize={PAGE_SIZE}
+              />
+            </>
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <div className="rounded-full bg-muted p-4 mb-4">
