@@ -10,6 +10,8 @@ import { PageShell } from "~/components/layout/PageShell";
 import { IssueTimeline } from "~/components/issues/IssueTimeline";
 import { IssueSidebar } from "~/components/issues/IssueSidebar";
 import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
+import { OwnerBadge } from "~/components/issues/OwnerBadge";
+import { getMachineOwnerName } from "~/lib/issues/owner";
 import { formatIssueId } from "~/lib/issues/utils";
 import type { Issue, IssueWithAllRelations } from "~/lib/types";
 
@@ -66,6 +68,20 @@ export default async function IssueDetailPage({
             id: true,
             name: true,
             initials: true,
+          },
+          with: {
+            owner: {
+              columns: {
+                id: true,
+                name: true,
+              },
+            },
+            invitedOwner: {
+              columns: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
         reportedByUser: {
@@ -139,12 +155,24 @@ export default async function IssueDetailPage({
 
       {/* Header */}
       <div className="space-y-3">
-        <Link
-          href={`/m/${initials}`}
-          className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          {issue.machine.name}
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={`/m/${initials}`}
+            className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {issue.machine.name}
+          </Link>
+          {getMachineOwnerName(issue as unknown as IssueWithAllRelations) && (
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <span>•</span>
+              <span>Owner:</span>
+              <span className="font-medium text-foreground">
+                {getMachineOwnerName(issue as unknown as IssueWithAllRelations)}
+              </span>
+              <OwnerBadge size="sm" />
+            </div>
+          )}
+        </div>
         <div className="space-y-3">
           <h1 className="flex items-center gap-3">
             <span className="text-muted-foreground font-mono text-2xl">

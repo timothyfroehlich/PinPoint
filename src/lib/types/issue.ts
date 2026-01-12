@@ -14,7 +14,13 @@ export type IssueListItem = Issue & {
 };
 
 export type IssueWithAllRelations = Issue & {
-  machine: Pick<Machine, "id" | "name">;
+  machine: Pick<Machine, "id" | "name"> & {
+    owner?: Pick<UserProfile, "id" | "name"> | null;
+    invitedOwner?: {
+      id: string;
+      name: string;
+    } | null;
+  };
   reportedByUser?: Pick<UserProfile, "id" | "name" | "email"> | null;
   invitedReporter?: {
     id: string;
