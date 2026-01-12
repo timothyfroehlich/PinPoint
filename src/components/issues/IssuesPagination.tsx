@@ -35,7 +35,8 @@ export function IssuesPagination({
     } else {
       params.set("page", page.toString());
     }
-    return `/issues?${params.toString()}`;
+    const queryString = params.toString();
+    return queryString ? `/issues?${queryString}` : "/issues";
   };
 
   // Calculate range of issues being displayed
@@ -64,7 +65,10 @@ export function IssuesPagination({
       const end = Math.min(totalPages - 1, currentPage + 1);
 
       for (let i = start; i <= end; i++) {
-        pages.push(i);
+        // Prevent duplicates with first/last page
+        if (i !== 1 && i !== totalPages) {
+          pages.push(i);
+        }
       }
 
       if (currentPage < totalPages - 2) {
@@ -112,7 +116,9 @@ export function IssuesPagination({
 
           {/* Page numbers */}
           {getPageNumbers().map((page, index) => (
-            <PaginationItem key={`page-${index}`}>
+            <PaginationItem
+              key={page === "ellipsis" ? `ellipsis-${index}` : `page-${page}`}
+            >
               {page === "ellipsis" ? (
                 <PaginationEllipsis />
               ) : (
