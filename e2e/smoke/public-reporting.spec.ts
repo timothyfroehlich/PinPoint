@@ -79,6 +79,38 @@ test.describe("Public Issue Reporting", () => {
     ).toBeVisible();
   });
 
+  test("should pre-fill name on signup when provided without email", async ({
+    page,
+  }) => {
+    await page.goto("/report");
+    await page.getByTestId("machine-select").selectOption({ index: 1 });
+    // Wait for URL refresh (router.push) to prevent race conditions on Mobile Safari
+    await expect(page).toHaveURL(/machine=/);
+
+    await page
+      .getByLabel("Issue Title *")
+      .fill(`${PUBLIC_PREFIX} with Name Only`);
+    await selectOption(page, "severity-select", "minor");
+
+    // Provide name but no email
+    await page.getByLabel("First Name").fill("Jane");
+    await page.getByLabel("Last Name").fill("Reporter");
+
+    await page.getByRole("button", { name: "Submit Issue Report" }).click();
+
+    // Should redirect to success page with new_pending flag
+    await expect(page).toHaveURL(/\/report\/success/);
+    await expect(page.getByText("Want to track your reports?")).toBeVisible();
+
+    // Click the signup link
+    await page.getByRole("link", { name: "Join PinPoint" }).click();
+
+    // Should redirect to signup page with name pre-filled
+    await expect(page).toHaveURL(/\/signup\?/);
+    await expect(page.getByLabel(/First Name/i)).toHaveValue("Jane");
+    await expect(page.getByLabel(/Last Name/i)).toHaveValue("Reporter");
+  });
+
   test("should allow reporting another issue from success page", async ({
     page,
   }) => {
