@@ -149,7 +149,7 @@ class WorktreeState:
         """Add a recovery command"""
         self.recovery_commands.append(command)
 
-    def get_status_summary(self) -> str:
+    def get_status_summary(self, ignore_managed: bool = False) -> str:
         """Get git status summary for reporting"""
         try:
             # Get branch info
@@ -204,10 +204,30 @@ class WorktreeState:
                     if match:
                         deletions = int(match.group(1))
 
-            if pending_files == 0:
-                return f"branch {branch} | {upstream_status} | clean"
-            else:
-                return f"branch {branch} | {upstream_status} | files {pending_files}, +{insertions}/-{deletions}"
+            # Check for hidden modifications in skip-worktree files
+            hidden_mods = False
+            if not ignore_managed:
+                managed_files = ["supabase/config.toml", "src/test/setup/schema.sql"]
+                for f in managed_files:
+                    f_path = self.path / f
+                    if not f_path.exists():
+                        continue
+                    try:
+                        wt_hash = subprocess.run(["git", "-C", str(self.path), "hash-object", f], capture_output=True, text=True, check=True).stdout.strip()
+                        idx_hash_res = subprocess.run(["git", "-C", str(self.path), "ls-files", "-s", f], capture_output=True, text=True, check=True).stdout.strip()
+                        if idx_hash_res:
+                            idx_hash = idx_hash_res.split()[1]
+                            if wt_hash != idx_hash:
+                                hidden_mods = True
+                                break
+                    except (subprocess.CalledProcessError, IndexError):
+                        pass
+
+            status_msg = "clean" if pending_files == 0 else f"files {pending_files}, +{insertions}/-{deletions}"
+            if hidden_mods:
+                status_msg += " (hidden changes)"
+
+            return f"branch {branch} | {upstream_status} | {status_msg}"
         except Exception as e:
             return f"Unable to get status: {e}"
 
@@ -235,13 +255,44 @@ class Worktree:
         )
         return result.stdout.strip()
 
-    def has_uncommitted_changes(self) -> bool:
-        """Check if there are uncommitted changes"""
+    def get_uncommitted_changes(self, ignore_managed: bool = False) -> list[str]:
+        """Get list of uncommitted changes (including skip-worktree files)"""
+        modified_files = set()
+        managed_files = {"supabase/config.toml", "src/test/setup/schema.sql"}
+
+        # 1. Check tracked files via diff-index
         result = subprocess.run(
-            ["git", "-C", str(self.path), "diff-index", "--quiet", "HEAD", "--"],
-            capture_output=True
+            ["git", "-C", str(self.path), "diff-index", "--name-only", "HEAD", "--"],
+            capture_output=True, text=True
         )
-        return result.returncode != 0
+        if result.stdout.strip():
+            for line in result.stdout.strip().split('\n'):
+                file = line.strip()
+                if file and not (ignore_managed and file in managed_files):
+                    modified_files.add(file)
+
+        # 2. Explicitly check hashes of managed skip-worktree files
+        if not ignore_managed:
+            for f in managed_files:
+                f_path = self.path / f
+                if not f_path.exists():
+                    continue
+
+                try:
+                    wt_hash = subprocess.run(["git", "-C", str(self.path), "hash-object", f], capture_output=True, text=True, check=True).stdout.strip()
+                    idx_hash_res = subprocess.run(["git", "-C", str(self.path), "ls-files", "-s", f], capture_output=True, text=True, check=True).stdout.strip()
+                    if idx_hash_res:
+                        idx_hash = idx_hash_res.split()[1]
+                        if wt_hash != idx_hash:
+                            modified_files.add(f)
+                except (subprocess.CalledProcessError, IndexError):
+                    pass
+
+        return sorted(list(modified_files))
+
+    def has_uncommitted_changes(self, ignore_managed: bool = False) -> bool:
+        """Check if there are uncommitted changes"""
+        return len(self.get_uncommitted_changes(ignore_managed)) > 0
 
     def validate_config(self) -> bool:
         """Validate configuration files"""
@@ -577,16 +628,22 @@ SUPABASE_SERVICE_ROLE_KEY=
                 capture_output=True, check=True
             )
 
-    def stash_changes(self, branch: str) -> bool:
+    def stash_changes(self, branch: str, ignore_managed: bool = False) -> bool:
         """Stash uncommitted changes if present"""
-        if not self.has_uncommitted_changes():
+        if not self.has_uncommitted_changes(ignore_managed):
             return False
 
+        modified = self.get_uncommitted_changes(ignore_managed)
         stash_name = f"sync-worktrees-auto-{branch}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
 
         if self.dry_run:
-            print(f"[DRY-RUN] Would stash: {stash_name}")
+            print(f"[DRY-RUN] Would stash: {stash_name} ({len(modified)} files)")
         else:
+            # We want to stash specifically the files detected as modified (excluding ignored ones)
+            # Standard 'git stash' stashes EVERYTHING. To ignore files, we can't use simple stash.
+            # However, for simplicity, if we are ignoring managed files, we just stash everything
+            # and accept that we might pop back the config changes.
+            # But the better way is to skip stashing entirely if only ignored files are modified.
             subprocess.run(
                 ["git", "-C", str(self.path), "stash", "push", "-u", "-m", stash_name],
                 capture_output=True, check=True
@@ -1120,7 +1177,14 @@ class SyncManager:
                 self.worktrees.append(worktree)
                 self._process_worktree(worktree)
             except ValueError as e:
-                print(f"Error: {e}")
+                print(f"Error initializing worktree: {e}")
+                continue
+            except Exception as e:
+                print(f"\n❌ Error processing worktree {path.name}: {e}")
+                # We don't crash the script, but we mark the worktree as failed
+                # if we have a Worktree object
+                if 'worktree' in locals() and hasattr(worktree, 'state'):
+                    worktree.state.update_status(StatusLevel.ERROR)
                 continue
 
     def _process_worktree(self, worktree: Worktree) -> None:
@@ -1144,10 +1208,30 @@ class SyncManager:
             print("Phase 0.5: Reset to origin/main")
             worktree.fetch()
 
-            if worktree.has_uncommitted_changes():
-                print_status("error", "Cannot reset: Uncommitted changes present.")
-                worktree.state.update_status(StatusLevel.ERROR)
-                return
+            modified = worktree.get_uncommitted_changes()
+            if modified:
+                managed_files = {"supabase/config.toml", "src/test/setup/schema.sql"}
+                only_managed = all(f in managed_files for f in modified)
+
+                if only_managed:
+                    print("  Unblocking reset by reverting managed config/schema files...")
+                    for f in modified:
+                        # Skip-worktree files must have the flag removed before checkout/revert
+                        subprocess.run(
+                            ["git", "-C", str(worktree.path), "update-index", "--no-skip-worktree", f],
+                            check=True, capture_output=True
+                        )
+                        subprocess.run(
+                            ["git", "-C", str(worktree.path), "checkout", "HEAD", "--", f],
+                            check=True, capture_output=True
+                        )
+                else:
+                    other_files = [f for f in modified if f not in managed_files]
+                    error_msg = f"Cannot reset: Uncommitted changes in non-managed files: {', '.join(other_files)}"
+                    print_status("error", error_msg)
+                    worktree.state.update_status(StatusLevel.ERROR)
+                    worktree.state.merge_message = error_msg
+                    return
 
             worktree.checkout_detached_main()
             print("  Checked out origin/main (detached)")
@@ -1165,7 +1249,7 @@ class SyncManager:
         current_branch = worktree.get_current_branch()
         print(f"  Current branch: {current_branch}")
 
-        if worktree.stash_changes(current_branch):
+        if worktree.stash_changes(current_branch, ignore_managed=not is_main):
             print("  Stashed uncommitted changes")
 
         # Phase 3: Branch Operations
@@ -1246,9 +1330,14 @@ class SyncManager:
             print()
             print(f"{status_icon} {worktree.name} ({worktree.state.overall_status.value.upper()})")
             print(f"   Path: {worktree.path}")
-            print(f"   Config: {' | '.join(worktree.state.config_messages) or 'Unknown'}")
+            print(f"   Config: {' | '.join(worktree.state.config_messages) or 'Unknown'}\n")
             print(f"   Merge: {worktree.state.merge_message or 'Unknown'}")
-            print(f"   Status: {worktree.state.get_status_summary()}")
+
+            # Determine if this is the main worktree
+            is_main = (self.main_worktree_path and
+                       worktree.path.resolve() == self.main_worktree_path.resolve())
+
+            print(f"   Status: {worktree.state.get_status_summary(ignore_managed=not is_main)}")
 
             if worktree.state.conflicts_present:
                 print("   ⚠️  CONFLICTS PRESENT - See recovery section below")
