@@ -76,12 +76,13 @@ export function InviteUserDialog({
         formData.append("sendInvite", String(values.sendInvite));
 
         const result = await inviteUser(formData);
+
         if (result.ok) {
           toast.success("User invited successfully");
           form.reset();
           // Build the new user object to pass to the callback
           const newUser: UnifiedUser = {
-            id: result.userId,
+            id: result.value.userId,
             name: `${values.firstName} ${values.lastName}`,
             email: values.email,
             role: values.role,
@@ -89,11 +90,13 @@ export function InviteUserDialog({
             avatarUrl: null,
           };
           // Call onSuccess with both the ID and full user object, then close dialog
-          // Note: router.refresh() removed - parent manages users state directly
-          onSuccess?.(result.userId, newUser);
+          onSuccess?.(result.value.userId, newUser);
           onOpenChange(false);
+        } else {
+          toast.error(result.message);
         }
       } catch (error) {
+        // This catches network errors or unexpected client-side errors
         toast.error(
           error instanceof Error ? error.message : "Failed to invite user"
         );

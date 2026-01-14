@@ -40,8 +40,13 @@ export function UserRoleSelect({
 
     startTransition(async () => {
       try {
-        await updateUserRole(userId, newRole, userType);
-        toast.success("Role updated successfully");
+        const result = await updateUserRole(userId, newRole, userType);
+
+        if (result.ok) {
+          toast.success("Role updated successfully");
+        } else {
+          toast.error(result.message);
+        }
       } catch (error) {
         toast.error(
           error instanceof Error ? error.message : "Failed to update role"

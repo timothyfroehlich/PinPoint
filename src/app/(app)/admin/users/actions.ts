@@ -8,36 +8,64 @@ import { revalidatePath } from "next/cache";
 import { sendInviteEmail } from "~/lib/email/invite";
 import { requireSiteUrl } from "~/lib/url";
 import { inviteUserSchema, updateUserRoleSchema } from "./schema";
+import { type Result, ok, err } from "~/lib/result";
+import { log } from "~/lib/logger";
 
-async function verifyAdmin(userId: string): Promise<void> {
+export type UpdateUserRoleResult = Result<
+  void,
+  "UNAUTHORIZED" | "FORBIDDEN" | "VALIDATION" | "SERVER"
+>;
+
+export type InviteUserResult = Result<
+  { userId: string },
+  "UNAUTHORIZED" | "FORBIDDEN" | "VALIDATION" | "CONFLICT" | "SERVER"
+>;
+
+export type ResendInviteResult = Result<
+  void,
+  "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "SERVER"
+>;
+
+async function verifyAdmin(userId: string): Promise<boolean> {
   const currentUserProfile = await db.query.userProfiles.findFirst({
     where: eq(userProfiles.id, userId),
     columns: { role: true },
   });
 
-  if (currentUserProfile?.role !== "admin") {
-    throw new Error("Forbidden: Only admins can perform this action");
-  }
+  return currentUserProfile?.role === "admin";
 }
 
 export async function updateUserRole(
   userId: string,
   newRole: "guest" | "member" | "admin",
   userType: "active" | "invited" = "active"
-): Promise<void> {
+): Promise<UpdateUserRoleResult> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    throw new Error("Unauthorized");
+    return err("UNAUTHORIZED", "Unauthorized");
   }
 
-  await verifyAdmin(user.id);
+  const isAdmin = await verifyAdmin(user.id);
+  if (!isAdmin) {
+    return err("FORBIDDEN", "Only admins can perform this action");
+  }
 
   // Validate input
-  const validated = updateUserRoleSchema.parse({ userId, newRole, userType });
+  const validation = updateUserRoleSchema.safeParse({
+    userId,
+    newRole,
+    userType,
+  });
+
+  if (!validation.success) {
+    return err("VALIDATION", "Invalid input");
+  }
+
+  const validated = validation.data;
 
   // Constraint: Admin cannot demote themselves
   if (
@@ -45,37 +73,50 @@ export async function updateUserRole(
     validated.userId === user.id &&
     validated.newRole !== "admin"
   ) {
-    throw new Error("Admins cannot demote themselves");
+    return err("VALIDATION", "Admins cannot demote themselves");
   }
 
-  if (validated.userType === "active") {
-    await db
-      .update(userProfiles)
-      .set({ role: validated.newRole })
-      .where(eq(userProfiles.id, validated.userId));
-  } else {
-    await db
-      .update(invitedUsers)
-      .set({ role: validated.newRole })
-      .where(eq(invitedUsers.id, validated.userId));
-  }
+  try {
+    if (validated.userType === "active") {
+      await db
+        .update(userProfiles)
+        .set({ role: validated.newRole })
+        .where(eq(userProfiles.id, validated.userId));
+    } else {
+      await db
+        .update(invitedUsers)
+        .set({ role: validated.newRole })
+        .where(eq(invitedUsers.id, validated.userId));
+    }
 
-  revalidatePath("/admin/users");
+    revalidatePath("/admin/users");
+    return ok(undefined);
+  } catch (error) {
+    log.error(
+      {
+        error: error instanceof Error ? error.message : "Unknown",
+        action: "updateUserRole",
+      },
+      "Failed to update user role"
+    );
+    return err("SERVER", "Failed to update role");
+  }
 }
 
-export async function inviteUser(
-  formData: FormData
-): Promise<{ ok: boolean; userId: string }> {
+export async function inviteUser(formData: FormData): Promise<InviteUserResult> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    throw new Error("Unauthorized");
+    return err("UNAUTHORIZED", "Unauthorized");
   }
 
-  await verifyAdmin(user.id);
+  const isAdmin = await verifyAdmin(user.id);
+  if (!isAdmin) {
+    return err("FORBIDDEN", "Only admins can perform this action");
+  }
 
   const rawData = {
     firstName: formData.get("firstName"),
@@ -85,116 +126,165 @@ export async function inviteUser(
     sendInvite: formData.get("sendInvite") === "true",
   };
 
-  const validated = inviteUserSchema.parse(rawData);
+  const validation = inviteUserSchema.safeParse(rawData);
 
-  // Check if user already exists
-  const existingUser = await db.query.authUsers.findFirst({
-    where: eq(authUsers.email, validated.email),
-  });
-
-  if (existingUser) {
-    throw new Error("A user with this email already exists and is active.");
+  if (!validation.success) {
+    return err("VALIDATION", "Invalid input");
   }
 
-  const existingInvited = await db.query.invitedUsers.findFirst({
-    where: eq(invitedUsers.email, validated.email),
-  });
+  const validated = validation.data;
 
-  if (existingInvited) {
-    throw new Error("This user has already been invited.");
-  }
-
-  // Create invited user
-  const [newInvited] = await db
-    .insert(invitedUsers)
-    .values({
-      firstName: validated.firstName,
-      lastName: validated.lastName,
-      email: validated.email,
-      role: validated.role,
-    })
-    .returning();
-
-  if (!newInvited) {
-    throw new Error("Failed to create invited user");
-  }
-
-  if (validated.sendInvite) {
-    // Security: Use configured site URL to prevent Host Header Injection
-    const siteUrl = requireSiteUrl("invite-user");
-
-    const currentUser = await db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, user.id),
+  try {
+    // Check if user already exists
+    const existingUser = await db.query.authUsers.findFirst({
+      where: eq(authUsers.email, validated.email),
     });
 
-    const emailResult = await sendInviteEmail({
-      to: validated.email,
-      firstName: validated.firstName,
-      inviterName: currentUser?.name ?? "An administrator",
-      siteUrl,
-    });
-
-    if (!emailResult.success) {
-      throw new Error(
-        `Failed to send invitation email: ${String(emailResult.error)}`
+    if (existingUser) {
+      return err(
+        "CONFLICT",
+        "A user with this email already exists and is active."
       );
     }
 
-    await db
-      .update(invitedUsers)
-      .set({ inviteSentAt: new Date() })
-      .where(eq(invitedUsers.id, newInvited.id));
-  }
+    const existingInvited = await db.query.invitedUsers.findFirst({
+      where: eq(invitedUsers.email, validated.email),
+    });
 
-  revalidatePath("/admin/users");
-  return { ok: true, userId: newInvited.id };
+    if (existingInvited) {
+      return err("CONFLICT", "This user has already been invited.");
+    }
+
+    // Create invited user
+    const [newInvited] = await db
+      .insert(invitedUsers)
+      .values({
+        firstName: validated.firstName,
+        lastName: validated.lastName,
+        email: validated.email,
+        role: validated.role,
+      })
+      .returning();
+
+    if (!newInvited) {
+      return err("SERVER", "Failed to create invited user");
+    }
+
+    if (validated.sendInvite) {
+      // Security: Use configured site URL to prevent Host Header Injection
+      const siteUrl = requireSiteUrl("invite-user");
+
+      const currentUser = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, user.id),
+      });
+
+      const emailResult = await sendInviteEmail({
+        to: validated.email,
+        firstName: validated.firstName,
+        inviterName: currentUser?.name ?? "An administrator",
+        siteUrl,
+      });
+
+      if (!emailResult.success) {
+        log.error(
+          {
+            error: emailResult.error,
+            action: "inviteUser.email",
+          },
+          "Failed to send invitation email"
+        );
+        // Note: User created but email failed. We still return success but could warn?
+        // Or should we fail? The previous code threw an error.
+        // Let's fail the action but the user is already created. Ideally we should rollback.
+        // But for now, let's return a SERVER error so the UI shows failure.
+        // The user is in the DB though.
+        return err("SERVER", "User created but failed to send email.");
+      }
+
+      await db
+        .update(invitedUsers)
+        .set({ inviteSentAt: new Date() })
+        .where(eq(invitedUsers.id, newInvited.id));
+    }
+
+    revalidatePath("/admin/users");
+    return ok({ userId: newInvited.id });
+  } catch (error) {
+    log.error(
+      {
+        error: error instanceof Error ? error.message : "Unknown",
+        action: "inviteUser",
+      },
+      "Invite user error"
+    );
+    return err("SERVER", "An unexpected error occurred");
+  }
 }
 
-export async function resendInvite(userId: string): Promise<{ ok: boolean }> {
+export async function resendInvite(userId: string): Promise<ResendInviteResult> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    throw new Error("Unauthorized");
+    return err("UNAUTHORIZED", "Unauthorized");
   }
 
-  await verifyAdmin(user.id);
-
-  const invited = await db.query.invitedUsers.findFirst({
-    where: eq(invitedUsers.id, userId),
-  });
-
-  if (!invited) {
-    throw new Error("Invited user not found");
+  const isAdmin = await verifyAdmin(user.id);
+  if (!isAdmin) {
+    return err("FORBIDDEN", "Only admins can perform this action");
   }
 
-  // Security: Use configured site URL to prevent Host Header Injection
-  const siteUrl = requireSiteUrl("resend-invite");
+  try {
+    const invited = await db.query.invitedUsers.findFirst({
+      where: eq(invitedUsers.id, userId),
+    });
 
-  const currentUser = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-  });
+    if (!invited) {
+      return err("NOT_FOUND", "Invited user not found");
+    }
 
-  const emailResult = await sendInviteEmail({
-    to: invited.email,
-    firstName: invited.firstName,
-    inviterName: currentUser?.name ?? "An administrator",
-    siteUrl,
-  });
+    // Security: Use configured site URL to prevent Host Header Injection
+    const siteUrl = requireSiteUrl("resend-invite");
 
-  if (!emailResult.success) {
-    throw new Error(
-      `Failed to send invitation email: ${String(emailResult.error)}`
+    const currentUser = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+    });
+
+    const emailResult = await sendInviteEmail({
+      to: invited.email,
+      firstName: invited.firstName,
+      inviterName: currentUser?.name ?? "An administrator",
+      siteUrl,
+    });
+
+    if (!emailResult.success) {
+      log.error(
+        {
+          error: emailResult.error,
+          action: "resendInvite",
+        },
+        "Failed to send invitation email"
+      );
+      return err("SERVER", "Failed to send invitation email");
+    }
+
+    await db
+      .update(invitedUsers)
+      .set({ inviteSentAt: new Date() })
+      .where(eq(invitedUsers.id, userId));
+
+    revalidatePath("/admin/users");
+    return ok(undefined);
+  } catch (error) {
+    log.error(
+      {
+        error: error instanceof Error ? error.message : "Unknown",
+        action: "resendInvite",
+      },
+      "Resend invite error"
     );
+    return err("SERVER", "An unexpected error occurred");
   }
-
-  await db
-    .update(invitedUsers)
-    .set({ inviteSentAt: new Date() })
-    .where(eq(invitedUsers.id, userId));
-
-  revalidatePath("/admin/users");
-  return { ok: true };
 }

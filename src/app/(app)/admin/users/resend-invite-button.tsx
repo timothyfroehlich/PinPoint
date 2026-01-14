@@ -21,8 +21,13 @@ export function ResendInviteButton({
   function handleResend(): void {
     startTransition(async () => {
       try {
-        await resendInvite(userId);
-        toast.success("Invitation resent successfully");
+        const result = await resendInvite(userId);
+
+        if (result.ok) {
+          toast.success("Invitation resent successfully");
+        } else {
+          toast.error(result.message);
+        }
       } catch (error) {
         toast.error(
           error instanceof Error ? error.message : "Failed to resend invitation"
