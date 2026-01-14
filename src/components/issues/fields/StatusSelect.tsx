@@ -44,7 +44,7 @@ export function StatusSelect({
     >
       <SelectTrigger
         className="w-full border-outline-variant bg-surface text-on-surface"
-        aria-label="Select Status"
+        aria-label={`Status: ${STATUS_CONFIG[value].label}`}
         data-testid="issue-status-select"
       >
         <SelectValue>
