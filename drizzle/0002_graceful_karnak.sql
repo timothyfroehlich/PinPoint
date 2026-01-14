@@ -1,0 +1,1 @@
+CREATE INDEX "idx_machines_name" ON "machines" USING btree ("name");
