@@ -32,14 +32,9 @@ export const puckConfig: Config = {
         level: "h2",
         children: "Heading Text",
       },
-      render: ({
-        level,
-        children,
-      }: {
-        level: "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
-        children: string;
-      }) => {
-        const Tag = level;
+      render: (props) => {
+        const { level, children } = props;
+        const Tag = level as "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
         const sizeClasses: Record<
           "h1" | "h2" | "h3" | "h4" | "h5" | "h6",
           string
@@ -51,7 +46,7 @@ export const puckConfig: Config = {
           h5: "text-lg font-semibold",
           h6: "text-base font-semibold",
         };
-        return <Tag className={sizeClasses[level]}>{children}</Tag>;
+        return <Tag className={sizeClasses[Tag]}>{children}</Tag>;
       },
     },
     TextBlock: {
@@ -63,8 +58,8 @@ export const puckConfig: Config = {
       defaultProps: {
         text: "Add your text here...",
       },
-      render: ({ text }: { text: string }) => {
-        return <p className="text-base leading-relaxed">{text}</p>;
+      render: (props) => {
+        return <p className="text-base leading-relaxed">{props["text"]}</p>;
       },
     },
     ButtonBlock: {
@@ -91,15 +86,14 @@ export const puckConfig: Config = {
         variant: "default",
         href: "#",
       },
-      render: ({
-        label,
-        variant,
-        href,
-      }: {
-        label: string;
-        variant: "default" | "destructive" | "outline" | "secondary" | "ghost";
-        href?: string;
-      }) => {
+      render: (props) => {
+        const { label, variant, href } = props;
+        const v = variant as
+          | "default"
+          | "destructive"
+          | "outline"
+          | "secondary"
+          | "ghost";
         const variantClasses: Record<
           "default" | "destructive" | "outline" | "secondary" | "ghost",
           string
@@ -115,8 +109,8 @@ export const puckConfig: Config = {
         };
         return (
           <a
-            href={href ?? "#"}
-            className={`inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors ${variantClasses[variant]}`}
+            href={(href as string | undefined) ?? "#"}
+            className={`inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors ${variantClasses[v]}`}
           >
             {label}
           </a>
@@ -136,13 +130,8 @@ export const puckConfig: Config = {
         title: "Card Title",
         description: "Card description goes here...",
       },
-      render: ({
-        title,
-        description,
-      }: {
-        title: string;
-        description: string;
-      }) => {
+      render: (props) => {
+        const { title, description } = props;
         return (
           <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
             <h3 className="text-lg font-semibold mb-2">{title}</h3>
@@ -165,13 +154,15 @@ export const puckConfig: Config = {
       defaultProps: {
         size: "medium",
       },
-      render: ({ size }: { size: "small" | "medium" | "large" }) => {
+      render: (props) => {
+        const { size } = props;
+        const s = size as "small" | "medium" | "large";
         const sizeClasses: Record<"small" | "medium" | "large", string> = {
           small: "h-4",
           medium: "h-8",
           large: "h-16",
         };
-        return <div className={sizeClasses[size]} />;
+        return <div className={sizeClasses[s]} />;
       },
     },
   },
