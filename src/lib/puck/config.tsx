@@ -59,6 +59,7 @@ export const puckConfig: Config = {
         text: "Add your text here...",
       },
       render: (props) => {
+        // Note: Bracket notation required due to Puck's index signature
         return <p className="text-base leading-relaxed">{props["text"]}</p>;
       },
     },

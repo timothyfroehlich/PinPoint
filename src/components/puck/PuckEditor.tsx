@@ -4,6 +4,7 @@ import { Puck } from "@puckeditor/core";
 import "@puckeditor/core/puck.css";
 import { useState, useEffect } from "react";
 import type React from "react";
+import { toast } from "sonner";
 import { puckConfig } from "~/lib/puck/config";
 import type { Data } from "@puckeditor/core";
 
@@ -36,8 +37,8 @@ export function PuckEditor(): React.JSX.Element {
     window.localStorage.setItem("puck-prototype-data", JSON.stringify(newData));
     setData(newData);
     
-    // Show success message
-    console.log("Prototype saved successfully!");
+    // Show success notification
+    toast.success("Prototype saved successfully!");
   };
 
   if (isLoading) {
