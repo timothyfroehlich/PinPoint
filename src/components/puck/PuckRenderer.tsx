@@ -2,7 +2,8 @@
 
 import { Render } from "@puckeditor/core";
 import "@puckeditor/core/puck.css";
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+import type React from "react";
 import { puckConfig } from "~/lib/puck/config";
 import type { Data } from "@puckeditor/core";
 

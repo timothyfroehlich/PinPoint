@@ -1,5 +1,5 @@
 import type { Config } from "@puckeditor/core";
-import React from "react";
+import type React from "react";
 
 /**
  * Puck configuration for UX prototyping.
