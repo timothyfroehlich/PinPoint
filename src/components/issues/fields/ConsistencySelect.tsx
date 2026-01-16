@@ -41,7 +41,11 @@ export function ConsistencySelect({
     >
       <SelectTrigger
         className="w-full border-outline-variant bg-surface text-on-surface"
-        aria-label="Select Consistency"
+        aria-label={
+          CONSISTENCY_CONFIG[value]
+            ? `Consistency: ${CONSISTENCY_CONFIG[value].label}`
+            : "Select Consistency"
+        }
         data-testid={testId}
       >
         <SelectValue>

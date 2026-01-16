@@ -17,3 +17,8 @@
 
 **Learning:** When placing interactive elements (like `Select` or `Button`) inside data tables, relying solely on column headers is insufficient for screen reader users navigating by control. A simple "Edit" or "Select" announcement lacks context.
 **Action:** Pass the row entity's name (e.g., user name) to the interactive component and use it in a dynamic `aria-label` (e.g., "Change role for John Doe").
+
+## 2026-02-18 - [Shadcn Select Accessibility]
+
+**Learning:** Shadcn UI `SelectTrigger` components with a static `aria-label` override the screen reader announcement of the inner `SelectValue`.
+**Action:** Use a dynamic `aria-label` that includes both the label and the value (e.g., `aria-label={\`Severity: ${value}\`}`) to ensure context is preserved.

@@ -42,7 +42,11 @@ export function SeveritySelect({
     >
       <SelectTrigger
         className="w-full border-outline-variant bg-surface text-on-surface"
-        aria-label="Select Severity"
+        aria-label={
+          SEVERITY_CONFIG[value]
+            ? `Severity: ${SEVERITY_CONFIG[value].label}`
+            : "Select Severity"
+        }
         data-testid={testId}
       >
         <SelectValue>
