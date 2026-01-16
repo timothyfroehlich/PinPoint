@@ -46,13 +46,9 @@ export default function DebugIndexPage(): React.JSX.Element {
 
       <div className="pt-8 border-t border-border">
         <h2 className="text-lg font-semibold mb-4">Documentation</h2>
-        <ul className="space-y-2 text-sm">
-          <li>
-            <Link href="/docs/PUCK_INTEGRATION.md" className="text-primary hover:underline">
-              Puck Integration Guide
-            </Link>
-          </li>
-        </ul>
+        <p className="text-sm text-muted-foreground">
+          See <code className="px-1.5 py-0.5 bg-muted rounded text-xs">docs/PUCK_INTEGRATION.md</code> in the repository for detailed Puck integration guide.
+        </p>
       </div>
     </div>
   );
