@@ -123,6 +123,14 @@ pnpm run preflight    # full local CI gate before pushing
 # See docs/E2E_DOCKER.md for running Safari tests locally via Docker
 ```
 
+### UX Prototyping with Puck
+
+PinPoint includes [Puck](https://puckeditor.com/), a visual editor for rapid UX prototyping:
+
+- Visit `/debug/puck` for the drag-and-drop editor
+- Visit `/debug/puck/preview` to view your prototypes
+- See `docs/PUCK_INTEGRATION.md` for full documentation
+
 For more detail, see `docs/DEVELOPMENT.md` and `docs/TESTING_PLAN.md`.
 
 ---

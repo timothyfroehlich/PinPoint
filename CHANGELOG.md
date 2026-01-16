@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Developer Tools**: Integrated Puck visual editor for UX prototyping at `/debug/puck` with drag-and-drop components (HeadingBlock, TextBlock, ButtonBlock, CardBlock, SpacerBlock)
+- **Debug Tools**: Added debug index page at `/debug` listing all available developer tools
+- **Documentation**: Added comprehensive Puck integration guide at `docs/PUCK_INTEGRATION.md`
+
 ### Changed
 
 - **UI/Components**: Redesigned issue status and priority dropdowns with rich shadcn/ui Select components, replacing native HTML elements. Includes grouped status options, tooltips, and improved visual hierarchy with Material Design 3 colors.
