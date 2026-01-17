@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e  # Exit immediately if any command fails
 
 # Configuration
 BACKUP_DIR="$HOME/.pinpoint/db-backups"
@@ -16,7 +17,14 @@ BACKUP_FILE=$1
 
 if [ -z "$BACKUP_FILE" ]; then
     echo -e "${BLUE}🔍 No backup file specified. Looking for the latest one in $BACKUP_DIR...${NC}"
-    BACKUP_FILE=$(ls -t "$BACKUP_DIR"/pinpoint_prod_*.sql 2>/dev/null | head -n 1)
+
+    # Use find for robust file resolution, handling spaces and special characters
+    BACKUP_FILE=$(
+        find "$BACKUP_DIR" -maxdepth 1 -type f -name 'pinpoint_prod_*.sql' -printf '%T@ %p\n' 2>/dev/null \
+            | sort -nr \
+            | head -n 1 \
+            | cut -d' ' -f2-
+    )
 
     if [ -z "$BACKUP_FILE" ]; then
         echo -e "${RED}❌ No backup files found in $BACKUP_DIR${NC}"
@@ -38,19 +46,33 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 1
 fi
 
-# Load database URL from .env.local
-if [ -f "$ENV_FILE" ]; then
-    # Simple grep/sed to extract DATABASE_URL
-    DATABASE_URL=$(grep "^DATABASE_URL=" "$ENV_FILE" | cut -d '=' -f2-)
-else
+# Load and parse database URL from .env.local
+if [ ! -f "$ENV_FILE" ]; then
     echo -e "${RED}❌ $ENV_FILE not found. Cannot determine local database URL.${NC}"
     exit 1
 fi
+
+# Extract DATABASE_URL line and strip key + optional surrounding quotes
+DATABASE_URL_LINE=$(grep -m1 "^DATABASE_URL=" "$ENV_FILE" || echo "")
+DATABASE_URL=${DATABASE_URL_LINE#DATABASE_URL=}
+# Remove surrounding double quotes if present
+DATABASE_URL=${DATABASE_URL#\"}
+DATABASE_URL=${DATABASE_URL%\"}
 
 if [ -z "$DATABASE_URL" ]; then
     echo -e "${RED}❌ DATABASE_URL not found in $ENV_FILE${NC}"
     exit 1
 fi
+
+# Safety check: Ensure we're connecting to localhost
+if [[ ! "$DATABASE_URL" =~ (localhost|127\.0\.0\.1) ]]; then
+    echo -e "${RED}❌ DATABASE_URL does not point to localhost or 127.0.0.1${NC}"
+    echo -e "${RED}   Refusing to reset non-local database: $DATABASE_URL${NC}"
+    echo -e "${YELLOW}⚠️  This script should ONLY be used with local development databases.${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Verified DATABASE_URL points to local database${NC}"
 
 echo -e "${BLUE}🧹 Resetting local database schema...${NC}"
 # Use the project's existing reset logic (minus seeding)
@@ -59,7 +81,7 @@ pnpm run db:migrate
 
 echo -e "${BLUE}🌱 Seeding local database from production dump...${NC}"
 # Use psql to apply the dump. We use --quiet and --set ON_ERROR_STOP=1
-if psql "$DATABASE_URL" -f "$BACKUP_FILE" --set ON_ERROR_STOP=1; then
+if psql "$DATABASE_URL" --quiet -f "$BACKUP_FILE" --set ON_ERROR_STOP=1; then
     echo -e "${GREEN}✅ Local database seeded successfully!${NC}"
 else
     echo -e "${RED}❌ Seeding failed!${NC}"

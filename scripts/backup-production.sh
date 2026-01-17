@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # Configuration
 BACKUP_DIR="$HOME/.pinpoint/db-backups"
@@ -9,9 +10,29 @@ PROD_REF="udhesuizjsgxfeotqybn"
 # Colors for output
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}🚀 Starting manual backup of PinPoint production database...${NC}"
+
+# Verify we're linked to the correct production project
+echo -e "${BLUE}ℹ️  Checking current Supabase project link...${NC}"
+CURRENT_REF=$(cat supabase/.temp/project-ref 2>/dev/null || echo "")
+
+if [ -z "$CURRENT_REF" ]; then
+    echo -e "${RED}❌ No Supabase project linked. Run 'supabase link' first.${NC}"
+    exit 1
+fi
+
+if [ "$CURRENT_REF" != "$PROD_REF" ]; then
+    echo -e "${RED}❌ Currently linked to project: $CURRENT_REF${NC}"
+    echo -e "${RED}   Expected production project: $PROD_REF${NC}"
+    echo -e "${YELLOW}⚠️  Refusing to backup wrong environment.${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Confirmed linked to production project: $PROD_REF${NC}"
 
 # Ensure backup directory exists
 mkdir -p "$BACKUP_DIR"
