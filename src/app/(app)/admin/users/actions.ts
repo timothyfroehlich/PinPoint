@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { sendInviteEmail } from "~/lib/email/invite";
 import { requireSiteUrl } from "~/lib/url";
+import { log } from "~/lib/logger";
 import { inviteUserSchema, updateUserRoleSchema } from "./schema";
 
 async function verifyAdmin(userId: string): Promise<void> {
@@ -135,9 +136,11 @@ export async function inviteUser(
     });
 
     if (!emailResult.success) {
-      throw new Error(
-        `Failed to send invitation email: ${String(emailResult.error)}`
+      log.error(
+        { error: emailResult.error, email: validated.email },
+        "Failed to send invitation email"
       );
+      throw new Error("Failed to send invitation email");
     }
 
     await db
@@ -185,9 +188,11 @@ export async function resendInvite(userId: string): Promise<{ ok: boolean }> {
   });
 
   if (!emailResult.success) {
-    throw new Error(
-      `Failed to send invitation email: ${String(emailResult.error)}`
+    log.error(
+      { error: emailResult.error, userId },
+      "Failed to send invitation email"
     );
+    throw new Error("Failed to send invitation email");
   }
 
   await db
