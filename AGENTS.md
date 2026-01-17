@@ -1,345 +1,105 @@
----
-trigger: always_on
-# For Antigravity
----
+# PinPoint Agent Context
 
-# PinPoint - Pinball Issue Tracking
+## 1. User & Mission
 
-## About the User
+**User**: Tim (GitHub: timothyfroehlich)
+**Goal**: Vibecoding PinPoint (Pinball Issue Tracker) for Austin Pinball Collective.
+**Phase**: Soft-launched (Beta). Active users. Working on MVP+ Polish.
+**Style**: Explain pros/cons. Teach, don't just fix.
+**Constraint**: PR reviews are AI-generated; apply critical thinking.
 
-**Name**: Tim (GitHub: timothyfroehlich)
-**Context**: Learning web development via solo vibecoding. New to TypeScript/JavaScript. Explain decisions with pros/cons.
-**Guideline**: PR review comments are AI-generated suggestions - apply critical thinking, not blind acceptance.
+## 2. Critical Non-Negotiables (The "10 Commandments")
 
-## Critical Commands
+1. **Escape parentheses** in paths (e.g., `src/app/\(app\)/page.tsx`).
+2. **Migrations ONLY**: Never use `drizzle-kit push`. Use `db:generate` + `db:migrate`.
+3. **Worker-Scoped PGlite**: No per-test DB instances (causes lockups). Use shared worker.
+4. **Server Components Default**: "use client" only for interaction leaves.
+5. **Progressive Enhancement**: `<form action={serverAction}>`. No inline handlers.
+6. **Supabase SSR**: `createClient()` -> `auth.getUser()` immediately. No logic in between.
+7. **Type Safety**: No `any`, no `!`, no unsafe `as`. This project uses ts-strictest.
+8. **Path Aliases**: Always use `~/` (e.g., `~/lib/utils`).
+9. **Preflight**: Must run `pnpm run preflight` before commit.
+10. **Code Cleanliness**: Follow Rule of Three. DRY up code only after 3rd duplication.
 
-**Run BEFORE every commit:**
+## 3. Agent Skills (Progressive Disclosure)
 
-```bash
-pnpm run preflight  # Typecheck, lint, format, test, build, integration tests
-```
+**YOU MUST LOAD RELEVANT SKILLS FOR EVERY TASK.**
+If your tool does not support skills, read the file path directly.
 
-**Development:**
+| Category       | Skill Name            | Path                                          | When to Use                                        |
+| :------------- | :-------------------- | :-------------------------------------------- | :------------------------------------------------- |
+| **UI**         | `pinpoint-ui`         | `.gemini/skills/pinpoint-ui/SKILL.md`         | Components, shadcn/ui, forms, responsive design.   |
+| **TypeScript** | `pinpoint-typescript` | `.gemini/skills/pinpoint-typescript/SKILL.md` | Type errors, generics, strict mode, Drizzle types. |
+| **Testing**    | `pinpoint-testing`    | `.gemini/skills/pinpoint-testing/SKILL.md`    | Writing tests, PGlite setup, Playwright.           |
+| **Security**   | `pinpoint-security`   | `.gemini/skills/pinpoint-security/SKILL.md`   | Auth flows, CSP, Zod validation, Supabase SSR.     |
+| **Patterns**   | `pinpoint-patterns`   | `.gemini/skills/pinpoint-patterns/SKILL.md`   | Server Actions, architecture, data fetching.       |
 
-```bash
-pnpm run dev              # Start dev server (uses PORT from .env.local)
-pnpm run build            # Production build
-pnpm run typecheck        # TypeScript validation
-pnpm run lint             # ESLint check
-pnpm test                 # Unit tests only
-pnpm run test:integration # DB integration tests (requires `supabase start`)
-pnpm run smoke            # E2E smoke tests (Playwright)
-```
+## 4. Environment & Workflow
 
-**Database Migrations (ALWAYS use migrations, never `push`):**
+### Worktrees & Ports
 
-```bash
-# 1. Edit src/server/db/schema.ts
-# 2. Generate migration:
-pnpm run db:generate -- --name <descriptive-name>
-# 3. Apply migration:
-pnpm run db:migrate
-# 4. Update test schema:
-pnpm run test:_generate-schema
-# 5. Commit schema.ts, drizzle/, and src/test/setup/schema.sql
-```
+We use git worktrees for parallel environments. Run `python3 scripts/sync_worktrees.py` to sync config.
 
-**Components:**
+| Worktree    | Next.js | Supabase API | Postgres |
+| :---------- | :------ | :----------- | :------- |
+| Main        | 3000    | 54321        | 54322    |
+| Secondary   | 3100    | 55321        | 55322    |
+| Review      | 3200    | 56321        | 56322    |
+| AntiGravity | 3300    | 57321        | 57322    |
 
-```bash
-pnpm dlx shadcn@latest add [component]  # Add shadcn/ui components
-```
+### Key Commands
 
-## Tech Stack
+- `pnpm run check` (**RUN OFTEN**): Fast check (types, lint, format, unit tests). ~5s.
+- `pnpm run preflight`: Full suite (check + build + integration). **Run before commit.**
+- `pnpm run db:migrate`: Apply schema changes locally.
+- `pnpm run test:e2e`: Full E2E suite (Don't run Safari locally on Linux).
 
-- **Frontend**: Next.js 16, React 19 (Server Components), shadcn/ui, Tailwind CSS v4
-- **Backend**: Drizzle ORM, PostgreSQL (Supabase)
-- **Auth**: Supabase SSR (single-tenant, no RLS)
-- **Testing**: Vitest (unit/integration), Playwright (E2E), worker-scoped PGlite
-- **Language**: TypeScript (@tsconfig/strictest)
-- **Phase**: Greenfield v2, Beta, early production users
+### Safe Command Patterns
 
-**Knowledge Gap**: Training cutoff Jan 2025, current date Dec 2025. Use Context7 MCP (`resolve-library-id` → `get-library-docs`) for latest library patterns.
+- **Search**: `rg --files | rg "pattern"`, `rg -l "content" --type js`
+- **Discovery**: `fd "*.js"`, `fd --type f --changed-within 1day`
+- **Repository**: `git ls-files | grep "\.js$"`
 
-## Top 10 Non-Negotiables
+### Deployment Infrastructure
 
-1. **Use migrations, never `push`**: `push` causes schema drift and data loss in production. Migrations are version-controlled.
-2. **Worker-scoped PGlite only**: Per-test PGlite instances cause system lockups. Use shared worker instance.
-3. **Server Components first**: Better performance, security, SEO. Use "use client" only for interactivity leaves.
-4. **Progressive enhancement**: Forms must work without JavaScript. Use `<form action={serverAction}>`.
-5. **useActionState for forms**: Modern React 19 pattern. Replaces cookie-based flash messages.
-6. **Supabase SSR contract**: Use `~/lib/supabase/server`, call `auth.getUser()` immediately after `createClient()`.
-7. **CSP with nonces**: Security headers required. Use `middleware.ts` for dynamic nonces, `next.config.ts` for static headers.
-8. **Type safety (strictest)**: No `any`, no `!`, no unsafe `as`. Write type guards for validation.
-9. **Path aliases (`~/`)**: Always use `~/lib/...` instead of relative imports `../../../lib/...`.
-10. **Preflight before commit**: `pnpm run preflight` must pass. Pre-commit hooks enforce this.
+- **Vercel Migrations**: Automatically runs `pnpm run migrate:production` on build.
+  - _Fix Stuck Migration_: `DATABASE_URL=<prod_url> tsx scripts/mark-migration-applied.ts <migration_number>`
+- **Supabase Projects**:
+  - `pinpoint-preview` (Dev/Staging) - Disposable data.
+  - `pinpoint-prod` (Live) - **Real user data. STRICT SAFETY.**
+- **Database Safety**:
+  - Local: `db:reset` allowed.
+  - Prod: **NEVER** `db:reset`. ONLY `db:migrate`.
 
-## Quick Code Examples
+### GitHub Copilot Reviews
 
-### Server Action with Auth
-
-```typescript
-"use server";
-import { createClient } from "~/lib/supabase/server";
-import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
-
-export async function updateProfile(formData: FormData) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser(); // Call immediately!
-  if (!user) redirect("/login");
-
-  const name = formData.get("name");
-  if (typeof name !== "string") throw new Error("Invalid name");
-
-  await db.update(users).set({ name }).where(eq(users.id, user.id));
-  revalidatePath("/profile");
-}
-```
-
-### Safe Drizzle Query
-
-```typescript
-import { eq } from "drizzle-orm";
-import { issues } from "~/server/db/schema";
-
-export async function getIssuesForMachine(machineId: string) {
-  if (!machineId) throw new Error("Machine ID required");
-
-  return await db.query.issues.findMany({
-    where: eq(issues.machineId, machineId),
-    orderBy: desc(issues.createdAt),
-  });
-}
-```
-
-### Type Guard for Optional Properties
-
-```typescript
-// ✅ Correct: Conditional spread for optional properties
-const data = {
-  id: uuid(),
-  ...(name && { name }), // Only adds if name exists
-  ...(description && { description }),
-};
-
-// ❌ Wrong: Direct assignment of potentially undefined
-const data = { name: value }; // Error with exactOptionalPropertyTypes
-```
-
-### Server Component Pattern
-
-```typescript
-export default async function MachineIssuesPage({
-  params
-}: {
-  params: { machineId: string }
-}) {
-  const issues = await getIssuesForMachine(params.machineId);
-
-  return (
-    <div>
-      {issues.map((issue) => (
-        <IssueCard key={issue.id} issue={issue} />
-      ))}
-    </div>
-  );
-}
-```
-
-### Form with Progressive Enhancement
-
-```typescript
-// ✅ Good: Direct Server Action reference
-<form action={updateProfile}>
-  <input name="name" required />
-  <button type="submit">Save</button>
-</form>
-
-// ❌ Bad: Inline wrapper (breaks Next.js form handling)
-<form action={async () => { await updateProfile(); }}>
-```
-
-### Dropdown with Server Action
-
-```typescript
-// ✅ Good: Use onSelect for Server Actions in dropdowns
-<DropdownMenuItem
-  onSelect={async () => {
-    await deleteIssue(issueId);
-  }}
->
-  Delete
-</DropdownMenuItem>
-
-// ❌ Bad: Form inside dropdown (unmounts before submission completes)
-<DropdownMenuItem>
-  <form action={deleteIssue}>
-    <button>Delete</button>
-  </form>
-</DropdownMenuItem>
-```
-
-## Worktree Port Allocation
-
-| Worktree    | Next.js | Supabase API | PostgreSQL | project_id           |
-| ----------- | ------- | ------------ | ---------- | -------------------- |
-| Main        | 3000    | 54321        | 54322      | pinpoint             |
-| Secondary   | 3100    | 55321        | 55322      | pinpoint-secondary   |
-| Review      | 3200    | 56321        | 56322      | pinpoint-review      |
-| AntiGravity | 3300    | 57321        | 57322      | pinpoint-antigravity |
-
-**Note**: Each worktree uses `skip-worktree` for `supabase/config.toml`. Use `scripts/sync_worktrees.py` to manage.
-
-**Warning**: Escape parentheses in paths: `src/app/\(app\)` not `src/app/(app)`.
-
-## Agent Skills (Progressive Disclosure)
-
-**What are Agent Skills?**
-Agent Skills provide on-demand detailed guidance without loading everything upfront. They use progressive disclosure: metadata loads first (~100 tokens per skill), full content loads only when relevant.
-
-**Supported agents**: Claude Code, GitHub Copilot (as of Dec 18, 2025)
-**Coming soon**: gemini-cli
-
-**Available skills** (in `.claude/skills/` and `.github/skills/`):
-
-- `pinpoint-security` - CSP nonces, auth checks, input validation, Supabase SSR
-- `pinpoint-testing` - Test pyramid, PGlite patterns, Playwright best practices
-- `pinpoint-typescript` - Strictest patterns, type guards, optional properties
-- `pinpoint-ui` - shadcn/ui, progressive enhancement, Server Components
-- `pinpoint-patterns` - Server Actions, data fetching, error handling
-
-**If your agent doesn't support skills yet:**
-Read the skill files directly for full context. Each skill is a single Markdown file:
+Fetch all comments (including hidden ones):
 
 ```bash
-cat .claude/skills/pinpoint-security/SKILL.md    # Security patterns
-cat .claude/skills/pinpoint-testing/SKILL.md     # Testing strategy
-cat .claude/skills/pinpoint-typescript/SKILL.md  # TypeScript patterns
-cat .claude/skills/pinpoint-ui/SKILL.md          # UI/component patterns
-cat .claude/skills/pinpoint-patterns/SKILL.md    # Project patterns
+gh api graphql -f query='{ repository(owner: "timothyfroehlich", name: "PinPoint") { pullRequest(number: <PR_NUMBER>) { reviews(last: 5) { nodes { author { login } state comments(first: 20) { nodes { path line body } } } } } } }'
 ```
 
-## Documentation & Skills Reference
+## 5. Current Priorities (MVP+ Polish)
 
-For detailed guidance, use Agent Skills (if supported) or reference docs directly:
+**Status**: Soft-launched. Active users.
 
-**Security**
+1.  **Critical Fixes**:
+    - Fix Password Reset in Prod (Issue #792).
+    - Security: Fix Host Header Injection in Auth (PR #781).
+2.  **Feature Development**:
+    - **Search & Filtering**: Build out search pane (`feature/issue-filter-search`).
+    - **Photo Uploads**: Attach photos to issues/machines.
+3.  **UI Polish**:
+    - Redesign Issue Status/Priority Dropdowns (#744).
+    - Pagination for Issue List (#752).
+    - Highlight machine owners (#753).
+    - Refactor MainLayout Header (#693).
+4.  **Code Hygiene**:
+    - Delete CHANGELOG.md and references (#776).
+    - General DRY/refactoring.
 
-- Skill: `pinpoint-security` (CSP, auth patterns, input validation)
-- Docs: @docs/SECURITY.md, @docs/NON_NEGOTIABLES.md#security
+## 6. Documentation Philosophy
 
-**Testing**
-
-- Skill: `pinpoint-testing` (test pyramid, PGlite patterns, Playwright)
-- Docs: @docs/TESTING_PLAN.md, @docs/E2E_BEST_PRACTICES.md
-
-**TypeScript**
-
-- Skill: `pinpoint-typescript` (type guards, optional properties, Drizzle safety)
-- Docs: @docs/TYPESCRIPT_STRICTEST_PATTERNS.md
-
-**UI/Components**
-
-- Skill: `pinpoint-ui` (shadcn/ui, Server Components, progressive enhancement)
-- Docs: @docs/UI_GUIDE.md, @docs/patterns/ui-patterns/\*
-
-**Patterns**
-
-- Skill: `pinpoint-patterns` (Server Actions, data fetching, error handling)
-- Docs: @docs/PATTERNS.md, @docs/patterns/\*
-
-**Product/Architecture** (no skills, use docs directly):
-
-- @docs/PRODUCT_SPEC.md - Feature specifications (MVP/MVP+/1.0/2.0)
-- @docs/TECH_SPEC.md - Single-tenant architecture
-- @docs/V2_ROADMAP.md - Deferred features
-
-## Testing Strategy
-
-**Distribution (100-150 tests total)**:
-
-- 70% Unit (~70-100): Pure functions, utilities, validation
-- 25% Integration (~25-35): DB queries with worker-scoped PGlite
-- 5% E2E (~5-10): Critical flows only (Playwright)
-
-**Dev Loop**:
-
-| Command                             | When to use                      |
-| ----------------------------------- | -------------------------------- |
-| `pnpm run check`                    | After ANY code change (~5s)      |
-| `pnpm test -- path/to/file.test.ts` | Debug specific test              |
-| `pnpm run preflight`                | Before commit (full suite, ~60s) |
-| **Mobile Safari**                   | **DO NOT RUN LOCALLY** (CI only) |
-
-**Key Constraints**:
-
-- Worker-scoped PGlite only (no per-test instances)
-- No testing Server Components directly (use E2E)
-- Test behavior, not implementation
-
-## Coding Standards
-
-**TypeScript**: Strictest config - no `any`, no `!`, no unsafe `as`. Explicit return types for public functions.
-
-**Naming**:
-
-- Components: PascalCase files (`IssueCard.tsx`)
-- Client Components: `"use client"` directive at top
-- Hooks: `useThing.ts`
-- DB: snake_case schema, convert to camelCase at boundaries
-
-**Database**: Use migrations, not `push`. Schema is source of truth - code adapts to schema, never modify schema to fix TypeScript errors.
-
-## Scope Control
-
-**The Scope Firewall** (defer if answers are No/No/Yes):
-
-1. Does this solve a problem we have RIGHT NOW?
-2. Does this block achieving the core value proposition?
-3. Can we ship MVP without this?
-
-**"Done Enough" Standard** (ship if all Yes):
-
-1. Works for happy path?
-2. Handles most common error case?
-3. Has at least one test?
-4. Secure (input validation, auth checks)?
-5. Readable by someone else?
-
-## Commit Guidelines
-
-- **Style**: Conventional commits (`feat:`, `fix:`, `chore:`)
-- **Process**: Run `pnpm run preflight` → commit → push
-- **Hooks**: Husky + lint-staged enforce quality gates
-
-## GitHub Copilot Reviews
-
-When an agent or user requests a review from `@github/copilot`, the resulting inline comments may not be fully visible via basic `gh pr view` commands.
-
-**To fetch all review comments from Copilot:**
-
-```bash
-gh api graphql -f query='
-{
-  repository(owner: "timothyfroehlich", name: "PinPoint") {
-    pullRequest(number: <PR_NUMBER>) {
-      reviews(last: 5) {
-        nodes {
-          author { login }
-          state
-          comments(first: 20) {
-            nodes {
-              path
-              line
-              body
-            }
-          }
-        }
-      }
-    }
-  }
-}'
-```
+- Actionable information only - focus on "what" and "how", not "why"
+- Designed for efficient LLM consumption
+- Skills provide deep dives on-demand
