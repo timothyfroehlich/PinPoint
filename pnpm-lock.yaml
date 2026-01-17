@@ -129,6 +129,9 @@ importers:
       '@eslint/js':
         specifier: ^9.39.2
         version: 9.39.2
+      '@onlook/nextjs':
+        specifier: ^2.1.1
+        version: 2.1.1
       '@playwright/test':
         specifier: ^1.57.0
         version: 1.57.0
@@ -1311,6 +1314,9 @@ packages:
   '@nolyfill/is-core-module@1.0.39':
     resolution: {integrity: sha512-nn5ozdjYQpUCZlWGuxcJY/KpxkWQs4DcbMCmKojjyrYDEAGy4Ce19NN4v5MduafTwJlbKc99UA8YhSVqq9yPZA==}
     engines: {node: '>=12.4.0'}
+
+  '@onlook/nextjs@2.1.1':
+    resolution: {integrity: sha512-BHqR2JWlRNj7p6HEW/Ug358xx+kDNAyrpoZgY8Quv90Cw3PEpIurDz6ztGAUUfB27mkJ/bKEosksYd0302tPNg==}
 
   '@opentelemetry/api-logs@0.208.0':
     resolution: {integrity: sha512-CjruKY9V6NMssL/T1kAFgzosF1v9o6oeN+aX5JB/C/xPNtmgIJqcXHG7fA82Ou1zCpWGl4lROQUKwUNE1pMCyg==}
@@ -6967,6 +6973,8 @@ snapshots:
       fastq: 1.20.1
 
   '@nolyfill/is-core-module@1.0.39': {}
+
+  '@onlook/nextjs@2.1.1': {}
 
   '@opentelemetry/api-logs@0.208.0':
     dependencies:
