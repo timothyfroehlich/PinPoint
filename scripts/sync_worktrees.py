@@ -285,6 +285,7 @@ class Worktree:
             "inbucket_port": self.port_config.inbucket_port,
             "smtp_port": self.port_config.smtp_port,
             "pop3_port": self.port_config.pop3_port,
+            "refresh_token_reuse_interval": 60,  # Supabase default (more forgiving for E2E tests)
         }
 
         # Parse current values
@@ -297,6 +298,7 @@ class Worktree:
         current["inbucket_port"] = self._extract_port(content, r'^\[inbucket\].*?^port = (\d+)', re.MULTILINE | re.DOTALL)
         current["smtp_port"] = self._extract_port(content, r'^\[inbucket\].*?^smtp_port = (\d+)', re.MULTILINE | re.DOTALL)
         current["pop3_port"] = self._extract_port(content, r'^\[inbucket\].*?^pop3_port = (\d+)', re.MULTILINE | re.DOTALL)
+        current["refresh_token_reuse_interval"] = self._extract_port(content, r'^\[auth\].*?^refresh_token_reuse_interval = (\d+)', re.MULTILINE | re.DOTALL)
 
         # Check what needs fixing
         changes = []
@@ -337,6 +339,7 @@ class Worktree:
             content = self._replace_port_in_section(content, "inbucket", expected["inbucket_port"])
             content = self._ensure_inbucket_port(content, "smtp_port", expected["smtp_port"])
             content = self._ensure_inbucket_port(content, "pop3_port", expected["pop3_port"])
+            content = self._replace_port_in_section(content, "auth", expected["refresh_token_reuse_interval"], "refresh_token_reuse_interval")
 
             config_file.write_text(content)
 
@@ -515,38 +518,44 @@ SUPABASE_SERVICE_ROLE_KEY=
             return content + f"\n{key}={value}\n"
 
     def _fix_skip_worktree(self, is_main_worktree: bool) -> None:
-        """Fix skip-worktree flag on config.toml"""
-        try:
-            result = subprocess.run(
-                ["git", "-C", str(self.path), "ls-files", "-v", "supabase/config.toml"],
-                capture_output=True, text=True, check=True
-            )
-            skip_flag = result.stdout[0] if result.stdout else ""
+        """Fix skip-worktree flag on config.toml and schema.sql"""
+        files_to_manage = [
+            "supabase/config.toml",
+            "src/test/setup/schema.sql"
+        ]
 
-            if is_main_worktree:
-                # Main worktree should NOT have skip-worktree
-                if skip_flag == "S":
-                    if self.dry_run:
-                        print(f"[DRY-RUN] Would remove skip-worktree from {self.name}")
-                    else:
-                        subprocess.run(
-                            ["git", "-C", str(self.path), "update-index", "--no-skip-worktree", "supabase/config.toml"],
-                            check=True
-                        )
-                    self.state.config_messages.append("skip-worktree removed")
-            else:
-                # Others MUST have skip-worktree
-                if skip_flag != "S":
-                    if self.dry_run:
-                        print(f"[DRY-RUN] Would add skip-worktree to {self.name}")
-                    else:
-                        subprocess.run(
-                            ["git", "-C", str(self.path), "update-index", "--skip-worktree", "supabase/config.toml"],
-                            check=True
-                        )
-                    self.state.config_messages.append("skip-worktree added")
-        except subprocess.CalledProcessError:
-            pass  # File may not be tracked
+        for file_path in files_to_manage:
+            try:
+                result = subprocess.run(
+                    ["git", "-C", str(self.path), "ls-files", "-v", file_path],
+                    capture_output=True, text=True, check=True
+                )
+                skip_flag = result.stdout[0] if result.stdout else ""
+
+                if is_main_worktree:
+                    # Main worktree should NOT have skip-worktree
+                    if skip_flag == "S":
+                        if self.dry_run:
+                            print(f"[DRY-RUN] Would remove skip-worktree from {file_path} in {self.name}")
+                        else:
+                            subprocess.run(
+                                ["git", "-C", str(self.path), "update-index", "--no-skip-worktree", file_path],
+                                check=True
+                            )
+                        self.state.config_messages.append(f"skip-worktree removed from {file_path}")
+                else:
+                    # Others MUST have skip-worktree
+                    if skip_flag != "S":
+                        if self.dry_run:
+                            print(f"[DRY-RUN] Would add skip-worktree to {file_path} in {self.name}")
+                        else:
+                            subprocess.run(
+                                ["git", "-C", str(self.path), "update-index", "--skip-worktree", file_path],
+                                check=True
+                            )
+                        self.state.config_messages.append(f"skip-worktree added to {file_path}")
+            except subprocess.CalledProcessError:
+                pass  # File may not be tracked
 
     def fetch(self) -> None:
         """Fetch from origin"""
@@ -956,7 +965,7 @@ git reset --hard HEAD"""
         else:
             try:
                 subprocess.run(
-                    ["pnpm", "run", "test:_generate-schema", "--silent"],
+                    ["pnpm", "run", "test:_generate-schema"],
                     cwd=self.path,
                     capture_output=True,
                     timeout=60
