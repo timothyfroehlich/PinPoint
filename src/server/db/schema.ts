@@ -183,6 +183,9 @@ export const issues = pgTable(
     assignedToIdx: index("idx_issues_assigned_to").on(t.assignedTo),
     reportedByIdx: index("idx_issues_reported_by").on(t.reportedBy),
     statusIdx: index("idx_issues_status").on(t.status),
+    // Optimizing filters in Issue List
+    severityIdx: index("idx_issues_severity").on(t.severity),
+    priorityIdx: index("idx_issues_priority").on(t.priority),
     createdAtIdx: index("idx_issues_created_at").on(t.createdAt),
     invitedReportedByIdx: index("idx_issues_invited_reported_by").on(
       t.invitedReportedBy
