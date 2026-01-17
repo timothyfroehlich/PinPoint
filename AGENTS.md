@@ -52,6 +52,8 @@ We use git worktrees for parallel environments. Run `python3 scripts/sync_worktr
 - `pnpm run check` (**RUN OFTEN**): Fast check (types, lint, format, unit tests). ~5s.
 - `pnpm run preflight`: Full suite (check + build + integration). **Run before commit.**
 - `pnpm run db:migrate`: Apply schema changes locally.
+- `pnpm run db:backup`: Manual production data dump to `~/.pinpoint/db-backups` (verifies Supabase CLI link matches expected production project).
+- `pnpm run db:seed:from-prod`: Reset local DB and seed from the latest production backup.
 - `pnpm run test:e2e`: Full E2E suite (Don't run Safari locally on Linux).
 
 ### Safe Command Patterns
