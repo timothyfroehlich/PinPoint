@@ -1,5 +1,8 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
+import path from "path";
+
+const isDevelopment = process.env.NODE_ENV === "development";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -8,6 +11,12 @@ const nextConfig: NextConfig = {
   },
   // Keep pino and its worker dependency external so Turbopack doesn't try to bundle their test fixtures.
   serverExternalPackages: ["pino", "thread-stream"],
+  // Enable Onlook visual editor in development mode only
+  ...(isDevelopment && {
+    experimental: {
+      swcPlugins: [["@onlook/nextjs", { root: path.resolve(".") }]],
+    },
+  }),
   turbopack: {
     resolveAlias: {
       "~/*": "./src/*",

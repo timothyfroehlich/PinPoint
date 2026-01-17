@@ -60,6 +60,51 @@ If you’re trying to understand how to implement something, read:
    pnpm run preflight  # full gate: typecheck, lint, format, tests, build, int tests, smoke
    ```
 
+## Onlook Visual Editor (UX Prototyping)
+
+Onlook is an integrated visual editor that allows you to prototype and design UI directly in the browser while your Next.js app is running. It enables real-time visual editing of components, drag-and-drop rearrangement, and Tailwind CSS styling—all while keeping your code in sync.
+
+### What You Can Do with Onlook
+
+- **Visual Editing**: Edit React components directly in the browser with a Figma-like interface
+- **Drag & Drop**: Rearrange elements within their parent containers
+- **Style Manipulation**: Adjust Tailwind CSS classes visually in real-time
+- **Code Sync**: Changes are reflected in your actual source code
+- **AI Assistance**: Use AI-powered suggestions for design improvements
+
+### Enabling Onlook
+
+Onlook is disabled by default. To enable it in your local development environment:
+
+1. Set the environment variable in your `.env.local`:
+
+   ```bash
+   NEXT_PUBLIC_ONLOOK_ENABLED=true
+   ```
+
+2. Restart your dev server:
+
+   ```bash
+   pnpm run dev
+   ```
+
+3. Connect with the Onlook desktop app or web interface:
+   - **Onlook Desktop**: Download from [https://onlook.com](https://onlook.com)
+   - **Onlook Web**: Visit [https://onlook.com](https://onlook.com) and import your project
+
+### How It Works
+
+The `@onlook/nextjs` SWC plugin adds special `data-onlook-id` attributes to DOM elements during development. These IDs allow the Onlook editor to map elements back to their source code locations, enabling direct visual manipulation that updates your actual TypeScript/TSX files.
+
+### Important Notes
+
+- **Development Only**: Onlook is automatically disabled in production builds
+- **No Runtime Impact**: When disabled, Onlook adds zero overhead
+- **Source Code Changes**: Onlook writes changes directly to your source files, so review changes before committing
+- **Compatibility**: Works best with TailwindCSS-based styling (which PinPoint uses)
+
+For more information, see the [Onlook GitHub repository](https://github.com/onlook-dev/onlook).
+
 ## Testing Overview
 
 PinPoint uses the following test types (see `docs/TESTING_PLAN.md` for details):
