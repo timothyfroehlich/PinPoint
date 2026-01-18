@@ -7,10 +7,31 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 export default async function ReportSuccessPage({
   searchParams,
 }: {
-  searchParams: Promise<{ new_pending?: string }>;
+  searchParams: Promise<{
+    new_pending?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+  }>;
 }): Promise<React.JSX.Element> {
   const params = await searchParams;
   const isNewPending = params.new_pending === "true";
+
+  // Build signup URL with pre-filled name and email data
+  const signupParams = new URLSearchParams();
+  if (params.firstName) {
+    signupParams.set("firstName", params.firstName);
+  }
+  if (params.lastName) {
+    signupParams.set("lastName", params.lastName);
+  }
+  if (params.email) {
+    signupParams.set("email", params.email);
+  }
+  const signupUrl =
+    signupParams.toString() !== ""
+      ? `/signup?${signupParams.toString()}`
+      : "/signup";
 
   return (
     <main className="min-h-screen bg-surface py-12">
@@ -50,7 +71,7 @@ export default async function ReportSuccessPage({
                   size="sm"
                   className="w-full bg-primary text-on-primary"
                 >
-                  <Link href="/signup">Join PinPoint</Link>
+                  <Link href={signupUrl}>Join PinPoint</Link>
                 </Button>
               </div>
             )}

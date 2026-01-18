@@ -19,7 +19,11 @@ import { eq } from "drizzle-orm";
 export default async function SignupPage({
   searchParams,
 }: {
-  searchParams: Promise<{ email?: string }>;
+  searchParams: Promise<{
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+  }>;
 }): Promise<React.JSX.Element> {
   // Check if already logged in
   const supabase = await createClient();
@@ -31,7 +35,7 @@ export default async function SignupPage({
     redirect("/dashboard");
   }
 
-  const { email } = await searchParams;
+  const { email, firstName, lastName } = await searchParams;
   let initialData = undefined;
 
   if (email) {
@@ -47,8 +51,19 @@ export default async function SignupPage({
       };
     } else {
       // If email is provided but no invited user found, we still pre-fill the email
-      initialData = { email };
+      // Also include firstName and lastName from query params if provided
+      initialData = {
+        email,
+        ...(firstName && { firstName }),
+        ...(lastName && { lastName }),
+      };
     }
+  } else if (firstName || lastName) {
+    // No email but name provided (e.g., from report success page)
+    initialData = {
+      ...(firstName && { firstName }),
+      ...(lastName && { lastName }),
+    };
   }
 
   return (
