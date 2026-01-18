@@ -78,6 +78,8 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "drizzle-orm": "^0.45.1",
+    "google-auth-library": "^10.5.0",
+    "google-spreadsheet": "^5.0.2",
     "lucide-react": "^0.562.0",
     "next": "^16.1.1",
     "nodemailer": "^7.0.12",
