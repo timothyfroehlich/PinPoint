@@ -180,7 +180,7 @@ export function Sidebar({
           )}
         </div>
 
-        {/* Help / Changelog + Collapse (bottom) */}
+        {/* Help + Collapse (bottom) */}
         <div className="border-t border-border px-2 pt-3 pb-2 space-y-2">
           <div className="space-y-1">
             <NavItem
