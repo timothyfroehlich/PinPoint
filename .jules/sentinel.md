@@ -29,3 +29,9 @@
 **Vulnerability:** Found `TestAdminButton` containing hardcoded test credentials was statically imported into the login form, including the credentials in the production JavaScript bundle.
 **Learning:** Static imports of development-only components include their code (and secrets) in production bundles unless tree-shaken, which is unreliable for side-effect imports or complex components.
 **Prevention:** Use `next/dynamic` to lazily load development-only components, ensuring their code is split into a separate chunk that is never requested in production unless the component is rendered.
+
+## 2026-01-25 - Sensitive Information Exposure in User Invitation
+
+**Vulnerability:** Admin invitation actions (`inviteUser`, `resendInvite`) were throwing raw error messages (including potential SMTP error details) which were then displayed to the user via toast notifications.
+**Learning:** Even admin-only actions must be secure against information disclosure. Relying on `throw new Error(details)` in Server Actions often propagates the details to the client unless intercepted.
+**Prevention:** Always wrap external service calls (like Email, DB) in `try/catch` blocks in Server Actions. Log the full error securely on the server, and throw a generic, sanitized error message to the client.
