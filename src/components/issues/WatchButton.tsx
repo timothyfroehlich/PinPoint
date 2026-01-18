@@ -48,12 +48,12 @@ export function WatchButton({
       {isWatching ? (
         <>
           {!isPending && <EyeOff className="size-4" />}
-          {isPending ? "Unwatching..." : "Unwatch Issue"}
+          Unwatch Issue
         </>
       ) : (
         <>
           {!isPending && <Eye className="size-4" />}
-          {isPending ? "Watching..." : "Watch Issue"}
+          Watch Issue
         </>
       )}
     </Button>
