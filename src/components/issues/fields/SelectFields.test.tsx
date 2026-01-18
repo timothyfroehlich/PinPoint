@@ -19,36 +19,21 @@ window.HTMLElement.prototype.scrollIntoView = vi.fn();
 describe("Issue Field Selects Accessibility", () => {
   it("SeveritySelect has dynamic accessible name", () => {
     const onValueChange = vi.fn();
-    render(
-      <SeveritySelect
-        value="major"
-        onValueChange={onValueChange}
-      />
-    );
+    render(<SeveritySelect value="major" onValueChange={onValueChange} />);
     const trigger = screen.getByRole("combobox");
     expect(trigger).toHaveAttribute("aria-label", "Severity: Major");
   });
 
   it("StatusSelect has dynamic accessible name", () => {
     const onValueChange = vi.fn();
-    render(
-      <StatusSelect
-        value="in_progress"
-        onValueChange={onValueChange}
-      />
-    );
+    render(<StatusSelect value="in_progress" onValueChange={onValueChange} />);
     const trigger = screen.getByRole("combobox");
     expect(trigger).toHaveAttribute("aria-label", "Status: In Progress");
   });
 
   it("PrioritySelect has dynamic accessible name", () => {
     const onValueChange = vi.fn();
-    render(
-      <PrioritySelect
-        value="high"
-        onValueChange={onValueChange}
-      />
-    );
+    render(<PrioritySelect value="high" onValueChange={onValueChange} />);
     const trigger = screen.getByRole("combobox");
     expect(trigger).toHaveAttribute("aria-label", "Priority: High");
   });
@@ -56,10 +41,7 @@ describe("Issue Field Selects Accessibility", () => {
   it("ConsistencySelect has dynamic accessible name", () => {
     const onValueChange = vi.fn();
     render(
-      <ConsistencySelect
-        value="frequent"
-        onValueChange={onValueChange}
-      />
+      <ConsistencySelect value="frequent" onValueChange={onValueChange} />
     );
     const trigger = screen.getByRole("combobox");
     expect(trigger).toHaveAttribute("aria-label", "Consistency: Frequent");
