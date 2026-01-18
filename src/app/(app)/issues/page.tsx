@@ -5,7 +5,7 @@ import { db } from "~/server/db";
 import { issues } from "~/server/db/schema";
 import { IssueFilters } from "~/components/issues/IssueFilters";
 import { IssueRow } from "~/components/issues/IssueRow";
-import { CheckCircle2, Search } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { redirect } from "next/navigation";
 import type {
@@ -143,13 +143,6 @@ export default async function IssuesPage({
     invitedReporter: { name: string } | null;
   })[];
 
-  const currentMachine = machine
-    ? allMachines.find((m) => m.initials === machine)
-    : null;
-
-  // If status is not explicitly 'closed' (so it's open or default), treat empty state as success
-  const isLookingAtOpenIssues = status !== "closed";
-
   return (
     <div className="container mx-auto max-w-5xl py-8 px-4 sm:px-6">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -176,31 +169,15 @@ export default async function IssuesPage({
               ))}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-center animate-in fade-in zoom-in duration-300">
-              {isLookingAtOpenIssues ? (
-                <>
-                  <div className="rounded-full bg-success/10 p-4 mb-4">
-                    <CheckCircle2 className="size-8 text-success" />
-                  </div>
-                  <h3 className="text-lg font-medium">All Clear!</h3>
-                  <p className="text-muted-foreground max-w-sm mt-2">
-                    {currentMachine
-                      ? `${currentMachine.name} is ready to play.`
-                      : "No open issues found. All systems operational."}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="rounded-full bg-muted p-4 mb-4">
-                    <Search className="size-8 text-muted-foreground" />
-                  </div>
-                  <h3 className="text-lg font-medium">No matches found</h3>
-                  <p className="text-muted-foreground max-w-sm mt-2">
-                    We couldn&apos;t find any issues matching your current
-                    filters. Try adjusting or clearing them.
-                  </p>
-                </>
-              )}
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="rounded-full bg-muted p-4 mb-4">
+                <AlertTriangle className="size-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-medium">No issues found</h3>
+              <p className="text-muted-foreground max-w-sm mt-2">
+                We couldn&apos;t find any issues matching your current filters.
+                Try adjusting or clearing them.
+              </p>
             </div>
           )}
         </div>
