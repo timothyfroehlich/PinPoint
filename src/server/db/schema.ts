@@ -114,7 +114,6 @@ export const machines = pgTable(
     invitedOwnerIdIdx: index("idx_machines_invited_owner_id").on(
       t.invitedOwnerId
     ),
-    nameIdx: index("idx_machines_name").on(t.name),
   })
 );
 
