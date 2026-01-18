@@ -68,7 +68,8 @@ describe("Public Issue Reporting Security", () => {
 
   it("should return generic error message on server error", async () => {
     // Simulate a sensitive DB error
-    const sensitiveError = "duplicate key value violates unique constraint 'users_email_key'";
+    const sensitiveError =
+      "duplicate key value violates unique constraint 'users_email_key'";
     vi.mocked(createIssue).mockRejectedValue(new Error(sensitiveError));
 
     const formData = new FormData();
@@ -85,12 +86,16 @@ describe("Public Issue Reporting Security", () => {
     // VERIFY: Error should be generic, not the sensitive one
     // Note: This expectation is designed to fail BEFORE the fix
     if (result.error === sensitiveError) {
-        // Test failed (vulnerability confirmed) - we expect this initially
-        expect(result.error).toBe("Unable to submit the issue. Please try again.");
+      // Test failed (vulnerability confirmed) - we expect this initially
+      expect(result.error).toBe(
+        "Unable to submit the issue. Please try again."
+      );
     } else {
-        // If it's already generic (unexpected), assertion will pass
-        expect(result.error).not.toContain("duplicate key");
-        expect(result.error).toBe("Unable to submit the issue. Please try again.");
+      // If it's already generic (unexpected), assertion will pass
+      expect(result.error).not.toContain("duplicate key");
+      expect(result.error).toBe(
+        "Unable to submit the issue. Please try again."
+      );
     }
   });
 });
