@@ -79,6 +79,7 @@ node_modules/
 supabase/.temp/
 supabase/.branches/
 supabase/config.toml.bak.*
+supabase/config.toml  # Generated from config.toml.template (worktree-specific)
 
 # Archived v1 test artifacts and build caches
 # (should have been ignored in v1, preventing future similar issues)
