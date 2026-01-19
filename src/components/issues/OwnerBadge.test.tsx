@@ -8,7 +8,7 @@ describe("OwnerBadge", () => {
 
     const badge = screen.getByTestId("owner-badge");
     expect(badge).toBeInTheDocument();
-    expect(badge).toHaveTextContent("Owner");
+    expect(badge).toHaveTextContent("Game Owner");
   });
 
   it("renders with default size", () => {

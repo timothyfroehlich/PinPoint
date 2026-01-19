@@ -30,7 +30,7 @@ export function OwnerBadge({
       data-testid="owner-badge"
     >
       <Crown className="size-3" />
-      Owner
+      Game Owner
     </Badge>
   );
 }

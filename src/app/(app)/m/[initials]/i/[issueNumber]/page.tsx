@@ -184,7 +184,7 @@ export default async function IssueDetailPage({
           {ownerName && (
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <span>•</span>
-              <span>Owner:</span>
+              <span>Game Owner:</span>
               <span className="font-medium text-foreground">{ownerName}</span>
               <OwnerBadge size="sm" />
             </div>
