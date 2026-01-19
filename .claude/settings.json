@@ -12,6 +12,7 @@
       "WebFetch(domain:prettier.io)",
       "WebFetch(domain:docs.npmjs.com)",
       "Bash(pnpm test:*)",
+      "Bash(pnpm test:*)",
       "Bash(pnpm run typecheck:*)",
       "Bash(pnpm run typecheck:brief:*)",
       "Bash(pnpm run build:*)",
@@ -74,6 +75,9 @@
     ]
   },
   "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "playwright"
+  ],
   "hooks": {
     "PostToolUse": [
       {
@@ -102,10 +106,11 @@
   },
   "enabledPlugins": {
     "context7@claude-plugins-official": true,
+    "github@claude-plugins-official": true,
     "code-review@claude-plugins-official": true,
     "commit-commands@claude-plugins-official": true,
-    "supabase@claude-plugins-official": false,
-    "vercel@claude-plugins-official": false,
+    "supabase@claude-plugins-official": true,
+    "vercel@claude-plugins-official": true,
     "code-simplifier@claude-plugins-official": true
   }
 }

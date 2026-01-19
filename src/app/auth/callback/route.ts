@@ -9,9 +9,14 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import { type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
-import { getSiteUrl, isInternalUrl } from "~/lib/url";
+import { isInternalUrl } from "~/lib/url";
 
-export function resolveRedirectPath(nextParam: string | null): string {
+export function resolveRedirectPath(options: {
+  nextParam: string | null;
+  origin: string;
+  forwardedHost: string | null;
+}): string {
+  const { nextParam, origin, forwardedHost } = options;
   const fallback = "/";
 
   if (!nextParam) {
@@ -22,13 +27,16 @@ export function resolveRedirectPath(nextParam: string | null): string {
     return nextParam;
   }
 
-  // Allow absolute URLs that point to the configured site URL only.
+  // Allow absolute URLs that point to this host only; drop origin to prevent open redirects.
   try {
-    const siteUrl = getSiteUrl();
-    const siteHost = new URL(siteUrl).host;
-    const parsed = new URL(nextParam);
+    const originHost = new URL(origin).host;
+    const allowedHosts = new Set([originHost]);
+    if (forwardedHost) {
+      allowedHosts.add(forwardedHost);
+    }
 
-    if (parsed.host === siteHost) {
+    const parsed = new URL(nextParam, origin);
+    if (allowedHosts.has(parsed.host)) {
       const normalizedPath = `${parsed.pathname}${parsed.search}${parsed.hash}`;
       if (isInternalUrl(normalizedPath)) {
         return normalizedPath;
@@ -55,30 +63,30 @@ export function resolveRedirectPath(nextParam: string | null): string {
  * @see https://supabase.com/docs/guides/auth/server-side/nextjs
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const { searchParams } = new URL(request.url);
+  const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");
   const typeParam = searchParams.get("type");
   const nextParam = searchParams.get("next") ?? "/";
 
-  // Security: Always use configured site URL for redirects, never trust Host header
-  const next = resolveRedirectPath(nextParam);
-  const siteUrl = getSiteUrl();
-
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const next = resolveRedirectPath({ nextParam, origin, forwardedHost });
+  const isLocalEnv = process.env.NODE_ENV === "development";
   const shouldUseLoadingScreen = next === "/reset-password";
   const redirectPath = shouldUseLoadingScreen
     ? `/auth/loading?next=${encodeURIComponent(next)}`
     : next;
 
-  // Ensure redirectPath starts with / to avoid double slashes if siteUrl has trailing slash
-  // getSiteUrl() typically does not have trailing slash, but good to be safe.
-  // Actually getSiteUrl implementation: return `...` (no trailing slash usually).
-  // But redirectPath from resolveRedirectPath always starts with / due to isInternalUrl check.
-
-  const targetUrl = `${siteUrl}${redirectPath}`;
-
   const redirectToTarget = (): NextResponse => {
-    return NextResponse.redirect(targetUrl);
+    if (isLocalEnv) {
+      return NextResponse.redirect(`${origin}${redirectPath}`);
+    }
+
+    if (forwardedHost) {
+      return NextResponse.redirect(`https://${forwardedHost}${redirectPath}`);
+    }
+
+    return NextResponse.redirect(`${origin}${redirectPath}`);
   };
 
   const supabaseClient = createSupabaseClient(request);
@@ -120,9 +128,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   // Auth failed or no code - redirect to error page
-  // Use siteUrl for error page redirect too
   return applyCookies(
-    NextResponse.redirect(`${siteUrl}/auth/auth-code-error`),
+    NextResponse.redirect(`${origin}/auth/auth-code-error`),
     pendingCookies
   );
 }

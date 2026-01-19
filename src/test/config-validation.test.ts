@@ -3,9 +3,9 @@ import { readFileSync } from "fs";
 import { join } from "path";
 
 describe("Configuration Validation", () => {
-  it("should have all required ports in config.toml.template", () => {
-    // Read config.toml.template to extract redirect URLs
-    const configPath = join(process.cwd(), "supabase/config.toml.template");
+  it("should have all required ports in config.toml", () => {
+    // Read config.toml to extract redirect URLs
+    const configPath = join(process.cwd(), "supabase/config.toml");
     const configContent = readFileSync(configPath, "utf-8");
 
     // Extract additional_redirect_urls array
@@ -29,8 +29,8 @@ describe("Configuration Validation", () => {
   });
 
   it("should have all redirect URL variants for each port", () => {
-    // Read config.toml.template
-    const configPath = join(process.cwd(), "supabase/config.toml.template");
+    // Read config.toml
+    const configPath = join(process.cwd(), "supabase/config.toml");
     const configContent = readFileSync(configPath, "utf-8");
 
     const redirectMatch = /additional_redirect_urls = \[([\s\S]*?)\]/.exec(

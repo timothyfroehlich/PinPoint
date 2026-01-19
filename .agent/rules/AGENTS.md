@@ -1,0 +1,1 @@
+/home/froeht/Code/PinPoint-AntiGravity/AGENTS.md

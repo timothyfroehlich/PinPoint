@@ -24,10 +24,7 @@ describe("WatchButton", () => {
   });
 
   it("calls toggleWatcherAction on click", async () => {
-    (toggleWatcherAction as any).mockResolvedValue({
-      ok: true,
-      value: { isWatching: true },
-    });
+    (toggleWatcherAction as any).mockResolvedValue({ ok: true, value: { isWatching: true } });
 
     render(<WatchButton issueId="123" initialIsWatching={false} />);
 
