@@ -1,6 +1,6 @@
 {
-  "id": "2ec68f46-8ae5-476c-a625-e9e2b403850a",
-  "prevId": "fa772082-303a-4400-a6f3-66b94a7985f8",
+  "id": "eabb8c9f-09a6-4f7a-b573-edd280d58d27",
+  "prevId": "2ec68f46-8ae5-476c-a625-e9e2b403850a",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -463,6 +463,36 @@
           "columns": [
             {
               "expression": "invited_reported_by",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_issues_severity": {
+          "name": "idx_issues_severity",
+          "columns": [
+            {
+              "expression": "severity",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_issues_priority": {
+          "name": "idx_issues_priority",
+          "columns": [
+            {
+              "expression": "priority",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
