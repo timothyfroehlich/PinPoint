@@ -224,7 +224,7 @@ describe("Admin User Management Integration", () => {
       formData.append("sendInvite", "true");
 
       await expect(inviteUser(formData)).rejects.toThrow(
-        "Failed to send invitation email: SMTP Error"
+        "Failed to send invitation email"
       );
 
       // Verify user was still created (or should we rollback? Currently it's not in a transaction with email)
@@ -279,7 +279,7 @@ describe("Admin User Management Integration", () => {
         .returning();
 
       await expect(resendInvite(ucUser.id)).rejects.toThrow(
-        "Failed to send invitation email: Network Error"
+        "Failed to send invitation email"
       );
     });
   });

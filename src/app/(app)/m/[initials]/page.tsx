@@ -1,13 +1,12 @@
 import type React from "react";
 import { notFound, redirect } from "next/navigation";
 import { getUnifiedUsers } from "~/lib/users/queries";
-import type { UnifiedUser, IssueStatus } from "~/lib/types";
 import { cn } from "~/lib/utils";
 import Link from "next/link";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { machines, userProfiles } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
+import { machines, issues, userProfiles } from "~/server/db/schema";
+import { eq, notInArray, sql } from "drizzle-orm";
 import {
   deriveMachineStatus,
   getMachineStatusLabel,
@@ -62,57 +61,69 @@ export default async function MachineDetailPage({
   const isMemberOrAdmin =
     currentUserProfile?.role === "member" ||
     currentUserProfile?.role === "admin";
-
-  // Query machine with issues (direct Drizzle query - no DAL)
-  const machine = await db.query.machines.findFirst({
-    where: eq(machines.initials, initials),
-    with: {
-      issues: {
-        columns: {
-          id: true,
-          issueNumber: true,
-          title: true,
-          status: true,
-          severity: true,
-          priority: true,
-          consistency: true,
-          machineInitials: true,
-          createdAt: true,
-        },
-        orderBy: (issues, { desc }) => [desc(issues.createdAt)],
-      },
-      owner: {
-        columns: {
-          id: true,
-          name: true,
-          avatarUrl: true,
-          ...(isMemberOrAdmin && { email: true }),
-        },
-      },
-      invitedOwner: {
-        columns: {
-          id: true,
-          name: true,
-          ...(isMemberOrAdmin && { email: true }),
-        },
-      },
-    },
-  });
-
   const isAdmin = currentUserProfile?.role === "admin";
 
-  let allUsers: UnifiedUser[] = [];
-  if (isAdmin) {
-    allUsers = await getUnifiedUsers();
-  }
+  // Execute independent queries in parallel (CORE-PERF-001)
+  const [machine, totalIssuesCountResult, allUsers] = await Promise.all([
+    // Query 1: Machine with OPEN issues only
+    db.query.machines.findFirst({
+      where: eq(machines.initials, initials),
+      with: {
+        issues: {
+          // Filter to only OPEN issues to reduce payload
+          where: notInArray(issues.status, [...CLOSED_STATUSES]),
+          columns: {
+            id: true,
+            issueNumber: true,
+            title: true,
+            status: true,
+            severity: true,
+            priority: true,
+            consistency: true,
+            machineInitials: true,
+            createdAt: true,
+          },
+          orderBy: (issues, { desc }) => [desc(issues.createdAt)],
+        },
+        owner: {
+          columns: {
+            id: true,
+            name: true,
+            avatarUrl: true,
+            ...(isMemberOrAdmin && { email: true }),
+          },
+        },
+        invitedOwner: {
+          columns: {
+            id: true,
+            name: true,
+            ...(isMemberOrAdmin && { email: true }),
+          },
+        },
+      },
+    }),
+
+    // Query 2: Total count of ALL issues for this machine
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(issues)
+      .where(eq(issues.machineInitials, initials)),
+
+    // Query 3: All users (if admin)
+    isAdmin ? getUnifiedUsers() : Promise.resolve([]),
+  ]);
 
   // 404 if machine not found
   if (!machine) {
     notFound();
   }
 
+  const totalIssuesCount = totalIssuesCountResult[0]?.count ?? 0;
+  // machine.issues now contains only open issues due to the filter in the query
+  const openIssues = machine.issues;
+
   // Derive machine status
-  const machineStatus = deriveMachineStatus(machine.issues as IssueForStatus[]);
+  const machineStatus = deriveMachineStatus(openIssues as IssueForStatus[]);
 
   // Generate QR data for modal using dynamic host resolution
   const headersList = await headers();
@@ -124,13 +135,6 @@ export default async function MachineDetailPage({
     source: "qr",
   });
   const qrDataUrl = await generateQrPngDataUrl(reportUrl);
-
-  const openIssues = machine.issues.filter(
-    (issue) =>
-      !(CLOSED_STATUSES as readonly string[]).includes(
-        issue.status as IssueStatus
-      )
-  );
 
   return (
     <main className="min-h-screen bg-surface">
@@ -266,7 +270,7 @@ export default async function MachineDetailPage({
                         Total Issues
                       </p>
                       <p className="text-xl font-bold text-on-surface">
-                        {machine.issues.length}
+                        {totalIssuesCount}
                       </p>
                     </div>
                   </div>
@@ -283,7 +287,7 @@ export default async function MachineDetailPage({
                   Issues
                 </CardTitle>
                 <div className="flex gap-2">
-                  {machine.issues.length > 5 && (
+                  {totalIssuesCount > 5 && (
                     <Button
                       asChild
                       variant="ghost"
@@ -291,7 +295,7 @@ export default async function MachineDetailPage({
                       className="text-primary hover:text-primary hover:bg-primary/5"
                     >
                       <Link href={`/m/${machine.initials}/i`}>
-                        View All ({machine.issues.length})
+                        View All ({totalIssuesCount})
                       </Link>
                     </Button>
                   )}

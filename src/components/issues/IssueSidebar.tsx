@@ -3,6 +3,8 @@ import { Eye } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { SidebarActions } from "~/components/issues/SidebarActions";
 import { WatchButton } from "~/components/issues/WatchButton";
+import { OwnerBadge } from "~/components/issues/OwnerBadge";
+import { isUserMachineOwner } from "~/lib/issues/owner";
 import { type IssueWithAllRelations } from "~/lib/types";
 import { resolveIssueReporter } from "~/lib/issues/utils";
 
@@ -54,9 +56,14 @@ export function IssueSidebar({
                     {reporter.initial}
                   </div>
                   <div className="flex flex-col min-w-0 overflow-hidden">
-                    <span className="truncate text-sm font-medium text-foreground">
-                      {reporter.name}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm font-medium text-foreground">
+                        {reporter.name}
+                      </span>
+                      {isUserMachineOwner(issue, reporter.id) && (
+                        <OwnerBadge size="sm" />
+                      )}
+                    </div>
                     {reporter.email && (
                       <span className="truncate text-xs text-muted-foreground">
                         {reporter.email}

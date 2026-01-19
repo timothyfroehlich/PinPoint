@@ -2,9 +2,12 @@ import React from "react";
 import { formatDistanceToNow } from "date-fns";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { AddCommentForm } from "~/components/issues/AddCommentForm";
+import { OwnerBadge } from "~/components/issues/OwnerBadge";
+import { isUserMachineOwner } from "~/lib/issues/owner";
 import { type IssueWithAllRelations } from "~/lib/types";
 import { cn } from "~/lib/utils";
 import { resolveIssueReporter } from "~/lib/issues/utils";
+import { MessageSquare } from "lucide-react";
 
 // ----------------------------------------------------------------------
 // Types
@@ -16,6 +19,7 @@ interface TimelineEvent {
   id: string;
   type: TimelineEventType;
   author: {
+    id?: string | null;
     name: string;
     avatarFallback: string;
     email?: string | null | undefined;
@@ -28,9 +32,16 @@ interface TimelineEvent {
 // Components
 // ----------------------------------------------------------------------
 
-function TimelineItem({ event }: { event: TimelineEvent }): React.JSX.Element {
+function TimelineItem({
+  event,
+  issue,
+}: {
+  event: TimelineEvent;
+  issue: IssueWithAllRelations;
+}): React.JSX.Element {
   const isSystem = event.type === "system";
   const isIssue = event.type === "issue";
+  const isOwner = isUserMachineOwner(issue, event.author.id);
 
   return (
     <div className="relative flex gap-4">
@@ -53,12 +64,6 @@ function TimelineItem({ event }: { event: TimelineEvent }): React.JSX.Element {
       <div className="flex-1">
         {isSystem ? (
           <div className="flex items-center gap-2 py-1 text-xs leading-snug text-muted-foreground">
-            <span
-              className="font-medium text-foreground/80"
-              data-testid="timeline-system-author"
-            >
-              {event.author.name}
-            </span>
             <span>{event.content}</span>
             <span className="text-muted-foreground/40">&bull;</span>
             <span
@@ -85,6 +90,7 @@ function TimelineItem({ event }: { event: TimelineEvent }): React.JSX.Element {
                     >
                       {event.author.name}
                     </span>
+                    {isOwner && <OwnerBadge size="sm" />}
                     {event.author.email && (
                       <span className="text-xs text-muted-foreground font-normal">
                         {"<"}
@@ -140,6 +146,7 @@ export function IssueTimeline({
     id: `issue-${issue.id}`,
     type: "issue",
     author: {
+      id: reporter.id ?? null,
       name: reporter.name,
       avatarFallback: reporter.initial,
       email: reporter.email,
@@ -155,6 +162,7 @@ export function IssueTimeline({
       id: c.id,
       type: c.isSystem ? "system" : "comment",
       author: {
+        id: c.author?.id ?? null,
         name: authorName,
         avatarFallback: authorName.slice(0, 2).toUpperCase(),
         email: c.author?.email,
@@ -167,6 +175,9 @@ export function IssueTimeline({
   // 3. Combine
   const allEvents = [issueEvent, ...commentEvents];
 
+  // Check if there are no comments (only the initial issue)
+  const noComments = allEvents.length === 1;
+
   return (
     <div className="flex-1 space-y-6">
       <div className="relative">
@@ -176,8 +187,23 @@ export function IssueTimeline({
         {/* Events List */}
         <div className="relative flex flex-col space-y-6">
           {allEvents.map((event) => (
-            <TimelineItem key={event.id} event={event} />
+            <TimelineItem key={event.id} event={event} issue={issue} />
           ))}
+
+          {/* Delightful Empty State when no comments yet */}
+          {noComments && (
+            <div className="ml-16 rounded-xl border border-dashed border-muted-foreground/30 bg-muted/10 p-6 text-center animate-in fade-in zoom-in duration-300">
+              <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-full bg-muted">
+                <MessageSquare className="size-5 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-medium text-foreground">
+                No comments yet
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Start the conversation by adding a comment below.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Add Comment Form */}
