@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 # Check if supabase CLI is installed
 if ! command -v supabase &> /dev/null; then
