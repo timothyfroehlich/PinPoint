@@ -245,9 +245,9 @@ class Worktree:
 
     def validate_config(self) -> bool:
         """Validate configuration files"""
-        config_file = self.path / "supabase" / "config.toml"
-        if not config_file.exists():
-            self.state.config_messages.append("Missing supabase/config.toml")
+        template_file = self.path / "supabase" / "config.toml.template"
+        if not template_file.exists():
+            self.state.config_messages.append("Missing supabase/config.toml.template")
             self.state.update_status(StatusLevel.ERROR)
             return False
         return True
