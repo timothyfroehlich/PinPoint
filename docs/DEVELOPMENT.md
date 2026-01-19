@@ -157,6 +157,22 @@ For preview and production, we use **Automated Migrations** via Vercel build hoo
    - This applies pending migrations _before_ the new code is built and deployed.
    - Requires `DATABASE_URL` (or `DIRECT_URL` / `POSTGRES_URL`) to be set in the Vercel environment.
 
+3. **Migration State Mismatch (Troubleshooting)**:
+
+   If a migration fails with "relation does not exist" or similar errors, it usually means a migration was manually applied but not tracked in Drizzle's migration table.
+
+   **To fix:**
+
+   ```bash
+   # 1. Identify the failed migration number from Vercel build logs
+   # 2. Mark it as applied (replace 0001 with actual migration number):
+   DATABASE_URL=<production-url> tsx scripts/mark-migration-applied.ts 0001
+
+   # 3. Trigger a redeployment (push a trivial change or use Vercel UI)
+   ```
+
+   **Prevention:** Always use the automated migration system. Avoid manually running migrations in production/preview unless absolutely necessary.
+
 ## Troubleshooting
 
 ### Supabase Connection Issues
