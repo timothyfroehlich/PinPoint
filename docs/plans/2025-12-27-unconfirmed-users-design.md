@@ -691,4 +691,3 @@ type MachineOwner = {
 
 - `docs/PRODUCT_SPEC.md` - Update to mark MVP+ status
 - `docs/NON_NEGOTIABLES.md` - Add any new patterns/constraints
-- `CHANGELOG.md` - Document this feature when shipped
