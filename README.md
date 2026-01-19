@@ -120,7 +120,6 @@ pnpm run test         # unit + PGlite integration tests
 pnpm run test:integration   # Supabase-backed integration tests
 pnpm run smoke        # Playwright smoke E2E tests
 pnpm run preflight    # full local CI gate before pushing
-# See docs/E2E_DOCKER.md for running Safari tests locally via Docker
 ```
 
 For more detail, see `docs/DEVELOPMENT.md` and `docs/TESTING_PLAN.md`.
