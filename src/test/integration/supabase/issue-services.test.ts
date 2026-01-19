@@ -215,7 +215,7 @@ describe("Issue Service Functions (Integration)", () => {
   });
 
   describe("createIssue with reporter variations", () => {
-    it("should create an issue with guest reporter info and correct timeline message", async () => {
+    it("should create an issue with guest reporter info", async () => {
       const db = await getTestDb();
 
       const guestInfo = {
@@ -233,7 +233,7 @@ describe("Issue Service Functions (Integration)", () => {
       expect(issue.reporterEmail).toBe(guestInfo.reporterEmail);
       expect(issue.reportedBy).toBeNull();
 
-      // Verify timeline event
+      // Verify no initial timeline event is created
       const events = await db.query.issueComments.findMany({
         where: eq(issueComments.issueId, issue.id),
         orderBy: desc(issueComments.createdAt),
@@ -242,13 +242,10 @@ describe("Issue Service Functions (Integration)", () => {
       const reportEvent = events.find(
         (e: any) => e.isSystem && e.content.includes("Issue reported by")
       );
-      expect(reportEvent).toBeDefined();
-      expect(reportEvent?.content).toBe(
-        `Issue reported by ${guestInfo.reporterName}`
-      );
+      expect(reportEvent).toBeUndefined();
     });
 
-    it("should create an anonymous issue and correct timeline message", async () => {
+    it("should create an anonymous issue", async () => {
       const db = await getTestDb();
 
       const anonInfo = {
@@ -263,6 +260,7 @@ describe("Issue Service Functions (Integration)", () => {
       expect(issue.reporterEmail).toBeNull();
       expect(issue.reportedBy).toBeNull();
 
+      // Verify no initial timeline event is created
       const events = await db.query.issueComments.findMany({
         where: eq(issueComments.issueId, issue.id),
         orderBy: desc(issueComments.createdAt),
@@ -271,10 +269,10 @@ describe("Issue Service Functions (Integration)", () => {
       const reportEvent = events.find(
         (e: any) => e.isSystem && e.content.includes("Issue reported by")
       );
-      expect(reportEvent?.content).toBe("Issue reported by Guest");
+      expect(reportEvent).toBeUndefined();
     });
 
-    it("should create a member issue and correct timeline message", async () => {
+    it("should create a member issue", async () => {
       const db = await getTestDb();
 
       const memberInfo = {
@@ -290,6 +288,7 @@ describe("Issue Service Functions (Integration)", () => {
       expect(issue.reporterName).toBeNull();
       expect(issue.reporterEmail).toBeNull();
 
+      // Verify no initial timeline event is created
       const events = await db.query.issueComments.findMany({
         where: eq(issueComments.issueId, issue.id),
         orderBy: desc(issueComments.createdAt),
@@ -298,7 +297,7 @@ describe("Issue Service Functions (Integration)", () => {
       const reportEvent = events.find(
         (e: any) => e.isSystem && e.content.includes("Issue reported by")
       );
-      expect(reportEvent?.content).toBe("Issue reported by Test User");
+      expect(reportEvent).toBeUndefined();
     });
   });
 });

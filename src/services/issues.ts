@@ -132,22 +132,6 @@ export async function createIssue({
 
     if (!issue) throw new Error("Issue creation failed");
 
-    // 3. Create Timeline Event
-    let reporterDesc = reporterName ?? reporterEmail ?? "Guest";
-    if (reportedBy) {
-      const user = await tx.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, reportedBy),
-        columns: { name: true },
-      });
-      reporterDesc = user?.name ?? "Member";
-    }
-
-    await createTimelineEvent(
-      issue.id,
-      `Issue reported by ${reporterDesc}`,
-      tx
-    );
-
     log.info(
       {
         issueId: issue.id,
