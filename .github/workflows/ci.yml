@@ -297,6 +297,9 @@ jobs:
         with:
           version: latest
 
+      - name: Generate config.toml from template
+        run: cp supabase/config.toml.template supabase/config.toml
+
       - name: Start Supabase (minimal services for migrations)
         run: |
           supabase start -x "studio,realtime,storage-api,edge-runtime,logflare,vector,imgproxy,supavisor,postgres-meta"
