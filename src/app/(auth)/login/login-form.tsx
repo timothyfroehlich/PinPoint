@@ -3,12 +3,17 @@
 import type React from "react";
 import Link from "next/link";
 import { useActionState } from "react";
+import dynamic from "next/dynamic";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { loginAction, type LoginResult } from "~/app/(auth)/actions";
 import { cn } from "~/lib/utils";
-import { TestAdminButton } from "./TestAdminButton";
+
+// Lazily load TestAdminButton to prevent including test credentials in the production bundle
+const TestAdminButton = dynamic(() =>
+  import("./TestAdminButton").then((mod) => mod.TestAdminButton)
+);
 
 interface LoginFormProps {
   enableTestAdmin?: boolean;
