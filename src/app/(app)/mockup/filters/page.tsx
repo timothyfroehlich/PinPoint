@@ -8,6 +8,8 @@ import {
   Activity,
   User,
   Clock,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { MultiSelect, type Option } from "~/components/mockups/MultiSelect";
@@ -103,7 +105,7 @@ const MOCK_ISSUES: MockIssue[] = [
     priority: "high",
     severity: "major",
     machine: "AFM",
-    machineLabel: "AFM",
+    machineLabel: "Attack from Mars",
     assignee: "Tim F.",
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2),
     updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 4),
@@ -115,7 +117,7 @@ const MOCK_ISSUES: MockIssue[] = [
     priority: "high",
     severity: "unplayable",
     machine: "TZ",
-    machineLabel: "TZ",
+    machineLabel: "Twilight Zone",
     assignee: "Ryan C.",
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5),
     updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1),
@@ -127,7 +129,7 @@ const MOCK_ISSUES: MockIssue[] = [
     priority: "medium",
     severity: "major",
     machine: "MM",
-    machineLabel: "MM",
+    machineLabel: "Medieval Madness",
     assignee: "John D.",
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10),
     updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 48),
@@ -139,7 +141,7 @@ const MOCK_ISSUES: MockIssue[] = [
     priority: "low",
     severity: "cosmetic",
     machine: "MB",
-    machineLabel: "MB",
+    machineLabel: "Monster Bash",
     assignee: undefined,
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30),
     updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5),
@@ -151,7 +153,7 @@ const MOCK_ISSUES: MockIssue[] = [
     priority: "high",
     severity: "major",
     machine: "CV",
-    machineLabel: "CV",
+    machineLabel: "Cirqus Voltaire",
     assignee: "Tim F.",
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3),
     updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 1),
@@ -163,7 +165,7 @@ const MOCK_ISSUES: MockIssue[] = [
     priority: "medium",
     severity: "minor",
     machine: "TOTAN",
-    machineLabel: "TOTAN",
+    machineLabel: "Tales of Arabian Nights",
     assignee: "Ryan C.",
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 12),
     updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 12),
@@ -175,7 +177,7 @@ const MOCK_ISSUES: MockIssue[] = [
     priority: "low",
     severity: "minor",
     machine: "HOTTIP",
-    machineLabel: "HOTTIP",
+    machineLabel: "Hot Tip",
     assignee: "John D.",
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7),
     updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7),
@@ -187,7 +189,7 @@ const MOCK_ISSUES: MockIssue[] = [
     priority: "medium",
     severity: "cosmetic",
     machine: "TZ",
-    machineLabel: "TZ",
+    machineLabel: "Twilight Zone",
     assignee: "Tim F.",
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 14),
     updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 2),
@@ -199,7 +201,7 @@ const MOCK_ISSUES: MockIssue[] = [
     priority: "high",
     severity: "unplayable",
     machine: "MM",
-    machineLabel: "MM",
+    machineLabel: "Medieval Madness",
     assignee: "Ryan C.",
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2),
     updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 1),
@@ -211,16 +213,80 @@ const MOCK_ISSUES: MockIssue[] = [
     priority: "low",
     severity: "cosmetic",
     machine: "MB",
-    machineLabel: "MB",
+    machineLabel: "Monster Bash",
     assignee: undefined,
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 60),
     updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10),
+  },
+  {
+    id: "111",
+    title: "Upper playfield diverter sticking",
+    status: "new",
+    priority: "high",
+    severity: "major",
+    machine: "TZ",
+    machineLabel: "Twilight Zone",
+    assignee: "Ryan C.",
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1),
+    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 12),
+  },
+  {
+    id: "112",
+    title: "Coin mech jammed with token",
+    status: "confirmed",
+    priority: "medium",
+    severity: "minor",
+    machine: "AFM",
+    machineLabel: "Attack from Mars",
+    assignee: "Tim F.",
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2),
+    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2),
+  },
+  {
+    id: "113",
+    title: "Lower pop bumper fuse blowing",
+    status: "in_progress",
+    priority: "high",
+    severity: "major",
+    machine: "MM",
+    machineLabel: "Medieval Madness",
+    assignee: "John D.",
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3),
+    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 18),
+  },
+  {
+    id: "114",
+    title: "Skill shot optics misaligned",
+    status: "need_parts",
+    priority: "medium",
+    severity: "major",
+    machine: "CV",
+    machineLabel: "Cirqus Voltaire",
+    assignee: "Ryan C.",
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 15),
+    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3),
+  },
+  {
+    id: "115",
+    title: "Translator board loose connection",
+    status: "new",
+    priority: "low",
+    severity: "minor",
+    machine: "TOTAN",
+    machineLabel: "Tales of Arabian Nights",
+    assignee: undefined,
+    createdAt: new Date(),
+    updatedAt: new Date(),
   },
 ];
 
 export default function MockupFiltersPage(): React.JSX.Element {
   const [search, setSearch] = React.useState("");
   const [expanded, setExpanded] = React.useState(false);
+  const searchBarRef = React.useRef<HTMLDivElement>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const badgesContainerRef = React.useRef<HTMLDivElement>(null);
+  const [visibleBadgeCount, setVisibleBadgeCount] = React.useState(Infinity);
   const [selectedStatuses, setSelectedStatuses] = React.useState<string[]>([]);
   const [selectedMachines, setSelectedMachines] = React.useState<string[]>([]);
   const [selectedSeverities, setSelectedSeverities] = React.useState<string[]>(
@@ -243,6 +309,10 @@ export default function MockupFiltersPage(): React.JSX.Element {
     from?: Date | undefined;
     to?: Date | undefined;
   }>({});
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const pageSize = 10;
 
   const [sortState, setSortState] = React.useState<{
     column: keyof MockIssue | null;
@@ -340,6 +410,30 @@ export default function MockupFiltersPage(): React.JSX.Element {
     selectedSeverities,
     selectedPriorities,
     selectedAssignees,
+  ]);
+
+  // Text Width Measurement
+  const measureRef = React.useRef<HTMLSpanElement>(null);
+  const [textWidth, setTextWidth] = React.useState(0);
+
+  React.useEffect(() => {
+    if (measureRef.current) {
+      // Use getBoundingClientRect for more precision
+      setTextWidth(measureRef.current.getBoundingClientRect().width);
+    }
+  }, [search]);
+
+  // Reset to first page when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    search,
+    selectedStatuses,
+    selectedMachines,
+    selectedSeverities,
+    selectedPriorities,
+    selectedAssignees,
+    dateRange,
   ]);
 
   // Badge Logic
@@ -480,62 +574,195 @@ export default function MockupFiltersPage(): React.JSX.Element {
     selectedConsistencies.length +
     (dateRange.from ? 1 : 0);
 
+  // Layout State
+  // const [inputWidth, setInputWidth] = React.useState<string>("33%");
+
+  const [badgeAreaWidth, setBadgeAreaWidth] = React.useState(0);
+
+  // Calculate visible badges based on text collision and update input padding
+  React.useEffect(() => {
+    if (!searchBarRef.current) return;
+
+    const calculateLayout = (): void => {
+      requestAnimationFrame(() => {
+        if (!searchBarRef.current) return;
+
+        const containerWidth = searchBarRef.current.offsetWidth;
+        if (containerWidth === 0) return;
+
+        if (badgeList.length === 0) {
+          setVisibleBadgeCount(0);
+          return;
+        }
+
+        // Constants
+        const leftPadding = 12; // px-3 left
+        const rightPadding = 12; // px-3 right
+        const iconWidth = 16; // search icon
+        const iconGap = 8; // gap after icon
+        const plusBadgeWidth = 36; // Reserved for "+X"
+        const textBuffer = 6; // Space after text before collision
+
+        // Calculate where the text starts and ends
+        const textStartPosition = leftPadding + iconWidth + iconGap;
+        const textEndPosition = textStartPosition + textWidth + textBuffer;
+
+        // Calculate available space for badges on the right
+        // Badges are positioned with right-3 (12px from right edge)
+        const badgeAreaRightEdge = containerWidth - rightPadding;
+        const maxBadgeSpace = badgeAreaRightEdge - textEndPosition;
+
+        // Estimate badge widths
+        const badgeGap = 6;
+        const badgeWidths = badgeList.map((b) => b.label.length * 7.5 + 34);
+
+        // Check if all badges fit
+        let totalNeeded = badgeWidths.reduce((a, b) => a + b + badgeGap, 0);
+        if (badgeWidths.length > 0) totalNeeded -= badgeGap;
+
+        if (totalNeeded <= maxBadgeSpace) {
+          // All fit, show everything
+          setVisibleBadgeCount(badgeList.length);
+          return;
+        }
+
+        // Some don't fit. Reserve space for +X and fit what we can.
+        const spaceForVisible = Math.max(
+          0,
+          maxBadgeSpace - plusBadgeWidth - badgeGap
+        );
+
+        let used = 0;
+        let count = 0;
+        for (const w of badgeWidths) {
+          if (used + w <= spaceForVisible) {
+            used += w + badgeGap;
+            count++;
+          } else {
+            break;
+          }
+        }
+
+        setVisibleBadgeCount(count);
+
+        // Calculate total width of visible badges + +X badge (if shown) + gaps for input padding
+        const visibleBadgeWidth = badgeWidths
+          .slice(0, count)
+          .reduce((a, b) => a + b + badgeGap, 0);
+        const hasOverflow = count < badgeList.length;
+        const totalBadgeAreaWidth =
+          visibleBadgeWidth + (hasOverflow ? plusBadgeWidth + badgeGap : 0);
+        setBadgeAreaWidth(totalBadgeAreaWidth); // Removed safety margin to reduce dead space
+      });
+    };
+
+    calculateLayout();
+
+    const resizeObserver = new ResizeObserver(calculateLayout);
+    resizeObserver.observe(searchBarRef.current);
+
+    return () => resizeObserver.disconnect();
+  }, [badgeList, textWidth, totalActive]);
+
+  const visibleBadges = badgeList.slice(0, visibleBadgeCount);
+  const hiddenBadgeCount = badgeList.length - visibleBadgeCount;
+
   return (
     <div className="p-4 flex flex-col gap-4 max-w-7xl mx-auto">
       <div className="bg-card border rounded-lg shadow-sm divide-y">
         {/* Row 1: Integrated Search Bar (Full-width) */}
         <div className="p-3">
-          <div
-            className={cn(
-              "flex items-center gap-2 px-3 h-11 bg-background border rounded-md transition-all shadow-sm ring-offset-background",
-              "focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:border-ring/30"
-            )}
-          >
-            <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div className="flex items-center gap-2">
+            <div
+              ref={searchBarRef}
+              className={cn(
+                "flex items-center gap-2 px-3 h-11 bg-background border rounded-md transition-all shadow-sm ring-offset-background flex-1 relative",
+                "focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:border-ring/30"
+              )}
+            >
+              <Search className="h-4 w-4 text-muted-foreground shrink-0 relative z-10" />
 
-            <input
-              placeholder="Search issues..."
-              className="flex-1 min-w-0 h-full bg-transparent border-0 text-sm focus:outline-none placeholder:text-muted-foreground ml-1"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+              {/* Hidden text measurement span */}
+              <span
+                ref={measureRef}
+                className="absolute invisible whitespace-pre pointer-events-none"
+                style={{
+                  left: "36px",
+                  fontFamily: "inherit",
+                  fontSize: "0.875rem", // Match text-sm (14px)
+                  fontWeight: "400",
+                  letterSpacing: "normal",
+                }}
+              >
+                {search || ""}
+              </span>
 
-            <div className="flex items-center gap-1.5 shrink-0 overflow-hidden justify-end">
-              {badgeList.map((badge) => (
-                <Badge
-                  key={badge.id}
-                  variant="secondary"
-                  className="h-7 px-2 font-normal whitespace-nowrap gap-1 pr-1 bg-muted/40 border-muted hover:bg-muted"
-                >
-                  {badge.label}
-                  <X
-                    className="h-3 w-3 cursor-pointer hover:text-foreground pointer-events-auto"
-                    onPointerDown={(e) => {
-                      e.stopPropagation();
-                      badge.clear();
-                    }}
-                  />
-                </Badge>
-              ))}
+              <input
+                ref={inputRef}
+                placeholder="Search issues..."
+                className="flex-1 bg-transparent border-0 text-sm focus:outline-none placeholder:text-muted-foreground relative z-10"
+                style={{ paddingRight: `${badgeAreaWidth}px` }}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+
+              {/* Badges positioned absolutely on the right */}
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-20">
+                {visibleBadges.map((badge) => (
+                  <Badge
+                    key={badge.id}
+                    variant="secondary"
+                    className="h-7 px-2 font-normal whitespace-nowrap gap-1 pr-1 bg-muted/40 border-muted hover:bg-muted pointer-events-auto shrink-0"
+                  >
+                    {badge.label}
+                    <button
+                      type="button"
+                      className="ml-1 h-4 w-4 rounded-sm hover:bg-muted-foreground/20 flex items-center justify-center transition-colors relative z-10"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        badge.clear();
+                      }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                      }}
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                      }}
+                      aria-label={`Clear ${badge.label}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+                {hiddenBadgeCount > 0 && (
+                  <Badge
+                    variant="secondary"
+                    className="h-7 px-2 font-normal whitespace-nowrap bg-muted/40 border-muted hover:bg-muted pointer-events-auto shrink-0"
+                  >
+                    +{hiddenBadgeCount}
+                  </Badge>
+                )}
+              </div>
             </div>
 
-            {totalActive > 0 && (
-              <Button
-                variant="secondary"
-                size="sm"
-                className="h-7 px-2.5 rounded-full text-xs font-bold border border-muted-foreground/20 hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-colors shrink-0"
-                onClick={clearAll}
-              >
-                <X className="mr-1 h-3 w-3" />
-                Clear
-              </Button>
-            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-7 px-2.5 rounded-full text-xs font-bold border border-muted-foreground/20 hover:bg-destructive hover:text-destructive-foreground hover:border-destructive transition-colors shrink-0"
+              onClick={clearAll}
+            >
+              <X className="mr-1 h-3 w-3" />
+              Clear
+            </Button>
           </div>
         </div>
 
         {/* Row 2: Main Filter Selects */}
         <div className="p-3">
-          <div className="grid grid-cols-2 lg:grid-cols-6 gap-2">
+          <div className="grid grid-cols-3 lg:grid-cols-6 gap-2">
             <MultiSelect
               options={machineOptions}
               value={selectedMachines}
@@ -634,14 +861,54 @@ export default function MockupFiltersPage(): React.JSX.Element {
 
       <div className="mt-4">
         <div className="flex items-center justify-between mb-2 px-1">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            Issues Log
-            <Badge variant="secondary" className="ml-1 rounded-full font-bold">
-              {filteredIssues.length}
-            </Badge>
-          </h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              Issues Log
+              <Badge
+                variant="secondary"
+                className="ml-1 rounded-full font-bold"
+              >
+                {filteredIssues.length}
+              </Badge>
+            </h2>
+          </div>
+
+          <div className="flex-1" />
+
+          {/* Split Pagination (Far Right) */}
           <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground font-medium mr-2">
+              {(currentPage - 1) * pageSize + 1}-
+              {Math.min(currentPage * pageSize, filteredIssues.length)} of{" "}
+              {filteredIssues.length}
+            </span>
+            <div className="flex items-center gap-1 border rounded-md bg-muted/20 p-0.5">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="h-6 w-6 flex items-center justify-center rounded-sm hover:bg-background hover:shadow-sm disabled:opacity-30 transition-all"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </button>
+              <div className="h-4 w-[1px] bg-border/50 mx-0.5" />
+              <button
+                onClick={() =>
+                  setCurrentPage((p) =>
+                    Math.min(Math.ceil(filteredIssues.length / pageSize), p + 1)
+                  )
+                }
+                disabled={
+                  currentPage === Math.ceil(filteredIssues.length / pageSize)
+                }
+                className="h-6 w-6 flex items-center justify-center rounded-sm hover:bg-background hover:shadow-sm disabled:opacity-30 transition-all"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 ml-4">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -698,7 +965,10 @@ export default function MockupFiltersPage(): React.JSX.Element {
           </div>
         </div>
         <IssueList
-          issues={filteredIssues}
+          issues={filteredIssues.slice(
+            (currentPage - 1) * pageSize,
+            currentPage * pageSize
+          )}
           sortState={sortState}
           onSort={handleSort}
         />

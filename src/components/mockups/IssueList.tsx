@@ -97,25 +97,41 @@ export function IssueList({
   );
 
   return (
-    <div className="w-full bg-card border rounded-lg overflow-hidden shadow-sm">
-      <div className="overflow-x-auto">
+    <div className="w-full bg-card border rounded-lg overflow-hidden shadow-sm overflow-x-auto">
+      <div>
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b bg-muted/30">
-              <Header label="Issue" column="id" className="w-full min-w-[200px]" />
-              <Header label="Status" column="status" className="w-[1%] whitespace-nowrap" />
-              <Header label="Priority" column="priority" className="w-[1%] whitespace-nowrap" />
-              <Header label="Severity" column="severity" className="w-[1%] whitespace-nowrap" />
+              <Header
+                label="Issue"
+                column="id"
+                className="w-full min-w-[200px] sm:min-w-[300px]"
+              />
+              <Header
+                label="Status"
+                column="status"
+                className="min-w-[150px] max-w-[150px]"
+              />
+              <Header
+                label="Priority"
+                column="priority"
+                className="min-w-[110px] max-w-[110px]"
+              />
+              <Header
+                label="Severity"
+                column="severity"
+                className="min-w-[110px] max-w-[110px]"
+              />
               <Header
                 label="Assignee"
                 column="assignee"
-                className="hidden lg:table-cell w-[1%] whitespace-nowrap"
+                className="hidden min-[950px]:table-cell min-w-[150px] max-w-[150px]"
               />
               <Header
                 label="Modified"
                 column="updatedAt"
                 align="right"
-                className="hidden xl:table-cell w-[1%] whitespace-nowrap"
+                className="hidden min-[1100px]:table-cell min-w-[150px] max-w-[150px]"
               />
             </tr>
           </thead>
@@ -143,14 +159,16 @@ export function IssueList({
                   key={issue.id}
                   className="hover:bg-muted/50 transition-colors group"
                 >
-                  <td className="px-4 py-4 min-w-[200px]">
+                  <td className="px-4 py-4 min-w-[200px] sm:min-w-[300px]">
                     <div className="flex flex-col gap-0.5">
-                      <div className="flex items-center gap-2 text-sm font-bold text-foreground overflow-hidden">
-                        <span className="shrink-0">{issue.id}</span>
-                        <span className="text-muted-foreground/60 font-medium whitespace-nowrap shrink-0">
+                      <div className="flex items-center gap-1.5 text-sm font-bold text-foreground whitespace-nowrap overflow-hidden min-w-0">
+                        <span className="shrink-0">
+                          {issue.machine}-{issue.id}
+                        </span>
+                        <span className="text-muted-foreground/60 font-medium shrink-0">
                           —
                         </span>
-                        <span className="text-muted-foreground font-semibold truncate">
+                        <span className="text-muted-foreground font-semibold truncate min-w-0">
                           {issue.machineLabel}
                         </span>
                       </div>
@@ -159,42 +177,55 @@ export function IssueList({
                       </span>
                     </div>
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+                  <td className="px-4 py-4 min-w-[150px] max-w-[150px]">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-foreground leading-tight">
                       <statusConfig.icon
-                        className={cn("h-3.5 w-3.5", statusConfig.iconColor)}
+                        className={cn(
+                          "h-3.5 w-3.5 shrink-0",
+                          statusConfig.iconColor
+                        )}
                       />
-                      {statusConfig.label}
+                      <span className="line-clamp-2">{statusConfig.label}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-1.5 text-xs font-medium">
+                  <td className="px-4 py-4 min-w-[150px] max-w-[150px]">
+                    <div className="flex items-center gap-1.5 text-xs font-medium leading-tight">
                       <priorityConfig.icon
-                        className={cn("h-3.5 w-3.5", priorityConfig.iconColor)}
+                        className={cn(
+                          "h-3.5 w-3.5 shrink-0",
+                          priorityConfig.iconColor
+                        )}
                       />
-                      {priorityConfig.label}
+                      <span className="line-clamp-2">
+                        {priorityConfig.label}
+                      </span>
                     </div>
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-1.5 text-xs font-medium">
+                  <td className="px-4 py-4 min-w-[150px] max-w-[150px]">
+                    <div className="flex items-center gap-1.5 text-xs font-medium leading-tight">
                       <severityConfig.icon
-                        className={cn("h-3.5 w-3.5", severityConfig.iconColor)}
+                        className={cn(
+                          "h-3.5 w-3.5 shrink-0",
+                          severityConfig.iconColor
+                        )}
                       />
-                      {severityConfig.label}
+                      <span className="line-clamp-2">
+                        {severityConfig.label}
+                      </span>
                     </div>
                   </td>
-                  <td className="px-4 py-4 whitespace-nowrap uppercase tracking-tighter hidden lg:table-cell">
+                  <td className="px-4 py-4 uppercase tracking-tighter hidden min-[950px]:table-cell min-w-[150px] max-w-[150px]">
                     <div className="flex items-center gap-2">
-                      <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center border border-border">
+                      <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center border border-border shrink-0">
                         <User className="h-3.5 w-3.5 text-muted-foreground" />
                       </div>
-                      <span className="text-xs font-medium">
+                      <span className="text-xs font-medium leading-tight line-clamp-2">
                         {issue.assignee ?? "Unassigned"}
                       </span>
                     </div>
                   </td>
-                  <td className="px-4 py-4 text-right hidden xl:table-cell">
-                    <span className="text-xs font-medium text-foreground block w-24 ml-auto">
+                  <td className="px-4 py-4 text-right hidden min-[1100px]:table-cell min-w-[150px] max-w-[150px]">
+                    <span className="text-xs font-medium text-foreground leading-tight line-clamp-2">
                       {formatDistanceToNow(issue.updatedAt, {
                         addSuffix: true,
                       })}

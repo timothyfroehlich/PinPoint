@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ChevronsUpDown, X } from "lucide-react";
+import { ChevronsUpDown } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import {
@@ -71,10 +71,6 @@ export function MultiSelect({
     onChange(newValue);
   };
 
-  const clearSelection = (e: React.PointerEvent): void => {
-    e.stopPropagation();
-    onChange([]);
-  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -108,15 +104,7 @@ export function MultiSelect({
               </Badge>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            {value.length > 0 && (
-              <X
-                className="h-4 w-4 opacity-50 hover:opacity-100 pointer-events-auto"
-                onPointerDown={clearSelection}
-              />
-            )}
-            <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
-          </div>
+          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent
