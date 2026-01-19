@@ -252,7 +252,7 @@ class Worktree:
             return False
         return True
 
-    def fix_config(self, is_main_worktree: bool) -> None:
+    def fix_config(self) -> None:
         """Fix configuration files (config.toml from template, .env.local)"""
         # Generate config.toml from template
         self._generate_config_from_template()
@@ -1100,7 +1100,7 @@ class SyncManager:
         print()
         print("Phase 1: Configuration Validation & Fixing")
         if worktree.validate_config():
-            worktree.fix_config(is_main)
+            worktree.fix_config()
         print(f"  {' | '.join(worktree.state.config_messages)}")
 
         # Phase 2: Git State
