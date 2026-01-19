@@ -23,12 +23,19 @@ import { Checkbox } from "~/components/ui/checkbox";
 export interface Option {
   label: string;
   value: string;
+  badgeLabel?: string;
   group?: string;
   icon?: React.ComponentType<{ className?: string }>;
 }
 
-interface MultiSelectProps {
+export interface GroupedOption {
+  label: string;
   options: Option[];
+}
+
+interface MultiSelectProps {
+  options?: Option[];
+  groups?: GroupedOption[];
   value?: string[];
   onChange: (value: string[]) => void;
   placeholder?: string;
@@ -38,7 +45,8 @@ interface MultiSelectProps {
 }
 
 export function MultiSelect({
-  options,
+  options = [],
+  groups,
   value = [],
   onChange,
   placeholder = "Select options...",
@@ -48,7 +56,13 @@ export function MultiSelect({
 }: MultiSelectProps): React.JSX.Element {
   const [open, setOpen] = React.useState(false);
 
-  const selectedOptions = options.filter((opt) => value.includes(opt.value));
+  const allFilteredOptions = groups
+    ? groups.flatMap((g) => g.options)
+    : options;
+
+  const selectedOptions = allFilteredOptions.filter((opt) =>
+    value.includes(opt.value)
+  );
 
   const toggleOption = (optionValue: string): void => {
     const newValue = value.includes(optionValue)
@@ -57,7 +71,7 @@ export function MultiSelect({
     onChange(newValue);
   };
 
-  const clearSelection = (e: React.MouseEvent): void => {
+  const clearSelection = (e: React.PointerEvent): void => {
     e.stopPropagation();
     onChange([]);
   };
@@ -75,34 +89,30 @@ export function MultiSelect({
           )}
         >
           <div className="flex flex-wrap gap-1 items-center">
-            {selectedOptions.length === 0 && (
-              <span className="text-muted-foreground">{placeholder}</span>
-            )}
-            {selectedOptions.length > 0 &&
-              selectedOptions.length <= maxDisplayed &&
-              selectedOptions.map((option) => (
-                <Badge
-                  key={option.value}
-                  variant="secondary"
-                  className="rounded-sm px-1 font-normal"
-                >
-                  {option.label}
-                </Badge>
-              ))}
-            {selectedOptions.length > maxDisplayed && (
+            <span
+              className={cn(
+                "text-sm",
+                selectedOptions.length > 0
+                  ? "text-foreground font-medium"
+                  : "text-muted-foreground"
+              )}
+            >
+              {placeholder}
+            </span>
+            {selectedOptions.length > 0 && (
               <Badge
                 variant="secondary"
-                className="rounded-sm px-1 font-normal"
+                className="ml-1 rounded-sm px-1 font-normal h-5 text-[10px]"
               >
-                {selectedOptions.length} selected
+                {selectedOptions.length}
               </Badge>
             )}
           </div>
           <div className="flex items-center gap-2">
             {value.length > 0 && (
               <X
-                className="h-4 w-4 opacity-50 hover:opacity-100"
-                onClick={clearSelection}
+                className="h-4 w-4 opacity-50 hover:opacity-100 pointer-events-auto"
+                onPointerDown={clearSelection}
               />
             )}
             <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
@@ -117,23 +127,85 @@ export function MultiSelect({
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
             <CommandEmpty>No results found.</CommandEmpty>
-            <CommandGroup>
-              {options.map((option) => {
-                const isSelected = value.includes(option.value);
-                return (
-                  <CommandItem
-                    key={option.value}
-                    onSelect={() => toggleOption(option.value)}
-                  >
-                    <Checkbox checked={isSelected} className="mr-2" />
-                    {option.icon && (
-                      <option.icon className="mr-2 h-4 w-4 text-muted-foreground" />
-                    )}
-                    <span>{option.label}</span>
-                  </CommandItem>
+            {groups ? (
+              groups.map((group) => {
+                const groupOptionValues = group.options.map((opt) => opt.value);
+                const isAllSelected = group.options.every((opt) =>
+                  value.includes(opt.value)
                 );
-              })}
-            </CommandGroup>
+                const isPartiallySelected =
+                  !isAllSelected &&
+                  group.options.some((opt) => value.includes(opt.value));
+
+                return (
+                  <CommandGroup
+                    key={group.label}
+                    heading={
+                      <div className="flex items-center gap-2 py-1">
+                        <Checkbox
+                          checked={isAllSelected}
+                          className={cn(
+                            "h-3.5 w-3.5",
+                            isPartiallySelected && "opacity-50"
+                          )}
+                          onCheckedChange={() => {
+                            if (isAllSelected) {
+                              onChange(
+                                value.filter(
+                                  (v) => !groupOptionValues.includes(v)
+                                )
+                              );
+                            } else {
+                              onChange(
+                                Array.from(
+                                  new Set([...value, ...groupOptionValues])
+                                )
+                              );
+                            }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <span>{group.label}</span>
+                      </div>
+                    }
+                  >
+                    {group.options.map((option) => (
+                      <CommandItem
+                        key={option.value}
+                        onSelect={() => toggleOption(option.value)}
+                      >
+                        <Checkbox
+                          checked={value.includes(option.value)}
+                          className="mr-2"
+                        />
+                        {option.icon && (
+                          <option.icon className="mr-2 h-4 w-4 text-muted-foreground" />
+                        )}
+                        <span>{option.label}</span>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                );
+              })
+            ) : (
+              <CommandGroup>
+                {options.map((option) => {
+                  const isSelected = value.includes(option.value);
+                  return (
+                    <CommandItem
+                      key={option.value}
+                      onSelect={() => toggleOption(option.value)}
+                    >
+                      <Checkbox checked={isSelected} className="mr-2" />
+                      {option.icon && (
+                        <option.icon className="mr-2 h-4 w-4 text-muted-foreground" />
+                      )}
+                      <span>{option.label}</span>
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>
