@@ -9,5 +9,6 @@
 **Action:** Audit page loaders for serial `await` calls on independent data and replace array-based counting with SQL aggregation.
 
 ## 2025-02-14 - Composite Index Optimization
+
 **Learning:** Replacing an index on `(A)` with `(A, B)` is a safe optimization when queries filter by `A` and sort by `B`. It allows the DB to fetch pre-sorted data, avoiding a sort operation, while still supporting lookups on `A`.
 **Action:** Always check if a frequently sorted column can be added to an existing filter index to create a composite index.
