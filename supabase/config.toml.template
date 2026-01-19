@@ -90,7 +90,7 @@ additional_redirect_urls = [
 ]
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
-refresh_token_reuse_interval = 10
+refresh_token_reuse_interval = 60
 enable_signup = true
 enable_anonymous_sign_ins = false
 enable_manual_linking = false
