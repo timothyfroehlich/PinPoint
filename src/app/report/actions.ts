@@ -218,10 +218,7 @@ export async function submitPublicIssueAction(
     }
     log.error({ error }, "Failed to submit issue");
     return {
-      error:
-        error instanceof Error
-          ? error.message
-          : "Unable to submit the issue. Please try again.",
+      error: "Unable to submit the issue. Please try again.",
     };
   }
 }

@@ -5,7 +5,7 @@ import { db } from "~/server/db";
 import { issues } from "~/server/db/schema";
 import { IssueFilters } from "~/components/issues/IssueFilters";
 import { IssueRow } from "~/components/issues/IssueRow";
-import { AlertTriangle } from "lucide-react";
+import { CheckCircle2, Search } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { redirect } from "next/navigation";
 import type {
@@ -97,6 +97,22 @@ export default async function IssuesPage({
       reportedByUser: {
         columns: { name: true },
       },
+      invitedReporter: {
+        columns: { name: true },
+      },
+    },
+    columns: {
+      id: true,
+      createdAt: true,
+      machineInitials: true,
+      issueNumber: true,
+      title: true,
+      status: true,
+      severity: true,
+      priority: true,
+      consistency: true,
+      reporterName: true,
+      reporterEmail: true,
     },
     limit: 100, // Reasonable limit for now
   });
@@ -119,9 +135,12 @@ export default async function IssuesPage({
     | "severity"
     | "priority"
     | "consistency"
+    | "reporterName"
+    | "reporterEmail"
   > & {
     machine: { name: string } | null;
     reportedByUser: { name: string } | null;
+    invitedReporter: { name: string } | null;
   })[];
 
   return (
@@ -150,15 +169,30 @@ export default async function IssuesPage({
               ))}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="rounded-full bg-muted p-4 mb-4">
-                <AlertTriangle className="size-8 text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-medium">No issues found</h3>
-              <p className="text-muted-foreground max-w-sm mt-2">
-                We couldn&apos;t find any issues matching your current filters.
-                Try adjusting or clearing them.
-              </p>
+            <div className="flex flex-col items-center justify-center py-12 text-center animate-in fade-in zoom-in duration-300">
+              {status !== "closed" && !severity && !priority && !machine ? (
+                <>
+                  <div className="rounded-full bg-primary/10 p-4 mb-4">
+                    <CheckCircle2 className="size-8 text-primary" />
+                  </div>
+                  <h3 className="text-lg font-medium">All Clear!</h3>
+                  <p className="text-muted-foreground max-w-sm mt-2">
+                    There are no open issues. The machines are running
+                    perfectly.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="rounded-full bg-muted p-4 mb-4">
+                    <Search className="size-8 text-muted-foreground" />
+                  </div>
+                  <h3 className="text-lg font-medium">No matches found</h3>
+                  <p className="text-muted-foreground max-w-sm mt-2">
+                    We couldn&apos;t find any issues matching your current
+                    filters. Try adjusting or clearing them.
+                  </p>
+                </>
+              )}
             </div>
           )}
         </div>

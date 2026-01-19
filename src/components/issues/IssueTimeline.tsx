@@ -4,6 +4,8 @@ import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { AddCommentForm } from "~/components/issues/AddCommentForm";
 import { type IssueWithAllRelations } from "~/lib/types";
 import { cn } from "~/lib/utils";
+import { resolveIssueReporter } from "~/lib/issues/utils";
+import { MessageSquare } from "lucide-react";
 
 // ----------------------------------------------------------------------
 // Types
@@ -133,23 +135,15 @@ export function IssueTimeline({
   issue,
 }: IssueTimelineProps): React.JSX.Element {
   // 1. Normalize Issue as the first event
-  const reporterName =
-    issue.reportedByUser?.name ??
-    issue.invitedReporter?.name ??
-    issue.reporterName ??
-    "Anonymous";
-  const reporterEmail =
-    issue.reportedByUser?.email ??
-    issue.invitedReporter?.email ??
-    issue.reporterEmail;
+  const reporter = resolveIssueReporter(issue);
 
   const issueEvent: TimelineEvent = {
     id: `issue-${issue.id}`,
     type: "issue",
     author: {
-      name: reporterName,
-      avatarFallback: reporterName.slice(0, 2).toUpperCase(),
-      email: reporterEmail,
+      name: reporter.name,
+      avatarFallback: reporter.initial,
+      email: reporter.email,
     },
     createdAt: new Date(issue.createdAt),
     content: issue.description,
@@ -174,6 +168,9 @@ export function IssueTimeline({
   // 3. Combine
   const allEvents = [issueEvent, ...commentEvents];
 
+  // Check if there are no comments (only the initial issue)
+  const noComments = allEvents.length === 1;
+
   return (
     <div className="flex-1 space-y-6">
       <div className="relative">
@@ -185,6 +182,21 @@ export function IssueTimeline({
           {allEvents.map((event) => (
             <TimelineItem key={event.id} event={event} />
           ))}
+
+          {/* Delightful Empty State when no comments yet */}
+          {noComments && (
+            <div className="ml-16 rounded-xl border border-dashed border-muted-foreground/30 bg-muted/10 p-6 text-center animate-in fade-in zoom-in duration-300">
+              <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-full bg-muted">
+                <MessageSquare className="size-5 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-medium text-foreground">
+                No comments yet
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Start the conversation by adding a comment below.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Add Comment Form */}

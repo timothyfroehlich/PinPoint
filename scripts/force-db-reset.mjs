@@ -24,6 +24,7 @@ const tables = [
   "issues",
   "machines",
   "user_profiles",
+  "invited_users",
   "unconfirmed_users",
 ];
 

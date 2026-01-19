@@ -15,6 +15,13 @@
       "when": 1768170240258,
       "tag": "0001_invited-users-rename",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1768589345535,
+      "tag": "0002_add_issue_indexes",
+      "breakpoints": true
     }
   ]
 }
