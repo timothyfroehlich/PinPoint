@@ -2,6 +2,8 @@ import React from "react";
 import { formatDistanceToNow } from "date-fns";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { AddCommentForm } from "~/components/issues/AddCommentForm";
+import { OwnerBadge } from "~/components/issues/OwnerBadge";
+import { isUserMachineOwner } from "~/lib/issues/owner";
 import { type IssueWithAllRelations } from "~/lib/types";
 import { cn } from "~/lib/utils";
 import { resolveIssueReporter } from "~/lib/issues/utils";
@@ -17,6 +19,7 @@ interface TimelineEvent {
   id: string;
   type: TimelineEventType;
   author: {
+    id?: string | null;
     name: string;
     avatarFallback: string;
     email?: string | null | undefined;
@@ -29,9 +32,16 @@ interface TimelineEvent {
 // Components
 // ----------------------------------------------------------------------
 
-function TimelineItem({ event }: { event: TimelineEvent }): React.JSX.Element {
+function TimelineItem({
+  event,
+  issue,
+}: {
+  event: TimelineEvent;
+  issue: IssueWithAllRelations;
+}): React.JSX.Element {
   const isSystem = event.type === "system";
   const isIssue = event.type === "issue";
+  const isOwner = isUserMachineOwner(issue, event.author.id);
 
   return (
     <div className="relative flex gap-4">
@@ -80,6 +90,7 @@ function TimelineItem({ event }: { event: TimelineEvent }): React.JSX.Element {
                     >
                       {event.author.name}
                     </span>
+                    {isOwner && <OwnerBadge size="sm" />}
                     {event.author.email && (
                       <span className="text-xs text-muted-foreground font-normal">
                         {"<"}
@@ -135,6 +146,7 @@ export function IssueTimeline({
     id: `issue-${issue.id}`,
     type: "issue",
     author: {
+      id: reporter.id ?? null,
       name: reporter.name,
       avatarFallback: reporter.initial,
       email: reporter.email,
@@ -150,6 +162,7 @@ export function IssueTimeline({
       id: c.id,
       type: c.isSystem ? "system" : "comment",
       author: {
+        id: c.author?.id ?? null,
         name: authorName,
         avatarFallback: authorName.slice(0, 2).toUpperCase(),
         email: c.author?.email,
@@ -174,7 +187,7 @@ export function IssueTimeline({
         {/* Events List */}
         <div className="relative flex flex-col space-y-6">
           {allEvents.map((event) => (
-            <TimelineItem key={event.id} event={event} />
+            <TimelineItem key={event.id} event={event} issue={issue} />
           ))}
 
           {/* Delightful Empty State when no comments yet */}
