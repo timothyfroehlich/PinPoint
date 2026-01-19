@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { submitPublicIssueAction } from "./actions";
+import { submitPublicIssueAction } from "~/app/report/actions";
 
 // Mock Next.js server modules
 vi.mock("next/headers", () => ({
@@ -66,7 +66,7 @@ describe("Public Issue Reporting Security", () => {
     vi.unstubAllEnvs();
   });
 
-  it("should return generic error message on server error", async () => {
+  it("should not expose sensitive database error messages to client", async () => {
     // Simulate a sensitive DB error
     const sensitiveError =
       "duplicate key value violates unique constraint 'users_email_key'";
@@ -83,19 +83,9 @@ describe("Public Issue Reporting Security", () => {
     // Verify error is returned
     expect(result).toHaveProperty("error");
 
-    // VERIFY: Error should be generic, not the sensitive one
-    // Note: This expectation is designed to fail BEFORE the fix
-    if (result.error === sensitiveError) {
-      // Test failed (vulnerability confirmed) - we expect this initially
-      expect(result.error).toBe(
-        "Unable to submit the issue. Please try again."
-      );
-    } else {
-      // If it's already generic (unexpected), assertion will pass
-      expect(result.error).not.toContain("duplicate key");
-      expect(result.error).toBe(
-        "Unable to submit the issue. Please try again."
-      );
-    }
+    // Error should be a generic, non-sensitive message
+    expect(result.error).not.toBe(sensitiveError);
+    expect(result.error).not.toContain("duplicate key");
+    expect(result.error).toBe("Unable to submit the issue. Please try again.");
   });
 });
