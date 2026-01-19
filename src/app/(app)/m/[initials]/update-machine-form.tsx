@@ -20,7 +20,7 @@ interface UpdateMachineFormProps {
     name: string;
     initials: string;
     ownerId: string | null;
-    unconfirmedOwnerId: string | null;
+    invitedOwnerId: string | null;
   };
   allUsers: UnifiedUser[];
   isAdmin: boolean;
@@ -101,7 +101,7 @@ export function UpdateMachineForm({
       {isAdmin && (
         <OwnerSelect
           users={allUsers}
-          defaultValue={machine.ownerId ?? machine.unconfirmedOwnerId ?? null}
+          defaultValue={machine.ownerId ?? machine.invitedOwnerId ?? null}
         />
       )}
 

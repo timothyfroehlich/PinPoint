@@ -37,7 +37,7 @@ export default defineConfig({
     "issue_watchers",
     "notifications",
     "notification_preferences",
-    "unconfirmed_users",
+    "invited_users",
   ],
   schemaFilter: ["public"],
   verbose: true,

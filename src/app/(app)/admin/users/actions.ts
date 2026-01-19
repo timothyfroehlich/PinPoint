@@ -2,11 +2,11 @@
 
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { userProfiles, unconfirmedUsers, authUsers } from "~/server/db/schema";
+import { userProfiles, invitedUsers, authUsers } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { sendInviteEmail } from "~/lib/email/invite";
-import { headers } from "next/headers";
+import { requireSiteUrl } from "~/lib/url";
 import { inviteUserSchema, updateUserRoleSchema } from "./schema";
 
 async function verifyAdmin(userId: string): Promise<void> {
@@ -23,7 +23,7 @@ async function verifyAdmin(userId: string): Promise<void> {
 export async function updateUserRole(
   userId: string,
   newRole: "guest" | "member" | "admin",
-  userType: "active" | "unconfirmed" = "active"
+  userType: "active" | "invited" = "active"
 ): Promise<void> {
   const supabase = await createClient();
   const {
@@ -55,9 +55,9 @@ export async function updateUserRole(
       .where(eq(userProfiles.id, validated.userId));
   } else {
     await db
-      .update(unconfirmedUsers)
+      .update(invitedUsers)
       .set({ role: validated.newRole })
-      .where(eq(unconfirmedUsers.id, validated.userId));
+      .where(eq(invitedUsers.id, validated.userId));
   }
 
   revalidatePath("/admin/users");
@@ -96,17 +96,17 @@ export async function inviteUser(
     throw new Error("A user with this email already exists and is active.");
   }
 
-  const existingUnconfirmed = await db.query.unconfirmedUsers.findFirst({
-    where: eq(unconfirmedUsers.email, validated.email),
+  const existingInvited = await db.query.invitedUsers.findFirst({
+    where: eq(invitedUsers.email, validated.email),
   });
 
-  if (existingUnconfirmed) {
+  if (existingInvited) {
     throw new Error("This user has already been invited.");
   }
 
-  // Create unconfirmed user
-  const [newUnconfirmed] = await db
-    .insert(unconfirmedUsers)
+  // Create invited user
+  const [newInvited] = await db
+    .insert(invitedUsers)
     .values({
       firstName: validated.firstName,
       lastName: validated.lastName,
@@ -115,14 +115,13 @@ export async function inviteUser(
     })
     .returning();
 
-  if (!newUnconfirmed) {
-    throw new Error("Failed to create unconfirmed user");
+  if (!newInvited) {
+    throw new Error("Failed to create invited user");
   }
 
   if (validated.sendInvite) {
-    const host = (await headers()).get("host") ?? "localhost:3000";
-    const protocol = host.includes("localhost") ? "http" : "https";
-    const siteUrl = `${protocol}://${host}`;
+    // Security: Use configured site URL to prevent Host Header Injection
+    const siteUrl = requireSiteUrl("invite-user");
 
     const currentUser = await db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, user.id),
@@ -142,13 +141,13 @@ export async function inviteUser(
     }
 
     await db
-      .update(unconfirmedUsers)
+      .update(invitedUsers)
       .set({ inviteSentAt: new Date() })
-      .where(eq(unconfirmedUsers.id, newUnconfirmed.id));
+      .where(eq(invitedUsers.id, newInvited.id));
   }
 
   revalidatePath("/admin/users");
-  return { ok: true, userId: newUnconfirmed.id };
+  return { ok: true, userId: newInvited.id };
 }
 
 export async function resendInvite(userId: string): Promise<{ ok: boolean }> {
@@ -163,25 +162,24 @@ export async function resendInvite(userId: string): Promise<{ ok: boolean }> {
 
   await verifyAdmin(user.id);
 
-  const unconfirmed = await db.query.unconfirmedUsers.findFirst({
-    where: eq(unconfirmedUsers.id, userId),
+  const invited = await db.query.invitedUsers.findFirst({
+    where: eq(invitedUsers.id, userId),
   });
 
-  if (!unconfirmed) {
-    throw new Error("Unconfirmed user not found");
+  if (!invited) {
+    throw new Error("Invited user not found");
   }
 
-  const host = (await headers()).get("host") ?? "localhost:3000";
-  const protocol = host.includes("localhost") ? "http" : "https";
-  const siteUrl = `${protocol}://${host}`;
+  // Security: Use configured site URL to prevent Host Header Injection
+  const siteUrl = requireSiteUrl("resend-invite");
 
   const currentUser = await db.query.userProfiles.findFirst({
     where: eq(userProfiles.id, user.id),
   });
 
   const emailResult = await sendInviteEmail({
-    to: unconfirmed.email,
-    firstName: unconfirmed.firstName,
+    to: invited.email,
+    firstName: invited.firstName,
     inviterName: currentUser?.name ?? "An administrator",
     siteUrl,
   });
@@ -193,9 +191,9 @@ export async function resendInvite(userId: string): Promise<{ ok: boolean }> {
   }
 
   await db
-    .update(unconfirmedUsers)
+    .update(invitedUsers)
     .set({ inviteSentAt: new Date() })
-    .where(eq(unconfirmedUsers.id, userId));
+    .where(eq(invitedUsers.id, userId));
 
   revalidatePath("/admin/users");
   return { ok: true };

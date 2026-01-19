@@ -42,14 +42,14 @@ export default async function IssuesPage({
     redirect("/login?next=%2Fissues");
   }
 
-  const params = await searchParams;
-  const { status, severity, priority, machine } = params;
-
-  // Fetch machines for filter dropdown
-  const allMachines = await db.query.machines.findMany({
+  // 1. Start independent queries immediately
+  const machinesPromise = db.query.machines.findMany({
     orderBy: (machines, { asc }) => [asc(machines.name)],
     columns: { initials: true, name: true },
   });
+
+  const params = await searchParams;
+  const { status, severity, priority, machine } = params;
 
   // Safe type casting for filters using imported constants from single source of truth
   // Based on _issue-status-redesign/README.md - Final design with 11 statuses
@@ -80,9 +80,9 @@ export default async function IssuesPage({
       ? (priority as IssuePriority)
       : undefined;
 
-  // Fetch Issues based on filters
+  // 2. Fetch Issues based on filters (depends on params)
   // Type assertion needed because Drizzle infers status as string, not IssueStatus
-  const issuesList = (await db.query.issues.findMany({
+  const issuesPromise = db.query.issues.findMany({
     where: and(
       inArray(issues.status, statusFilter),
       severityFilter ? eq(issues.severity, severityFilter) : undefined,
@@ -97,9 +97,34 @@ export default async function IssuesPage({
       reportedByUser: {
         columns: { name: true },
       },
+      invitedReporter: {
+        columns: { name: true },
+      },
+    },
+    columns: {
+      id: true,
+      createdAt: true,
+      machineInitials: true,
+      issueNumber: true,
+      title: true,
+      status: true,
+      severity: true,
+      priority: true,
+      consistency: true,
+      reporterName: true,
+      reporterEmail: true,
     },
     limit: 100, // Reasonable limit for now
-  })) as (Pick<
+  });
+
+  // 3. Await all promises in parallel
+  // This reduces TTFB by fetching machines and issues concurrently
+  const [allMachines, issuesListRaw] = await Promise.all([
+    machinesPromise,
+    issuesPromise,
+  ]);
+
+  const issuesList = issuesListRaw as (Pick<
     Issue,
     | "id"
     | "createdAt"
@@ -110,9 +135,12 @@ export default async function IssuesPage({
     | "severity"
     | "priority"
     | "consistency"
+    | "reporterName"
+    | "reporterEmail"
   > & {
     machine: { name: string } | null;
     reportedByUser: { name: string } | null;
+    invitedReporter: { name: string } | null;
   })[];
 
   return (
@@ -149,7 +177,8 @@ export default async function IssuesPage({
                   </div>
                   <h3 className="text-lg font-medium">All Clear!</h3>
                   <p className="text-muted-foreground max-w-sm mt-2">
-                    There are no open issues. The machines are running perfectly.
+                    There are no open issues. The machines are running
+                    perfectly.
                   </p>
                 </>
               ) : (
@@ -159,8 +188,8 @@ export default async function IssuesPage({
                   </div>
                   <h3 className="text-lg font-medium">No matches found</h3>
                   <p className="text-muted-foreground max-w-sm mt-2">
-                    We couldn&apos;t find any issues matching your current filters.
-                    Try adjusting or clearing them.
+                    We couldn&apos;t find any issues matching your current
+                    filters. Try adjusting or clearing them.
                   </p>
                 </>
               )}

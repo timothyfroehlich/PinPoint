@@ -85,7 +85,7 @@ export function InviteUserDialog({
             name: `${values.firstName} ${values.lastName}`,
             email: values.email,
             role: values.role,
-            status: "unconfirmed",
+            status: "invited",
             avatarUrl: null,
           };
           // Call onSuccess with both the ID and full user object, then close dialog

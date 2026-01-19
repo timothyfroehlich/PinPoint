@@ -80,7 +80,7 @@ const getDashboardData = cache(async (userId?: string) => {
         )
     : Promise.resolve([{ count: 0 }]);
 
-  // Query 3: Recently reported issues (last 10, with machine and reporter)
+  // Query 3: Recently reported issues (last 10, with machine and all reporter types)
   const recentIssuesPromise = db.query.issues.findMany({
     orderBy: desc(issues.createdAt),
     limit: 10,
@@ -98,6 +98,12 @@ const getDashboardData = cache(async (userId?: string) => {
           name: true,
         },
       },
+      invitedReporter: {
+        columns: {
+          id: true,
+          name: true,
+        },
+      },
     },
     columns: {
       id: true,
@@ -109,6 +115,8 @@ const getDashboardData = cache(async (userId?: string) => {
       machineInitials: true,
       issueNumber: true,
       createdAt: true,
+      reporterName: true,
+      reporterEmail: true,
     },
   });
 
@@ -138,11 +146,12 @@ const getDashboardData = cache(async (userId?: string) => {
     .where(notInArray(issues.status, [...CLOSED_STATUSES]));
 
   // Query 6: Machines needing service (machines with at least one open issue)
-  // Optimized to use count(distinct) instead of fetching all IDs
+  // Optimized to use count(distinct) on issues table, removing unnecessary JOIN with machines
   const machinesNeedingServicePromise = db
-    .select({ count: sql<number>`count(distinct ${machines.id})::int` })
-    .from(machines)
-    .innerJoin(issues, eq(issues.machineInitials, machines.initials))
+    .select({
+      count: sql<number>`count(distinct ${issues.machineInitials})::int`,
+    })
+    .from(issues)
     .where(notInArray(issues.status, [...CLOSED_STATUSES]));
 
   // Execute all queries in parallel
@@ -381,9 +390,6 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                   issue={issue as unknown as Issue}
                   machine={{ name: issue.machine.name }}
                   showReporter={true}
-                  reporterName={
-                    issue.reportedByUser?.name ?? "Anonymous Reporter"
-                  }
                   dataTestId="recent-issue-card"
                 />
               ))}

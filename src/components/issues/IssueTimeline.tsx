@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { AddCommentForm } from "~/components/issues/AddCommentForm";
 import { type IssueWithAllRelations } from "~/lib/types";
 import { cn } from "~/lib/utils";
+import { resolveIssueReporter } from "~/lib/issues/utils";
 
 // ----------------------------------------------------------------------
 // Types
@@ -17,6 +18,7 @@ interface TimelineEvent {
   author: {
     name: string;
     avatarFallback: string;
+    email?: string | null | undefined;
   };
   createdAt: Date;
   content: string | null;
@@ -51,7 +53,10 @@ function TimelineItem({ event }: { event: TimelineEvent }): React.JSX.Element {
       <div className="flex-1">
         {isSystem ? (
           <div className="flex items-center gap-2 py-1 text-xs leading-snug text-muted-foreground">
-            <span className="font-medium text-foreground/80">
+            <span
+              className="font-medium text-foreground/80"
+              data-testid="timeline-system-author"
+            >
               {event.author.name}
             </span>
             <span>{event.content}</span>
@@ -73,9 +78,21 @@ function TimelineItem({ event }: { event: TimelineEvent }): React.JSX.Element {
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="flex flex-col">
-                  <span className="font-semibold text-foreground">
-                    {event.author.name}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="font-semibold text-foreground"
+                      data-testid="timeline-author-name"
+                    >
+                      {event.author.name}
+                    </span>
+                    {event.author.email && (
+                      <span className="text-xs text-muted-foreground font-normal">
+                        {"<"}
+                        {event.author.email}
+                        {">"}
+                      </span>
+                    )}
+                  </div>
                   {isIssue ? (
                     <span className="text-xs uppercase tracking-wide text-primary">
                       Initial report
@@ -117,29 +134,35 @@ export function IssueTimeline({
   issue,
 }: IssueTimelineProps): React.JSX.Element {
   // 1. Normalize Issue as the first event
+  const reporter = resolveIssueReporter(issue);
+
   const issueEvent: TimelineEvent = {
     id: `issue-${issue.id}`,
     type: "issue",
     author: {
-      name: issue.reportedByUser?.name ?? "Unknown User",
-      avatarFallback:
-        issue.reportedByUser?.name.slice(0, 2).toUpperCase() ?? "U",
+      name: reporter.name,
+      avatarFallback: reporter.initial,
+      email: reporter.email,
     },
     createdAt: new Date(issue.createdAt),
     content: issue.description,
   };
 
   // 2. Normalize Comments
-  const commentEvents: TimelineEvent[] = issue.comments.map((c) => ({
-    id: c.id,
-    type: c.isSystem ? "system" : "comment",
-    author: {
-      name: c.author?.name ?? "System",
-      avatarFallback: c.author?.name.slice(0, 2).toUpperCase() ?? "S",
-    },
-    createdAt: new Date(c.createdAt),
-    content: c.content,
-  }));
+  const commentEvents: TimelineEvent[] = issue.comments.map((c) => {
+    const authorName = c.author?.name ?? "System";
+    return {
+      id: c.id,
+      type: c.isSystem ? "system" : "comment",
+      author: {
+        name: authorName,
+        avatarFallback: authorName.slice(0, 2).toUpperCase(),
+        email: c.author?.email,
+      },
+      createdAt: new Date(c.createdAt),
+      content: c.content,
+    };
+  });
 
   // 3. Combine
   const allEvents = [issueEvent, ...commentEvents];

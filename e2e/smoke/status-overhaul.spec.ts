@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loginAs } from "../support/actions";
+import { loginAs, selectOption } from "../support/actions";
 import { cleanupTestEntities } from "../support/cleanup";
 import { seededMachines } from "../support/constants";
 
@@ -22,9 +22,9 @@ test.describe("Status Overhaul E2E", () => {
     await page.goto(`/report?machine=${machine.initials}`);
     await page.getByTestId("machine-select").selectOption(machine.id);
     await page.getByLabel("Issue Title *").fill("E2E Status Overhaul Test");
-    await page.getByTestId("severity-select").selectOption("major");
-    await page.getByTestId("priority-select").selectOption("high");
-    await page.getByTestId("consistency-select").selectOption("frequent");
+    await selectOption(page, "severity-select", "major");
+    await selectOption(page, "priority-select", "high");
+    await selectOption(page, "consistency-select", "frequent");
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
     // 2. Verify redirect and badges
@@ -38,7 +38,7 @@ test.describe("Status Overhaul E2E", () => {
     );
 
     // 3. Update Status
-    await page.getByLabel("Update Issue Status").selectOption("in_progress");
+    await selectOption(page, "issue-status-select", "in_progress");
 
     // 4. Verify status change in badge and timeline
     await expect(page.getByTestId("issue-status-badge")).toHaveText(

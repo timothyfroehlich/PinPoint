@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { randomUUID } from "node:crypto";
-import { unconfirmedUsers, userProfiles } from "~/server/db/schema";
+import { invitedUsers, userProfiles } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import {
   updateUserRole,
@@ -164,8 +164,8 @@ describe("Admin User Management Integration", () => {
 
       const ucUser = await (
         await getTestDb()
-      ).query.unconfirmedUsers.findFirst({
-        where: eq(unconfirmedUsers.email, "invite@test.com"),
+      ).query.invitedUsers.findFirst({
+        where: eq(invitedUsers.email, "invite@test.com"),
       });
       expect(ucUser).toBeDefined();
       expect(ucUser?.role).toBe("member");
@@ -192,7 +192,7 @@ describe("Admin User Management Integration", () => {
       mockGetUser.mockResolvedValue({ data: { user: adminUser! } });
 
       const email = "already-invited@test.com";
-      await (await getTestDb()).insert(unconfirmedUsers).values({
+      await (await getTestDb()).insert(invitedUsers).values({
         firstName: "Already",
         lastName: "Invited",
         email,
@@ -231,8 +231,8 @@ describe("Admin User Management Integration", () => {
       // The current implementation inserts THEN sends email.
       const ucUser = await (
         await getTestDb()
-      ).query.unconfirmedUsers.findFirst({
-        where: eq(unconfirmedUsers.email, "fail@test.com"),
+      ).query.invitedUsers.findFirst({
+        where: eq(invitedUsers.email, "fail@test.com"),
       });
       expect(ucUser).toBeDefined();
     });
@@ -245,7 +245,7 @@ describe("Admin User Management Integration", () => {
       const [ucUser] = await (
         await getTestDb()
       )
-        .insert(unconfirmedUsers)
+        .insert(invitedUsers)
         .values({
           firstName: "Resend",
           lastName: "Me",
@@ -270,7 +270,7 @@ describe("Admin User Management Integration", () => {
       const [ucUser] = await (
         await getTestDb()
       )
-        .insert(unconfirmedUsers)
+        .insert(invitedUsers)
         .values({
           firstName: "Fail",
           lastName: "Resend",

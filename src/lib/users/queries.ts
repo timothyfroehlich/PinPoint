@@ -1,5 +1,5 @@
 import { db } from "~/server/db";
-import { userProfiles, unconfirmedUsers } from "~/server/db/schema";
+import { userProfiles, invitedUsers } from "~/server/db/schema";
 import { sql } from "drizzle-orm";
 import type { UnifiedUser } from "~/lib/types";
 
@@ -17,21 +17,21 @@ export async function getUnifiedUsers(): Promise<UnifiedUser[]> {
     })
     .from(userProfiles);
 
-  // Fetch unconfirmed users
-  const unconfirmedUsersList = await db
+  // Fetch invited users
+  const invitedUsersList = await db
     .select({
-      id: unconfirmedUsers.id,
-      name: unconfirmedUsers.name,
-      email: unconfirmedUsers.email,
-      role: unconfirmedUsers.role,
+      id: invitedUsers.id,
+      name: invitedUsers.name,
+      email: invitedUsers.email,
+      role: invitedUsers.role,
       avatarUrl: sql<null>`null`,
-      status: sql<"unconfirmed">`'unconfirmed'`,
-      inviteSentAt: unconfirmedUsers.inviteSentAt,
+      status: sql<"invited">`'invited'`,
+      inviteSentAt: invitedUsers.inviteSentAt,
     })
-    .from(unconfirmedUsers);
+    .from(invitedUsers);
 
   // Merge and sort by name
-  const allUsers = [...activatedUsers, ...unconfirmedUsersList].sort((a, b) => {
+  const allUsers = [...activatedUsers, ...invitedUsersList].sort((a, b) => {
     if (!a.name) return 1;
     if (!b.name) return -1;
     return a.name.localeCompare(b.name);

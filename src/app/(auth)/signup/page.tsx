@@ -6,7 +6,7 @@ import { createClient } from "~/lib/supabase/server";
 import { SignupForm } from "./signup-form";
 
 import { db } from "~/server/db";
-import { unconfirmedUsers } from "~/server/db/schema";
+import { invitedUsers } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 
 /**
@@ -35,18 +35,18 @@ export default async function SignupPage({
   let initialData = undefined;
 
   if (email) {
-    const unconfirmed = await db.query.unconfirmedUsers.findFirst({
-      where: eq(unconfirmedUsers.email, email),
+    const invited = await db.query.invitedUsers.findFirst({
+      where: eq(invitedUsers.email, email),
     });
 
-    if (unconfirmed) {
+    if (invited) {
       initialData = {
-        email: unconfirmed.email,
-        firstName: unconfirmed.firstName,
-        lastName: unconfirmed.lastName,
+        email: invited.email,
+        firstName: invited.firstName,
+        lastName: invited.lastName,
       };
     } else {
-      // If email is provided but no unconfirmed user found, we still pre-fill the email
+      // If email is provided but no invited user found, we still pre-fill the email
       initialData = { email };
     }
   }
