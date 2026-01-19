@@ -116,7 +116,9 @@ export function UpdateMachineForm({
         />
       ) : (
         <div className="space-y-2" data-testid="owner-display">
-          <span className="text-sm font-semibold text-on-surface">Machine Owner</span>
+          <span className="text-sm font-semibold text-on-surface">
+            Machine Owner
+          </span>
           <div className="rounded-md border border-outline bg-surface px-3 py-2">
             {machine.owner || machine.invitedOwner ? (
               <div className="flex items-center gap-2">
