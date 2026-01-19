@@ -2,7 +2,8 @@ import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import type Mail from "nodemailer/lib/mailer";
 
-export const EMAIL_FROM = "PinPoint <notifications@pinpoint.austinpinball.org>";
+export const EMAIL_FROM =
+  "PinPoint <notifications@pinpoint.austinpinballcollective.org>";
 
 export interface EmailParams {
   to: string;

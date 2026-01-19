@@ -16,7 +16,11 @@ describe("resolveIssueReporter", () => {
 
   it("resolves invitedReporter if no reportedByUser", () => {
     const issue = {
-      invitedReporter: { id: "invited-1", name: "Invited", email: "invited@example.com" },
+      invitedReporter: {
+        id: "invited-1",
+        name: "Invited",
+        email: "invited@example.com",
+      },
     };
     expect(resolveIssueReporter(issue)).toEqual({
       id: "invited-1",

@@ -23,3 +23,9 @@
 **Vulnerability:** Admin invitation emails were constructing links using `headers().get("host")`. This allows attackers to spoof the Host header and generate password reset or invite links pointing to malicious domains.
 **Learning:** Never trust the `Host` header for constructing absolute URLs, especially for security-critical flows like authentication or invitations.
 **Prevention:** Use a configured, static site URL (via `NEXT_PUBLIC_SITE_URL`) enforced by utilities like `requireSiteUrl()` to generate absolute links.
+
+## 2026-01-12 - Hardcoded Secrets in Client Bundle
+
+**Vulnerability:** Found `TestAdminButton` containing hardcoded test credentials was statically imported into the login form, including the credentials in the production JavaScript bundle.
+**Learning:** Static imports of development-only components include their code (and secrets) in production bundles unless tree-shaken, which is unreliable for side-effect imports or complex components.
+**Prevention:** Use `next/dynamic` to lazily load development-only components, ensuring their code is split into a separate chunk that is never requested in production unless the component is rendered.

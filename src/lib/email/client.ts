@@ -44,10 +44,14 @@ function createTransport(): EmailTransport | null {
   // Production/Dev: use Resend if API key is present
   const apiKey = process.env["RESEND_API_KEY"];
   if (apiKey) {
+    console.log("[Email] Using Resend transport with API key");
     return new ResendTransport(apiKey);
   }
 
   // No transport configured
+  console.warn(
+    "[Email] ⚠️ No email transport configured - RESEND_API_KEY not found"
+  );
   return null;
 }
 
@@ -58,6 +62,8 @@ export async function sendEmail({
   subject,
   html,
 }: EmailParams): Promise<EmailResult> {
+  console.log(`[Email] Attempting to send email to ${to}: ${subject}`);
+
   if (!transport) {
     console.warn("⚠️ No email transport configured. Email not sent:", {
       to,
@@ -69,6 +75,8 @@ export async function sendEmail({
   const result = await transport.send({ to, subject, html });
   if (result.success) {
     console.log(`✅ Email sent successfully to ${to}: ${subject}`);
+  } else {
+    console.error(`❌ Email failed to send to ${to}:`, result.error);
   }
   return result;
 }

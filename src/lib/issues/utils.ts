@@ -27,8 +27,7 @@ export function resolveIssueReporter(issue: IssueReporterInfo): {
     issue.reporterEmail ??
     null;
 
-  const id =
-    issue.reportedByUser?.id ?? issue.invitedReporter?.id ?? null;
+  const id = issue.reportedByUser?.id ?? issue.invitedReporter?.id ?? null;
 
   return {
     id,

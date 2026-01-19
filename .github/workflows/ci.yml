@@ -297,6 +297,9 @@ jobs:
         with:
           version: latest
 
+      - name: Generate config.toml from template
+        run: cp supabase/config.toml.template supabase/config.toml
+
       - name: Start Supabase (minimal services for migrations)
         run: |
           supabase start -x "studio,realtime,storage-api,edge-runtime,logflare,vector,imgproxy,supavisor,postgres-meta"
@@ -354,6 +357,9 @@ jobs:
         uses: supabase/setup-cli@v1
         with:
           version: latest
+
+      - name: Generate config.toml from template
+        run: cp supabase/config.toml.template supabase/config.toml
 
       - name: Make Supabase integration script executable
         run: chmod +x ./scripts/run-supabase-integration-tests.sh ./scripts/supabase-init-for-tests.sh
@@ -414,6 +420,9 @@ jobs:
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium
+
+      - name: Generate config.toml from template
+        run: cp supabase/config.toml.template supabase/config.toml
 
       - name: Make E2E script executable
         run: chmod +x ./scripts/supabase-init-for-tests.sh
@@ -486,6 +495,9 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Generate config.toml from template
+        run: cp supabase/config.toml.template supabase/config.toml
+
       - name: Make E2E script executable
         run: chmod +x ./scripts/supabase-init-for-tests.sh
 
@@ -556,6 +568,9 @@ jobs:
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium
+
+      - name: Generate config.toml from template
+        run: cp supabase/config.toml.template supabase/config.toml
 
       - name: Make E2E script executable
         run: chmod +x ./scripts/supabase-init-for-tests.sh
@@ -630,6 +645,9 @@ jobs:
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install webkit
+
+      - name: Generate config.toml from template
+        run: cp supabase/config.toml.template supabase/config.toml
 
       - name: Make E2E script executable
         run: chmod +x ./scripts/supabase-init-for-tests.sh
