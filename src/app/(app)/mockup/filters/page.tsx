@@ -7,7 +7,6 @@ import {
   X,
   Activity,
   User,
-  Clock,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -29,11 +28,6 @@ import {
   SEVERITY_CONFIG,
   PRIORITY_CONFIG,
 } from "~/lib/issues/status";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "~/components/ui/popover";
 
 // Sample Data derived from canonical config
 const statusGroups = [
@@ -285,7 +279,6 @@ export default function MockupFiltersPage(): React.JSX.Element {
   const [expanded, setExpanded] = React.useState(false);
   const searchBarRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
-  const badgesContainerRef = React.useRef<HTMLDivElement>(null);
   const [visibleBadgeCount, setVisibleBadgeCount] = React.useState(Infinity);
   const [selectedStatuses, setSelectedStatuses] = React.useState<string[]>([]);
   const [selectedMachines, setSelectedMachines] = React.useState<string[]>([]);
@@ -437,7 +430,11 @@ export default function MockupFiltersPage(): React.JSX.Element {
   ]);
 
   // Badge Logic
-  const getBadges = () => {
+  const getBadges = (): {
+    id: string;
+    label: string;
+    clear: () => void;
+  }[] => {
     const badges: {
       id: string;
       label: string;
@@ -467,11 +464,13 @@ export default function MockupFiltersPage(): React.JSX.Element {
         label: "Status: New",
         clear: () =>
           setSelectedStatuses((prev) =>
-            prev.filter((v) => !newGroupIds.includes(v as any))
+            prev.filter(
+              (v) => !newGroupIds.includes(v as (typeof newGroupIds)[number])
+            )
           ),
       });
       remainingStatuses = remainingStatuses.filter(
-        (s) => !newGroupIds.includes(s as any)
+        (s) => !newGroupIds.includes(s as (typeof newGroupIds)[number])
       );
     }
 
@@ -486,11 +485,14 @@ export default function MockupFiltersPage(): React.JSX.Element {
         label: "Status: In Progress",
         clear: () =>
           setSelectedStatuses((prev) =>
-            prev.filter((v) => !inProgressIds.includes(v as any))
+            prev.filter(
+              (v) =>
+                !inProgressIds.includes(v as (typeof inProgressIds)[number])
+            )
           ),
       });
       remainingStatuses = remainingStatuses.filter(
-        (s) => !inProgressIds.includes(s as any)
+        (s) => !inProgressIds.includes(s as (typeof inProgressIds)[number])
       );
     }
 
@@ -503,11 +505,13 @@ export default function MockupFiltersPage(): React.JSX.Element {
         label: "Status: Closed",
         clear: () =>
           setSelectedStatuses((prev) =>
-            prev.filter((v) => !closedIds.includes(v as any))
+            prev.filter(
+              (v) => !closedIds.includes(v as (typeof closedIds)[number])
+            )
           ),
       });
       remainingStatuses = remainingStatuses.filter(
-        (s) => !closedIds.includes(s as any)
+        (s) => !closedIds.includes(s as (typeof closedIds)[number])
       );
     }
 
@@ -515,7 +519,8 @@ export default function MockupFiltersPage(): React.JSX.Element {
     remainingStatuses.forEach((s) => {
       badges.push({
         id: `status-${s}`,
-        label: (STATUS_CONFIG as any)[s]?.label ?? s,
+        label:
+          (STATUS_CONFIG as Record<string, { label: string }>)[s]?.label ?? s,
         clear: () => setSelectedStatuses((prev) => prev.filter((v) => v !== s)),
       });
     });
@@ -524,7 +529,8 @@ export default function MockupFiltersPage(): React.JSX.Element {
     selectedSeverities.forEach((s) => {
       badges.push({
         id: `severity-${s}`,
-        label: (SEVERITY_CONFIG as any)[s]?.label ?? s,
+        label:
+          (SEVERITY_CONFIG as Record<string, { label: string }>)[s]?.label ?? s,
         clear: () =>
           setSelectedSeverities((prev) => prev.filter((v) => v !== s)),
       });
@@ -534,7 +540,8 @@ export default function MockupFiltersPage(): React.JSX.Element {
     selectedPriorities.forEach((p) => {
       badges.push({
         id: `priority-${p}`,
-        label: (PRIORITY_CONFIG as any)[p]?.label ?? p,
+        label:
+          (PRIORITY_CONFIG as Record<string, { label: string }>)[p]?.label ?? p,
         clear: () =>
           setSelectedPriorities((prev) => prev.filter((v) => v !== p)),
       });
@@ -584,7 +591,7 @@ export default function MockupFiltersPage(): React.JSX.Element {
     if (!searchBarRef.current) return;
 
     const calculateLayout = (): void => {
-      requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
         if (!searchBarRef.current) return;
 
         const containerWidth = searchBarRef.current.offsetWidth;
@@ -940,7 +947,6 @@ export default function MockupFiltersPage(): React.JSX.Element {
                   onClick={() => handleSort("updatedAt")}
                   className="text-xs"
                 >
-                  <Clock className="mr-2 h-3.5 w-3.5" />
                   Modified
                   {sortState.column === "updatedAt" && (
                     <span className="ml-auto text-[10px] text-primary">

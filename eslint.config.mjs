@@ -18,6 +18,8 @@ export default [
       "*.config.mjs",
       "*.config.ts",
       "*.config.cjs",
+      "src/app/(app)/mockup/**",
+      "src/components/mockups/**",
     ],
   },
   {

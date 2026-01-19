@@ -73,6 +73,7 @@ The search bar is a complex component with the following behavior:
 ```
 
 **Technical Implementation:**
+
 - Hidden `<span>` measures input text width using `getBoundingClientRect()`
 - `ResizeObserver` recalculates badge layout on container resize
 - Badges positioned with `position: absolute; right: 12px`
@@ -80,12 +81,14 @@ The search bar is a complex component with the following behavior:
 - Badges have `z-index: 20`, input has `z-index: 10`
 
 **Badge Behavior:**
+
 - **Order**: Most recently added filter appears leftmost (shifts others right/into overflow)
 - **Overflow**: When text approaches badges, rightmost badges collapse into `+X` indicator
 - **Click X**: Removes that specific filter
 - **Click +X Badge**: Opens popover showing all hidden badges with X buttons
 
 **Badge Display Format:**
+
 - Machines: Use abbreviation (e.g., "AFM" not "Attack from Mars")
 - Status Groups: "Status: New", "Status: In Progress", "Status: Closed"
 - Individual Statuses: Show status label directly
@@ -97,8 +100,8 @@ Popover + Command (searchable) + Checkbox list:
 
 ```typescript
 interface MultiSelectProps {
-  options?: Option[];           // Flat options
-  groups?: GroupedOption[];     // Grouped options (for Status)
+  options?: Option[]; // Flat options
+  groups?: GroupedOption[]; // Grouped options (for Status)
   value: string[];
   onChange: (value: string[]) => void;
   placeholder?: string;
@@ -107,6 +110,7 @@ interface MultiSelectProps {
 ```
 
 **Status Dropdown Special Behavior:**
+
 - Group headers ("New", "In Progress", "Closed") have checkboxes
 - Clicking group checkbox selects/deselects all statuses in group
 - Partial selection shows **indeterminate** state on group checkbox
@@ -114,6 +118,7 @@ interface MultiSelectProps {
 ### Pagination Component
 
 **Split Design (Header Position):**
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │ ISSUES LOG [15]        1-15 of 97 [◀│▶]        [View Options ▼] │
@@ -121,6 +126,7 @@ interface MultiSelectProps {
 ```
 
 **Configuration:**
+
 - Page sizes: 15 (default), 25, 50
 - Page size selector in View Options dropdown
 - Auto-reset to page 1 when any filter changes
@@ -131,14 +137,14 @@ interface MultiSelectProps {
 
 ### Column Widths
 
-| Column   | Width        | Responsive            | Notes                          |
-|----------|--------------|----------------------|--------------------------------|
-| Issue    | `flex-1`     | Always visible       | Min-width 200px, no wrapping   |
-| Status   | `150px`      | Dynamic hide         | Icon + Label, 2-line max       |
-| Priority | `150px`      | Dynamic hide         | Icon + Label, 2-line max       |
-| Severity | `150px`      | Dynamic hide         | Icon + Label, 2-line max       |
-| Assignee | `150px`      | Hide at 950px        | Text only (no avatar), 2-line  |
-| Modified | `150px`      | Hide at 1100px       | Right-aligned, 2-line max      |
+| Column   | Width    | Responsive     | Notes                         |
+| -------- | -------- | -------------- | ----------------------------- |
+| Issue    | `flex-1` | Always visible | Min-width 200px, no wrapping  |
+| Status   | `150px`  | Dynamic hide   | Icon + Label, 2-line max      |
+| Priority | `150px`  | Dynamic hide   | Icon + Label, 2-line max      |
+| Severity | `150px`  | Dynamic hide   | Icon + Label, 2-line max      |
+| Assignee | `150px`  | Hide at 950px  | Text only (no avatar), 2-line |
+| Modified | `150px`  | Hide at 1100px | Right-aligned, 2-line max     |
 
 ### Dynamic Column Hiding
 
@@ -146,6 +152,7 @@ interface MultiSelectProps {
 > Columns should hide dynamically based on available whitespace, not just breakpoints.
 
 **Algorithm:**
+
 1. Calculate Issue column natural width (content + padding)
 2. If Issue column whitespace < 50px, begin hiding rightmost optional columns
 3. Hide order: Modified → Assignee → Severity → Priority → Status
@@ -166,6 +173,7 @@ Left flipper not responding to button press
 ### Sorting Behavior
 
 **Bi-state Column Sort:**
+
 - Click column header: `desc` → `asc` → `desc` (no unsorted state)
 - Active sort shows arrow icon (up/down)
 - Inactive columns show muted up/down icon on hover
@@ -177,6 +185,7 @@ Left flipper not responding to button press
 **Issue Column Sort**: Sorts by machine initials first, then issue number (numeric, not lexicographic)
 
 **View Options Dropdown Sorts:**
+
 - Assignee
 - Modified (updatedAt)
 - Created (createdAt)
@@ -187,22 +196,22 @@ Left flipper not responding to button press
 
 All filters stored in URL for shareability. **Core requirement.**
 
-| Parameter     | Type            | Example                           |
-|---------------|-----------------|-----------------------------------|
-| `q`           | string          | `q=flipper`                       |
-| `status`      | comma-separated | `status=new,confirmed`            |
-| `machine`     | comma-separated | `machine=TZ,MM,AFM`               |
-| `severity`    | comma-separated | `severity=major,unplayable`       |
-| `priority`    | comma-separated | `priority=high,medium`            |
-| `assignee`    | comma-separated | `assignee=uuid1,uuid2`            |
-| `owner`       | comma-separated | `owner=uuid1`                     |
-| `reporter`    | string          | `reporter=uuid` or `anonymous`    |
-| `consistency` | comma-separated | `consistency=frequent,constant`   |
-| `date_from`   | ISO date        | `date_from=2026-01-01`            |
-| `date_to`     | ISO date        | `date_to=2026-12-31`              |
-| `sort`        | string          | `sort=updated_desc`               |
-| `page`        | number          | `page=2`                          |
-| `page_size`   | number          | `page_size=25`                    |
+| Parameter     | Type            | Example                         |
+| ------------- | --------------- | ------------------------------- |
+| `q`           | string          | `q=flipper`                     |
+| `status`      | comma-separated | `status=new,confirmed`          |
+| `machine`     | comma-separated | `machine=TZ,MM,AFM`             |
+| `severity`    | comma-separated | `severity=major,unplayable`     |
+| `priority`    | comma-separated | `priority=high,medium`          |
+| `assignee`    | comma-separated | `assignee=uuid1,uuid2`          |
+| `owner`       | comma-separated | `owner=uuid1`                   |
+| `reporter`    | string          | `reporter=uuid` or `anonymous`  |
+| `consistency` | comma-separated | `consistency=frequent,constant` |
+| `date_from`   | ISO date        | `date_from=2026-01-01`          |
+| `date_to`     | ISO date        | `date_to=2026-12-31`            |
+| `sort`        | string          | `sort=updated_desc`             |
+| `page`        | number          | `page=2`                        |
+| `page_size`   | number          | `page_size=25`                  |
 
 ### Default Behaviors
 
@@ -306,24 +315,28 @@ test("pagination persists through filter changes", async ({ page }) => {
 ## Implementation Checklist
 
 ### Phase 1: Core Components
+
 - [ ] `MultiSelect` component with grouped options support
 - [ ] `DateRangePicker` component
 - [ ] Search bar with responsive badge system
 - [ ] Pagination controls with page size selector
 
 ### Phase 2: URL State Management
+
 - [ ] Parse all filter params from URL
 - [ ] Sync filter state to URL on changes
 - [ ] Handle invalid/malformed params gracefully
 - [ ] Implement debounced search (300ms)
 
 ### Phase 3: Data Layer
+
 - [ ] Build `buildWhereConditions()` query logic
 - [ ] Implement `buildOrderBy()` with issue column special case
 - [ ] Add pagination with proper offset/limit
 - [ ] Cached data fetchers following `docs/patterns/data-fetching.md`
 
 ### Phase 4: Table Implementation
+
 - [ ] Dynamic column hiding algorithm
 - [ ] Standardized 150px column widths
 - [ ] 2-line max with `line-clamp-2`
@@ -331,6 +344,7 @@ test("pagination persists through filter changes", async ({ page }) => {
 - [ ] Bi-state sorting on column headers
 
 ### Phase 5: Testing
+
 - [ ] Unit tests for filter parsing and validation
 - [ ] Integration tests for query building
 - [ ] E2E tests for critical filter workflows
@@ -353,6 +367,7 @@ test("pagination persists through filter changes", async ({ page }) => {
 ## Files to Create/Modify
 
 **New:**
+
 - `src/components/ui/multi-select.tsx` (upgrade from mockup)
 - `src/components/ui/date-range-picker.tsx`
 - `src/lib/issues/filters.ts` (URL parsing, query building)
@@ -361,6 +376,7 @@ test("pagination persists through filter changes", async ({ page }) => {
 - `e2e/smoke/issue-filtering.spec.ts`
 
 **Modify:**
+
 - `src/app/(app)/issues/page.tsx` (main issues page)
 - `src/components/issues/IssueList.tsx` (table component)
 - `src/components/issues/IssueFilters.tsx` (filter bar)

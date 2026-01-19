@@ -41,7 +41,6 @@ interface MultiSelectProps {
   placeholder?: string;
   searchPlaceholder?: string;
   className?: string;
-  maxDisplayed?: number;
 }
 
 export function MultiSelect({
@@ -55,13 +54,7 @@ export function MultiSelect({
 }: MultiSelectProps): React.JSX.Element {
   const [open, setOpen] = React.useState(false);
 
-  const allFilteredOptions = groups
-    ? groups.flatMap((g) => g.options)
-    : options;
-
-  const selectedOptions = allFilteredOptions.filter((opt) =>
-    value.includes(opt.value)
-  );
+  const selectedCount = value.length;
 
   const toggleOption = (optionValue: string): void => {
     const newValue = value.includes(optionValue)
@@ -78,27 +71,26 @@ export function MultiSelect({
           role="combobox"
           aria-expanded={open}
           className={cn(
-            "w-full justify-between h-auto min-h-10 px-3 py-2",
+            "w-full justify-between h-9 px-3 py-2 font-normal",
             className
           )}
         >
-          <div className="flex flex-wrap gap-1 items-center">
+          <div className="flex items-center text-sm truncate">
             <span
               className={cn(
-                "text-sm",
-                selectedOptions.length > 0
+                selectedCount > 0
                   ? "text-foreground font-medium"
                   : "text-muted-foreground"
               )}
             >
               {placeholder}
             </span>
-            {selectedOptions.length > 0 && (
+            {selectedCount > 0 && (
               <Badge
                 variant="secondary"
-                className="ml-1 rounded-sm px-1 font-normal h-5 text-[10px]"
+                className="ml-2 rounded-sm px-1 font-normal h-5 text-[10px]"
               >
-                {selectedOptions.length}
+                {selectedCount}
               </Badge>
             )}
           </div>
@@ -116,42 +108,53 @@ export function MultiSelect({
             {groups ? (
               groups.map((group) => {
                 const groupOptionValues = group.options.map((opt) => opt.value);
-                const isAllSelected = group.options.every((opt) =>
+                const groupSelectedCount = group.options.filter((opt) =>
                   value.includes(opt.value)
-                );
+                ).length;
+                const isAllSelected =
+                  groupSelectedCount === group.options.length;
                 const isPartiallySelected =
-                  !isAllSelected &&
-                  group.options.some((opt) => value.includes(opt.value));
+                  groupSelectedCount > 0 &&
+                  groupSelectedCount < group.options.length;
+
+                const toggleGroup = (): void => {
+                  if (isAllSelected) {
+                    // Deselect all in group
+                    onChange(
+                      value.filter((v) => !groupOptionValues.includes(v))
+                    );
+                  } else {
+                    // Select all in group
+                    const otherValues = value.filter(
+                      (v) => !groupOptionValues.includes(v)
+                    );
+                    onChange([...otherValues, ...groupOptionValues]);
+                  }
+                };
 
                 return (
                   <CommandGroup
                     key={group.label}
                     heading={
-                      <div className="flex items-center gap-2 py-1">
+                      <div
+                        className="flex items-center gap-2 py-1 cursor-pointer select-none hover:bg-accent/50 -mx-2 px-2 rounded-sm transition-colors group/header"
+                        onClick={toggleGroup}
+                      >
                         <Checkbox
-                          checked={isAllSelected}
-                          className={cn(
-                            "h-3.5 w-3.5",
-                            isPartiallySelected && "opacity-50"
-                          )}
-                          onCheckedChange={() => {
-                            if (isAllSelected) {
-                              onChange(
-                                value.filter(
-                                  (v) => !groupOptionValues.includes(v)
-                                )
-                              );
-                            } else {
-                              onChange(
-                                Array.from(
-                                  new Set([...value, ...groupOptionValues])
-                                )
-                              );
-                            }
-                          }}
+                          checked={
+                            isAllSelected
+                              ? true
+                              : isPartiallySelected
+                                ? "indeterminate"
+                                : false
+                          }
+                          className="h-3.5 w-3.5"
+                          onCheckedChange={toggleGroup}
                           onClick={(e) => e.stopPropagation()}
                         />
-                        <span>{group.label}</span>
+                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70 group-hover/header:text-foreground transition-colors">
+                          {group.label}
+                        </span>
                       </div>
                     }
                   >
@@ -159,15 +162,16 @@ export function MultiSelect({
                       <CommandItem
                         key={option.value}
                         onSelect={() => toggleOption(option.value)}
+                        className="flex items-center gap-2"
                       >
                         <Checkbox
                           checked={value.includes(option.value)}
-                          className="mr-2"
+                          className="h-4 w-4"
                         />
                         {option.icon && (
-                          <option.icon className="mr-2 h-4 w-4 text-muted-foreground" />
+                          <option.icon className="h-4 w-4 text-muted-foreground" />
                         )}
-                        <span>{option.label}</span>
+                        <span className="flex-1">{option.label}</span>
                       </CommandItem>
                     ))}
                   </CommandGroup>
@@ -181,12 +185,13 @@ export function MultiSelect({
                     <CommandItem
                       key={option.value}
                       onSelect={() => toggleOption(option.value)}
+                      className="flex items-center gap-2"
                     >
-                      <Checkbox checked={isSelected} className="mr-2" />
+                      <Checkbox checked={isSelected} className="h-4 w-4" />
                       {option.icon && (
-                        <option.icon className="mr-2 h-4 w-4 text-muted-foreground" />
+                        <option.icon className="h-4 w-4 text-muted-foreground" />
                       )}
-                      <span>{option.label}</span>
+                      <span className="flex-1">{option.label}</span>
                     </CommandItem>
                   );
                 })}

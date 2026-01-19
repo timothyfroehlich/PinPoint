@@ -5,7 +5,6 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
-  Clock,
   User,
   AlertCircle,
 } from "lucide-react";
