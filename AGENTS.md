@@ -47,6 +47,23 @@ We use git worktrees for parallel environments. Run `python3 scripts/sync_worktr
 | Review      | 3200    | 56321        | 56322    |
 | AntiGravity | 3300    | 57321        | 57322    |
 
+#### Worktree Isolation Strategy (`skip-worktree`)
+
+We use `git update-index --skip-worktree` to isolate configuration per worktree. This allows parallel environments without git conflicts.
+
+- **Files Managed**:
+  - `supabase/config.toml`: Configures unique ports for each worktree.
+  - `src/test/setup/schema.sql`: Auto-generated test schema (can vary by worktree state).
+
+- **Behavior**:
+  - **Main Worktree**: Files are tracked normally. Changes CAN be committed.
+  - **Secondary Worktrees**: Files have `skip-worktree` set. Local changes are **IGNORED** by git status and **NOT** committed.
+  - **Sync Script**: `scripts/sync_worktrees.py` manages this flag automatically. Run it if you see "entry not uptodate" errors or config desync.
+
+- **Pitfalls**:
+  - `git checkout` may fail with "Entry not uptodate" if the ignored file differs from the target branch. **Fix**: Run `python3 scripts/sync_worktrees.py`.
+  - Changes to these files in secondary worktrees will NOT be saved to git. make config changes in **Main** only.
+
 ### Key Commands
 
 - `pnpm run check` (**RUN OFTEN**): Fast check (types, lint, format, unit tests). ~5s.
