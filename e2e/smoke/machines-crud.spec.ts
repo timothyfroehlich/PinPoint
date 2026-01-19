@@ -125,14 +125,14 @@ test.describe("Machines CRUD", () => {
     await expect(ownerDisplay).toBeVisible();
 
     // Verify owner label is present
-    await expect(ownerDisplay.getByText("Machine Owner")).toBeVisible();
+    await expect(page.getByText("Machine Owner")).toBeVisible();
 
     // Verify owner name is shown (Admin User owns all seeded machines)
-    await expect(ownerDisplay.getByText("Admin User")).toBeVisible();
+    await expect(page.getByText("Admin User")).toBeVisible();
 
     // Verify the help text is shown
     await expect(
-      ownerDisplay.getByText(
+      page.getByText(
         "The owner receives notifications for new issues on this machine."
       )
     ).toBeVisible();
