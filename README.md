@@ -86,8 +86,7 @@ cd PinPoint
 pnpm install
 cp .env.example .env.local   # then fill in Supabase + DB vars
 
-supabase start               # in one terminal
-pnpm run dev                  # in another
+pnpm run dev                  # automatically ensures Supabase is running
 ```
 
 Open `http://localhost:<PORT>` (see `.env.local`) to use the app.
