@@ -129,6 +129,8 @@ CREATE INDEX "idx_issues_reported_by" ON "issues" USING btree ("reported_by");
 CREATE INDEX "idx_issues_status" ON "issues" USING btree ("status");
 CREATE INDEX "idx_issues_created_at" ON "issues" USING btree ("created_at");
 CREATE INDEX "idx_issues_invited_reported_by" ON "issues" USING btree ("invited_reported_by");
+CREATE INDEX "idx_issues_severity" ON "issues" USING btree ("severity");
+CREATE INDEX "idx_issues_priority" ON "issues" USING btree ("priority");
 CREATE INDEX "idx_machines_owner_id" ON "machines" USING btree ("owner_id");
 CREATE INDEX "idx_machines_invited_owner_id" ON "machines" USING btree ("invited_owner_id");
 CREATE INDEX "idx_notif_prefs_global_watch_email" ON "notification_preferences" USING btree ("email_watch_new_issues_global");

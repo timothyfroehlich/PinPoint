@@ -187,6 +187,10 @@ export const issues = pgTable(
     invitedReportedByIdx: index("idx_issues_invited_reported_by").on(
       t.invitedReportedBy
     ),
+    // Index on severity to optimize "Unplayable Machines" dashboard query and issues filtering
+    severityIdx: index("idx_issues_severity").on(t.severity),
+    // Index on priority to optimize issues list filtering
+    priorityIdx: index("idx_issues_priority").on(t.priority),
   })
 );
 
