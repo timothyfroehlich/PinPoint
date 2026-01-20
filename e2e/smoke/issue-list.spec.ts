@@ -125,11 +125,18 @@ test.describe("Issue List Features", () => {
   test("should handle status group toggling in filters", async ({ page }) => {
     await page.goto("/issues");
 
+    // Verify default badges are visible (per user request)
+    await expect(
+      page.locator('[data-slot="badge"]').filter({ hasText: "New" })
+    ).toBeVisible();
+    await expect(
+      page.locator('[data-slot="badge"]').filter({ hasText: "Confirmed" })
+    ).toBeVisible();
+
     // Open Status Filter
     await page.getByTestId("filter-status").click();
 
-    // Click the "New" group header to select all statuses in that group
-    // The group header has a test ID like "filter-status-group-new"
+    // Click the "New" group header to toggle (deselect) them
     const newGroupHeader = page.getByTestId("filter-status-group-new");
     await expect(newGroupHeader).toBeVisible();
     await newGroupHeader.click();
@@ -137,10 +144,20 @@ test.describe("Issue List Features", () => {
     // Close the popover
     await page.keyboard.press("Escape");
 
-    // Verify URL has status parameters (should include "new" and "confirmed")
-    await expect(page).toHaveURL(/status=/);
+    // Verify badges are gone
+    await expect(
+      page.locator('[data-slot="badge"]').filter({ hasText: "New" })
+    ).toBeHidden();
+    await expect(
+      page.locator('[data-slot="badge"]').filter({ hasText: "Confirmed" })
+    ).toBeHidden();
 
-    // Verify the filter badges appear (use first() since text appears in both badge and button)
+    // Click again to re-select
+    await page.getByTestId("filter-status").click();
+    await newGroupHeader.click();
+    await page.keyboard.press("Escape");
+
+    // Verify badges are back
     await expect(
       page.locator('[data-slot="badge"]').filter({ hasText: "New" })
     ).toBeVisible();

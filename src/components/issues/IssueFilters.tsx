@@ -238,8 +238,10 @@ export function IssueFilters({
       });
     });
 
-    // Status
-    filters.status?.forEach((s) => {
+    // Status - Show badges for current status filters (or defaults if none)
+    const activeStatuses =
+      filters.status ?? ([...OPEN_STATUSES] as IssueStatus[]);
+    activeStatuses.forEach((s) => {
       const config = STATUS_CONFIG[s];
       badges.push({
         id: `status-${s}`,
@@ -248,7 +250,7 @@ export function IssueFilters({
         iconColor: config.iconColor,
         clear: () =>
           pushFilters({
-            status: filters.status!.filter((v) => v !== s),
+            status: activeStatuses.filter((v) => v !== s),
             page: 1,
           }),
       });
