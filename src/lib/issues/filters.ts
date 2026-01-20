@@ -167,9 +167,7 @@ export function buildWhereConditions(filters: IssueFilters): SQL[] {
     conditions.push(inArray(issues.status, filters.status));
   } else {
     // Correctly cast OPEN_STATUSES to IssueStatus[] to avoid readonly mismatch
-    conditions.push(
-      inArray(issues.status, [...OPEN_STATUSES] as IssueStatus[])
-    );
+    conditions.push(inArray(issues.status, [...OPEN_STATUSES]));
   }
 
   if (filters.machine && filters.machine.length > 0) {
