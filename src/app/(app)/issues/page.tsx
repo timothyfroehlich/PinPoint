@@ -11,11 +11,11 @@ import Link from "next/link";
 import { cn } from "~/lib/utils";
 import type { IssueListItem } from "~/lib/types";
 
+import { parseIssueFilters } from "~/lib/issues/filters";
 import {
-  parseIssueFilters,
   buildWhereConditions,
   buildOrderBy,
-} from "~/lib/issues/filters";
+} from "~/lib/issues/filters-queries";
 import { count } from "drizzle-orm";
 
 export const metadata: Metadata = {

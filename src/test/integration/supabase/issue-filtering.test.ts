@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { issues, machines, userProfiles } from "~/server/db/schema";
-import { buildWhereConditions } from "~/lib/issues/filters";
+import { buildWhereConditions } from "~/lib/issues/filters-queries";
 import { and, type SQL } from "drizzle-orm";
 
 describe("Issue Filtering Integration", () => {
