@@ -15,6 +15,7 @@ import type {
   notifications,
   notificationPreferences,
   issueWatchers,
+  machineWatchers,
 } from "~/server/db/schema";
 
 // Enum types for type safety (import/define before using in Issue type)
@@ -59,3 +60,4 @@ export type NotificationPreference = InferSelectModel<
   typeof notificationPreferences
 >;
 export type IssueWatcher = InferSelectModel<typeof issueWatchers>;
+export type MachineWatcher = InferSelectModel<typeof machineWatchers>;

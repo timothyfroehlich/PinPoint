@@ -35,6 +35,7 @@ export default defineConfig({
     "issues",
     "issue_comments",
     "issue_watchers",
+    "machine_watchers",
     "notifications",
     "notification_preferences",
     "invited_users",

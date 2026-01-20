@@ -217,6 +217,27 @@ export const issueWatchers = pgTable(
 );
 
 /**
+ * Machine Watchers Table
+ *
+ * Users watching a machine for notifications on all its issues.
+ */
+export const machineWatchers = pgTable(
+  "machine_watchers",
+  {
+    machineId: uuid("machine_id")
+      .notNull()
+      .references(() => machines.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => userProfiles.id, { onDelete: "cascade" }),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.machineId, t.userId] }),
+    userIdIdx: index("idx_machine_watchers_user_id").on(t.userId),
+  })
+);
+
+/**
  * Issue Comments Table
  *
  * Comments on issues, including system-generated timeline events.
@@ -363,6 +384,7 @@ export const userProfilesRelations = relations(
     }),
     notifications: many(notifications),
     watchedIssues: many(issueWatchers),
+    watchedMachines: many(machineWatchers),
   })
 );
 
@@ -378,6 +400,7 @@ export const machinesRelations = relations(machines, ({ many, one }) => ({
     references: [invitedUsers.id],
     relationName: "invited_owner",
   }),
+  watchers: many(machineWatchers),
 }));
 
 export const issuesRelations = relations(issues, ({ one, many }) => ({
@@ -430,6 +453,20 @@ export const issueWatchersRelations = relations(issueWatchers, ({ one }) => ({
     references: [userProfiles.id],
   }),
 }));
+
+export const machineWatchersRelations = relations(
+  machineWatchers,
+  ({ one }) => ({
+    machine: one(machines, {
+      fields: [machineWatchers.machineId],
+      references: [machines.id],
+    }),
+    user: one(userProfiles, {
+      fields: [machineWatchers.userId],
+      references: [userProfiles.id],
+    }),
+  })
+);
 
 export const notificationsRelations = relations(notifications, ({ one }) => ({
   user: one(userProfiles, {

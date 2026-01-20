@@ -18,7 +18,7 @@ import type { Issue } from "~/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
-import { ArrowLeft, Calendar, Plus } from "lucide-react";
+import { ArrowLeft, Calendar, Plus, Eye } from "lucide-react";
 import { headers } from "next/headers";
 import { resolveRequestUrl } from "~/lib/url";
 import { UpdateMachineForm } from "./update-machine-form";
@@ -26,6 +26,7 @@ import { QrCodeDialog } from "./qr-code-dialog";
 import { buildMachineReportUrl } from "~/lib/machines/report-url";
 import { generateQrPngDataUrl } from "~/lib/machines/qr";
 import { IssueCard } from "~/components/issues/IssueCard";
+import { WatchMachineButton } from "~/components/machines/WatchMachineButton";
 
 /**
  * Machine Detail Page (Protected Route)
@@ -100,6 +101,9 @@ export default async function MachineDetailPage({
             ...(isMemberOrAdmin && { email: true }),
           },
         },
+        watchers: {
+          columns: { userId: true },
+        },
       },
     }),
 
@@ -121,6 +125,9 @@ export default async function MachineDetailPage({
   const totalIssuesCount = totalIssuesCountResult[0]?.count ?? 0;
   // machine.issues now contains only open issues due to the filter in the query
   const openIssues = machine.issues;
+
+  // Check if current user is watching this machine
+  const isWatching = machine.watchers.some((w) => w.userId === user.id);
 
   // Derive machine status
   const machineStatus = deriveMachineStatus(openIssues as IssueForStatus[]);
@@ -214,6 +221,19 @@ export default async function MachineDetailPage({
                   allUsers={allUsers}
                   isAdmin={isAdmin}
                 />
+
+                {/* Watch Button */}
+                <div className="space-y-2">
+                  <WatchMachineButton
+                    machineId={machine.id}
+                    initialIsWatching={isWatching}
+                  />
+                  {/* Watchers Count */}
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Eye className="size-4" />
+                    <span>{machine.watchers.length} watching</span>
+                  </div>
+                </div>
 
                 <div className="pt-6 border-t border-outline-variant/50 space-y-4">
                   {/* Status & Issues Count Row */}

@@ -6,6 +6,7 @@ import {
   authUsers,
   issues,
   issueWatchers,
+  machineWatchers,
   machines,
 } from "~/server/db/schema";
 import type { IssueWatcher } from "~/lib/types/database";
@@ -80,28 +81,29 @@ export async function createNotification(
 
   if (type === "new_issue") {
     let ownerId = issueContext?.machineOwnerId ?? null;
+    let machineId: string | null = null;
 
-    // If we weren't given the owner, look it up to honour preferences
-    if (!ownerId) {
-      if (resourceType === "issue") {
-        const issue = await tx.query.issues.findFirst({
-          where: eq(issues.id, resourceId),
-          with: {
-            machine: true,
-          },
-        });
+    // Look up owner and machineId
+    if (resourceType === "issue") {
+      const issue = await tx.query.issues.findFirst({
+        where: eq(issues.id, resourceId),
+        with: {
+          machine: true,
+        },
+      });
 
-        ownerId = issue?.machine.ownerId ?? null;
-        resolvedIssueTitle = resolvedIssueTitle ?? issue?.title;
-        resolvedMachineName = resolvedMachineName ?? issue?.machine.name;
-      } else {
-        const machine = await tx.query.machines.findFirst({
-          where: eq(machines.id, resourceId),
-          columns: { ownerId: true, name: true },
-        });
-        ownerId = machine?.ownerId ?? null;
-        resolvedMachineName = resolvedMachineName ?? machine?.name;
-      }
+      ownerId = ownerId ?? issue?.machine.ownerId ?? null;
+      machineId = issue?.machine.id ?? null;
+      resolvedIssueTitle = resolvedIssueTitle ?? issue?.title;
+      resolvedMachineName = resolvedMachineName ?? issue?.machine.name;
+    } else {
+      const machine = await tx.query.machines.findFirst({
+        where: eq(machines.id, resourceId),
+        columns: { ownerId: true, name: true, id: true },
+      });
+      ownerId = ownerId ?? machine?.ownerId ?? null;
+      machineId = machine?.id ?? null;
+      resolvedMachineName = resolvedMachineName ?? machine?.name;
     }
 
     // Resolve formatted ID if missing
@@ -127,6 +129,14 @@ export async function createNotification(
     });
 
     addRecipients(...globalSubscribers.map((p) => p.userId));
+
+    // Machine watchers (users watching this specific machine)
+    if (machineId) {
+      const machineWatchersList = await tx.query.machineWatchers.findMany({
+        where: eq(machineWatchers.machineId, machineId),
+      });
+      addRecipients(...machineWatchersList.map((w) => w.userId));
+    }
 
     if (ownerId) {
       const ownerPref = await tx.query.notificationPreferences.findFirst({
