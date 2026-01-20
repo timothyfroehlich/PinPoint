@@ -43,12 +43,33 @@ export function buildWhereConditions(filters: IssueFilters): SQL[] {
       ilike(issues.reporterEmail, search),
     ];
 
-    // Check if the query is a number or contains a number (e.g. AFM-101 or 101)
-    const numericMatch = /\d+/.exec(filters.q);
-    if (numericMatch) {
-      const issueNum = parseInt(numericMatch[0], 10);
-      if (!isNaN(issueNum)) {
-        searchConditions.push(eq(issues.issueNumber, issueNum));
+    // Check if the query matches a pattern like "AFM-101" or "AFM 101"
+    const issuePatternMatch = /^([a-zA-Z]{1,4})[- ](\d+)$/.exec(
+      filters.q.trim()
+    );
+    if (issuePatternMatch) {
+      const initials = issuePatternMatch[1];
+      const num = issuePatternMatch[2];
+      if (initials && num) {
+        const issueNum = parseInt(num, 10);
+        if (!isNaN(issueNum)) {
+          const cond = and(
+            ilike(issues.machineInitials, initials),
+            eq(issues.issueNumber, issueNum)
+          );
+          if (cond) {
+            searchConditions.push(cond);
+          }
+        }
+      }
+    } else {
+      // Fallback: check if the query is just a number
+      const numericMatch = /^\d+$/.exec(filters.q.trim());
+      if (numericMatch) {
+        const issueNum = parseInt(numericMatch[0], 10);
+        if (!isNaN(issueNum)) {
+          searchConditions.push(eq(issues.issueNumber, issueNum));
+        }
       }
     }
 
@@ -121,7 +142,12 @@ export function buildWhereConditions(filters: IssueFilters): SQL[] {
       )
     );
 
-    conditions.push(or(...searchConditions)!);
+    if (searchConditions.length > 0) {
+      const cond = or(...searchConditions);
+      if (cond) {
+        conditions.push(cond);
+      }
+    }
   }
 
   // Status (Default to OPEN_STATUSES if none specified)
@@ -151,12 +177,13 @@ export function buildWhereConditions(filters: IssueFilters): SQL[] {
 
     if (hasUnassigned && actualAssignees.length > 0) {
       // Both unassigned and specific users
-      conditions.push(
-        or(
-          isNull(issues.assignedTo),
-          inArray(issues.assignedTo, actualAssignees)
-        )!
+      const cond = or(
+        isNull(issues.assignedTo),
+        inArray(issues.assignedTo, actualAssignees)
       );
+      if (cond) {
+        conditions.push(cond);
+      }
     } else if (hasUnassigned) {
       // Only unassigned
       conditions.push(isNull(issues.assignedTo));

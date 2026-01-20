@@ -34,18 +34,15 @@ If you’re trying to understand how to implement something, read:
 
    ```bash
    pnpm install
-   cp .env.example .env.local
-   # Fill in Supabase + database env vars
+   python3 scripts/sync_worktrees.py
    ```
 
-3. **Start Supabase + Dev Server**
+   This generates `supabase/config.toml` and `.env.local` from templates. These files are ignored by git to keep your local environment clean.
+
+3. **Start Dev Server**
 
    ```bash
-   # In one terminal
-   supabase start
-
-   # In another terminal
-   pnpm run dev
+   pnpm run dev    # automatically ensures Supabase is running
    ```
 
 4. **Run Fast Checks While Iterating**

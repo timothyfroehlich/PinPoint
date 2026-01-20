@@ -38,7 +38,18 @@ If your tool does not support skills, read the file path directly.
 
 ### Worktrees & Ports
 
-We use git worktrees for parallel environments. Run `python3 scripts/sync_worktrees.py` to sync config.
+We use git worktrees for parallel environments. Config is managed via templates to prevent local leaks.
+
+**Workflow**:
+
+1. Run `python3 scripts/sync_worktrees.py` to generate `supabase/config.toml` and `.env.local` from templates.
+2. `supabase/config.toml` is ignored by git; do not track it.
+
+**Troubleshooting**:
+
+- _Config Mismatch_: If ports don't match the table below, re-run `python3 scripts/sync_worktrees.py`.
+- _Supabase Failures_: Run `supabase stop --all` then re-run the sync script.
+- _Template Changes_: If you need to change shared config, edit `supabase/config.toml.template` in the project root.
 
 | Worktree    | Next.js | Supabase API | Postgres |
 | :---------- | :------ | :----------- | :------- |

@@ -114,6 +114,7 @@ export const machines = pgTable(
     invitedOwnerIdIdx: index("idx_machines_invited_owner_id").on(
       t.invitedOwnerId
     ),
+    nameIdx: index("idx_machines_name").on(t.name),
   })
 );
 
@@ -187,6 +188,10 @@ export const issues = pgTable(
     invitedReportedByIdx: index("idx_issues_invited_reported_by").on(
       t.invitedReportedBy
     ),
+    // Index on severity to optimize "Unplayable Machines" dashboard query and issues filtering
+    severityIdx: index("idx_issues_severity").on(t.severity),
+    // Index on priority to optimize issues list filtering
+    priorityIdx: index("idx_issues_priority").on(t.priority),
   })
 );
 
@@ -234,7 +239,10 @@ export const issueComments = pgTable(
       .defaultNow(),
   },
   (t) => ({
-    issueIdIdx: index("idx_issue_comments_issue_id").on(t.issueId),
+    issueIdCreatedAtIdx: index("idx_issue_comments_issue_id_created_at").on(
+      t.issueId,
+      t.createdAt
+    ),
     authorIdIdx: index("idx_issue_comments_author_id").on(t.authorId),
   })
 );

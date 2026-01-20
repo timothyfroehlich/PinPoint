@@ -7,8 +7,6 @@ import { IssueFilters } from "~/components/issues/IssueFilters";
 import { IssueList } from "~/components/issues/IssueList";
 import { createClient } from "~/lib/supabase/server";
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { cn } from "~/lib/utils";
 import type { IssueListItem } from "~/lib/types";
 
 import { parseIssueFilters } from "~/lib/issues/filters";
@@ -87,7 +85,7 @@ export default async function IssuesPage({
       },
     },
     limit: filters.pageSize,
-    offset: (filters.page! - 1) * filters.pageSize!,
+    offset: (filters.page - 1) * filters.pageSize,
   });
 
   const totalCountPromise = db
@@ -125,8 +123,8 @@ export default async function IssuesPage({
       <div className="space-y-6">
         {/* Filters */}
         <IssueFilters
+          allUsers={allUsers}
           machines={allMachines}
-          users={allUsers}
           filters={filters}
         />
 
@@ -134,115 +132,11 @@ export default async function IssuesPage({
         <IssueList
           issues={issuesList}
           totalCount={totalCount}
-          sort={filters.sort!}
-          page={filters.page!}
-          pageSize={filters.pageSize!}
+          sort={filters.sort}
+          page={filters.page}
+          pageSize={filters.pageSize}
           allUsers={allUsers}
         />
-
-        {/* Results Info & Pagination */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
-          <div className="text-sm text-muted-foreground">
-            Showing{" "}
-            <span className="font-medium text-foreground">
-              {(filters.page! - 1) * filters.pageSize! + 1}
-            </span>{" "}
-            to{" "}
-            <span className="font-medium text-foreground">
-              {Math.min(filters.page! * filters.pageSize!, totalCount)}
-            </span>{" "}
-            of <span className="font-medium text-foreground">{totalCount}</span>{" "}
-            results
-          </div>
-
-          {totalCount > filters.pageSize! && (
-            <div className="flex items-center gap-1">
-              <Link
-                href={{
-                  query: { ...rawParams, page: Math.max(1, filters.page! - 1) },
-                }}
-                className={cn(
-                  "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-3",
-                  filters.page === 1 && "pointer-events-none opacity-50"
-                )}
-              >
-                Previous
-              </Link>
-
-              <div className="flex items-center gap-1 mx-2">
-                {(() => {
-                  const totalPages = Math.ceil(totalCount / filters.pageSize!);
-                  const currentPage = filters.page!;
-                  const pages: (number | string)[] = [];
-
-                  if (totalPages <= 7) {
-                    for (let i = 1; i <= totalPages; i++) pages.push(i);
-                  } else {
-                    pages.push(1);
-                    if (currentPage > 3) pages.push("...");
-
-                    const start = Math.max(2, currentPage - 1);
-                    const end = Math.min(totalPages - 1, currentPage + 1);
-
-                    for (let i = start; i <= end; i++) {
-                      if (!pages.includes(i)) pages.push(i);
-                    }
-
-                    if (currentPage < totalPages - 2) pages.push("...");
-                    if (!pages.includes(totalPages)) pages.push(totalPages);
-                  }
-
-                  return pages.map((p, i) => {
-                    if (p === "...") {
-                      return (
-                        <span
-                          key={`dots-${i}`}
-                          className="w-9 h-9 flex items-center justify-center text-muted-foreground"
-                        >
-                          ...
-                        </span>
-                      );
-                    }
-                    const pageNum = p as number;
-                    return (
-                      <Link
-                        key={pageNum}
-                        href={{ query: { ...rawParams, page: pageNum } }}
-                        className={cn(
-                          "inline-flex items-center justify-center rounded-md text-sm font-medium h-9 w-9",
-                          filters.page === pageNum
-                            ? "bg-primary text-primary-foreground shadow"
-                            : "hover:bg-accent hover:text-accent-foreground border border-transparent"
-                        )}
-                      >
-                        {pageNum}
-                      </Link>
-                    );
-                  });
-                })()}
-              </div>
-
-              <Link
-                href={{
-                  query: {
-                    ...rawParams,
-                    page: Math.min(
-                      Math.ceil(totalCount / filters.pageSize!),
-                      filters.page! + 1
-                    ),
-                  },
-                }}
-                className={cn(
-                  "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-3",
-                  filters.page! >= Math.ceil(totalCount / filters.pageSize!) &&
-                    "pointer-events-none opacity-50"
-                )}
-              >
-                Next
-              </Link>
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );

@@ -4,9 +4,10 @@ import { resolveIssueReporter } from "./utils";
 describe("resolveIssueReporter", () => {
   it("resolves reportedByUser", () => {
     const issue = {
-      reportedByUser: { name: "User", email: "user@example.com" },
+      reportedByUser: { id: "user-1", name: "User", email: "user@example.com" },
     };
     expect(resolveIssueReporter(issue)).toEqual({
+      id: "user-1",
       name: "User",
       email: "user@example.com",
       initial: "U",
@@ -15,9 +16,14 @@ describe("resolveIssueReporter", () => {
 
   it("resolves invitedReporter if no reportedByUser", () => {
     const issue = {
-      invitedReporter: { name: "Invited", email: "invited@example.com" },
+      invitedReporter: {
+        id: "invited-1",
+        name: "Invited",
+        email: "invited@example.com",
+      },
     };
     expect(resolveIssueReporter(issue)).toEqual({
+      id: "invited-1",
       name: "Invited",
       email: "invited@example.com",
       initial: "I",
@@ -30,6 +36,7 @@ describe("resolveIssueReporter", () => {
       reporterEmail: "legacy@example.com",
     };
     expect(resolveIssueReporter(issue)).toEqual({
+      id: null,
       name: "Legacy",
       email: "legacy@example.com",
       initial: "L",
@@ -39,6 +46,7 @@ describe("resolveIssueReporter", () => {
   it("falls back to Anonymous", () => {
     const issue = {};
     expect(resolveIssueReporter(issue)).toEqual({
+      id: null,
       name: "Anonymous",
       email: null,
       initial: "A",

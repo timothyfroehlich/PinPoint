@@ -245,37 +245,35 @@ class Worktree:
 
     def validate_config(self) -> bool:
         """Validate configuration files"""
-        config_file = self.path / "supabase" / "config.toml"
-        if not config_file.exists():
-            self.state.config_messages.append("Missing supabase/config.toml")
+        template_file = self.path / "supabase" / "config.toml.template"
+        if not template_file.exists():
+            self.state.config_messages.append("Missing supabase/config.toml.template")
             self.state.update_status(StatusLevel.ERROR)
             return False
         return True
 
-    def fix_config(self, is_main_worktree: bool) -> None:
-        """Fix configuration files (config.toml, .env.local, skip-worktree)"""
-        # Fix config.toml
-        self._fix_config_toml()
+    def fix_config(self) -> None:
+        """Fix configuration files (config.toml from template, .env.local)"""
+        # Generate config.toml from template
+        self._generate_config_from_template()
 
         # Fix .env.local
         self._fix_env_local()
 
-        # Fix skip-worktree
-        self._fix_skip_worktree(is_main_worktree)
-
-    def _fix_config_toml(self) -> None:
-        """Fix supabase/config.toml with correct ports and project_id"""
+    def _generate_config_from_template(self) -> None:
+        """Generate supabase/config.toml from config.toml.template with worktree-specific values"""
+        template_file = self.path / "supabase" / "config.toml.template"
         config_file = self.path / "supabase" / "config.toml"
 
-        if not config_file.exists():
-            self.state.config_messages.append("Missing supabase/config.toml")
+        if not template_file.exists():
+            self.state.config_messages.append("Missing supabase/config.toml.template")
             self.state.update_status(StatusLevel.ERROR)
             return
 
-        # Read current config
-        content = config_file.read_text()
+        # Read template
+        template_content = template_file.read_text()
 
-        # Expected values
+        # Expected values for this worktree
         expected = {
             "project_id": self.port_config.project_id,
             "api_port": self.port_config.api_port,
@@ -288,49 +286,33 @@ class Worktree:
             "refresh_token_reuse_interval": 60,  # Supabase default (more forgiving for E2E tests)
         }
 
-        # Parse current values
-        current = {}
-        current["project_id"] = self._extract_value(content, r'^project_id = "([^"]+)"')
-        current["api_port"] = self._extract_port(content, r'^\[api\].*?^port = (\d+)', re.MULTILINE | re.DOTALL)
-        current["db_port"] = self._extract_port(content, r'^\[db\].*?^port = (\d+)', re.MULTILINE | re.DOTALL)
-        current["shadow_port"] = self._extract_port(content, r'^\[db\].*?^shadow_port = (\d+)', re.MULTILINE | re.DOTALL)
-        current["pooler_port"] = self._extract_port(content, r'^\[db\.pooler\].*?^port = (\d+)', re.MULTILINE | re.DOTALL)
-        current["inbucket_port"] = self._extract_port(content, r'^\[inbucket\].*?^port = (\d+)', re.MULTILINE | re.DOTALL)
-        current["smtp_port"] = self._extract_port(content, r'^\[inbucket\].*?^smtp_port = (\d+)', re.MULTILINE | re.DOTALL)
-        current["pop3_port"] = self._extract_port(content, r'^\[inbucket\].*?^pop3_port = (\d+)', re.MULTILINE | re.DOTALL)
-        current["refresh_token_reuse_interval"] = self._extract_port(content, r'^\[auth\].*?^refresh_token_reuse_interval = (\d+)', re.MULTILINE | re.DOTALL)
+        # Check if config already exists and is up-to-date
+        if config_file.exists():
+            current_content = config_file.read_text()
+            current = {}
+            current["project_id"] = self._extract_value(current_content, r'^project_id = "([^"]+)"')
+            current["api_port"] = self._extract_port(current_content, r'^\[api\].*?^port = (\d+)', re.MULTILINE | re.DOTALL)
+            current["db_port"] = self._extract_port(current_content, r'^\[db\].*?^port = (\d+)', re.MULTILINE | re.DOTALL)
+            current["shadow_port"] = self._extract_port(current_content, r'^\[db\].*?^shadow_port = (\d+)', re.MULTILINE | re.DOTALL)
+            current["pooler_port"] = self._extract_port(current_content, r'^\[db\.pooler\].*?^port = (\d+)', re.MULTILINE | re.DOTALL)
+            current["inbucket_port"] = self._extract_port(current_content, r'^\[inbucket\].*?^port = (\d+)', re.MULTILINE | re.DOTALL)
+            current["smtp_port"] = self._extract_port(current_content, r'^\[inbucket\].*?^smtp_port = (\d+)', re.MULTILINE | re.DOTALL)
+            current["pop3_port"] = self._extract_port(current_content, r'^\[inbucket\].*?^pop3_port = (\d+)', re.MULTILINE | re.DOTALL)
+            current["refresh_token_reuse_interval"] = self._extract_port(current_content, r'^\[auth\].*?^refresh_token_reuse_interval = (\d+)', re.MULTILINE | re.DOTALL)
 
-        # Check what needs fixing
-        changes = []
-        needs_fix = False
+            # Check if all values match
+            if current == expected:
+                self.state.config_messages.append("config.toml up-to-date")
+                return
 
-        for key, expected_val in expected.items():
-            current_val = current.get(key)
-            if current_val != expected_val:
-                if key == "project_id":
-                    changes.append(f"project_id: {current_val} → {expected_val}")
-                else:
-                    port_name = key.replace("_", " ").title()
-                    changes.append(f"{port_name}: {current_val} → {expected_val}")
-                needs_fix = True
-
-        if not needs_fix:
-            self.state.config_messages.append("config.toml validated (no changes needed)")
-            return
-
-        # Create backup and apply fixes
+        # Generate config from template
         if self.dry_run:
-            print(f"[DRY-RUN] Would fix config.toml in {self.name}:")
-            for change in changes:
-                print(f"[DRY-RUN]   {change}")
-            backup_file = f"config.toml.bak.{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-            print(f"[DRY-RUN] Would create backup: {backup_file}")
+            print(f"[DRY-RUN] Would generate config.toml from template in {self.name}")
+            print(f"[DRY-RUN]   project_id: {expected['project_id']}")
+            print(f"[DRY-RUN]   ports: API={expected['api_port']}, DB={expected['db_port']}, etc.")
         else:
-            # Create backup
-            backup_file = config_file.parent / f"config.toml.bak.{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-            shutil.copy2(config_file, backup_file)
-
-            # Apply fixes with sed-like replacements
+            # Apply replacements to template
+            content = template_content
             content = self._replace_project_id(content, expected["project_id"])
             content = self._replace_port_in_section(content, "api", expected["api_port"])
             content = self._replace_port_in_section(content, "db", expected["db_port"], "port")
@@ -341,11 +323,12 @@ class Worktree:
             content = self._ensure_inbucket_port(content, "pop3_port", expected["pop3_port"])
             content = self._replace_port_in_section(content, "auth", expected["refresh_token_reuse_interval"], "refresh_token_reuse_interval")
 
+            # Write generated config
             config_file.write_text(content)
 
         self.state.config_fixed = True
-        self.state.config_messages.append(f"Fixed: {', '.join(changes)}")
-        self.state.update_status(StatusLevel.WARNING)
+        self.state.config_messages.append("config.toml generated from template")
+        self.state.update_status(StatusLevel.SUCCESS)
 
     def _extract_value(self, content: str, pattern: str) -> Optional[str]:
         """Extract a string value from config"""
@@ -517,45 +500,6 @@ SUPABASE_SERVICE_ROLE_KEY=
             # Add new
             return content + f"\n{key}={value}\n"
 
-    def _fix_skip_worktree(self, is_main_worktree: bool) -> None:
-        """Fix skip-worktree flag on config.toml and schema.sql"""
-        files_to_manage = [
-            "supabase/config.toml",
-            "src/test/setup/schema.sql"
-        ]
-
-        for file_path in files_to_manage:
-            try:
-                result = subprocess.run(
-                    ["git", "-C", str(self.path), "ls-files", "-v", file_path],
-                    capture_output=True, text=True, check=True
-                )
-                skip_flag = result.stdout[0] if result.stdout else ""
-
-                if is_main_worktree:
-                    # Main worktree should NOT have skip-worktree
-                    if skip_flag == "S":
-                        if self.dry_run:
-                            print(f"[DRY-RUN] Would remove skip-worktree from {file_path} in {self.name}")
-                        else:
-                            subprocess.run(
-                                ["git", "-C", str(self.path), "update-index", "--no-skip-worktree", file_path],
-                                check=True
-                            )
-                        self.state.config_messages.append(f"skip-worktree removed from {file_path}")
-                else:
-                    # Others MUST have skip-worktree
-                    if skip_flag != "S":
-                        if self.dry_run:
-                            print(f"[DRY-RUN] Would add skip-worktree to {file_path} in {self.name}")
-                        else:
-                            subprocess.run(
-                                ["git", "-C", str(self.path), "update-index", "--skip-worktree", file_path],
-                                check=True
-                            )
-                        self.state.config_messages.append(f"skip-worktree added to {file_path}")
-            except subprocess.CalledProcessError:
-                pass  # File may not be tracked
 
     def fetch(self) -> None:
         """Fetch from origin"""
@@ -702,63 +646,11 @@ SUPABASE_SERVICE_ROLE_KEY=
                 self.state.merge_message = "Merge conflicts in config.toml (auto-resolvable)"
                 recovery = f"""cd {self.path}
 
-# Config.toml conflict detected - recommend accepting main's version
-# Your local port customizations are preserved via skip-worktree
-
-# Auto-resolve (accept main's config structure, restore ports after):
-git checkout --theirs supabase/config.toml
-git add supabase/config.toml
-git commit -m "Merge main (accept config.toml structure)"
-python3 scripts/sync_worktrees.py  # Restore correct ports
-"""
-            elif config_conflict and other_conflicts:
-                # Mixed conflicts - manual intervention needed
-                self.state.merge_message = f"Merge conflicts in config.toml + {len(other_conflicts)} other file(s)"
-                recovery = f"""cd {self.path}
-
-# CONFLICTS IN MULTIPLE FILES - MANUAL RESOLUTION REQUIRED
-# Files with conflicts: {', '.join(conflicted_files)}
-
-# Step 1: Resolve config.toml (accept main's structure)
-git checkout --theirs supabase/config.toml
-git add supabase/config.toml
-
-# Step 2: Resolve other conflicts manually
-# Edit each file, then:
-git add <resolved-files>
-
-# Step 3: Complete merge
-git commit
-
-# Step 4: Restore correct ports
-python3 scripts/sync_worktrees.py
-
-# Alternative: Abort merge entirely
-git merge --abort
-git reset --hard {self.state.pre_merge_sha}
-"""
-            else:
-                # Only non-config conflicts
-                self.state.merge_message = f"Merge conflicts in {len(conflicted_files)} file(s)"
-                recovery = f"""cd {self.path}
-
-# MANUAL CONFLICT RESOLUTION REQUIRED
-# Files with conflicts: {', '.join(conflicted_files)}
-
-# Option 1: Resolve manually
-git status
-# Edit files to resolve conflicts, then:
-git add <resolved-files>
-git commit
-
-# Option 2: Abort merge
-git merge --abort
-git reset --hard {self.state.pre_merge_sha}
-
 # Option 3: Accept all main's changes
 git checkout --theirs .
 git add .
 git commit -m "Merge main (accept all main changes)"
+python3 scripts/sync_worktrees.py  # Restore ports
 """
 
             self.state.add_recovery_command(recovery)
@@ -1156,7 +1048,7 @@ class SyncManager:
         print()
         print("Phase 1: Configuration Validation & Fixing")
         if worktree.validate_config():
-            worktree.fix_config(is_main)
+            worktree.fix_config()
         print(f"  {' | '.join(worktree.state.config_messages)}")
 
         # Phase 2: Git State

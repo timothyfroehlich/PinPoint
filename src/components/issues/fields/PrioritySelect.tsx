@@ -37,7 +37,7 @@ export function PrioritySelect({
     >
       <SelectTrigger
         className="w-full border-outline-variant bg-surface text-on-surface"
-        aria-label="Select Priority"
+        aria-label={`Priority: ${PRIORITY_CONFIG[value].label}`}
         data-testid={testId}
       >
         <SelectValue>

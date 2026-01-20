@@ -3,13 +3,14 @@ export function formatIssueId(initials: string, number: number): string {
 }
 
 export interface IssueReporterInfo {
-  reportedByUser?: { name: string; email?: string | null } | null;
-  invitedReporter?: { name: string; email?: string | null } | null;
+  reportedByUser?: { id?: string; name: string; email?: string | null } | null;
+  invitedReporter?: { id?: string; name: string; email?: string | null } | null;
   reporterName?: string | null;
   reporterEmail?: string | null;
 }
 
 export function resolveIssueReporter(issue: IssueReporterInfo): {
+  id?: string | null;
   name: string;
   email?: string | null;
   initial: string;
@@ -26,7 +27,10 @@ export function resolveIssueReporter(issue: IssueReporterInfo): {
     issue.reporterEmail ??
     null;
 
+  const id = issue.reportedByUser?.id ?? issue.invitedReporter?.id ?? null;
+
   return {
+    id,
     name,
     email,
     initial: (name[0] ?? "A").toUpperCase(),

@@ -239,8 +239,7 @@ export function IssueFilters({
     });
 
     // Status - Show badges for current status filters (or defaults if none)
-    const activeStatuses =
-      filters.status ?? ([...OPEN_STATUSES] as IssueStatus[]);
+    const activeStatuses = filters.status ?? [...OPEN_STATUSES];
     activeStatuses.forEach((s) => {
       const config = STATUS_CONFIG[s];
       badges.push({
@@ -264,11 +263,13 @@ export function IssueFilters({
         label: config.label,
         icon: config.icon,
         iconColor: config.iconColor,
-        clear: () =>
+        clear: () => {
+          const current = filters.severity ?? [];
           pushFilters({
-            severity: filters.severity!.filter((v) => v !== s),
+            severity: current.filter((v) => v !== s),
             page: 1,
-          }),
+          });
+        },
       });
     });
 
@@ -280,11 +281,13 @@ export function IssueFilters({
         label: config.label,
         icon: config.icon,
         iconColor: config.iconColor,
-        clear: () =>
+        clear: () => {
+          const current = filters.priority ?? [];
           pushFilters({
-            priority: filters.priority!.filter((v) => v !== p),
+            priority: current.filter((v) => v !== p),
             page: 1,
-          }),
+          });
+        },
       });
     });
 
@@ -296,39 +299,44 @@ export function IssueFilters({
         label: config.label,
         icon: config.icon,
         iconColor: config.iconColor,
-        clear: () =>
+        clear: () => {
+          const current = filters.consistency ?? [];
           pushFilters({
-            consistency: filters.consistency!.filter((v) => v !== c),
+            consistency: current.filter((v) => v !== c),
             page: 1,
-          }),
+          });
+        },
       });
     });
 
-    // Assignee
     filters.assignee?.forEach((id) => {
       const user = users.find((u) => u.id === id);
+      const label = id === "UNASSIGNED" ? "Unassigned" : (user?.name ?? id);
       badges.push({
         id: `assignee-${id}`,
-        label: `Assigned: ${user?.name ?? id}`,
-        clear: () =>
+        label: `Assigned: ${label}`,
+        clear: () => {
+          const current = filters.assignee ?? [];
           pushFilters({
-            assignee: filters.assignee!.filter((v) => v !== id),
+            assignee: current.filter((v) => v !== id),
             page: 1,
-          }),
+          });
+        },
       });
     });
 
-    // Owner
     filters.owner?.forEach((id) => {
       const user = users.find((u) => u.id === id);
       badges.push({
         id: `owner-${id}`,
         label: `Owner: ${user?.name ?? id}`,
-        clear: () =>
+        clear: () => {
+          const current = filters.owner ?? [];
           pushFilters({
-            owner: filters.owner!.filter((v) => v !== id),
+            owner: current.filter((v) => v !== id),
             page: 1,
-          }),
+          });
+        },
       });
     });
 
@@ -345,7 +353,7 @@ export function IssueFilters({
     if (filters.createdFrom || filters.createdTo) {
       badges.push({
         id: "created-date",
-        label: "Created Date",
+        label: "Created",
         clear: () =>
           pushFilters({
             createdFrom: undefined,
@@ -358,7 +366,7 @@ export function IssueFilters({
     if (filters.updatedFrom || filters.updatedTo) {
       badges.push({
         id: "updated-date",
-        label: "Modified Date",
+        label: "Modified",
         clear: () =>
           pushFilters({
             updatedFrom: undefined,
@@ -574,7 +582,7 @@ export function IssueFilters({
           />
           <MultiSelect
             groups={statusGroups}
-            value={filters.status ?? ([...OPEN_STATUSES] as IssueStatus[])}
+            value={filters.status ?? [...OPEN_STATUSES]}
             onChange={(val) =>
               pushFilters({ status: val as IssueStatus[], page: 1 })
             }
