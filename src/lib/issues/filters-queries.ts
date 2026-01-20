@@ -127,6 +127,21 @@ export function buildWhereConditions(filters: IssueFilters): SQL[] {
       )
     );
 
+    // Search in machine names
+    searchConditions.push(
+      exists(
+        db
+          .select()
+          .from(machines)
+          .where(
+            and(
+              eq(machines.initials, issues.machineInitials),
+              ilike(machines.name, search)
+            )
+          )
+      )
+    );
+
     // Search in issue comments
     searchConditions.push(
       exists(
@@ -193,8 +208,8 @@ export function buildWhereConditions(filters: IssueFilters): SQL[] {
     }
   }
 
-  if (filters.reporter) {
-    conditions.push(eq(issues.reportedBy, filters.reporter));
+  if (filters.reporter && filters.reporter.length > 0) {
+    conditions.push(inArray(issues.reportedBy, filters.reporter));
   }
 
   if (filters.owner && filters.owner.length > 0) {

@@ -159,7 +159,8 @@ export function IssueFilters({
         params.set("assignee", merged.assignee.join(","));
       if (merged.owner && merged.owner.length > 0)
         params.set("owner", merged.owner.join(","));
-      if (merged.reporter) params.set("reporter", merged.reporter);
+      if (merged.reporter && merged.reporter.length > 0)
+        params.set("reporter", merged.reporter.join(","));
       if (merged.consistency && merged.consistency.length > 0)
         params.set("consistency", merged.consistency.join(","));
       if (merged.watching) params.set("watching", "true");
@@ -340,15 +341,20 @@ export function IssueFilters({
       });
     });
 
-    // Reporter
-    if (filters.reporter) {
-      const user = users.find((u) => u.id === filters.reporter);
+    filters.reporter?.forEach((id) => {
+      const user = users.find((u) => u.id === id);
       badges.push({
-        id: `reporter-${filters.reporter}`,
-        label: `Reporter: ${user?.name ?? filters.reporter}`,
-        clear: () => pushFilters({ reporter: undefined, page: 1 }),
+        id: `reporter-${id}`,
+        label: `Reporter: ${user?.name ?? id}`,
+        clear: () => {
+          const current = filters.reporter ?? [];
+          pushFilters({
+            reporter: current.filter((v) => v !== id),
+            page: 1,
+          });
+        },
       });
-    }
+    });
 
     if (filters.createdFrom || filters.createdTo) {
       badges.push({
@@ -673,8 +679,8 @@ export function IssueFilters({
             />
             <MultiSelect
               options={userOptions}
-              value={filters.reporter ? [filters.reporter] : []}
-              onChange={(val) => pushFilters({ reporter: val[0], page: 1 })}
+              value={filters.reporter ?? []}
+              onChange={(val) => pushFilters({ reporter: val, page: 1 })}
               placeholder="Reporter"
               data-testid="filter-reporter"
             />

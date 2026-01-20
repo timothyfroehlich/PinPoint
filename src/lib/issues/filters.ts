@@ -17,7 +17,7 @@ export interface IssueFilters {
   priority?: IssuePriority[] | undefined;
   assignee?: string[] | undefined;
   owner?: string[] | undefined;
-  reporter?: string | undefined;
+  reporter?: string[] | undefined;
   consistency?: IssueConsistency[] | undefined;
   watching?: boolean | undefined;
   createdFrom?: Date | undefined;
@@ -81,7 +81,7 @@ export function parseIssueFilters(params: URLSearchParams): IssueFilters {
   const owner = params.get("owner")?.split(",");
   if (owner) filters.owner = owner;
 
-  const reporter = params.get("reporter");
+  const reporter = params.get("reporter")?.split(",");
   if (reporter) filters.reporter = reporter;
 
   const consistency = parseCommaList(
