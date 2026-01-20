@@ -53,8 +53,9 @@ export default async function IssuesPage({
   // Add currentUserId for watching filter
   filters.currentUserId = user.id;
   const whereConditions = buildWhereConditions(filters);
-
   const orderBy = buildOrderBy(filters.sort);
+  const pageSize = filters.pageSize ?? 15;
+  const page = filters.page ?? 1;
 
   // 2. Start independent queries immediately
   const machinesPromise = db.query.machines.findMany({
@@ -84,8 +85,8 @@ export default async function IssuesPage({
         columns: { id: true, name: true, email: true },
       },
     },
-    limit: filters.pageSize,
-    offset: (filters.page - 1) * filters.pageSize,
+    limit: pageSize,
+    offset: (page - 1) * pageSize,
   });
 
   const totalCountPromise = db
@@ -123,7 +124,7 @@ export default async function IssuesPage({
       <div className="space-y-6">
         {/* Filters */}
         <IssueFilters
-          allUsers={allUsers}
+          users={allUsers}
           machines={allMachines}
           filters={filters}
         />
@@ -132,9 +133,9 @@ export default async function IssuesPage({
         <IssueList
           issues={issuesList}
           totalCount={totalCount}
-          sort={filters.sort}
-          page={filters.page}
-          pageSize={filters.pageSize}
+          sort={filters.sort ?? "updated_desc"}
+          page={page}
+          pageSize={pageSize}
           allUsers={allUsers}
         />
       </div>
