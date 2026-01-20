@@ -43,7 +43,6 @@ describe("machines service", () => {
         userId,
       });
 
-      const deleteMock = vi.fn().mockResolvedValue(undefined);
       mockDb.delete.mockReturnValue({
         where: vi.fn().mockResolvedValue(undefined),
       } as unknown as ReturnType<typeof db.delete>);

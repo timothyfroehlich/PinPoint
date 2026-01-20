@@ -22,6 +22,13 @@
       "when": 1768329482552,
       "tag": "0002_sour_madripoor",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1768876388177,
+      "tag": "0003_real_wendell_rand",
+      "breakpoints": true
     }
   ]
 }
