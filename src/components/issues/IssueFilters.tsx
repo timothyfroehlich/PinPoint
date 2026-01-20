@@ -159,10 +159,15 @@ export function IssueFilters({
     if (merged.consistency && merged.consistency.length > 0)
       params.set("consistency", merged.consistency.join(","));
 
-    if (merged.dateFrom)
-      params.set("date_from", merged.dateFrom.toISOString().split("T")[0]!);
-    if (merged.dateTo)
-      params.set("date_to", merged.dateTo.toISOString().split("T")[0]!);
+    if (merged.createdFrom)
+      params.set("created_from", merged.createdFrom.toISOString());
+    if (merged.createdTo)
+      params.set("created_to", merged.createdTo.toISOString());
+
+    if (merged.updatedFrom)
+      params.set("updated_from", merged.updatedFrom.toISOString());
+    if (merged.updatedTo)
+      params.set("updated_to", merged.updatedTo.toISOString());
 
     if (merged.sort && merged.sort !== "updated_desc")
       params.set("sort", merged.sort);
@@ -182,12 +187,12 @@ export function IssueFilters({
       }
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [search]);
+  }, [search, filters.q, pushFilters]);
 
   // Sync search state when filters prop changes (e.g. back button)
   React.useEffect(() => {
     setSearch(filters.q ?? "");
-  }, [filters.q]);
+  }, [filters.q, setSearch]);
 
   // Measure text width for collision detection
   React.useEffect(() => {
@@ -328,12 +333,29 @@ export function IssueFilters({
       });
     }
 
-    if (filters.dateFrom) {
+    if (filters.createdFrom || filters.createdTo) {
       badges.push({
-        id: "date",
-        label: "Date Filter",
+        id: "created-date",
+        label: "Created Date",
         clear: () =>
-          pushFilters({ dateFrom: undefined, dateTo: undefined, page: 1 }),
+          pushFilters({
+            createdFrom: undefined,
+            createdTo: undefined,
+            page: 1,
+          }),
+      });
+    }
+
+    if (filters.updatedFrom || filters.updatedTo) {
+      badges.push({
+        id: "updated-date",
+        label: "Modified Date",
+        clear: () =>
+          pushFilters({
+            updatedFrom: undefined,
+            updatedTo: undefined,
+            page: 1,
+          }),
       });
     }
 
@@ -409,7 +431,7 @@ export function IssueFilters({
     const ro = new ResizeObserver(calculateLayout);
     ro.observe(searchBarRef.current);
     return () => ro.disconnect();
-  }, [badgeList, textWidth]);
+  }, [badgeList, textWidth, searchBarRef]);
 
   const visibleBadges = badgeList.slice(0, visibleBadgeCount);
   const hiddenBadgeCount = badgeList.length - visibleBadgeCount;
@@ -438,6 +460,7 @@ export function IssueFilters({
             <input
               ref={inputRef}
               placeholder="Search issues..."
+              data-testid="issue-search"
               className="flex-1 bg-transparent border-0 text-sm focus:outline-none placeholder:text-muted-foreground relative z-10"
               style={{ paddingRight: `${badgeAreaWidth}px` }}
               value={search}
@@ -538,6 +561,7 @@ export function IssueFilters({
             value={filters.machine ?? []}
             onChange={(val) => pushFilters({ machine: val, page: 1 })}
             placeholder="Machine"
+            data-testid="filter-machine"
           />
           <MultiSelect
             groups={statusGroups}
@@ -546,6 +570,7 @@ export function IssueFilters({
               pushFilters({ status: val as IssueStatus[], page: 1 })
             }
             placeholder="Status"
+            data-testid="filter-status"
           />
           <MultiSelect
             options={severityOptions}
@@ -554,6 +579,7 @@ export function IssueFilters({
               pushFilters({ severity: val as IssueSeverity[], page: 1 })
             }
             placeholder="Severity"
+            data-testid="filter-severity"
           />
           <MultiSelect
             options={priorityOptions}
@@ -562,12 +588,14 @@ export function IssueFilters({
               pushFilters({ priority: val as IssuePriority[], page: 1 })
             }
             placeholder="Priority"
+            data-testid="filter-priority"
           />
           <MultiSelect
             options={userOptions}
             value={filters.assignee ?? []}
             onChange={(val) => pushFilters({ assignee: val, page: 1 })}
             placeholder="Assignee"
+            data-testid="filter-assignee"
           />
           <Button
             variant="outline"
@@ -582,12 +610,27 @@ export function IssueFilters({
         {expanded && (
           <div className="mt-2 pt-2 border-t grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 animate-in fade-in slide-in-from-top-1">
             <DateRangePicker
-              from={filters.dateFrom}
-              to={filters.dateTo}
+              from={filters.createdFrom}
+              to={filters.createdTo}
+              placeholder="Created Range"
+              data-testid="filter-created"
               onChange={(range) => {
                 pushFilters({
-                  dateFrom: range.from ?? undefined,
-                  dateTo: range.to ?? undefined,
+                  createdFrom: range.from ?? undefined,
+                  createdTo: range.to ?? undefined,
+                  page: 1,
+                });
+              }}
+            />
+            <DateRangePicker
+              from={filters.updatedFrom}
+              to={filters.updatedTo}
+              placeholder="Modified Range"
+              data-testid="filter-modified"
+              onChange={(range) => {
+                pushFilters({
+                  updatedFrom: range.from ?? undefined,
+                  updatedTo: range.to ?? undefined,
                   page: 1,
                 });
               }}
@@ -602,19 +645,24 @@ export function IssueFilters({
                 })
               }
               placeholder="Consistency"
+              data-testid="filter-consistency"
             />
-            <MultiSelect
-              options={userOptions}
-              value={filters.owner ?? []}
-              onChange={(val) => pushFilters({ owner: val, page: 1 })}
-              placeholder="Owner"
-            />
-            <MultiSelect
-              options={userOptions}
-              value={filters.reporter ? [filters.reporter] : []}
-              onChange={(val) => pushFilters({ reporter: val[0], page: 1 })}
-              placeholder="Reporter"
-            />
+            <div className="grid grid-cols-2 gap-2">
+              <MultiSelect
+                options={userOptions}
+                value={filters.owner ?? []}
+                onChange={(val) => pushFilters({ owner: val, page: 1 })}
+                placeholder="Owner"
+                data-testid="filter-owner"
+              />
+              <MultiSelect
+                options={userOptions}
+                value={filters.reporter ? [filters.reporter] : []}
+                onChange={(val) => pushFilters({ reporter: val[0], page: 1 })}
+                placeholder="Reporter"
+                data-testid="filter-reporter"
+              />
+            </div>
           </div>
         )}
       </div>

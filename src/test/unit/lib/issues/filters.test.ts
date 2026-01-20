@@ -35,11 +35,11 @@ describe("parseIssueFilters", () => {
 
   it("parses date range correctly", () => {
     const params = new URLSearchParams(
-      "date_from=2026-01-01&date_to=2026-01-31"
+      "created_from=2026-01-01&created_to=2026-01-31"
     );
     const filters = parseIssueFilters(params);
-    expect(filters.dateFrom?.toISOString()).toContain("2026-01-01");
-    expect(filters.dateTo?.toISOString()).toContain("2026-01-31");
+    expect(filters.createdFrom?.toISOString()).toContain("2026-01-01");
+    expect(filters.createdTo?.toISOString()).toContain("2026-01-31");
   });
 
   it("handles pagination parameters", () => {

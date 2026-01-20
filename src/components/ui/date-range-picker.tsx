@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar as CalendarIcon, X } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
@@ -18,6 +18,8 @@ interface DateRangePickerProps {
   to?: Date | undefined;
   onChange: (range: { from?: Date | undefined; to?: Date | undefined }) => void;
   className?: string | undefined;
+  placeholder?: string | undefined;
+  "data-testid"?: string | undefined;
 }
 
 export function DateRangePicker({
@@ -25,11 +27,18 @@ export function DateRangePicker({
   to,
   onChange,
   className,
+  placeholder = "Pick a date range",
+  "data-testid": testId,
 }: DateRangePickerProps): React.JSX.Element {
   const [date, setDate] = React.useState<DateRange | undefined>({
     from,
     to,
   });
+
+  // Sync internal state with props
+  React.useEffect(() => {
+    setDate({ from, to });
+  }, [from, to]);
 
   const handleSelect = (range: DateRange | undefined): void => {
     setDate(range);
@@ -37,6 +46,13 @@ export function DateRangePicker({
     if (range?.from) result.from = range.from;
     if (range?.to) result.to = range.to;
     onChange(result);
+  };
+
+  const handleClear = (e: React.MouseEvent): void => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDate(undefined);
+    onChange({ from: undefined, to: undefined });
   };
 
   const [isMobile, setIsMobile] = React.useState(false);
@@ -55,8 +71,9 @@ export function DateRangePicker({
           <Button
             id="date"
             variant={"outline"}
+            data-testid={testId}
             className={cn(
-              "w-full justify-start text-left font-normal h-9 px-3",
+              "w-full justify-start text-left font-normal h-9 px-3 group relative pr-8",
               !date?.from && "text-muted-foreground"
             )}
           >
@@ -72,9 +89,18 @@ export function DateRangePicker({
                   format(date.from, "LLL dd, y")
                 )
               ) : (
-                <span>Pick a date range</span>
+                <span>{placeholder}</span>
               )}
             </span>
+            {date?.from && (
+              <div
+                role="button"
+                onClick={handleClear}
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 rounded-sm hover:bg-muted flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X className="h-3 w-3 text-muted-foreground" />
+              </div>
+            )}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">

@@ -8,8 +8,11 @@ import {
   or,
   like,
   eq,
+  and,
+  exists,
 } from "drizzle-orm";
-import { issues } from "~/server/db/schema";
+import { db } from "~/server/db";
+import { issues, machines } from "~/server/db/schema";
 import type {
   IssueStatus,
   IssueSeverity,
@@ -31,8 +34,10 @@ export interface IssueFilters {
   owner?: string[] | undefined;
   reporter?: string | undefined;
   consistency?: IssueConsistency[] | undefined;
-  dateFrom?: Date | undefined;
-  dateTo?: Date | undefined;
+  createdFrom?: Date | undefined;
+  createdTo?: Date | undefined;
+  updatedFrom?: Date | undefined;
+  updatedTo?: Date | undefined;
   sort?: string | undefined;
   page?: number | undefined;
   pageSize?: number | undefined;
@@ -104,16 +109,28 @@ export function parseIssueFilters(params: URLSearchParams): IssueFilters {
   const ps = parseInt(params.get("page_size") ?? "15", 10);
   filters.pageSize = !isNaN(ps) && ps > 0 ? ps : 15;
 
-  const dateFrom = params.get("date_from");
-  if (dateFrom) {
-    const d = new Date(dateFrom);
-    if (!isNaN(d.getTime())) filters.dateFrom = d;
+  const createdFrom = params.get("created_from");
+  if (createdFrom) {
+    const d = new Date(createdFrom);
+    if (!isNaN(d.getTime())) filters.createdFrom = d;
   }
 
-  const dateTo = params.get("date_to");
-  if (dateTo) {
-    const d = new Date(dateTo);
-    if (!isNaN(d.getTime())) filters.dateTo = d;
+  const createdTo = params.get("created_to");
+  if (createdTo) {
+    const d = new Date(createdTo);
+    if (!isNaN(d.getTime())) filters.createdTo = d;
+  }
+
+  const updatedFrom = params.get("updated_from");
+  if (updatedFrom) {
+    const d = new Date(updatedFrom);
+    if (!isNaN(d.getTime())) filters.updatedFrom = d;
+  }
+
+  const updatedTo = params.get("updated_to");
+  if (updatedTo) {
+    const d = new Date(updatedTo);
+    if (!isNaN(d.getTime())) filters.updatedTo = d;
   }
 
   return filters;
@@ -151,7 +168,7 @@ export function buildWhereConditions(filters: IssueFilters): SQL[] {
   } else {
     // Correctly cast OPEN_STATUSES to IssueStatus[] to avoid readonly mismatch
     conditions.push(
-      inArray(issues.status, [...OPEN_STATUSES] as unknown as IssueStatus[])
+      inArray(issues.status, [...OPEN_STATUSES] as IssueStatus[])
     );
   }
 
@@ -175,21 +192,44 @@ export function buildWhereConditions(filters: IssueFilters): SQL[] {
     conditions.push(eq(issues.reportedBy, filters.reporter));
   }
 
-  // TODO: Owner filter (requires join with machines)
+  if (filters.owner && filters.owner.length > 0) {
+    conditions.push(
+      exists(
+        db
+          .select()
+          .from(machines)
+          .where(
+            and(
+              eq(machines.initials, issues.machineInitials),
+              inArray(machines.ownerId, filters.owner)
+            )
+          )
+      )
+    );
+  }
 
   if (filters.consistency && filters.consistency.length > 0) {
     conditions.push(inArray(issues.consistency, filters.consistency));
   }
 
-  if (filters.dateFrom) {
-    conditions.push(gte(issues.createdAt, filters.dateFrom));
+  if (filters.createdFrom) {
+    conditions.push(gte(issues.createdAt, filters.createdFrom));
   }
 
-  if (filters.dateTo) {
-    // End of day for dateTo
-    const endOfDay = new Date(filters.dateTo);
-    endOfDay.setHours(23, 59, 59, 999);
+  if (filters.createdTo) {
+    const endOfDay = new Date(filters.createdTo);
+    endOfDay.setUTCHours(23, 59, 59, 999);
     conditions.push(lte(issues.createdAt, endOfDay));
+  }
+
+  if (filters.updatedFrom) {
+    conditions.push(gte(issues.updatedAt, filters.updatedFrom));
+  }
+
+  if (filters.updatedTo) {
+    const endOfDay = new Date(filters.updatedTo);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+    conditions.push(lte(issues.updatedAt, endOfDay));
   }
 
   return conditions;
@@ -235,8 +275,10 @@ export function hasActiveIssueFilters(params: URLSearchParams): boolean {
     "owner",
     "reporter",
     "consistency",
-    "date_from",
-    "date_to",
+    "created_from",
+    "created_to",
+    "updated_from",
+    "updated_to",
   ];
   return filterKeys.some((key) => {
     const val = params.get(key);

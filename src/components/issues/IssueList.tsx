@@ -87,7 +87,7 @@ export function IssueList({
   const [stableIds, setStableIds] = React.useState<string[]>([]);
   React.useEffect(() => {
     setStableIds(issues.map((i) => i.id));
-  }, [sort, page, pageSize, totalCount]);
+  }, [issues, sort, page, pageSize, totalCount]);
 
   const stableIssues = React.useMemo(() => {
     const issueMap = new Map(issues.map((i) => [i.id, i]));
@@ -158,15 +158,12 @@ export function IssueList({
     // For PinPoint, we mostly use column_asc/column_desc format in the URL
     // Default for many is desc (e.g. updated_desc)
 
-    let newSort = column;
-    if (sort === `${column}_desc`) {
-      newSort = `${column}_asc`;
-    } else if (sort === `${column}_asc`) {
-      newSort = `${column}_desc`;
-    } else {
-      // Default to desc for new column
-      newSort = `${column}_desc`;
-    }
+    const newSort =
+      sort === `${column}_desc`
+        ? `${column}_asc`
+        : sort === `${column}_asc`
+          ? `${column}_desc`
+          : `${column}_desc`;
 
     params.set("sort", newSort);
     router.push(`${pathname}?${params.toString()}`);
@@ -449,6 +446,8 @@ export function IssueList({
                 return (
                   <tr
                     key={issue.id}
+                    data-testid="issue-row"
+                    data-issue-id={issue.id}
                     className="hover:bg-muted/50 transition-colors group"
                   >
                     <td className="px-4 py-4 min-w-[200px] sm:min-w-[300px]">
@@ -456,6 +455,7 @@ export function IssueList({
                         <div className="flex items-center gap-1.5 text-sm font-bold text-foreground whitespace-nowrap overflow-hidden min-w-0">
                           <Link
                             href={`/m/${issue.machineInitials}/i/${issue.issueNumber}`}
+                            data-testid="issue-id"
                             className="hover:text-primary transition-colors shrink-0"
                           >
                             {formatIssueId(
@@ -472,6 +472,7 @@ export function IssueList({
                         </div>
                         <Link
                           href={`/m/${issue.machineInitials}/i/${issue.issueNumber}`}
+                          data-testid="issue-title"
                           className="text-sm text-muted-foreground line-clamp-1 group-hover:text-foreground transition-colors"
                         >
                           {issue.title}
@@ -692,13 +693,17 @@ interface EditableCellProps {
 }
 
 function IssueEditableCell({
+  field,
   config,
   options,
   onUpdate,
   isUpdating,
 }: EditableCellProps): React.JSX.Element {
   return (
-    <td className="p-1 min-w-[150px] max-w-[150px]">
+    <td
+      className="p-1 min-w-[150px] max-w-[150px]"
+      data-testid={`issue-cell-${field}`}
+    >
       <DropdownMenu>
         <DropdownMenuTrigger asChild disabled={isUpdating}>
           <button
@@ -755,7 +760,10 @@ function IssueAssigneeCell({
   isUpdating,
 }: AssigneeCellProps): React.JSX.Element {
   return (
-    <td className="p-1 min-w-[150px] max-w-[150px]">
+    <td
+      className="p-1 min-w-[150px] max-w-[150px]"
+      data-testid="issue-cell-assignee"
+    >
       <DropdownMenu>
         <DropdownMenuTrigger asChild disabled={isUpdating}>
           <button

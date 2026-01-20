@@ -1,8 +1,8 @@
 import type React from "react";
 import { type Metadata } from "next";
-import { and, eq, exists, inArray } from "drizzle-orm";
+import { and } from "drizzle-orm";
 import { db } from "~/server/db";
-import { issues, machines } from "~/server/db/schema";
+import { issues } from "~/server/db/schema";
 import { IssueFilters } from "~/components/issues/IssueFilters";
 import { IssueList } from "~/components/issues/IssueList";
 import { createClient } from "~/lib/supabase/server";
@@ -53,21 +53,6 @@ export default async function IssuesPage({
 
   const filters = parseIssueFilters(urlParams);
   const whereConditions = buildWhereConditions(filters);
-  if (filters.owner && filters.owner.length > 0) {
-    whereConditions.push(
-      exists(
-        db
-          .select()
-          .from(machines)
-          .where(
-            and(
-              eq(machines.initials, issues.machineInitials),
-              inArray(machines.ownerId, filters.owner)
-            )
-          )
-      )
-    );
-  }
 
   const orderBy = buildOrderBy(filters.sort);
 

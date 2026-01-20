@@ -157,4 +157,15 @@ describe("Issue Filtering Integration", () => {
     expect(results).toHaveLength(1);
     expect(results[0]?.id).toBe(ISSUE_1_ID);
   });
+
+  it("filters by owner", async () => {
+    const where = buildWhereConditions({
+      owner: [ALICE_ID],
+    });
+    const results = await queryIssues(where);
+    expect(results).toHaveLength(2);
+    expect(results.map((i) => i.id)).toContain(ISSUE_1_ID);
+    expect(results.map((i) => i.id)).toContain(ISSUE_3_ID);
+    expect(results.map((i) => i.id)).not.toContain(ISSUE_2_ID);
+  });
 });
