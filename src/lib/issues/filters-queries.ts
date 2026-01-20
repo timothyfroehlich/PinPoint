@@ -6,13 +6,14 @@ import {
   gte,
   lte,
   or,
-  like,
+  ilike,
   eq,
   and,
   exists,
+  isNull,
 } from "drizzle-orm";
 import { db } from "~/server/db";
-import { issues, machines } from "~/server/db/schema";
+import { issues, machines, issueWatchers } from "~/server/db/schema";
 import { OPEN_STATUSES } from "~/lib/issues/status";
 import type { IssueFilters } from "./filters";
 
@@ -27,8 +28,8 @@ export function buildWhereConditions(filters: IssueFilters): SQL[] {
   if (filters.q) {
     const search = `%${filters.q}%`;
     const searchConditions = [
-      like(issues.title, search),
-      like(issues.machineInitials, search),
+      ilike(issues.title, search),
+      ilike(issues.machineInitials, search),
     ];
 
     // Check if the query is a number or contains a number (e.g. AFM-101 or 101)
@@ -64,7 +65,25 @@ export function buildWhereConditions(filters: IssueFilters): SQL[] {
   }
 
   if (filters.assignee && filters.assignee.length > 0) {
-    conditions.push(inArray(issues.assignedTo, filters.assignee));
+    // Check if "UNASSIGNED" special value is included
+    const hasUnassigned = filters.assignee.includes("UNASSIGNED");
+    const actualAssignees = filters.assignee.filter((a) => a !== "UNASSIGNED");
+
+    if (hasUnassigned && actualAssignees.length > 0) {
+      // Both unassigned and specific users
+      conditions.push(
+        or(
+          isNull(issues.assignedTo),
+          inArray(issues.assignedTo, actualAssignees)
+        )!
+      );
+    } else if (hasUnassigned) {
+      // Only unassigned
+      conditions.push(isNull(issues.assignedTo));
+    } else {
+      // Only specific assignees
+      conditions.push(inArray(issues.assignedTo, actualAssignees));
+    }
   }
 
   if (filters.reporter) {
@@ -89,6 +108,23 @@ export function buildWhereConditions(filters: IssueFilters): SQL[] {
 
   if (filters.consistency && filters.consistency.length > 0) {
     conditions.push(inArray(issues.consistency, filters.consistency));
+  }
+
+  // Watching filter requires current user ID to be passed in
+  if (filters.watching && filters.currentUserId) {
+    conditions.push(
+      exists(
+        db
+          .select()
+          .from(issueWatchers)
+          .where(
+            and(
+              eq(issueWatchers.issueId, issues.id),
+              eq(issueWatchers.userId, filters.currentUserId)
+            )
+          )
+      )
+    );
   }
 
   if (filters.createdFrom) {

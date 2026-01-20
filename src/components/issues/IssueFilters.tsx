@@ -19,6 +19,7 @@ import {
   SEVERITY_CONFIG,
   PRIORITY_CONFIG,
   CONSISTENCY_CONFIG,
+  OPEN_STATUSES,
 } from "~/lib/issues/status";
 import { type IssueFilters as FilterState } from "~/lib/issues/filters";
 import type {
@@ -102,11 +103,13 @@ export function IssueFilters({
   );
 
   const userOptions = React.useMemo(
-    () =>
-      users.map((u) => ({
+    () => [
+      { label: "Unassigned", value: "UNASSIGNED" },
+      ...users.map((u) => ({
         label: u.name,
         value: u.id,
       })),
+    ],
     [users]
   );
 
@@ -137,47 +140,51 @@ export function IssueFilters({
     []
   );
 
-  // Update URL function
-  const pushFilters = (newFilters: Partial<FilterState>): void => {
-    const params = new URLSearchParams();
-    const merged = { ...filters, ...newFilters };
+  // Update URL function - memoized to prevent unnecessary effect triggers
+  const pushFilters = React.useCallback(
+    (newFilters: Partial<FilterState>): void => {
+      const params = new URLSearchParams();
+      const merged = { ...filters, ...newFilters };
 
-    if (merged.q) params.set("q", merged.q);
-    if (merged.status && merged.status.length > 0)
-      params.set("status", merged.status.join(","));
-    if (merged.machine && merged.machine.length > 0)
-      params.set("machine", merged.machine.join(","));
-    if (merged.severity && merged.severity.length > 0)
-      params.set("severity", merged.severity.join(","));
-    if (merged.priority && merged.priority.length > 0)
-      params.set("priority", merged.priority.join(","));
-    if (merged.assignee && merged.assignee.length > 0)
-      params.set("assignee", merged.assignee.join(","));
-    if (merged.owner && merged.owner.length > 0)
-      params.set("owner", merged.owner.join(","));
-    if (merged.reporter) params.set("reporter", merged.reporter);
-    if (merged.consistency && merged.consistency.length > 0)
-      params.set("consistency", merged.consistency.join(","));
+      if (merged.q) params.set("q", merged.q);
+      if (merged.status && merged.status.length > 0)
+        params.set("status", merged.status.join(","));
+      if (merged.machine && merged.machine.length > 0)
+        params.set("machine", merged.machine.join(","));
+      if (merged.severity && merged.severity.length > 0)
+        params.set("severity", merged.severity.join(","));
+      if (merged.priority && merged.priority.length > 0)
+        params.set("priority", merged.priority.join(","));
+      if (merged.assignee && merged.assignee.length > 0)
+        params.set("assignee", merged.assignee.join(","));
+      if (merged.owner && merged.owner.length > 0)
+        params.set("owner", merged.owner.join(","));
+      if (merged.reporter) params.set("reporter", merged.reporter);
+      if (merged.consistency && merged.consistency.length > 0)
+        params.set("consistency", merged.consistency.join(","));
+      if (merged.watching) params.set("watching", "true");
 
-    if (merged.createdFrom)
-      params.set("created_from", merged.createdFrom.toISOString());
-    if (merged.createdTo)
-      params.set("created_to", merged.createdTo.toISOString());
+      if (merged.createdFrom)
+        params.set("created_from", merged.createdFrom.toISOString());
+      if (merged.createdTo)
+        params.set("created_to", merged.createdTo.toISOString());
 
-    if (merged.updatedFrom)
-      params.set("updated_from", merged.updatedFrom.toISOString());
-    if (merged.updatedTo)
-      params.set("updated_to", merged.updatedTo.toISOString());
+      if (merged.updatedFrom)
+        params.set("updated_from", merged.updatedFrom.toISOString());
+      if (merged.updatedTo)
+        params.set("updated_to", merged.updatedTo.toISOString());
 
-    if (merged.sort && merged.sort !== "updated_desc")
-      params.set("sort", merged.sort);
-    if (merged.page && merged.page > 1)
-      params.set("page", merged.page.toString());
-    if (merged.pageSize && merged.pageSize !== 15)
-      params.set("page_size", merged.pageSize.toString());
+      if (merged.sort && merged.sort !== "updated_desc")
+        params.set("sort", merged.sort);
+      if (merged.page && merged.page > 1)
+        params.set("page", merged.page.toString());
+      if (merged.pageSize && merged.pageSize !== 15)
+        params.set("page_size", merged.pageSize.toString());
 
-    router.push(`${pathname}?${params.toString()}`);
-  };
+      router.push(`${pathname}?${params.toString()}`);
+    },
+    [filters, router, pathname]
+  );
 
   // Debounced search
   React.useEffect(() => {
@@ -565,7 +572,7 @@ export function IssueFilters({
           />
           <MultiSelect
             groups={statusGroups}
-            value={filters.status ?? []}
+            value={filters.status ?? ([...OPEN_STATUSES] as IssueStatus[])}
             onChange={(val) =>
               pushFilters({ status: val as IssueStatus[], page: 1 })
             }
@@ -608,11 +615,11 @@ export function IssueFilters({
         </div>
 
         {expanded && (
-          <div className="mt-2 pt-2 border-t grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 animate-in fade-in slide-in-from-top-1">
+          <div className="mt-2 pt-2 border-t grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 animate-in fade-in slide-in-from-top-1">
             <DateRangePicker
               from={filters.createdFrom}
               to={filters.createdTo}
-              placeholder="Created Range"
+              placeholder="Created"
               data-testid="filter-created"
               onChange={(range) => {
                 pushFilters({
@@ -625,7 +632,7 @@ export function IssueFilters({
             <DateRangePicker
               from={filters.updatedFrom}
               to={filters.updatedTo}
-              placeholder="Modified Range"
+              placeholder="Modified"
               data-testid="filter-modified"
               onChange={(range) => {
                 pushFilters({
@@ -647,22 +654,33 @@ export function IssueFilters({
               placeholder="Consistency"
               data-testid="filter-consistency"
             />
-            <div className="grid grid-cols-2 gap-2">
-              <MultiSelect
-                options={userOptions}
-                value={filters.owner ?? []}
-                onChange={(val) => pushFilters({ owner: val, page: 1 })}
-                placeholder="Owner"
-                data-testid="filter-owner"
-              />
-              <MultiSelect
-                options={userOptions}
-                value={filters.reporter ? [filters.reporter] : []}
-                onChange={(val) => pushFilters({ reporter: val[0], page: 1 })}
-                placeholder="Reporter"
-                data-testid="filter-reporter"
-              />
-            </div>
+            <MultiSelect
+              options={userOptions}
+              value={filters.owner ?? []}
+              onChange={(val) => pushFilters({ owner: val, page: 1 })}
+              placeholder="Owner"
+              data-testid="filter-owner"
+            />
+            <MultiSelect
+              options={userOptions}
+              value={filters.reporter ? [filters.reporter] : []}
+              onChange={(val) => pushFilters({ reporter: val[0], page: 1 })}
+              placeholder="Reporter"
+              data-testid="filter-reporter"
+            />
+            <Button
+              variant={filters.watching ? "default" : "outline"}
+              className="h-9 justify-start font-normal"
+              onClick={() =>
+                pushFilters({
+                  watching: !filters.watching,
+                  page: 1,
+                })
+              }
+              data-testid="filter-watching"
+            >
+              {filters.watching ? "Watching: On" : "Watching"}
+            </Button>
           </div>
         )}
       </div>

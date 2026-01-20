@@ -19,6 +19,7 @@ export interface IssueFilters {
   owner?: string[] | undefined;
   reporter?: string | undefined;
   consistency?: IssueConsistency[] | undefined;
+  watching?: boolean | undefined;
   createdFrom?: Date | undefined;
   createdTo?: Date | undefined;
   updatedFrom?: Date | undefined;
@@ -26,6 +27,7 @@ export interface IssueFilters {
   sort?: string | undefined;
   page?: number | undefined;
   pageSize?: number | undefined;
+  currentUserId?: string | undefined; // Server-side only, for watching filter
 }
 
 const VALID_SEVERITIES: IssueSeverity[] = [
@@ -117,6 +119,10 @@ export function parseIssueFilters(params: URLSearchParams): IssueFilters {
     const d = new Date(updatedTo);
     if (!isNaN(d.getTime())) filters.updatedTo = d;
   }
+
+  // Watching is a simple boolean flag
+  const watching = params.get("watching");
+  if (watching === "true") filters.watching = true;
 
   return filters;
 }
