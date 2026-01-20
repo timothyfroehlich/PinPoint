@@ -15,7 +15,6 @@ import { db } from "~/server/db";
 import { issues, machines } from "~/server/db/schema";
 import { OPEN_STATUSES } from "~/lib/issues/status";
 import type { IssueFilters } from "./filters";
-import type { IssueStatus } from "~/lib/types";
 
 /**
  * Builds an array of Drizzle SQL conditions from filters
@@ -49,9 +48,7 @@ export function buildWhereConditions(filters: IssueFilters): SQL[] {
     conditions.push(inArray(issues.status, filters.status));
   } else {
     // Correctly cast OPEN_STATUSES to IssueStatus[] to avoid readonly mismatch
-    conditions.push(
-      inArray(issues.status, [...OPEN_STATUSES] as IssueStatus[])
-    );
+    conditions.push(inArray(issues.status, [...OPEN_STATUSES]));
   }
 
   if (filters.machine && filters.machine.length > 0) {
