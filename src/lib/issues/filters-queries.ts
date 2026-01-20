@@ -13,7 +13,14 @@ import {
   isNull,
 } from "drizzle-orm";
 import { db } from "~/server/db";
-import { issues, machines, issueWatchers } from "~/server/db/schema";
+import {
+  issues,
+  machines,
+  issueWatchers,
+  userProfiles,
+  invitedUsers,
+  issueComments,
+} from "~/server/db/schema";
 import { OPEN_STATUSES } from "~/lib/issues/status";
 import type { IssueFilters } from "./filters";
 
@@ -24,12 +31,16 @@ import type { IssueFilters } from "./filters";
 export function buildWhereConditions(filters: IssueFilters): SQL[] {
   const conditions: SQL[] = [];
 
-  // Search query (Title, ID, Machine)
+  // Comprehensive search across all relevant text fields
   if (filters.q) {
     const search = `%${filters.q}%`;
     const searchConditions = [
+      // Issue fields
       ilike(issues.title, search),
+      ilike(issues.description, search),
       ilike(issues.machineInitials, search),
+      ilike(issues.reporterName, search),
+      ilike(issues.reporterEmail, search),
     ];
 
     // Check if the query is a number or contains a number (e.g. AFM-101 or 101)
@@ -40,6 +51,75 @@ export function buildWhereConditions(filters: IssueFilters): SQL[] {
         searchConditions.push(eq(issues.issueNumber, issueNum));
       }
     }
+
+    // Search in reporter's user profile name/email
+    searchConditions.push(
+      exists(
+        db
+          .select()
+          .from(userProfiles)
+          .where(
+            and(
+              eq(userProfiles.id, issues.reportedBy),
+              or(
+                ilike(userProfiles.name, search),
+                ilike(userProfiles.email, search)
+              )
+            )
+          )
+      )
+    );
+
+    // Search in invited reporter's name/email
+    searchConditions.push(
+      exists(
+        db
+          .select()
+          .from(invitedUsers)
+          .where(
+            and(
+              eq(invitedUsers.id, issues.invitedReportedBy),
+              or(
+                ilike(invitedUsers.name, search),
+                ilike(invitedUsers.email, search)
+              )
+            )
+          )
+      )
+    );
+
+    // Search in assignee's user profile name/email
+    searchConditions.push(
+      exists(
+        db
+          .select()
+          .from(userProfiles)
+          .where(
+            and(
+              eq(userProfiles.id, issues.assignedTo),
+              or(
+                ilike(userProfiles.name, search),
+                ilike(userProfiles.email, search)
+              )
+            )
+          )
+      )
+    );
+
+    // Search in issue comments
+    searchConditions.push(
+      exists(
+        db
+          .select()
+          .from(issueComments)
+          .where(
+            and(
+              eq(issueComments.issueId, issues.id),
+              ilike(issueComments.content, search)
+            )
+          )
+      )
+    );
 
     conditions.push(or(...searchConditions)!);
   }
