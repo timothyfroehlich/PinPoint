@@ -8,6 +8,7 @@ description: Testing strategy, test pyramid (70% unit/25% integration/5% E2E), P
 ## When to Use This Skill
 
 Use this skill when:
+
 - Writing new tests (unit, integration, or E2E)
 - Debugging test failures
 - Setting up test infrastructure
@@ -17,11 +18,13 @@ Use this skill when:
 ## Quick Reference
 
 ### Test Distribution (100-150 tests total)
+
 - **70% Unit (~70-100)**: Pure functions, utilities, validation
 - **25% Integration (~25-35)**: DB queries with worker-scoped PGlite
 - **5% E2E (~5-10)**: Critical flows (Playwright)
 
 ### Commands
+
 ```bash
 pnpm run check          # Quick: types + lint + unit (~5s)
 pnpm test               # Unit tests only
@@ -32,6 +35,7 @@ pnpm run preflight                 # Full suite (~60s) - run before commit
 ```
 
 ### Critical Rules
+
 1. **Worker-scoped PGlite only**: Per-test instances cause lockups
 2. **No testing Server Components directly**: Use E2E instead
 3. **Test behavior, not implementation**: Focus on outcomes
@@ -55,6 +59,7 @@ cat docs/NON_NEGOTIABLES.md | grep -A 10 "## Testing"
 ## Code Examples
 
 ### Unit Test Pattern
+
 ```typescript
 // Pure function testing
 import { describe, it, expect } from "vitest";
@@ -76,6 +81,7 @@ describe("calculateSeverityScore", () => {
 ```
 
 ### Integration Test with PGlite (Worker-Scoped)
+
 ```typescript
 import { describe, it, expect, beforeAll } from "vitest";
 import { getPGlite } from "~/test/setup/pglite";
@@ -111,6 +117,7 @@ describe("getIssuesForMachine", () => {
 ```
 
 ### E2E Test with Playwright
+
 ```typescript
 import { test, expect } from "@playwright/test";
 
@@ -142,6 +149,7 @@ test.describe("Issue Creation Flow", () => {
 ### What to Test at Each Level
 
 **Unit Tests (70%)**:
+
 - Pure functions and utilities
 - Input validation (Zod schemas)
 - Type guards and converters
@@ -149,6 +157,7 @@ test.describe("Issue Creation Flow", () => {
 - Error handling in isolated functions
 
 **Integration Tests (25%)**:
+
 - Database queries (Drizzle with PGlite)
 - Server Action data access layers
 - Auth flows (Supabase SSR)
@@ -156,6 +165,7 @@ test.describe("Issue Creation Flow", () => {
 - Multi-step workflows involving DB
 
 **E2E Tests (5%)**:
+
 - Critical user journeys (login, create issue, resolve issue)
 - Form submissions with validation
 - Navigation and routing
@@ -187,6 +197,7 @@ e2e/
 ## PGlite Best Practices
 
 ### ✅ Correct: Worker-Scoped Instance
+
 ```typescript
 import { getPGlite } from "~/test/setup/pglite";
 
@@ -204,6 +215,7 @@ describe("Database operations", () => {
 ```
 
 ### ❌ Wrong: Per-Test Instance (Causes Lockups)
+
 ```typescript
 // DON'T DO THIS - causes system lockups!
 beforeEach(async () => {
@@ -214,16 +226,19 @@ beforeEach(async () => {
 ## E2E Patterns from E2E_BEST_PRACTICES.md
 
 ### Selector Strategy
+
 1. **Prefer**: Accessibility roles and labels (`getByRole`, `getByLabel`)
 2. **Fallback**: Test IDs (`data-testid`) when roles aren't sufficient
 3. **Avoid**: CSS selectors, text content that changes
 
 ### Test Organization
+
 - **Smoke tests** (`e2e/smoke/`): Critical flows, run in CI
 - **Full tests** (`e2e/full/`): Comprehensive coverage, run less frequently
 - Keep tests independent (no shared state between tests)
 
 ### Common Patterns
+
 ```typescript
 // Wait for real UI state, not arbitrary timeouts
 await expect(page.getByText("Loading...")).toBeHidden();
@@ -250,6 +265,7 @@ test.beforeEach(async ({ page }) => {
 ### ❌ Don't Do These
 
 **Testing Implementation Details**:
+
 ```typescript
 // ❌ Bad: Testing internal state
 expect(component.state.count).toBe(5);
@@ -259,6 +275,7 @@ expect(screen.getByText("Count: 5")).toBeInTheDocument();
 ```
 
 **Arbitrary Waits**:
+
 ```typescript
 // ❌ Bad: Arbitrary timeout
 await page.waitForTimeout(5000);
@@ -268,6 +285,7 @@ await expect(page.getByText("Data loaded")).toBeVisible();
 ```
 
 **Over-Mocking**:
+
 ```typescript
 // ❌ Bad: Mocking everything (for DB logic)
 vi.mock("~/server/db");
@@ -278,6 +296,7 @@ vi.mock("drizzle-orm");
 ```
 
 **Testing Server Components Directly**:
+
 ```typescript
 // ❌ Bad: Unit testing async Server Component
 import { render } from "@testing-library/react";
@@ -307,5 +326,5 @@ Before committing tests:
 
 - Full testing strategy: `docs/TESTING_PLAN.md`
 - E2E best practices: `docs/E2E_BEST_PRACTICES.md`
-- Non-negotiables: `docs/NON_NEGOTIABLES.md` (CORE-TEST-* rules)
+- Non-negotiables: `docs/NON_NEGOTIABLES.md` (CORE-TEST-\* rules)
 - Playwright docs: Use Context7 MCP for latest patterns
