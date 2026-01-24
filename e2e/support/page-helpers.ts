@@ -11,6 +11,7 @@
  */
 
 import type { Page, Locator } from "@playwright/test";
+import { selectOption } from "./actions";
 
 /**
  * Submit a form and wait for Server Action redirect to complete
@@ -45,4 +46,49 @@ export async function submitFormAndWaitForRedirect(
   await page.waitForURL((url) => !url.pathname.startsWith(awayFrom), {
     timeout,
   });
+}
+
+/**
+ * Fill out the issue report form with sensible defaults
+ *
+ * Provides required fields by default to reduce E2E test brittleness.
+ * Override any field as needed for specific test scenarios.
+ *
+ * @param page - Playwright Page object
+ * @param options - Form field values
+ */
+export async function fillReportForm(
+  page: Page,
+  options: {
+    title: string;
+    description?: string;
+    severity?: "minor" | "playable" | "unplayable";
+    priority?: "low" | "medium" | "high";
+    consistency?: "intermittent" | "frequent" | "constant";
+    /** Set to false for anonymous/public forms that don't have priority */
+    includePriority?: boolean;
+  }
+): Promise<void> {
+  const {
+    title,
+    description,
+    severity = "minor",
+    priority = "low",
+    consistency = "intermittent",
+    includePriority = true,
+  } = options;
+
+  await page.getByLabel("Issue Title *").fill(title);
+
+  if (description) {
+    await page.getByLabel("Description").fill(description);
+  }
+
+  await selectOption(page, "severity-select", severity);
+
+  if (includePriority) {
+    await selectOption(page, "priority-select", priority);
+  }
+
+  await selectOption(page, "consistency-select", consistency);
 }

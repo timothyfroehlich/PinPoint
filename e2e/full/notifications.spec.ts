@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { ensureLoggedIn, selectOption } from "../support/actions.js";
+import { fillReportForm } from "../support/page-helpers.js";
 import { seededMachines, TEST_USERS } from "../support/constants.js";
 import {
   createTestUser,
@@ -66,11 +67,10 @@ test.describe("Notifications", () => {
     );
 
     const issueTitle = `Public Report ${timestamp}`;
-    await publicPage.getByLabel("Issue Title *").fill(issueTitle);
-    await expect(publicPage.getByLabel("Issue Title *")).toHaveValue(
-      issueTitle
-    );
-    await selectOption(publicPage, "severity-select", "minor");
+    await fillReportForm(publicPage, {
+      title: issueTitle,
+      includePriority: false,
+    });
 
     await publicPage
       .getByRole("button", { name: "Submit Issue Report" })
@@ -131,11 +131,7 @@ test.describe("Notifications", () => {
     ).toBeVisible();
 
     const issueTitle = `Status Change ${timestamp}`;
-    await page.getByLabel("Issue Title *").fill(issueTitle);
-    // Explicitly select severity (required)
-    await selectOption(page, "severity-select", "minor");
-    // Explicitly select priority (required for logged-in users)
-    await selectOption(page, "priority-select", "low");
+    await fillReportForm(page, { title: issueTitle });
 
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
@@ -224,16 +220,17 @@ test.describe("Notifications", () => {
       .selectOption({ value: seededMachines.medievalMadness.id });
 
     const issueTitle = `Global Watcher Test ${timestamp}`;
-    await publicPage.getByLabel("Issue Title *").fill(issueTitle);
     // Verify machine selection stuck
     await expect(publicPage.getByTestId("machine-select")).toHaveValue(
       seededMachines.medievalMadness.id
     );
-    await expect(publicPage.getByLabel("Issue Title *")).toHaveValue(
-      issueTitle
-    );
 
-    await selectOption(publicPage, "severity-select", "unplayable");
+    await fillReportForm(publicPage, {
+      title: issueTitle,
+      severity: "unplayable",
+      consistency: "constant",
+      includePriority: false,
+    });
 
     await publicPage
       .getByRole("button", { name: "Submit Issue Report" })
@@ -288,13 +285,10 @@ test.describe("Notifications", () => {
       machine.id
     );
     const issueTitle = `Interaction Test ${timestamp}`;
-    await publicPage.getByLabel("Issue Title *").fill(issueTitle);
-    await expect(publicPage.getByLabel("Issue Title *")).toHaveValue(
-      issueTitle
-    );
-
-    // Explicitly select severity (required)
-    await selectOption(publicPage, "severity-select", "minor");
+    await fillReportForm(publicPage, {
+      title: issueTitle,
+      includePriority: false,
+    });
 
     await publicPage
       .getByRole("button", { name: "Submit Issue Report" })
@@ -345,9 +339,7 @@ test.describe("Notifications", () => {
       .getByTestId("machine-select")
       .selectOption({ value: machine.id });
 
-    await memberPage.getByLabel("Issue Title *").fill("Email Test Issue");
-    // Explicitly select severity (required)
-    await selectOption(memberPage, "severity-select", "minor");
+    await fillReportForm(memberPage, { title: "Email Test Issue" });
 
     await expect(memberPage.getByTestId("machine-select")).toHaveValue(
       machine.id
