@@ -13,7 +13,7 @@ fi
 
 # Check if gh CLI is available
 if ! command -v gh &> /dev/null; then
-    echo "Error: gh CLI not found. Install with: npm install -g gh"
+    echo "Error: gh CLI not found. See installation instructions at: https://cli.github.com/manual/installation"
     exit 1
 fi
 
