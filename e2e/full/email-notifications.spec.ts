@@ -55,6 +55,7 @@ test.describe("Email Notifications", () => {
     await expect(page.getByTestId("severity-select")).toBeVisible();
     await selectOption(page, "severity-select", "minor");
     await selectOption(page, "priority-select", "low");
+    await selectOption(page, "consistency-select", "intermittent");
 
     // Submit form and wait for Server Action redirect (Safari-defensive)
     await submitFormAndWaitForRedirect(
@@ -109,6 +110,7 @@ test.describe("Email Notifications", () => {
     await page.getByLabel("Issue Title *").fill("Status Change Test");
     await selectOption(page, "severity-select", "minor");
     await selectOption(page, "priority-select", "low");
+    await selectOption(page, "consistency-select", "intermittent");
 
     // Submit form and wait for Server Action redirect (Safari-defensive)
     await submitFormAndWaitForRedirect(

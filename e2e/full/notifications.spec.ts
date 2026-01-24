@@ -71,6 +71,7 @@ test.describe("Notifications", () => {
       issueTitle
     );
     await selectOption(publicPage, "severity-select", "minor");
+    await selectOption(publicPage, "consistency-select", "intermittent");
 
     await publicPage
       .getByRole("button", { name: "Submit Issue Report" })
@@ -136,6 +137,7 @@ test.describe("Notifications", () => {
     await selectOption(page, "severity-select", "minor");
     // Explicitly select priority (required for logged-in users)
     await selectOption(page, "priority-select", "low");
+    await selectOption(page, "consistency-select", "intermittent");
 
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
@@ -234,6 +236,7 @@ test.describe("Notifications", () => {
     );
 
     await selectOption(publicPage, "severity-select", "unplayable");
+    await selectOption(publicPage, "consistency-select", "constant");
 
     await publicPage
       .getByRole("button", { name: "Submit Issue Report" })
@@ -295,6 +298,7 @@ test.describe("Notifications", () => {
 
     // Explicitly select severity (required)
     await selectOption(publicPage, "severity-select", "minor");
+    await selectOption(publicPage, "consistency-select", "intermittent");
 
     await publicPage
       .getByRole("button", { name: "Submit Issue Report" })
@@ -348,6 +352,8 @@ test.describe("Notifications", () => {
     await memberPage.getByLabel("Issue Title *").fill("Email Test Issue");
     // Explicitly select severity (required)
     await selectOption(memberPage, "severity-select", "minor");
+    await selectOption(memberPage, "priority-select", "low");
+    await selectOption(memberPage, "consistency-select", "intermittent");
 
     await expect(memberPage.getByTestId("machine-select")).toHaveValue(
       machine.id
