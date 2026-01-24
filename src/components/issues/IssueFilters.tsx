@@ -43,6 +43,15 @@ const SEARCH_BAR_LAYOUT = {
   PLUS_BADGE_WIDTH: 36,
   TEXT_BUFFER: 10,
   BADGE_GAP: 6,
+  /**
+   * Heuristic for badge width calculation:
+   * 8px per character is a conservative estimate for the Inter font at small sizes.
+   * 34px overhead accounts for:
+   * - Icon (16px) + Gap (6px) + Padding (12px approx) + Borders
+   *
+   * We use a fixed estimation rather than measuring the DOM (measureRef) for performance
+   * reasons, as this runs on every render/resize and we want to avoid layout thrashing.
+   */
   CHAR_WIDTH_ESTIMATE: 8,
   BADGE_OVERHEAD: 34,
 } as const;
