@@ -109,5 +109,34 @@ test.describe("Machines CRUD", () => {
     await expect(page.getByText("Bear Kick opto not working")).toBeVisible();
   });
 
+  test("should display machine owner to all logged-in users", async ({
+    page,
+  }) => {
+    // Navigate to a machine detail page
+    await page.goto(`/m/${seededMachines.medievalMadness.initials}`);
+
+    // Machine Information card should be visible
+    await expect(
+      page.getByRole("heading", { name: "Machine Information" })
+    ).toBeVisible();
+
+    // As a member (default login), owner should be displayed but read-only
+    const ownerDisplay = page.getByTestId("owner-display");
+    await expect(ownerDisplay).toBeVisible();
+
+    // Verify owner label is present
+    await expect(page.getByText("Machine Owner")).toBeVisible();
+
+    // Verify owner name is shown (Admin User owns all seeded machines)
+    await expect(page.getByText("Admin User")).toBeVisible();
+
+    // Verify the help text is shown
+    await expect(
+      page.getByText(
+        "The owner receives notifications for new issues on this machine."
+      )
+    ).toBeVisible();
+  });
+
   // Empty state test (requires creation) moved to integration/full suite
 });
