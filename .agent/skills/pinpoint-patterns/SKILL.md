@@ -8,6 +8,7 @@ description: Project-specific code patterns for Server Actions, data fetching, e
 ## When to Use This Skill
 
 Use this skill when:
+
 - Implementing new features
 - Wondering "how should I structure this?"
 - Looking for established patterns to follow
@@ -17,12 +18,14 @@ Use this skill when:
 ## Quick Reference
 
 ### Pattern Discovery Process
+
 1. Check `docs/PATTERNS.md` (index of all patterns)
 2. Look in `docs/patterns/` for specific pattern files
 3. If implementing same approach 2+ times, add new pattern
 4. Focus on PinPoint-specific patterns (not general Next.js knowledge)
 
 ### Core Patterns
+
 - **Server Actions**: File organization, auth, validation, revalidation
 - **Data Fetching**: Drizzle queries, caching, error handling
 - **Error Handling**: Validation errors, auth errors, DB errors
@@ -415,6 +418,7 @@ Example contribution:
 **When to use**: Forms with multiple steps (e.g., machine setup wizard)
 
 **Pattern**:
+
 1. Use React 19 `useActionState` for state management
 2. Store step number in state
 3. Conditionally render step components

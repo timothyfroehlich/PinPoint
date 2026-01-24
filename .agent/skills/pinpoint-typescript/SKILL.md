@@ -8,6 +8,7 @@ description: TypeScript strictest patterns, type guards, optional properties (ex
 ## When to Use This Skill
 
 Use this skill when:
+
 - Fixing TypeScript compilation errors
 - Implementing complex types or generics
 - Dealing with optional properties and `exactOptionalPropertyTypes`
@@ -18,6 +19,7 @@ Use this skill when:
 ## Quick Reference
 
 ### Critical TypeScript Rules
+
 1. **Strictest config**: No `any`, no `!`, no unsafe `as`
 2. **Explicit return types**: Required for public functions
 3. **Path aliases**: Use `~/` instead of relative imports
@@ -27,6 +29,7 @@ Use this skill when:
 ### Common Fixes
 
 **Optional Properties (exactOptionalPropertyTypes)**:
+
 ```typescript
 // ✅ Correct: Conditional spread
 const data = {
@@ -55,7 +58,9 @@ cat docs/TYPESCRIPT_STRICTEST_PATTERNS.md
 ```typescript
 // ✅ Safe authentication check
 const supabase = await createClient();
-const { data: { user } } = await supabase.auth.getUser();
+const {
+  data: { user },
+} = await supabase.auth.getUser();
 
 if (!user?.id) {
   throw new Error("Unauthorized");
@@ -98,7 +103,7 @@ function hasItems<T>(arr: T[] | undefined): arr is T[] {
 
 // Usage
 if (hasItems(issues)) {
-  issues.forEach(issue => console.log(issue.title)); // Safe
+  issues.forEach((issue) => console.log(issue.title)); // Safe
 }
 
 // ✅ Type guard for Supabase user
@@ -426,5 +431,5 @@ Before committing TypeScript code:
 ## Additional Resources
 
 - TypeScript patterns: `docs/TYPESCRIPT_STRICTEST_PATTERNS.md`
-- Non-negotiables: `docs/NON_NEGOTIABLES.md` (CORE-TS-* rules)
+- Non-negotiables: `docs/NON_NEGOTIABLES.md` (CORE-TS-\* rules)
 - Drizzle types: Use Context7 MCP for latest patterns
