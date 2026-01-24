@@ -12,10 +12,11 @@ import { PRIORITY_CONFIG } from "~/lib/issues/status";
 import { type IssuePriority } from "~/lib/types";
 
 interface PrioritySelectProps {
-  value: IssuePriority;
+  value: IssuePriority | "";
   onValueChange: (value: IssuePriority) => void;
   disabled?: boolean;
   name?: string;
+  placeholder?: string;
   testId?: string;
 }
 
@@ -26,6 +27,7 @@ export function PrioritySelect({
   onValueChange,
   disabled = false,
   name = "priority",
+  placeholder = "Select priority...",
   testId = "issue-priority-select",
 }: PrioritySelectProps): React.JSX.Element {
   return (
@@ -37,20 +39,25 @@ export function PrioritySelect({
     >
       <SelectTrigger
         className="w-full border-outline-variant bg-surface text-on-surface"
-        aria-label={`Priority: ${PRIORITY_CONFIG[value].label}`}
+        aria-label={
+          value
+            ? `Priority: ${PRIORITY_CONFIG[value].label}`
+            : "Select Priority"
+        }
         data-testid={testId}
       >
-        <SelectValue>
-          {(() => {
-            const config = PRIORITY_CONFIG[value];
-            const Icon = config.icon;
-            return (
-              <div className="flex items-center gap-2">
-                <Icon className={`size-4 ${config.iconColor}`} />
-                <span>{config.label}</span>
-              </div>
-            );
-          })()}
+        <SelectValue placeholder={placeholder}>
+          {value &&
+            (() => {
+              const config = PRIORITY_CONFIG[value];
+              const Icon = config.icon;
+              return (
+                <div className="flex items-center gap-2">
+                  <Icon className={`size-4 ${config.iconColor}`} />
+                  <span>{config.label}</span>
+                </div>
+              );
+            })()}
         </SelectValue>
       </SelectTrigger>
       <SelectContent>

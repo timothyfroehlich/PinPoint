@@ -12,10 +12,11 @@ import { SEVERITY_CONFIG } from "~/lib/issues/status";
 import { type IssueSeverity } from "~/lib/types";
 
 interface SeveritySelectProps {
-  value: IssueSeverity;
+  value: IssueSeverity | "";
   onValueChange: (value: IssueSeverity) => void;
   disabled?: boolean;
   name?: string;
+  placeholder?: string;
   testId?: string;
 }
 
@@ -31,6 +32,7 @@ export function SeveritySelect({
   onValueChange,
   disabled = false,
   name = "severity",
+  placeholder = "Select severity...",
   testId = "issue-severity-select",
 }: SeveritySelectProps): React.JSX.Element {
   return (
@@ -42,20 +44,25 @@ export function SeveritySelect({
     >
       <SelectTrigger
         className="w-full border-outline-variant bg-surface text-on-surface"
-        aria-label={`Severity: ${SEVERITY_CONFIG[value].label}`}
+        aria-label={
+          value
+            ? `Severity: ${SEVERITY_CONFIG[value].label}`
+            : "Select Severity"
+        }
         data-testid={testId}
       >
-        <SelectValue>
-          {(() => {
-            const config = SEVERITY_CONFIG[value];
-            const Icon = config.icon;
-            return (
-              <div className="flex items-center gap-2">
-                <Icon className={`size-4 ${config.iconColor}`} />
-                <span>{config.label}</span>
-              </div>
-            );
-          })()}
+        <SelectValue placeholder={placeholder}>
+          {value &&
+            (() => {
+              const config = SEVERITY_CONFIG[value];
+              const Icon = config.icon;
+              return (
+                <div className="flex items-center gap-2">
+                  <Icon className={`size-4 ${config.iconColor}`} />
+                  <span>{config.label}</span>
+                </div>
+              );
+            })()}
         </SelectValue>
       </SelectTrigger>
       <SelectContent>

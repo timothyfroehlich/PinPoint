@@ -4,6 +4,8 @@ import subprocess
 import tomllib
 from pathlib import Path
 
+CONFIG_TEMPLATE_PATH = Path("supabase/config.toml.template")
+
 def get_git_config():
     """Read the config.toml from HEAD using git show."""
     try:
@@ -15,7 +17,10 @@ def get_git_config():
         )
         return tomllib.loads(result.stdout)
     except subprocess.CalledProcessError:
-        # If file doesn't exist in HEAD (new repo?), assume empty
+        # If file doesn't exist in HEAD, fall back to template so local ports
+        # (set per-worktree) don't cause false drift errors.
+        if CONFIG_TEMPLATE_PATH.exists():
+            return tomllib.loads(CONFIG_TEMPLATE_PATH.read_text())
         return {}
     except Exception as e:
         print(f"Error reading git config: {e}", file=sys.stderr)

@@ -70,10 +70,9 @@ export function UnifiedReportForm({
   );
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [severity, setSeverity] = useState<IssueSeverity>("minor");
-  const [priority, setPriority] = useState<IssuePriority>("medium");
-  const [consistency, setConsistency] =
-    useState<IssueConsistency>("intermittent");
+  const [severity, setSeverity] = useState<IssueSeverity | "">("");
+  const [priority, setPriority] = useState<IssuePriority | "">("");
+  const [consistency, setConsistency] = useState<IssueConsistency | "">("");
 
   const [state, formAction, isPending] = useActionState(
     submitPublicIssueAction,
@@ -96,9 +95,9 @@ export function UnifiedReportForm({
           machineId: string;
           title: string;
           description: string;
-          severity: IssueSeverity;
-          priority: IssuePriority;
-          consistency: IssueConsistency;
+          severity: IssueSeverity | "";
+          priority: IssuePriority | "";
+          consistency: IssueConsistency | "";
         }>;
 
         // Only restore machineId if not provided via prop or URL already
@@ -385,7 +384,6 @@ export function UnifiedReportForm({
                 <Button
                   type="submit"
                   className="w-full bg-primary text-on-primary hover:bg-primary/90 mt-2 h-10 text-sm font-semibold"
-                  disabled={!selectedMachineId}
                   loading={isPending}
                 >
                   Submit Issue Report

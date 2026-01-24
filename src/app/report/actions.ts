@@ -17,11 +17,6 @@ import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import type { ActionState } from "./unified-report-form";
 
-const redirectWithError = (message: string): never => {
-  const params = new URLSearchParams({ error: message });
-  redirect(`/report?${params.toString()}`);
-};
-
 /**
  * Server Action: submit anonymous issue
  *
@@ -51,15 +46,14 @@ export async function submitPublicIssueAction(
 
   if (!success) {
     const resetTime = formatResetTime(reset);
-    redirectWithError(
-      `Too many submissions. Please try again in ${resetTime}.`
-    );
+    return {
+      error: `Too many submissions. Please try again in ${resetTime}.`,
+    };
   }
 
   const parsedValue = parsePublicIssueForm(formData);
   if (!parsedValue.success) {
-    redirectWithError(parsedValue.error);
-    return { error: parsedValue.error }; // Should be unreachable
+    return { error: parsedValue.error };
   }
 
   // After the early return, parsedValue is narrowed to ParsedPublicIssue
