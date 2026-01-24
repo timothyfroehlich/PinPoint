@@ -23,6 +23,8 @@ import type {
   IssueConsistency,
   IssuePriority,
 } from "~/lib/types";
+import { ImageUploadButton } from "~/components/images/ImageUploadButton";
+import { ImageGallery } from "~/components/images/ImageGallery";
 
 interface Machine {
   id: string;
@@ -73,6 +75,15 @@ export function UnifiedReportForm({
   const [severity, setSeverity] = useState<IssueSeverity | "">("");
   const [priority, setPriority] = useState<IssuePriority | "">("");
   const [consistency, setConsistency] = useState<IssueConsistency | "">("");
+
+  interface ImageMetadata {
+    blobUrl: string;
+    blobPathname: string;
+    originalFilename: string;
+    fileSizeBytes: number;
+    mimeType: string;
+  }
+  const [uploadedImages, setUploadedImages] = useState<ImageMetadata[]>([]);
 
   const [state, formAction, isPending] = useActionState(
     submitPublicIssueAction,
@@ -259,6 +270,49 @@ export function UnifiedReportForm({
                     onChange={(e) => setDescription(e.target.value)}
                     className="min-h-[80px] border-outline-variant bg-surface text-on-surface focus:border-primary"
                   />
+                </div>
+
+                <div className="space-y-3 pb-2 pt-1 border-t border-b border-outline-variant/30 py-4">
+                  <div className="flex flex-col gap-4">
+                    <ImageUploadButton
+                      issueId="new"
+                      currentCount={uploadedImages.length}
+                      maxCount={user ? 4 : 2}
+                      onUploadComplete={(img) =>
+                        setUploadedImages([...uploadedImages, img])
+                      }
+                      disabled={isPending}
+                    />
+
+                    {uploadedImages.length > 0 && (
+                      <div className="mt-2">
+                        <ImageGallery
+                          images={uploadedImages.map((img) => ({
+                            id: Math.random().toString(),
+                            issueId: "temp",
+                            uploadedBy: "temp",
+                            fullImageUrl: img.blobUrl,
+                            fullBlobPathname: img.blobPathname,
+                            fileSizeBytes: img.fileSizeBytes,
+                            mimeType: img.mimeType,
+                            originalFilename: img.originalFilename,
+                            createdAt: new Date(),
+                            updatedAt: new Date(),
+                            deletedAt: null,
+                            deletedBy: null,
+                            commentId: null,
+                            croppedImageUrl: null,
+                            croppedBlobPathname: null,
+                          }))}
+                        />
+                      </div>
+                    )}
+                    <input
+                      type="hidden"
+                      name="imagesMetadata"
+                      value={JSON.stringify(uploadedImages)}
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

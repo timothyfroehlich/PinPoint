@@ -35,7 +35,7 @@ After generating the brainstorm content, you MUST write it to disk using this ex
 2. Then immediately run:
 
 ```bash
-python .agent/skills/superpowers-workflow/scripts/write_artifact.py --path artifacts/superpowers/brainstorm.md
+python3 .agent/skills/superpowers-workflow/scripts/write_artifact.py --path artifacts/superpowers/brainstorm.md
 
 ```
 

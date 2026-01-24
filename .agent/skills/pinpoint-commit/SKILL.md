@@ -1,5 +1,5 @@
 ---
-name: PinPoint Commit
+name: pinpoint-commit
 description: Comprehensive commit-to-PR workflow with intelligent testing, branch management, and CI monitoring
 ---
 

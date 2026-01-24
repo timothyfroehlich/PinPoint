@@ -18,7 +18,7 @@ Requirements:
 3. At the end, write the final summary to `artifacts/superpowers/finish.md`.
 4. After writing, confirm the files exist by listing `artifacts/superpowers/`.
 
-If you are unable to write these files directly, use `python .agent/skills/superpowers-workflow/scripts/write_artifact.py --path <target>` to persist the content.
+If you are unable to write these files directly, use `python3 .agent/skills/superpowers-workflow/scripts/write_artifact.py --path <target>` to persist the content.
 
 ## Preconditions (do not skip)
 

@@ -58,7 +58,7 @@ After generating the plan content above, you MUST write it to disk:
 2. Run:
 
 ```bash
-python .agent/skills/superpowers-workflow/scripts/write_artifact.py --path artifacts/superpowers/plan.md
+python3 .agent/skills/superpowers-workflow/scripts/write_artifact.py --path artifacts/superpowers/plan.md
 
 ```
 

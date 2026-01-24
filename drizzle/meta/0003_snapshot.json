@@ -1,6 +1,6 @@
 {
-  "id": "eabb8c9f-09a6-4f7a-b573-edd280d58d27",
-  "prevId": "2ec68f46-8ae5-476c-a625-e9e2b403850a",
+  "id": "2b2e7465-9437-4b21-b6ef-58afc5c54e1f",
+  "prevId": "eabb8c9f-09a6-4f7a-b573-edd280d58d27",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -207,6 +207,195 @@
           "tableFrom": "issue_comments",
           "tableTo": "user_profiles",
           "columnsFrom": ["author_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.issue_images": {
+      "name": "issue_images",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "issue_id": {
+          "name": "issue_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "comment_id": {
+          "name": "comment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "uploaded_by": {
+          "name": "uploaded_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "full_image_url": {
+          "name": "full_image_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cropped_image_url": {
+          "name": "cropped_image_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "full_blob_pathname": {
+          "name": "full_blob_pathname",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cropped_blob_pathname": {
+          "name": "cropped_blob_pathname",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "file_size_bytes": {
+          "name": "file_size_bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mime_type": {
+          "name": "mime_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "original_filename": {
+          "name": "original_filename",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deleted_by": {
+          "name": "deleted_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_issue_images_issue_id": {
+          "name": "idx_issue_images_issue_id",
+          "columns": [
+            {
+              "expression": "issue_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_issue_images_uploaded_by": {
+          "name": "idx_issue_images_uploaded_by",
+          "columns": [
+            {
+              "expression": "uploaded_by",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_issue_images_deleted_at": {
+          "name": "idx_issue_images_deleted_at",
+          "columns": [
+            {
+              "expression": "deleted_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "issue_images_issue_id_issues_id_fk": {
+          "name": "issue_images_issue_id_issues_id_fk",
+          "tableFrom": "issue_images",
+          "tableTo": "issues",
+          "columnsFrom": ["issue_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "issue_images_comment_id_issue_comments_id_fk": {
+          "name": "issue_images_comment_id_issue_comments_id_fk",
+          "tableFrom": "issue_images",
+          "tableTo": "issue_comments",
+          "columnsFrom": ["comment_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "issue_images_uploaded_by_user_profiles_id_fk": {
+          "name": "issue_images_uploaded_by_user_profiles_id_fk",
+          "tableFrom": "issue_images",
+          "tableTo": "user_profiles",
+          "columnsFrom": ["uploaded_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "issue_images_deleted_by_user_profiles_id_fk": {
+          "name": "issue_images_deleted_by_user_profiles_id_fk",
+          "tableFrom": "issue_images",
+          "tableTo": "user_profiles",
+          "columnsFrom": ["deleted_by"],
           "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"

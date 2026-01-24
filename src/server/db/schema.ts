@@ -248,6 +248,57 @@ export const issueComments = pgTable(
 );
 
 /**
+ * Issue Images Table
+ *
+ * Images attached to issues and comments with soft-delete support.
+ */
+export const issueImages = pgTable(
+  "issue_images",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    issueId: uuid("issue_id")
+      .notNull()
+      .references(() => issues.id, { onDelete: "cascade" }),
+    commentId: uuid("comment_id").references(() => issueComments.id, {
+      onDelete: "cascade",
+    }),
+    uploadedBy: uuid("uploaded_by")
+      .notNull()
+      .references(() => userProfiles.id),
+
+    // Vercel Blob URLs
+    fullImageUrl: text("full_image_url").notNull(),
+    croppedImageUrl: text("cropped_image_url"),
+
+    // For deletion from Blob
+    fullBlobPathname: text("full_blob_pathname").notNull(),
+    croppedBlobPathname: text("cropped_blob_pathname"),
+
+    // Metadata
+    fileSizeBytes: integer("file_size_bytes").notNull(),
+    mimeType: text("mime_type").notNull(),
+    originalFilename: text("original_filename"),
+
+    // Soft delete
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    deletedBy: uuid("deleted_by").references(() => userProfiles.id),
+
+    // Timestamps
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    issueIdIdx: index("idx_issue_images_issue_id").on(t.issueId),
+    uploadedByIdx: index("idx_issue_images_uploaded_by").on(t.uploadedBy),
+    deletedAtIdx: index("idx_issue_images_deleted_at").on(t.deletedAt),
+  })
+);
+
+/**
  * Notifications Table
  *
  * In-app notifications for users.
@@ -356,6 +407,7 @@ export const userProfilesRelations = relations(
     reportedIssues: many(issues, { relationName: "reported_by" }),
     assignedIssues: many(issues, { relationName: "assigned_to" }),
     comments: many(issueComments),
+    uploadedImages: many(issueImages),
     ownedMachines: many(machines, { relationName: "owner" }),
     notificationPreferences: one(notificationPreferences, {
       fields: [userProfiles.id],
@@ -401,6 +453,7 @@ export const issuesRelations = relations(issues, ({ one, many }) => ({
     relationName: "invited_reporter",
   }),
   comments: many(issueComments),
+  images: many(issueImages),
   watchers: many(issueWatchers),
 }));
 
@@ -409,13 +462,32 @@ export const invitedUsersRelations = relations(invitedUsers, ({ many }) => ({
   reportedIssues: many(issues, { relationName: "invited_reporter" }),
 }));
 
-export const issueCommentsRelations = relations(issueComments, ({ one }) => ({
+export const issueCommentsRelations = relations(
+  issueComments,
+  ({ one, many }) => ({
+    issue: one(issues, {
+      fields: [issueComments.issueId],
+      references: [issues.id],
+    }),
+    author: one(userProfiles, {
+      fields: [issueComments.authorId],
+      references: [userProfiles.id],
+    }),
+    images: many(issueImages),
+  })
+);
+
+export const issueImagesRelations = relations(issueImages, ({ one }) => ({
   issue: one(issues, {
-    fields: [issueComments.issueId],
+    fields: [issueImages.issueId],
     references: [issues.id],
   }),
-  author: one(userProfiles, {
-    fields: [issueComments.authorId],
+  comment: one(issueComments, {
+    fields: [issueImages.commentId],
+    references: [issueComments.id],
+  }),
+  uploader: one(userProfiles, {
+    fields: [issueImages.uploadedBy],
     references: [userProfiles.id],
   }),
 }));
@@ -447,3 +519,8 @@ export const notificationPreferencesRelations = relations(
     }),
   })
 );
+
+/**
+ * Type exports
+ */
+export type IssueImage = typeof issueImages.$inferSelect;

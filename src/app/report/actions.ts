@@ -12,7 +12,7 @@ import {
 } from "~/lib/rate-limit";
 import { parsePublicIssueForm } from "./validation";
 import { db } from "~/server/db";
-import { machines, userProfiles } from "~/server/db/schema";
+import { machines, userProfiles, issueImages } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import type { ActionState } from "./unified-report-form";
@@ -162,6 +162,41 @@ export async function submitPublicIssueAction(
       reporterName,
       reporterEmail,
     });
+
+    // 5. Link uploaded images
+    const imagesMetadataStr = formData.get("imagesMetadata");
+    if (imagesMetadataStr && typeof imagesMetadataStr === "string") {
+      try {
+        interface ImageMetadata {
+          blobUrl: string;
+          blobPathname: string;
+          originalFilename: string;
+          fileSizeBytes: number;
+          mimeType: string;
+        }
+        const imagesMetadata = JSON.parse(imagesMetadataStr) as ImageMetadata[];
+        if (Array.isArray(imagesMetadata) && imagesMetadata.length > 0) {
+          await db.insert(issueImages).values(
+            imagesMetadata.map((img) => ({
+              issueId: issue.id,
+              uploadedBy: reportedBy ?? "00000000-0000-0000-0000-000000000000",
+              fullImageUrl: img.blobUrl,
+              fullBlobPathname: img.blobPathname,
+              fileSizeBytes: img.fileSizeBytes,
+              mimeType: img.mimeType,
+              originalFilename: img.originalFilename,
+            }))
+          );
+        }
+      } catch (e) {
+        log.error(
+          { error: e, issueId: issue.id },
+          "Failed to link images to issue"
+        );
+        // Non-blocking for the user, images just won't show up
+      }
+    }
+
     log.info(
       { issueId: issue.id, issueNumber: issue.issueNumber },
       "Issue created, redirecting..."
