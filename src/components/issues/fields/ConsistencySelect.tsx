@@ -12,10 +12,11 @@ import { CONSISTENCY_CONFIG } from "~/lib/issues/status";
 import { type IssueConsistency } from "~/lib/types";
 
 interface ConsistencySelectProps {
-  value: IssueConsistency;
+  value: IssueConsistency | "";
   onValueChange: (value: IssueConsistency) => void;
   disabled?: boolean;
   name?: string;
+  placeholder?: string;
   testId?: string;
 }
 
@@ -30,6 +31,7 @@ export function ConsistencySelect({
   onValueChange,
   disabled = false,
   name = "consistency",
+  placeholder = "Select consistency...",
   testId = "issue-consistency-select",
 }: ConsistencySelectProps): React.JSX.Element {
   return (
@@ -41,20 +43,25 @@ export function ConsistencySelect({
     >
       <SelectTrigger
         className="w-full border-outline-variant bg-surface text-on-surface"
-        aria-label={`Consistency: ${CONSISTENCY_CONFIG[value].label}`}
+        aria-label={
+          value
+            ? `Consistency: ${CONSISTENCY_CONFIG[value].label}`
+            : "Select Consistency"
+        }
         data-testid={testId}
       >
-        <SelectValue>
-          {(() => {
-            const config = CONSISTENCY_CONFIG[value];
-            const Icon = config.icon;
-            return (
-              <div className="flex items-center gap-2">
-                <Icon className={`size-4 ${config.iconColor}`} />
-                <span>{config.label}</span>
-              </div>
-            );
-          })()}
+        <SelectValue placeholder={placeholder}>
+          {value &&
+            (() => {
+              const config = CONSISTENCY_CONFIG[value];
+              const Icon = config.icon;
+              return (
+                <div className="flex items-center gap-2">
+                  <Icon className={`size-4 ${config.iconColor}`} />
+                  <span>{config.label}</span>
+                </div>
+              );
+            })()}
         </SelectValue>
       </SelectTrigger>
       <SelectContent>

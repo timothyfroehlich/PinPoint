@@ -114,6 +114,7 @@ export const machines = pgTable(
     invitedOwnerIdIdx: index("idx_machines_invited_owner_id").on(
       t.invitedOwnerId
     ),
+    nameIdx: index("idx_machines_name").on(t.name),
   })
 );
 
@@ -238,7 +239,10 @@ export const issueComments = pgTable(
       .defaultNow(),
   },
   (t) => ({
-    issueIdIdx: index("idx_issue_comments_issue_id").on(t.issueId),
+    issueIdCreatedAtIdx: index("idx_issue_comments_issue_id_created_at").on(
+      t.issueId,
+      t.createdAt
+    ),
     authorIdIdx: index("idx_issue_comments_author_id").on(t.authorId),
   })
 );

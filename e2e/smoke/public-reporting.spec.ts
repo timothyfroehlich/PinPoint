@@ -6,7 +6,7 @@
 
 import { test, expect } from "@playwright/test";
 import { cleanupTestEntities } from "../support/cleanup";
-import { selectOption } from "../support/actions";
+import { fillReportForm } from "../support/page-helpers";
 
 const PUBLIC_PREFIX = "E2E Public Report";
 
@@ -34,11 +34,11 @@ test.describe("Public Issue Reporting", () => {
     await expect(page).toHaveURL(/machine=/);
 
     const issueTitle = `${PUBLIC_PREFIX} ${Date.now()}`;
-    await page.getByLabel("Issue Title *").fill(issueTitle);
-    await page
-      .getByLabel("Description")
-      .fill("Playfield gets stuck during multiball.");
-    await selectOption(page, "severity-select", "minor");
+    await fillReportForm(page, {
+      title: issueTitle,
+      description: "Playfield gets stuck during multiball.",
+      includePriority: false,
+    });
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
     await expect(page).toHaveURL("/report/success");
@@ -63,8 +63,10 @@ test.describe("Public Issue Reporting", () => {
     // Wait for URL refresh (router.push) to prevent race conditions on Mobile Safari
     await expect(page).toHaveURL(/machine=/);
 
-    await page.getByLabel("Issue Title *").fill(`${PUBLIC_PREFIX} with Email`);
-    await selectOption(page, "severity-select", "minor");
+    await fillReportForm(page, {
+      title: `${PUBLIC_PREFIX} with Email`,
+      includePriority: false,
+    });
 
     await page.getByLabel("First Name").fill("Test");
     await page.getByLabel("Last Name").fill("User");

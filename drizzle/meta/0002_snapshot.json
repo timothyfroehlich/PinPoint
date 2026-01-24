@@ -1,5 +1,5 @@
 {
-  "id": "f68365de-7755-4202-84ce-9ab74b1ae09c",
+  "id": "2ec68f46-8ae5-476c-a625-e9e2b403850a",
   "prevId": "fa772082-303a-4400-a6f3-66b94a7985f8",
   "version": "7",
   "dialect": "postgresql",
@@ -155,11 +155,17 @@
         }
       },
       "indexes": {
-        "idx_issue_comments_issue_id": {
-          "name": "idx_issue_comments_issue_id",
+        "idx_issue_comments_issue_id_created_at": {
+          "name": "idx_issue_comments_issue_id_created_at",
           "columns": [
             {
               "expression": "issue_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -466,36 +472,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "idx_issues_severity": {
-          "name": "idx_issues_severity",
-          "columns": [
-            {
-              "expression": "severity",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "idx_issues_priority": {
-          "name": "idx_issues_priority",
-          "columns": [
-            {
-              "expression": "priority",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -631,6 +607,21 @@
           "columns": [
             {
               "expression": "invited_owner_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_machines_name": {
+          "name": "idx_machines_name",
+          "columns": [
+            {
+              "expression": "name",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

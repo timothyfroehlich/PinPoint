@@ -86,8 +86,7 @@ cd PinPoint
 pnpm install
 cp .env.example .env.local   # then fill in Supabase + DB vars
 
-supabase start               # in one terminal
-pnpm run dev                  # in another
+pnpm run dev                  # automatically ensures Supabase is running
 ```
 
 Open `http://localhost:<PORT>` (see `.env.local`) to use the app.
@@ -120,7 +119,6 @@ pnpm run test         # unit + PGlite integration tests
 pnpm run test:integration   # Supabase-backed integration tests
 pnpm run smoke        # Playwright smoke E2E tests
 pnpm run preflight    # full local CI gate before pushing
-# See docs/E2E_DOCKER.md for running Safari tests locally via Docker
 ```
 
 For more detail, see `docs/DEVELOPMENT.md` and `docs/TESTING_PLAN.md`.
