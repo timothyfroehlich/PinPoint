@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { loginAs, selectOption } from "../support/actions";
 import { cleanupTestEntities } from "../support/cleanup";
 import { seededMachines } from "../support/constants";
+import { fillReportForm } from "../support/page-helpers";
 
 test.describe("Status Overhaul E2E", () => {
   test.beforeEach(async ({ page }, testInfo) => {
@@ -21,10 +22,12 @@ test.describe("Status Overhaul E2E", () => {
     // 1. Create Issue
     await page.goto(`/report?machine=${machine.initials}`);
     await page.getByTestId("machine-select").selectOption(machine.id);
-    await page.getByLabel("Issue Title *").fill("E2E Status Overhaul Test");
-    await selectOption(page, "severity-select", "major");
-    await selectOption(page, "priority-select", "high");
-    await selectOption(page, "consistency-select", "frequent");
+    await fillReportForm(page, {
+      title: "E2E Status Overhaul Test",
+      severity: "unplayable",
+      priority: "high",
+      consistency: "frequent",
+    });
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
     // 2. Verify redirect and badges

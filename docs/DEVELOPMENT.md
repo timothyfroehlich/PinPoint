@@ -38,14 +38,10 @@ If you’re trying to understand how to implement something, read:
    # Fill in Supabase + database env vars
    ```
 
-3. **Start Supabase + Dev Server**
+3. **Start Dev Server**
 
    ```bash
-   # In one terminal
-   supabase start
-
-   # In another terminal
-   pnpm run dev
+   pnpm run dev    # automatically ensures Supabase is running
    ```
 
 4. **Run Fast Checks While Iterating**

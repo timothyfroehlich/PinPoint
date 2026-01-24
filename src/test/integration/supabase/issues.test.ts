@@ -323,14 +323,14 @@ describe("Issues CRUD Operations (PGlite)", () => {
         .insert(issueComments)
         .values({
           issueId: testIssue.id,
-          content: "Issue created",
+          content: "Status changed from new to in_progress",
           isSystem: true,
           authorId: null,
         })
         .returning();
 
       expect(event).toBeDefined();
-      expect(event.content).toBe("Issue created");
+      expect(event.content).toBe("Status changed from new to in_progress");
       expect(event.isSystem).toBe(true);
       expect(event.authorId).toBeNull();
     });
@@ -387,7 +387,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
       await db.insert(issueComments).values([
         {
           issueId: testIssue.id,
-          content: "Issue created",
+          content: "Priority changed",
           isSystem: true,
           createdAt: new Date(now - 3_000),
         },
@@ -520,7 +520,7 @@ describe("Issues CRUD Operations (PGlite)", () => {
       // Create timeline event
       await db.insert(issueComments).values({
         issueId: issue.id,
-        content: "Issue created",
+        content: "Status changed from new to in_progress",
         isSystem: true,
       });
 
