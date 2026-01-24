@@ -145,6 +145,7 @@ export function hasActiveIssueFilters(params: URLSearchParams): boolean {
     "owner",
     "reporter",
     "consistency",
+    "watching",
     "created_from",
     "created_to",
     "updated_from",

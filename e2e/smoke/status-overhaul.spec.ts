@@ -24,7 +24,7 @@ test.describe("Status Overhaul E2E", () => {
     await page.getByTestId("machine-select").selectOption(machine.id);
     await fillReportForm(page, {
       title: "E2E Status Overhaul Test",
-      severity: "unplayable",
+      severity: "major",
       priority: "high",
       consistency: "frequent",
     });

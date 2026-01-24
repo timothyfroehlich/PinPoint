@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useRouter, usePathname } from "next/navigation";
 import { Search, SlidersHorizontal, X } from "lucide-react";
+import { useSearchFilters } from "~/hooks/use-search-filters";
 import { Button } from "~/components/ui/button";
 import { MultiSelect } from "~/components/ui/multi-select";
 import { DateRangePicker } from "~/components/ui/date-range-picker";
@@ -77,8 +77,7 @@ export function IssueFilters({
   users,
   filters,
 }: IssueFiltersProps): React.JSX.Element {
-  const router = useRouter();
-  const pathname = usePathname();
+  const { pushFilters } = useSearchFilters(filters);
 
   const [search, setSearch] = React.useState(filters.q ?? "");
   const [expanded, setExpanded] = React.useState(false);
@@ -164,58 +163,6 @@ export function IssueFilters({
       },
     ],
     []
-  );
-
-  // Update URL function - memoized to prevent unnecessary effect triggers
-  const pushFilters = React.useCallback(
-    (newFilters: Partial<FilterState>): void => {
-      const params = new URLSearchParams();
-      const merged = { ...filters, ...newFilters };
-
-      if (merged.q) params.set("q", merged.q);
-      if (merged.status) {
-        if (merged.status.length > 0) {
-          params.set("status", merged.status.join(","));
-        } else {
-          params.set("status", "all");
-        }
-      }
-      if (merged.machine && merged.machine.length > 0)
-        params.set("machine", merged.machine.join(","));
-      if (merged.severity && merged.severity.length > 0)
-        params.set("severity", merged.severity.join(","));
-      if (merged.priority && merged.priority.length > 0)
-        params.set("priority", merged.priority.join(","));
-      if (merged.assignee && merged.assignee.length > 0)
-        params.set("assignee", merged.assignee.join(","));
-      if (merged.owner && merged.owner.length > 0)
-        params.set("owner", merged.owner.join(","));
-      if (merged.reporter && merged.reporter.length > 0)
-        params.set("reporter", merged.reporter.join(","));
-      if (merged.consistency && merged.consistency.length > 0)
-        params.set("consistency", merged.consistency.join(","));
-      if (merged.watching) params.set("watching", "true");
-
-      if (merged.createdFrom)
-        params.set("created_from", merged.createdFrom.toISOString());
-      if (merged.createdTo)
-        params.set("created_to", merged.createdTo.toISOString());
-
-      if (merged.updatedFrom)
-        params.set("updated_from", merged.updatedFrom.toISOString());
-      if (merged.updatedTo)
-        params.set("updated_to", merged.updatedTo.toISOString());
-
-      if (merged.sort && merged.sort !== "updated_desc")
-        params.set("sort", merged.sort);
-      if (merged.page && merged.page > 1)
-        params.set("page", merged.page.toString());
-      if (merged.pageSize && merged.pageSize !== 15)
-        params.set("page_size", merged.pageSize.toString());
-
-      router.push(`${pathname}?${params.toString()}`);
-    },
-    [filters, router, pathname]
   );
 
   // Debounced search
@@ -592,6 +539,7 @@ export function IssueFilters({
                     type="button"
                     className="ml-0.5 h-4 w-4 rounded-sm hover:bg-muted-foreground/20 flex items-center justify-center transition-colors"
                     onClick={() => badge.clear()}
+                    aria-label={`Clear ${badge.label}`}
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -652,10 +600,8 @@ export function IssueFilters({
               className="h-11 px-3 text-muted-foreground hover:text-foreground"
               onClick={() => {
                 setSearch("");
-                // Explicitly clear to "all" status to remove default badges
-                const params = new URLSearchParams();
-                params.set("status", "all");
-                router.push(`${pathname}?${params.toString()}`);
+                // Clear all filters and reset to page 1
+                pushFilters({ status: [] }, { resetPagination: true });
               }}
             >
               Clear

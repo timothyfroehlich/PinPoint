@@ -92,6 +92,11 @@ describe("hasActiveIssueFilters", () => {
     expect(hasActiveIssueFilters(params)).toBe(true);
   });
 
+  it("returns true when watching filter is set", () => {
+    const params = new URLSearchParams("watching=true");
+    expect(hasActiveIssueFilters(params)).toBe(true);
+  });
+
   it("returns false when only page/page_size/sort are present", () => {
     const params = new URLSearchParams("page=2&page_size=25&sort=issue_asc");
     expect(hasActiveIssueFilters(params)).toBe(false);

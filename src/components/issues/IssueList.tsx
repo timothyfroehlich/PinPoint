@@ -10,9 +10,6 @@ import {
   ChevronLeft,
   ChevronRight,
   SlidersHorizontal,
-  Loader2,
-  CheckCircle2,
-  X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "~/lib/utils";
@@ -43,14 +40,17 @@ import {
   assignIssueAction,
 } from "~/app/(app)/issues/actions";
 
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useSearchFilters } from "~/hooks/use-search-filters";
+import { parseIssueFilters } from "~/lib/issues/filters";
+import { IssueEditableCell } from "~/components/issues/cells/IssueEditableCell";
+import {
+  IssueAssigneeCell,
+  type UserOption,
+} from "~/components/issues/cells/IssueAssigneeCell";
+import { useTableResponsiveColumns } from "~/hooks/use-table-responsive-columns";
 
 export type SortDirection = "asc" | "desc" | null;
-
-export interface UserOption {
-  id: string;
-  name: string;
-}
 
 interface IssueListProps {
   issues: IssueListItem[];
@@ -73,10 +73,24 @@ export function IssueList({
   pageSize,
   allUsers,
 }: IssueListProps): React.JSX.Element {
-  const router = useRouter();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const containerRef = React.useRef<HTMLDivElement>(null);
+  const filters = parseIssueFilters(searchParams);
+  const { setSort, setPage, setPageSize } = useSearchFilters(filters);
+
+  // Responsive column visibility
+  const { visibleColumns, containerRef } = useTableResponsiveColumns<
+    "status" | "priority" | "severity" | "assignee" | "modified"
+  >(
+    [
+      { key: "modified", minWidth: COLUMN_WIDTH, priority: 1 },
+      { key: "assignee", minWidth: COLUMN_WIDTH, priority: 2 },
+      { key: "severity", minWidth: COLUMN_WIDTH, priority: 3 },
+      { key: "priority", minWidth: COLUMN_WIDTH, priority: 4 },
+      { key: "status", minWidth: COLUMN_WIDTH, priority: 5 },
+    ],
+    ISSUE_MIN_WIDTH,
+    ISSUE_BUFFER
+  );
 
   // For managing multiple concurrent updates if needed, though we'll likely do one at a time per row/cell
   const [_isPending, startTransition] = React.useTransition();
@@ -96,64 +110,7 @@ export function IssueList({
       .filter((i): i is IssueListItem => !!i);
   }, [issues, stableIds]);
 
-  const [visibleColumns, setVisibleColumns] = React.useState({
-    status: true,
-    priority: true,
-    severity: true,
-    assignee: true,
-    modified: true,
-  });
-
-  React.useEffect(() => {
-    if (!containerRef.current) return;
-
-    const calculateLayout = (): void => {
-      if (!containerRef.current) return;
-      const width = containerRef.current.offsetWidth;
-      if (width === 0) return;
-
-      const hideOrder = [
-        "modified",
-        "assignee",
-        "severity",
-        "priority",
-        "status",
-      ] as const;
-
-      let availableIssueWidth = width - hideOrder.length * COLUMN_WIDTH;
-      const nextVisible = {
-        status: true,
-        priority: true,
-        severity: true,
-        assignee: true,
-        modified: true,
-      };
-
-      for (const column of hideOrder) {
-        if (availableIssueWidth < ISSUE_MIN_WIDTH + ISSUE_BUFFER) {
-          nextVisible[column] = false;
-          availableIssueWidth += COLUMN_WIDTH;
-        } else {
-          break; // Stop hiding if we have enough space
-        }
-      }
-
-      setVisibleColumns(nextVisible);
-    };
-
-    const observer = new ResizeObserver(() => {
-      window.requestAnimationFrame(calculateLayout);
-    });
-
-    calculateLayout();
-    observer.observe(containerRef.current);
-
-    return () => observer.disconnect();
-  }, []);
-
   const handleSort = (column: string): void => {
-    const params = new URLSearchParams(searchParams.toString());
-
     // Simple toggle logic
     // For PinPoint, we mostly use column_asc/column_desc format in the URL
     // Default for many is desc (e.g. updated_desc)
@@ -165,28 +122,7 @@ export function IssueList({
           ? `${column}_desc`
           : `${column}_desc`;
 
-    params.set("sort", newSort);
-    router.push(`${pathname}?${params.toString()}`);
-  };
-
-  const setSort = (newSort: string): void => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("sort", newSort);
-    params.set("page", "1");
-    router.push(`${pathname}?${params.toString()}`);
-  };
-
-  const setPageSize = (size: number): void => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("page_size", size.toString());
-    params.set("page", "1");
-    router.push(`${pathname}?${params.toString()}`);
-  };
-
-  const setPage = (newPage: number): void => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("page", newPage.toString());
-    router.push(`${pathname}?${params.toString()}`);
+    setSort(newSort);
   };
 
   const start = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
@@ -671,155 +607,5 @@ export function IssueList({
         </div>
       )}
     </div>
-  );
-}
-
-interface EditableCellProps {
-  issue: IssueListItem;
-  field: string;
-  config: {
-    label: string;
-    icon: LucideIcon;
-    iconColor: string;
-  };
-  options: {
-    value: string;
-    label: string;
-    icon: LucideIcon;
-    iconColor: string;
-  }[];
-  onUpdate: (value: string) => void;
-  isUpdating: boolean;
-}
-
-function IssueEditableCell({
-  field,
-  config,
-  options,
-  onUpdate,
-  isUpdating,
-}: EditableCellProps): React.JSX.Element {
-  return (
-    <td
-      className="p-1 min-w-[150px] max-w-[150px]"
-      data-testid={`issue-cell-${field}`}
-    >
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild disabled={isUpdating}>
-          <button
-            className={cn(
-              "flex items-center gap-1.5 text-xs font-medium text-foreground leading-tight hover:bg-muted/80 px-3 py-3 rounded-md transition-colors w-full text-left",
-              isUpdating && "opacity-50 cursor-not-allowed"
-            )}
-          >
-            {isUpdating ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0 text-muted-foreground" />
-            ) : (
-              <config.icon
-                className={cn("h-3.5 w-3.5 shrink-0", config.iconColor)}
-              />
-            )}
-            <span className="line-clamp-1 flex-1">{config.label}</span>
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="min-w-[180px]">
-          <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            Update Field
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          {options.map((opt) => (
-            <DropdownMenuItem
-              key={opt.value}
-              className="flex items-center gap-2 cursor-pointer"
-              onClick={() => onUpdate(opt.value)}
-            >
-              <opt.icon className={cn("h-3.5 w-3.5", opt.iconColor)} />
-              <span className="flex-1">{opt.label}</span>
-              {opt.label === config.label && (
-                <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
-              )}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </td>
-  );
-}
-
-interface AssigneeCellProps {
-  issue: IssueListItem;
-  users: UserOption[];
-  onUpdate: (userId: string | null) => void;
-  isUpdating: boolean;
-}
-
-function IssueAssigneeCell({
-  issue,
-  users,
-  onUpdate,
-  isUpdating,
-}: AssigneeCellProps): React.JSX.Element {
-  return (
-    <td
-      className="p-1 min-w-[150px] max-w-[150px]"
-      data-testid="issue-cell-assignee"
-    >
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild disabled={isUpdating}>
-          <button
-            className={cn(
-              "text-xs font-medium leading-tight hover:bg-muted/80 px-3 py-3 rounded-md transition-colors w-full text-left",
-              isUpdating && "opacity-50 cursor-not-allowed"
-            )}
-          >
-            {isUpdating ? (
-              <div className="flex items-center gap-2">
-                <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0 text-muted-foreground" />
-                <span>{issue.assignedToUser?.name ?? "Unassigned"}</span>
-              </div>
-            ) : (
-              <span className="line-clamp-2">
-                {issue.assignedToUser?.name ?? "Unassigned"}
-              </span>
-            )}
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="start"
-          className="min-w-[200px] max-h-[300px] overflow-y-auto"
-        >
-          <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            Assign To
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="flex items-center gap-2 cursor-pointer"
-            onClick={() => onUpdate(null)}
-          >
-            <div className="h-4 w-4 rounded-full bg-muted flex items-center justify-center">
-              <X className="h-2 w-2 text-muted-foreground" />
-            </div>
-            <span className="flex-1 text-muted-foreground italic">
-              Unassigned
-            </span>
-            {!issue.assignedToUser && (
-              <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
-            )}
-          </DropdownMenuItem>
-          {users.map((user) => (
-            <DropdownMenuItem
-              key={user.id}
-              className="flex items-center gap-2 cursor-pointer"
-              onClick={() => onUpdate(user.id)}
-            >
-              <span className="flex-1">{user.name}</span>
-              {issue.assignedTo === user.id && (
-                <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
-              )}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </td>
   );
 }

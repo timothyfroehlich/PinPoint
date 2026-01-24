@@ -1,6 +1,6 @@
 import type React from "react";
 import { type Metadata } from "next";
-import { and, not, inArray } from "drizzle-orm";
+import { and } from "drizzle-orm";
 import { db } from "~/server/db";
 import { issues } from "~/server/db/schema";
 import { IssueFilters } from "~/components/issues/IssueFilters";
@@ -14,7 +14,6 @@ import {
   buildWhereConditions,
   buildOrderBy,
 } from "~/lib/issues/filters-queries";
-import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { count } from "drizzle-orm";
 
 export const metadata: Metadata = {
@@ -70,7 +69,7 @@ export default async function IssuesPage({
   });
 
   const issuesPromise = db.query.issues.findMany({
-    where: and(...where, not(inArray(issues.status, CLOSED_STATUSES))),
+    where: and(...where),
     orderBy: orderBy,
     with: {
       machine: {
