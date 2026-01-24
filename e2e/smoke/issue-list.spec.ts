@@ -25,8 +25,10 @@ test.describe("Issue List Features", () => {
     // Search for Issue 1
     await page.getByPlaceholder("Search issues...").fill("Thing's box");
     await page.keyboard.press("Enter");
-    await expect(page.getByText(title1)).toBeVisible();
-    await expect(page.getByText(title2)).toBeHidden();
+    await page.waitForURL((url) => url.searchParams.has("q"));
+    await expect(page.getByText("Showing 1 of 1 issues")).toBeVisible();
+    await expect(page.getByRole("row", { name: title1 })).toBeVisible();
+    await expect(page.getByRole("row", { name: title2 })).toBeHidden();
 
     // Clear Search (Wait for search badge or clear button to be stable)
     const clearProps = page.getByRole("button", { name: "Clear" });
@@ -127,7 +129,10 @@ test.describe("Issue List Features", () => {
 
     // Verify badges ARE visible by default (Open statuses)
     await expect(
-      page.locator('[data-slot="badge"]').filter({ hasText: "New" })
+      page
+        .getByTestId("filter-bar")
+        .locator('[data-slot="badge"]')
+        .filter({ hasText: "New" })
     ).toBeVisible();
 
     // Open Status Filter
@@ -141,14 +146,22 @@ test.describe("Issue List Features", () => {
 
     // Close the popover
     await page.keyboard.press("Escape");
+    await page.waitForURL((url) => url.searchParams.has("status"));
+    await expect(page.getByText("Showing 4 of 5 issues")).toBeVisible();
 
     // Verify "New" badge is hidden (deselected)
     // "In Progress" should still be visible as we didn't touch it
     await expect(
-      page.locator('[data-slot="badge"]').filter({ hasText: "In Progress" })
+      page
+        .getByTestId("filter-bar")
+        .locator('[data-slot="badge"]')
+        .filter({ hasText: "In Progress" })
     ).toBeVisible();
     await expect(
-      page.locator('[data-slot="badge"]').filter({ hasText: "New" })
+      page
+        .getByTestId("filter-bar")
+        .locator('[data-slot="badge"]')
+        .filter({ hasText: "New" })
     ).toBeHidden();
 
     // Click again to re-select
@@ -158,18 +171,32 @@ test.describe("Issue List Features", () => {
 
     // Verify "New" badge is back
     await expect(
-      page.locator('[data-slot="badge"]').filter({ hasText: "New" })
+      page
+        .getByTestId("filter-bar")
+        .locator('[data-slot="badge"]')
+        .filter({ hasText: "New" })
     ).toBeVisible();
 
     // Test clearing to "All"
     await page.getByRole("button", { name: "Clear" }).click();
+    await page.waitForURL(
+      (url) =>
+        url.searchParams.get("status") === "all" ||
+        !url.searchParams.has("status")
+    );
 
     // After clear (status=all), NO status badges should be visible
     await expect(
-      page.locator('[data-slot="badge"]').filter({ hasText: "New" })
+      page
+        .getByTestId("filter-bar")
+        .locator('[data-slot="badge"]')
+        .filter({ hasText: "New" })
     ).toBeHidden();
     await expect(
-      page.locator('[data-slot="badge"]').filter({ hasText: "In Progress" })
+      page
+        .getByTestId("filter-bar")
+        .locator('[data-slot="badge"]')
+        .filter({ hasText: "In Progress" })
     ).toBeHidden();
   });
 

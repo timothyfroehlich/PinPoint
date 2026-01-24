@@ -43,15 +43,6 @@ const SEARCH_BAR_LAYOUT = {
   PLUS_BADGE_WIDTH: 36,
   TEXT_BUFFER: 10,
   BADGE_GAP: 6,
-  /**
-   * Heuristic for badge width calculation:
-   * 8px per character is a conservative estimate for the Inter font at small sizes.
-   * 34px overhead accounts for:
-   * - Icon (16px) + Gap (6px) + Padding (12px approx) + Borders
-   *
-   * We use a fixed estimation rather than measuring the DOM (measureRef) for performance
-   * reasons, as this runs on every render/resize and we want to avoid layout thrashing.
-   */
   CHAR_WIDTH_ESTIMATE: 8,
   BADGE_OVERHEAD: 34,
 } as const;
@@ -78,6 +69,7 @@ export function IssueFilters({
   filters,
 }: IssueFiltersProps): React.JSX.Element {
   const { pushFilters } = useSearchFilters(filters);
+  const [isSearching, startTransition] = React.useTransition();
 
   const [search, setSearch] = React.useState(filters.q ?? "");
   const [expanded, setExpanded] = React.useState(false);
@@ -104,7 +96,7 @@ export function IssueFilters({
     () =>
       Object.entries(SEVERITY_CONFIG).map(([value, config]) => ({
         label: config.label,
-        value,
+        value: value as IssueSeverity,
       })),
     []
   );
@@ -113,7 +105,7 @@ export function IssueFilters({
     () =>
       Object.entries(PRIORITY_CONFIG).map(([value, config]) => ({
         label: config.label,
-        value,
+        value: value as IssuePriority,
       })),
     []
   );
@@ -122,7 +114,7 @@ export function IssueFilters({
     () =>
       Object.entries(CONSISTENCY_CONFIG).map(([value, config]) => ({
         label: config.label,
-        value,
+        value: value as IssueConsistency,
       })),
     []
   );
@@ -187,7 +179,7 @@ export function IssueFilters({
     }
   }, [search]);
 
-  const getBadges = (): {
+  const getBadges = React.useCallback((): {
     id: string;
     label: string;
     icon?: LucideIcon;
@@ -210,17 +202,19 @@ export function IssueFilters({
         id: `machine-${m}`,
         label,
         clear: () =>
-          pushFilters({
-            machine: filters.machine!.filter((v) => v !== m),
-            page: 1,
-          }),
+          startTransition(() =>
+            pushFilters({
+              machine: filters.machine!.filter((v) => v !== m),
+              page: 1,
+            })
+          ),
       });
     });
 
-    // Status
     const activeStatuses: readonly IssueStatus[] =
       filters.status ?? OPEN_STATUSES;
-    if (activeStatuses.length > 0) {
+
+    if (activeStatuses.length > 0 && filters.status !== undefined) {
       const processedStatuses = new Set<string>();
 
       const checkGroup = (
@@ -228,28 +222,29 @@ export function IssueFilters({
         groupStatuses: readonly IssueStatus[],
         label: string
       ): void => {
-        const hasAll = groupStatuses.every((s) => activeStatuses.includes(s));
+        const currentGroupStatuses = groupStatuses;
+        const hasAll = currentGroupStatuses.every((s) =>
+          activeStatuses.includes(s)
+        );
         if (hasAll) {
           badges.push({
             id: `status-group-${groupName}`,
             label: label,
             clear: () => {
               const nextStatuses = activeStatuses.filter(
-                (s) => !groupStatuses.includes(s)
+                (s) => !(currentGroupStatuses as readonly string[]).includes(s)
               );
               pushFilters({ status: nextStatuses, page: 1 });
             },
           });
-          groupStatuses.forEach((s) => processedStatuses.add(s));
+          currentGroupStatuses.forEach((s) => processedStatuses.add(s));
         }
       };
 
-      // Check for full groups
       checkGroup("new", STATUS_GROUPS.new, "New");
       checkGroup("in_progress", STATUS_GROUPS.in_progress, "In Progress");
       checkGroup("closed", STATUS_GROUPS.closed, "Closed");
 
-      // Individual statuses
       activeStatuses.forEach((s) => {
         if (!processedStatuses.has(s)) {
           const config = STATUS_CONFIG[s];
@@ -265,6 +260,18 @@ export function IssueFilters({
               }),
           });
         }
+      });
+    } else if (filters.status === undefined) {
+      badges.push({
+        id: "status-group-new-default",
+        label: "New",
+        clear: () =>
+          pushFilters({ status: [...STATUS_GROUPS.in_progress], page: 1 }),
+      });
+      badges.push({
+        id: "status-group-ip-default",
+        label: "In Progress",
+        clear: () => pushFilters({ status: [...STATUS_GROUPS.new], page: 1 }),
       });
     }
 
@@ -395,11 +402,10 @@ export function IssueFilters({
     }
 
     return badges;
-  };
+  }, [filters, machineOptions, users, pushFilters]);
 
-  const badgeList = getBadges();
+  const badgeList = React.useMemo(() => getBadges(), [getBadges]);
 
-  // Badge collision & layout calculation
   React.useEffect(() => {
     if (!searchBarRef.current) return;
 
@@ -477,140 +483,173 @@ export function IssueFilters({
 
   return (
     <div className="bg-card border rounded-lg shadow-sm divide-y">
-      {/* Search Row */}
       <div className="p-3">
-        <div className="flex items-center gap-2">
+        <form
+          className="flex items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            startTransition(() => {
+              pushFilters({ q: search, page: 1 });
+            });
+          }}
+        >
           <div
             ref={searchBarRef}
             className={cn(
-              "flex items-center gap-2 px-3 h-11 bg-background border rounded-md transition-all shadow-sm ring-offset-background flex-1 relative focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
+              "flex items-center gap-2 px-3 h-11 bg-background border rounded-md transition-all shadow-sm ring-offset-background flex-1 relative focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
+              isSearching && "opacity-70 grayscale-[0.3]"
             )}
           >
-            <Search className="h-4 w-4 text-muted-foreground shrink-0 relative z-10" />
+            <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+            <div className="flex-1 min-w-0 relative h-full flex items-center">
+              <TooltipProvider delayDuration={300}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <input
+                      ref={inputRef}
+                      placeholder="Search issues..."
+                      data-testid="issue-search"
+                      className="flex-1 bg-transparent border-0 text-sm focus:outline-none placeholder:text-muted-foreground relative z-10 w-full"
+                      style={{ paddingRight: `${badgeAreaWidth}px` }}
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="bottom"
+                    align="start"
+                    className="max-w-[300px] p-3"
+                  >
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      Search across titles, descriptions, IDs (e.g., AFM-101),
+                      machine names, assignees, reporters, and comments.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <div
+                data-testid="filter-bar"
+                className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-20 pointer-events-none"
+              >
+                {visibleBadges.map((badge) => (
+                  <Badge
+                    key={badge.id}
+                    data-testid="filter-badge"
+                    className={cn(
+                      "flex items-center gap-1 px-2 py-0.5 whitespace-nowrap rounded-sm text-[10px] font-medium leading-none h-6 bg-secondary/50 border-secondary-foreground/10 text-secondary-foreground group/badge max-w-[120px] pointer-events-auto",
+                      badge.iconColor
+                    )}
+                  >
+                    {badge.icon && (
+                      <badge.icon
+                        className={cn("h-3 w-3 shrink-0", badge.iconColor)}
+                      />
+                    )}
+                    <span className="truncate">{badge.label}</span>
+                    <button
+                      type="button"
+                      className="opacity-0 group-hover/badge:opacity-100 p-0.5 hover:bg-secondary rounded-full transition-opacity ml-0.5"
+                      onClick={() => badge.clear()}
+                      aria-label={`Clear ${badge.label}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+
+                {hiddenBadgeCount > 0 && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Badge
+                        variant="secondary"
+                        className="h-6 px-1.5 text-[10px] bg-muted/50 border-muted-foreground/10 cursor-pointer pointer-events-auto hover:bg-muted"
+                      >
+                        +{hiddenBadgeCount}
+                      </Badge>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-64 p-2">
+                      <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-1 pb-2">
+                        Hidden Filters
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        {badgeList.slice(visibleBadgeCount).map((badge) => (
+                          <div
+                            key={badge.id}
+                            className="flex items-center justify-between gap-2 rounded-md px-2 py-1 text-xs hover:bg-muted"
+                          >
+                            <div className="flex items-center gap-2 overflow-hidden">
+                              {badge.icon && (
+                                <badge.icon
+                                  className={cn(
+                                    "h-3.5 w-3.5 shrink-0",
+                                    badge.iconColor
+                                  )}
+                                />
+                              )}
+                              <span className="truncate">{badge.label}</span>
+                            </div>
+                            <button
+                              type="button"
+                              className="h-5 w-5 rounded-sm hover:bg-muted-foreground/20 flex items-center justify-center shrink-0 transition-colors"
+                              onClick={() => badge.clear()}
+                              aria-label={`Clear ${badge.label}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                )}
+              </div>
+            </div>
 
             <span
               ref={measureRef}
-              className="absolute invisible whitespace-pre pointer-events-none text-sm"
-              style={{ left: "36px" }}
+              className="absolute opacity-0 pointer-events-none whitespace-pre text-sm invisible h-0"
+              aria-hidden="true"
             >
-              {search || ""}
+              {search || "Search issues..."}
             </span>
-
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <input
-                    ref={inputRef}
-                    placeholder="Search issues..."
-                    data-testid="issue-search"
-                    className="flex-1 bg-transparent border-0 text-sm focus:outline-none placeholder:text-muted-foreground relative z-10"
-                    style={{ paddingRight: `${badgeAreaWidth}px` }}
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </TooltipTrigger>
-                <TooltipContent
-                  side="bottom"
-                  align="start"
-                  className="max-w-xs"
-                >
-                  <p>
-                    Search across titles, descriptions, IDs (e.g., AFM-101),
-                    machine names, assignees, reporters, and comments.
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-20">
-              {visibleBadges.map((badge) => (
-                <Badge
-                  key={badge.id}
-                  variant="secondary"
-                  className="h-7 px-2 font-normal whitespace-nowrap gap-1.5 pr-1 bg-muted/40 border-muted hover:bg-muted shrink-0"
-                >
-                  {badge.icon && (
-                    <badge.icon
-                      className={cn("h-3.5 w-3.5", badge.iconColor)}
-                    />
-                  )}
-                  {badge.label}
-                  <button
-                    type="button"
-                    className="ml-0.5 h-4 w-4 rounded-sm hover:bg-muted-foreground/20 flex items-center justify-center transition-colors"
-                    onClick={() => badge.clear()}
-                    aria-label={`Clear ${badge.label}`}
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-              {hiddenBadgeCount > 0 && (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Badge
-                      variant="secondary"
-                      className="h-7 px-2 font-normal whitespace-nowrap bg-muted/40 border-muted shrink-0 hover:bg-muted cursor-pointer pointer-events-auto"
-                    >
-                      +{hiddenBadgeCount}
-                    </Badge>
-                  </PopoverTrigger>
-                  <PopoverContent align="end" className="w-64 p-2">
-                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-1 pb-2">
-                      Hidden Filters
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      {badgeList.slice(visibleBadgeCount).map((badge) => (
-                        <div
-                          key={badge.id}
-                          className="flex items-center justify-between gap-2 rounded-md px-2 py-1 text-xs hover:bg-muted"
-                        >
-                          <div className="flex items-center gap-2 overflow-hidden">
-                            {badge.icon && (
-                              <badge.icon
-                                className={cn(
-                                  "h-3.5 w-3.5 shrink-0",
-                                  badge.iconColor
-                                )}
-                              />
-                            )}
-                            <span className="truncate">{badge.label}</span>
-                          </div>
-                          <button
-                            type="button"
-                            className="h-5 w-5 rounded-sm hover:bg-muted-foreground/20 flex items-center justify-center shrink-0 transition-colors"
-                            onClick={() => badge.clear()}
-                            aria-label={`Clear ${badge.label}`}
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              )}
-            </div>
           </div>
 
           {(badgeList.length > 0 || search) && (
             <Button
+              type="button"
               variant="ghost"
               size="sm"
               className="h-11 px-3 text-muted-foreground hover:text-foreground"
               onClick={() => {
                 setSearch("");
-                // Clear all filters and reset to page 1
-                pushFilters({ status: [] }, { resetPagination: true });
+                pushFilters(
+                  {
+                    q: undefined,
+                    status: [],
+                    machine: [],
+                    severity: [],
+                    priority: [],
+                    assignee: [],
+                    owner: [],
+                    reporter: [],
+                    consistency: [],
+                    watching: undefined,
+                    createdFrom: undefined,
+                    createdTo: undefined,
+                    updatedFrom: undefined,
+                    updatedTo: undefined,
+                  },
+                  { resetPagination: true }
+                );
               }}
             >
               Clear
             </Button>
           )}
-        </div>
+        </form>
       </div>
 
-      {/* Main Filter Row */}
       <div className="p-3">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
           <MultiSelect

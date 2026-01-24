@@ -50,6 +50,7 @@ export default async function IssuesPage({
   });
 
   const filters = parseIssueFilters(urlParams);
+
   // Add currentUserId for watching filter
   filters.currentUserId = user.id;
   const where = buildWhereConditions(filters, db);

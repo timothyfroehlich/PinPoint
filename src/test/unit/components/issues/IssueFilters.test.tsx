@@ -60,12 +60,11 @@ describe("IssueFilters", () => {
     expect(newBadge).toBeInTheDocument();
 
     // Find the 'x' button inside the "New" badge
-    // The badge structure: Badge > Icon > Label > Button > X
-    // We can find the button by its aria-label or just by being a button sibling
-    // But our component doesn't have aria-labels on these buttons yet (except in Hidden Filters).
-    // Let's find by role 'button' within the badge
-    const badgeElement = newBadge.closest(".inline-flex"); // Badge class
-    const clearButton = badgeElement?.querySelector("button");
+    // The new badge structure uses data-testid="filter-badge"
+    const badgeElement = newBadge.closest('[data-testid="filter-badge"]');
+    const clearButton = badgeElement?.querySelector(
+      'button[aria-label*="Clear"]'
+    );
 
     expect(clearButton).toBeInTheDocument();
     fireEvent.click(clearButton!);
@@ -88,8 +87,10 @@ describe("IssueFilters", () => {
     render(<IssueFilters {...defaultProps} filters={{ status: ["fixed"] }} />);
 
     const fixedBadge = await screen.findByText("Fixed");
-    const badgeElement = fixedBadge.closest(".inline-flex");
-    const clearButton = badgeElement?.querySelector("button");
+    const badgeElement = fixedBadge.closest('[data-testid="filter-badge"]');
+    const clearButton = badgeElement?.querySelector(
+      'button[aria-label*="Clear"]'
+    );
 
     fireEvent.click(clearButton!);
 

@@ -121,6 +121,12 @@ export function MultiSelect({
                   groupSelectedCount < group.options.length;
 
                 const toggleGroup = (): void => {
+                  console.log(
+                    "[MultiSelect] toggleGroup called for:",
+                    group.label,
+                    "isAllSelected:",
+                    isAllSelected
+                  );
                   if (isAllSelected) {
                     // Deselect all in group
                     onChange(

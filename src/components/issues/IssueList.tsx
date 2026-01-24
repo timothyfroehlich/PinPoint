@@ -48,7 +48,10 @@ import {
   IssueAssigneeCell,
   type UserOption,
 } from "~/components/issues/cells/IssueAssigneeCell";
-import { useTableResponsiveColumns } from "~/hooks/use-table-responsive-columns";
+import {
+  useTableResponsiveColumns,
+  type ColumnConfig,
+} from "~/hooks/use-table-responsive-columns";
 
 export type SortDirection = "asc" | "desc" | null;
 
@@ -77,17 +80,25 @@ export function IssueList({
   const filters = parseIssueFilters(searchParams);
   const { setSort, setPage, setPageSize } = useSearchFilters(filters);
 
+  const columnConfig = React.useMemo(
+    () =>
+      [
+        { key: "modified", minWidth: COLUMN_WIDTH, priority: 1 },
+        { key: "assignee", minWidth: COLUMN_WIDTH, priority: 2 },
+        { key: "severity", minWidth: COLUMN_WIDTH, priority: 3 },
+        { key: "priority", minWidth: COLUMN_WIDTH, priority: 4 },
+        { key: "status", minWidth: COLUMN_WIDTH, priority: 5 },
+      ] as const,
+    []
+  );
+
   // Responsive column visibility
   const { visibleColumns, containerRef } = useTableResponsiveColumns<
     "status" | "priority" | "severity" | "assignee" | "modified"
   >(
-    [
-      { key: "modified", minWidth: COLUMN_WIDTH, priority: 1 },
-      { key: "assignee", minWidth: COLUMN_WIDTH, priority: 2 },
-      { key: "severity", minWidth: COLUMN_WIDTH, priority: 3 },
-      { key: "priority", minWidth: COLUMN_WIDTH, priority: 4 },
-      { key: "status", minWidth: COLUMN_WIDTH, priority: 5 },
-    ],
+    [...columnConfig] as (ColumnConfig & {
+      key: "status" | "severity" | "priority" | "assignee" | "modified";
+    })[],
     ISSUE_MIN_WIDTH,
     ISSUE_BUFFER
   );
