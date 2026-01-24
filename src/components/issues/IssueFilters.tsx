@@ -261,9 +261,10 @@ export function IssueFilters({
       });
     });
 
-    // Status - Only show badges if status is explicitly filtered in the URL
-    if (filters.status !== undefined) {
-      const activeStatuses = filters.status;
+    // Status
+    const activeStatuses: readonly IssueStatus[] =
+      filters.status ?? OPEN_STATUSES;
+    if (activeStatuses.length > 0) {
       const processedStatuses = new Set<string>();
 
       const checkGroup = (
@@ -280,34 +281,34 @@ export function IssueFilters({
               const nextStatuses = activeStatuses.filter(
                 (s) => !groupStatuses.includes(s)
               );
-              pushFilters({
-                status: nextStatuses,
-                page: 1,
-              });
+              pushFilters({ status: nextStatuses, page: 1 });
             },
           });
           groupStatuses.forEach((s) => processedStatuses.add(s));
         }
       };
 
+      // Check for full groups
       checkGroup("new", STATUS_GROUPS.new, "New");
       checkGroup("in_progress", STATUS_GROUPS.in_progress, "In Progress");
       checkGroup("closed", STATUS_GROUPS.closed, "Closed");
 
+      // Individual statuses
       activeStatuses.forEach((s) => {
-        if (processedStatuses.has(s)) return;
-        const config = STATUS_CONFIG[s];
-        badges.push({
-          id: `status-${s}`,
-          label: config.label,
-          icon: config.icon,
-          iconColor: config.iconColor,
-          clear: () =>
-            pushFilters({
-              status: activeStatuses.filter((v) => v !== s),
-              page: 1,
-            }),
-        });
+        if (!processedStatuses.has(s)) {
+          const config = STATUS_CONFIG[s];
+          badges.push({
+            id: `status-${s}`,
+            label: config.label,
+            icon: config.icon,
+            iconColor: config.iconColor,
+            clear: () =>
+              pushFilters({
+                status: activeStatuses.filter((v) => v !== s),
+                page: 1,
+              }),
+          });
+        }
       });
     }
 
@@ -642,7 +643,10 @@ export function IssueFilters({
               className="h-11 px-3 text-muted-foreground hover:text-foreground"
               onClick={() => {
                 setSearch("");
-                router.push(pathname);
+                // Explicitly clear to "all" status to remove default badges
+                const params = new URLSearchParams();
+                params.set("status", "all");
+                router.push(`${pathname}?${params.toString()}`);
               }}
             >
               Clear

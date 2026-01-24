@@ -125,10 +125,10 @@ test.describe("Issue List Features", () => {
   test("should handle status group toggling in filters", async ({ page }) => {
     await page.goto("/issues");
 
-    // Verify NO badges are visible by default
+    // Verify badges ARE visible by default (Open statuses)
     await expect(
       page.locator('[data-slot="badge"]').filter({ hasText: "New" })
-    ).toBeHidden();
+    ).toBeVisible();
 
     // Open Status Filter
     await page.getByTestId("filter-status").click();
@@ -142,8 +142,8 @@ test.describe("Issue List Features", () => {
     // Close the popover
     await page.keyboard.press("Escape");
 
-    // NOW verify some badges are visible (like "In Progress") but NOT "New"
-    // Because the filter is now explicit: [in_progress, need_parts, ...]
+    // Verify "New" badge is hidden (deselected)
+    // "In Progress" should still be visible as we didn't touch it
     await expect(
       page.locator('[data-slot="badge"]').filter({ hasText: "In Progress" })
     ).toBeVisible();
@@ -156,19 +156,20 @@ test.describe("Issue List Features", () => {
     await newGroupHeader.click();
     await page.keyboard.press("Escape");
 
-    // Verify "New" badge is back (since it's now explicitly selected along with others)
+    // Verify "New" badge is back
     await expect(
       page.locator('[data-slot="badge"]').filter({ hasText: "New" })
     ).toBeVisible();
 
-    // Click again to deselect
-    await page.getByTestId("filter-status").click();
-    await newGroupHeader.click();
-    await page.keyboard.press("Escape");
+    // Test clearing to "All"
+    await page.getByRole("button", { name: "Clear" }).click();
 
-    // Verify badges are gone
+    // After clear (status=all), NO status badges should be visible
     await expect(
       page.locator('[data-slot="badge"]').filter({ hasText: "New" })
+    ).toBeHidden();
+    await expect(
+      page.locator('[data-slot="badge"]').filter({ hasText: "In Progress" })
     ).toBeHidden();
   });
 

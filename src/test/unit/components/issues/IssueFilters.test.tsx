@@ -38,11 +38,13 @@ describe("IssueFilters", () => {
     filters: {}, // No filters = default state
   };
 
-  it("shows no status badges on landing (default state)", async () => {
+  it("shows status badges on landing (default state)", async () => {
     render(<IssueFilters {...defaultProps} />);
     // Wait for layout effect
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(screen.queryByText("New")).not.toBeInTheDocument();
+    // Default state: Open statuses are selected, so badges should be visible
+    expect(screen.getByText("New")).toBeInTheDocument();
+    expect(screen.getByText("In Progress")).toBeInTheDocument();
   });
 
   it("clears 'New' group statuses when X is clicked", async () => {
