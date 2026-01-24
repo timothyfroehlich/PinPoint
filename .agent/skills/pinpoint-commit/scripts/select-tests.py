@@ -53,8 +53,7 @@ def get_changed_files() -> List[str]:
 
 def matches_pattern(filepath: str, pattern: str) -> bool:
     """Check if filepath matches a glob pattern."""
-    from fnmatch import fnmatch
-    return fnmatch(filepath, pattern)
+    return Path(filepath).match(pattern)
 
 
 def analyze_impact(files: List[str]) -> dict:
