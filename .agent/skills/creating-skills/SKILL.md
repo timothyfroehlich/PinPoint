@@ -1,5 +1,5 @@
 ---
-name: Writing Skills
+name: writing-skills
 description: TDD for process documentation - test with subagents before writing, iterate until bulletproof
 version: 1.0.0
 ---
