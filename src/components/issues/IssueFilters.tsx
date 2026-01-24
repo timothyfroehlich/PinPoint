@@ -438,7 +438,7 @@ export function IssueFilters({
     }
 
     return badges;
-  };;
+  };
 
   const badgeList = getBadges();
 

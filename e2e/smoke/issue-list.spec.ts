@@ -125,18 +125,16 @@ test.describe("Issue List Features", () => {
   test("should handle status group toggling in filters", async ({ page }) => {
     await page.goto("/issues");
 
-    // Verify default badges are visible (per user request)
+    // Verify NO badges are visible by default
     await expect(
       page.locator('[data-slot="badge"]').filter({ hasText: "New" })
-    ).toBeVisible();
-    await expect(
-      page.locator('[data-slot="badge"]').filter({ hasText: "Confirmed" })
-    ).toBeVisible();
+    ).toBeHidden();
 
     // Open Status Filter
     await page.getByTestId("filter-status").click();
 
-    // Click the "New" group header to toggle (deselect) them
+    // The MultiSelect value defaults to all OPEN_STATUSES.
+    // Clicking "New" group header will DESELECT "new" and "confirmed".
     const newGroupHeader = page.getByTestId("filter-status-group-new");
     await expect(newGroupHeader).toBeVisible();
     await newGroupHeader.click();
@@ -144,12 +142,13 @@ test.describe("Issue List Features", () => {
     // Close the popover
     await page.keyboard.press("Escape");
 
-    // Verify badges are gone
+    // NOW verify some badges are visible (like "In Progress") but NOT "New"
+    // Because the filter is now explicit: [in_progress, need_parts, ...]
+    await expect(
+      page.locator('[data-slot="badge"]').filter({ hasText: "In Progress" })
+    ).toBeVisible();
     await expect(
       page.locator('[data-slot="badge"]').filter({ hasText: "New" })
-    ).toBeHidden();
-    await expect(
-      page.locator('[data-slot="badge"]').filter({ hasText: "Confirmed" })
     ).toBeHidden();
 
     // Click again to re-select
@@ -157,25 +156,19 @@ test.describe("Issue List Features", () => {
     await newGroupHeader.click();
     await page.keyboard.press("Escape");
 
-    // Verify badges are back
+    // Verify "New" badge is back (since it's now explicitly selected along with others)
     await expect(
       page.locator('[data-slot="badge"]').filter({ hasText: "New" })
     ).toBeVisible();
-    await expect(
-      page.locator('[data-slot="badge"]').filter({ hasText: "Confirmed" })
-    ).toBeVisible();
 
-    // Open filter again and click group header to deselect all
+    // Click again to deselect
     await page.getByTestId("filter-status").click();
     await newGroupHeader.click();
     await page.keyboard.press("Escape");
 
-    // Verify badges are gone (check that they're not in the badge area)
+    // Verify badges are gone
     await expect(
       page.locator('[data-slot="badge"]').filter({ hasText: "New" })
-    ).toBeHidden();
-    await expect(
-      page.locator('[data-slot="badge"]').filter({ hasText: "Confirmed" })
     ).toBeHidden();
   });
 

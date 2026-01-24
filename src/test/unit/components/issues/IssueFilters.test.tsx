@@ -15,14 +15,12 @@ vi.mock("next/navigation", () => ({
 }));
 
 // Mock ResizeObserver
-vi.stubGlobal(
-  "ResizeObserver",
-  vi.fn().mockImplementation(() => ({
-    observe: vi.fn(),
-    unobserve: vi.fn(),
-    disconnect: vi.fn(),
-  }))
-);
+class MockResizeObserver {
+  observe = vi.fn();
+  unobserve = vi.fn();
+  disconnect = vi.fn();
+}
+vi.stubGlobal("ResizeObserver", MockResizeObserver);
 
 // Mock requestAnimationFrame
 vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) =>
@@ -40,8 +38,20 @@ describe("IssueFilters", () => {
     filters: {}, // No filters = default state
   };
 
-  it("clears 'New' group statuses when X is clicked", async () => {
+  it("shows no status badges on landing (default state)", async () => {
     render(<IssueFilters {...defaultProps} />);
+    // Wait for layout effect
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.queryByText("New")).not.toBeInTheDocument();
+  });
+
+  it("clears 'New' group statuses when X is clicked", async () => {
+    render(
+      <IssueFilters
+        {...defaultProps}
+        filters={{ status: [...OPEN_STATUSES] }}
+      />
+    );
 
     // Wait for badges to render (layout effect)
     const newBadge = await screen.findByText("New");
@@ -73,12 +83,7 @@ describe("IssueFilters", () => {
 
   it("clears individual status when X is clicked", async () => {
     // Setup filter with just "fixed" status (closed group)
-    render(
-      <IssueFilters
-        {...defaultProps}
-        filters={{ status: ["fixed"] }}
-      />
-    );
+    render(<IssueFilters {...defaultProps} filters={{ status: ["fixed"] }} />);
 
     const fixedBadge = await screen.findByText("Fixed");
     const badgeElement = fixedBadge.closest(".inline-flex");
