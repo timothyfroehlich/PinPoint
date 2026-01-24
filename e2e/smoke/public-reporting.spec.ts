@@ -89,10 +89,10 @@ test.describe("Public Issue Reporting", () => {
     // Wait for URL refresh (router.push) to prevent race conditions on Mobile Safari
     await expect(page).toHaveURL(/machine=/);
 
-    await page
-      .getByLabel("Issue Title *")
-      .fill(`${PUBLIC_PREFIX} with Name Only`);
-    await selectOption(page, "severity-select", "minor");
+    await fillReportForm(page, {
+      title: `${PUBLIC_PREFIX} with Name Only`,
+      includePriority: false,
+    });
 
     // Provide name but no email
     await page.getByLabel("First Name").fill("Jane");
@@ -124,10 +124,10 @@ test.describe("Public Issue Reporting", () => {
     // Wait for URL refresh (router.push) to prevent race conditions on Mobile Safari
     await expect(page).toHaveURL(/machine=/);
 
-    await page
-      .getByLabel("Issue Title *")
-      .fill(`${PUBLIC_PREFIX} with Name and Email`);
-    await selectOption(page, "severity-select", "minor");
+    await fillReportForm(page, {
+      title: `${PUBLIC_PREFIX} with Name and Email`,
+      includePriority: false,
+    });
 
     // Provide name and email
     await page.getByLabel("First Name").fill("John");
