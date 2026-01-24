@@ -39,6 +39,7 @@ test.describe("Public Issue Reporting", () => {
       .getByLabel("Description")
       .fill("Playfield gets stuck during multiball.");
     await selectOption(page, "severity-select", "minor");
+    await selectOption(page, "consistency-select", "intermittent");
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
     await expect(page).toHaveURL("/report/success");
@@ -65,6 +66,7 @@ test.describe("Public Issue Reporting", () => {
 
     await page.getByLabel("Issue Title *").fill(`${PUBLIC_PREFIX} with Email`);
     await selectOption(page, "severity-select", "minor");
+    await selectOption(page, "consistency-select", "intermittent");
 
     await page.getByLabel("First Name").fill("Test");
     await page.getByLabel("Last Name").fill("User");
