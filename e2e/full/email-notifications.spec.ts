@@ -1,9 +1,12 @@
 import { test, expect } from "@playwright/test";
 import { MailpitClient } from "../support/mailpit.js";
+import { selectOption } from "../support/actions.js";
+import {
+  fillReportForm,
+  submitFormAndWaitForRedirect,
+} from "../support/page-helpers.js";
 import { TEST_USERS } from "../support/constants.js";
 import { deleteTestIssueByNumber } from "e2e/support/supabase-admin.js";
-import { submitFormAndWaitForRedirect } from "../support/page-helpers.js";
-import { selectOption } from "../support/actions.js";
 
 /**
  * Email notification verification tests
@@ -49,13 +52,10 @@ test.describe("Email Notifications", () => {
 
     // Create an issue for a specific machine (e.g., MM)
     await page.goto("/report?machine=MM");
-    await page.getByLabel("Issue Title *").fill("Test Issue for Email");
-    await page.getByLabel("Description").fill("Testing email notifications");
-    // Wait for severity select to be visible
-    await expect(page.getByTestId("severity-select")).toBeVisible();
-    await selectOption(page, "severity-select", "minor");
-    await selectOption(page, "priority-select", "low");
-    await selectOption(page, "consistency-select", "intermittent");
+    await fillReportForm(page, {
+      title: "Test Issue for Email",
+      description: "Testing email notifications",
+    });
 
     // Submit form and wait for Server Action redirect (Safari-defensive)
     await submitFormAndWaitForRedirect(
@@ -107,10 +107,7 @@ test.describe("Email Notifications", () => {
 
     // Create issue for a specific machine (e.g., MM)
     await page.goto("/report?machine=MM");
-    await page.getByLabel("Issue Title *").fill("Status Change Test");
-    await selectOption(page, "severity-select", "minor");
-    await selectOption(page, "priority-select", "low");
-    await selectOption(page, "consistency-select", "intermittent");
+    await fillReportForm(page, { title: "Status Change Test" });
 
     // Submit form and wait for Server Action redirect (Safari-defensive)
     await submitFormAndWaitForRedirect(

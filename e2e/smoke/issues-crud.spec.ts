@@ -6,9 +6,10 @@
  */
 
 import { test, expect, type Page } from "@playwright/test";
-import { loginAs, selectOption } from "../support/actions.js";
+import { loginAs } from "../support/actions.js";
 import { cleanupTestEntities, extractIdFromUrl } from "../support/cleanup.js";
 import { seededMachines } from "../support/constants.js";
+import { fillReportForm } from "../support/page-helpers.js";
 
 const createdIssueIds = new Set<string>();
 
@@ -45,13 +46,12 @@ test.describe("Issues System", () => {
       await page.goto(`/report?machine=${machineInitials}`);
 
       // Fill out form
-      await page.getByLabel("Issue Title *").fill("Test flipper not working");
-      await page
-        .getByLabel("Description")
-        .fill("The right flipper does not respond when button is pressed");
-      await selectOption(page, "severity-select", "minor");
-      await selectOption(page, "priority-select", "medium");
-      await selectOption(page, "consistency-select", "intermittent");
+      await fillReportForm(page, {
+        title: "Test flipper not working",
+        description:
+          "The right flipper does not respond when button is pressed",
+        priority: "medium",
+      });
 
       // Submit form
       await page.getByRole("button", { name: "Submit Issue Report" }).click();
@@ -100,10 +100,7 @@ test.describe("Issues System", () => {
       ).toBeVisible();
 
       // Fill out remaining fields
-      await page.getByLabel("Issue Title *").fill("Display flickering");
-      await selectOption(page, "severity-select", "minor");
-      await selectOption(page, "priority-select", "low");
-      await selectOption(page, "consistency-select", "intermittent");
+      await fillReportForm(page, { title: "Display flickering" });
 
       // Submit
       await page.getByRole("button", { name: "Submit Issue Report" }).click();
@@ -132,10 +129,7 @@ test.describe("Issues System", () => {
       machineInitials = seededMachines.addamsFamily.initials;
       issueTitle = `Test Issue for Details ${Date.now()}`;
       await page.goto(`/report?machine=${machineInitials}`);
-      await page.getByLabel("Issue Title *").fill(issueTitle);
-      await selectOption(page, "severity-select", "minor");
-      await selectOption(page, "priority-select", "medium");
-      await selectOption(page, "consistency-select", "intermittent");
+      await fillReportForm(page, { title: issueTitle, priority: "medium" });
       await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
       await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
