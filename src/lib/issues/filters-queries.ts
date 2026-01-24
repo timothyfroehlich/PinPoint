@@ -12,7 +12,9 @@ import {
   exists,
   isNull,
 } from "drizzle-orm";
-import { db } from "~/server/db";
+import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import type { Schema } from "~/server/db";
+
 import {
   issues,
   machines,
@@ -28,7 +30,10 @@ import type { IssueFilters } from "./filters";
  * Builds an array of Drizzle SQL conditions from filters
  * This should ONLY be called on the server.
  */
-export function buildWhereConditions(filters: IssueFilters): SQL[] {
+export function buildWhereConditions(
+  filters: IssueFilters,
+  db: PostgresJsDatabase<Schema>
+): SQL[] {
   const conditions: SQL[] = [];
 
   // Comprehensive search across all relevant text fields
@@ -165,13 +170,15 @@ export function buildWhereConditions(filters: IssueFilters): SQL[] {
     }
   }
 
-  // Status (Default to OPEN_STATUSES if none specified)
-  if (filters.status && filters.status.length > 0) {
-    conditions.push(inArray(issues.status, filters.status));
-  } else {
-    // Correctly cast OPEN_STATUSES to IssueStatus[] to avoid readonly mismatch
+  // Status
+  if (filters.status === undefined) {
+    // Default to open statuses if no status filter is provided in URL
     conditions.push(inArray(issues.status, [...OPEN_STATUSES]));
+  } else if (filters.status.length > 0) {
+    // Specific statuses selected
+    conditions.push(inArray(issues.status, filters.status));
   }
+  // If filters.status is [], it means "All" - no condition added
 
   if (filters.machine && filters.machine.length > 0) {
     conditions.push(inArray(issues.machineInitials, filters.machine));

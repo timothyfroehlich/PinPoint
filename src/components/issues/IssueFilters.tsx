@@ -29,6 +29,23 @@ import type {
   IssueConsistency,
 } from "~/lib/types";
 import type { LucideIcon } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
+
+const SEARCH_BAR_LAYOUT = {
+  PADDING: 12, // px-3
+  ICON_WIDTH: 16,
+  ICON_GAP: 8,
+  PLUS_BADGE_WIDTH: 36,
+  TEXT_BUFFER: 10,
+  BADGE_GAP: 6,
+  CHAR_WIDTH_ESTIMATE: 8,
+  BADGE_OVERHEAD: 34,
+} as const;
 
 interface MachineOption {
   initials: string;
@@ -147,8 +164,13 @@ export function IssueFilters({
       const merged = { ...filters, ...newFilters };
 
       if (merged.q) params.set("q", merged.q);
-      if (merged.status && merged.status.length > 0)
-        params.set("status", merged.status.join(","));
+      if (merged.status) {
+        if (merged.status.length > 0) {
+          params.set("status", merged.status.join(","));
+        } else {
+          params.set("status", "all");
+        }
+      }
       if (merged.machine && merged.machine.length > 0)
         params.set("machine", merged.machine.join(","));
       if (merged.severity && merged.severity.length > 0)
@@ -239,22 +261,55 @@ export function IssueFilters({
       });
     });
 
-    // Status - Show badges for current status filters (or defaults if none)
-    const activeStatuses = filters.status ?? [...OPEN_STATUSES];
-    activeStatuses.forEach((s) => {
-      const config = STATUS_CONFIG[s];
-      badges.push({
-        id: `status-${s}`,
-        label: config.label,
-        icon: config.icon,
-        iconColor: config.iconColor,
-        clear: () =>
-          pushFilters({
-            status: activeStatuses.filter((v) => v !== s),
-            page: 1,
-          }),
+    // Status - Only show badges if status is explicitly filtered in the URL
+    if (filters.status !== undefined) {
+      const activeStatuses = filters.status;
+      const processedStatuses = new Set<string>();
+
+      const checkGroup = (
+        groupName: string,
+        groupStatuses: readonly IssueStatus[],
+        label: string
+      ): void => {
+        const hasAll = groupStatuses.every((s) => activeStatuses.includes(s));
+        if (hasAll) {
+          badges.push({
+            id: `status-group-${groupName}`,
+            label: label,
+            clear: () => {
+              const nextStatuses = activeStatuses.filter(
+                (s) => !groupStatuses.includes(s)
+              );
+              pushFilters({
+                status: nextStatuses,
+                page: 1,
+              });
+            },
+          });
+          groupStatuses.forEach((s) => processedStatuses.add(s));
+        }
+      };
+
+      checkGroup("new", STATUS_GROUPS.new, "New");
+      checkGroup("in_progress", STATUS_GROUPS.in_progress, "In Progress");
+      checkGroup("closed", STATUS_GROUPS.closed, "Closed");
+
+      activeStatuses.forEach((s) => {
+        if (processedStatuses.has(s)) return;
+        const config = STATUS_CONFIG[s];
+        badges.push({
+          id: `status-${s}`,
+          label: config.label,
+          icon: config.icon,
+          iconColor: config.iconColor,
+          clear: () =>
+            pushFilters({
+              status: activeStatuses.filter((v) => v !== s),
+              page: 1,
+            }),
+        });
       });
-    });
+    }
 
     // Severity
     filters.severity?.forEach((s) => {
@@ -383,7 +438,7 @@ export function IssueFilters({
     }
 
     return badges;
-  };
+  };;
 
   const badgeList = getBadges();
 
@@ -403,20 +458,24 @@ export function IssueFilters({
           return;
         }
 
-        const leftPadding = 12; // px-3 left
-        const rightPadding = 12; // px-3 right
-        const iconWidth = 16; // search icon
-        const iconGap = 8; // gap after icon
-        const plusBadgeWidth = 36; // Reserved for "+X"
-        const textBuffer = 10; // Space after text before collision
+        const leftPadding = SEARCH_BAR_LAYOUT.PADDING;
+        const rightPadding = SEARCH_BAR_LAYOUT.PADDING;
+        const iconWidth = SEARCH_BAR_LAYOUT.ICON_WIDTH;
+        const iconGap = SEARCH_BAR_LAYOUT.ICON_GAP;
+        const plusBadgeWidth = SEARCH_BAR_LAYOUT.PLUS_BADGE_WIDTH;
+        const textBuffer = SEARCH_BAR_LAYOUT.TEXT_BUFFER;
 
         const textStartPosition = leftPadding + iconWidth + iconGap;
         const textEndPosition = textStartPosition + textWidth + textBuffer;
         const badgeAreaRightEdge = containerWidth - rightPadding;
         const maxBadgeSpace = badgeAreaRightEdge - textEndPosition;
 
-        const badgeGap = 6;
-        const badgeWidths = badgeList.map((b) => b.label.length * 8 + 34);
+        const badgeGap = SEARCH_BAR_LAYOUT.BADGE_GAP;
+        const badgeWidths = badgeList.map(
+          (b) =>
+            b.label.length * SEARCH_BAR_LAYOUT.CHAR_WIDTH_ESTIMATE +
+            SEARCH_BAR_LAYOUT.BADGE_OVERHEAD
+        );
 
         let totalNeeded = badgeWidths.reduce((a, b) => a + b + badgeGap, 0);
         if (badgeWidths.length > 0) totalNeeded -= badgeGap;
@@ -480,15 +539,31 @@ export function IssueFilters({
               {search || ""}
             </span>
 
-            <input
-              ref={inputRef}
-              placeholder="Search issues..."
-              data-testid="issue-search"
-              className="flex-1 bg-transparent border-0 text-sm focus:outline-none placeholder:text-muted-foreground relative z-10"
-              style={{ paddingRight: `${badgeAreaWidth}px` }}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <input
+                    ref={inputRef}
+                    placeholder="Search issues..."
+                    data-testid="issue-search"
+                    className="flex-1 bg-transparent border-0 text-sm focus:outline-none placeholder:text-muted-foreground relative z-10"
+                    style={{ paddingRight: `${badgeAreaWidth}px` }}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </TooltipTrigger>
+                <TooltipContent
+                  side="bottom"
+                  align="start"
+                  className="max-w-xs"
+                >
+                  <p>
+                    Search across titles, descriptions, IDs (e.g., AFM-101),
+                    machine names, assignees, reporters, and comments.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-20">
               {visibleBadges.map((badge) => (

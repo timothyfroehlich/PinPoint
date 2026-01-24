@@ -51,7 +51,9 @@ export function parseIssueFilters(params: URLSearchParams): IssueFilters {
     val: string | null,
     validValues: readonly T[]
   ): T[] | undefined => {
-    if (!val) return undefined;
+    if (val === null) return undefined;
+    if (val === "all") return [];
+
     const items = val
       .split(",")
       .filter((v): v is T => validValues.includes(v as T));
@@ -64,7 +66,9 @@ export function parseIssueFilters(params: URLSearchParams): IssueFilters {
   if (q) filters.q = q;
 
   const status = parseCommaList(params.get("status"), ALL_ISSUE_STATUSES);
-  if (status) filters.status = status;
+  if (status !== undefined) {
+    filters.status = status;
+  }
 
   const machine = params.get("machine")?.split(",");
   if (machine) filters.machine = machine;

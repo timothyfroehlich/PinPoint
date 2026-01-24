@@ -1,6 +1,6 @@
 import type React from "react";
 import { type Metadata } from "next";
-import { and } from "drizzle-orm";
+import { and, not, inArray } from "drizzle-orm";
 import { db } from "~/server/db";
 import { issues } from "~/server/db/schema";
 import { IssueFilters } from "~/components/issues/IssueFilters";
@@ -14,6 +14,7 @@ import {
   buildWhereConditions,
   buildOrderBy,
 } from "~/lib/issues/filters-queries";
+import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { count } from "drizzle-orm";
 
 export const metadata: Metadata = {
@@ -52,7 +53,7 @@ export default async function IssuesPage({
   const filters = parseIssueFilters(urlParams);
   // Add currentUserId for watching filter
   filters.currentUserId = user.id;
-  const whereConditions = buildWhereConditions(filters);
+  const where = buildWhereConditions(filters, db);
   const orderBy = buildOrderBy(filters.sort);
   const pageSize = filters.pageSize ?? 15;
   const page = filters.page ?? 1;
@@ -69,7 +70,7 @@ export default async function IssuesPage({
   });
 
   const issuesPromise = db.query.issues.findMany({
-    where: and(...whereConditions),
+    where: and(...where, not(inArray(issues.status, CLOSED_STATUSES))),
     orderBy: orderBy,
     with: {
       machine: {
@@ -92,7 +93,7 @@ export default async function IssuesPage({
   const totalCountPromise = db
     .select({ value: count() })
     .from(issues)
-    .where(and(...whereConditions));
+    .where(and(...where));
 
   // 3. Await all promises in parallel
   const [allMachines, allUsers, issuesListRaw, totalCountResult] =

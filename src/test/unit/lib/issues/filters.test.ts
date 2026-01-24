@@ -54,6 +54,13 @@ describe("parseIssueFilters", () => {
     const filters = parseIssueFilters(params);
     expect(filters.page).toBe(1);
     expect(filters.pageSize).toBe(15);
+    expect(filters.status).toBeUndefined();
+  });
+
+  it("handles status=all", () => {
+    const params = new URLSearchParams("status=all");
+    const filters = parseIssueFilters(params);
+    expect(filters.status).toEqual([]);
   });
 
   it("handles sort parameter", () => {

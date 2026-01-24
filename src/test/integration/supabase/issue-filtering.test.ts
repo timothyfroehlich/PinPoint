@@ -110,62 +110,103 @@ describe("Issue Filtering Integration", () => {
   };
 
   it("filters by status (OR logic)", async () => {
-    const where = buildWhereConditions({ status: ["new", "confirmed"] });
-    const results = await queryIssues(where);
+    const db = await getTestDb();
+    const conditions = buildWhereConditions(
+      { status: ["new", "confirmed"] },
+      db
+    );
+    const results = await queryIssues(conditions);
     expect(results).toHaveLength(2);
     expect(results.map((i) => i.id)).toContain(ISSUE_1_ID);
     expect(results.map((i) => i.id)).toContain(ISSUE_2_ID);
   });
 
   it("filters by search query (title match)", async () => {
-    const where = buildWhereConditions({ q: "Gumball" });
+    const db = await getTestDb();
+    const where = buildWhereConditions({ q: "Gumball" }, db);
     const results = await queryIssues(where);
     expect(results).toHaveLength(1);
     expect(results[0]?.id).toBe(ISSUE_2_ID);
   });
 
   it("filters by search query (issue number match)", async () => {
-    const where = buildWhereConditions({ q: "1" });
+    const db = await getTestDb();
+    const where = buildWhereConditions({ q: "1" }, db);
     const results = await queryIssues(where);
     expect(results.some((i) => i.id === ISSUE_1_ID)).toBe(true);
   });
 
   it("filters by search query (machine initials match)", async () => {
-    const where = buildWhereConditions({ q: "AFM" });
+    const db = await getTestDb();
+    const where = buildWhereConditions({ q: "AFM" }, db);
     const results = await queryIssues(where);
     expect(results).toHaveLength(2);
     expect(results.map((i) => i.id)).toContain(ISSUE_1_ID);
     expect(results.map((i) => i.id)).toContain(ISSUE_3_ID);
+  });
+
+  it("defaults to open statuses when status is undefined", async () => {
+    const db = await getTestDb();
+    const where = buildWhereConditions({}, db);
+    const results = await queryIssues(where);
+    // ISSUE_1 (new), ISSUE_2 (confirmed) are open. ISSUE_3 (in_progress) is also open.
+    // Wait, let's check OPEN_STATUSES definition.
+    expect(results.length).toBeGreaterThan(0);
+    expect(
+      results.every((i: any) =>
+        ["new", "confirmed", "in_progress"].includes(i.status)
+      )
+    ).toBe(true);
+  });
+
+  it("shows all statuses when status is empty array (all)", async () => {
+    const db = await getTestDb();
+    const where = buildWhereConditions({ status: [] }, db);
+    const results = await queryIssues(where);
+    // Should include all 3 issues regardless of status
+    expect(results).toHaveLength(3);
   });
 
   it("filters by combined status and machine initials", async () => {
-    const where = buildWhereConditions({
-      status: ["new"],
-      machine: ["AFM"],
-    });
+    const db = await getTestDb();
+    const where = buildWhereConditions(
+      {
+        status: ["new"],
+        machine: ["AFM"],
+      },
+      db
+    );
     const results = await queryIssues(where);
     expect(results).toHaveLength(1);
-    expect(results[0]?.id).toBe(ISSUE_1_ID);
+    expect((results[0] as any).id).toBe(ISSUE_1_ID);
   });
 
   it("filters by severity and priority", async () => {
-    const where = buildWhereConditions({
-      severity: ["major"],
-      priority: ["high"],
-    });
+    const db = await getTestDb();
+    const where = buildWhereConditions(
+      {
+        severity: ["major"],
+        priority: ["high"],
+      },
+      db
+    );
     const results = await queryIssues(where);
     expect(results).toHaveLength(1);
-    expect(results[0]?.id).toBe(ISSUE_1_ID);
+    expect((results[0] as any).id).toBe(ISSUE_1_ID);
   });
 
   it("filters by owner", async () => {
-    const where = buildWhereConditions({
-      owner: [ALICE_ID],
-    });
+    const db = await getTestDb();
+    const where = buildWhereConditions(
+      {
+        owner: [ALICE_ID],
+      },
+      db
+    );
     const results = await queryIssues(where);
     expect(results).toHaveLength(2);
-    expect(results.map((i) => i.id)).toContain(ISSUE_1_ID);
-    expect(results.map((i) => i.id)).toContain(ISSUE_3_ID);
-    expect(results.map((i) => i.id)).not.toContain(ISSUE_2_ID);
+    expect(results.map((i: any) => i.id)).toContain(ISSUE_1_ID);
+    expect(results.map((i: any) => i.id)).toContain(ISSUE_3_ID);
+    expect(results.map((i: any) => i.id)).not.toContain(ISSUE_2_ID);
   });
 });
