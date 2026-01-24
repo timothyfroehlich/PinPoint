@@ -8,6 +8,7 @@ description: shadcn/ui patterns, progressive enhancement, Server Components, Cli
 ## When to Use This Skill
 
 Use this skill when:
+
 - Building or modifying UI components
 - Creating forms
 - Working with shadcn/ui components
@@ -19,6 +20,7 @@ Use this skill when:
 ## Quick Reference
 
 ### Critical UI Rules
+
 1. **Server Components first**: Default to Server Components, use "use client" only for interactivity
 2. **Progressive enhancement**: Forms must work without JavaScript
 3. **shadcn/ui only**: No MUI components
@@ -27,6 +29,7 @@ Use this skill when:
 6. **Tailwind CSS v4**: Use CSS variables, no hardcoded hex colors
 
 ### Adding Components
+
 ```bash
 pnpm exec shadcn@latest add [component]
 ```
@@ -405,6 +408,7 @@ export default async function MachinesPage() {
 ### ❌ Don't Do These
 
 **Global CSS Resets**:
+
 ```css
 /* ❌ Bad: Breaks component internals */
 * {
@@ -417,6 +421,7 @@ export default async function MachinesPage() {
 ```
 
 **Hardcoded Spacing in Components**:
+
 ```typescript
 // ❌ Bad: Rigid component
 export function Card({ children }: CardProps) {
@@ -430,6 +435,7 @@ export function Card({ children, className }: CardProps) {
 ```
 
 **Inline Styles**:
+
 ```typescript
 // ❌ Bad: Inline styles
 <div style={{ marginTop: '10px', color: '#ff0000' }}>

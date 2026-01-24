@@ -8,6 +8,7 @@ description: Security patterns, CSP nonces, input validation, auth checks, Supab
 ## When to Use This Skill
 
 Use this skill when:
+
 - Implementing authentication or authorization
 - Creating forms or handling user input
 - Setting up security headers (CSP, CORS, etc.)
@@ -17,6 +18,7 @@ Use this skill when:
 ## Quick Reference
 
 ### Critical Security Rules
+
 1. **CSP with nonces**: Dynamic nonces via middleware, static headers via next.config.ts
 2. **Validate ALL inputs**: Use Zod for all form data and user inputs
 3. **Supabase SSR contract**: Use `~/lib/supabase/server`, call `auth.getUser()` immediately
@@ -26,6 +28,7 @@ Use this skill when:
 ### Common Patterns
 
 **Server Action with Auth**:
+
 ```typescript
 "use server";
 import { createClient } from "~/lib/supabase/server";
@@ -33,7 +36,9 @@ import { redirect } from "next/navigation";
 
 export async function protectedAction(formData: FormData) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser(); // Call immediately!
+  const {
+    data: { user },
+  } = await supabase.auth.getUser(); // Call immediately!
   if (!user) redirect("/login");
 
   // Validate inputs
@@ -51,6 +56,7 @@ export async function protectedAction(formData: FormData) {
 ```
 
 **Form Validation**:
+
 ```typescript
 import { z } from "zod";
 
@@ -89,43 +95,52 @@ cat docs/NON_NEGOTIABLES.md | grep -A 20 "## Security"
 ### Key Security Constraints (from NON_NEGOTIABLES.md)
 
 **CORE-SEC-001**: Protect APIs and Server Actions
+
 - Verify authentication in all Server Actions
 - Check authorization before data access
 - Never skip auth checks in protected routes
 
 **CORE-SEC-002**: Validate all inputs
+
 - Use Zod for all form data and user inputs
 - Never trust FormData or query params without validation
 - Prevent injection attacks (SQL, XSS, command injection)
 
 **CORE-SEC-003**: Security headers via middleware
+
 - CSP with nonces (prevents XSS)
 - Set headers in `middleware.ts` (dynamic) and `next.config.ts` (static)
 - Don't remove or weaken Content-Security-Policy
 
 **CORE-SEC-004**: Nonce-based CSP
+
 - Generate unique nonce per request using Web Crypto API
 - Use 'strict-dynamic' to allow Next.js dynamic imports
 - Never use 'unsafe-inline' or 'unsafe-eval' in script-src
 
 **CORE-SEC-005**: No hardcoded hostnames or ports
+
 - Use `NEXT_PUBLIC_SITE_URL` and `PORT` environment variables
 - Prevents environment mismatches and "whack-a-mole" bugs
 
 **CORE-SSR-001**: Use SSR wrapper and cookie contract
+
 - Use `~/lib/supabase/server`'s `createClient()` with proper cookies
 - Don't import from `@supabase/supabase-js` directly on server
 
 **CORE-SSR-002**: Call `auth.getUser()` immediately
+
 - Workaround for timing issues
 - Avoids token invalidation
 - No logic between `createClient()` and `getUser()`
 
 **CORE-SSR-003**: Middleware is required
+
 - Enables token refresh and SSR session continuity
 - Don't remove or bypass middleware
 
 **CORE-SSR-006**: Database trigger for auto-profile creation
+
 - OAuth-proof (works for Google/GitHub login)
 - Atomic transaction via `handle_new_user()` trigger
 - Don't create profiles manually in signup Server Actions
@@ -135,6 +150,7 @@ cat docs/NON_NEGOTIABLES.md | grep -A 20 "## Security"
 ### CSP with Nonces (Middleware)
 
 See `src/middleware.ts` for implementation:
+
 - Generates unique nonce per request
 - Uses Web Crypto API (Edge Runtime compatible)
 - Sets CSP header with nonce for scripts
@@ -176,7 +192,9 @@ import sanitizeHtml from "sanitize-html";
 
 export async function createComment(formData: FormData) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
   const rawContent = formData.get("content");
@@ -266,5 +284,5 @@ it("accepts valid input", () => {
 ## Additional Resources
 
 - Security documentation: `docs/SECURITY.md`
-- Non-negotiables: `docs/NON_NEGOTIABLES.md` (CORE-SEC-* and CORE-SSR-* rules)
+- Non-negotiables: `docs/NON_NEGOTIABLES.md` (CORE-SEC-_ and CORE-SSR-_ rules)
 - Supabase SSR guide: Use Context7 MCP for latest patterns
