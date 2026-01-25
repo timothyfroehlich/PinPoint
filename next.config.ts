@@ -14,6 +14,14 @@ const nextConfig: NextConfig = {
       "@/*": "./src/*",
     },
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "**.public.blob.vercel-storage.com",
+      },
+    ],
+  },
   async headers() {
     return [
       {
