@@ -28,7 +28,7 @@ let testDb: PgliteDatabase<typeof schema> | undefined;
  * Get the worker-scoped test database instance.
  * Creates and initializes on first call, returns cached instance thereafter.
  */
-export async function getTestDb() {
+export async function getTestDb(): Promise<PgliteDatabase<typeof schema>> {
   if (testDb) {
     return testDb;
   }

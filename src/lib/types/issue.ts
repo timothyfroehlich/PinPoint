@@ -10,6 +10,7 @@ export type IssueCommentWithAuthor = Pick<
 export type IssueListItem = Issue & {
   machine: Pick<Machine, "id" | "name">;
   reportedByUser?: Pick<UserProfile, "id" | "name" | "email"> | null;
+  invitedReporter?: Pick<UserProfile, "id" | "name" | "email"> | null;
   assignedToUser?: Pick<UserProfile, "id" | "name" | "email"> | null;
 };
 

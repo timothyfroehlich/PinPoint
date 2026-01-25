@@ -28,13 +28,7 @@ This skill provides a guided, 6-phase workflow that handles the entire commit-to
 - Automatic branch validation/creation
 - GitHub issue linking support
 - PR creation with detailed descriptions
-- CI monitoring with timeout
-
-**Helper Scripts** (in `scripts/`):
-
-- `select-tests.py` - Analyzes changed files, recommends test suite
-- `generate-commit-message.py` - Generates conventional commit messages
-- `watch-ci.sh` - Monitors GitHub Actions with timeout
+- Optional CI monitoring
 
 ---
 
@@ -114,42 +108,41 @@ This runs the full validation suite:
 
 ### 2.2 Intelligent E2E Test Selection
 
-Run the helper script:
+Analyze changed files using `git diff --name-only --staged` and recommend test suite based on impact.
 
-```bash
-python3 .agent/skills/pinpoint-commit/scripts/select-tests.py
-```
+**Decision Matrix**:
 
-**Output example**:
+**High Impact Files** → Recommend `pnpm run e2e:full` (~3-5 min):
 
-```json
-{
-  "recommendation": "e2e:full",
-  "files_analyzed": 3,
-  "high_impact": 2,
-  "high_impact_files": [
-    "src/app/(app)/issues/page.tsx",
-    "src/components/IssueList.tsx"
-  ],
-  "reasons": [
-    "Page components - affects user journeys",
-    "UI components - may break interactions"
-  ]
-}
-```
+- `src/app/(app)/**/page.tsx` - Page components (user journeys)
+- `src/app/(app)/**/layout.tsx` - Layout components (site structure)
+- `src/app/(auth)/**/*` - Authentication flows
+- `src/components/issues/*` - Core issue UI components
+- `src/components/machines/*` - Core machine UI components
+- `src/server/actions/*` - Server actions (data mutations)
+- `src/lib/supabase/*` - Auth/database client
+- `supabase/migrations/*` - Database schema changes
 
-**Decision Matrix** (built into script):
+**Medium Impact Files** → `pnpm run smoke` (already in preflight):
 
-- **High impact** → `pnpm run e2e:full` (~3-5 min)
-- **Medium impact** → `pnpm run smoke` (already run in preflight)
-- **Low impact** → Skip additional E2E
+- `src/components/ui/*` - Reusable UI components
+- `src/lib/*` - Utility libraries
+- `src/server/db/schema.ts` - Schema definitions
 
-**Ask user**:
+**Low Impact Files** → Skip additional E2E:
+
+- `docs/**/*` - Documentation
+- `*.test.ts` - Test files
+- `*.spec.ts` - E2E test files
+- `.agent/**/*` - Agent skills
+- `scripts/*` - Build/dev scripts
+
+**Present recommendation**:
 
 ```
 Based on your changes to:
-  - src/app/(app)/issues/page.tsx (page component)
-  - src/components/IssueList.tsx (UI component)
+  - src/app/(app)/issues/page.tsx (page component - HIGH IMPACT)
+  - src/components/IssueList.tsx (core UI - HIGH IMPACT)
 
 I recommend: pnpm run e2e:full
 
@@ -242,35 +235,40 @@ git checkout -b <branch-name> main
 
 ### 4.1 Generate Message
 
-Run the helper script:
-
-```bash
-python3 .agent/skills/pinpoint-commit/scripts/generate-commit-message.py
-```
-
-**Output example**:
-
-```json
-{
-  "title": "feat(issues): Update issues functionality",
-  "body": "- Update 3 source file(s)\n- Add/update 2 test(s)",
-  "type": "feat",
-  "scope": "issues",
-  "files": ["src/app/(app)/issues/page.tsx", "..."],
-  "stats": { "insertions": 42, "deletions": 10 }
-}
-```
+Analyze staged changes using `git diff --staged --stat` and `git diff --staged --name-only` to generate a conventional commit message.
 
 **Conventional Commits format**: `<type>(<scope>): <description>`
 
-**Types**:
+**Type Selection** (analyze changed files):
 
-- `feat` - New feature
-- `fix` - Bug fix
-- `chore` - Maintenance
-- `docs` - Documentation
-- `refactor` - Code refactoring
-- `test` - Test changes
+- `feat` - New features (new components, new routes, new functionality)
+- `fix` - Bug fixes (fix typos, fix logic errors, fix crashes)
+- `refactor` - Code restructuring (extract hooks, extract components, reorganize)
+- `chore` - Maintenance (dependency updates, config changes, tooling)
+- `docs` - Documentation only (README, comments, doc files)
+- `test` - Test additions/changes (new tests, test fixes)
+- `style` - Formatting only (prettier, lint fixes without logic changes)
+
+**Scope Selection** (primary area of changes):
+
+Look at changed file paths and use:
+
+- `issues` - src/components/issues/_, src/app/(app)/issues/_
+- `machines` - src/components/machines/_, src/app/(app)/m/_
+- `auth` - src/app/(auth)/_, src/lib/supabase/_
+- `ui` - src/components/ui/\*
+- `db` - supabase/migrations/_, src/server/db/_
+- `e2e` - e2e/\*_/_
+- `agents` - .agent/\*_/_
+
+**Body Generation**:
+
+Use `git diff --staged --stat` output to create bullet points:
+
+- Group by category: "Bug Fixes", "Features", "Refactoring", "Documentation", "Testing"
+- Be specific about what changed
+- Mention notable file changes
+- Include impact (+X/-Y lines)
 
 ### 4.2 Review with User
 
@@ -422,21 +420,34 @@ Options:
 
 ### 6.1 Watch CI
 
-Use helper script:
+Poll GitHub Actions status using `gh pr checks <pr-number>`:
 
 ```bash
-bash .agent/skills/pinpoint-commit/scripts/watch-ci.sh <pr-number> 600
+# Check current status
+gh pr checks <pr-number>
+
+# Poll every 30 seconds for up to 10 minutes
+# Show status updates to user
 ```
 
-**Status updates** (every 30 seconds):
+**Status check output format**:
 
 ```
-⏳ Monitoring CI for PR #123 (timeout: 600s)...
-[00:30] Checks: 2/6 complete, 2 passed, 0 failed
-[01:00] Checks: 4/6 complete, 4 passed, 0 failed
-[03:00] Checks: 6/6 complete, 6 passed, 0 failed
+✓ Preflight          pass  2m 15s
+✓ Build             pass  1m 45s
+○ E2E Tests         pending
+× Playwright        fail
+```
 
-✅ All CI checks passed! (180s)
+**Parse and present**:
+
+```
+⏳ Monitoring CI for PR #123...
+[00:30] Checks: 2/4 complete, 2 passed, 0 failed
+[01:00] Checks: 3/4 complete, 3 passed, 0 failed
+[03:00] Checks: 4/4 complete, 4 passed, 0 failed
+
+✅ All CI checks passed! (3m 0s)
 ```
 
 **On success**:
@@ -494,68 +505,6 @@ Your code is ready for team review! 🚀
 
 ---
 
-## Helper Script Reference
-
-### select-tests.py
-
-**Purpose**: Analyze changed files and recommend test suite
-
-**Usage**:
-
-```bash
-python3 .agent/skills/pinpoint-commit/scripts/select-tests.py
-```
-
-**Output**: JSON with recommendation and reasoning
-
-**Decision logic**:
-
-- High-impact files (pages, UI, auth) → `e2e:full`
-- Medium-impact files (lib, components) → `smoke`
-- Low-impact files (docs, tests) → `skip`
-
-### generate-commit-message.py
-
-**Purpose**: Generate conventional commit message
-
-**Usage**:
-
-```bash
-python3 .agent/skills/pinpoint-commit/scripts/generate-commit-message.py
-```
-
-**Output**: JSON with title, body, type, scope
-
-**Features**:
-
-- Detects commit type (feat/fix/chore/docs)
-- Infers scope from file paths
-- Generates bullet-point body
-- Includes diff stats
-
-### watch-ci.sh
-
-**Purpose**: Monitor GitHub Actions CI status
-
-**Usage**:
-
-```bash
-bash .agent/skills/pinpoint-commit/scripts/watch-ci.sh <pr-number> [timeout-seconds]
-```
-
-**Arguments**:
-
-- `pr-number` - PR number to monitor
-- `timeout-seconds` - Max wait time (default: 600)
-
-**Exit codes**:
-
-- `0` - All checks passed
-- `1` - Some checks failed
-- `2` - Timeout
-
----
-
 ## Turbo Mode
 
 Steps marked `// turbo` auto-run without approval:
@@ -587,10 +536,10 @@ Steps marked `// turbo` auto-run without approval:
 ### Pro Tips
 
 1. **Run frequently**: Don't wait to accumulate many changes
-2. **Trust the test selector**: It knows high-risk patterns
-3. **Edit commit messages**: The generator is a starting point
+2. **Trust the decision matrix**: High-impact files need full E2E coverage
+3. **Edit commit messages**: Generated messages are a starting point
 4. **Link issues**: Helps track which PRs close which issues
-5. **Watch CI**: Catch failures early
+5. **Watch CI**: Catch failures early before requesting review
 
 ---
 

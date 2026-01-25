@@ -66,9 +66,8 @@ The Python script performs comprehensive worktree management:
 
 ### Phase 1: Configuration Validation & Fixing
 
-- Validates and fixes `supabase/config.toml` (ports, project_id)
+- Validates and fixes `supabase/config.toml` (ports, project_id) from `supabase/config.toml.template`
 - Creates/fixes `.env.local` with correct ports and URLs
-- Manages `skip-worktree` flags (main worktree vs. others)
 
 ### Phase 2: Git State Management
 
@@ -181,4 +180,3 @@ If you see Supabase startup failures:
 
 - `AGENTS.md` - Port allocation table
 - `scripts/SYNC_WORKTREES_LESSONS.md` - Lessons learned (if exists)
-- `docs/NON_NEGOTIABLES.md` - Skip-worktree patterns

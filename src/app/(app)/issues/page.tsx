@@ -1,20 +1,20 @@
 import type React from "react";
 import { type Metadata } from "next";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and } from "drizzle-orm";
 import { db } from "~/server/db";
 import { issues } from "~/server/db/schema";
 import { IssueFilters } from "~/components/issues/IssueFilters";
-import { IssueRow } from "~/components/issues/IssueRow";
-import { CheckCircle2, Search } from "lucide-react";
+import { IssueList } from "~/components/issues/IssueList";
 import { createClient } from "~/lib/supabase/server";
 import { redirect } from "next/navigation";
-import type {
-  Issue,
-  IssueStatus,
-  IssueSeverity,
-  IssuePriority,
-} from "~/lib/types";
-import { OPEN_STATUSES, CLOSED_STATUSES } from "~/lib/issues/status";
+import type { IssueListItem } from "~/lib/types";
+
+import { parseIssueFilters } from "~/lib/issues/filters";
+import {
+  buildWhereConditions,
+  buildOrderBy,
+} from "~/lib/issues/filters-queries";
+import { count } from "drizzle-orm";
 
 export const metadata: Metadata = {
   title: "Issues | PinPoint",
@@ -22,12 +22,7 @@ export const metadata: Metadata = {
 };
 
 interface IssuesPageProps {
-  searchParams: Promise<{
-    status?: string;
-    severity?: string;
-    priority?: string;
-    machine?: string;
-  }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export default async function IssuesPage({
@@ -42,109 +37,79 @@ export default async function IssuesPage({
     redirect("/login?next=%2Fissues");
   }
 
-  // 1. Start independent queries immediately
+  // 1. Parse filters from searchParams
+  const rawParams = await searchParams;
+  // Convert Record to URLSearchParams (parseIssueFilters expects URLSearchParams)
+  const urlParams = new URLSearchParams();
+  Object.entries(rawParams).forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      urlParams.set(key, value.join(","));
+    } else if (value !== undefined) {
+      urlParams.set(key, value);
+    }
+  });
+
+  const filters = parseIssueFilters(urlParams);
+
+  // Add currentUserId for watching filter
+  filters.currentUserId = user.id;
+  const where = buildWhereConditions(filters, db);
+  const orderBy = buildOrderBy(filters.sort);
+  const pageSize = filters.pageSize ?? 15;
+  const page = filters.page ?? 1;
+
+  // 2. Start independent queries immediately
   const machinesPromise = db.query.machines.findMany({
-    orderBy: (machines, { asc }) => [asc(machines.name)],
+    orderBy: (m, { asc }) => [asc(m.name)],
     columns: { initials: true, name: true },
   });
 
-  const params = await searchParams;
-  const { status, severity, priority, machine } = params;
-
-  // Safe type casting for filters using imported constants from single source of truth
-  // Based on _issue-status-redesign/README.md - Final design with 11 statuses
-  let statusFilter: IssueStatus[];
-
-  if (status === "closed") {
-    statusFilter = [...CLOSED_STATUSES];
-  } else if (
-    (OPEN_STATUSES as readonly IssueStatus[]).includes(status as IssueStatus)
-  ) {
-    statusFilter = [status as IssueStatus];
-  } else if (
-    (CLOSED_STATUSES as readonly IssueStatus[]).includes(status as IssueStatus)
-  ) {
-    statusFilter = [status as IssueStatus];
-  } else {
-    // Default case: Show all Open issues
-    statusFilter = [...OPEN_STATUSES];
-  }
-
-  const severityFilter: IssueSeverity | undefined =
-    severity && ["cosmetic", "minor", "major", "unplayable"].includes(severity)
-      ? (severity as IssueSeverity)
-      : undefined;
-
-  const priorityFilter: IssuePriority | undefined =
-    priority && ["low", "medium", "high"].includes(priority)
-      ? (priority as IssuePriority)
-      : undefined;
-
-  // 2. Fetch Issues based on filters (depends on params)
-  // Type assertion needed because Drizzle infers status as string, not IssueStatus
-  const issuesPromise = db.query.issues.findMany({
-    where: and(
-      inArray(issues.status, statusFilter),
-      severityFilter ? eq(issues.severity, severityFilter) : undefined,
-      priorityFilter ? eq(issues.priority, priorityFilter) : undefined,
-      machine ? eq(issues.machineInitials, machine) : undefined
-    ),
-    orderBy: desc(issues.createdAt),
-    with: {
-      machine: {
-        columns: { name: true },
-      },
-      reportedByUser: {
-        columns: { name: true },
-      },
-      invitedReporter: {
-        columns: { name: true },
-      },
-    },
-    columns: {
-      id: true,
-      createdAt: true,
-      machineInitials: true,
-      issueNumber: true,
-      title: true,
-      status: true,
-      severity: true,
-      priority: true,
-      consistency: true,
-      reporterName: true,
-      reporterEmail: true,
-    },
-    limit: 100, // Reasonable limit for now
+  const usersPromise = db.query.userProfiles.findMany({
+    orderBy: (u, { asc }) => [asc(u.name)],
+    columns: { id: true, name: true },
   });
 
-  // 3. Await all promises in parallel
-  // This reduces TTFB by fetching machines and issues concurrently
-  const [allMachines, issuesListRaw] = await Promise.all([
-    machinesPromise,
-    issuesPromise,
-  ]);
+  const issuesPromise = db.query.issues.findMany({
+    where: and(...where),
+    orderBy: orderBy,
+    with: {
+      machine: {
+        columns: { id: true, name: true },
+      },
+      reportedByUser: {
+        columns: { id: true, name: true, email: true },
+      },
+      invitedReporter: {
+        columns: { id: true, name: true, email: true },
+      },
+      assignedToUser: {
+        columns: { id: true, name: true, email: true },
+      },
+    },
+    limit: pageSize,
+    offset: (page - 1) * pageSize,
+  });
 
-  const issuesList = issuesListRaw as (Pick<
-    Issue,
-    | "id"
-    | "createdAt"
-    | "machineInitials"
-    | "issueNumber"
-    | "title"
-    | "status"
-    | "severity"
-    | "priority"
-    | "consistency"
-    | "reporterName"
-    | "reporterEmail"
-  > & {
-    machine: { name: string } | null;
-    reportedByUser: { name: string } | null;
-    invitedReporter: { name: string } | null;
-  })[];
+  const totalCountPromise = db
+    .select({ value: count() })
+    .from(issues)
+    .where(and(...where));
+
+  // 3. Await all promises in parallel
+  const [allMachines, allUsers, issuesListRaw, totalCountResult] =
+    await Promise.all([
+      machinesPromise,
+      usersPromise,
+      issuesPromise,
+      totalCountPromise,
+    ]);
+
+  const totalCount = totalCountResult[0]?.value ?? 0;
+
+  const issuesList = issuesListRaw as IssueListItem[];
 
   return (
-    <div className="container mx-auto max-w-5xl py-8 px-4 sm:px-6">
+    <div className="container mx-auto max-w-7xl py-8 px-4 sm:px-6">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">All Issues</h1>
@@ -152,50 +117,28 @@ export default async function IssuesPage({
             Track and manage reported problems across the collection.
           </p>
         </div>
+        <div className="text-sm text-muted-foreground">
+          Showing {issuesList.length} of {totalCount} issues
+        </div>
       </div>
 
       <div className="space-y-6">
         {/* Filters */}
-        <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
-          <IssueFilters machines={allMachines} />
-        </div>
+        <IssueFilters
+          users={allUsers}
+          machines={allMachines}
+          filters={filters}
+        />
 
         {/* Issues List */}
-        <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
-          {issuesList.length > 0 ? (
-            <div className="divide-y divide-border">
-              {issuesList.map((issue) => (
-                <IssueRow key={issue.id} issue={issue} />
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-center animate-in fade-in zoom-in duration-300">
-              {status !== "closed" && !severity && !priority && !machine ? (
-                <>
-                  <div className="rounded-full bg-primary/10 p-4 mb-4">
-                    <CheckCircle2 className="size-8 text-primary" />
-                  </div>
-                  <h3 className="text-lg font-medium">All Clear!</h3>
-                  <p className="text-muted-foreground max-w-sm mt-2">
-                    There are no open issues. The machines are running
-                    perfectly.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="rounded-full bg-muted p-4 mb-4">
-                    <Search className="size-8 text-muted-foreground" />
-                  </div>
-                  <h3 className="text-lg font-medium">No matches found</h3>
-                  <p className="text-muted-foreground max-w-sm mt-2">
-                    We couldn&apos;t find any issues matching your current
-                    filters. Try adjusting or clearing them.
-                  </p>
-                </>
-              )}
-            </div>
-          )}
-        </div>
+        <IssueList
+          issues={issuesList}
+          totalCount={totalCount}
+          sort={filters.sort ?? "updated_desc"}
+          page={page}
+          pageSize={pageSize}
+          allUsers={allUsers}
+        />
       </div>
     </div>
   );

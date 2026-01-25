@@ -70,6 +70,10 @@
 
   /* Radius */
   --radius: 0.5rem;
+
+  /* Custom Breakpoints for Issue List */
+  --breakpoint-table-assignee: 950px;
+  --breakpoint-table-modified: 1100px;
 }
 
 @utility glow-primary {
