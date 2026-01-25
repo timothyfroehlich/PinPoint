@@ -272,49 +272,6 @@ export function UnifiedReportForm({
                   />
                 </div>
 
-                <div className="space-y-3 pb-2 pt-1 border-t border-b border-outline-variant/30 py-4">
-                  <div className="flex flex-col gap-4">
-                    <ImageUploadButton
-                      issueId="new"
-                      currentCount={uploadedImages.length}
-                      maxCount={user ? 4 : 2}
-                      onUploadComplete={(img) =>
-                        setUploadedImages([...uploadedImages, img])
-                      }
-                      disabled={isPending}
-                    />
-
-                    {uploadedImages.length > 0 && (
-                      <div className="mt-2">
-                        <ImageGallery
-                          images={uploadedImages.map((img) => ({
-                            id: Math.random().toString(),
-                            issueId: "temp",
-                            uploadedBy: "temp",
-                            fullImageUrl: img.blobUrl,
-                            fullBlobPathname: img.blobPathname,
-                            fileSizeBytes: img.fileSizeBytes,
-                            mimeType: img.mimeType,
-                            originalFilename: img.originalFilename,
-                            createdAt: new Date(),
-                            updatedAt: new Date(),
-                            deletedAt: null,
-                            deletedBy: null,
-                            commentId: null,
-                            croppedImageUrl: null,
-                            croppedBlobPathname: null,
-                          }))}
-                        />
-                      </div>
-                    )}
-                    <input
-                      type="hidden"
-                      name="imagesMetadata"
-                      value={JSON.stringify(uploadedImages)}
-                    />
-                  </div>
-                </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="severity" className="text-on-surface">
@@ -357,6 +314,52 @@ export function UnifiedReportForm({
                       />
                     </div>
                   )}
+                </div>
+
+                <div className="space-y-3 pb-2 pt-1 border-t border-b border-outline-variant/30 py-4">
+                  <div className="flex flex-col gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-on-surface">Photos</Label>
+                      <ImageUploadButton
+                        issueId="new"
+                        currentCount={uploadedImages.length}
+                        maxCount={user ? 4 : 2}
+                        onUploadComplete={(img) =>
+                          setUploadedImages([...uploadedImages, img])
+                        }
+                        disabled={isPending}
+                      />
+                    </div>
+
+                    {uploadedImages.length > 0 && (
+                      <div className="mt-2">
+                        <ImageGallery
+                          images={uploadedImages.map((img) => ({
+                            id: img.blobPathname,
+                            issueId: "temp",
+                            uploadedBy: "temp",
+                            fullImageUrl: img.blobUrl,
+                            fullBlobPathname: img.blobPathname,
+                            fileSizeBytes: img.fileSizeBytes,
+                            mimeType: img.mimeType,
+                            originalFilename: img.originalFilename,
+                            createdAt: new Date(),
+                            updatedAt: new Date(),
+                            deletedAt: null,
+                            deletedBy: null,
+                            commentId: null,
+                            croppedImageUrl: null,
+                            croppedBlobPathname: null,
+                          }))}
+                        />
+                      </div>
+                    )}
+                    <input
+                      type="hidden"
+                      name="imagesMetadata"
+                      value={JSON.stringify(uploadedImages)}
+                    />
+                  </div>
                 </div>
 
                 {/* Reporter Info (Only if NOT logged in) */}

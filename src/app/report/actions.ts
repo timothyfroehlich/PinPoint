@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { log } from "~/lib/logger";
 import { createIssue } from "~/services/issues";
 import {
@@ -16,6 +17,16 @@ import { machines, userProfiles, issueImages } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import type { ActionState } from "./unified-report-form";
+
+const imageMetadataSchema = z.object({
+  blobUrl: z.string().url().startsWith("https://"), // Basic brand check for Vercel Blob
+  blobPathname: z.string().min(1),
+  originalFilename: z.string().min(1),
+  fileSizeBytes: z.number().positive(),
+  mimeType: z.string().startsWith("image/"),
+});
+
+const imagesMetadataArraySchema = z.array(imageMetadataSchema);
 
 /**
  * Server Action: submit anonymous issue
@@ -167,19 +178,14 @@ export async function submitPublicIssueAction(
     const imagesMetadataStr = formData.get("imagesMetadata");
     if (imagesMetadataStr && typeof imagesMetadataStr === "string") {
       try {
-        interface ImageMetadata {
-          blobUrl: string;
-          blobPathname: string;
-          originalFilename: string;
-          fileSizeBytes: number;
-          mimeType: string;
-        }
-        const imagesMetadata = JSON.parse(imagesMetadataStr) as ImageMetadata[];
-        if (Array.isArray(imagesMetadata) && imagesMetadata.length > 0) {
+        const rawJson = JSON.parse(imagesMetadataStr) as unknown;
+        const imagesMetadata = imagesMetadataArraySchema.parse(rawJson);
+
+        if (imagesMetadata.length > 0) {
           await db.insert(issueImages).values(
             imagesMetadata.map((img) => ({
               issueId: issue.id,
-              uploadedBy: reportedBy ?? "00000000-0000-0000-0000-000000000000",
+              uploadedBy: reportedBy, // Now nullable
               fullImageUrl: img.blobUrl,
               fullBlobPathname: img.blobPathname,
               fileSizeBytes: img.fileSizeBytes,

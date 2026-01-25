@@ -1,6 +1,6 @@
 {
-  "id": "2b2e7465-9437-4b21-b6ef-58afc5c54e1f",
-  "prevId": "eabb8c9f-09a6-4f7a-b573-edd280d58d27",
+  "id": "c106b742-dce9-41ee-bf9e-4f2400aeab96",
+  "prevId": "2b2e7465-9437-4b21-b6ef-58afc5c54e1f",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -245,7 +245,7 @@
           "name": "uploaded_by",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "full_image_url": {
           "name": "full_image_url",

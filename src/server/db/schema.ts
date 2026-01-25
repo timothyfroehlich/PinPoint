@@ -262,9 +262,9 @@ export const issueImages = pgTable(
     commentId: uuid("comment_id").references(() => issueComments.id, {
       onDelete: "cascade",
     }),
-    uploadedBy: uuid("uploaded_by")
-      .notNull()
-      .references(() => userProfiles.id),
+    uploadedBy: uuid("uploaded_by").references(() => userProfiles.id, {
+      onDelete: "no action",
+    }),
 
     // Vercel Blob URLs
     fullImageUrl: text("full_image_url").notNull(),

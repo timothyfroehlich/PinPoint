@@ -5,8 +5,16 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "~/server/db";
 import { issueImages } from "~/server/db/schema";
-import { uploadToBlob } from "~/lib/blob/client";
+import { uploadToBlob, deleteFromBlob } from "~/lib/blob/client";
+import { validateImageFile } from "~/lib/blob/compression";
+import { BLOB_CONFIG } from "~/lib/blob/config";
 import { type Result, ok, err } from "~/lib/result";
+import {
+  checkImageUploadLimit,
+  getClientIp,
+  formatResetTime,
+} from "~/lib/rate-limit";
+import { eq, count, isNull } from "drizzle-orm";
 
 const uploadSchema = z.object({
   issueId: z.string(), // Can be real UUID or 'new'
@@ -23,17 +31,29 @@ export async function uploadIssueImage(formData: FormData): Promise<
       fileSizeBytes: number;
       mimeType: string;
     },
-    "AUTH" | "VALIDATION" | "BLOB" | "DATABASE"
+    "AUTH" | "VALIDATION" | "BLOB" | "DATABASE" | "RATE_LIMIT"
   >
 > {
+  let uploadedBlobPathname: string | undefined;
+
   try {
-    // 1. Auth check (optional for public reports, but usually we want to track who uploaded it)
+    // 1. Rate Limit Check
+    const ip = await getClientIp();
+    const { success, reset } = await checkImageUploadLimit(ip);
+    if (!success) {
+      return err(
+        "RATE_LIMIT",
+        `Too many uploads. Please try again in ${formatResetTime(reset)}.`
+      );
+    }
+
+    // 2. Auth check
     const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
-    // 2. Validate metadata
+    // 3. Validate metadata
     const rawData = {
       issueId: formData.get("issueId"),
       commentId: (formData.get("commentId") as string | null) ?? undefined,
@@ -47,23 +67,62 @@ export async function uploadIssueImage(formData: FormData): Promise<
     const { issueId, commentId } = validated.data;
     const isNewIssue = issueId === "new";
 
-    // 3. Get image file
+    // 4. Get and Validate image file (Server-side)
     const file = formData.get("image");
     if (!(file instanceof File)) {
       return err("VALIDATION", "No image file provided");
     }
 
-    // 4. Validate limits (simplified for MVP - more complex checks would query DB)
-    // In a real app, we'd check BLOB_CONFIG.LIMITS against DB counts here.
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      return err("VALIDATION", validation.error ?? "Invalid image file");
+    }
 
-    // 5. Upload to Blob
+    // 5. Enforce Limits
+    // Check per-user limit (based on IP for anonymous, user ID for auth)
+    const userIdForLimit = user?.id;
+    const userImagesCount = await db
+      .select({ val: count() })
+      .from(issueImages)
+      .where(
+        userIdForLimit
+          ? eq(issueImages.uploadedBy, userIdForLimit)
+          : isNull(issueImages.uploadedBy) // Simple fallback for anonymous (strict IP limiting handles the rest)
+      );
+
+    const userLimit = user
+      ? BLOB_CONFIG.LIMITS.AUTHENTICATED_USER_MAX
+      : BLOB_CONFIG.LIMITS.PUBLIC_USER_MAX;
+
+    if ((userImagesCount[0]?.val ?? 0) >= userLimit) {
+      return err("VALIDATION", "You have reached your upload limit.");
+    }
+
+    // Check per-issue limit
+    if (!isNewIssue) {
+      const issueImagesCount = await db
+        .select({ val: count() })
+        .from(issueImages)
+        .where(eq(issueImages.issueId, issueId));
+
+      if (
+        (issueImagesCount[0]?.val ?? 0) >= BLOB_CONFIG.LIMITS.ISSUE_TOTAL_MAX
+      ) {
+        return err("VALIDATION", "This issue has reached its image limit.");
+      }
+    }
+
+    // 6. Upload to Blob
     const timestamp = Date.now();
-    // For new issues, we use a different prefix or just a flat structure
     const blobPrefix = isNewIssue ? "pending" : issueId;
-    const pathname = `issue-images/${blobPrefix}/${timestamp}-${file.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
+    const pathname = `issue-images/${blobPrefix}/${timestamp}-${file.name.replace(
+      /[^a-zA-Z0-9.]/g,
+      "_"
+    )}`;
     const blob = await uploadToBlob(file, pathname);
+    uploadedBlobPathname = blob.pathname;
 
-    // 6. DB or just return metadata
+    // 7. DB or just return metadata
     if (isNewIssue) {
       return ok({
         blobUrl: blob.url,
@@ -80,7 +139,7 @@ export async function uploadIssueImage(formData: FormData): Promise<
         .values({
           issueId,
           commentId,
-          uploadedBy: user?.id ?? "00000000-0000-0000-0000-000000000000", // Needs actual user or system ID
+          uploadedBy: user?.id ?? null,
           fullImageUrl: blob.url,
           fullBlobPathname: blob.pathname,
           fileSizeBytes: file.size,
@@ -93,7 +152,8 @@ export async function uploadIssueImage(formData: FormData): Promise<
         throw new Error("Failed to insert image record");
       }
 
-      revalidatePath(`/issues/${issueId}`);
+      // Revalidate broader paths to ensure all relevant pages update
+      revalidatePath("/m");
       revalidatePath("/report");
 
       return ok({
@@ -106,6 +166,10 @@ export async function uploadIssueImage(formData: FormData): Promise<
       });
     } catch (dbError) {
       console.error("DB insert failed for image, cleaning up blob:", dbError);
+      // Step 4: Actual cleanup
+      if (uploadedBlobPathname) {
+        await deleteFromBlob(uploadedBlobPathname);
+      }
       return err("DATABASE", "Failed to record image in database");
     }
   } catch (error) {

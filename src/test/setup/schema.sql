@@ -25,6 +25,24 @@ CREATE TABLE "issue_comments" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 
+CREATE TABLE "issue_images" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"issue_id" uuid NOT NULL,
+	"comment_id" uuid,
+	"uploaded_by" uuid,
+	"full_image_url" text NOT NULL,
+	"cropped_image_url" text,
+	"full_blob_pathname" text NOT NULL,
+	"cropped_blob_pathname" text,
+	"file_size_bytes" integer NOT NULL,
+	"mime_type" text NOT NULL,
+	"original_filename" text,
+	"deleted_at" timestamp with time zone,
+	"deleted_by" uuid,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+
 CREATE TABLE "issue_watchers" (
 	"issue_id" uuid NOT NULL,
 	"user_id" uuid NOT NULL,
@@ -111,6 +129,10 @@ CREATE TABLE "user_profiles" (
 
 ALTER TABLE "issue_comments" ADD CONSTRAINT "issue_comments_issue_id_issues_id_fk" FOREIGN KEY ("issue_id") REFERENCES "public"."issues"("id") ON DELETE cascade ON UPDATE no action;
 ALTER TABLE "issue_comments" ADD CONSTRAINT "issue_comments_author_id_user_profiles_id_fk" FOREIGN KEY ("author_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "issue_images" ADD CONSTRAINT "issue_images_issue_id_issues_id_fk" FOREIGN KEY ("issue_id") REFERENCES "public"."issues"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "issue_images" ADD CONSTRAINT "issue_images_comment_id_issue_comments_id_fk" FOREIGN KEY ("comment_id") REFERENCES "public"."issue_comments"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "issue_images" ADD CONSTRAINT "issue_images_uploaded_by_user_profiles_id_fk" FOREIGN KEY ("uploaded_by") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "issue_images" ADD CONSTRAINT "issue_images_deleted_by_user_profiles_id_fk" FOREIGN KEY ("deleted_by") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "issue_watchers" ADD CONSTRAINT "issue_watchers_issue_id_issues_id_fk" FOREIGN KEY ("issue_id") REFERENCES "public"."issues"("id") ON DELETE cascade ON UPDATE no action;
 ALTER TABLE "issue_watchers" ADD CONSTRAINT "issue_watchers_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE cascade ON UPDATE no action;
 ALTER TABLE "issues" ADD CONSTRAINT "issues_machine_initials_machines_initials_fk" FOREIGN KEY ("machine_initials") REFERENCES "public"."machines"("initials") ON DELETE cascade ON UPDATE no action;
@@ -123,6 +145,9 @@ ALTER TABLE "notification_preferences" ADD CONSTRAINT "notification_preferences_
 ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE cascade ON UPDATE no action;
 CREATE INDEX "idx_issue_comments_issue_id_created_at" ON "issue_comments" USING btree ("issue_id","created_at");
 CREATE INDEX "idx_issue_comments_author_id" ON "issue_comments" USING btree ("author_id");
+CREATE INDEX "idx_issue_images_issue_id" ON "issue_images" USING btree ("issue_id");
+CREATE INDEX "idx_issue_images_uploaded_by" ON "issue_images" USING btree ("uploaded_by");
+CREATE INDEX "idx_issue_images_deleted_at" ON "issue_images" USING btree ("deleted_at");
 CREATE INDEX "idx_issue_watchers_user_id" ON "issue_watchers" USING btree ("user_id");
 CREATE INDEX "idx_issues_assigned_to" ON "issues" USING btree ("assigned_to");
 CREATE INDEX "idx_issues_reported_by" ON "issues" USING btree ("reported_by");

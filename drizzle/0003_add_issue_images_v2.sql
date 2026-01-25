@@ -1,0 +1,1 @@
+ALTER TABLE "issue_images" ALTER COLUMN "uploaded_by" DROP NOT NULL;
