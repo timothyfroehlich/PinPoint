@@ -144,7 +144,7 @@ function createPublicIssueLimiter(): Ratelimit | null {
 
 /**
  * Image Upload rate limiter
- * - IP-based: 5 uploads per 15 minutes (sliding window)
+ * - IP-based: 10 uploads per hour (sliding window)
  */
 function createImageUploadLimiter(): Ratelimit | null {
   const redis = getRedis();

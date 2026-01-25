@@ -18,6 +18,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: "https",
+        // Wildcard for Vercel Blob storage subdomains which may vary across regions/deployments
         hostname: "**.public.blob.vercel-storage.com",
       },
       {

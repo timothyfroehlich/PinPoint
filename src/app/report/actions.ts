@@ -12,6 +12,7 @@ import {
   getClientIp,
 } from "~/lib/rate-limit";
 import { parsePublicIssueForm } from "./validation";
+import { BLOB_CONFIG } from "~/lib/blob/config";
 import { db } from "~/server/db";
 import { machines, userProfiles, issueImages } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
@@ -181,29 +182,58 @@ export async function submitPublicIssueAction(
         const rawJson = JSON.parse(imagesMetadataStr) as unknown;
         const imagesMetadata = imagesMetadataArraySchema.parse(rawJson);
 
+        // Validate count respects limits (security measure against manual JSON editing)
+        const limit = reportedBy
+          ? BLOB_CONFIG.LIMITS.AUTHENTICATED_USER_MAX
+          : BLOB_CONFIG.LIMITS.PUBLIC_USER_MAX;
+
+        if (imagesMetadata.length > limit) {
+          log.warn(
+            { issueId: issue.id, count: imagesMetadata.length, limit },
+            "Blocked attempt to link too many images"
+          );
+          // Just take the first few that fit the limit
+          imagesMetadata.splice(limit);
+        }
+
         if (imagesMetadata.length > 0) {
           log.info(
             { issueId: issue.id, count: imagesMetadata.length },
             "Linking images to issue..."
           );
-          await db.insert(issueImages).values(
-            imagesMetadata.map((img) => ({
-              issueId: issue.id,
-              uploadedBy: reportedBy,
-              fullImageUrl: img.blobUrl,
-              fullBlobPathname: img.blobPathname,
-              fileSizeBytes: img.fileSizeBytes,
-              mimeType: img.mimeType,
-              originalFilename: img.originalFilename,
-            }))
-          );
+          try {
+            await db.insert(issueImages).values(
+              imagesMetadata.map((img) => ({
+                issueId: issue.id,
+                uploadedBy: reportedBy,
+                fullImageUrl: img.blobUrl,
+                fullBlobPathname: img.blobPathname,
+                fileSizeBytes: img.fileSizeBytes,
+                mimeType: img.mimeType,
+                originalFilename: img.originalFilename,
+              }))
+            );
+          } catch (dbError) {
+            log.error(
+              {
+                error: dbError instanceof Error ? dbError.message : dbError,
+                issueId: issue.id,
+                orphanedBlobs: imagesMetadata.map((img) => img.blobPathname),
+              },
+              "Database failed to link images to issue"
+            );
+          }
         }
-      } catch (e) {
+      } catch (parseError) {
         log.error(
-          { error: e instanceof Error ? e.message : e, issueId: issue.id },
-          "Failed to link images to issue"
+          {
+            error:
+              parseError instanceof Error ? parseError.message : parseError,
+            issueId: issue.id,
+          },
+          "Failed to parse images metadata"
         );
-        // Non-blocking for the user, images just won't show up
+        // Non-blocking for the user
       }
     }
 

@@ -3,7 +3,6 @@ import React from "react";
 
 import Image from "next/image";
 import { Dialog, DialogContent, DialogTrigger } from "~/components/ui/dialog";
-import { Card } from "~/components/ui/card";
 export interface GalleryImage {
   id: string;
   fullImageUrl: string;
@@ -24,7 +23,7 @@ export function ImageGallery({
       {images.map((image) => (
         <Dialog key={image.id}>
           <DialogTrigger asChild>
-            <Card className="group relative aspect-square cursor-zoom-in overflow-hidden">
+            <button className="group relative aspect-square w-full cursor-zoom-in overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
               <Image
                 src={image.fullImageUrl}
                 alt={image.originalFilename ?? "Issue image"}
@@ -33,7 +32,7 @@ export function ImageGallery({
                 sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
               />
               {/* Note: Delete button will be added in PR 3 */}
-            </Card>
+            </button>
           </DialogTrigger>
           <DialogContent className="max-w-3xl border-none bg-transparent p-0 shadow-none">
             <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-black/90">

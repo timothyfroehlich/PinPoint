@@ -14,9 +14,17 @@ export async function uploadToBlob(
 ): Promise<PutBlobResult> {
   // Mock implementation for local testing without Vercel credentials
   if (process.env["MOCK_BLOB_STORAGE"] === "true") {
-    // Determine local path in public/uploads
+    // Determine local path in public/uploads and sanitize to prevent path traversal
     const publicDir = path.join(process.cwd(), "public", "uploads");
-    const filePath = path.join(publicDir, pathname);
+    // Remove any leading slashes or ../ segments to keep it within publicDir
+    const safePathname = pathname
+      .replace(/^(\.\.[/\\])+/, "")
+      .replace(/^[/\\]/, "");
+    const filePath = path.join(publicDir, safePathname);
+
+    if (!filePath.startsWith(publicDir)) {
+      throw new Error("Invalid pathname");
+    }
 
     // Ensure directory exists
     await fs.mkdir(path.dirname(filePath), { recursive: true });
@@ -60,7 +68,14 @@ export async function deleteFromBlob(pathname: string): Promise<void> {
   if (process.env["MOCK_BLOB_STORAGE"] === "true") {
     try {
       const publicDir = path.join(process.cwd(), "public", "uploads");
-      const filePath = path.join(publicDir, pathname);
+      const safePathname = pathname
+        .replace(/^(\.\.[/\\])+/, "")
+        .replace(/^[/\\]/, "");
+      const filePath = path.join(publicDir, safePathname);
+
+      if (!filePath.startsWith(publicDir)) {
+        return; // Ignore invalid paths
+      }
       await fs.unlink(filePath);
     } catch {
       // Ignore if file doesn't exist, similar to blob behavior

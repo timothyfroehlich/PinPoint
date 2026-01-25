@@ -75,7 +75,7 @@ test.describe("Image Upload Reporting", () => {
     await page.getByLabel("Email").fill("admin@test.com");
     await page.getByLabel("Password").fill("TestPassword123");
     await page.getByRole("button", { name: "Sign In" }).click();
-    await expect(page).toHaveURL("/m");
+    await expect(page).toHaveURL("/dashboard");
 
     // 2. Go to Report
     await page.goto("/report");

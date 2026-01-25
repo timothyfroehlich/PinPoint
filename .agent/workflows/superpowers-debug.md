@@ -23,7 +23,7 @@ After generating the debug content above, you MUST write it to disk:
 2. Run:
 
 ```bash
-python3 .agent/skills/superpowers-workflow/scripts/write_artifact.py --path artifacts/superpowers/debug.md
+python .agent/skills/superpowers-workflow/scripts/write_artifact.py --path artifacts/superpowers/debug.md
 
 ```
 

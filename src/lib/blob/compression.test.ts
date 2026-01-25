@@ -1,4 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+// Mock browser-image-compression as it doesn't run in Node
+vi.mock("browser-image-compression", () => ({
+  default: vi.fn(),
+}));
+
 import { validateImageFile } from "./compression";
 import { BLOB_CONFIG } from "./config";
 
@@ -59,6 +65,36 @@ describe("Compression Utilities", () => {
       const result = validateImageFile(file);
       expect(result.valid).toBe(false);
       expect(result.error).toContain("File too small");
+    });
+  });
+
+  describe("compressImage", () => {
+    it("should return compressed file on success", async () => {
+      const { compressImage } = await import("./compression");
+      const { default: imageCompression } =
+        await import("browser-image-compression");
+
+      const file = new File(["dummy"], "test.jpg", { type: "image/jpeg" });
+      const mockCompressed = new File(["compressed"], "test.jpg", {
+        type: "image/jpeg",
+      });
+
+      vi.mocked(imageCompression).mockResolvedValue(mockCompressed);
+
+      const result = await compressImage(file);
+      expect(result).toBe(mockCompressed);
+    });
+
+    it("should return original file if compression fails", async () => {
+      const { compressImage } = await import("./compression");
+      const { default: imageCompression } =
+        await import("browser-image-compression");
+
+      const file = new File(["dummy"], "test.jpg", { type: "image/jpeg" });
+      vi.mocked(imageCompression).mockRejectedValue(new Error("Failed"));
+
+      const result = await compressImage(file);
+      expect(result).toBe(file);
     });
   });
 });

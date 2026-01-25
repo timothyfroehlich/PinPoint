@@ -14,7 +14,7 @@ import {
   getClientIp,
   formatResetTime,
 } from "~/lib/rate-limit";
-import { eq, count } from "drizzle-orm";
+import { eq, count, and, isNull } from "drizzle-orm";
 
 const uploadSchema = z.object({
   issueId: z.string(), // Can be real UUID or 'new'
@@ -85,7 +85,12 @@ export async function uploadIssueImage(formData: FormData): Promise<
       const userImagesCount = await db
         .select({ val: count() })
         .from(issueImages)
-        .where(eq(issueImages.uploadedBy, user.id));
+        .where(
+          and(
+            eq(issueImages.uploadedBy, user.id),
+            isNull(issueImages.deletedAt)
+          )
+        );
 
       if (
         (userImagesCount[0]?.val ?? 0) >=
@@ -100,7 +105,9 @@ export async function uploadIssueImage(formData: FormData): Promise<
       const issueImagesCount = await db
         .select({ val: count() })
         .from(issueImages)
-        .where(eq(issueImages.issueId, issueId));
+        .where(
+          and(eq(issueImages.issueId, issueId), isNull(issueImages.deletedAt))
+        );
 
       if (
         (issueImagesCount[0]?.val ?? 0) >= BLOB_CONFIG.LIMITS.ISSUE_TOTAL_MAX

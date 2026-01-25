@@ -218,4 +218,74 @@ describe("Issue Images Database Operations (PGlite)", () => {
       expect(userImagesCount[0].val).toBe(3);
     });
   });
+
+  describe("Soft Delete", () => {
+    it("should allow soft-deleting an image", async () => {
+      const db = await getTestDb();
+
+      const [image] = await db
+        .insert(issueImages)
+        .values({
+          issueId: testIssue.id,
+          uploadedBy: testUser.id,
+          fullImageUrl: "https://blob.com/delete-me.jpg",
+          fullBlobPathname: "delete-me.jpg",
+          fileSizeBytes: 1024,
+          mimeType: "image/jpeg",
+        })
+        .returning();
+
+      await db
+        .update(issueImages)
+        .set({
+          deletedAt: new Date(),
+          deletedBy: testUser.id,
+        })
+        .where(eq(issueImages.id, image.id));
+
+      const updated = await db.query.issueImages.findFirst({
+        where: eq(issueImages.id, image.id),
+      });
+
+      expect(updated?.deletedAt).toBeDefined();
+      expect(updated?.deletedBy).toBe(testUser.id);
+    });
+
+    it("should exclude soft-deleted images from active counts", async () => {
+      const db = await getTestDb();
+      const { isNull, and } = await import("drizzle-orm");
+
+      await db.insert(issueImages).values([
+        {
+          issueId: testIssue.id,
+          uploadedBy: testUser.id,
+          fullImageUrl: "https://blob.com/active.jpg",
+          fullBlobPathname: "active.jpg",
+          fileSizeBytes: 1024,
+          mimeType: "image/jpeg",
+        },
+        {
+          issueId: testIssue.id,
+          uploadedBy: testUser.id,
+          fullImageUrl: "https://blob.com/deleted.jpg",
+          fullBlobPathname: "deleted.jpg",
+          fileSizeBytes: 1024,
+          mimeType: "image/jpeg",
+          deletedAt: new Date(),
+        },
+      ]);
+
+      const activeCount = await db
+        .select({ val: count() })
+        .from(issueImages)
+        .where(
+          and(
+            eq(issueImages.issueId, testIssue.id),
+            isNull(issueImages.deletedAt)
+          )
+        );
+
+      expect(activeCount[0].val).toBe(1);
+    });
+  });
 });
