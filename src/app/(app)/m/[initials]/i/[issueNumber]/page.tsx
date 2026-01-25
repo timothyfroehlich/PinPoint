@@ -4,12 +4,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import {
-  issues,
-  userProfiles,
-  authUsers,
-  type IssueImage,
-} from "~/server/db/schema";
+import { issues, userProfiles, authUsers } from "~/server/db/schema";
 import { eq, asc, and, notInArray, sql } from "drizzle-orm";
 import { PageShell } from "~/components/layout/PageShell";
 import { IssueTimeline } from "~/components/issues/IssueTimeline";
@@ -18,7 +13,6 @@ import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
 import { OwnerBadge } from "~/components/issues/OwnerBadge";
 import { getMachineOwnerName } from "~/lib/issues/owner";
 import { formatIssueId } from "~/lib/issues/utils";
-import { ImageGallery } from "~/components/images/ImageGallery";
 import type { Issue, IssueWithAllRelations } from "~/lib/types";
 
 export default async function IssueDetailPage({
@@ -209,22 +203,6 @@ export default async function IssueDetailPage({
 
       <div className="grid gap-10 md:grid-cols-[minmax(0,1fr)_320px]">
         <section className="space-y-5 lg:pr-4">
-          <div className="text-on-surface mb-6">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-              Description
-            </h2>
-            <p className="whitespace-pre-wrap">{issue.description}</p>
-          </div>
-
-          {issue.images.length > 0 && (
-            <div className="mb-8">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-4">
-                Images ({issue.images.length})
-              </h2>
-              <ImageGallery images={issue.images as unknown as IssueImage[]} />
-            </div>
-          )}
-
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             Activity
           </h2>
