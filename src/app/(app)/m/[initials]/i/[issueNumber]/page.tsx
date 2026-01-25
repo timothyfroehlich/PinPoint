@@ -202,7 +202,7 @@ export default async function IssueDetailPage({
               issue={
                 issue as unknown as Pick<
                   Issue,
-                  "status" | "severity" | "priority" | "consistency"
+                  "status" | "severity" | "priority" | "frequency"
                 >
               }
               variant="strip"

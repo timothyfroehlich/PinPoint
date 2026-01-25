@@ -272,7 +272,7 @@ describe("updateIssueFrequencyAction", () => {
     } as any);
   });
 
-  it("should successfully update consistency", async () => {
+  it("should successfully update frequency", async () => {
     vi.mocked(db.query.issues.findFirst).mockResolvedValue({
       machineInitials: "MM",
       issueNumber: 1,
@@ -286,13 +286,13 @@ describe("updateIssueFrequencyAction", () => {
     vi.mocked(canUpdateIssue).mockReturnValue(true);
     vi.mocked(updateIssueFrequency).mockResolvedValue({
       issueId: validUuid,
-      oldConsistency: "intermittent",
-      newConsistency: "constant",
+      oldFrequency: "intermittent",
+      newFrequency: "constant",
     });
 
     const formData = new FormData();
     formData.append("issueId", validUuid);
-    formData.append("consistency", "constant");
+    formData.append("frequency", "constant");
 
     const result = await updateIssueFrequencyAction(initialState, formData);
 
