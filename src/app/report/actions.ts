@@ -19,7 +19,7 @@ import { createClient } from "~/lib/supabase/server";
 import type { ActionState } from "./unified-report-form";
 
 const imageMetadataSchema = z.object({
-  blobUrl: z.string().url().startsWith("https://"), // Basic brand check for Vercel Blob
+  blobUrl: z.string().url(), // Removed strict https check for local dev flexibility
   blobPathname: z.string().min(1),
   originalFilename: z.string().min(1),
   fileSizeBytes: z.number().positive(),
@@ -182,10 +182,14 @@ export async function submitPublicIssueAction(
         const imagesMetadata = imagesMetadataArraySchema.parse(rawJson);
 
         if (imagesMetadata.length > 0) {
+          log.info(
+            { issueId: issue.id, count: imagesMetadata.length },
+            "Linking images to issue..."
+          );
           await db.insert(issueImages).values(
             imagesMetadata.map((img) => ({
               issueId: issue.id,
-              uploadedBy: reportedBy, // Now nullable
+              uploadedBy: reportedBy,
               fullImageUrl: img.blobUrl,
               fullBlobPathname: img.blobPathname,
               fileSizeBytes: img.fileSizeBytes,
@@ -196,7 +200,7 @@ export async function submitPublicIssueAction(
         }
       } catch (e) {
         log.error(
-          { error: e, issueId: issue.id },
+          { error: e instanceof Error ? e.message : e, issueId: issue.id },
           "Failed to link images to issue"
         );
         // Non-blocking for the user, images just won't show up
@@ -211,6 +215,7 @@ export async function submitPublicIssueAction(
     revalidatePath("/m");
     revalidatePath(`/m/${machine.initials}`);
     revalidatePath(`/m/${machine.initials}/i`);
+    revalidatePath(`/m/${machine.initials}/i/${issue.issueNumber}`);
 
     // Redirect logic:
     // 1. Authenticated users go directly to the issue detail page
