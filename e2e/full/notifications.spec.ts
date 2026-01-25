@@ -228,7 +228,7 @@ test.describe("Notifications", () => {
     await fillReportForm(publicPage, {
       title: issueTitle,
       severity: "unplayable",
-      consistency: "constant",
+      frequency: "constant",
       includePriority: false,
     });
 

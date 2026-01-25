@@ -10,7 +10,7 @@ describe("publicIssueSchema", () => {
       title: "Public Report",
       description: "Something is wrong",
       severity: "minor",
-      consistency: "intermittent",
+      frequency: "intermittent",
     });
     expect(result.success).toBe(true);
   });
@@ -20,7 +20,7 @@ describe("publicIssueSchema", () => {
       machineId: validUuid,
       title: "Public Report",
       severity: "minor",
-      consistency: "constant",
+      frequency: "constant",
     });
     expect(result.success).toBe(true);
   });

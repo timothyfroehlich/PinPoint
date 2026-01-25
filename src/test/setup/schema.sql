@@ -40,7 +40,7 @@ CREATE TABLE "issues" (
 	"status" text DEFAULT 'new' NOT NULL,
 	"severity" text DEFAULT 'minor' NOT NULL,
 	"priority" text DEFAULT 'medium' NOT NULL,
-	"consistency" text DEFAULT 'intermittent' NOT NULL,
+	"frequency" text DEFAULT 'intermittent' NOT NULL,
 	"reported_by" uuid,
 	"invited_reported_by" uuid,
 	"reporter_name" text,

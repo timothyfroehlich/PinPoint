@@ -26,7 +26,7 @@ test.describe("Status Overhaul E2E", () => {
       title: "E2E Status Overhaul Test",
       severity: "major",
       priority: "high",
-      consistency: "frequent",
+      frequency: "frequent",
     });
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
@@ -36,7 +36,7 @@ test.describe("Status Overhaul E2E", () => {
     await expect(page.getByTestId("issue-status-badge")).toHaveText(/New/i);
     await expect(page.getByTestId("issue-severity-badge")).toHaveText(/Major/i);
     await expect(page.getByTestId("issue-priority-badge")).toHaveText(/High/i);
-    await expect(page.getByTestId("issue-consistency-badge")).toHaveText(
+    await expect(page.getByTestId("issue-frequency-badge")).toHaveText(
       /Frequent/i
     );
 

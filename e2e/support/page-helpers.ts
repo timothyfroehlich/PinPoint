@@ -64,7 +64,7 @@ export async function fillReportForm(
     description?: string;
     severity?: "minor" | "playable" | "unplayable";
     priority?: "low" | "medium" | "high";
-    consistency?: "intermittent" | "frequent" | "constant";
+    frequency?: "intermittent" | "frequent" | "constant";
     /** Set to false for anonymous/public forms that don't have priority */
     includePriority?: boolean;
   }
@@ -74,7 +74,7 @@ export async function fillReportForm(
     description,
     severity = "minor",
     priority = "low",
-    consistency = "intermittent",
+    frequency = "intermittent",
     includePriority = true,
   } = options;
 
@@ -90,5 +90,5 @@ export async function fillReportForm(
     await selectOption(page, "priority-select", priority);
   }
 
-  await selectOption(page, "consistency-select", consistency);
+  await selectOption(page, "frequency-select", frequency);
 }

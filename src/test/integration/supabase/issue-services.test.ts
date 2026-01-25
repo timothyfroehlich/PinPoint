@@ -104,7 +104,7 @@ describe("Issue Service Functions (Integration)", () => {
         issueNumber: 1,
         severity: "minor",
         priority: "low",
-        consistency: "intermittent",
+        frequency: "intermittent",
         status: "new",
         reportedBy: testUser.id,
       })
@@ -190,20 +190,20 @@ describe("Issue Service Functions (Integration)", () => {
     expect(event?.content).toContain("from Low to High");
   });
 
-  it("should update consistency and create timeline event", async () => {
+  it("should update frequency and create timeline event", async () => {
     const db = await getTestDb();
     const newConsistency = "constant";
 
     await updateIssueConsistency({
       issueId: testIssue.id,
-      consistency: newConsistency,
+      frequency: newConsistency,
     });
 
     const updated = await db.query.issues.findFirst({
       where: eq(issues.id, testIssue.id),
     });
 
-    expect(updated?.consistency).toBe(newConsistency);
+    expect(updated?.frequency).toBe(newConsistency);
 
     const event = await db.query.issueComments.findFirst({
       where: eq(issueComments.issueId, testIssue.id),
