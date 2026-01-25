@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
-import { useCallback } from "react";
+import { useCallback, useRef, useEffect } from "react";
 import type { IssueFilters } from "~/lib/issues/filters";
 
 interface UseSearchFiltersOptions {
@@ -40,13 +40,34 @@ export function useSearchFilters(
    * @param options - Optional configuration
    * @param options.resetPagination - Reset to page 1 (default: false)
    */
+  /*
+   * Stable reference to filters so we don't recreate the callback on every render.
+   * This prevents infinite loops in consumers that use this callback in effects.
+   */
+  /*
+   * Stable reference to filters so we don't recreate the callback on every render.
+   * This prevents infinite loops in consumers that use this callback in effects.
+   */
+  const filtersRef = useRef(filters);
+  useEffect(() => {
+    filtersRef.current = filters;
+  }, [filters]);
+
+  /**
+   * Updates filter state by merging with current filters
+   *
+   * @param updates - Partial filter updates to apply
+   * @param options - Optional configuration
+   * @param options.resetPagination - Reset to page 1 (default: false)
+   */
   const pushFilters = useCallback(
     (
       updates: Partial<IssueFilters>,
       options: UseSearchFiltersOptions = {}
     ): void => {
       const params = new URLSearchParams();
-      const merged = { ...filters, ...updates };
+      const currentFilters = filtersRef.current;
+      const merged = { ...currentFilters, ...updates };
 
       // Apply pagination reset if requested
       if (options.resetPagination) {
@@ -106,7 +127,7 @@ export function useSearchFilters(
 
       router.push(`${pathname}?${params.toString()}`);
     },
-    [filters, router, pathname]
+    [router, pathname]
   );
 
   /**

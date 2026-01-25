@@ -7,11 +7,7 @@ import { Button } from "~/components/ui/button";
 import { MultiSelect } from "~/components/ui/multi-select";
 import { DateRangePicker } from "~/components/ui/date-range-picker";
 import { Badge } from "~/components/ui/badge";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "~/components/ui/popover";
+
 import { cn } from "~/lib/utils";
 import {
   STATUS_CONFIG,
@@ -35,17 +31,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
-
-const SEARCH_BAR_LAYOUT = {
-  PADDING: 12, // px-3
-  ICON_WIDTH: 16,
-  ICON_GAP: 8,
-  PLUS_BADGE_WIDTH: 36,
-  TEXT_BUFFER: 10,
-  BADGE_GAP: 6,
-  CHAR_WIDTH_ESTIMATE: 8,
-  BADGE_OVERHEAD: 34,
-} as const;
 
 interface MachineOption {
   initials: string;
@@ -76,11 +61,6 @@ export function IssueFilters({
 
   const searchBarRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
-  const measureRef = React.useRef<HTMLSpanElement>(null);
-
-  const [textWidth, setTextWidth] = React.useState(0);
-  const [badgeAreaWidth, setBadgeAreaWidth] = React.useState(0);
-  const [visibleBadgeCount, setVisibleBadgeCount] = React.useState(Infinity);
 
   const machineOptions = React.useMemo(
     () =>
@@ -171,13 +151,6 @@ export function IssueFilters({
   React.useEffect(() => {
     setSearch(filters.q ?? "");
   }, [filters.q, setSearch]);
-
-  // Measure text width for collision detection
-  React.useEffect(() => {
-    if (measureRef.current) {
-      setTextWidth(measureRef.current.getBoundingClientRect().width);
-    }
-  }, [search]);
 
   const getBadges = React.useCallback((): {
     id: string;
@@ -406,80 +379,8 @@ export function IssueFilters({
 
   const badgeList = React.useMemo(() => getBadges(), [getBadges]);
 
-  React.useEffect(() => {
-    if (!searchBarRef.current) return;
-
-    const calculateLayout = (): void => {
-      window.requestAnimationFrame(() => {
-        if (!searchBarRef.current) return;
-        const containerWidth = searchBarRef.current.offsetWidth;
-        if (containerWidth === 0) return;
-
-        if (badgeList.length === 0) {
-          setVisibleBadgeCount(0);
-          setBadgeAreaWidth(0);
-          return;
-        }
-
-        const leftPadding = SEARCH_BAR_LAYOUT.PADDING;
-        const rightPadding = SEARCH_BAR_LAYOUT.PADDING;
-        const iconWidth = SEARCH_BAR_LAYOUT.ICON_WIDTH;
-        const iconGap = SEARCH_BAR_LAYOUT.ICON_GAP;
-        const plusBadgeWidth = SEARCH_BAR_LAYOUT.PLUS_BADGE_WIDTH;
-        const textBuffer = SEARCH_BAR_LAYOUT.TEXT_BUFFER;
-
-        const textStartPosition = leftPadding + iconWidth + iconGap;
-        const textEndPosition = textStartPosition + textWidth + textBuffer;
-        const badgeAreaRightEdge = containerWidth - rightPadding;
-        const maxBadgeSpace = badgeAreaRightEdge - textEndPosition;
-
-        const badgeGap = SEARCH_BAR_LAYOUT.BADGE_GAP;
-        const badgeWidths = badgeList.map(
-          (b) =>
-            b.label.length * SEARCH_BAR_LAYOUT.CHAR_WIDTH_ESTIMATE +
-            SEARCH_BAR_LAYOUT.BADGE_OVERHEAD
-        );
-
-        let totalNeeded = badgeWidths.reduce((a, b) => a + b + badgeGap, 0);
-        if (badgeWidths.length > 0) totalNeeded -= badgeGap;
-
-        if (totalNeeded <= maxBadgeSpace) {
-          setVisibleBadgeCount(badgeList.length);
-          setBadgeAreaWidth(totalNeeded);
-          return;
-        }
-
-        const spaceForVisible = Math.max(
-          0,
-          maxBadgeSpace - plusBadgeWidth - badgeGap
-        );
-        let used = 0;
-        let count = 0;
-        for (const w of badgeWidths) {
-          if (used + w <= spaceForVisible) {
-            used += w + badgeGap;
-            count++;
-          } else {
-            break;
-          }
-        }
-
-        setVisibleBadgeCount(count);
-        const visibleWidth = badgeWidths
-          .slice(0, count)
-          .reduce((a, b) => a + b + badgeGap, 0);
-        setBadgeAreaWidth(visibleWidth + plusBadgeWidth + badgeGap);
-      });
-    };
-
-    calculateLayout();
-    const ro = new ResizeObserver(calculateLayout);
-    ro.observe(searchBarRef.current);
-    return () => ro.disconnect();
-  }, [badgeList, textWidth, searchBarRef]);
-
-  const visibleBadges = badgeList.slice(0, visibleBadgeCount);
-  const hiddenBadgeCount = badgeList.length - visibleBadgeCount;
+  // Simplification: Show all badges.
+  const visibleBadges = badgeList;
 
   return (
     <div className="bg-card border rounded-lg shadow-sm divide-y">
@@ -510,7 +411,6 @@ export function IssueFilters({
                       placeholder="Search issues..."
                       data-testid="issue-search"
                       className="flex-1 bg-transparent border-0 text-sm focus:outline-none placeholder:text-muted-foreground relative z-10 w-full"
-                      style={{ paddingRight: `${badgeAreaWidth}px` }}
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                     />
@@ -557,62 +457,8 @@ export function IssueFilters({
                     </button>
                   </Badge>
                 ))}
-
-                {hiddenBadgeCount > 0 && (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Badge
-                        variant="secondary"
-                        className="h-6 px-1.5 text-[10px] bg-muted/50 border-muted-foreground/10 cursor-pointer pointer-events-auto hover:bg-muted"
-                      >
-                        +{hiddenBadgeCount}
-                      </Badge>
-                    </PopoverTrigger>
-                    <PopoverContent align="end" className="w-64 p-2">
-                      <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-1 pb-2">
-                        Hidden Filters
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        {badgeList.slice(visibleBadgeCount).map((badge) => (
-                          <div
-                            key={badge.id}
-                            className="flex items-center justify-between gap-2 rounded-md px-2 py-1 text-xs hover:bg-muted"
-                          >
-                            <div className="flex items-center gap-2 overflow-hidden">
-                              {badge.icon && (
-                                <badge.icon
-                                  className={cn(
-                                    "h-3.5 w-3.5 shrink-0",
-                                    badge.iconColor
-                                  )}
-                                />
-                              )}
-                              <span className="truncate">{badge.label}</span>
-                            </div>
-                            <button
-                              type="button"
-                              className="h-5 w-5 rounded-sm hover:bg-muted-foreground/20 flex items-center justify-center shrink-0 transition-colors"
-                              onClick={() => badge.clear()}
-                              aria-label={`Clear ${badge.label}`}
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                )}
               </div>
             </div>
-
-            <span
-              ref={measureRef}
-              className="absolute opacity-0 pointer-events-none whitespace-pre text-sm invisible h-0"
-              aria-hidden="true"
-            >
-              {search || "Search issues..."}
-            </span>
           </div>
 
           {(badgeList.length > 0 || search) && (

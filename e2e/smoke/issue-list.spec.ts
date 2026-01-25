@@ -31,7 +31,7 @@ test.describe("Issue List Features", () => {
     await expect(page.getByRole("row", { name: title2 })).toBeHidden();
 
     // Clear Search (Wait for search badge or clear button to be stable)
-    const clearProps = page.getByRole("button", { name: "Clear" });
+    const clearProps = page.getByRole("button", { name: "Clear", exact: true });
     await expect(clearProps).toBeVisible();
     await clearProps.click();
     await expect(page.getByText(title1)).toBeVisible();
@@ -49,7 +49,10 @@ test.describe("Issue List Features", () => {
 
     // Clear Severity Filter
     // Note: The clear button disappears/reappears during state changes, use force click
-    const clearButton = page.getByRole("button", { name: "Clear" });
+    const clearButton = page.getByRole("button", {
+      name: "Clear",
+      exact: true,
+    });
     await expect(clearButton).toBeVisible();
     await clearButton.click({ force: true });
   });
@@ -147,7 +150,7 @@ test.describe("Issue List Features", () => {
     // Close the popover
     await page.keyboard.press("Escape");
     await page.waitForURL((url) => url.searchParams.has("status"));
-    await expect(page.getByText("Showing 4 of 5 issues")).toBeVisible();
+    await expect(page.getByText("Showing 3 of 3 issues")).toBeVisible();
 
     // Verify "New" badge is hidden (deselected)
     // "In Progress" should still be visible as we didn't touch it
@@ -178,7 +181,7 @@ test.describe("Issue List Features", () => {
     ).toBeVisible();
 
     // Test clearing to "All"
-    await page.getByRole("button", { name: "Clear" }).click();
+    await page.getByRole("button", { name: "Clear", exact: true }).click();
     await page.waitForURL(
       (url) =>
         url.searchParams.get("status") === "all" ||

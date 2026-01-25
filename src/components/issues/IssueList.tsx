@@ -88,20 +88,16 @@ export function IssueList({
         { key: "severity", minWidth: COLUMN_WIDTH, priority: 3 },
         { key: "priority", minWidth: COLUMN_WIDTH, priority: 4 },
         { key: "status", minWidth: COLUMN_WIDTH, priority: 5 },
-      ] as const,
+      ] as (ColumnConfig & {
+        key: "modified" | "assignee" | "severity" | "priority" | "status";
+      })[],
     []
   );
 
   // Responsive column visibility
   const { visibleColumns, containerRef } = useTableResponsiveColumns<
     "status" | "priority" | "severity" | "assignee" | "modified"
-  >(
-    [...columnConfig] as (ColumnConfig & {
-      key: "status" | "severity" | "priority" | "assignee" | "modified";
-    })[],
-    ISSUE_MIN_WIDTH,
-    ISSUE_BUFFER
-  );
+  >(columnConfig, ISSUE_MIN_WIDTH, ISSUE_BUFFER);
 
   // For managing multiple concurrent updates if needed, though we'll likely do one at a time per row/cell
   const [_isPending, startTransition] = React.useTransition();
