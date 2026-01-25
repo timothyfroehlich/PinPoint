@@ -188,7 +188,7 @@ pnpm run preflight
 ## Rollback Plan
 
 ```bash
-git revert HEAD  # Revert fix commit
+git revert HEAD  # Revert **fix** commit
 git push origin feature/multi-photo-upload --force-with-lease
 ```
 
