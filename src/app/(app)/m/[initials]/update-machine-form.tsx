@@ -21,6 +21,17 @@ interface UpdateMachineFormProps {
     initials: string;
     ownerId: string | null;
     invitedOwnerId: string | null;
+    owner?: {
+      id: string;
+      name: string;
+      avatarUrl?: string | null;
+      email?: string;
+    } | null;
+    invitedOwner?: {
+      id: string;
+      name: string;
+      email?: string;
+    } | null;
   };
   allUsers: UnifiedUser[];
   isAdmin: boolean;
@@ -97,12 +108,40 @@ export function UpdateMachineForm({
         </p>
       </div>
 
-      {/* Owner Select (Admin Only) */}
-      {isAdmin && (
+      {/* Machine Owner */}
+      {isAdmin ? (
         <OwnerSelect
           users={allUsers}
           defaultValue={machine.ownerId ?? machine.invitedOwnerId ?? null}
         />
+      ) : (
+        <div className="space-y-2" data-testid="owner-display">
+          <span className="text-sm font-semibold text-on-surface">
+            Machine Owner
+          </span>
+          <div className="rounded-md border border-outline bg-surface px-3 py-2">
+            {machine.owner || machine.invitedOwner ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-on-surface">
+                  {machine.owner?.name ?? machine.invitedOwner?.name}
+                </span>
+                {/* Show invited badge only for truly invited owners (not yet accepted) */}
+                {machine.invitedOwner && !machine.owner && (
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-on-surface-variant/70">
+                    (Invited)
+                  </span>
+                )}
+              </div>
+            ) : (
+              <span className="text-sm text-on-surface-variant">
+                No owner assigned
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-on-surface-variant">
+            The owner receives notifications for new issues on this machine.
+          </p>
+        </div>
       )}
 
       {/* Actions */}
