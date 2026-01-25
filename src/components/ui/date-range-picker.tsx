@@ -73,11 +73,10 @@ export function DateRangePicker({
             variant={"outline"}
             data-testid={testId}
             className={cn(
-              "w-full justify-start text-left font-normal h-9 px-3 group relative pr-8",
+              "w-full justify-between text-left font-normal h-9 px-3 group relative pr-8",
               !date?.from && "text-muted-foreground"
             )}
           >
-            <CalendarIcon className="mr-2 h-4 w-4 shrink-0 opacity-50" />
             <span className="truncate">
               {date?.from ? (
                 date.to ? (
@@ -92,6 +91,7 @@ export function DateRangePicker({
                 <span>{placeholder}</span>
               )}
             </span>
+            <CalendarIcon className="h-4 w-4 shrink-0 opacity-50 ml-2" />
             {date?.from && (
               <div
                 role="button"

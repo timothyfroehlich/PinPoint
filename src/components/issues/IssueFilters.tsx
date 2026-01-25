@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { Search, SlidersHorizontal, X, Eye, EyeOff } from "lucide-react";
 import { useSearchFilters } from "~/hooks/use-search-filters";
 import { Button } from "~/components/ui/button";
 import { MultiSelect } from "~/components/ui/multi-select";
@@ -541,11 +541,11 @@ export function IssueFilters({
           />
           <Button
             variant="outline"
-            className="h-9 justify-start font-normal text-muted-foreground"
+            className="h-9 justify-between font-normal text-muted-foreground"
             onClick={() => setExpanded(!expanded)}
           >
-            <SlidersHorizontal className="mr-2 h-4 w-4" />
             {expanded ? "Less Filters" : "More Filters"}
+            <SlidersHorizontal className="ml-2 h-4 w-4" />
           </Button>
         </div>
 
@@ -605,7 +605,7 @@ export function IssueFilters({
             />
             <Button
               variant={filters.watching ? "default" : "outline"}
-              className="h-9 justify-start font-normal"
+              className="h-9 justify-between font-normal"
               onClick={() =>
                 pushFilters({
                   watching: !filters.watching,
@@ -614,7 +614,14 @@ export function IssueFilters({
               }
               data-testid="filter-watching"
             >
-              {filters.watching ? "Watching: On" : "Watching"}
+              <span className="truncate">
+                {filters.watching ? "Watching: On" : "Watching"}
+              </span>
+              {filters.watching ? (
+                <Eye className="ml-2 h-4 w-4 shrink-0" />
+              ) : (
+                <EyeOff className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              )}
             </Button>
           </div>
         )}
