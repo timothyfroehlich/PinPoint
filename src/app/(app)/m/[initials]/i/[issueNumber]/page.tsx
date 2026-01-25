@@ -131,7 +131,7 @@ export default async function IssueDetailPage({
         status: true,
         severity: true,
         priority: true,
-        consistency: true,
+        frequency: true,
         issueNumber: true,
         machineInitials: true,
         reporterName: true,

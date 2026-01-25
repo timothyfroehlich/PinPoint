@@ -34,7 +34,7 @@ export default function HelpPage(): React.JSX.Element {
           </li>
           <li>
             Choose a <strong>severity</strong> (how it affects play) and{" "}
-            <strong>consistency</strong> (how often it happens).
+            <strong>frequency</strong> (how often it happens).
           </li>
           <li>
             (Optional) Provide your name and email if you want to be notified

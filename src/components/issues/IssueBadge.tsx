@@ -15,12 +15,25 @@ import {
   ISSUE_FIELD_ICONS,
   ISSUE_BADGE_WIDTH,
   ISSUE_BADGE_MIN_WIDTH_STRIP,
+import {
+  getIssueStatusIcon,
+  getIssueStatusLabel,
+  getIssueSeverityLabel,
+  getIssuePriorityLabel,
+  getIssueFrequencyLabel,
+  STATUS_STYLES,
+  SEVERITY_STYLES,
+  PRIORITY_STYLES,
+  FREQUENCY_STYLES,
+  ISSUE_FIELD_ICONS,
+  ISSUE_BADGE_WIDTH,
+  ISSUE_BADGE_MIN_WIDTH_STRIP,
 } from "~/lib/issues/status";
 import type {
   IssueStatus,
   IssueSeverity,
   IssuePriority,
-  IssueConsistency,
+  IssueFrequency,
 } from "~/lib/types";
 import { cn } from "~/lib/utils";
 import {
@@ -39,7 +52,7 @@ type IssueBadgeProps = {
   | { type: "status"; value: IssueStatus }
   | { type: "severity"; value: IssueSeverity }
   | { type: "priority"; value: IssuePriority }
-  | { type: "consistency"; value: IssueConsistency }
+  | { type: "frequency"; value: IssueFrequency }
 );
 
 export function IssueBadge({
@@ -70,10 +83,10 @@ export function IssueBadge({
       styles = PRIORITY_STYLES[value];
       Icon = ISSUE_FIELD_ICONS.priority;
       break;
-    case "consistency":
-      label = getIssueConsistencyLabel(value);
-      styles = CONSISTENCY_STYLES[value];
-      Icon = ISSUE_FIELD_ICONS.consistency;
+    case "frequency":
+      label = getIssueFrequencyLabel(value);
+      styles = FREQUENCY_STYLES[value];
+      Icon = ISSUE_FIELD_ICONS.frequency;
       break;
   }
 

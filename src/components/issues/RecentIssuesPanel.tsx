@@ -12,7 +12,7 @@ import type {
   IssueStatus,
   IssueSeverity,
   IssuePriority,
-  IssueConsistency,
+  IssueFrequency,
 } from "~/lib/types";
 
 interface RecentIssuesPanelProps {
@@ -50,7 +50,7 @@ export async function RecentIssuesPanel({
     status: IssueStatus;
     severity: IssueSeverity;
     priority: IssuePriority;
-    consistency: IssueConsistency;
+    frequency: IssueFrequency;
     createdAt: Date;
   }[] = [];
   try {
@@ -66,7 +66,7 @@ export async function RecentIssuesPanel({
         status: true,
         severity: true,
         priority: true,
-        consistency: true,
+        frequency: true,
         createdAt: true,
       },
     })) as typeof issues;
