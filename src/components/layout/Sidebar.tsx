@@ -144,8 +144,10 @@ export function Sidebar({
           <Link
             href="/dashboard"
             {...(onNavigate ? { onClick: onNavigate } : {})}
-            className="flex size-full items-center justify-center"
-            aria-label={collapsed ? "Austin Pinball Collective" : undefined}
+            className="flex size-full items-center justify-center gap-2"
+            aria-label={
+              collapsed ? "PinPoint" : "PinPoint - Austin Pinball Collective"
+            }
           >
             {collapsed ? (
               <Image
@@ -156,16 +158,24 @@ export function Sidebar({
                 className="animate-in fade-in zoom-in duration-300"
               />
             ) : (
-              <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-4 duration-300">
+              <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-4 duration-300">
                 <Image
                   src="/logo-pinpoint-transparent.png"
                   alt="PinPoint"
-                  width={42}
-                  height={42}
+                  width={38}
+                  height={38}
                 />
                 <span className="text-xl font-bold tracking-tight text-foreground">
                   PinPoint
                 </span>
+                <div className="h-5 w-px bg-primary/20 mx-1" />
+                <Image
+                  src="/apc-logo.png"
+                  alt="Austin Pinball Collective"
+                  width={60}
+                  height={34}
+                  className="h-8 w-auto object-contain opacity-90"
+                />
               </div>
             )}
           </Link>

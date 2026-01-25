@@ -1,6 +1,5 @@
 import type React from "react";
 import { Sidebar } from "./Sidebar";
-import Image from "next/image";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import {
@@ -125,36 +124,6 @@ export async function MainLayout({
           </div>
 
           <div className="flex items-center gap-6">
-            {/* Branding Block - Pushed to the right */}
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-4 group transition-all duration-300 hover:opacity-95"
-            >
-              <div className="flex items-center gap-2.5">
-                <Image
-                  src="/logo-pinpoint-transparent.png"
-                  alt="PinPoint"
-                  width={40}
-                  height={40}
-                  className="animate-in fade-in zoom-in duration-500"
-                  priority
-                />
-                <span className="text-xl font-bold tracking-tight text-foreground hidden sm:inline-block">
-                  PinPoint
-                </span>
-              </div>
-              <div className="h-5 w-px bg-border/40 mx-1 hidden sm:block" />
-              <Image
-                src="/apc-logo.png"
-                alt="Austin Pinball Collective"
-                width={65}
-                height={36}
-                className="h-7 w-auto object-contain drop-shadow-[0_0_8px_rgba(74,222,128,0.2)] opacity-80 group-hover:opacity-100 transition-opacity hidden sm:block"
-              />
-            </Link>
-
-            <div className="h-4 w-px bg-border/20 hidden md:block" />
-
             <div className="flex items-center gap-4">
               <FeedbackWidget />
               {user ? (
