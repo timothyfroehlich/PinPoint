@@ -12,7 +12,6 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
-  CircleDot,
   HelpCircle,
   Map as MapIcon,
 } from "lucide-react";
@@ -149,16 +148,26 @@ export function Sidebar({
             aria-label={collapsed ? "Austin Pinball Collective" : undefined}
           >
             {collapsed ? (
-              <CircleDot className="size-8 text-primary animate-in fade-in zoom-in duration-300" />
-            ) : (
               <Image
-                src="/apc-logo.png"
-                alt="Austin Pinball Collective"
-                width={160}
-                height={100}
-                className="w-auto h-20 object-contain drop-shadow-[0_0_8px_rgba(74,222,128,0.5)] animate-in fade-in slide-in-from-left-4 duration-300"
-                priority
+                src="/logo-pinpoint.svg"
+                alt="P"
+                width={32}
+                height={32}
+                className="drop-shadow-[0_0_8px_rgba(0,242,255,0.5)] animate-in fade-in zoom-in duration-300"
               />
+            ) : (
+              <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-4 duration-300">
+                <Image
+                  src="/logo-pinpoint.svg"
+                  alt="PinPoint"
+                  width={32}
+                  height={32}
+                  className="drop-shadow-[0_0_8px_rgba(0,242,255,0.5)]"
+                />
+                <span className="text-xl font-bold tracking-tight text-foreground">
+                  PinPoint
+                </span>
+              </div>
             )}
           </Link>
         </div>

@@ -1,5 +1,6 @@
 import type React from "react";
 import { Sidebar } from "./Sidebar";
+import Image from "next/image";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import {
@@ -121,8 +122,37 @@ export async function MainLayout({
             <MobileNav role={userProfile?.role} />
           </div>
 
-          {/* Dynamic Header Area - Title removed to allow content to breathe */}
-          <div className="flex-1" />
+          {/* Branding Area */}
+          <div className="flex-1 flex items-center gap-4">
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-4 group transition-opacity hover:opacity-90"
+            >
+              <div className="flex items-center gap-2.5">
+                <Image
+                  src="/logo-pinpoint.svg"
+                  alt="PinPoint"
+                  width={32}
+                  height={32}
+                  className="drop-shadow-[0_0_8px_rgba(0,242,255,0.6)] animate-in fade-in zoom-in duration-500"
+                  priority
+                />
+                <span className="text-xl font-bold tracking-tight text-foreground hidden sm:inline-block">
+                  PinPoint
+                </span>
+              </div>
+              <div className="h-6 w-px bg-border/60 mx-1 hidden sm:block" />
+              <div className="flex items-center gap-2 opacity-80 group-hover:opacity-100 transition-opacity hidden sm:flex">
+                <Image
+                  src="/apc-logo.png"
+                  alt="Austin Pinball Collective"
+                  width={70}
+                  height={40}
+                  className="h-8 w-auto object-contain drop-shadow-[0_0_8px_rgba(74,222,128,0.3)]"
+                />
+              </div>
+            </Link>
+          </div>
 
           <div className="flex items-center gap-4">
             <FeedbackWidget />
