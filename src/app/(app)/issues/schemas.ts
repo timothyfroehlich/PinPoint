@@ -46,8 +46,8 @@ export const createIssueSchema = z.object({
   priority: z.enum(["low", "medium", "high"], {
     message: "Invalid priority level",
   }),
-  consistency: z.enum(["intermittent", "frequent", "constant"], {
-    message: "Invalid consistency level",
+  frequency: z.enum(["intermittent", "frequent", "constant"], {
+    message: "Invalid frequency level",
   }),
 });
 
@@ -84,12 +84,12 @@ export const updateIssuePrioritySchema = z.object({
 });
 
 /**
- * Schema for updating issue consistency
+ * Schema for updating issue frequency
  */
-export const updateIssueConsistencySchema = z.object({
+export const updateIssueFrequencySchema = z.object({
   issueId: uuidish,
-  consistency: z.enum(["intermittent", "frequent", "constant"], {
-    message: "Invalid consistency level",
+  frequency: z.enum(["intermittent", "frequent", "constant"], {
+    message: "Invalid frequency level",
   }),
 });
 

@@ -15,12 +15,12 @@ import { formatIssueId } from "~/lib/issues/utils";
 import {
   type IssueSeverity,
   type IssuePriority,
-  type IssueConsistency,
+  type IssueFrequency,
   type IssueStatus,
 } from "~/lib/types";
 import {
   CLOSED_STATUSES,
-  getIssueConsistencyLabel,
+  getIssueFrequencyLabel,
   getIssuePriorityLabel,
   getIssueSeverityLabel,
   getIssueStatusLabel,
@@ -34,7 +34,7 @@ export interface CreateIssueParams {
   machineInitials: string;
   severity: IssueSeverity;
   priority?: IssuePriority | undefined;
-  consistency?: IssueConsistency | undefined;
+  frequency?: IssueFrequency | undefined;
   reportedBy?: string | null;
   reporterName?: string | null;
   reporterEmail?: string | null;
@@ -68,9 +68,9 @@ export interface UpdateIssuePriorityParams {
   priority: IssuePriority;
 }
 
-export interface UpdateIssueConsistencyParams {
+export interface UpdateIssueFrequencyParams {
   issueId: string;
-  consistency: IssueConsistency;
+  frequency: IssueFrequency;
 }
 
 export type Issue = InferSelectModel<typeof issues>;
@@ -88,7 +88,7 @@ export async function createIssue({
   machineInitials,
   severity,
   priority,
-  consistency,
+  frequency,
   reportedBy,
   reporterName,
   reporterEmail,
@@ -122,7 +122,7 @@ export async function createIssue({
         description: description ?? null,
         severity,
         priority: priority ?? "medium",
-        consistency: consistency ?? "intermittent",
+        frequency: frequency ?? "intermittent",
         reportedBy: reportedBy ?? null,
         reporterName: reporterName ?? null,
         reporterEmail: reporterEmail ?? null,
@@ -608,54 +608,54 @@ export async function updateIssuePriority({
 }
 
 /**
- * Update issue consistency
+ * Update issue frequency
  */
-export async function updateIssueConsistency({
+export async function updateIssueFrequency({
   issueId,
-  consistency,
-}: UpdateIssueConsistencyParams): Promise<{
+  frequency,
+}: UpdateIssueFrequencyParams): Promise<{
   issueId: string;
-  oldConsistency: string;
-  newConsistency: string;
+  oldFrequency: string;
+  newFrequency: string;
 }> {
-  // Get current issue to check old consistency
+  // Get current issue to check old frequency
   const currentIssue = await db.query.issues.findFirst({
     where: eq(issues.id, issueId),
-    columns: { consistency: true, machineInitials: true },
+    columns: { frequency: true, machineInitials: true },
   });
 
   if (!currentIssue) {
     throw new Error("Issue not found");
   }
 
-  const oldConsistency = currentIssue.consistency;
+  const oldFrequency = currentIssue.frequency;
 
-  // Update consistency
+  // Update frequency
   await db
     .update(issues)
     .set({
-      consistency,
+      frequency,
       updatedAt: new Date(),
     })
     .where(eq(issues.id, issueId));
 
   // Create timeline event
-  const oldLabel = getIssueConsistencyLabel(oldConsistency as IssueConsistency);
-  const newLabel = getIssueConsistencyLabel(consistency);
+  const oldLabel = getIssueFrequencyLabel(oldFrequency as IssueFrequency);
+  const newLabel = getIssueFrequencyLabel(frequency);
   await createTimelineEvent(
     issueId,
-    `Consistency changed from ${oldLabel} to ${newLabel}`
+    `Frequency changed from ${oldLabel} to ${newLabel}`
   );
 
   log.info(
     {
       issueId,
-      oldConsistency,
-      newConsistency: consistency,
-      action: "updateIssueConsistency",
+      oldFrequency,
+      newFrequency: frequency,
+      action: "updateIssueFrequency",
     },
-    "Issue consistency updated"
+    "Issue frequency updated"
   );
 
-  return { issueId, oldConsistency, newConsistency: consistency };
+  return { issueId, oldFrequency, newFrequency: frequency };
 }

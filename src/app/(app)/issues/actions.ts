@@ -19,7 +19,7 @@ import {
   updateIssueStatusSchema,
   updateIssueSeveritySchema,
   updateIssuePrioritySchema,
-  updateIssueConsistencySchema,
+  updateIssueFrequencySchema,
   assignIssueSchema,
   addCommentSchema,
 } from "./schemas";
@@ -31,7 +31,7 @@ import {
   assignIssue,
   updateIssueSeverity,
   updateIssuePriority,
-  updateIssueConsistency,
+  updateIssueFrequency,
 } from "~/services/issues";
 import { canUpdateIssue } from "~/lib/permissions";
 import { userProfiles } from "~/server/db/schema";
@@ -72,7 +72,7 @@ export type UpdateIssuePriorityResult = Result<
   "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
 >;
 
-export type UpdateIssueConsistencyResult = Result<
+export type UpdateIssueFrequencyResult = Result<
   { issueId: string },
   "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
 >;
@@ -141,7 +141,7 @@ export async function createIssueAction(
     machineInitials,
     severity,
     priority,
-    consistency,
+    frequency,
   } = validation.data;
 
   // Create issue via service
@@ -152,7 +152,7 @@ export async function createIssueAction(
       machineInitials,
       severity,
       priority,
-      consistency,
+      frequency,
       reportedBy: user.id,
     });
 
@@ -385,12 +385,12 @@ export async function updateIssueSeverityAction(
 }
 
 /**
- * Update Issue Consistency Action
+ * Update Issue Frequency Action
  */
-export async function updateIssueConsistencyAction(
-  _prevState: UpdateIssueConsistencyResult | undefined,
+export async function updateIssueFrequencyAction(
+  _prevState: UpdateIssueFrequencyResult | undefined,
   formData: FormData
-): Promise<UpdateIssueConsistencyResult> {
+): Promise<UpdateIssueFrequencyResult> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -399,10 +399,10 @@ export async function updateIssueConsistencyAction(
 
   const rawData = {
     issueId: toOptionalString(formData.get("issueId")),
-    consistency: toOptionalString(formData.get("consistency")),
+    frequency: toOptionalString(formData.get("frequency")),
   };
 
-  const validation = updateIssueConsistencySchema.safeParse(rawData);
+  const validation = updateIssueFrequencySchema.safeParse(rawData);
   if (!validation.success) {
     return err(
       "VALIDATION",
@@ -410,7 +410,7 @@ export async function updateIssueConsistencyAction(
     );
   }
 
-  const { issueId, consistency } = validation.data;
+  const { issueId, frequency } = validation.data;
 
   try {
     const currentIssue = await db.query.issues.findFirst({
@@ -449,10 +449,10 @@ export async function updateIssueConsistencyAction(
       );
     }
 
-    // Update consistency
-    await updateIssueConsistency({
+    // Update frequency
+    await updateIssueFrequency({
       issueId,
-      consistency,
+      frequency,
     });
 
     revalidatePath(
@@ -463,11 +463,11 @@ export async function updateIssueConsistencyAction(
     log.error(
       {
         error: error instanceof Error ? error.message : "Unknown",
-        action: "updateIssueConsistency",
+        action: "updateIssueFrequency",
       },
-      "Update issue consistency error"
+      "Update issue frequency error"
     );
-    return err("SERVER", "Failed to update consistency");
+    return err("SERVER", "Failed to update frequency");
   }
 }
 
