@@ -336,20 +336,8 @@ export function UnifiedReportForm({
                         <ImageGallery
                           images={uploadedImages.map((img) => ({
                             id: img.blobPathname,
-                            issueId: "temp",
-                            uploadedBy: "temp",
                             fullImageUrl: img.blobUrl,
-                            fullBlobPathname: img.blobPathname,
-                            fileSizeBytes: img.fileSizeBytes,
-                            mimeType: img.mimeType,
                             originalFilename: img.originalFilename,
-                            createdAt: new Date(),
-                            updatedAt: new Date(),
-                            deletedAt: null,
-                            deletedBy: null,
-                            commentId: null,
-                            croppedImageUrl: null,
-                            croppedBlobPathname: null,
                           }))}
                         />
                       </div>

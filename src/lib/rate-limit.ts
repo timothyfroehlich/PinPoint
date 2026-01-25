@@ -19,6 +19,7 @@ import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { headers } from "next/headers";
 import { log } from "~/lib/logger";
+import { BLOB_CONFIG } from "~/lib/blob/config";
 
 /**
  * Rate limit check result
@@ -151,7 +152,7 @@ function createImageUploadLimiter(): Ratelimit | null {
 
   return new Ratelimit({
     redis,
-    limiter: Ratelimit.slidingWindow(5, "15 m"),
+    limiter: Ratelimit.slidingWindow(BLOB_CONFIG.RATE_LIMIT.PER_HOUR, "1 h"),
     prefix: "ratelimit:image-upload:ip",
     analytics: true,
   });

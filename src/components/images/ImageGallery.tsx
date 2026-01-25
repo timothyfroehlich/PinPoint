@@ -4,10 +4,14 @@ import React from "react";
 import Image from "next/image";
 import { Dialog, DialogContent, DialogTrigger } from "~/components/ui/dialog";
 import { Card } from "~/components/ui/card";
-import { type IssueImage } from "~/server/db/schema";
+export interface GalleryImage {
+  id: string;
+  fullImageUrl: string;
+  originalFilename?: string | null;
+}
 
 interface ImageGalleryProps {
-  images: IssueImage[];
+  images: GalleryImage[];
 }
 
 export function ImageGallery({

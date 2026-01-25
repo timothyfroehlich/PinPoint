@@ -60,23 +60,3 @@ export async function compressImage(
     return file; // Fallback to original
   }
 }
-
-/**
- * Retrieves dimensions (width/height) of an image file.
- */
-export function getImageDimensions(
-  file: File
-): Promise<{ width: number; height: number }> {
-  return new Promise((resolve, reject) => {
-    const img = new window.Image();
-    img.onload = () => {
-      resolve({ width: img.width, height: img.height });
-      URL.revokeObjectURL(img.src);
-    };
-    img.onerror = () => {
-      reject(new Error("Failed to load image for dimensions"));
-      URL.revokeObjectURL(img.src);
-    };
-    img.src = URL.createObjectURL(file);
-  });
-}

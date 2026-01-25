@@ -14,7 +14,7 @@ import {
   getClientIp,
   formatResetTime,
 } from "~/lib/rate-limit";
-import { eq, count, isNull } from "drizzle-orm";
+import { eq, count } from "drizzle-orm";
 
 const uploadSchema = z.object({
   issueId: z.string(), // Can be real UUID or 'new'
@@ -79,23 +79,20 @@ export async function uploadIssueImage(formData: FormData): Promise<
     }
 
     // 5. Enforce Limits
-    // Check per-user limit (based on IP for anonymous, user ID for auth)
-    const userIdForLimit = user?.id;
-    const userImagesCount = await db
-      .select({ val: count() })
-      .from(issueImages)
-      .where(
-        userIdForLimit
-          ? eq(issueImages.uploadedBy, userIdForLimit)
-          : isNull(issueImages.uploadedBy) // Simple fallback for anonymous (strict IP limiting handles the rest)
-      );
+    // Check per-user limit for authenticated users.
+    // Anonymous users are limited solely via IP-based rate limiting.
+    if (user) {
+      const userImagesCount = await db
+        .select({ val: count() })
+        .from(issueImages)
+        .where(eq(issueImages.uploadedBy, user.id));
 
-    const userLimit = user
-      ? BLOB_CONFIG.LIMITS.AUTHENTICATED_USER_MAX
-      : BLOB_CONFIG.LIMITS.PUBLIC_USER_MAX;
-
-    if ((userImagesCount[0]?.val ?? 0) >= userLimit) {
-      return err("VALIDATION", "You have reached your upload limit.");
+      if (
+        (userImagesCount[0]?.val ?? 0) >=
+        BLOB_CONFIG.LIMITS.AUTHENTICATED_USER_MAX
+      ) {
+        return err("VALIDATION", "You have reached your upload limit.");
+      }
     }
 
     // Check per-issue limit

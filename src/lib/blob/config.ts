@@ -27,6 +27,8 @@ export const BLOB_CONFIG = {
   },
 
   // Cleanup
+  // TODO: Implement cron/cleanup job to delete blobs in "pending" folder older than 24h
+  // TODO: Implement cron/cleanup job to enforce SOFT_DELETE_RETENTION_HOURS
   SOFT_DELETE_RETENTION_HOURS: 24,
 } as const;
 
