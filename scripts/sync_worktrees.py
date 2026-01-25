@@ -646,63 +646,11 @@ SUPABASE_SERVICE_ROLE_KEY=
                 self.state.merge_message = "Merge conflicts in config.toml (auto-resolvable)"
                 recovery = f"""cd {self.path}
 
-# Config.toml conflict detected - recommend accepting main's version
-# Your local port customizations are preserved via skip-worktree
-
-# Auto-resolve (accept main's config structure, restore ports after):
-git checkout --theirs supabase/config.toml
-git add supabase/config.toml
-git commit -m "Merge main (accept config.toml structure)"
-python3 scripts/sync_worktrees.py  # Restore correct ports
-"""
-            elif config_conflict and other_conflicts:
-                # Mixed conflicts - manual intervention needed
-                self.state.merge_message = f"Merge conflicts in config.toml + {len(other_conflicts)} other file(s)"
-                recovery = f"""cd {self.path}
-
-# CONFLICTS IN MULTIPLE FILES - MANUAL RESOLUTION REQUIRED
-# Files with conflicts: {', '.join(conflicted_files)}
-
-# Step 1: Resolve config.toml (accept main's structure)
-git checkout --theirs supabase/config.toml
-git add supabase/config.toml
-
-# Step 2: Resolve other conflicts manually
-# Edit each file, then:
-git add <resolved-files>
-
-# Step 3: Complete merge
-git commit
-
-# Step 4: Restore correct ports
-python3 scripts/sync_worktrees.py
-
-# Alternative: Abort merge entirely
-git merge --abort
-git reset --hard {self.state.pre_merge_sha}
-"""
-            else:
-                # Only non-config conflicts
-                self.state.merge_message = f"Merge conflicts in {len(conflicted_files)} file(s)"
-                recovery = f"""cd {self.path}
-
-# MANUAL CONFLICT RESOLUTION REQUIRED
-# Files with conflicts: {', '.join(conflicted_files)}
-
-# Option 1: Resolve manually
-git status
-# Edit files to resolve conflicts, then:
-git add <resolved-files>
-git commit
-
-# Option 2: Abort merge
-git merge --abort
-git reset --hard {self.state.pre_merge_sha}
-
 # Option 3: Accept all main's changes
 git checkout --theirs .
 git add .
 git commit -m "Merge main (accept all main changes)"
+python3 scripts/sync_worktrees.py  # Restore ports
 """
 
             self.state.add_recovery_command(recovery)

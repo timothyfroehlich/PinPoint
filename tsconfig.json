@@ -29,6 +29,8 @@
     "playwright.config.ts",
     "vitest.config.ts",
     "drizzle.config.ts",
-    "postcss.config.mjs"
+    "postcss.config.mjs",
+    "src/app/(app)/mockup/**/*",
+    "src/components/mockups/**/*"
   ]
 }
