@@ -2,7 +2,9 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { issues, machines, userProfiles } from "~/server/db/schema";
 import { buildWhereConditions } from "~/lib/issues/filters-queries";
-import { and, type SQL } from "drizzle-orm";
+import { and, type SQL, type InferSelectModel } from "drizzle-orm";
+
+type Issue = InferSelectModel<typeof issues>;
 
 describe("Issue Filtering Integration", () => {
   setupTestDb();
@@ -101,7 +103,7 @@ describe("Issue Filtering Integration", () => {
     ]);
   });
 
-  const queryIssues = async (where: SQL[]) => {
+  const queryIssues = async (where: SQL[]): Promise<Issue[]> => {
     const db = await getTestDb();
     return await db
       .select()
@@ -141,8 +143,8 @@ describe("Issue Filtering Integration", () => {
     const where = buildWhereConditions({ q: "AFM" }, db);
     const results = await queryIssues(where);
     expect(results).toHaveLength(2);
-    expect(results.map((i) => i.id)).toContain(ISSUE_1_ID);
-    expect(results.map((i) => i.id)).toContain(ISSUE_3_ID);
+    expect(results.map((i: Issue) => i.id)).toContain(ISSUE_1_ID);
+    expect(results.map((i: Issue) => i.id)).toContain(ISSUE_3_ID);
   });
 
   it("defaults to open statuses when status is undefined", async () => {
@@ -153,8 +155,8 @@ describe("Issue Filtering Integration", () => {
     // Wait, let's check OPEN_STATUSES definition.
     expect(results.length).toBeGreaterThan(0);
     expect(
-      results.every((i: any) =>
-        ["new", "confirmed", "in_progress"].includes(i.status)
+      results.every((i: Issue) =>
+        (["new", "confirmed", "in_progress"] as string[]).includes(i.status)
       )
     ).toBe(true);
   });
@@ -178,7 +180,7 @@ describe("Issue Filtering Integration", () => {
     );
     const results = await queryIssues(where);
     expect(results).toHaveLength(1);
-    expect((results[0] as any).id).toBe(ISSUE_1_ID);
+    expect(results[0]?.id).toBe(ISSUE_1_ID);
   });
 
   it("filters by severity and priority", async () => {
@@ -192,7 +194,7 @@ describe("Issue Filtering Integration", () => {
     );
     const results = await queryIssues(where);
     expect(results).toHaveLength(1);
-    expect((results[0] as any).id).toBe(ISSUE_1_ID);
+    expect(results[0]?.id).toBe(ISSUE_1_ID);
   });
 
   it("filters by owner", async () => {
@@ -205,8 +207,8 @@ describe("Issue Filtering Integration", () => {
     );
     const results = await queryIssues(where);
     expect(results).toHaveLength(2);
-    expect(results.map((i: any) => i.id)).toContain(ISSUE_1_ID);
-    expect(results.map((i: any) => i.id)).toContain(ISSUE_3_ID);
-    expect(results.map((i: any) => i.id)).not.toContain(ISSUE_2_ID);
+    expect(results.map((i) => i.id)).toContain(ISSUE_1_ID);
+    expect(results.map((i) => i.id)).toContain(ISSUE_3_ID);
+    expect(results.map((i) => i.id)).not.toContain(ISSUE_2_ID);
   });
 });

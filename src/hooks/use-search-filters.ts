@@ -33,17 +33,6 @@ export function useSearchFilters(
   const router = useRouter();
   const pathname = usePathname();
 
-  /**
-   * Updates filter state by merging with current filters
-   *
-   * @param updates - Partial filter updates to apply
-   * @param options - Optional configuration
-   * @param options.resetPagination - Reset to page 1 (default: false)
-   */
-  /*
-   * Stable reference to filters so we don't recreate the callback on every render.
-   * This prevents infinite loops in consumers that use this callback in effects.
-   */
   /*
    * Stable reference to filters so we don't recreate the callback on every render.
    * This prevents infinite loops in consumers that use this callback in effects.

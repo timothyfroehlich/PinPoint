@@ -48,13 +48,14 @@ test.describe("Issue List Features", () => {
     await expect(page.getByText(title2)).toBeHidden();
 
     // Clear Severity Filter
-    // Note: The clear button disappears/reappears during state changes, use force click
+    // The clear button may disappear/reappear during state changes; wait for it to stabilize
     const clearButton = page.getByRole("button", {
       name: "Clear",
       exact: true,
     });
     await expect(clearButton).toBeVisible();
-    await clearButton.click({ force: true });
+    await clearButton.waitFor({ state: "visible" });
+    await clearButton.click();
   });
 
   test.skip("should inline-edit issues (Flaky Env)", async ({ page }) => {

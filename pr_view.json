@@ -1,0 +1,120 @@
+{
+  "comments": [
+    {
+      "id": "IC_kwDOPB_pGs7gt6Kx",
+      "author": { "login": "vercel" },
+      "authorAssociation": "NONE",
+      "body": "[vc]: #Wpx6YRlJKJbBK6lLwNCBaNFQTn+CeWAb/KMvYgcIVn8=:eyJpc01vbm9yZXBvIjp0cnVlLCJ0eXBlIjoiZ2l0aHViIiwicHJvamVjdHMiOlt7Im5hbWUiOiJwaW4tcG9pbnQiLCJpbnNwZWN0b3JVcmwiOiJodHRwczovL3ZlcmNlbC5jb20vYWR2YWNhci9waW4tcG9pbnQvNHpGcG85Y0t3Y1E4Wko4QUdONW1yaks3ZEpVbiIsInByZXZpZXdVcmwiOiJwaW4tcG9pbnQtZ2l0LWZlYXR1cmUtaXNzdWUtZmlsdGVyLXNlYXJjaC1hZHZhY2FyLnZlcmNlbC5hcHAiLCJuZXh0Q29tbWl0U3RhdHVzIjoiREVQTE9ZRUQiLCJsaXZlRmVlZGJhY2siOnsicmVzb2x2ZWQiOjAsInVucmVzb2x2ZWQiOjAsInRvdGFsIjowLCJsaW5rIjoicGluLXBvaW50LWdpdC1mZWF0dXJlLWlzc3VlLWZpbHRlci1zZWFyY2gtYWR2YWNhci52ZXJjZWwuYXBwIn0sInJvb3REaXJlY3RvcnkiOm51bGwsInByb2plY3RJZCI6InByal8xQWthZ3h5c2ZxTmI5YVA0QUhzOHl2ZzlEdkl2IiwidjAiOmZhbHNlfV19\nThe latest updates on your projects. Learn more about [Vercel for GitHub](https://vercel.link/github-learn-more).\n\n| Project | Deployment | Review | Updated (UTC) |\n| :--- | :----- | :------ | :------ |\n| [pin-point](https://vercel.com/advacar/pin-point) | ![Ready](https://vercel.com/static/status/ready.svg) [Ready](https://vercel.com/advacar/pin-point/4zFpo9cKwcQ8ZJ8AGN5mrjK7dJUn) | [Preview](https://pin-point-git-feature-issue-filter-search-advacar.vercel.app), [Comment](https://vercel.live/open-feedback/pin-point-git-feature-issue-filter-search-advacar.vercel.app?via=pr-comment-feedback-link) | Jan 25, 2026 3:19am |\n\n",
+      "createdAt": "2026-01-19T21:11:46Z",
+      "includesCreatedEdit": true,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/timothyfroehlich/PinPoint/pull/815#issuecomment-3770131121",
+      "viewerDidAuthor": false
+    },
+    {
+      "id": "IC_kwDOPB_pGs7gwlgu",
+      "author": { "login": "timothyfroehlich" },
+      "authorAssociation": "OWNER",
+      "body": "### Code review\n\nFound 4 issues:\n\n1. Non-null assertion operators violate ts-strictest (AGENTS.md says \"Type Safety: No `any`, no `!`, no unsafe `as`. This project uses ts-strictest.\")\n\nhttps://github.com/timothyfroehlich/PinPoint/blob/50a93c6b583f30031d1c16b1c87cb9bff6f6a0af/src/lib/issues/filters-queries.ts#L123-L125\n\nhttps://github.com/timothyfroehlich/PinPoint/blob/50a93c6b583f30031d1c16b1c87cb9bff6f6a0af/src/lib/issues/filters-queries.ts#L157-L160\n\nhttps://github.com/timothyfroehlich/PinPoint/blob/50a93c6b583f30031d1c16b1c87cb9bff6f6a0af/src/components/issues/IssueList.tsx#L441-L445\n\n2. Unsafe type assertions violate ts-strictest (AGENTS.md says \"Type Safety: No `any`, no `!`, no unsafe `as`. This project uses ts-strictest.\")\n\nhttps://github.com/timothyfroehlich/PinPoint/blob/50a93c6b583f30031d1c16b1c87cb9bff6f6a0af/src/app/(app)/issues/page.tsx#L108-L110\n\nhttps://github.com/timothyfroehlich/PinPoint/blob/50a93c6b583f30031d1c16b1c87cb9bff6f6a0af/src/components/issues/IssueList.tsx#L428-L441\n\nhttps://github.com/timothyfroehlich/PinPoint/blob/50a93c6b583f30031d1c16b1c87cb9bff6f6a0af/src/components/issues/IssueFilters.tsx#L578-L580\n\n3. Branch missing performance-critical database indexes from main (indexes on severity, priority, machine name, and composite comment index were added in PRs #794 and #779 after branch diverged)\n\nhttps://github.com/timothyfroehlich/PinPoint/blob/50a93c6b583f30031d1c16b1c87cb9bff6f6a0af/src/server/db/schema.ts#L183-L190\n\n4. Migration workflow violation - migration files deleted instead of following proper workflow (AGENTS.md says \"Migrations ONLY: Never use `drizzle-kit push`. Use `db:generate` + `db:migrate`.\")\n\nhttps://github.com/timothyfroehlich/PinPoint/blob/50a93c6b583f30031d1c16b1c87cb9bff6f6a0af/drizzle/meta/_journal.json#L1-L30\n\n🤖 Generated with [Claude Code](https://claude.ai/code)\n\n<sub>- If this code review was useful, please react with 👍. Otherwise, react with 👎.</sub>\n",
+      "createdAt": "2026-01-20T03:16:10Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/timothyfroehlich/PinPoint/pull/815#issuecomment-3770832942",
+      "viewerDidAuthor": true
+    }
+  ],
+  "reviews": [
+    {
+      "id": "PRR_kwDOPB_pGs7bUrPh",
+      "author": { "login": "copilot-pull-request-reviewer" },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "## Pull request overview\n\nThis PR implements a comprehensive issue search and filtering system for the Issues List page, replacing temporary mockup controls with a production-ready implementation featuring URL-synchronized filters, responsive design, and multi-select filter controls.\n\n**Changes:**\n- Added full search and filtering functionality with 10+ filter types (search, status, machine, severity, priority, assignee, owner, reporter, consistency, date ranges)\n- Implemented URL synchronization for all filter states to enable shareable links\n- Created responsive UI components with dynamic column hiding and collapsing filter badges\n- Built efficient database query layer using Drizzle ORM with proper WHERE conditions and pagination\n\n### Reviewed changes\n\nCopilot reviewed 20 out of 22 changed files in this pull request and generated 10 comments.\n\n<details>\n<summary>Show a summary per file</summary>\n\n| File | Description |\r\n| ---- | ----------- |\r\n| `src/lib/issues/filters.ts` | Core filter parsing and query building logic with URL parameter handling |\r\n| `src/components/issues/IssueFilters.tsx` | Main filter UI component with responsive search bar and multi-select dropdowns |\r\n| `src/components/issues/IssueList.tsx` | Enhanced issue table with inline editing, dynamic columns, and pagination |\r\n| `src/components/ui/multi-select.tsx` | Reusable multi-select component with grouped options and search |\r\n| `src/components/ui/popover.tsx` | Popover primitive for dropdown UI elements |\r\n| `src/components/ui/command.tsx` | Command palette component for searchable lists |\r\n| `src/components/ui/checkbox.tsx` | Checkbox component with indeterminate state support |\r\n| `src/components/ui/calendar.tsx` | Calendar component for date range selection |\r\n| `src/components/ui/date-range-picker.tsx` | Date range picker combining calendar and popover |\r\n| `src/app/(app)/issues/page.tsx` | Updated issues page with new filtering, owner filter EXISTS query, and pagination |\r\n| `src/test/unit/lib/issues/filters.test.ts` | Unit tests for filter parsing and validation logic |\r\n| `src/test/integration/supabase/issue-filtering.test.ts` | Integration tests for database filtering queries |\r\n| `tsconfig.json` | Excluded mockup directories from TypeScript compilation |\r\n| `eslint.config.mjs` | Excluded mockup directories from linting |\r\n| `package.json` | Added dependencies: cmdk, react-day-picker, @radix-ui/react-checkbox, @radix-ui/react-popover |\n</details>\n\n\n<details>\n<summary>Files not reviewed (1)</summary>\n\n* **pnpm-lock.yaml**: Language not supported\n</details>\n\n\n",
+      "submittedAt": "2026-01-19T21:14:40Z",
+      "includesCreatedEdit": false,
+      "reactionGroups": [],
+      "state": "COMMENTED",
+      "commit": { "oid": "57ecef683c02fe5c1888ebb83757db7503feccbd" }
+    },
+    {
+      "id": "PRR_kwDOPB_pGs7bVtLG",
+      "author": { "login": "copilot-pull-request-reviewer" },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "## Pull request overview\n\nCopilot reviewed 18 out of 20 changed files in this pull request and generated 8 comments.\n\n<details>\n<summary>Files not reviewed (1)</summary>\n\n* **pnpm-lock.yaml**: Language not supported\n</details>\n\n<details>\n<summary>Comments suppressed due to low confidence (2)</summary>\n\n**src/lib/issues/filters.ts:207**\n* The `exists` subquery for owner filtering embeds a reference to the `db` instance directly in the query building function. This creates a tight coupling and makes the function harder to test in isolation. Consider passing the db instance as a parameter or restructuring to separate query building from execution.\n**src/lib/issues/filters.ts:171**\n* The default status filter logic shows open statuses when no status parameter is provided, but this behavior is embedded in `buildWhereConditions` rather than in `parseIssueFilters`. This creates an implicit default that's not reflected in the parsed filters object, making the state less transparent. Consider moving this default to `parseIssueFilters` so that `filters.status` explicitly contains the default open statuses when no status param exists.\n</details>\n\n",
+      "submittedAt": "2026-01-20T00:07:09Z",
+      "includesCreatedEdit": false,
+      "reactionGroups": [],
+      "state": "COMMENTED",
+      "commit": { "oid": "c0cfc1c08778b3a8249535e3eb8e11b601d9b6cd" }
+    },
+    {
+      "id": "PRR_kwDOPB_pGs7bWbx-",
+      "author": { "login": "copilot-pull-request-reviewer" },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "## Pull request overview\n\nCopilot reviewed 18 out of 20 changed files in this pull request and generated 9 comments.\n\n<details>\n<summary>Files not reviewed (1)</summary>\n\n* **pnpm-lock.yaml**: Language not supported\n</details>\n\n\n",
+      "submittedAt": "2026-01-20T02:37:21Z",
+      "includesCreatedEdit": false,
+      "reactionGroups": [],
+      "state": "COMMENTED",
+      "commit": { "oid": "cd04eacb40a991598fe3789e78b2d0e38f881b3c" }
+    },
+    {
+      "id": "PRR_kwDOPB_pGs7bXYJW",
+      "author": { "login": "copilot-pull-request-reviewer" },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "## Pull request overview\n\nCopilot reviewed 23 out of 25 changed files in this pull request and generated 9 comments.\n\n<details>\n<summary>Files not reviewed (1)</summary>\n\n* **pnpm-lock.yaml**: Language not supported\n</details>\n\n\n",
+      "submittedAt": "2026-01-20T04:51:46Z",
+      "includesCreatedEdit": false,
+      "reactionGroups": [],
+      "state": "COMMENTED",
+      "commit": { "oid": "f904e98a294bf2018c72f431d2aa87be093009ce" }
+    },
+    {
+      "id": "PRR_kwDOPB_pGs7crMgp",
+      "author": { "login": "copilot-pull-request-reviewer" },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "## Pull request overview\n\nCopilot reviewed 25 out of 27 changed files in this pull request and generated 1 comment.\n\n<details>\n<summary>Files not reviewed (1)</summary>\n\n* **pnpm-lock.yaml**: Language not supported\n</details>\n\n\n",
+      "submittedAt": "2026-01-24T18:09:29Z",
+      "includesCreatedEdit": false,
+      "reactionGroups": [],
+      "state": "COMMENTED",
+      "commit": { "oid": "782f243ffe4e79e9df10ce393997bf000a913b69" }
+    },
+    {
+      "id": "PRR_kwDOPB_pGs7crY4F",
+      "author": { "login": "copilot-pull-request-reviewer" },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "## Pull request overview\n\nCopilot reviewed 25 out of 27 changed files in this pull request and generated 5 comments.\n\n<details>\n<summary>Files not reviewed (1)</summary>\n\n* **pnpm-lock.yaml**: Language not supported\n</details>\n\n\n",
+      "submittedAt": "2026-01-24T18:55:31Z",
+      "includesCreatedEdit": false,
+      "reactionGroups": [],
+      "state": "COMMENTED",
+      "commit": { "oid": "9fbb94352fffdcef49983e00604bf9c77b940bb8" }
+    },
+    {
+      "id": "PRR_kwDOPB_pGs7csvEy",
+      "author": { "login": "copilot-pull-request-reviewer" },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "## Pull request overview\n\nCopilot reviewed 33 out of 35 changed files in this pull request and generated 4 comments.\n\n<details>\n<summary>Files not reviewed (1)</summary>\n\n* **pnpm-lock.yaml**: Language not supported\n</details>\n\n\n",
+      "submittedAt": "2026-01-24T20:49:39Z",
+      "includesCreatedEdit": false,
+      "reactionGroups": [],
+      "state": "COMMENTED",
+      "commit": { "oid": "20f4e9f38ce52f7a66971ebf0f7761aaf5387d90" }
+    },
+    {
+      "id": "PRR_kwDOPB_pGs7cuRPE",
+      "author": { "login": "copilot-pull-request-reviewer" },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "## Pull request overview\n\nCopilot reviewed 33 out of 35 changed files in this pull request and generated 10 comments.\n\n<details>\n<summary>Files not reviewed (1)</summary>\n\n* **pnpm-lock.yaml**: Language not supported\n</details>\n\n\n",
+      "submittedAt": "2026-01-25T02:59:16Z",
+      "includesCreatedEdit": false,
+      "reactionGroups": [],
+      "state": "COMMENTED",
+      "commit": { "oid": "a8c633860095ef4c578e393f9e0123333eb940bd" }
+    }
+  ]
+}
