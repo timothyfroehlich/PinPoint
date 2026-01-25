@@ -149,20 +149,19 @@ export function Sidebar({
           >
             {collapsed ? (
               <Image
-                src="/logo-pinpoint.svg"
+                src="/logo-pinpoint-transparent.png"
                 alt="P"
-                width={32}
-                height={32}
-                className="drop-shadow-[0_0_8px_rgba(0,242,255,0.5)] animate-in fade-in zoom-in duration-300"
+                width={40}
+                height={40}
+                className="animate-in fade-in zoom-in duration-300"
               />
             ) : (
               <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-4 duration-300">
                 <Image
-                  src="/logo-pinpoint.svg"
+                  src="/logo-pinpoint-transparent.png"
                   alt="PinPoint"
-                  width={32}
-                  height={32}
-                  className="drop-shadow-[0_0_8px_rgba(0,242,255,0.5)]"
+                  width={42}
+                  height={42}
                 />
                 <span className="text-xl font-bold tracking-tight text-foreground">
                   PinPoint

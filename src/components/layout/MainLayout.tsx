@@ -117,81 +117,89 @@ export async function MainLayout({
       <main className="flex-1 overflow-y-auto">
         {/* Header Area */}
         <header className="flex h-16 items-center justify-between border-b border-border px-6 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-          {/* Mobile Menu Trigger */}
-          <div className="md:hidden mr-4">
-            <MobileNav role={userProfile?.role} />
+          {/* Mobile Menu Trigger & Left Spacer */}
+          <div className="flex-1 flex items-center">
+            <div className="md:hidden mr-4">
+              <MobileNav role={userProfile?.role} />
+            </div>
           </div>
 
-          {/* Branding Area */}
-          <div className="flex-1 flex items-center gap-4">
+          <div className="flex items-center gap-6">
+            {/* Branding Block - Pushed to the right */}
             <Link
               href="/dashboard"
-              className="flex items-center gap-4 group transition-opacity hover:opacity-90"
+              className="flex items-center gap-4 group transition-all duration-300 hover:opacity-95"
             >
               <div className="flex items-center gap-2.5">
                 <Image
-                  src="/logo-pinpoint.svg"
+                  src="/logo-pinpoint-transparent.png"
                   alt="PinPoint"
-                  width={32}
-                  height={32}
-                  className="drop-shadow-[0_0_8px_rgba(0,242,255,0.6)] animate-in fade-in zoom-in duration-500"
+                  width={40}
+                  height={40}
+                  className="animate-in fade-in zoom-in duration-500"
                   priority
                 />
                 <span className="text-xl font-bold tracking-tight text-foreground hidden sm:inline-block">
                   PinPoint
                 </span>
               </div>
-              <div className="h-6 w-px bg-border/60 mx-1 hidden sm:block" />
-              <div className="flex items-center gap-2 opacity-80 group-hover:opacity-100 transition-opacity hidden sm:flex">
-                <Image
-                  src="/apc-logo.png"
-                  alt="Austin Pinball Collective"
-                  width={70}
-                  height={40}
-                  className="h-8 w-auto object-contain drop-shadow-[0_0_8px_rgba(74,222,128,0.3)]"
-                />
-              </div>
+              <div className="h-5 w-px bg-border/40 mx-1 hidden sm:block" />
+              <Image
+                src="/apc-logo.png"
+                alt="Austin Pinball Collective"
+                width={65}
+                height={36}
+                className="h-7 w-auto object-contain drop-shadow-[0_0_8px_rgba(74,222,128,0.2)] opacity-80 group-hover:opacity-100 transition-opacity hidden sm:block"
+              />
             </Link>
-          </div>
 
-          <div className="flex items-center gap-4">
-            <FeedbackWidget />
-            {user ? (
-              <>
-                <Button asChild variant="ghost" size="sm">
-                  <Link href="/report">Report Issue</Link>
-                </Button>
-                <NotificationList notifications={enrichedNotifications} />
-                <UserMenu
-                  userName={userProfile?.name ?? "User"}
-                  email={user.email}
-                />
-              </>
-            ) : (
-              <div className="flex items-center gap-3">
-                <Button
-                  asChild
-                  variant="ghost"
-                  size="sm"
-                  data-testid="nav-report-issue"
-                >
-                  <Link href="/report">Report Issue</Link>
-                </Button>
-                <div className="h-4 w-px bg-border mx-1" />
-                <Button
-                  asChild
-                  variant="ghost"
-                  size="sm"
-                  className="text-muted-foreground hover:text-foreground"
-                  data-testid="nav-signin"
-                >
-                  <Link href="/login">Sign In</Link>
-                </Button>
-                <Button asChild size="sm" data-testid="nav-signup">
-                  <Link href="/signup">Sign Up</Link>
-                </Button>
-              </div>
-            )}
+            <div className="h-4 w-px bg-border/20 hidden md:block" />
+
+            <div className="flex items-center gap-4">
+              <FeedbackWidget />
+              {user ? (
+                <>
+                  <Button
+                    asChild
+                    variant="ghost"
+                    size="sm"
+                    className="hidden lg:flex"
+                  >
+                    <Link href="/report">Report Issue</Link>
+                  </Button>
+                  <NotificationList notifications={enrichedNotifications} />
+                  <UserMenu
+                    userName={userProfile?.name ?? "User"}
+                    email={user.email}
+                  />
+                </>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <Button
+                    asChild
+                    variant="ghost"
+                    size="sm"
+                    className="hidden lg:flex"
+                    data-testid="nav-report-issue"
+                  >
+                    <Link href="/report">Report Issue</Link>
+                  </Button>
+                  <div className="h-4 w-px bg-border mx-1 hidden lg:block" />
+                  <Button
+                    asChild
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-foreground"
+                    data-testid="nav-signin"
+                  >
+                    <Link href="/login">Sign In</Link>
+                  </Button>
+                  <Button asChild size="sm" data-testid="nav-signup">
+                    <Link href="/signup">Sign Up</Link>
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
