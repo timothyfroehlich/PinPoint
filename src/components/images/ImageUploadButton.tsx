@@ -5,7 +5,8 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Camera, Image as ImageIcon, Loader2 } from "lucide-react";
-import { validateImageFile, compressImage } from "~/lib/blob/compression";
+import { compressImage } from "~/lib/blob/compression";
+import { validateImageFile } from "~/lib/blob/validation";
 import { uploadIssueImage } from "~/server/actions/images";
 import { toast } from "~/components/ui/use-toast";
 

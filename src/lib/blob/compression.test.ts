@@ -5,7 +5,7 @@ vi.mock("browser-image-compression", () => ({
   default: vi.fn(),
 }));
 
-import { validateImageFile } from "./compression";
+import { validateImageFile } from "./validation";
 import { BLOB_CONFIG } from "./config";
 
 describe("Compression Utilities", () => {

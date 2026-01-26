@@ -6,7 +6,7 @@ import { z } from "zod";
 import { db } from "~/server/db";
 import { issueImages } from "~/server/db/schema";
 import { uploadToBlob, deleteFromBlob } from "~/lib/blob/client";
-import { validateImageFile } from "~/lib/blob/compression";
+import { validateImageFile } from "~/lib/blob/validation";
 import { BLOB_CONFIG } from "~/lib/blob/config";
 import { type Result, ok, err } from "~/lib/result";
 import {
