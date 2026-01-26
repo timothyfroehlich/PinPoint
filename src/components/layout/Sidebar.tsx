@@ -153,28 +153,29 @@ export function Sidebar({
               <Image
                 src="/logo-pinpoint-transparent.png"
                 alt="P"
-                width={40}
-                height={40}
-                className="animate-in fade-in zoom-in duration-300"
+                width={56}
+                height={56}
+                className="animate-in fade-in zoom-in duration-300 object-contain h-[56px] w-[56px]"
               />
             ) : (
               <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-4 duration-300">
                 <Image
                   src="/logo-pinpoint-transparent.png"
                   alt="PinPoint"
-                  width={38}
-                  height={38}
+                  width={50}
+                  height={50}
+                  className="object-contain h-[50px] w-[50px]"
                 />
                 <span className="text-xl font-bold tracking-tight text-foreground">
                   PinPoint
                 </span>
-                <div className="h-5 w-px bg-primary/20 mx-1" />
+                <div className="h-6 w-px bg-primary/20 mx-1" />
                 <Image
                   src="/apc-logo.png"
                   alt="Austin Pinball Collective"
-                  width={60}
-                  height={34}
-                  className="h-8 w-auto object-contain opacity-90"
+                  width={64}
+                  height={38}
+                  className="h-9 w-auto object-contain opacity-90"
                 />
               </div>
             )}
