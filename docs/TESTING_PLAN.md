@@ -49,6 +49,28 @@
 
 ---
 
+## Test Schema Management
+
+The file `src/test/setup/schema.sql` is **auto-generated** and **not committed to git**.
+
+### Regeneration
+
+- **Automatic**: Runs before all test commands (if stale) via `pnpm run test:ensure-schema`
+- **Manual**: `pnpm run test:_generate-schema`
+- **Check**: `tsx scripts/ensure-test-schema.ts`
+
+### When Schema Changes
+
+1. Modify `src/server/db/schema.ts`
+2. Run `pnpm run db:migrate` (regenerates automatically if using standard workflows)
+3. Tests will use updated schema automatically
+
+### CI/CD
+
+Test schema is regenerated on every CI run, ensuring tests always match the current schema.
+
+---
+
 ## Test Types & When to Use
 
 ### 1. Unit Tests (Vitest)
