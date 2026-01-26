@@ -101,7 +101,25 @@ export const assignIssueSchema = z.object({
  * Common schema for image metadata from Vercel Blob
  */
 export const imageMetadataSchema = z.object({
-  blobUrl: z.string().url(),
+  blobUrl: z
+    .string()
+    .url()
+    .refine(
+      (url) => {
+        const parsedUrl = new URL(url);
+        const isVercelBlob = parsedUrl.hostname.endsWith(
+          ".public.blob.vercel-storage.com"
+        );
+        const isLocalhost =
+          process.env["MOCK_BLOB_STORAGE"] === "true" &&
+          parsedUrl.hostname === "localhost";
+        return isVercelBlob || isLocalhost;
+      },
+      {
+        message:
+          "Image URL must be from Vercel Blob storage or localhost (dev only)",
+      }
+    ),
   blobPathname: z.string().min(1),
   originalFilename: z.string().min(1),
   fileSizeBytes: z.number().positive(),

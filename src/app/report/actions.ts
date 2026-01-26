@@ -18,6 +18,7 @@ import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import type { ActionState } from "./unified-report-form";
 import { imagesMetadataArraySchema } from "../(app)/issues/schemas";
+import { deleteFromBlob } from "~/lib/blob/client";
 
 /**
  * Server Action: submit anonymous issue
@@ -211,7 +212,11 @@ export async function submitPublicIssueAction(
                 issueId: issue.id,
                 orphanedBlobs: imagesMetadata.map((img) => img.blobPathname),
               },
-              "Database failed to link images to issue. TODO: Implement cleanup job (BLOB_CONFIG.SOFT_DELETE_RETENTION_HOURS) to remove these pending blobs."
+              "Database failed to link images to issue. Cleaning up orphaned blobs."
+            );
+            // Immediate cleanup of orphaned blobs
+            await Promise.allSettled(
+              imagesMetadata.map((img) => deleteFromBlob(img.blobPathname))
             );
             // Don't return error here - issue was already created successfully
             // User will be redirected, but images won't appear on the issue
