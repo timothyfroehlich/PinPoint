@@ -21,10 +21,28 @@ export async function compressImage(
         : BLOB_CONFIG.COMPRESSION.CROPPED_IMAGE_QUALITY,
   };
 
+  console.log("[Compression] Starting compression with useWebWorker: true", {
+    mode,
+    fileSize: file.size,
+    options,
+  });
+
   try {
-    return await imageCompression(file, options);
+    const startTime = Date.now();
+    const compressed = await imageCompression(file, options);
+    const duration = Date.now() - startTime;
+    console.log("[Compression] Compression successful", {
+      duration: `${duration}ms`,
+      originalSize: file.size,
+      compressedSize: compressed.size,
+      reduction: `${(((file.size - compressed.size) / file.size) * 100).toFixed(1)}%`,
+    });
+    return compressed;
   } catch (error) {
-    console.error("Compression failed:", error);
+    console.error(
+      "[Compression] Compression failed, using original file:",
+      error
+    );
     return file; // Fallback to original
   }
 }
