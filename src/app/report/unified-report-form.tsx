@@ -325,7 +325,7 @@ export function UnifiedReportForm({
                         currentCount={uploadedImages.length}
                         maxCount={user ? 4 : 2}
                         onUploadComplete={(img) =>
-                          setUploadedImages([...uploadedImages, img])
+                          setUploadedImages((prev) => [...prev, img])
                         }
                         disabled={isPending}
                       />

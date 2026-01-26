@@ -122,6 +122,32 @@ describe("uploadIssueImage", () => {
     expect(blobClient.uploadToBlob).toHaveBeenCalled();
   });
 
+  it("should handle blob upload failure for new issue", async () => {
+    vi.mocked(rateLimit.checkImageUploadLimit).mockResolvedValue({
+      success: true,
+      limit: 5,
+      remaining: 4,
+      reset: 0,
+    });
+
+    vi.mocked(blobClient.uploadToBlob).mockRejectedValue(
+      new Error("Storage unavailable")
+    );
+
+    const formData = new FormData();
+    formData.append("issueId", "new");
+    const file = createMockFile("test.jpg", "image/jpeg", 2048);
+    formData.append("image", file);
+
+    const result = await uploadIssueImage(formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("BLOB");
+      expect(result.message).toBe("Storage unavailable");
+    }
+  });
+
   it("should insert record and revalidate for existing issue", async () => {
     vi.mocked(rateLimit.checkImageUploadLimit).mockResolvedValue({
       success: true,

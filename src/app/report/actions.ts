@@ -220,7 +220,7 @@ export async function submitPublicIssueAction(
                 issueId: issue.id,
                 orphanedBlobs: imagesMetadata.map((img) => img.blobPathname),
               },
-              "Database failed to link images to issue"
+              "Database failed to link images to issue. TODO: Implement cleanup job (BLOB_CONFIG.SOFT_DELETE_RETENTION_HOURS) to remove these pending blobs."
             );
           }
         }

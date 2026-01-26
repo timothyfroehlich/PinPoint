@@ -34,7 +34,10 @@ export function ImageGallery({
               {/* Note: Delete button will be added in PR 3 */}
             </button>
           </DialogTrigger>
-          <DialogContent className="max-w-3xl border-none bg-transparent p-0 shadow-none">
+          <DialogContent
+            className="max-w-3xl border-none bg-transparent p-0 shadow-none"
+            aria-label={`View image: ${image.originalFilename ?? "Issue image"}`}
+          >
             <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-black/90">
               <Image
                 src={image.fullImageUrl}

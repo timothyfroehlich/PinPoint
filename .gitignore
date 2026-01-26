@@ -140,3 +140,4 @@ __pycache__/
 
 # Sentry Config File
 .env.sentry-build-plugin
+artifacts/superpowers/
