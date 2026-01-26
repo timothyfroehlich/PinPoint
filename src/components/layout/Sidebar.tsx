@@ -168,6 +168,14 @@ export function Sidebar({
                 <span className="text-xl font-bold tracking-tight text-foreground">
                   PinPoint
                 </span>
+                <div className="h-5 w-px bg-primary/20 mx-1" />
+                <Image
+                  src="/apc-logo.png"
+                  alt="Austin Pinball Collective"
+                  width={60}
+                  height={34}
+                  className="h-8 w-auto object-contain opacity-90"
+                />
               </div>
             )}
           </Link>
