@@ -105,6 +105,17 @@ export async function createTestMachine(ownerId: string) {
     .select()
     .single();
   if (error) throw error;
+
+  // Also add owner to machine_watchers (full subscribe)
+  const { error: watcherError } = await supabaseAdmin
+    .from("machine_watchers")
+    .insert({
+      machine_id: data.id,
+      user_id: ownerId,
+      watch_mode: "subscribe",
+    });
+  if (watcherError) throw watcherError;
+
   return data;
 }
 

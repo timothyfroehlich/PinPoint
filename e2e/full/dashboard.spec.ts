@@ -114,9 +114,12 @@ test.describe.serial("Member Dashboard", () => {
       await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
 
       // Use filter to find the specific h1 containing the title, avoiding strict mode violation
-      // with the Dashboard h1
+      // with the Dashboard h1 or the Austin Pinball Collective logo
       // Verify title matches
-      const heading = page.getByRole("main").getByRole("heading", { level: 1 });
+      const heading = page.getByRole("main").getByRole("heading", {
+        level: 1,
+        name: new RegExp(issueTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+      });
 
       await expect(heading).toBeVisible();
       // Allow for some whitespace variation
