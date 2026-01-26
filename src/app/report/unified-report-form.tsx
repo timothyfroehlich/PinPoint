@@ -25,6 +25,7 @@ import type {
 } from "~/lib/types";
 import { ImageUploadButton } from "~/components/images/ImageUploadButton";
 import { ImageGallery } from "~/components/images/ImageGallery";
+import { type ImageMetadata } from "~/types/images";
 
 interface Machine {
   id: string;
@@ -76,13 +77,6 @@ export function UnifiedReportForm({
   const [priority, setPriority] = useState<IssuePriority | "">("");
   const [consistency, setConsistency] = useState<IssueConsistency | "">("");
 
-  interface ImageMetadata {
-    blobUrl: string;
-    blobPathname: string;
-    originalFilename: string;
-    fileSizeBytes: number;
-    mimeType: string;
-  }
   const [uploadedImages, setUploadedImages] = useState<ImageMetadata[]>([]);
 
   const [state, formAction, isPending] = useActionState(

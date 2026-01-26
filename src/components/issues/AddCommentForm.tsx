@@ -12,14 +12,7 @@ import {
 import { ImageUploadButton } from "~/components/images/ImageUploadButton";
 import { ImageGallery } from "~/components/images/ImageGallery";
 import { BLOB_CONFIG } from "~/lib/blob/config";
-
-interface ImageMetadata {
-  blobUrl: string;
-  blobPathname: string;
-  originalFilename: string;
-  fileSizeBytes: number;
-  mimeType: string;
-}
+import { type ImageMetadata } from "~/types/images";
 
 interface AddCommentFormProps {
   issueId: string;

@@ -35,7 +35,10 @@ test.describe("Image Upload Reporting", () => {
     // Use a test PNG from fixtures (2.3KB) that meets the 1KB minimum validation requirement
     const testImagePath = join(__dirname, "..", "fixtures", "test-image.png");
 
-    await page.setInputFiles('input[type="file"]', testImagePath);
+    await page.setInputFiles(
+      'input[data-testid="image-upload-input"]',
+      testImagePath
+    );
 
     // 4. Verify Preview appears
     // The preview card has a generic "Issue image" alt text or the filename
@@ -89,7 +92,10 @@ test.describe("Image Upload Reporting", () => {
 
     // 4. Upload Image
     const testImagePath = join(__dirname, "..", "fixtures", "test-image.png");
-    await page.setInputFiles('input[type="file"]', testImagePath);
+    await page.setInputFiles(
+      'input[data-testid="image-upload-input"]',
+      testImagePath
+    );
 
     // Verify preview
     await expect(

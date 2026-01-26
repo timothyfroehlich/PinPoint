@@ -3,11 +3,7 @@ import React from "react";
 
 import Image from "next/image";
 import { Dialog, DialogContent, DialogTrigger } from "~/components/ui/dialog";
-export interface GalleryImage {
-  id: string;
-  fullImageUrl: string;
-  originalFilename?: string | null;
-}
+import { type GalleryImage } from "~/types/images";
 
 interface ImageGalleryProps {
   images: GalleryImage[];
@@ -22,7 +18,14 @@ export function ImageGallery({
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
       {images.map((image) => {
         // Only bypass Next.js optimization for localhost URLs (MOCK_BLOB_STORAGE)
-        const isLocalhost = image.fullImageUrl.includes("localhost");
+        const isLocalhost = (() => {
+          try {
+            const url = new URL(image.fullImageUrl);
+            return url.hostname === "localhost" || url.hostname === "127.0.0.1";
+          } catch {
+            return false;
+          }
+        })();
 
         return (
           <Dialog key={image.id}>

@@ -20,7 +20,7 @@ const uuidish = z
  *
  * Validates:
  * - title: Required, trimmed, 1-200 characters
- * - description: Optional, trimmed
+ * - description: Nullish (can be null, undefined, or string), trimmed
  * - machineInitials: Required (Plan: Machine Initials)
  * - severity: Enum of 'minor' | 'playable' | 'unplayable'
  */

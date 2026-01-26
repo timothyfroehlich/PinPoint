@@ -9,15 +9,7 @@ import { compressImage } from "~/lib/blob/compression";
 import { validateImageFile } from "~/lib/blob/validation";
 import { uploadIssueImage } from "~/server/actions/images";
 import { toast } from "sonner";
-
-interface ImageMetadata {
-  blobUrl: string;
-  blobPathname: string;
-  originalFilename: string;
-  fileSizeBytes: number;
-  mimeType: string;
-  imageId?: string;
-}
+import { type ImageMetadata } from "~/types/images";
 
 interface ImageUploadButtonProps {
   issueId: string; // 'new' or UUID
@@ -139,6 +131,7 @@ export function ImageUploadButton({
         className="hidden"
         ref={fileInputRef}
         onChange={handleFileChange}
+        data-testid="image-upload-input"
       />
 
       {isAtLimit && (
