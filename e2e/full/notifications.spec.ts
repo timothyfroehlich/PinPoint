@@ -9,6 +9,7 @@ import {
   deleteTestMachine,
 } from "../support/supabase-admin.js";
 import { getTestIssueTitle } from "../support/test-isolation.js";
+import { escapeRegexString } from "../support/string-utils.js";
 
 const cleanupUserIds: string[] = [];
 const cleanupMachineIds: string[] = [];
@@ -88,7 +89,7 @@ test.describe("Notifications", () => {
 
     // Filter by unique issue title to avoid crosstalk from other workers
     const notification = ownerPage
-      .getByText(new RegExp(issueTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+      .getByText(new RegExp(escapeRegexString(issueTitle)))
       .first();
     await expect(notification).toBeVisible();
 
@@ -181,7 +182,7 @@ test.describe("Notifications", () => {
 
     // Look for specific notification with issue title
     const notification = page
-      .getByText(new RegExp(issueTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+      .getByText(new RegExp(escapeRegexString(issueTitle)))
       .first();
     await expect(notification).toBeVisible();
 
@@ -249,7 +250,7 @@ test.describe("Notifications", () => {
 
     // Filter to this test's notification only - other workers may have created global watchers too
     const notification = watcherPage
-      .getByText(new RegExp(issueTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+      .getByText(new RegExp(escapeRegexString(issueTitle)))
       .first();
     await expect(notification).toBeVisible();
 
@@ -307,7 +308,7 @@ test.describe("Notifications", () => {
     await page.goto("/dashboard"); // Reload to fetch
     await page.getByRole("button", { name: /notifications/i }).click();
     const notificationItem = page
-      .getByText(new RegExp(issueTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+      .getByText(new RegExp(escapeRegexString(issueTitle)))
       .first();
     await expect(notificationItem).toBeVisible();
 
@@ -370,7 +371,7 @@ test.describe("Notifications", () => {
     await bell.click();
 
     const notification = page
-      .getByText(new RegExp(issueTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+      .getByText(new RegExp(escapeRegexString(issueTitle)))
       .first();
     await expect(notification).toBeVisible();
 

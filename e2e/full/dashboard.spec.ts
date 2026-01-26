@@ -7,6 +7,7 @@
 
 import { test, expect, type Page } from "@playwright/test";
 import { ensureLoggedIn } from "../support/actions.js";
+import { escapeRegexString } from "../support/string-utils.js";
 
 async function getStatNumber(page: Page, testId: string): Promise<number> {
   const rawText = await page.getByTestId(testId).innerText();
@@ -118,7 +119,7 @@ test.describe.serial("Member Dashboard", () => {
       // Verify title matches
       const heading = page.getByRole("main").getByRole("heading", {
         level: 1,
-        name: new RegExp(issueTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+        name: new RegExp(escapeRegexString(issueTitle)),
       });
 
       await expect(heading).toBeVisible();

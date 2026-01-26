@@ -7,6 +7,7 @@ import {
 } from "../support/page-helpers.js";
 import { TEST_USERS } from "../support/constants.js";
 import { deleteTestIssueByNumber } from "e2e/support/supabase-admin.js";
+import { getTestIssueTitle } from "../support/test-isolation.js";
 
 /**
  * Email notification verification tests
@@ -40,8 +41,7 @@ test.describe("Email Notifications", () => {
   );
 
   test("should send email when issue is created", async ({ page }) => {
-    const timestamp = Date.now();
-    const issueTitle = `Test Issue for Email ${timestamp}`;
+    const issueTitle = getTestIssueTitle("Test Issue for Email");
 
     // Clear mailbox before test
     mailpit.clearMailbox(TEST_USERS.admin.email);
@@ -98,8 +98,7 @@ test.describe("Email Notifications", () => {
   );
 
   test("should send email when status changes", async ({ page }) => {
-    const timestamp = Date.now();
-    const issueTitle = `Status Change Test ${timestamp}`;
+    const issueTitle = getTestIssueTitle("Status Change Test");
 
     // Clear mailbox
     mailpit.clearMailbox(TEST_USERS.admin.email);
