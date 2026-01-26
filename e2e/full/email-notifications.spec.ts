@@ -40,8 +40,11 @@ test.describe("Email Notifications", () => {
   );
 
   test("should send email when issue is created", async ({ page }) => {
+    const timestamp = Date.now();
+    const issueTitle = `Test Issue for Email ${timestamp}`;
+
     // Clear mailbox before test
-    await mailpit.clearMailbox(TEST_USERS.admin.email);
+    mailpit.clearMailbox(TEST_USERS.admin.email);
 
     // Login as admin
     await page.goto("/login");
@@ -53,7 +56,7 @@ test.describe("Email Notifications", () => {
     // Create an issue for a specific machine (e.g., MM)
     await page.goto("/report?machine=MM");
     await fillReportForm(page, {
-      title: "Test Issue for Email",
+      title: issueTitle,
       description: "Testing email notifications",
     });
 
@@ -75,14 +78,14 @@ test.describe("Email Notifications", () => {
     }
     // Wait for email to arrive in Mailpit
     const email = await mailpit.waitForEmail(TEST_USERS.admin.email, {
-      subjectContains: "Test Issue for Email",
+      subjectContains: issueTitle,
       timeout: 30000,
       pollIntervalMs: 750,
     });
 
     // Verify email was sent
     expect(email).not.toBeNull();
-    expect(email?.subject).toContain("Test Issue for Email");
+    expect(email?.subject).toContain(issueTitle);
     expect(email?.to).toContain(TEST_USERS.admin.email);
   });
 
@@ -95,8 +98,11 @@ test.describe("Email Notifications", () => {
   );
 
   test("should send email when status changes", async ({ page }) => {
+    const timestamp = Date.now();
+    const issueTitle = `Status Change Test ${timestamp}`;
+
     // Clear mailbox
-    await mailpit.clearMailbox(TEST_USERS.admin.email);
+    mailpit.clearMailbox(TEST_USERS.admin.email);
 
     // Login
     await page.goto("/login");
@@ -107,7 +113,7 @@ test.describe("Email Notifications", () => {
 
     // Create issue for a specific machine (e.g., MM)
     await page.goto("/report?machine=MM");
-    await fillReportForm(page, { title: "Status Change Test" });
+    await fillReportForm(page, { title: issueTitle });
 
     // Submit form and wait for Server Action redirect (Safari-defensive)
     await submitFormAndWaitForRedirect(
@@ -122,12 +128,12 @@ test.describe("Email Notifications", () => {
     await expect(
       page
         .getByRole("main")
-        .getByRole("heading", { level: 1, name: /Status Change Test/ })
+        .getByRole("heading", { level: 1, name: new RegExp(issueTitle) })
     ).toBeVisible();
 
     // Clear the "new issue" email
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    await mailpit.clearMailbox(TEST_USERS.admin.email);
+    mailpit.clearMailbox(TEST_USERS.admin.email);
 
     // Update status
     await selectOption(page, "issue-status-select", "in_progress");
@@ -151,5 +157,6 @@ test.describe("Email Notifications", () => {
 
     expect(emailAfterStatusChange).not.toBeNull();
     expect(emailAfterStatusChange?.subject).toContain("Status Changed");
+    expect(emailAfterStatusChange?.subject).toContain(issueTitle);
   });
 });
