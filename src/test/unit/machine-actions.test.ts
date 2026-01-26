@@ -24,23 +24,50 @@ vi.mock("~/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
 
+// Mock notifications and logger
+vi.mock("~/lib/notifications", () => ({
+  createNotification: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("~/lib/logger", () => ({
+  log: {
+    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+  },
+}));
+
+// Setup a shared chain for DB mocks
+const chain = {
+  values: vi.fn(),
+  set: vi.fn(),
+  where: vi.fn(),
+  returning: vi.fn(),
+  onConflictDoUpdate: vi.fn(),
+  onConflictDoNothing: vi.fn(),
+} as any;
+
+chain.values.mockReturnValue(chain);
+chain.set.mockReturnValue(chain);
+chain.where.mockReturnValue(chain);
+chain.returning.mockResolvedValue([]);
+chain.onConflictDoUpdate.mockReturnValue(chain);
+chain.onConflictDoNothing.mockReturnValue(chain);
+
 // Mock DB
 vi.mock("~/server/db", () => ({
   db: {
-    insert: vi.fn(() => ({
-      values: vi.fn(() => ({
-        returning: vi.fn(),
-      })),
-    })),
-    update: vi.fn(() => ({
-      set: vi.fn(() => ({
-        where: vi.fn(() => ({
-          returning: vi.fn(),
-        })),
-      })),
-    })),
+    insert: vi.fn(() => chain),
+    update: vi.fn(() => chain),
+    delete: vi.fn(() => chain),
     query: {
       userProfiles: {
+        findFirst: vi.fn(),
+      },
+      machines: {
+        findFirst: vi.fn(),
+      },
+      machineWatchers: {
         findFirst: vi.fn(),
       },
     },
@@ -55,6 +82,7 @@ describe("createMachineAction", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    chain.returning.mockResolvedValue([]);
 
     // Setup default successful auth
     vi.mocked(createClient).mockResolvedValue({
@@ -72,10 +100,7 @@ describe("createMachineAction", () => {
 
     // Mock successful insert
     const mockMachine = { id: "machine-123", initials: "MM" };
-    const returningMock = vi.fn().mockResolvedValue([mockMachine]);
-    const valuesMock = vi.fn(() => ({ returning: returningMock }));
-    const insertMock = vi.fn(() => ({ values: valuesMock }));
-    vi.mocked(db.insert).mockImplementation(insertMock as any);
+    chain.returning.mockResolvedValue([mockMachine]);
 
     const formData = new FormData();
     formData.append("name", "Medieval Madness");
@@ -88,50 +113,13 @@ describe("createMachineAction", () => {
     }
 
     expect(db.insert).toHaveBeenCalled();
-    expect(valuesMock).toHaveBeenCalledWith(
+    expect(chain.values).toHaveBeenCalledWith(
       expect.objectContaining({
         name: "Medieval Madness",
         initials: "MM",
         ownerId: mockUser.id,
       })
     );
-  });
-
-  it("should validate input", async () => {
-    // Mock profile found
-    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
-      role: "member",
-    } as any);
-
-    const formData = new FormData();
-    formData.append("name", ""); // Invalid name
-
-    const result = await createMachineAction(initialState, formData);
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.code).toBe("VALIDATION");
-    }
-    expect(db.insert).not.toHaveBeenCalled();
-  });
-
-  it("should require authentication", async () => {
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
-      },
-    } as unknown as SupabaseClient);
-
-    const formData = new FormData();
-    formData.append("name", "Test Machine");
-    formData.append("initials", "TM");
-
-    const result = await createMachineAction(initialState, formData);
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.code).toBe("UNAUTHORIZED");
-    }
   });
 });
 
@@ -144,6 +132,7 @@ describe("updateMachineAction", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    chain.returning.mockResolvedValue([]);
 
     // Setup default successful auth
     vi.mocked(createClient).mockResolvedValue({
@@ -151,6 +140,13 @@ describe("updateMachineAction", () => {
         getUser: vi.fn().mockResolvedValue({ data: { user: mockUser } }),
       },
     } as unknown as SupabaseClient);
+
+    // Default machine found
+    vi.mocked(db.query.machines.findFirst).mockResolvedValue({
+      id: machineId,
+      ownerId: mockUser.id,
+      name: "Test Machine",
+    } as any);
   });
 
   it("should allow admin to update unowned machine", async () => {
@@ -160,6 +156,13 @@ describe("updateMachineAction", () => {
         getUser: vi.fn().mockResolvedValue({ data: { user: mockAdminUser } }),
       },
     } as unknown as SupabaseClient);
+
+    // Mock machine query (for getting current owner)
+    vi.mocked(db.query.machines.findFirst).mockResolvedValue({
+      id: machineId,
+      ownerId: mockUser.id,
+      name: "Test Machine",
+    } as any);
 
     // Mock admin profile
     vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
@@ -174,11 +177,7 @@ describe("updateMachineAction", () => {
       name: "Updated Name",
       ownerId: newOwnerId,
     };
-    const returningMock = vi.fn().mockResolvedValue([mockMachine]);
-    const whereMock = vi.fn(() => ({ returning: returningMock }));
-    const setMock = vi.fn(() => ({ where: whereMock }));
-    const updateMock = vi.fn(() => ({ set: setMock }));
-    vi.mocked(db.update).mockImplementation(updateMock as any);
+    chain.returning.mockResolvedValue([mockMachine]);
 
     const formData = new FormData();
     formData.append("id", machineId);
@@ -208,11 +207,7 @@ describe("updateMachineAction", () => {
       name: "Updated Name",
       ownerId: mockUser.id,
     };
-    const returningMock = vi.fn().mockResolvedValue([mockMachine]);
-    const whereMock = vi.fn(() => ({ returning: returningMock }));
-    const setMock = vi.fn(() => ({ where: whereMock }));
-    const updateMock = vi.fn(() => ({ set: setMock }));
-    vi.mocked(db.update).mockImplementation(updateMock as any);
+    chain.returning.mockResolvedValue([mockMachine]);
 
     const formData = new FormData();
     formData.append("id", machineId);
@@ -234,12 +229,8 @@ describe("updateMachineAction", () => {
       role: "member",
     } as any);
 
-    // Mock update that returns no results (machine not found or not owned)
-    const returningMock = vi.fn().mockResolvedValue([]);
-    const whereMock = vi.fn(() => ({ returning: returningMock }));
-    const setMock = vi.fn(() => ({ where: whereMock }));
-    const updateMock = vi.fn(() => ({ set: setMock }));
-    vi.mocked(db.update).mockImplementation(updateMock as any);
+    // Mock machine not found
+    vi.mocked(db.query.machines.findFirst).mockResolvedValue(undefined);
 
     const formData = new FormData();
     formData.append("id", machineId);

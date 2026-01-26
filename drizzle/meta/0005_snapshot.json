@@ -1,6 +1,6 @@
 {
-  "id": "1f4dd43b-7382-4b1f-9995-73c2a7941f1a",
-  "prevId": "eabb8c9f-09a6-4f7a-b573-edd280d58d27",
+  "id": "4464d644-9c16-43c1-aedc-432bc75b6442",
+  "prevId": "1f4dd43b-7382-4b1f-9995-73c2a7941f1a",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -581,6 +581,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'notify'"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         }
       },
       "indexes": {
@@ -869,6 +876,20 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "email_notify_on_machine_ownership_change": {
+          "name": "email_notify_on_machine_ownership_change",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "in_app_notify_on_machine_ownership_change": {
+          "name": "in_app_notify_on_machine_ownership_change",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
         }
       },
       "indexes": {

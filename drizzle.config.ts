@@ -38,6 +38,7 @@ export default defineConfig({
     "notifications",
     "notification_preferences",
     "invited_users",
+    "machine_watchers",
   ],
   schemaFilter: ["public"],
   verbose: true,

@@ -54,22 +54,31 @@ async function main() {
     });
 
     // Check current migration state
-    const appliedMigrations = await sql`
-      SELECT hash, created_at
-      FROM drizzle.__drizzle_migrations
-      ORDER BY created_at ASC
-    `;
+    let appliedMigrations: unknown[] = [];
+    try {
+      appliedMigrations = (await sql`
+        SELECT hash, created_at
+        FROM drizzle.__drizzle_migrations
+        ORDER BY created_at ASC
+      `) as unknown as unknown[];
+    } catch {
+      // Fresh database - drizzle schema doesn't exist yet
+      console.log("\n📦 Fresh database detected (no migration history found)");
+    }
 
-    console.log(
-      `\n✓ ${appliedMigrations.length} migration(s) already applied:`
-    );
-    appliedMigrations.forEach((migration) => {
-      if ("hash" in migration && "created_at" in migration) {
-        console.log(
-          `   - ${migration["hash"]} (applied: ${migration["created_at"]})`
-        );
-      }
-    });
+    if (appliedMigrations.length > 0) {
+      console.log(
+        `\n✓ ${appliedMigrations.length} migration(s) already applied:`
+      );
+      appliedMigrations.forEach((migration) => {
+        const typedMigration = migration as Record<string, unknown>;
+        if ("hash" in typedMigration && "created_at" in typedMigration) {
+          console.log(
+            `   - ${String(typedMigration["hash"])} (applied: ${String(typedMigration["created_at"])})`
+          );
+        }
+      });
+    }
 
     const pendingCount = journal.entries.length - appliedMigrations.length;
     if (pendingCount > 0) {

@@ -8,6 +8,7 @@ import {
   deleteTestUser,
   deleteTestMachine,
 } from "../support/supabase-admin.js";
+import { getTestIssueTitle } from "../support/test-isolation.js";
 
 const cleanupUserIds: string[] = [];
 const cleanupMachineIds: string[] = [];
@@ -66,7 +67,7 @@ test.describe("Notifications", () => {
       machine.id
     );
 
-    const issueTitle = `Public Report ${timestamp}`;
+    const issueTitle = getTestIssueTitle("Public Report");
     await fillReportForm(publicPage, {
       title: issueTitle,
       includePriority: false,
@@ -83,11 +84,12 @@ test.describe("Notifications", () => {
     await ownerPage.goto("/dashboard"); // Reload/Navigate to fetch notifications
 
     const bell = ownerPage.getByRole("button", { name: /notifications/i });
-    // Should have 1 notification (since it's a fresh user)
-    await expect(bell).toContainText("1");
-
     await bell.click();
-    const notification = ownerPage.getByText(/New report/).first();
+
+    // Filter by unique issue title to avoid crosstalk from other workers
+    const notification = ownerPage
+      .getByText(new RegExp(issueTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+      .first();
     await expect(notification).toBeVisible();
 
     // Verify it links to the correct machine/issue (by clicking and checking title)
@@ -130,7 +132,7 @@ test.describe("Notifications", () => {
       page.getByRole("heading", { name: "Report an Issue" })
     ).toBeVisible();
 
-    const issueTitle = `Status Change ${timestamp}`;
+    const issueTitle = getTestIssueTitle("Status Change");
     await fillReportForm(page, { title: issueTitle });
 
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
@@ -177,8 +179,10 @@ test.describe("Notifications", () => {
     await expect(bell).toBeVisible();
     await bell.click();
 
-    // Look for specific notification
-    const notification = page.getByText(/Status updated for/).first();
+    // Look for specific notification with issue title
+    const notification = page
+      .getByText(new RegExp(issueTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+      .first();
     await expect(notification).toBeVisible();
 
     await adminContext.close();
@@ -219,7 +223,7 @@ test.describe("Notifications", () => {
       .getByTestId("machine-select")
       .selectOption({ value: seededMachines.medievalMadness.id });
 
-    const issueTitle = `Global Watcher Test ${timestamp}`;
+    const issueTitle = getTestIssueTitle("Global Watcher Test");
     // Verify machine selection stuck
     await expect(publicPage.getByTestId("machine-select")).toHaveValue(
       seededMachines.medievalMadness.id
@@ -241,10 +245,12 @@ test.describe("Notifications", () => {
     await watcherPage.bringToFront();
     await watcherPage.goto("/dashboard");
     const bell = watcherPage.getByRole("button", { name: /notifications/i });
-    await expect(bell).toContainText("1");
     await bell.click();
 
-    const notification = watcherPage.getByText(/New report/).first();
+    // Filter to this test's notification only - other workers may have created global watchers too
+    const notification = watcherPage
+      .getByText(new RegExp(issueTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+      .first();
     await expect(notification).toBeVisible();
 
     await notification.click();
@@ -284,7 +290,7 @@ test.describe("Notifications", () => {
     await expect(publicPage.getByTestId("machine-select")).toHaveValue(
       machine.id
     );
-    const issueTitle = `Interaction Test ${timestamp}`;
+    const issueTitle = getTestIssueTitle("Interaction Test");
     await fillReportForm(publicPage, {
       title: issueTitle,
       includePriority: false,
@@ -300,7 +306,9 @@ test.describe("Notifications", () => {
     await page.bringToFront();
     await page.goto("/dashboard"); // Reload to fetch
     await page.getByRole("button", { name: /notifications/i }).click();
-    const notificationItem = page.getByText(/New report/).first();
+    const notificationItem = page
+      .getByText(new RegExp(issueTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+      .first();
     await expect(notificationItem).toBeVisible();
 
     // 4. Action: Click Notification
@@ -339,13 +347,14 @@ test.describe("Notifications", () => {
       .getByTestId("machine-select")
       .selectOption({ value: machine.id });
 
-    await fillReportForm(memberPage, { title: "Email Test Issue" });
+    const issueTitle = getTestIssueTitle("Email Test Issue");
+    await fillReportForm(memberPage, { title: issueTitle });
 
     await expect(memberPage.getByTestId("machine-select")).toHaveValue(
       machine.id
     );
     await expect(memberPage.getByLabel("Issue Title *")).toHaveValue(
-      "Email Test Issue"
+      issueTitle
     );
 
     await memberPage
@@ -358,10 +367,11 @@ test.describe("Notifications", () => {
     await page.goto("/dashboard");
 
     const bell = page.getByRole("button", { name: /notifications/i });
-    await expect(bell).toContainText("1");
     await bell.click();
 
-    const notification = page.getByText(/New report/);
+    const notification = page
+      .getByText(new RegExp(issueTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+      .first();
     await expect(notification).toBeVisible();
 
     await memberContext.close();

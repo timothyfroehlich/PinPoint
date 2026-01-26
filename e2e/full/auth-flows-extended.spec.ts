@@ -8,7 +8,7 @@
 import { test, expect } from "@playwright/test";
 import { loginAs, logout } from "../support/actions.js";
 import { seededMember } from "../support/constants.js";
-import { getPasswordResetLink, deleteAllMessages } from "../support/mailpit.js";
+import { getPasswordResetLink } from "../support/mailpit.js";
 
 // Removed local signOut helper in favor of shared action
 
@@ -112,8 +112,6 @@ test.describe("Extended Authentication", () => {
     const oldPassword = "OldPassword123!";
     const newPassword = "NewPassword456!";
 
-    await deleteAllMessages(testEmail);
-
     // Create account
     await page.goto("/signup");
     await page.getByLabel("First Name").fill("Password Reset");
@@ -128,8 +126,6 @@ test.describe("Extended Authentication", () => {
 
     // Sign out to start reset journey
     await logout(page);
-
-    await deleteAllMessages(testEmail);
 
     // Request reset
     await page.goto("/forgot-password");
@@ -173,6 +169,5 @@ test.describe("Extended Authentication", () => {
 
     // Cleanup
     await logout(page);
-    await deleteAllMessages(testEmail);
   });
 });
