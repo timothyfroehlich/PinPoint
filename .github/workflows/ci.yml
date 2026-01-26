@@ -431,6 +431,8 @@ jobs:
         run: ./scripts/supabase-init-for-tests.sh
 
       - name: Run Smoke Tests (Chromium)
+        env:
+          MOCK_BLOB_STORAGE: "true"
         run: pnpm exec playwright test e2e/smoke --project=chromium --reporter=dot
 
       - name: Upload Playwright report
@@ -505,6 +507,8 @@ jobs:
         run: ./scripts/supabase-init-for-tests.sh
 
       - name: Run Full Tests (Chromium)
+        env:
+          MOCK_BLOB_STORAGE: "true"
         run: pnpm exec playwright test --config=playwright.config.full.ts --project=chromium --reporter=dot
 
       - name: Upload Playwright report
@@ -579,6 +583,8 @@ jobs:
         run: ./scripts/supabase-init-for-tests.sh
 
       - name: Run Full Tests (Mobile Chrome)
+        env:
+          MOCK_BLOB_STORAGE: "true"
         run: pnpm exec playwright test --config=playwright.config.full.ts --project="Mobile Chrome" --reporter=dot
 
       - name: Upload Playwright report
@@ -656,6 +662,8 @@ jobs:
         run: ./scripts/supabase-init-for-tests.sh
 
       - name: Run Full Tests (Mobile Safari)
+        env:
+          MOCK_BLOB_STORAGE: "true"
         run: pnpm exec playwright test --config=playwright.config.full.ts --project="Mobile Safari" --reporter=dot
 
       - name: Upload Playwright report
