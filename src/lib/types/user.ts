@@ -4,7 +4,7 @@ export type UserStatus = "active" | "invited";
 export interface UnifiedUser {
   id: string;
   name: string;
-  email: string;
+  email?: string | null;
   role: UserRole;
   status: UserStatus;
   avatarUrl: string | null;
@@ -14,6 +14,6 @@ export interface UnifiedUser {
 export interface MachineOwner {
   id: string;
   name: string;
-  email: string;
+  email?: string | null;
   status: UserStatus;
 }

@@ -70,7 +70,7 @@ describe("Invited Users Integration", () => {
       role: "member",
     });
 
-    const unifiedUsers = await getUnifiedUsers();
+    const unifiedUsers = await getUnifiedUsers({ includeEmails: true });
 
     expect(unifiedUsers).toHaveLength(2);
     expect(unifiedUsers.find((u: any) => u.status === "active")?.email).toBe(

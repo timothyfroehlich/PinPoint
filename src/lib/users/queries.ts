@@ -3,13 +3,17 @@ import { userProfiles, invitedUsers } from "~/server/db/schema";
 import { sql } from "drizzle-orm";
 import type { UnifiedUser } from "~/lib/types";
 
-export async function getUnifiedUsers(): Promise<UnifiedUser[]> {
+export async function getUnifiedUsers(
+  options: { includeEmails?: boolean } = {}
+): Promise<UnifiedUser[]> {
+  const { includeEmails = false } = options;
+
   // Fetch activated users
   const activatedUsers = await db
     .select({
       id: userProfiles.id,
       name: userProfiles.name,
-      email: userProfiles.email,
+      ...(includeEmails ? { email: userProfiles.email } : {}),
       role: userProfiles.role,
       avatarUrl: userProfiles.avatarUrl,
       status: sql<"active">`'active'`,
@@ -22,7 +26,7 @@ export async function getUnifiedUsers(): Promise<UnifiedUser[]> {
     .select({
       id: invitedUsers.id,
       name: invitedUsers.name,
-      email: invitedUsers.email,
+      ...(includeEmails ? { email: invitedUsers.email } : {}),
       role: invitedUsers.role,
       avatarUrl: sql<null>`null`,
       status: sql<"invited">`'invited'`,

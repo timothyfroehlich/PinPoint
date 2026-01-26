@@ -2,7 +2,7 @@ import type React from "react";
 import { type Metadata } from "next";
 import { and } from "drizzle-orm";
 import { db } from "~/server/db";
-import { issues } from "~/server/db/schema";
+import { issues, userProfiles } from "~/server/db/schema";
 import { IssueFilters } from "~/components/issues/IssueFilters";
 import { IssueList } from "~/components/issues/IssueList";
 import { createClient } from "~/lib/supabase/server";
@@ -14,7 +14,7 @@ import {
   buildWhereConditions,
   buildOrderBy,
 } from "~/lib/issues/filters-queries";
-import { count } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 
 export const metadata: Metadata = {
   title: "Issues | PinPoint",
@@ -51,9 +51,17 @@ export default async function IssuesPage({
 
   const filters = parseIssueFilters(urlParams);
 
+  // Fetch current user profile to check role for visibility
+  const currentUserProfile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, user.id),
+    columns: { role: true },
+  });
+
+  const isAdmin = currentUserProfile?.role === "admin";
+
   // Add currentUserId for watching filter
   filters.currentUserId = user.id;
-  const where = buildWhereConditions(filters, db);
+  const where = buildWhereConditions(filters, db, { isAdmin });
   const orderBy = buildOrderBy(filters.sort);
   const pageSize = filters.pageSize ?? 15;
   const page = filters.page ?? 1;
@@ -77,13 +85,25 @@ export default async function IssuesPage({
         columns: { id: true, name: true },
       },
       reportedByUser: {
-        columns: { id: true, name: true, email: true },
+        columns: {
+          id: true,
+          name: true,
+          ...(isAdmin && { email: true }),
+        },
       },
       invitedReporter: {
-        columns: { id: true, name: true, email: true },
+        columns: {
+          id: true,
+          name: true,
+          ...(isAdmin && { email: true }),
+        },
       },
       assignedToUser: {
-        columns: { id: true, name: true, email: true },
+        columns: {
+          id: true,
+          name: true,
+          ...(isAdmin && { email: true }),
+        },
       },
     },
     limit: pageSize,
