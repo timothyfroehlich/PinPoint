@@ -211,9 +211,6 @@ jobs:
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Ensure test schema is current
-        run: pnpm run test:ensure-schema
-
       - name: Run unit tests
         run: |
           set -a
@@ -250,9 +247,6 @@ jobs:
       - name: Install dependencies (if cache miss)
         if: steps.cache-restore.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
-
-      - name: Ensure test schema is current
-        run: pnpm run test:ensure-schema
 
       - name: Run integration tests
         run: |
@@ -320,7 +314,11 @@ jobs:
         run: pnpm run db:migrate
 
       - name: Ensure test schema is current
-        run: pnpm run test:ensure-schema
+        run: |
+          set -a
+          source .env.ci
+          set +a
+          pnpm run test:ensure-schema
 
   test-integration-supabase:
     name: Supabase Integration Tests

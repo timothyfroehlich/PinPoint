@@ -62,8 +62,8 @@ The file `src/test/setup/schema.sql` is **auto-generated** and **not committed t
 ### When Schema Changes
 
 1. Modify `src/server/db/schema.ts`
-2. Run `pnpm run db:migrate` (regenerates automatically if using standard workflows)
-3. Tests will use updated schema automatically
+2. Run `pnpm run db:migrate` to apply migrations to your development database
+3. Next time you run tests, `pnpm run test:ensure-schema` will regenerate the test schema if needed, so tests will use the updated schema automatically
 
 ### CI/CD
 

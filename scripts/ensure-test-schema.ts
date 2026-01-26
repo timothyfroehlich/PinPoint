@@ -18,8 +18,16 @@ const SCHEMA_SQL = resolve(ROOT, "src/test/setup/schema.sql");
 function getModifiedTime(path: string): number {
   try {
     return statSync(path).mtimeMs;
-  } catch {
-    return 0;
+  } catch (error: unknown) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "ENOENT"
+    ) {
+      return 0;
+    }
+    throw error;
   }
 }
 
@@ -28,18 +36,26 @@ function main() {
   const schemaTsTime = getModifiedTime(SCHEMA_TS);
   const schemaSqlTime = getModifiedTime(SCHEMA_SQL);
 
-  if (!schemaExists) {
-    console.log("⚠️  Test schema missing, generating...");
-    execSync("pnpm run test:_generate-schema", { stdio: "inherit" });
-    console.log("✅ Test schema generated");
-    return;
-  }
+  try {
+    if (!schemaExists) {
+      console.log("⚠️  Test schema missing, generating...");
+      execSync("pnpm run test:_generate-schema", { stdio: "inherit" });
+      console.log("✅ Test schema generated");
+      return;
+    }
 
-  if (schemaTsTime > schemaSqlTime) {
-    console.log("⚠️  Test schema stale, regenerating...");
-    execSync("pnpm run test:_generate-schema", { stdio: "inherit" });
-    console.log("✅ Test schema updated");
-    return;
+    if (schemaTsTime > schemaSqlTime) {
+      console.log("⚠️  Test schema stale, regenerating...");
+      execSync("pnpm run test:_generate-schema", { stdio: "inherit" });
+      console.log("✅ Test schema updated");
+      return;
+    }
+  } catch (error) {
+    console.error("❌ Failed to ensure test schema:");
+    if (error instanceof Error) {
+      console.error(error.message);
+    }
+    process.exit(1);
   }
 
   console.log("✓ Test schema up-to-date");
