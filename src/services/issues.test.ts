@@ -108,10 +108,6 @@ describe("Issue Service", () => {
           issueTitle: "Test Issue",
           machineName: "Test Machine",
           formattedIssueId: "MM-01",
-          issueContext: {
-            assignedToId: assigneeId,
-            reportedById: "reporter-1",
-          },
         },
         expect.anything()
       );
@@ -152,7 +148,6 @@ describe("Issue Service", () => {
           issueTitle: "New Issue",
           machineName: "Test Machine",
           formattedIssueId: "MM-01",
-          issueContext: { machineOwnerId: "owner-1" },
         },
         expect.anything()
       );
@@ -193,10 +188,6 @@ describe("Issue Service", () => {
         machineName: "Machine Name",
         formattedIssueId: "MM-01",
         commentContent: "My comment",
-        issueContext: {
-          assignedToId: "assignee-1",
-          reportedById: "reporter-1",
-        },
       });
     });
   });

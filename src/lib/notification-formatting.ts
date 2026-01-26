@@ -18,6 +18,8 @@ export function getEmailSubject(
       return `${prefix}Status Changed ${formattedIssueId ? `(${formattedIssueId})` : ""}: ${issueTitle}`;
     case "new_comment":
       return `${prefix}New Comment on ${formattedIssueId ? `(${formattedIssueId})` : ""}: ${issueTitle}`;
+    case "machine_ownership_changed":
+      return `${prefix}Ownership Update: You have been ${issueTitle?.includes("removed") ? "removed as" : "added as"} an owner`;
     default:
       return "PinPoint Notification";
   }

@@ -56,6 +56,14 @@ CREATE TABLE "issues" (
           ("issues"."reported_by" IS NULL AND "issues"."invited_reported_by" IS NULL AND ("issues"."reporter_name" IS NOT NULL OR "issues"."reporter_email" IS NOT NULL)))
 );
 
+CREATE TABLE "machine_watchers" (
+	"machine_id" uuid NOT NULL,
+	"user_id" uuid NOT NULL,
+	"watch_mode" text DEFAULT 'notify' NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "machine_watchers_machine_id_user_id_pk" PRIMARY KEY("machine_id","user_id")
+);
+
 CREATE TABLE "machines" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"initials" text NOT NULL,
@@ -83,7 +91,9 @@ CREATE TABLE "notification_preferences" (
 	"email_notify_on_new_issue" boolean DEFAULT true NOT NULL,
 	"in_app_notify_on_new_issue" boolean DEFAULT true NOT NULL,
 	"email_watch_new_issues_global" boolean DEFAULT false NOT NULL,
-	"in_app_watch_new_issues_global" boolean DEFAULT false NOT NULL
+	"in_app_watch_new_issues_global" boolean DEFAULT false NOT NULL,
+	"email_notify_on_machine_ownership_change" boolean DEFAULT true NOT NULL,
+	"in_app_notify_on_machine_ownership_change" boolean DEFAULT true NOT NULL
 );
 
 CREATE TABLE "notifications" (
@@ -117,6 +127,8 @@ ALTER TABLE "issues" ADD CONSTRAINT "issues_machine_initials_machines_initials_f
 ALTER TABLE "issues" ADD CONSTRAINT "issues_reported_by_user_profiles_id_fk" FOREIGN KEY ("reported_by") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "issues" ADD CONSTRAINT "issues_invited_reported_by_invited_users_id_fk" FOREIGN KEY ("invited_reported_by") REFERENCES "public"."invited_users"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "issues" ADD CONSTRAINT "issues_assigned_to_user_profiles_id_fk" FOREIGN KEY ("assigned_to") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "machine_watchers" ADD CONSTRAINT "machine_watchers_machine_id_machines_id_fk" FOREIGN KEY ("machine_id") REFERENCES "public"."machines"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "machine_watchers" ADD CONSTRAINT "machine_watchers_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE cascade ON UPDATE no action;
 ALTER TABLE "machines" ADD CONSTRAINT "machines_owner_id_user_profiles_id_fk" FOREIGN KEY ("owner_id") REFERENCES "public"."user_profiles"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "machines" ADD CONSTRAINT "machines_invited_owner_id_invited_users_id_fk" FOREIGN KEY ("invited_owner_id") REFERENCES "public"."invited_users"("id") ON DELETE no action ON UPDATE no action;
 ALTER TABLE "notification_preferences" ADD CONSTRAINT "notification_preferences_user_id_user_profiles_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user_profiles"("id") ON DELETE cascade ON UPDATE no action;
@@ -131,6 +143,7 @@ CREATE INDEX "idx_issues_created_at" ON "issues" USING btree ("created_at");
 CREATE INDEX "idx_issues_invited_reported_by" ON "issues" USING btree ("invited_reported_by");
 CREATE INDEX "idx_issues_severity" ON "issues" USING btree ("severity");
 CREATE INDEX "idx_issues_priority" ON "issues" USING btree ("priority");
+CREATE INDEX "idx_machine_watchers_user_id" ON "machine_watchers" USING btree ("user_id");
 CREATE INDEX "idx_machines_owner_id" ON "machines" USING btree ("owner_id");
 CREATE INDEX "idx_machines_invited_owner_id" ON "machines" USING btree ("invited_owner_id");
 CREATE INDEX "idx_machines_name" ON "machines" USING btree ("name");

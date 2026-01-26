@@ -217,6 +217,36 @@ export const issueWatchers = pgTable(
 );
 
 /**
+ * Machine Watchers Table
+ *
+ * Users watching a machine for notifications on all its issues.
+ * Modes:
+ * - notify: Get notified of new issues
+ * - subscribe: Notify + auto-add to watchers for new issues
+ */
+export const machineWatchers = pgTable(
+  "machine_watchers",
+  {
+    machineId: uuid("machine_id")
+      .notNull()
+      .references(() => machines.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => userProfiles.id, { onDelete: "cascade" }),
+    watchMode: text("watch_mode", { enum: ["notify", "subscribe"] })
+      .notNull()
+      .default("notify"),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.machineId, t.userId] }),
+    userIdIdx: index("idx_machine_watchers_user_id").on(t.userId),
+  })
+);
+
+/**
  * Issue Comments Table
  *
  * Comments on issues, including system-generated timeline events.
@@ -265,6 +295,7 @@ export const notifications = pgTable(
         "issue_status_changed",
         "new_comment",
         "new_issue",
+        "machine_ownership_changed",
       ],
     }).notNull(),
     resourceId: uuid("resource_id").notNull(), // Generic reference to issue or machine
@@ -338,6 +369,18 @@ export const notificationPreferences = pgTable(
     inAppWatchNewIssuesGlobal: boolean("in_app_watch_new_issues_global")
       .notNull()
       .default(false),
+
+    // Machine Ownership Changes
+    emailNotifyOnMachineOwnershipChange: boolean(
+      "email_notify_on_machine_ownership_change"
+    )
+      .notNull()
+      .default(true),
+    inAppNotifyOnMachineOwnershipChange: boolean(
+      "in_app_notify_on_machine_ownership_change"
+    )
+      .notNull()
+      .default(true),
   },
   (t) => ({
     globalWatchEmailIdx: index("idx_notif_prefs_global_watch_email").on(
@@ -363,6 +406,7 @@ export const userProfilesRelations = relations(
     }),
     notifications: many(notifications),
     watchedIssues: many(issueWatchers),
+    watchedMachines: many(machineWatchers),
   })
 );
 
@@ -378,6 +422,7 @@ export const machinesRelations = relations(machines, ({ many, one }) => ({
     references: [invitedUsers.id],
     relationName: "invited_owner",
   }),
+  watchers: many(machineWatchers),
 }));
 
 export const issuesRelations = relations(issues, ({ one, many }) => ({
@@ -443,6 +488,20 @@ export const notificationPreferencesRelations = relations(
   ({ one }) => ({
     user: one(userProfiles, {
       fields: [notificationPreferences.userId],
+      references: [userProfiles.id],
+    }),
+  })
+);
+
+export const machineWatchersRelations = relations(
+  machineWatchers,
+  ({ one }) => ({
+    machine: one(machines, {
+      fields: [machineWatchers.machineId],
+      references: [machines.id],
+    }),
+    user: one(userProfiles, {
+      fields: [machineWatchers.userId],
       references: [userProfiles.id],
     }),
   })
