@@ -156,6 +156,7 @@ export function Sidebar({
                 width={56}
                 height={56}
                 className="animate-in fade-in zoom-in duration-300 object-contain h-[56px] w-[56px]"
+                priority
               />
             ) : (
               <div className="flex items-center justify-between w-full px-2 animate-in fade-in slide-in-from-left-4 duration-300">
@@ -165,6 +166,7 @@ export function Sidebar({
                   width={50}
                   height={50}
                   className="object-contain h-[50px] w-[50px] shrink-0"
+                  priority
                 />
                 <span className="text-xl font-bold tracking-tight text-foreground mx-auto">
                   PinPoint
