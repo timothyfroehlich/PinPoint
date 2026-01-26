@@ -10,6 +10,10 @@ export const metadata: Metadata = {
   title: "PinPoint - Pinball Machine Issue Tracking",
   description:
     "Issue tracking for pinball machines at Austin Pinball Collective",
+  icons: {
+    icon: "/favicon.png",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({

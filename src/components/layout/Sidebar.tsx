@@ -12,7 +12,6 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
-  CircleDot,
   HelpCircle,
   Map as MapIcon,
 } from "lucide-react";
@@ -138,27 +137,48 @@ export function Sidebar({
         {/* Logo Area */}
         <div
           className={cn(
-            "flex h-24 items-center justify-center border-b border-primary/20 transition-all duration-300",
+            "flex h-16 items-center justify-center border-b border-primary/20 transition-all duration-300",
             collapsed ? "px-0" : "px-4"
           )}
         >
           <Link
             href="/dashboard"
             {...(onNavigate ? { onClick: onNavigate } : {})}
-            className="flex size-full items-center justify-center"
-            aria-label={collapsed ? "Austin Pinball Collective" : undefined}
+            className="flex size-full items-center justify-center gap-2"
+            aria-label={
+              collapsed ? "PinPoint" : "PinPoint - Austin Pinball Collective"
+            }
           >
             {collapsed ? (
-              <CircleDot className="size-8 text-primary animate-in fade-in zoom-in duration-300" />
-            ) : (
               <Image
-                src="/apc-logo.png"
-                alt="Austin Pinball Collective"
-                width={160}
-                height={100}
-                className="w-auto h-20 object-contain drop-shadow-[0_0_8px_rgba(74,222,128,0.5)] animate-in fade-in slide-in-from-left-4 duration-300"
+                src="/logo-pinpoint-transparent.png"
+                alt="P"
+                width={56}
+                height={56}
+                className="animate-in fade-in zoom-in duration-300 object-contain h-[56px] w-[56px]"
                 priority
               />
+            ) : (
+              <div className="flex items-center justify-between w-full px-2 animate-in fade-in slide-in-from-left-4 duration-300">
+                <Image
+                  src="/logo-pinpoint-transparent.png"
+                  alt="PinPoint"
+                  width={50}
+                  height={50}
+                  className="object-contain h-[50px] w-[50px] shrink-0"
+                  priority
+                />
+                <span className="text-xl font-bold tracking-tight text-foreground mx-auto">
+                  PinPoint
+                </span>
+                <Image
+                  src="/apc-logo.png"
+                  alt="Austin Pinball Collective"
+                  width={64}
+                  height={38}
+                  className="h-9 w-auto object-contain shrink-0"
+                />
+              </div>
             )}
           </Link>
         </div>
