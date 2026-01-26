@@ -1,14 +1,15 @@
 import { test, expect } from "@playwright/test";
 import { ensureLoggedIn, selectOption } from "../support/actions.js";
 import { fillReportForm } from "../support/page-helpers.js";
-import { seededMachines, TEST_USERS } from "../support/constants.js";
+import { seededMachines } from "../support/constants.js";
 import {
   createTestUser,
   createTestMachine,
   deleteTestUser,
   deleteTestMachine,
+  updateUserRole,
 } from "../support/supabase-admin.js";
-import { getTestIssueTitle } from "../support/test-isolation.js";
+import { getTestIssueTitle, getTestEmail } from "../support/test-isolation.js";
 
 const cleanupUserIds: string[] = [];
 const cleanupMachineIds: string[] = [];
@@ -114,18 +115,25 @@ test.describe("Notifications", () => {
     page,
     browser,
   }, testInfo) => {
-    // 1. Setup: Use seeded member as reporter, but report on a fresh machine owned by a fresh admin
+    // 1. Setup: Use fresh member as reporter, and fresh machine owned by a fresh admin
     // This isolates the "Status Changed" notification to this interaction
 
     const timestamp = Date.now();
-    const adminEmail = `admin-${timestamp}@example.com`;
+    const adminEmail = getTestEmail(`admin-status-${timestamp}@test.com`);
     const admin = await createTestUser(adminEmail); // Acts as owner/admin
+    await updateUserRole(admin.id, "admin");
     cleanupUserIds.push(admin.id);
     const machine = await createTestMachine(admin.id);
     cleanupMachineIds.push(machine.id);
 
-    // Reporter (Member) reports an issue
-    await ensureLoggedIn(page, testInfo, TEST_USERS.member);
+    // Reporter (Fresh Member) reports an issue
+    const memberEmail = getTestEmail(`member-status-${timestamp}@test.com`);
+    const member = await createTestUser(memberEmail);
+    cleanupUserIds.push(member.id);
+    await ensureLoggedIn(page, testInfo, {
+      email: memberEmail,
+      password: "TestPassword123",
+    });
 
     await page.goto(`/report?machine=${machine.initials}`);
     await expect(
@@ -322,8 +330,9 @@ test.describe("Notifications", () => {
   test("email notification flow", async ({ page, browser }, testInfo) => {
     // 1. Setup: Fresh Admin/Owner
     const timestamp = Date.now();
-    const ownerEmail = `email-test-${timestamp}@example.com`;
+    const ownerEmail = getTestEmail(`email-test-${timestamp}@test.com`);
     const owner = await createTestUser(ownerEmail);
+    await updateUserRole(owner.id, "admin");
     cleanupUserIds.push(owner.id);
     const machine = await createTestMachine(owner.id);
     cleanupMachineIds.push(machine.id);
@@ -337,10 +346,16 @@ test.describe("Notifications", () => {
     // We rely on In-App to verify the event triggered, as we can't easily check email in E2E without Mailpit API
     // (We could use Mailpit API, but checking In-App is sufficient to prove the event fired)
 
-    // 2. Action: Member reports an issue
+    // 2. Action: Fresh Member reports an issue
+    const memberEmail = getTestEmail(`member-email-${timestamp}@test.com`);
+    const member = await createTestUser(memberEmail);
+    cleanupUserIds.push(member.id);
     const memberContext = await browser.newContext();
     const memberPage = await memberContext.newPage();
-    await ensureLoggedIn(memberPage, testInfo, TEST_USERS.member);
+    await ensureLoggedIn(memberPage, testInfo, {
+      email: memberEmail,
+      password: "TestPassword123",
+    });
 
     await memberPage.goto("/report");
     await memberPage

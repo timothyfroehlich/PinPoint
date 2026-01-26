@@ -7,6 +7,7 @@
 
 import { test, expect, type Page } from "@playwright/test";
 import { ensureLoggedIn } from "../support/actions.js";
+import { getTestPrefix } from "../support/test-isolation.js";
 
 async function getStatNumber(page: Page, testId: string): Promise<number> {
   const rawText = await page.getByTestId(testId).innerText();
@@ -99,8 +100,12 @@ test.describe.serial("Member Dashboard", () => {
   }, testInfo) => {
     await ensureLoggedIn(page, testInfo);
 
-    // Check if there are any issue cards
-    const issueCards = page.getByTestId("recent-issue-card");
+    // Check if there are any issue cards belonging to this worker
+    // Other workers might be creating issues simultaneously
+    const testPrefix = getTestPrefix();
+    const issueCards = page
+      .getByTestId("recent-issue-card")
+      .filter({ hasText: `[${testPrefix}]` });
     const count = await issueCards.count();
 
     if (count > 0) {
@@ -119,9 +124,13 @@ test.describe.serial("Member Dashboard", () => {
       // Use filter to find the specific h1 containing the title, avoiding strict mode violation
       // with the Dashboard h1 or the Austin Pinball Collective logo
       // Verify title matches
+      // Replace all spaces with \s+ in the regex for flexibility
+      const titlePattern = issueTitle
+        .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+        .replace(/\s+/g, "\\s+");
       const heading = page.getByRole("main").getByRole("heading", {
         level: 1,
-        name: new RegExp(issueTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+        name: new RegExp(titlePattern),
       });
 
       await expect(heading).toBeVisible();
