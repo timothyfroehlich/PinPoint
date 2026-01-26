@@ -83,6 +83,9 @@ We use git worktrees for parallel environments. Config is managed via templates 
 - **Database Safety**:
   - Local: `db:reset` allowed.
   - Prod: **NEVER** `db:reset`. ONLY `db:migrate`.
+- **Connection Requirements**:
+  - **Session Pooler (IPv4)**: Use `DATABASE_URL` (port `:6543`) for external connections. The `DIRECT_URL` (port `:5432`) uses IPv6 which may be unreachable from some environments.
+  - Format: `postgresql://postgres.[project-ref]:password@aws-0-us-east-2.pooler.supabase.com:6543/postgres`
 
 ### GitHub Copilot Reviews
 
