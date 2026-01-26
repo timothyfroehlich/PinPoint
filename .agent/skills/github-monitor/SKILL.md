@@ -1,3 +1,8 @@
+---
+name: github-monitor
+description: Monitor GitHub Actions, watch builds, and automatically transition to debugging on failure. Use when user says "monitor github actions", "watch builds", or "check actions".
+---
+
 # GitHub Actions Monitor Skill
 
 Use this skill whenever you are asked to "monitor the github actions" or "watch the builds".
