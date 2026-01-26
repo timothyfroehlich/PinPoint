@@ -56,12 +56,12 @@ async function main() {
     // Check current migration state
     let appliedMigrations: unknown[] = [];
     try {
-      appliedMigrations = await sql`
+      appliedMigrations = (await sql`
         SELECT hash, created_at
         FROM drizzle.__drizzle_migrations
         ORDER BY created_at ASC
-      `;
-    } catch (error) {
+      `) as unknown as unknown[];
+    } catch {
       // Fresh database - drizzle schema doesn't exist yet
       console.log("\n📦 Fresh database detected (no migration history found)");
     }
@@ -71,9 +71,10 @@ async function main() {
         `\n✓ ${appliedMigrations.length} migration(s) already applied:`
       );
       appliedMigrations.forEach((migration) => {
-        if ("hash" in migration && "created_at" in migration) {
+        const typedMigration = migration as Record<string, unknown>;
+        if ("hash" in typedMigration && "created_at" in typedMigration) {
           console.log(
-            `   - ${migration["hash"]} (applied: ${migration["created_at"]})`
+            `   - ${String(typedMigration["hash"])} (applied: ${String(typedMigration["created_at"])})`
           );
         }
       });
