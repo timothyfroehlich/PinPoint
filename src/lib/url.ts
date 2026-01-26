@@ -90,7 +90,7 @@ export function getSafeRedirect(
   url: string | null | undefined,
   fallback = "/dashboard"
 ): string {
-  if (isInternalUrl(url)) {
+  if (isInternalUrl(url) && !url.startsWith("/login")) {
     return url;
   }
   return fallback;

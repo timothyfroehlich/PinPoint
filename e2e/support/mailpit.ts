@@ -221,11 +221,21 @@ export class MailpitClient {
   }
 
   /**
-   * Delete all messages for a specific email
-   */
-  async clearMailbox(_email: string): Promise<void> {
-    // Mailpit does not support mailbox-scoped delete; use global delete for test isolation.
-    await this.deleteAllMessages();
+
+     * Delete all messages for a specific email
+
+     */
+
+  clearMailbox(email: string): void {
+    // Mailpit does not support mailbox-scoped delete.
+
+    // For test isolation in parallel runs, we should avoid global deletes.
+
+    // Tests should instead rely on unique subjects or timestamps.
+
+    console.log(
+      `[Mailpit] clearMailbox(${email}) called (no-op for parallel stability)`
+    );
   }
 
   /**
@@ -272,7 +282,7 @@ const mailpitClient = new MailpitClient();
 
 export const deleteAllMessages = async (email?: string): Promise<void> => {
   if (email) {
-    await mailpitClient.clearMailbox(email);
+    mailpitClient.clearMailbox(email);
     return;
   }
   await mailpitClient.deleteAllMessages();

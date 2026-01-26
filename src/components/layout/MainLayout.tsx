@@ -128,12 +128,7 @@ export async function MainLayout({
               <FeedbackWidget />
               {user ? (
                 <>
-                  <Button
-                    asChild
-                    variant="ghost"
-                    size="sm"
-                    className="hidden lg:flex"
-                  >
+                  <Button asChild variant="ghost" size="sm">
                     <Link href="/report">Report Issue</Link>
                   </Button>
                   <NotificationList notifications={enrichedNotifications} />
@@ -148,7 +143,6 @@ export async function MainLayout({
                     asChild
                     variant="ghost"
                     size="sm"
-                    className="hidden lg:flex"
                     data-testid="nav-report-issue"
                   >
                     <Link href="/report">Report Issue</Link>

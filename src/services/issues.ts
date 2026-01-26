@@ -6,7 +6,6 @@ import {
   machines,
   issueComments,
   userProfiles,
-  notificationPreferences,
 } from "~/server/db/schema";
 import { createTimelineEvent } from "~/lib/timeline/events";
 import { createNotification } from "~/lib/notifications";
@@ -152,24 +151,6 @@ export async function createIssue({
         .onConflictDoNothing();
     }
 
-    // Machine Owner (if prefs enabled)
-    if (updatedMachine.ownerId) {
-      const ownerPrefs = await tx.query.notificationPreferences.findFirst({
-        where: eq(notificationPreferences.userId, updatedMachine.ownerId),
-      });
-
-      // If owner wants notifications for new issues, auto-watch this specific issue
-      if (
-        ownerPrefs?.emailNotifyOnNewIssue ||
-        ownerPrefs?.inAppNotifyOnNewIssue
-      ) {
-        await tx
-          .insert(issueWatchers)
-          .values({ issueId: issue.id, userId: updatedMachine.ownerId })
-          .onConflictDoNothing();
-      }
-    }
-
     // 5. Notifications
     try {
       // Trigger Notification (actorId optional for public reports)
@@ -183,7 +164,6 @@ export async function createIssue({
           issueTitle: title,
           machineName: updatedMachine.name,
           formattedIssueId: formatIssueId(machineInitials, issueNumber),
-          issueContext: { machineOwnerId: updatedMachine.ownerId ?? null },
         },
         tx
       );
@@ -274,10 +254,6 @@ export async function updateIssueStatus({
             currentIssue.issueNumber
           ),
           newStatus: status,
-          issueContext: {
-            assignedToId: currentIssue.assignedTo ?? null,
-            reportedById: currentIssue.reportedBy ?? null,
-          },
         },
         tx
       );
@@ -345,10 +321,6 @@ export async function addIssueComment({
         ? formatIssueId(issue.machineInitials, issue.issueNumber)
         : undefined,
       commentContent: content,
-      issueContext: {
-        assignedToId: issue?.assignedTo ?? null,
-        reportedById: issue?.reportedBy ?? null,
-      },
     });
   } catch (error) {
     log.error(
@@ -484,10 +456,6 @@ export async function assignIssue({
               currentIssue.machineInitials,
               currentIssue.issueNumber
             ),
-            issueContext: {
-              assignedToId: assignedTo,
-              reportedById: currentIssue.reportedBy ?? null,
-            },
           },
           tx
         );

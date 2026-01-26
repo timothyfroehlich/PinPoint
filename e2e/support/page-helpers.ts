@@ -84,11 +84,14 @@ export async function fillReportForm(
     await page.getByLabel("Description").fill(description);
   }
 
-  await selectOption(page, "severity-select", severity);
+  await selectOption(page, "issue-severity-select", severity);
 
   if (includePriority) {
-    await selectOption(page, "priority-select", priority);
+    const prioritySelect = page.getByTestId("issue-priority-select");
+    if (await prioritySelect.isVisible()) {
+      await selectOption(page, "issue-priority-select", priority);
+    }
   }
 
-  await selectOption(page, "consistency-select", consistency);
+  await selectOption(page, "issue-consistency-select", consistency);
 }

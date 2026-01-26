@@ -26,6 +26,7 @@ import { QrCodeDialog } from "./qr-code-dialog";
 import { buildMachineReportUrl } from "~/lib/machines/report-url";
 import { generateQrPngDataUrl } from "~/lib/machines/qr";
 import { IssueCard } from "~/components/issues/IssueCard";
+import { WatchMachineButton } from "~/components/machines/WatchMachineButton";
 
 /**
  * Machine Detail Page (Protected Route)
@@ -100,6 +101,12 @@ export default async function MachineDetailPage({
             ...(isMemberOrAdmin && { email: true }),
           },
         },
+        watchers: {
+          columns: {
+            userId: true,
+            watchMode: true,
+          },
+        },
       },
     }),
 
@@ -135,6 +142,10 @@ export default async function MachineDetailPage({
     source: "qr",
   });
   const qrDataUrl = await generateQrPngDataUrl(reportUrl);
+
+  const currentUserWatch = machine.watchers.find((w) => w.userId === user.id);
+  const isWatching = !!currentUserWatch;
+  const watchMode = currentUserWatch?.watchMode ?? "notify";
 
   return (
     <main className="min-h-screen bg-surface">
@@ -174,6 +185,11 @@ export default async function MachineDetailPage({
               </div>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
+              <WatchMachineButton
+                machineId={machine.id}
+                initialIsWatching={isWatching}
+                initialWatchMode={watchMode}
+              />
               <Button
                 className="bg-primary text-on-primary hover:bg-primary/90"
                 asChild
