@@ -137,7 +137,7 @@ export function Sidebar({
         {/* Logo Area */}
         <div
           className={cn(
-            "flex h-24 items-center justify-center border-b border-primary/20 transition-all duration-300",
+            "flex h-16 items-center justify-center border-b border-primary/20 transition-all duration-300",
             collapsed ? "px-0" : "px-4"
           )}
         >
@@ -168,14 +168,6 @@ export function Sidebar({
                 <span className="text-xl font-bold tracking-tight text-foreground">
                   PinPoint
                 </span>
-                <div className="h-5 w-px bg-primary/20 mx-1" />
-                <Image
-                  src="/apc-logo.png"
-                  alt="Austin Pinball Collective"
-                  width={60}
-                  height={34}
-                  className="h-8 w-auto object-contain opacity-90"
-                />
               </div>
             )}
           </Link>

@@ -1,6 +1,7 @@
 import type React from "react";
 import { cache } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -217,8 +218,22 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
   } = data;
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="space-y-6 relative">
+      {/* Dashboard Branding - APC Watermark */}
+      <div className="absolute top-0 right-0 z-0 flex flex-col items-end opacity-90 hidden sm:flex">
+        <Image
+          src="/apc-logo.png"
+          alt="Austin Pinball Collective"
+          width={80}
+          height={45}
+          className="h-10 w-auto object-contain drop-shadow-[0_0_15px_rgba(74,222,128,0.15)]"
+        />
+        <span className="text-[10px] uppercase font-bold tracking-widest text-primary/60 mt-1">
+          Austin Pinball Collective
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative z-10">
         {/* Quick Stats Section */}
         <div className="lg:col-span-3" data-testid="quick-stats">
           <h2 className="text-xl font-semibold text-foreground mb-4">
