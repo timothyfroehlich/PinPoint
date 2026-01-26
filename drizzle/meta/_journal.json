@@ -43,6 +43,13 @@
       "when": 1769387252562,
       "tag": "0005_spotty_red_ghost",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1769407552894,
+      "tag": "0006_dazzling_phalanx",
+      "breakpoints": true
     }
   ]
 }

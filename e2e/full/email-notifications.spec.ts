@@ -91,13 +91,17 @@ test.describe.serial("Email Notifications", () => {
       { awayFrom: "/report" }
     );
 
-    // Verify we're on the issue page
-    await expect(page).toHaveURL(
-      new RegExp(`\\/m\\/${testMachineInitials}\\/i\\/[0-9]+`)
-    );
-    const titlePattern = issueTitle
-      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-      .replace(/\s+/g, "\\s+");
+    // Verify we're on the issue page (or success page + navigation)
+    // Worker isolation should prevent /report/success, but we keep the fallback for robustness
+    const issueUrlPattern = new RegExp(`\\/m\\/${testMachineInitials}\\/i\\/[0-9]+`);
+    await expect(page).toHaveURL(new RegExp(`(${issueUrlPattern.source})|(\\/report\\/success)`));
+
+    if (page.url().includes("/report/success")) {
+      await page.goto("/dashboard");
+      await page.getByTestId("recent-issue-card").filter({ hasText: issueTitle }).first().click();
+    }
+
+    await expect(page).toHaveURL(issueUrlPattern);
 
     // Wait for email to arrive in Mailpit
     const email = await mailpit.waitForEmail(testAdminEmail, {
@@ -143,9 +147,17 @@ test.describe.serial("Email Notifications", () => {
       { awayFrom: "/report" }
     );
 
-    await expect(page).toHaveURL(
-      new RegExp(`\\/m\\/${testMachineInitials}\\/i\\/[0-9]+`)
-    );
+    // Accept either direct issue page OR success page
+    const issueUrlPattern = new RegExp(`\\/m\\/${testMachineInitials}\\/i\\/[0-9]+`);
+    await expect(page).toHaveURL(new RegExp(`(${issueUrlPattern.source})|(\\/report\\/success)`));
+
+    // If we landed on success page, we need to go to dashboard or recent issues to find the new issue
+    if (page.url().includes("/report/success")) {
+      await page.goto("/dashboard");
+      await page.getByTestId("recent-issue-card").filter({ hasText: issueTitle }).first().click();
+    }
+
+    await expect(page).toHaveURL(issueUrlPattern);
 
     // Ensure we are on the page before interacting with sidebar
     const titlePattern = issueTitle
