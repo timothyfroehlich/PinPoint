@@ -313,14 +313,12 @@ jobs:
       - name: Apply migrations to fresh database
         run: pnpm run db:migrate
 
-      - name: Verify schema matches exported SQL
+      - name: Ensure test schema is current
         run: |
-          pnpm run test:_generate-schema
-          git diff --exit-code src/test/setup/schema.sql || {
-            echo "❌ Schema mismatch! The exported test schema doesn't match the migration result."
-            echo "Run 'pnpm run test:_generate-schema' locally and commit the updated schema.sql"
-            exit 1
-          }
+          set -a
+          source .env.ci
+          set +a
+          pnpm run test:ensure-schema
 
   test-integration-supabase:
     name: Supabase Integration Tests
