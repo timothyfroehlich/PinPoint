@@ -14,7 +14,6 @@ export async function uploadToBlob(
 ): Promise<PutBlobResult> {
   // Mock implementation for local testing without Vercel credentials
   if (process.env["MOCK_BLOB_STORAGE"] === "true") {
-    console.log("[BlobClient] Using mock blob storage");
     // Determine local path in public/uploads and sanitize to prevent path traversal
     const publicDir = path.join(process.cwd(), "public", "uploads");
     // Remove any leading slashes or ../ segments to keep it within publicDir
@@ -23,33 +22,22 @@ export async function uploadToBlob(
       .replace(/^[/\\]/, "");
     const filePath = path.join(publicDir, safePathname);
 
-    console.log("[BlobClient] Mock storage paths", {
-      publicDir,
-      safePathname,
-      filePath,
-    });
-
     if (!filePath.startsWith(publicDir)) {
       throw new Error("Invalid pathname");
     }
 
     // Ensure directory exists
-    console.log("[BlobClient] Creating directory:", path.dirname(filePath));
     await fs.mkdir(path.dirname(filePath), { recursive: true });
 
     // Write file
-    console.log("[BlobClient] Writing file to disk");
     const arrayBuffer = await file.arrayBuffer();
     await fs.writeFile(filePath, globalThis.Buffer.from(arrayBuffer));
-    console.log("[BlobClient] File written successfully");
 
     // Return mock result with local URL
     const port = process.env["PORT"] ?? "3000";
     const baseUrl =
       process.env["NEXT_PUBLIC_SITE_URL"] ?? `http://localhost:${port}`;
     const url = `${baseUrl}/uploads/${pathname}`;
-
-    console.log("[BlobClient] Mock upload complete", { url });
 
     return {
       url,

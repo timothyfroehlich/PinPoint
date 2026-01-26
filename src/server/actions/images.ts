@@ -34,12 +34,10 @@ export async function uploadIssueImage(formData: FormData): Promise<
     "AUTH" | "VALIDATION" | "BLOB" | "DATABASE" | "RATE_LIMIT"
   >
 > {
-  console.log("[ServerAction] uploadIssueImage called");
   let uploadedBlobPathname: string | undefined;
 
   try {
     // 1. Rate Limit Check
-    console.log("[ServerAction] Step 1: Checking rate limit");
     const ip = await getClientIp();
     const { success, reset } = await checkImageUploadLimit(ip);
     if (!success) {
@@ -119,7 +117,6 @@ export async function uploadIssueImage(formData: FormData): Promise<
     }
 
     // 6. Upload to Blob
-    console.log("[ServerAction] Step 6: Uploading to blob storage");
     const timestamp = Date.now();
     const blobPrefix = isNewIssue ? "pending" : issueId;
     const pathname = `issue-images/${blobPrefix}/${timestamp}-${file.name.replace(
@@ -128,10 +125,6 @@ export async function uploadIssueImage(formData: FormData): Promise<
     )}`;
     const blob = await uploadToBlob(file, pathname);
     uploadedBlobPathname = blob.pathname;
-    console.log("[ServerAction] Step 7: Blob upload complete", {
-      url: blob.url,
-      pathname: blob.pathname,
-    });
 
     // 7. DB or just return metadata
     if (isNewIssue) {

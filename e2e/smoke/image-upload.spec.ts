@@ -1,7 +1,11 @@
 import { test, expect } from "@playwright/test";
-import { Buffer } from "node:buffer";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import { fillReportForm } from "../support/page-helpers.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const IMAGE_UPLOAD_PREFIX = "E2E Image Upload";
 
@@ -28,19 +32,10 @@ test.describe("Image Upload Reporting", () => {
     });
 
     // 3. Upload Image
-    // Use a small 1x1 pixel transparent PNG for testing
-    const buffer = Buffer.from(
-      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
-      "base64"
-    );
+    // Use a test PNG from fixtures (2.3KB) that meets the 1KB minimum validation requirement
+    const testImagePath = join(__dirname, "..", "fixtures", "test-image.png");
 
-    // In Playwright, we can't easily construct a File object in the browser context from here without serving it.
-    // So we use setInputFiles on the file input directly.
-    await page.setInputFiles('input[type="file"]', {
-      name: "test-image.png",
-      mimeType: "image/png",
-      buffer,
-    });
+    await page.setInputFiles('input[type="file"]', testImagePath);
 
     // 4. Verify Preview appears
     // The preview card has a generic "Issue image" alt text or the filename
@@ -93,19 +88,12 @@ test.describe("Image Upload Reporting", () => {
     });
 
     // 4. Upload Image
-    const buffer = Buffer.from(
-      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
-      "base64"
-    );
-    await page.setInputFiles('input[type="file"]', {
-      name: "auth-test-image.png",
-      mimeType: "image/png",
-      buffer,
-    });
+    const testImagePath = join(__dirname, "..", "fixtures", "test-image.png");
+    await page.setInputFiles('input[type="file"]', testImagePath);
 
     // Verify preview
     await expect(
-      page.getByRole("img", { name: "auth-test-image.png" })
+      page.getByRole("img", { name: "test-image.png" })
     ).toBeVisible();
     // Wait for the upload validation/compression/upload cycle to finish (preview visibility confirms this usually,
     // but the actual upload request happens in background or before preview?
@@ -124,14 +112,14 @@ test.describe("Image Upload Reporting", () => {
     await expect(page.getByText("Images (1)")).toBeVisible();
 
     // The image itself in the gallery
-    const image = page.getByRole("img", { name: "auth-test-image.png" });
+    const image = page.getByRole("img", { name: "test-image.png" });
     await expect(image).toBeVisible();
 
     // Optional: Click to open lightbox
     await image.click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await expect(
-      page.getByRole("dialog").getByRole("img", { name: "auth-test-image.png" })
+      page.getByRole("dialog").getByRole("img", { name: "test-image.png" })
     ).toBeVisible();
   });
 });
