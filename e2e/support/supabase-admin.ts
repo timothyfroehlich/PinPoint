@@ -120,16 +120,16 @@ export async function createTestMachine(ownerId: string) {
 }
 
 /**
- * Create an unconfirmed user directly in the database
+ * Create an invited user directly in the database
  */
-export async function createUnconfirmedUser(
+export async function createInvitedUser(
   email: string,
   firstName = "Test",
   lastName = "Invite",
   role: "guest" | "member" | "admin" = "member"
 ) {
   const { data, error } = await supabaseAdmin
-    .from("unconfirmed_users")
+    .from("invited_users")
     .insert({
       email,
       first_name: firstName,
@@ -187,7 +187,7 @@ export async function deleteTestIssueByNumber(
   const { error } = await supabaseAdmin
     .from("issues")
     .delete()
-    .eq("machine_id", machine.id)
+    .eq("machine_initials", machineInitials)
     .eq("issue_number", issueNumber);
 
   if (error) throw error;
