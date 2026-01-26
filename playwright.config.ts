@@ -201,6 +201,8 @@ export default defineConfig({
     ignoreHTTPSErrors: true,
     env: {
       PORT: String(port),
+      // Explicitly forward mock storage flag if present
+      MOCK_BLOB_STORAGE: process.env["MOCK_BLOB_STORAGE"] ?? "",
     },
   },
 });

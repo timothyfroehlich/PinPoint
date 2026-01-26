@@ -67,7 +67,14 @@ test.describe("Email Notifications", () => {
       { awayFrom: "/report" }
     );
 
-    // Verify we're on the issue page
+    // Verify we're on the issue page (or success page + navigation)
+    await expect(page).toHaveURL(/(\/m\/MM\/i\/[0-9]+)|(\/report\/success)/);
+
+    if (page.url().includes("/report/success")) {
+      await page.goto("/dashboard");
+      await page.getByTestId("recent-issue-card").first().click();
+    }
+
     await expect(page).toHaveURL(/\/m\/MM\/i\/[0-9]+/);
     const url = page.url();
     const issueIdMatch = /\/i\/(\d+)/.exec(url);
@@ -122,6 +129,15 @@ test.describe("Email Notifications", () => {
       { awayFrom: "/report" }
     );
 
+    // Accept either direct issue page OR success page
+    await expect(page).toHaveURL(/(\/m\/MM\/i\/[0-9]+)|(\/report\/success)/);
+
+    // If we landed on success page, we need to go to dashboard or recent issues to find the new issue
+    if (page.url().includes("/report/success")) {
+      await page.goto("/dashboard");
+      await page.getByTestId("recent-issue-card").first().click();
+    }
+
     await expect(page).toHaveURL(/\/m\/MM\/i\/[0-9]+/);
 
     // Ensure we are on the page before interacting with sidebar
@@ -143,7 +159,7 @@ test.describe("Email Notifications", () => {
 
     const url = page.url();
     const issueIdMatch = /\/i\/(\d+)/.exec(url);
-    if (issueIdMatch) {
+    if (issueIdMatch?.[1]) {
       cleanupIssues.push({ initials: "MM", number: parseInt(issueIdMatch[1]) });
     }
 
