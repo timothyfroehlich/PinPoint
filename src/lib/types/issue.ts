@@ -11,6 +11,7 @@ export type IssueCommentWithAuthor = Pick<
   "id" | "content" | "createdAt" | "isSystem"
 > & {
   author?: Pick<UserProfile, "id" | "name" | "email"> | null;
+  images: IssueImage[];
 };
 
 export type IssueListItem = Issue & {

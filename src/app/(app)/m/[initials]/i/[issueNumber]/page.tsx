@@ -13,15 +13,23 @@ import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
 import { OwnerBadge } from "~/components/issues/OwnerBadge";
 import { getMachineOwnerName } from "~/lib/issues/owner";
 import { formatIssueId } from "~/lib/issues/utils";
+import { ImageGallery } from "~/components/images/ImageGallery";
 import type { Issue, IssueWithAllRelations } from "~/lib/types";
 
+/**
+ * Issue Detail Page (Protected Route)
+ *
+ * Displays issue details, timeline, and update actions.
+ */
 export default async function IssueDetailPage({
   params,
 }: {
   params: Promise<{ initials: string; issueNumber: string }>;
 }): Promise<React.JSX.Element> {
+  // Get params (Next.js 16: params is a Promise)
   const { initials, issueNumber } = await params;
 
+  // Auth guard
   const supabase = await createClient();
   const {
     data: { user },
@@ -37,6 +45,7 @@ export default async function IssueDetailPage({
     redirect(`/m/${initials}`);
   }
 
+  // Fetch current user profile to check roles for visibility
   const currentUserProfile = await db.query.userProfiles.findFirst({
     where: eq(userProfiles.id, user.id),
     columns: { role: true },
@@ -46,7 +55,9 @@ export default async function IssueDetailPage({
     currentUserProfile?.role === "member" ||
     currentUserProfile?.role === "admin";
 
+  // CORE-PERF-003: Execute independent queries in parallel to avoid waterfall
   const [issue, allUsers] = await Promise.all([
+    // Query issue with all relations
     db.query.issues.findFirst({
       where: and(
         eq(issues.machineInitials, initials),
@@ -106,6 +117,9 @@ export default async function IssueDetailPage({
                 name: true,
               },
             },
+            images: {
+              where: (images, { isNull }) => isNull(images.deletedAt),
+            },
           },
         },
         images: {
@@ -131,6 +145,7 @@ export default async function IssueDetailPage({
         reporterEmail: true,
       },
     }),
+    // Fetch all members/admins for assignment dropdown (Restrict to actual users)
     db
       .select({
         id: userProfiles.id,
@@ -149,11 +164,13 @@ export default async function IssueDetailPage({
     redirect(`/m/${initials}`);
   }
 
+  // Cast issue to IssueWithAllRelations for type safety
   const issueWithRelations = issue as unknown as IssueWithAllRelations;
   const ownerName = getMachineOwnerName(issueWithRelations);
 
   return (
     <PageShell className="space-y-8" size="wide">
+      {/* Back button */}
       <Link
         href={`/m/${initials}/i`}
         className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -162,6 +179,7 @@ export default async function IssueDetailPage({
         Back to Issues
       </Link>
 
+      {/* Header */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <Link
@@ -203,12 +221,28 @@ export default async function IssueDetailPage({
 
       <div className="grid gap-10 md:grid-cols-[minmax(0,1fr)_320px]">
         <section className="space-y-5 lg:pr-4">
+          {issue.images.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Images ({issue.images.length})
+              </h2>
+              <ImageGallery
+                images={issue.images.map((img) => ({
+                  id: img.id,
+                  fullImageUrl: img.fullImageUrl,
+                  originalFilename: img.originalFilename,
+                }))}
+              />
+            </div>
+          )}
+
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             Activity
           </h2>
           <IssueTimeline issue={issueWithRelations} />
         </section>
 
+        {/* Sticky Sidebar */}
         <IssueSidebar
           issue={issueWithRelations}
           allUsers={allUsers}

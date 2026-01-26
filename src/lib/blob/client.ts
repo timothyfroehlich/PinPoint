@@ -2,6 +2,7 @@ import { put, del } from "@vercel/blob";
 import type { PutBlobResult } from "@vercel/blob";
 import path from "path";
 import fs from "fs/promises";
+import { log } from "~/lib/logger";
 
 /**
  * Uploads a file to Vercel Blob storage.
@@ -54,7 +55,10 @@ export async function uploadToBlob(
       addRandomSuffix: true,
     });
   } catch (error) {
-    console.error("Blob upload failed:", error);
+    log.error(
+      { error: error instanceof Error ? error.message : "Unknown", pathname },
+      "Blob upload failed"
+    );
     throw new Error("Failed to upload image to storage");
   }
 }
@@ -86,7 +90,10 @@ export async function deleteFromBlob(pathname: string): Promise<void> {
   try {
     await del(pathname);
   } catch (error) {
-    console.error("Blob deletion failed:", error);
+    log.error(
+      { error: error instanceof Error ? error.message : "Unknown", pathname },
+      "Blob deletion failed"
+    );
     // Don't throw - deletion is idempotent and failures are non-blocking
   }
 }

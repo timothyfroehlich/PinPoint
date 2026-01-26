@@ -27,7 +27,10 @@ export function ImageGallery({
               <Image
                 src={image.fullImageUrl}
                 alt={image.originalFilename ?? "Issue image"}
+                aria-label={image.originalFilename ?? "Issue image"}
+                data-testid="gallery-image"
                 fill
+                unoptimized
                 className="object-cover transition-transform group-hover:scale-105"
                 sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
               />
@@ -42,7 +45,10 @@ export function ImageGallery({
               <Image
                 src={image.fullImageUrl}
                 alt={image.originalFilename ?? "Issue image"}
+                aria-label={image.originalFilename ?? "Issue image"}
+                data-testid="dialog-image"
                 fill
+                unoptimized
                 className="object-contain"
                 sizes="100vw"
                 priority

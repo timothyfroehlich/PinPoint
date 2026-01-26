@@ -8,7 +8,7 @@ import { Camera, Image as ImageIcon, Loader2 } from "lucide-react";
 import { compressImage } from "~/lib/blob/compression";
 import { validateImageFile } from "~/lib/blob/validation";
 import { uploadIssueImage } from "~/server/actions/images";
-import { toast } from "~/components/ui/use-toast";
+import { toast } from "sonner";
 
 interface ImageMetadata {
   blobUrl: string;
@@ -46,11 +46,7 @@ export function ImageUploadButton({
     // 1. Validate
     const validation = validateImageFile(file);
     if (!validation.valid) {
-      toast({
-        variant: "destructive",
-        title: "Invalid image",
-        description: validation.error ?? "Selected file is not a valid image.",
-      });
+      toast.error(validation.error ?? "Selected file is not a valid image.");
       return;
     }
 
@@ -67,25 +63,16 @@ export function ImageUploadButton({
       const result = await uploadIssueImage(formData);
 
       if (result.ok) {
-        toast({
-          title: "Success",
-          description: "Image uploaded successfully",
-        });
+        toast.success("Image uploaded successfully");
         onUploadComplete?.(result.value);
       } else {
-        toast({
-          variant: "destructive",
-          title: "Upload failed",
-          description: result.message,
-        });
+        toast.error(`Upload failed: ${result.message}`);
       }
     } catch (error) {
+      // Client-side component - use console.error as logger is server-side only
+
       console.error("Upload error:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "An unexpected error occurred during upload",
-      });
+      toast.error("An unexpected error occurred during upload");
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {

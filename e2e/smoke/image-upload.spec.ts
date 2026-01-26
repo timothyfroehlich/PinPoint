@@ -111,15 +111,18 @@ test.describe("Image Upload Reporting", () => {
     // "Images (1)" header
     await expect(page.getByText("Images (1)")).toBeVisible();
 
-    // The image itself in the gallery
-    const image = page.getByRole("img", { name: "test-image.png" });
+    // The image itself in the gallery (might also be in timeline, so use first())
+    const image = page.getByRole("img", { name: "test-image.png" }).first();
     await expect(image).toBeVisible();
 
     // Optional: Click to open lightbox
     await image.click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await expect(
-      page.getByRole("dialog").getByRole("img", { name: "test-image.png" })
+      page
+        .getByRole("dialog")
+        .getByRole("img", { name: "test-image.png" })
+        .first()
     ).toBeVisible();
   });
 });

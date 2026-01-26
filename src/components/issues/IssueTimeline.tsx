@@ -179,6 +179,7 @@ export function IssueTimeline({
       },
       createdAt: new Date(c.createdAt),
       content: c.content,
+      images: c.images,
     };
   });
 

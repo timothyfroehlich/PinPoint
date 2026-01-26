@@ -17,6 +17,7 @@ export const BLOB_CONFIG = {
   LIMITS: {
     PUBLIC_USER_MAX: 2,
     AUTHENTICATED_USER_MAX: 4,
+    COMMENT_MAX: 4,
     ISSUE_TOTAL_MAX: 10,
   },
 

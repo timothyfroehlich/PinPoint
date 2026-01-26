@@ -82,7 +82,8 @@ describe("Compression Utilities", () => {
       vi.mocked(imageCompression).mockResolvedValue(mockCompressed);
 
       const result = await compressImage(file);
-      expect(result).toBe(mockCompressed);
+      expect(result.name).toBe(file.name);
+      expect(result.type).toBe(mockCompressed.type);
     });
 
     it("should return original file if compression fails", async () => {

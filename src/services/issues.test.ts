@@ -184,20 +184,23 @@ describe("Issue Service", () => {
 
       await addIssueComment(params);
 
-      expect(createNotification).toHaveBeenCalledWith({
-        type: "new_comment",
-        resourceId: "issue-1",
-        resourceType: "issue",
-        actorId: "user-1",
-        issueTitle: "Issue Title",
-        machineName: "Machine Name",
-        formattedIssueId: "MM-01",
-        commentContent: "My comment",
-        issueContext: {
-          assignedToId: "assignee-1",
-          reportedById: "reporter-1",
+      expect(createNotification).toHaveBeenCalledWith(
+        {
+          type: "new_comment",
+          resourceId: "issue-1",
+          resourceType: "issue",
+          actorId: "user-1",
+          issueTitle: "Issue Title",
+          machineName: "Machine Name",
+          formattedIssueId: "MM-01",
+          commentContent: "My comment",
+          issueContext: {
+            assignedToId: "assignee-1",
+            reportedById: "reporter-1",
+          },
         },
-      });
+        expect.anything()
+      );
     });
   });
 

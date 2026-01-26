@@ -15,6 +15,7 @@ import {
   formatResetTime,
 } from "~/lib/rate-limit";
 import { eq, count, and, isNull } from "drizzle-orm";
+import { log } from "~/lib/logger";
 
 const uploadSchema = z.object({
   issueId: z.string(), // Can be real UUID or 'new'
@@ -169,7 +170,13 @@ export async function uploadIssueImage(formData: FormData): Promise<
         mimeType: file.type,
       });
     } catch (dbError) {
-      console.error("DB insert failed for image, cleaning up blob:", dbError);
+      log.error(
+        {
+          error: dbError instanceof Error ? dbError.message : "Unknown",
+          blobPathname: uploadedBlobPathname,
+        },
+        "DB insert failed for image, cleaning up blob"
+      );
       // Step 4: Actual cleanup
       if (uploadedBlobPathname) {
         await deleteFromBlob(uploadedBlobPathname);
@@ -177,7 +184,10 @@ export async function uploadIssueImage(formData: FormData): Promise<
       return err("DATABASE", "Failed to record image in database");
     }
   } catch (error) {
-    console.error("Upload action failed:", error);
+    log.error(
+      { error: error instanceof Error ? error.message : "Unknown" },
+      "Upload action failed"
+    );
     return err(
       "BLOB",
       error instanceof Error ? error.message : "Upload failed"

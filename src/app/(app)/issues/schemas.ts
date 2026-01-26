@@ -30,11 +30,7 @@ export const createIssueSchema = z.object({
     .min(1, "Title is required")
     .max(200, "Title must be less than 200 characters")
     .trim(),
-  description: z
-    .string()
-    .trim()
-    .max(5000, "Description is too long")
-    .optional(),
+  description: z.string().trim().max(5000, "Description is too long").nullish(),
   machineInitials: z
     .string()
     .min(2, "Machine initials invalid")
@@ -102,6 +98,19 @@ export const assignIssueSchema = z.object({
 });
 
 /**
+ * Common schema for image metadata from Vercel Blob
+ */
+export const imageMetadataSchema = z.object({
+  blobUrl: z.string().url(),
+  blobPathname: z.string().min(1),
+  originalFilename: z.string().min(1),
+  fileSizeBytes: z.number().positive(),
+  mimeType: z.string().startsWith("image/"),
+});
+
+export const imagesMetadataArraySchema = z.array(imageMetadataSchema);
+
+/**
  * Schema for adding a new comment
  */
 export const addCommentSchema = z.object({
@@ -111,4 +120,5 @@ export const addCommentSchema = z.object({
     .trim()
     .min(1, "Comment cannot be empty")
     .max(5000, "Comment is too long"),
+  imagesMetadata: z.string().nullish(), // JSON string from hidden input
 });

@@ -3,7 +3,6 @@
 import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
 import { log } from "~/lib/logger";
 import { createIssue } from "~/services/issues";
 import {
@@ -18,16 +17,7 @@ import { machines, userProfiles, issueImages } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import type { ActionState } from "./unified-report-form";
-
-const imageMetadataSchema = z.object({
-  blobUrl: z.string().url(), // Removed strict https check for local dev flexibility
-  blobPathname: z.string().min(1),
-  originalFilename: z.string().min(1),
-  fileSizeBytes: z.number().positive(),
-  mimeType: z.string().startsWith("image/"),
-});
-
-const imagesMetadataArraySchema = z.array(imageMetadataSchema);
+import { imagesMetadataArraySchema } from "../(app)/issues/schemas";
 
 /**
  * Server Action: submit anonymous issue
@@ -192,8 +182,9 @@ export async function submitPublicIssueAction(
             { issueId: issue.id, count: imagesMetadata.length, limit },
             "Blocked attempt to link too many images"
           );
-          // Just take the first few that fit the limit
-          imagesMetadata.splice(limit);
+          return {
+            error: `Too many images. Maximum ${limit} images allowed.`,
+          };
         }
 
         if (imagesMetadata.length > 0) {
@@ -222,6 +213,9 @@ export async function submitPublicIssueAction(
               },
               "Database failed to link images to issue. TODO: Implement cleanup job (BLOB_CONFIG.SOFT_DELETE_RETENTION_HOURS) to remove these pending blobs."
             );
+            // Don't return error here - issue was already created successfully
+            // User will be redirected, but images won't appear on the issue
+            // TODO: Consider implementing a flash message system to show warning
           }
         }
       } catch (parseError) {
