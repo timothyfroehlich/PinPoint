@@ -137,3 +137,4 @@ __pycache__/
 
 # Sentry Config File
 .env.sentry-build-plugin
+src/test/setup/schema.sql
