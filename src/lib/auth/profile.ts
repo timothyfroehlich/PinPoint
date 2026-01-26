@@ -1,6 +1,12 @@
 import { db } from "~/server/db";
-import { userProfiles, notificationPreferences } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
+import {
+  userProfiles,
+  notificationPreferences,
+  invitedUsers,
+  machines,
+  issues,
+} from "~/server/db/schema";
+import { eq, and, isNull } from "drizzle-orm";
 import type { User } from "@supabase/supabase-js";
 import { log } from "~/lib/logger";
 
@@ -64,6 +70,57 @@ export async function ensureUserProfile(user: User): Promise<void> {
         emailWatchNewIssuesGlobal: false,
         inAppWatchNewIssuesGlobal: false,
       });
+    }
+
+    // Transfer guest issues (by email)
+    // Matches SQL: WHERE reporter_email = NEW.email AND reported_by IS NULL AND invited_reported_by IS NULL
+    if (user.email) {
+      await db
+        .update(issues)
+        .set({
+          reportedBy: user.id,
+          reporterName: null,
+          reporterEmail: null,
+        })
+        .where(
+          and(
+            eq(issues.reporterEmail, user.email),
+            isNull(issues.reportedBy),
+            isNull(issues.invitedReportedBy)
+          )
+        );
+    }
+
+    // Handle invited users transfer
+    if (user.email) {
+      const invitedUser = await db.query.invitedUsers.findFirst({
+        where: eq(invitedUsers.email, user.email),
+      });
+
+      if (invitedUser) {
+        // Transfer machines
+        await db
+          .update(machines)
+          .set({
+            ownerId: user.id,
+            invitedOwnerId: null,
+          })
+          .where(eq(machines.invitedOwnerId, invitedUser.id));
+
+        // Transfer issues reported by invited user
+        await db
+          .update(issues)
+          .set({
+            reportedBy: user.id,
+            invitedReportedBy: null,
+            reporterName: null,
+            reporterEmail: null,
+          })
+          .where(eq(issues.invitedReportedBy, invitedUser.id));
+
+        // Delete the invited user record
+        await db.delete(invitedUsers).where(eq(invitedUsers.id, invitedUser.id));
+      }
     }
 
     log.info({ userId: user.id }, "User profile auto-healed successfully");

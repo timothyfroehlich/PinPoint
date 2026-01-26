@@ -7,10 +7,12 @@ import {
   userProfiles,
   machines,
   authUsers,
+  issues,
 } from "~/server/db/schema";
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { getMachineOwner } from "~/lib/machines/queries";
 import { createTestMachine } from "~/test/helpers/factories";
+import { ensureUserProfile } from "~/lib/auth/profile";
 
 // Mock the database to use the PGlite instance
 vi.mock("~/server/db", async () => {
@@ -228,5 +230,119 @@ describe("Invited Users Integration", () => {
     });
 
     expect(deletedInvited).toBeNull();
+  });
+
+  it("should transfer machines and issues via ensureUserProfile fallback", async () => {
+    const db = await getTestDb();
+
+    // 1. Create invited user
+    const [invited] = await db
+      .insert(invitedUsers)
+      .values({
+        firstName: "Fallback",
+        lastName: "Test",
+        email: "fallback@example.com",
+        role: "member",
+      })
+      .returning();
+
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Safe check, returning() might be empty
+    if (!invited) throw new Error("Failed to create invited user");
+
+    // 2. Create machine owned by invited user
+    const [machine] = await db
+      .insert(machines)
+      .values(
+        createTestMachine({
+          initials: "FALL",
+          invitedOwnerId: invited.id,
+        })
+      )
+      .returning();
+
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Safe check, returning() might be empty
+    if (!machine) throw new Error("Failed to create machine");
+
+    // 3. Create issue reported by invited user
+    const [invitedIssue] = await db
+      .insert(issues)
+      .values({
+        machineInitials: machine.initials,
+        issueNumber: 1,
+        title: "Invited Issue",
+        invitedReportedBy: invited.id,
+      })
+      .returning();
+
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Safe check, returning() might be empty
+    if (!invitedIssue) throw new Error("Failed to create invited issue");
+
+    // 4. Create guest issue (reported by email)
+    const [guestIssue] = await db
+      .insert(issues)
+      .values({
+        machineInitials: machine.initials,
+        issueNumber: 2,
+        title: "Guest Issue",
+        reporterEmail: "fallback@example.com",
+      })
+      .returning();
+
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Safe check, returning() might be empty
+    if (!guestIssue) throw new Error("Failed to create guest issue");
+
+    // 5. Call ensureUserProfile with a user object having the same email
+    const userId = randomUUID();
+    const mockUser = {
+      id: userId,
+      email: "fallback@example.com",
+      user_metadata: {
+        first_name: "Fallback",
+        last_name: "Test",
+      },
+    } as any;
+
+    // Simulate auth user creation (needed for FK constraint)
+    await db.insert(authUsers).values({
+      id: userId,
+      email: "fallback@example.com",
+    });
+
+    // Run the fallback logic
+    await ensureUserProfile(mockUser);
+
+    // 6. Verify profile created
+    const profile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, userId),
+    });
+    expect(profile).toBeDefined();
+    expect(profile?.email).toBe("fallback@example.com");
+
+    // 7. Verify machine owner updated
+    const updatedMachine = await db.query.machines.findFirst({
+      where: eq(machines.id, machine.id),
+    });
+    expect(updatedMachine?.ownerId).toBe(userId);
+    expect(updatedMachine?.invitedOwnerId).toBeNull();
+
+    // 8. Verify invited issue reporter updated
+    const updatedInvitedIssue = await db.query.issues.findFirst({
+      where: eq(issues.id, invitedIssue.id),
+    });
+    expect(updatedInvitedIssue?.reportedBy).toBe(userId);
+    expect(updatedInvitedIssue?.invitedReportedBy).toBeNull();
+
+    // 9. Verify guest issue reporter updated
+    const updatedGuestIssue = await db.query.issues.findFirst({
+      where: eq(issues.id, guestIssue.id),
+    });
+    expect(updatedGuestIssue?.reportedBy).toBe(userId);
+    expect(updatedGuestIssue?.reporterEmail).toBeNull();
+
+    // 10. Verify invited user deleted
+    const deletedInvited = await db.query.invitedUsers.findFirst({
+      where: eq(invitedUsers.id, invited.id),
+    });
+    expect(deletedInvited).toBeUndefined();
   });
 });
