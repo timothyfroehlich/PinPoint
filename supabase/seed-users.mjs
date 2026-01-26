@@ -158,6 +158,14 @@ async function seedUsersAndData() {
           owner_id = ${userIds.admin},
           initials = ${machine.initials}
       `;
+
+      // Also add owner to machine_watchers (full subscribe)
+      await sql`
+        INSERT INTO machine_watchers (machine_id, user_id, watch_mode)
+        VALUES (${machine.id}, ${userIds.admin}, 'subscribe')
+        ON CONFLICT (machine_id, user_id) DO UPDATE SET
+          watch_mode = 'subscribe'
+      `;
     }
     console.log("✅ Machines seeded with Admin owner.");
 

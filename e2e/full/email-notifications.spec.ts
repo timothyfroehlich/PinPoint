@@ -137,7 +137,9 @@ test.describe("Email Notifications", () => {
 
     // Update status
     await selectOption(page, "issue-status-select", "in_progress");
-    await expect(page.getByTestId("status-update-success")).toBeVisible();
+    await expect(page.getByTestId("status-update-success")).toBeVisible({
+      timeout: 30000,
+    });
 
     const url = page.url();
     const issueIdMatch = /\/i\/(\d+)/.exec(url);

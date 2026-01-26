@@ -10,13 +10,13 @@
 import { redirect } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { machines } from "~/server/db/schema";
+import { machines, machineWatchers, userProfiles } from "~/server/db/schema";
 import { createMachineSchema, updateMachineSchema } from "./schemas";
 import { type Result, ok, err } from "~/lib/result";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { userProfiles } from "~/server/db/schema";
-import console from "console";
+import { log } from "~/lib/logger";
+import { createNotification } from "~/lib/notifications";
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
 
@@ -146,6 +146,21 @@ export async function createMachineAction(
       throw new Error("Machine creation failed");
     }
 
+    // Auto-add owner to machine_watchers (full subscribe mode)
+    if (finalOwnerId) {
+      await db
+        .insert(machineWatchers)
+        .values({
+          machineId: machine.id,
+          userId: finalOwnerId,
+          watchMode: "subscribe",
+        })
+        .onConflictDoUpdate({
+          target: [machineWatchers.machineId, machineWatchers.userId],
+          set: { watchMode: "subscribe" },
+        });
+    }
+
     revalidatePath("/m");
 
     redirect(`/m/${machine.initials}`);
@@ -158,7 +173,10 @@ export async function createMachineAction(
       return err("VALIDATION", `Initials '${initials}' are already taken.`);
     }
 
-    console.error("createMachineAction failed", error);
+    log.error(
+      { error, action: "createMachineAction" },
+      "createMachineAction failed"
+    );
     return err("SERVER", "Failed to create machine. Please try again.");
   }
 }
@@ -239,6 +257,16 @@ export async function updateMachineAction(
         ? eq(machines.id, id)
         : and(eq(machines.id, id), eq(machines.ownerId, user.id));
 
+    // Get current machine state to check for owner change
+    const currentMachine = await db.query.machines.findFirst({
+      where: whereConditions,
+      columns: { ownerId: true, name: true },
+    });
+
+    if (!currentMachine) {
+      return err("NOT_FOUND", "Machine not found.");
+    }
+
     const [machine] = await db
       .update(machines)
       .set({
@@ -255,6 +283,62 @@ export async function updateMachineAction(
       return err("NOT_FOUND", "Machine not found.");
     }
 
+    // Handle owner changes in machine_watchers
+    if (shouldUpdateOwner) {
+      const oldOwnerId = currentMachine.ownerId;
+
+      // 1. Handle Old Owner
+      if (oldOwnerId && oldOwnerId !== finalOwnerId) {
+        // Remove old owner from watchers
+        await db
+          .delete(machineWatchers)
+          .where(
+            and(
+              eq(machineWatchers.machineId, id),
+              eq(machineWatchers.userId, oldOwnerId)
+            )
+          );
+
+        // Notify old owner
+        await createNotification({
+          type: "machine_ownership_changed",
+          resourceId: machine.id,
+          resourceType: "machine",
+          actorId: user.id,
+          machineName: machine.name,
+          issueTitle: "removed", // Passes context to email template
+          additionalRecipientIds: [oldOwnerId],
+        });
+      }
+
+      // 2. Handle New Owner
+      if (finalOwnerId && finalOwnerId !== oldOwnerId) {
+        // Add new owner as subscriber
+        await db
+          .insert(machineWatchers)
+          .values({
+            machineId: id,
+            userId: finalOwnerId,
+            watchMode: "subscribe",
+          })
+          .onConflictDoUpdate({
+            target: [machineWatchers.machineId, machineWatchers.userId],
+            set: { watchMode: "subscribe" },
+          });
+
+        // Notify new owner
+        await createNotification({
+          type: "machine_ownership_changed",
+          resourceId: machine.id,
+          resourceType: "machine",
+          actorId: user.id,
+          machineName: machine.name,
+          issueTitle: "added", // Passes context to email template
+          additionalRecipientIds: [finalOwnerId],
+        });
+      }
+    }
+
     revalidatePath("/m");
     revalidatePath(`/m/${machine.initials}`);
 
@@ -263,7 +347,10 @@ export async function updateMachineAction(
     if (isNextRedirectError(error)) {
       throw error;
     }
-    console.error("updateMachineAction failed", error);
+    log.error(
+      { error, action: "updateMachineAction" },
+      "updateMachineAction failed"
+    );
     return err("SERVER", "Failed to update machine. Please try again.");
   }
 }
@@ -307,7 +394,10 @@ export async function deleteMachineAction(
 
     return ok({ machineId });
   } catch (error) {
-    console.error("deleteMachineAction failed", error);
+    log.error(
+      { error, action: "deleteMachineAction" },
+      "deleteMachineAction failed"
+    );
     return err("SERVER", "Failed to delete machine. Please try again.");
   }
 }

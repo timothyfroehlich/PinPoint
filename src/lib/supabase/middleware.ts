@@ -114,8 +114,6 @@ export async function updateSession(
     path.startsWith("/auth") ||
     path.startsWith("/report") ||
     path.startsWith("/dashboard") ||
-    path.startsWith("/m") ||
-    path.startsWith("/issues") ||
     path.startsWith("/api");
 
   if (!user && !isPublic) {
