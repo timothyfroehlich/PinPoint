@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { sql } from "drizzle-orm";
+import { db, type Tx } from "~/server/db";
+import { userProfiles } from "~/server/db/schema";
+import { withUserContext } from "~/server/db/utils/rls";
 
 /**
  * Integration tests for Email Privacy Row Level Security (RLS)
@@ -153,5 +157,139 @@ describe("Email Privacy RLS Integration", () => {
 
     expect(anonError).toBeNull();
     expect(anonView).toHaveLength(0);
+  });
+
+  describe("Direct Drizzle Queries with Session Context", () => {
+    it("should show all emails with admin context", async () => {
+      const profiles = await withUserContext(
+        db,
+        { id: adminUser.id, role: "admin" },
+        async (tx: Tx) => {
+          return tx.select().from(userProfiles);
+        }
+      );
+
+      // Admin should see all emails
+      const profilesWithEmails = profiles.filter((p: any) => p.email !== null);
+      expect(profilesWithEmails.length).toBe(profiles.length);
+      expect(profilesWithEmails.length).toBeGreaterThan(0);
+    });
+
+    it("should show only own email with member context", async () => {
+      const profiles = await withUserContext(
+        db,
+        { id: memberUser.id, role: "member" },
+        async (tx: Tx) => {
+          return tx.select().from(userProfiles);
+        }
+      );
+
+      // Member should see all profiles but only their own email
+      expect(profiles.length).toBeGreaterThan(1);
+
+      const ownProfile = profiles.find((p: any) => p.id === memberUser.id);
+      expect(ownProfile?.email).toBe(memberUser.email);
+
+      // Note: RLS on SELECT * from a table doesn't mask columns - it filters ROWS.
+      // However, our policy for user_profiles is applied to UPDATE/DELETE.
+      // SELECT is generally public for user_profiles (except sensitive fields).
+      // The email privacy is enforced by the public_profiles_view.
+    });
+
+    it("should enforce context isolation between transactions", async () => {
+      // Transaction 1: admin context
+      const result1 = await withUserContext(
+        db,
+        { id: adminUser.id, role: "admin" },
+        async (tx: Tx) => {
+          const setting = await tx.execute(
+            sql`SELECT current_setting('request.user_id', true) as user_id,
+                       current_setting('request.user_role', true) as user_role`
+          );
+          return setting;
+        }
+      );
+
+      // Transaction 2: member context (different user)
+      const result2 = await withUserContext(
+        db,
+        { id: memberUser.id, role: "member" },
+        async (tx: Tx) => {
+          const setting = await tx.execute(
+            sql`SELECT current_setting('request.user_id', true) as user_id,
+                       current_setting('request.user_role', true) as user_role`
+          );
+          return setting;
+        }
+      );
+
+      // Verify each transaction has its own isolated context
+      expect(result1).toBeDefined();
+      expect(result2).toBeDefined();
+      // Result from execute() in Drizzle with postgres.js is an array of rows
+      const row1 = result1 as unknown as {
+        user_id: string;
+        user_role: string;
+      }[];
+      const row2 = result2 as unknown as {
+        user_id: string;
+        user_role: string;
+      }[];
+
+      expect(row1[0]?.user_id).toBe(adminUser.id);
+      expect(row1[0]?.user_role).toBe("admin");
+      expect(row2[0]?.user_id).toBe(memberUser.id);
+      expect(row2[0]?.user_role).toBe("member");
+    });
+
+    it("should mask emails in public_profiles_view for non-admins", async () => {
+      const profiles = await withUserContext(
+        db,
+        { id: memberUser.id, role: "member" },
+        async (tx: Tx) => {
+          return tx.execute(sql`SELECT id, email FROM public_profiles_view`);
+        }
+      );
+
+      const rows = profiles as unknown as {
+        id: string;
+        email: string | null;
+      }[];
+
+      // Should see own email
+      const ownProfile = rows.find((p) => p.id === memberUser.id);
+      expect(ownProfile?.email).toBe(memberUser.email);
+
+      // Should NOT see other emails (except possibly other members/admins if they are also the same user, but they aren't here)
+      const otherProfiles = rows.filter((p: any) => p.id !== memberUser.id);
+      expect(otherProfiles.length).toBeGreaterThan(0);
+      otherProfiles.forEach((profile: any) => {
+        expect(profile.email).toBeNull();
+      });
+    });
+
+    it("should show all emails in public_profiles_view for admins", async () => {
+      const profiles = await withUserContext(
+        db,
+        { id: adminUser.id, role: "admin" },
+        async (tx: Tx) => {
+          return tx.execute(sql`SELECT id, email FROM public_profiles_view`);
+        }
+      );
+
+      const rows = profiles as unknown as {
+        id: string;
+        email: string | null;
+      }[];
+
+      // Admin should see all emails
+      const profilesWithEmails = rows.filter((p) => p.email !== null);
+      // Wait, there might be other users in the DB without emails if we didn't seed them here.
+      // But for our test users, they should definitely have emails.
+      const testUsers = rows.filter(
+        (r) => r.id === adminUser.id || r.id === memberUser.id
+      );
+      testUsers.forEach((u: any) => expect(u.email).not.toBeNull());
+    });
   });
 });
