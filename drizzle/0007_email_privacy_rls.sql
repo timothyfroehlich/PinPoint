@@ -1,3 +1,6 @@
+-- 0. Cleanup old helper function if it exists
+DROP FUNCTION IF EXISTS get_my_role();
+
 -- 1. Enable RLS on tables
 ALTER TABLE "user_profiles" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "invited_users" ENABLE ROW LEVEL SECURITY;
@@ -13,36 +16,37 @@ USING (true);
 
 -- Users can update their own profile
 DROP POLICY IF EXISTS "Users can update their own profile" ON "user_profiles";
-CREATE POLICY "Users can update their own profile"
+CREATE POLICY "Profiles are updatable by owners"
 ON "user_profiles" FOR UPDATE
 TO authenticated
 USING (auth.uid() = id)
 WITH CHECK (auth.uid() = id);
 
--- Admins can do everything
-DROP POLICY IF EXISTS "Admins can do everything on profiles" ON "user_profiles";
-CREATE POLICY "Admins can do everything on profiles"
-ON "user_profiles" FOR ALL
+-- Admins can update any profile (using JWT to avoid recursion)
+DROP POLICY IF EXISTS "Admins can update any profile" ON "user_profiles";
+CREATE POLICY "Admins can update any profile"
+ON "user_profiles" FOR UPDATE
 TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM user_profiles 
-    WHERE id = auth.uid() AND role = 'admin'
-  )
-);
+USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin')
+WITH CHECK ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin');
+
+-- Admins can do everything else (using JWT to avoid recursion)
+-- We already have SELECT for all authenticated, so we just need DELETE/INSERT
+DROP POLICY IF EXISTS "Admins can delete profiles" ON "user_profiles";
+CREATE POLICY "Admins can delete profiles"
+ON "user_profiles" FOR DELETE
+TO authenticated
+USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin');
+
+DROP POLICY IF EXISTS "Admins can do everything on profiles" ON "user_profiles";
 
 -- 3. invited_users policies
--- Only admins can see invited users
+-- Only admins can see invited users (Using JWT metadata to avoid recursion)
 DROP POLICY IF EXISTS "Invited users are viewable by admins" ON "invited_users";
 CREATE POLICY "Invited users are viewable by admins"
 ON "invited_users" FOR SELECT
 TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM user_profiles 
-    WHERE id = auth.uid() AND role = 'admin'
-  )
-);
+USING ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin');
 
 -- 4. issues policies
 -- Issues are viewable by all authenticated users
@@ -65,10 +69,7 @@ SELECT
   created_at,
   updated_at,
   CASE
-    WHEN auth.uid() = id OR EXISTS (
-      SELECT 1 FROM user_profiles 
-      WHERE id = auth.uid() AND role = 'admin'
-    ) THEN email
+    WHEN auth.uid() = id OR (auth.jwt() -> 'user_metadata' ->> 'role') = 'admin' THEN email
     ELSE NULL
   END AS email
 FROM "user_profiles";
