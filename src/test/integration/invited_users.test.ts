@@ -8,6 +8,7 @@ import {
   machines,
   authUsers,
   issues,
+  notificationPreferences,
 } from "~/server/db/schema";
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { getMachineOwner } from "~/lib/machines/queries";
@@ -344,5 +345,83 @@ describe("Invited Users Integration", () => {
       where: eq(invitedUsers.id, invited.id),
     });
     expect(deletedInvited).toBeUndefined();
+  });
+
+  it("should transfer role from invited user when creating profile", async () => {
+    const db = await getTestDb();
+
+    // 1. Create invited user with 'admin' role
+    const [invited] = await db
+      .insert(invitedUsers)
+      .values({
+        firstName: "Admin",
+        lastName: "Invite",
+        email: "admin-invite@example.com",
+        role: "admin",
+      })
+      .returning();
+
+    // 2. Simulate auth user creation
+    const userId = randomUUID();
+    await db.insert(authUsers).values({
+      id: userId,
+      email: "admin-invite@example.com",
+    });
+
+    // 3. Run ensuring logic (simulating successful login/signup)
+    const mockUser = {
+      id: userId,
+      email: "admin-invite@example.com",
+      user_metadata: {
+        first_name: "Admin",
+        last_name: "Invite",
+      },
+    } as any;
+
+    await ensureUserProfile(mockUser);
+
+    // 4. Verify profile has transferred role
+    const profile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, userId),
+    });
+
+    // THIS SHOULD FAIL until implemented (currently defaults to 'member')
+    expect(profile?.role).toBe("admin");
+
+    // 5. Verify invited user is gone
+    const deletedInvited = await db.query.invitedUsers.findFirst({
+      where: eq(invitedUsers.id, invited.id),
+    });
+    expect(deletedInvited).toBeUndefined();
+  });
+
+  it("should initialize correct default notification preferences including machine ownership", async () => {
+    const db = await getTestDb();
+    const userId = randomUUID();
+
+    // 1. Simulate auth user
+    await db.insert(authUsers).values({
+      id: userId,
+      email: "prefs-test@example.com",
+    });
+
+    // 2. Run ensuring logic
+    const mockUser = {
+      id: userId,
+      email: "prefs-test@example.com",
+      user_metadata: { first_name: "Prefs", last_name: "Test" },
+    } as any;
+
+    await ensureUserProfile(mockUser);
+
+    // 3. Verify preferences
+    const prefs = await db.query.notificationPreferences.findFirst({
+      where: eq(notificationPreferences.userId, userId),
+    });
+
+    expect(prefs).toBeDefined();
+    // THIS SHOULD FAIL until implemented (currently not setting these fields in ensureUserProfile defaults)
+    expect(prefs?.emailNotifyOnMachineOwnershipChange).toBe(true);
+    expect(prefs?.inAppNotifyOnMachineOwnershipChange).toBe(true);
   });
 });

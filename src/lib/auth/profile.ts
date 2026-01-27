@@ -39,13 +39,25 @@ export async function ensureUserProfile(user: User): Promise<void> {
     const lastName = (user.user_metadata["last_name"] as string) || "";
     const avatarUrl = (user.user_metadata["avatar_url"] as string) || null;
 
+    // Check for existing invited user to inherit role
+    let role: "member" | "admin" | "guest" = "member";
+    if (user.email) {
+      const invitedUser = await db.query.invitedUsers.findFirst({
+        where: eq(invitedUsers.email, user.email),
+        columns: { role: true },
+      });
+      if (invitedUser) {
+        role = invitedUser.role;
+      }
+    }
+
     await db.insert(userProfiles).values({
       id: user.id,
       email: user.email!, // Email is required by schema
       firstName,
       lastName,
       avatarUrl,
-      role: "member", // Default role
+      role, // Inherited from invited user or default "member"
     });
 
     // Recreate notification preferences
@@ -69,6 +81,8 @@ export async function ensureUserProfile(user: User): Promise<void> {
         inAppNotifyOnNewIssue: true,
         emailWatchNewIssuesGlobal: false,
         inAppWatchNewIssuesGlobal: false,
+        emailNotifyOnMachineOwnershipChange: true,
+        inAppNotifyOnMachineOwnershipChange: true,
       });
     }
 
@@ -119,7 +133,9 @@ export async function ensureUserProfile(user: User): Promise<void> {
           .where(eq(issues.invitedReportedBy, invitedUser.id));
 
         // Delete the invited user record
-        await db.delete(invitedUsers).where(eq(invitedUsers.id, invitedUser.id));
+        await db
+          .delete(invitedUsers)
+          .where(eq(invitedUsers.id, invitedUser.id));
       }
     }
 

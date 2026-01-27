@@ -21,7 +21,15 @@ SET search_path = public
 AS $$
 DECLARE
   v_invited_user_id uuid;
+  v_role text;
 BEGIN
+  -- Handle legacy invited_users (if any exist) first to get role
+  -- Find matching invited user by email
+  SELECT id, role INTO v_invited_user_id, v_role
+  FROM public.invited_users
+  WHERE email = NEW.email
+  LIMIT 1;
+
   -- Create user profile
   INSERT INTO public.user_profiles (id, email, first_name, last_name, avatar_url, role)
   VALUES (
@@ -30,7 +38,7 @@ BEGIN
     COALESCE(NEW.raw_user_meta_data->>'first_name', ''),
     COALESCE(NEW.raw_user_meta_data->>'last_name', ''),
     NEW.raw_user_meta_data->>'avatar_url',
-    'member'
+    COALESCE(v_role, 'member') -- Use invited role if exists, else default to member
   );
 
   -- Create default notification preferences
@@ -47,7 +55,9 @@ BEGIN
     email_notify_on_new_issue,
     in_app_notify_on_new_issue,
     email_watch_new_issues_global,
-    in_app_watch_new_issues_global
+    in_app_watch_new_issues_global,
+    email_notify_on_machine_ownership_change,
+    in_app_notify_on_machine_ownership_change
   )
   VALUES (
     NEW.id,
@@ -56,7 +66,8 @@ BEGIN
     true, true, -- Status change
     true, true, -- New comment
     true, true, -- New issue (owned)
-    false, false -- Global watch
+    false, false, -- Global watch
+    true, true -- Machine ownership change
   );
 
   -- Transfer guest issues to newly created account
