@@ -72,6 +72,12 @@ We use git worktrees for parallel environments. Config is managed via templates 
 **Why**: Proper tracking enables `git pull`/`git push` without arguments and prevents accidentally
 pushing to main.
 
+### Commit Safety
+
+- **NEVER use `--no-verify`** without explicit user permission
+- This flag bypasses pre-commit hooks (lint, format, type checks)
+- Only use when user explicitly requests it
+
 ### Key Commands
 
 - `pnpm run check` (**RUN OFTEN**): Fast check (types, lint, format, unit tests). ~5s.
