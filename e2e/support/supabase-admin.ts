@@ -92,13 +92,13 @@ export async function createTestUser(
 /**
  * Create a test machine directly in the database
  */
-export async function createTestMachine(ownerId: string) {
-  const initials = `TM${Math.floor(Math.random() * 10000)}`;
+export async function createTestMachine(ownerId: string, initials?: string) {
+  const finalInitials = initials ?? `TM${Math.floor(Math.random() * 10000)}`;
   const { data, error } = await supabaseAdmin
     .from("machines")
     .insert({
-      initials,
-      name: `Test Machine ${initials}`,
+      initials: finalInitials,
+      name: `Test Machine ${finalInitials}`,
       owner_id: ownerId,
       next_issue_number: 1,
     })

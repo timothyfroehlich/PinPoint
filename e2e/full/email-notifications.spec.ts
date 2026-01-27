@@ -13,7 +13,11 @@ import {
   createTestMachine,
   updateUserRole,
 } from "e2e/support/supabase-admin.js";
-import { getTestIssueTitle, getTestEmail } from "../support/test-isolation.js";
+import {
+  getTestIssueTitle,
+  getTestEmail,
+  getTestMachineInitials,
+} from "../support/test-isolation.js";
 
 /**
  * Email notification verification tests
@@ -41,7 +45,8 @@ test.describe.serial("Email Notifications", () => {
     cleanupUserIds.push(user.id);
 
     // Create a unique machine for this worker
-    const machine = await createTestMachine(user.id);
+    const initials = getTestMachineInitials();
+    const machine = await createTestMachine(user.id, initials);
     testMachineInitials = machine.initials;
     cleanupMachineIds.push(machine.id);
   });
