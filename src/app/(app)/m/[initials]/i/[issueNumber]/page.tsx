@@ -13,6 +13,7 @@ import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
 import { OwnerBadge } from "~/components/issues/OwnerBadge";
 import { getMachineOwnerName } from "~/lib/issues/owner";
 import { formatIssueId } from "~/lib/issues/utils";
+import { ImageGallery } from "~/components/images/ImageGallery";
 import type { Issue, IssueWithAllRelations } from "~/lib/types";
 
 /**
@@ -115,7 +116,13 @@ export default async function IssueDetailPage({
                 ...(isAdmin && { email: true }),
               },
             },
+            images: {
+              where: (images, { isNull }) => isNull(images.deletedAt),
+            },
           },
+        },
+        images: {
+          where: (images, { isNull }) => isNull(images.deletedAt),
         },
         watchers: {
           columns: { userId: true },
@@ -213,6 +220,21 @@ export default async function IssueDetailPage({
 
       <div className="grid gap-10 md:grid-cols-[minmax(0,1fr)_320px]">
         <section className="space-y-5 lg:pr-4">
+          {issue.images.length > 0 && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Images ({issue.images.length})
+              </h2>
+              <ImageGallery
+                images={issue.images.map((img) => ({
+                  id: img.id,
+                  fullImageUrl: img.fullImageUrl,
+                  originalFilename: img.originalFilename,
+                }))}
+              />
+            </div>
+          )}
+
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             Activity
           </h2>

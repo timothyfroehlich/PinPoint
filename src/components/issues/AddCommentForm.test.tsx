@@ -46,7 +46,7 @@ describe("AddCommentForm", () => {
     mockUseActionState.mockReturnValue([undefined, vi.fn(), true]);
     render(<AddCommentForm issueId="123" />);
 
-    const button = screen.getByRole("button");
+    const button = screen.getByRole("button", { name: "Add Comment" });
     expect(button).toBeDisabled();
 
     // Check that standard text is maintained (Button handles spinner internally)

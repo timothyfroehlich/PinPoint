@@ -21,7 +21,7 @@ Use whenever the user asks to:
 
 Immediately after reading this skill (before any other output), run:
 
-python .agent/skills/superpowers-workflow/scripts/record_activation.py --skill superpowers-workflow
+python3 .agent/skills/superpowers-workflow/scripts/record_activation.py --skill superpowers-workflow
 
 ## Default workflow (mandatory unless explicitly unnecessary)
 

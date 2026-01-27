@@ -8,6 +8,8 @@ import { type IssueWithAllRelations } from "~/lib/types";
 import { cn } from "~/lib/utils";
 import { resolveIssueReporter } from "~/lib/issues/utils";
 import { MessageSquare } from "lucide-react";
+import { ImageGallery } from "~/components/images/ImageGallery";
+import { type IssueImage } from "~/server/db/schema";
 
 // ----------------------------------------------------------------------
 // Types
@@ -26,6 +28,7 @@ interface TimelineEvent {
   };
   createdAt: Date;
   content: string | null;
+  images?: IssueImage[];
 }
 
 // ----------------------------------------------------------------------
@@ -121,6 +124,12 @@ function TimelineItem({
                 {event.content}
               </div>
             )}
+
+            {event.images && event.images.length > 0 && (
+              <div className="mt-4">
+                <ImageGallery images={event.images} />
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -153,6 +162,7 @@ export function IssueTimeline({
     },
     createdAt: new Date(issue.createdAt),
     content: issue.description,
+    images: issue.images,
   };
 
   // 2. Normalize Comments
@@ -169,6 +179,7 @@ export function IssueTimeline({
       },
       createdAt: new Date(c.createdAt),
       content: c.content,
+      images: c.images,
     };
   });
 

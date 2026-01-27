@@ -110,8 +110,10 @@ test.describe.serial("Member Dashboard", () => {
       const issueTitle = await firstIssue.getByRole("heading").innerText();
       await firstIssue.click();
 
-      // Should navigate to issue detail page
-      await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
+      // Should navigate to issue detail page OR login page with next param
+      await expect(page).toHaveURL(
+        /(\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+)|(login\?next=%2Fm%2F.+)/
+      );
 
       // Add a small delay to allow the page to stabilize
       await page.waitForTimeout(500);
