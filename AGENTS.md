@@ -61,6 +61,17 @@ We use git worktrees for parallel environments. Config is managed via templates 
 | Review      | 3200    | 56321        | 56322    |
 | AntiGravity | 3300    | 57321        | 57322    |
 
+### Branch Management
+
+**Creating branches** - Ensure proper remote tracking:
+
+- `git checkout -b feature/name` then `git push -u origin feature/name`
+- **NOT**: `git checkout -b feature/name origin/main` (tracks main, not your branch)
+- Verify: `git branch -vv` shows `[origin/feature/name]`, not `[origin/main]`
+
+**Why**: Proper tracking enables `git pull`/`git push` without arguments and prevents accidentally
+pushing to main.
+
 ### Key Commands
 
 - `pnpm run check` (**RUN OFTEN**): Fast check (types, lint, format, unit tests). ~5s.
