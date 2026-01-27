@@ -155,6 +155,20 @@ export async function loginAction(
 
     redirect(next);
   } catch (error) {
+    // If redirect was thrown, re-throw it
+    if (error instanceof Error && error.message === "NEXT_REDIRECT") {
+      throw error;
+    }
+    // Also check for digest property which Next.js uses
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "digest" in error &&
+      String(error.digest).startsWith("NEXT_REDIRECT")
+    ) {
+      throw error;
+    }
+
     log.error(
       {
         error: error instanceof Error ? error.message : "Unknown",
@@ -348,10 +362,10 @@ export async function logoutAction(): Promise<void> {
       },
       "Logout server error"
     );
-  } finally {
-    // Always redirect to dashboard after logout attempt
-    redirect("/dashboard");
   }
+
+  // Always redirect to dashboard after logout attempt
+  redirect("/dashboard");
 }
 
 /**

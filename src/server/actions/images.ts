@@ -169,10 +169,11 @@ export async function uploadIssueImage(formData: FormData): Promise<
         fileSizeBytes: file.size,
         mimeType: file.type,
       });
-    } catch (dbError) {
+    } catch (caughtErr) {
       log.error(
         {
-          error: dbError instanceof Error ? dbError.message : "Unknown",
+          error:
+            caughtErr instanceof Error ? caughtErr.message : String(caughtErr),
           blobPathname: uploadedBlobPathname,
         },
         "DB insert failed for image, cleaning up blob"
@@ -183,14 +184,17 @@ export async function uploadIssueImage(formData: FormData): Promise<
       }
       return err("DATABASE", "Failed to record image in database");
     }
-  } catch (error) {
+  } catch (caughtErr) {
     log.error(
-      { error: error instanceof Error ? error.message : "Unknown" },
+      {
+        error:
+          caughtErr instanceof Error ? caughtErr.message : String(caughtErr),
+      },
       "Upload action failed"
     );
     return err(
       "BLOB",
-      error instanceof Error ? error.message : "Upload failed"
+      caughtErr instanceof Error ? caughtErr.message : "Upload failed"
     );
   }
 }

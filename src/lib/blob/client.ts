@@ -55,10 +55,11 @@ export async function uploadToBlob(
       addRandomSuffix: true,
     });
   } catch (err) {
-    log.error(
-      { error: err instanceof Error ? err.message : "Unknown", pathname },
-      "Blob upload failed"
-    );
+    const errorDetails = {
+      error: err instanceof Error ? err.message : String(err),
+      pathname,
+    };
+    log.error(errorDetails, "Blob upload failed");
     throw new Error("Failed to upload image to storage");
   }
 }
@@ -90,10 +91,11 @@ export async function deleteFromBlob(pathname: string): Promise<void> {
   try {
     await del(pathname);
   } catch (err) {
-    log.error(
-      { error: err instanceof Error ? err.message : "Unknown", pathname },
-      "Blob deletion failed"
-    );
+    const errorDetails = {
+      error: err instanceof Error ? err.message : String(err),
+      pathname,
+    };
+    log.error(errorDetails, "Blob deletion failed");
     // Don't throw - deletion is idempotent and failures are non-blocking
   }
 }
