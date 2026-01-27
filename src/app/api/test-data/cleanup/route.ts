@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ilike, inArray, or, type SQL } from "drizzle-orm";
 
 import { db } from "~/server/db";
+import { log } from "~/lib/logger";
 import {
   issues,
   machines,
@@ -103,63 +104,74 @@ export async function POST(request: Request): Promise<Response> {
     });
   }
 
-  const removedIssues = issueConditions.length
-    ? (
-        await db
-          .delete(issues)
-          .where(
-            issueConditions.length === 1
-              ? issueConditions[0]
-              : or(...issueConditions)
+  try {
+    const removedIssues = issueConditions.length
+      ? (
+          await db
+            .delete(issues)
+            .where(
+              issueConditions.length === 1
+                ? issueConditions[0]
+                : or(...issueConditions)
+            )
+            .returning({ id: issues.id })
+        ).map((row) => row.id)
+      : [];
+
+    const removedMachines = machineConditions.length
+      ? (
+          await db
+            .delete(machines)
+            .where(
+              machineConditions.length === 1
+                ? machineConditions[0]
+                : or(...machineConditions)
+            )
+            .returning({ id: machines.id })
+        ).map((row) => row.id)
+      : [];
+
+    const removedUsers: string[] = [];
+    if (userEmails.length) {
+      const deletedInvited = await db
+        .delete(invitedUsers)
+        .where(inArray(invitedUsers.email, userEmails))
+        .returning({ id: invitedUsers.id });
+
+      removedUsers.push(...deletedInvited.map((r) => r.id));
+
+      // Note: We don't delete auth users here via Drizzle because of foreign key complexities
+      // with Supabase Auth schema in the same transaction. For auth users, the E2E cleanup
+      // should use the supabaseAdmin helper if possible.
+      // However, we can delete their profiles if they exist.
+      const deletedProfiles = await db
+        .delete(userProfiles)
+        .where(
+          inArray(
+            userProfiles.id,
+            db
+              .select({ id: authUsers.id })
+              .from(authUsers)
+              .where(inArray(authUsers.email, userEmails))
           )
-          .returning({ id: issues.id })
-      ).map((row) => row.id)
-    : [];
-
-  const removedMachines = machineConditions.length
-    ? (
-        await db
-          .delete(machines)
-          .where(
-            machineConditions.length === 1
-              ? machineConditions[0]
-              : or(...machineConditions)
-          )
-          .returning({ id: machines.id })
-      ).map((row) => row.id)
-    : [];
-
-  const removedUsers: string[] = [];
-  if (userEmails.length) {
-    const deletedInvited = await db
-      .delete(invitedUsers)
-      .where(inArray(invitedUsers.email, userEmails))
-      .returning({ id: invitedUsers.id });
-
-    removedUsers.push(...deletedInvited.map((r) => r.id));
-
-    // Note: We don't delete auth users here via Drizzle because of foreign key complexities
-    // with Supabase Auth schema in the same transaction. For auth users, the E2E cleanup
-    // should use the supabaseAdmin helper if possible.
-    // However, we can delete their profiles if they exist.
-    const deletedProfiles = await db
-      .delete(userProfiles)
-      .where(
-        inArray(
-          userProfiles.id,
-          db
-            .select({ id: authUsers.id })
-            .from(authUsers)
-            .where(inArray(authUsers.email, userEmails))
         )
-      )
-      .returning({ id: userProfiles.id });
-    removedUsers.push(...deletedProfiles.map((r) => r.id));
-  }
+        .returning({ id: userProfiles.id });
+      removedUsers.push(...deletedProfiles.map((r) => r.id));
+    }
 
-  return NextResponse.json({
-    removedIssues,
-    removedMachines,
-    removedUsers,
-  });
+    return NextResponse.json({
+      removedIssues,
+      removedMachines,
+      removedUsers,
+    });
+  } catch (err) {
+    log.error(
+      { error: err instanceof Error ? err.message : String(err) },
+      "Test data cleanup failed"
+    );
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Cleanup failed" },
+      { status: 500 }
+    );
+  }
 }
