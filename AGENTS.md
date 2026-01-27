@@ -90,6 +90,22 @@ We use git worktrees for parallel environments. Config is managed via templates 
   - **Session Pooler (IPv4)**: Use `DATABASE_URL` (port `:6543`) for external connections. The `DIRECT_URL` (port `:5432`) uses IPv6 which may be unreachable from some environments.
   - Format: `postgresql://postgres.[project-ref]:password@aws-0-us-east-2.pooler.supabase.com:6543/postgres`
 
+### Migration Conflict Resolution
+
+When merging branches with competing migrations (both created same number):
+
+**Regeneration Protocol** (Standard):
+
+1. **Accept incoming** (main's migrations) - Keep main's SQL and meta files
+2. **Delete your migration files** - Remove conflicted `000N_*.sql` and `drizzle/meta/000N_snapshot.json`
+3. **Resolve schema.ts** - Manually merge both sets of changes
+4. **Regenerate**: `pnpm db:generate` creates fresh migration with correct number
+5. **Verify SQL** - Compare new SQL to deleted SQL, confirm intent preserved
+6. **Test**: `pnpm db:reset` to rebuild from scratch
+
+**Why this works**: Drizzle regenerates consistent meta files (prevId chain, journal idx).
+Eliminates manual JSON surgery and uncertainty.
+
 ### GitHub Copilot Reviews
 
 Fetch all comments (including hidden ones):
