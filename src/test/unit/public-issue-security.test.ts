@@ -76,7 +76,7 @@ describe("Public Issue Reporting Security", () => {
     formData.set("machineId", "00000000-0000-0000-0000-000000000000");
     formData.set("title", "Test Issue");
     formData.set("severity", "minor");
-    formData.set("consistency", "intermittent");
+    formData.set("frequency", "intermittent");
 
     const result = await submitPublicIssueAction({ error: "" }, formData);
 

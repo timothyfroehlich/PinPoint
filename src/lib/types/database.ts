@@ -28,7 +28,7 @@ export type { UserRole, IssueStatus };
 
 export type IssueSeverity = "cosmetic" | "minor" | "major" | "unplayable";
 export type IssuePriority = "low" | "medium" | "high";
-export type IssueConsistency = "intermittent" | "frequent" | "constant";
+export type IssueFrequency = "intermittent" | "frequent" | "constant";
 
 // Select types (full row from database)
 export type UserProfile = InferSelectModel<typeof userProfiles>;
@@ -38,12 +38,12 @@ export type Machine = InferSelectModel<typeof machines>;
 type DrizzleIssue = InferSelectModel<typeof issues>;
 export type Issue = Omit<
   DrizzleIssue,
-  "status" | "severity" | "priority" | "consistency" | "closedAt"
+  "status" | "severity" | "priority" | "frequency" | "closedAt"
 > & {
   status: IssueStatus;
   severity: IssueSeverity;
   priority: IssuePriority;
-  consistency: IssueConsistency;
+  frequency: IssueFrequency;
   closedAt: Date | null;
 };
 

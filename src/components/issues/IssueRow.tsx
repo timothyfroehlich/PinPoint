@@ -15,7 +15,7 @@ interface IssueRowProps {
     | "status"
     | "severity"
     | "priority"
-    | "consistency"
+    | "frequency"
     | "createdAt"
     | "machineInitials"
     | "reporterName"

@@ -1,11 +1,7 @@
 import type React from "react";
 import { IssueBadge } from "~/components/issues/IssueBadge";
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
-import type {
-  IssueSeverity,
-  IssuePriority,
-  IssueConsistency,
-} from "~/lib/types";
+import type { IssueSeverity, IssuePriority, IssueFrequency } from "~/lib/types";
 
 export default function BadgeDebugPage(): React.JSX.Element {
   const severities: IssueSeverity[] = [
@@ -15,7 +11,7 @@ export default function BadgeDebugPage(): React.JSX.Element {
     "unplayable",
   ];
   const priorities: IssuePriority[] = ["low", "medium", "high"];
-  const consistencies: IssueConsistency[] = [
+  const frequencies: IssueFrequency[] = [
     "intermittent",
     "frequent",
     "constant",
@@ -98,21 +94,21 @@ export default function BadgeDebugPage(): React.JSX.Element {
             </div>
           </section>
 
-          {/* Consistencies Section */}
+          {/* Frequencies Section */}
           <section className="space-y-4">
             <h2 className="text-xl font-semibold border-b pb-2 text-cyan-500">
-              Consistency Variations
+              Frequency Variations
             </h2>
             <div className="flex flex-col gap-3">
-              {consistencies.map((consistency) => {
+              {frequencies.map((frequency) => {
                 return (
                   <div
-                    key={consistency}
+                    key={frequency}
                     className="flex items-center gap-3 bg-surface p-2 rounded-lg border border-outline-variant"
                   >
-                    <IssueBadge type="consistency" value={consistency} />
+                    <IssueBadge type="frequency" value={frequency} />
                     <span className="text-[10px] font-mono text-muted-foreground">
-                      {consistency}
+                      {frequency}
                     </span>
                   </div>
                 );

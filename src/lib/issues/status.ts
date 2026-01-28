@@ -7,11 +7,7 @@ import {
   Repeat,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type {
-  IssueSeverity,
-  IssuePriority,
-  IssueConsistency,
-} from "~/lib/types";
+import type { IssueSeverity, IssuePriority, IssueFrequency } from "~/lib/types";
 
 /**
  * Single Source of Truth for Issue Status Values
@@ -252,8 +248,8 @@ export const PRIORITY_CONFIG: Record<
   },
 };
 
-export const CONSISTENCY_CONFIG: Record<
-  IssueConsistency,
+export const FREQUENCY_CONFIG: Record<
+  IssueFrequency,
   { label: string; styles: string; iconColor: string; icon: LucideIcon }
 > = {
   intermittent: {
@@ -301,10 +297,8 @@ export function getIssuePriorityLabel(priority: IssuePriority): string {
   return PRIORITY_CONFIG[priority].label;
 }
 
-export function getIssueConsistencyLabel(
-  consistency: IssueConsistency
-): string {
-  return CONSISTENCY_CONFIG[consistency].label;
+export function getIssueFrequencyLabel(frequency: IssueFrequency): string {
+  return FREQUENCY_CONFIG[frequency].label;
 }
 
 export function getIssueSeverityStyles(severity: IssueSeverity): string {
@@ -315,10 +309,8 @@ export function getIssuePriorityStyles(priority: IssuePriority): string {
   return PRIORITY_CONFIG[priority].styles;
 }
 
-export function getIssueConsistencyStyles(
-  consistency: IssueConsistency
-): string {
-  return CONSISTENCY_CONFIG[consistency].styles;
+export function getIssueFrequencyStyles(frequency: IssueFrequency): string {
+  return FREQUENCY_CONFIG[frequency].styles;
 }
 
 // Manual export for component use (easier for Tim to read/change)
@@ -349,14 +341,14 @@ export const PRIORITY_STYLES: Record<IssuePriority, string> = {
   high: PRIORITY_CONFIG.high.styles,
 };
 
-export const CONSISTENCY_STYLES: Record<IssueConsistency, string> = {
-  intermittent: CONSISTENCY_CONFIG.intermittent.styles,
-  frequent: CONSISTENCY_CONFIG.frequent.styles,
-  constant: CONSISTENCY_CONFIG.constant.styles,
+export const FREQUENCY_STYLES: Record<IssueFrequency, string> = {
+  intermittent: FREQUENCY_CONFIG.intermittent.styles,
+  frequent: FREQUENCY_CONFIG.frequent.styles,
+  constant: FREQUENCY_CONFIG.constant.styles,
 };
 
 export const ISSUE_FIELD_ICONS = {
   severity: AlertTriangle,
   priority: TrendingUp,
-  consistency: Repeat,
+  frequency: Repeat,
 };

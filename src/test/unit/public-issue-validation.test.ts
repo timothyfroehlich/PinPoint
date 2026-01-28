@@ -20,7 +20,7 @@ describe("parsePublicIssueForm", () => {
       title: "Flipper stuck",
       description: "Left flipper sometimes sticks halfway.",
       severity: "minor",
-      consistency: "intermittent",
+      frequency: "intermittent",
     });
 
     const result = parsePublicIssueForm(formData);
@@ -29,7 +29,7 @@ describe("parsePublicIssueForm", () => {
     if (result.success) {
       expect(result.data.title).toBe("Flipper stuck");
       expect(result.data.severity).toBe("minor");
-      expect(result.data.consistency).toBe("intermittent");
+      expect(result.data.frequency).toBe("intermittent");
     }
   });
 

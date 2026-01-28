@@ -26,7 +26,7 @@ test.describe("Status Overhaul E2E", () => {
       title: "E2E Status Overhaul Test",
       severity: "unplayable",
       priority: "high",
-      consistency: "frequent",
+      frequency: "frequent",
     });
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
@@ -38,7 +38,7 @@ test.describe("Status Overhaul E2E", () => {
       /Unplayable/i
     );
     await expect(page.getByTestId("issue-priority-badge")).toHaveText(/High/i);
-    await expect(page.getByTestId("issue-consistency-badge")).toHaveText(
+    await expect(page.getByTestId("issue-frequency-badge")).toHaveText(
       /Frequent/i
     );
 

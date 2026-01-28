@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 import { SeveritySelect } from "./SeveritySelect";
 import { StatusSelect } from "./StatusSelect";
 import { PrioritySelect } from "./PrioritySelect";
-import { ConsistencySelect } from "./ConsistencySelect";
+import { FrequencySelect } from "./FrequencySelect";
 import React from "react";
 
 // Mock ResizeObserver for Radix UI
@@ -38,12 +38,10 @@ describe("Issue Field Selects Accessibility", () => {
     expect(trigger).toHaveAttribute("aria-label", "Priority: High");
   });
 
-  it("ConsistencySelect has dynamic accessible name", () => {
+  it("FrequencySelect has dynamic accessible name", () => {
     const onValueChange = vi.fn();
-    render(
-      <ConsistencySelect value="frequent" onValueChange={onValueChange} />
-    );
+    render(<FrequencySelect value="frequent" onValueChange={onValueChange} />);
     const trigger = screen.getByRole("combobox");
-    expect(trigger).toHaveAttribute("aria-label", "Consistency: Frequent");
+    expect(trigger).toHaveAttribute("aria-label", "Frequency: Frequent");
   });
 });

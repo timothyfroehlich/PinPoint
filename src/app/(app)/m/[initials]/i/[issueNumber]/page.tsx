@@ -137,7 +137,7 @@ export default async function IssueDetailPage({
         status: true,
         severity: true,
         priority: true,
-        consistency: true,
+        frequency: true,
         issueNumber: true,
         machineInitials: true,
         reporterName: true,
@@ -208,7 +208,7 @@ export default async function IssueDetailPage({
               issue={
                 issue as unknown as Pick<
                   Issue,
-                  "status" | "severity" | "priority" | "consistency"
+                  "status" | "severity" | "priority" | "frequency"
                 >
               }
               variant="strip"
