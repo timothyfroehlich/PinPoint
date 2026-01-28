@@ -47,8 +47,12 @@ export async function withUserContext<T>(
   return await db.transaction(async (tx) => {
     // Set user context for RLS policies
     // Uses parameterized queries for SQL injection protection
-    await tx.execute(sql`SET LOCAL request.user_id = ${user.id}`);
-    await tx.execute(sql`SET LOCAL request.user_role = ${user.role}`);
+    await tx.execute(
+      sql`SELECT set_config('request.user_id', ${user.id}, true)`
+    );
+    await tx.execute(
+      sql`SELECT set_config('request.user_role', ${user.role}, true)`
+    );
 
     // Execute the query with context
     return await fn(tx);

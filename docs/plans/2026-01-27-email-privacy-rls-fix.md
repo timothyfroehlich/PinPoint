@@ -15,13 +15,14 @@
 ## Task 1: Create RLS Utility Module
 
 **Files:**
+
 - Create: `src/server/db/utils/rls.ts`
 
 **Step 1: Create the RLS utilities file**
 
 Create `src/server/db/utils/rls.ts`:
 
-```typescript
+````typescript
 /**
  * RLS Context Utilities
  *
@@ -66,7 +67,7 @@ export interface UserContext {
 export async function withUserContext<T>(
   db: Db,
   user: UserContext,
-  fn: (tx: Tx) => Promise<T>,
+  fn: (tx: Tx) => Promise<T>
 ): Promise<T> {
   return await db.transaction(async (tx) => {
     // Set user context for RLS policies
@@ -78,7 +79,7 @@ export async function withUserContext<T>(
     return await fn(tx);
   });
 }
-```
+````
 
 **Step 2: Verify TypeScript compiles**
 
@@ -100,6 +101,7 @@ git commit -m "feat(security): add RLS context utilities for session variable bi
 ## Task 2: Create User Context Types
 
 **Files:**
+
 - Create: `src/lib/types/user.ts`
 - Modify: `src/lib/types/index.ts`
 
@@ -150,13 +152,14 @@ git commit -m "feat(types): add UserContext and UserRole types for RLS"
 ## Task 3: Create User Context Helper
 
 **Files:**
+
 - Create: `src/lib/auth/context.ts`
 
 **Step 1: Create context helper file**
 
 Create `src/lib/auth/context.ts`:
 
-```typescript
+````typescript
 /**
  * User authentication context utilities
  *
@@ -182,7 +185,7 @@ import { type UserContext } from "~/lib/types";
  * ```
  */
 export async function getUserContext(
-  userId: string,
+  userId: string
 ): Promise<UserContext | null> {
   const profile = await db.query.userProfiles.findFirst({
     where: eq(userProfiles.id, userId),
@@ -196,7 +199,7 @@ export async function getUserContext(
     role: profile.role ?? "guest",
   };
 }
-```
+````
 
 **Step 2: Verify TypeScript compiles**
 
@@ -218,6 +221,7 @@ git commit -m "feat(auth): add getUserContext helper for RLS enforcement"
 ## Task 4: Create RLS Migration
 
 **Files:**
+
 - Create: `drizzle/0008_rls_session_context.sql`
 
 **Step 1: Create migration file**
@@ -331,6 +335,7 @@ git commit -m "feat(migration): update RLS policies to support session context
 ## Task 5: Write Integration Tests
 
 **Files:**
+
 - Modify: `src/test/integration/supabase/email-privacy-rls.test.ts`
 
 **Step 1: Add Drizzle-specific tests**
@@ -438,13 +443,14 @@ describe("Email Privacy - Direct Drizzle Queries", () => {
       db,
       { id: memberUser.id, role: "member" },
       async (tx) => {
-        return tx.execute(
-          sql`SELECT id, email FROM public_profiles_view`
-        );
+        return tx.execute(sql`SELECT id, email FROM public_profiles_view`);
       }
     );
 
-    const rows = profiles as unknown as Array<{ id: string; email: string | null }>;
+    const rows = profiles as unknown as Array<{
+      id: string;
+      email: string | null;
+    }>;
 
     // Should see own email
     const ownProfile = rows.find((p) => p.id === memberUser.id);
@@ -463,13 +469,14 @@ describe("Email Privacy - Direct Drizzle Queries", () => {
       db,
       { id: adminUser.id, role: "admin" },
       async (tx) => {
-        return tx.execute(
-          sql`SELECT id, email FROM public_profiles_view`
-        );
+        return tx.execute(sql`SELECT id, email FROM public_profiles_view`);
       }
     );
 
-    const rows = profiles as unknown as Array<{ id: string; email: string | null }>;
+    const rows = profiles as unknown as Array<{
+      id: string;
+      email: string | null;
+    }>;
 
     // Admin should see all emails
     const profilesWithEmails = rows.filter((p) => p.email !== null);
@@ -520,6 +527,7 @@ pnpm run preflight
 Expected: All checks pass
 
 If failures:
+
 - Type errors: Check imports are correct
 - Test failures: Review test logic, check database seeding
 - Build errors: Check for syntax issues
@@ -560,6 +568,7 @@ ROLLBACK;
 ```
 
 Expected:
+
 - Admin query: All emails visible
 - Member query: Only own email visible, others NULL
 
@@ -571,16 +580,19 @@ Create `docs/verification/email-privacy-rls-manual-test.md`:
 # Email Privacy RLS Manual Verification
 
 ## Test Date: [INSERT DATE]
+
 ## Tester: [INSERT NAME]
 
 ### SQL Verification
 
 **Admin Context:**
+
 - [ ] All emails visible in public_profiles_view
 - [ ] Can update any profile
 - [ ] Can delete profiles
 
 **Member Context:**
+
 - [ ] Only own email visible in public_profiles_view
 - [ ] Can only update own profile
 - [ ] Cannot delete profiles
@@ -592,6 +604,7 @@ Create `docs/verification/email-privacy-rls-manual-test.md`:
 - [ ] Context isolation verified
 
 ### Notes:
+
 [INSERT ANY OBSERVATIONS]
 ```
 
@@ -622,12 +635,14 @@ PR #XXX fixed the critical email privacy security issue by implementing session 
 ## Current State
 
 ✅ **Completed:**
+
 - RLS utilities created (`withUserContext`, `getUserContext`)
 - RLS policies updated to support session context
 - Integration tests prove enforcement works
 - Migration deployed successfully
 
 ❌ **Not Yet Done:**
+
 - Server actions still use global `db` instance (no context)
 - Service layer functions don't accept `DbOrTx` parameter
 - RLS policies work but aren't enforced on app queries yet
@@ -765,6 +780,7 @@ Expected: Pushed successfully
 After all tasks complete:
 
 ### Infrastructure Verification
+
 - [ ] `withUserContext` utility exists and compiles
 - [ ] `getUserContext` helper exists and compiles
 - [ ] RLS migration applied to local database
@@ -772,17 +788,20 @@ After all tasks complete:
 - [ ] All integration tests pass (Drizzle + Supabase)
 
 ### Functional Verification
+
 - [ ] Admin context shows all emails in SQL test
 - [ ] Member context shows only own email in SQL test
 - [ ] Transaction isolation works (context doesn't leak)
 - [ ] public_profiles_view masks emails correctly
 
 ### Documentation
+
 - [ ] Manual verification checklist created
 - [ ] GitHub issue created for full rollout
 - [ ] Commit messages are clear and descriptive
 
 ### Deployment Readiness
+
 - [ ] `pnpm run preflight` passes
 - [ ] All tests pass
 - [ ] No TypeScript errors
@@ -827,6 +846,7 @@ export async function myServiceFunction(
 ```
 
 **Risk mitigation:**
+
 - Each action update is isolated (no dependencies)
 - RLS policies fail closed (restrictive if no context)
 - Tests catch issues before production

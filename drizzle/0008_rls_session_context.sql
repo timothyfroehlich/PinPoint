@@ -2,21 +2,30 @@
 -- This enables RLS enforcement with direct database connections (Drizzle)
 
 -- 1. Drop existing policies that use auth.jwt()
+DROP POLICY IF EXISTS "Profiles are viewable by all authenticated users" ON "user_profiles";
 DROP POLICY IF EXISTS "Profiles are updatable by owners" ON "user_profiles";
 DROP POLICY IF EXISTS "Admins can update any profile" ON "user_profiles";
 DROP POLICY IF EXISTS "Admins can delete profiles" ON "user_profiles";
 DROP POLICY IF EXISTS "Invited users are viewable by admins" ON "invited_users";
 
 -- 2. Recreate policies using session context
+
+-- All authenticated users can view profiles (to see names/avatars)
+-- Emails are masked by public_profiles_view for non-owners/non-admins
+CREATE POLICY "Profiles are viewable by all authenticated users"
+ON "user_profiles" FOR SELECT
+TO authenticated
+USING (true);
+
 -- Users can update their own profile
 CREATE POLICY "Profiles are updatable by owners"
 ON "user_profiles" FOR UPDATE
 TO authenticated
 USING (
-  COALESCE(current_setting('request.user_id', true)::uuid, auth.uid()) = id
+  COALESCE(NULLIF(current_setting('request.user_id', true), '')::uuid, auth.uid()) = id
 )
 WITH CHECK (
-  COALESCE(current_setting('request.user_id', true)::uuid, auth.uid()) = id
+  COALESCE(NULLIF(current_setting('request.user_id', true), '')::uuid, auth.uid()) = id
 );
 
 -- Admins can update any profile
@@ -24,10 +33,10 @@ CREATE POLICY "Admins can update any profile"
 ON "user_profiles" FOR UPDATE
 TO authenticated
 USING (
-  COALESCE(current_setting('request.user_role', true), auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+  COALESCE(NULLIF(current_setting('request.user_role', true), ''), auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
 )
 WITH CHECK (
-  COALESCE(current_setting('request.user_role', true), auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+  COALESCE(NULLIF(current_setting('request.user_role', true), ''), auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
 );
 
 -- Admins can delete profiles
@@ -35,7 +44,7 @@ CREATE POLICY "Admins can delete profiles"
 ON "user_profiles" FOR DELETE
 TO authenticated
 USING (
-  COALESCE(current_setting('request.user_role', true), auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+  COALESCE(NULLIF(current_setting('request.user_role', true), ''), auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
 );
 
 -- Only admins can see invited users
@@ -43,7 +52,7 @@ CREATE POLICY "Invited users are viewable by admins"
 ON "invited_users" FOR SELECT
 TO authenticated
 USING (
-  COALESCE(current_setting('request.user_role', true), auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
+  COALESCE(NULLIF(current_setting('request.user_role', true), ''), auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
 );
 
 -- 3. Update public_profiles_view to use session context
@@ -58,9 +67,10 @@ SELECT
   created_at,
   updated_at,
   CASE
-    WHEN COALESCE(current_setting('request.user_id', true)::uuid, auth.uid()) = id
-      OR COALESCE(current_setting('request.user_role', true), auth.jwt() -> 'user_metadata' ->> 'role') = 'admin'
-    THEN email
+    WHEN NULLIF(current_setting('request.user_id', true), '') = id::text THEN email
+    WHEN NULLIF(current_setting('request.user_role', true), '') = 'admin' THEN email
+    WHEN auth.uid() = id THEN email
+    WHEN auth.jwt() -> 'user_metadata' ->> 'role' = 'admin' THEN email
     ELSE NULL
   END AS email
 FROM "user_profiles";
