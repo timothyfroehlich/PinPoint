@@ -2,7 +2,7 @@
  * E2E Tests: Member Dashboard
  *
  * Critical journey: Dashboard displays assigned issues, recent issues,
- * unplayable machines, and quick stats after login.
+ * newest games, recently fixed games, and quick stats after login.
  */
 
 import { test, expect, type Page } from "@playwright/test";
@@ -64,19 +64,34 @@ test.describe.serial("Member Dashboard", () => {
       "Assigned issues"
     );
 
-    // Unplayable Machines
+    // Newest Games
     await expect(
-      page.getByRole("heading", { name: "Unplayable Machines" })
+      page.getByRole("heading", { name: "Newest Games" })
     ).toBeVisible();
-    const unplayableEmptyState = page.getByText("All machines are playable");
-    const unplayableCards = page.getByTestId("unplayable-machine-card");
-    const unplayableCardsCount = await unplayableCards.count();
-    const unplayableEmptyStateCount = await unplayableEmptyState.count();
+    const newestEmptyState = page.getByText("No machines yet");
+    const newestMachinesList = page.getByTestId("newest-machines-list");
+    const newestMachinesCount = await newestMachinesList.locator("a").count();
+    const newestEmptyStateCount = await newestEmptyState.count();
 
     ensureCardsOrEmpty(
-      unplayableCardsCount,
-      unplayableEmptyStateCount,
-      "Unplayable machines"
+      newestMachinesCount,
+      newestEmptyStateCount,
+      "Newest games"
+    );
+
+    // Recently Fixed Games
+    await expect(
+      page.getByRole("heading", { name: "Recently Fixed Games" })
+    ).toBeVisible();
+    const fixedEmptyState = page.getByText("No recently fixed machines");
+    const fixedMachinesList = page.getByTestId("recently-fixed-machines-list");
+    const fixedMachinesCount = await fixedMachinesList.locator("a").count();
+    const fixedEmptyStateCount = await fixedEmptyState.count();
+
+    ensureCardsOrEmpty(
+      fixedMachinesCount,
+      fixedEmptyStateCount,
+      "Recently fixed games"
     );
 
     // Recent Issues

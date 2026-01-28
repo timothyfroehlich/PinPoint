@@ -4,13 +4,24 @@
  * Tests dashboard-specific queries:
  * - Issues assigned to current user
  * - Recently reported issues
- * - Unplayable machines
+ * - Newest machines
+ * - Recently fixed machines
  * - Dashboard stats
  */
 
 import { randomUUID } from "node:crypto";
 import { describe, it, expect } from "vitest";
-import { eq, desc, and, ne, sql } from "drizzle-orm";
+import {
+  eq,
+  desc,
+  and,
+  ne,
+  sql,
+  inArray,
+  notInArray,
+  not,
+  exists,
+} from "drizzle-orm";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
 import { machines, issues, userProfiles } from "~/server/db/schema";
 import {
@@ -22,6 +33,7 @@ import {
   deriveMachineStatus,
   type IssueForStatus,
 } from "~/lib/machines/status";
+import { CLOSED_STATUSES } from "~/lib/issues/status";
 
 describe("Dashboard Queries (PGlite)", () => {
   // Set up worker-scoped PGlite and auto-cleanup after each test
@@ -163,83 +175,231 @@ describe("Dashboard Queries (PGlite)", () => {
     });
   });
 
-  describe("Unplayable Machines Query", () => {
-    it("should return only machines with open unplayable issues", async () => {
+  describe("Newest Machines Query", () => {
+    it("should return 3 most recently added machines ordered by createdAt", async () => {
       const db = await getTestDb();
 
-      // Create 3 machines
-      const [machine1, machine2, machine3] = await db
+      // Create 5 machines with staggered creation times
+      const now = Date.now();
+      const machinesData = await db
         .insert(machines)
         .values([
-          createTestMachine({ name: "Unplayable Machine", initials: "UM" }),
-          createTestMachine({ name: "Playable Machine", initials: "PM" }),
-          createTestMachine({ name: "Operational Machine", initials: "OM" }),
+          createTestMachine({
+            name: "Oldest Machine",
+            initials: "M1",
+            createdAt: new Date(now - 5000),
+          }),
+          createTestMachine({
+            name: "Old Machine",
+            initials: "M2",
+            createdAt: new Date(now - 4000),
+          }),
+          createTestMachine({
+            name: "Third Newest",
+            initials: "M3",
+            createdAt: new Date(now - 3000),
+          }),
+          createTestMachine({
+            name: "Second Newest",
+            initials: "M4",
+            createdAt: new Date(now - 2000),
+          }),
+          createTestMachine({
+            name: "Newest Machine",
+            initials: "M5",
+            createdAt: new Date(now - 1000),
+          }),
         ])
         .returning();
 
-      // Machine 1: unplayable issue (open)
+      // Query newest machines (dashboard query pattern)
+      const newestMachines = await db.query.machines.findMany({
+        orderBy: desc(machines.createdAt),
+        limit: 3,
+        columns: {
+          id: true,
+          name: true,
+          initials: true,
+          createdAt: true,
+        },
+      });
+
+      // Should return exactly 3 most recent machines
+      expect(newestMachines).toHaveLength(3);
+      expect(newestMachines[0].name).toBe("Newest Machine");
+      expect(newestMachines[1].name).toBe("Second Newest");
+      expect(newestMachines[2].name).toBe("Third Newest");
+    });
+
+    it("should return empty array when no machines exist", async () => {
+      const db = await getTestDb();
+
+      // Query with no machines
+      const newestMachines = await db.query.machines.findMany({
+        orderBy: desc(machines.createdAt),
+        limit: 3,
+      });
+
+      expect(newestMachines).toHaveLength(0);
+    });
+  });
+
+  describe("Recently Fixed Machines Query", () => {
+    it("should return machines that had major/unplayable issues but now have none", async () => {
+      const db = await getTestDb();
+
+      // Create 4 machines
+      const [machine1, machine2, machine3, machine4] = await db
+        .insert(machines)
+        .values([
+          createTestMachine({ name: "Recently Fixed 1", initials: "RF1" }),
+          createTestMachine({ name: "Recently Fixed 2", initials: "RF2" }),
+          createTestMachine({ name: "Still Broken", initials: "SB" }),
+          createTestMachine({ name: "Never Broken", initials: "NB" }),
+        ])
+        .returning();
+
+      const now = Date.now();
+
+      // Machine 1: Had major issue, now fixed (most recent fix)
       await db.insert(issues).values(
         createTestIssue(machine1.initials, {
           issueNumber: 1,
-          severity: "unplayable",
-          status: "new",
+          severity: "major",
+          status: "fixed",
+          updatedAt: new Date(now - 1000),
         })
       );
 
-      // Machine 2: only playable issues (open)
+      // Machine 2: Had unplayable issue, now fixed (older fix)
       await db.insert(issues).values(
         createTestIssue(machine2.initials, {
           issueNumber: 1,
-          severity: "playable",
-          status: "new",
+          severity: "unplayable",
+          status: "fixed",
+          updatedAt: new Date(now - 2000),
         })
       );
 
-      // Machine 3: unplayable issue (fixed - should NOT appear)
-      await db.insert(issues).values(
+      // Machine 3: Has major issue (closed) but ALSO has open major issue (should NOT appear)
+      await db.insert(issues).values([
         createTestIssue(machine3.initials, {
           issueNumber: 1,
-          severity: "unplayable",
+          severity: "major",
+          status: "fixed",
+          updatedAt: new Date(now - 500),
+        }),
+        createTestIssue(machine3.initials, {
+          issueNumber: 2,
+          severity: "major",
+          status: "new",
+        }),
+      ]);
+
+      // Machine 4: Never had major/unplayable issues (should NOT appear)
+      await db.insert(issues).values(
+        createTestIssue(machine4.initials, {
+          issueNumber: 1,
+          severity: "playable",
           status: "fixed",
         })
       );
 
-      // Query all machines with issues (dashboard query pattern)
-      const allMachines = await db.query.machines.findMany({
-        with: {
-          issues: {
-            columns: {
-              id: true,
-              status: true,
-              severity: true,
-            },
-          },
-        },
-      });
-
-      const unplayableMachines = allMachines
-        .map((machine) => {
-          const status = deriveMachineStatus(
-            machine.issues as IssueForStatus[]
-          );
-          const unplayableIssuesCount = machine.issues.filter(
-            (issue: { severity: string; status: string }) =>
-              issue.severity === "unplayable" && issue.status !== "fixed"
-          ).length;
-
-          return {
-            id: machine.id,
-            name: machine.name,
-            status,
-            unplayableIssuesCount,
-          };
+      // Query recently fixed machines (dashboard query pattern)
+      const recentlyFixedMachines = await db
+        .select({
+          id: machines.id,
+          name: machines.name,
+          initials: machines.initials,
+          fixedAt: sql<Date>`max(${issues.updatedAt})`.as("fixed_at"),
         })
-        .filter((machine) => machine.status === "unplayable");
+        .from(machines)
+        .innerJoin(issues, eq(issues.machineInitials, machines.initials))
+        .where(
+          and(
+            // Issue was major or unplayable
+            inArray(issues.severity, ["major", "unplayable"]),
+            // Issue is now closed
+            inArray(issues.status, [...CLOSED_STATUSES]),
+            // Machine has NO open major/unplayable issues currently
+            not(
+              exists(
+                db
+                  .select({ one: sql`1` })
+                  .from(issues)
+                  .where(
+                    and(
+                      eq(issues.machineInitials, machines.initials),
+                      inArray(issues.severity, ["major", "unplayable"]),
+                      notInArray(issues.status, [...CLOSED_STATUSES])
+                    )
+                  )
+              )
+            )
+          )
+        )
+        .groupBy(machines.id, machines.name, machines.initials)
+        .orderBy(sql`max(${issues.updatedAt}) DESC`)
+        .limit(3);
 
-      // Should only return machine1
-      expect(unplayableMachines).toHaveLength(1);
-      expect(unplayableMachines[0].name).toBe("Unplayable Machine");
-      expect(unplayableMachines[0].unplayableIssuesCount).toBe(1);
+      // Should return machine1 and machine2 (recently fixed), not machine3 (still has open issues) or machine4 (never had major issues)
+      expect(recentlyFixedMachines).toHaveLength(2);
+      expect(recentlyFixedMachines[0].name).toBe("Recently Fixed 1"); // Most recent fix
+      expect(recentlyFixedMachines[1].name).toBe("Recently Fixed 2");
+    });
+
+    it("should return empty array when no machines have been recently fixed", async () => {
+      const db = await getTestDb();
+
+      // Create machine with open issue
+      const [machine] = await db
+        .insert(machines)
+        .values(createTestMachine({ initials: "BR" }))
+        .returning();
+
+      await db.insert(issues).values(
+        createTestIssue(machine.initials, {
+          issueNumber: 1,
+          severity: "major",
+          status: "new",
+        })
+      );
+
+      // Query should return nothing
+      const recentlyFixedMachines = await db
+        .select({
+          id: machines.id,
+          name: machines.name,
+          initials: machines.initials,
+          fixedAt: sql<Date>`max(${issues.updatedAt})`.as("fixed_at"),
+        })
+        .from(machines)
+        .innerJoin(issues, eq(issues.machineInitials, machines.initials))
+        .where(
+          and(
+            inArray(issues.severity, ["major", "unplayable"]),
+            inArray(issues.status, [...CLOSED_STATUSES]),
+            not(
+              exists(
+                db
+                  .select({ one: sql`1` })
+                  .from(issues)
+                  .where(
+                    and(
+                      eq(issues.machineInitials, machines.initials),
+                      inArray(issues.severity, ["major", "unplayable"]),
+                      notInArray(issues.status, [...CLOSED_STATUSES])
+                    )
+                  )
+              )
+            )
+          )
+        )
+        .groupBy(machines.id, machines.name, machines.initials)
+        .orderBy(sql`max(${issues.updatedAt}) DESC`)
+        .limit(3);
+
+      expect(recentlyFixedMachines).toHaveLength(0);
     });
   });
 

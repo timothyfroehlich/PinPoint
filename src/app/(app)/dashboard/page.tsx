@@ -6,12 +6,21 @@ import {
   CheckCircle2,
   Clock,
   Wrench,
-  XCircle,
+  Sparkles,
 } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { issues, machines, userProfiles } from "~/server/db/schema";
-import { desc, eq, sql, and, notInArray } from "drizzle-orm";
+import {
+  desc,
+  eq,
+  sql,
+  and,
+  notInArray,
+  inArray,
+  not,
+  exists,
+} from "drizzle-orm";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
 import type { Issue } from "~/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -120,24 +129,56 @@ const getDashboardData = cache(async (userId?: string) => {
     },
   });
 
-  // Query 4: Unplayable machines (database-level filtering for efficiency - PERF-002)
-  // Get machines with at least one open unplayable issue using JOIN and GROUP BY
-  const unplayableMachinesPromise = db
+  // Query 4: Newest machines (3 most recently added)
+  const newestMachinesPromise = db.query.machines.findMany({
+    orderBy: desc(machines.createdAt),
+    limit: 3,
+    columns: {
+      id: true,
+      name: true,
+      initials: true,
+      createdAt: true,
+    },
+  });
+
+  // Query 4b: Recently fixed machines
+  // Machines that had major/unplayable issues but now have none
+  // Ordered by when the last major/unplayable issue was closed
+  const recentlyFixedMachinesPromise = db
     .select({
       id: machines.id,
       name: machines.name,
       initials: machines.initials,
-      unplayableIssuesCount: sql<number>`count(*)::int`,
+      fixedAt: sql<Date>`max(${issues.updatedAt})`.as("fixed_at"),
     })
     .from(machines)
     .innerJoin(issues, eq(issues.machineInitials, machines.initials))
     .where(
       and(
-        eq(issues.severity, "unplayable"),
-        notInArray(issues.status, [...CLOSED_STATUSES])
+        // Issue was major or unplayable
+        inArray(issues.severity, ["major", "unplayable"]),
+        // Issue is now closed
+        inArray(issues.status, [...CLOSED_STATUSES]),
+        // Machine has NO open major/unplayable issues currently
+        not(
+          exists(
+            db
+              .select({ one: sql`1` })
+              .from(issues)
+              .where(
+                and(
+                  eq(issues.machineInitials, machines.initials),
+                  inArray(issues.severity, ["major", "unplayable"]),
+                  notInArray(issues.status, [...CLOSED_STATUSES])
+                )
+              )
+          )
+        )
       )
     )
-    .groupBy(machines.id, machines.name, machines.initials);
+    .groupBy(machines.id, machines.name, machines.initials)
+    .orderBy(sql`max(${issues.updatedAt}) DESC`)
+    .limit(3);
 
   // Query 5: Total open issues count
   const totalOpenIssuesPromise = db
@@ -160,7 +201,8 @@ const getDashboardData = cache(async (userId?: string) => {
     assignedIssues,
     assignedIssuesCountResult,
     recentIssues,
-    unplayableMachines,
+    newestMachines,
+    recentlyFixedMachines,
     totalOpenIssuesResult,
     machinesNeedingServiceResult,
   ] = await Promise.all([
@@ -168,7 +210,8 @@ const getDashboardData = cache(async (userId?: string) => {
     assignedIssuesPromise,
     assignedIssuesCountPromise,
     recentIssuesPromise,
-    unplayableMachinesPromise,
+    newestMachinesPromise,
+    recentlyFixedMachinesPromise,
     totalOpenIssuesPromise,
     machinesNeedingServicePromise,
   ]);
@@ -181,7 +224,8 @@ const getDashboardData = cache(async (userId?: string) => {
     userProfile,
     assignedIssues,
     recentIssues,
-    unplayableMachines,
+    newestMachines,
+    recentlyFixedMachines,
     totalOpenIssues,
     machinesNeedingService,
     myIssuesCount,
@@ -192,10 +236,11 @@ const getDashboardData = cache(async (userId?: string) => {
  * Member Dashboard Page (Public Route)
  *
  * Displays:
+ * - Quick stats (total open issues, machines needing service, issues assigned to me)
+ * - Newest games (3 most recently added machines)
+ * - Recently fixed games (machines that went from major/unplayable issues to none)
  * - Issues assigned to current user (Member only)
  * - Recently reported issues (last 10)
- * - Unplayable machines (machines with unplayable issues)
- * - Quick stats (total open issues, machines needing service, issues assigned to me)
  */
 export default async function DashboardPage(): Promise<React.JSX.Element> {
   // Auth guard - check if user is authenticated (CORE-SSR-002)
@@ -210,7 +255,8 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
   const {
     assignedIssues,
     recentIssues,
-    unplayableMachines,
+    newestMachines,
+    recentlyFixedMachines,
     totalOpenIssues,
     machinesNeedingService,
     myIssuesCount,
@@ -299,9 +345,95 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
           </div>
         </div>
 
+        {/* Newest Games Section */}
+        <div className="lg:col-span-3">
+          <h2 className="text-xl font-semibold text-foreground mb-4">
+            Newest Games
+          </h2>
+          {newestMachines.length === 0 ? (
+            <Card className="border-border bg-card">
+              <CardContent className="py-12 text-center">
+                <Sparkles className="mx-auto mb-4 size-12 text-muted-foreground" />
+                <p className="text-lg text-muted-foreground">No machines yet</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div
+              className="grid grid-cols-1 md:grid-cols-3 gap-4"
+              data-testid="newest-machines-list"
+            >
+              {newestMachines.map((machine) => (
+                <Link key={machine.id} href={`/m/${machine.initials}`}>
+                  <Card className="border-primary/20 bg-card hover:border-primary transition-all glow-primary cursor-pointer h-full">
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <CardTitle className="text-base text-foreground mb-1">
+                            {machine.name}
+                          </CardTitle>
+                          <p className="text-xs text-muted-foreground">
+                            Added{" "}
+                            {new Date(machine.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <span className="text-xs font-mono bg-muted px-2 py-1 rounded">
+                          {machine.initials}
+                        </span>
+                      </div>
+                    </CardHeader>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Recently Fixed Games Section */}
+        <div className="lg:col-span-3">
+          <h2 className="text-xl font-semibold text-foreground mb-4">
+            Recently Fixed Games
+          </h2>
+          {recentlyFixedMachines.length === 0 ? (
+            <Card className="border-border bg-card">
+              <CardContent className="py-12 text-center">
+                <CheckCircle2 className="mx-auto mb-4 size-12 text-muted-foreground" />
+                <p className="text-lg text-muted-foreground">
+                  No recently fixed machines
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div
+              className="grid grid-cols-1 md:grid-cols-3 gap-4"
+              data-testid="recently-fixed-machines-list"
+            >
+              {recentlyFixedMachines.map((machine) => (
+                <Link key={machine.id} href={`/m/${machine.initials}`}>
+                  <Card className="border-success/30 bg-success/10 hover:border-success transition-all glow-success cursor-pointer h-full">
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <CardTitle className="text-base text-success mb-1">
+                            {machine.name}
+                          </CardTitle>
+                          <p className="text-xs text-success/80">
+                            Fixed{" "}
+                            {new Date(machine.fixedAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <CheckCircle2 className="size-5 text-success" />
+                      </div>
+                    </CardHeader>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Issues Assigned to Me Section */}
         {user && (
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-3">
             <h2 className="text-xl font-semibold text-foreground mb-4">
               Issues Assigned to Me
             </h2>
@@ -315,7 +447,10 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-3" data-testid="assigned-issues-list">
+              <div
+                className="grid grid-cols-1 md:grid-cols-2 gap-3"
+                data-testid="assigned-issues-list"
+              >
                 {assignedIssues.map((issue) => (
                   <IssueCard
                     key={issue.id}
@@ -329,51 +464,6 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
             )}
           </div>
         )}
-
-        {/* Unplayable Machines Section */}
-        <div className="lg:col-span-1">
-          <h2 className="text-xl font-semibold text-foreground mb-4">
-            Unplayable Machines
-          </h2>
-          {unplayableMachines.length === 0 ? (
-            <Card className="border-border bg-card">
-              <CardContent className="py-12 text-center">
-                <CheckCircle2 className="mx-auto mb-4 size-12 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  All machines are playable
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3" data-testid="unplayable-machines-list">
-              {unplayableMachines.map((machine) => (
-                <Link key={machine.id} href={`/m/${machine.initials}`}>
-                  <Card
-                    className="border-destructive/30 bg-destructive/10 hover:border-destructive transition-all glow-destructive cursor-pointer"
-                    data-testid="unplayable-machine-card"
-                  >
-                    <CardHeader>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1">
-                          <CardTitle className="text-base text-destructive mb-1">
-                            {machine.name}
-                          </CardTitle>
-                          <p className="text-xs text-destructive/80">
-                            {machine.unplayableIssuesCount} unplayable{" "}
-                            {machine.unplayableIssuesCount === 1
-                              ? "issue"
-                              : "issues"}
-                          </p>
-                        </div>
-                        <XCircle className="size-5 text-destructive" />
-                      </div>
-                    </CardHeader>
-                  </Card>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
 
         {/* Recently Reported Issues Section */}
         <div className="lg:col-span-3">
