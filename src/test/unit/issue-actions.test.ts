@@ -115,6 +115,7 @@ describe("addCommentAction", () => {
       issueId: validUuid,
       content: "Test comment",
       userId: mockUser.id,
+      imagesMetadata: [],
     });
     expect(revalidatePath).toHaveBeenCalledWith("/m/MM/i/1");
   });

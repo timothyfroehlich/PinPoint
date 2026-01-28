@@ -7,11 +7,13 @@ import "@testing-library/jest-dom/vitest";
 
 // Mock next/navigation
 const pushMock = vi.fn();
+const mockSearchParams = new URLSearchParams();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push: pushMock,
   }),
   usePathname: () => "/issues",
+  useSearchParams: () => mockSearchParams,
 }));
 
 // Mock ResizeObserver

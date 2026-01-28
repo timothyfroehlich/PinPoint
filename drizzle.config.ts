@@ -27,17 +27,18 @@ export default defineConfig({
   dbCredentials: {
     url: directUrl,
   },
-  // Limit introspection to our app tables only
-  // Prevents Drizzle Kit from parsing Supabase system tables
+  //Prevent Drizzle Kit from parsing Supabase system tables
   tablesFilter: [
     "user_profiles",
     "machines",
     "issues",
     "issue_comments",
+    "issue_images",
     "issue_watchers",
     "notifications",
     "notification_preferences",
     "invited_users",
+    "machine_watchers",
   ],
   schemaFilter: ["public"],
   verbose: true,

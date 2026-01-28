@@ -29,6 +29,27 @@
       "when": 1768329482553,
       "tag": "0003_far_kitty_pryde",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1769381705746,
+      "tag": "0004_elite_the_renegades",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1769387252562,
+      "tag": "0005_spotty_red_ghost",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1769407552894,
+      "tag": "0006_dazzling_phalanx",
+      "breakpoints": true
     }
   ]
 }

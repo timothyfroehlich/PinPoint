@@ -49,13 +49,14 @@ Referencing `TASKS.md` PR order:
 
 1. **GitHub Staging Files**: Any files in `.github-staging/` directory MUST be manually reviewed before moving to `.github/`. Never automatically move or activate these files. See `.github-staging/README.md` for review process.
 2. **NEVER Merge Without Explicit Approval**: Do NOT merge PRs, enable auto-merge, or call any merge-related tools without explicit user approval. Always ask first, even if all CI checks pass.
-3. Security & Data Integrity: Input validation, single-tenant assumptions honored, issue-machine relationship enforced.
-4. Server-First Compliance: Avoid unnecessary `"use client"`.
-5. Type Safety: No forbidden escapes; proper narrowing.
-6. Progressive Enhancement: `<form action={serverAction}>` patterns validated.
-7. Memory Safety & Test Patterns: Worker-scoped DB setup; no per-test instances.
-8. Domain Consistency: Issue severity vocabulary and one-machine rule.
-9. **E2E Test Quality**: Follow `docs/E2E_BEST_PRACTICES.md` - semantic selectors (role + name), no hard-coded delays, independent tests, descriptive names, reusable actions extracted. Validate critical user journeys only, avoid testing implementation details or edge cases.
+3. **Code Regressions**: Actively check for regressions, especially from recently merged PRs. Review recent commit history and merged PRs to identify patterns that should not be reintroduced. Flag any code that undoes recent fixes or reverts established patterns without explicit justification.
+4. Security & Data Integrity: Input validation, single-tenant assumptions honored, issue-machine relationship enforced.
+5. Server-First Compliance: Avoid unnecessary `"use client"`.
+6. Type Safety: No forbidden escapes; proper narrowing.
+7. Progressive Enhancement: `<form action={serverAction}>` patterns validated.
+8. Memory Safety & Test Patterns: Worker-scoped DB setup; no per-test instances.
+9. Domain Consistency: Issue severity vocabulary and one-machine rule.
+10. **E2E Test Quality**: Follow `docs/E2E_BEST_PRACTICES.md` - semantic selectors (role + name), no hard-coded delays, independent tests, descriptive names, reusable actions extracted. Validate critical user journeys only, avoid testing implementation details or edge cases.
 
 ## Preferred Implementation Examples
 
@@ -121,4 +122,4 @@ As features stabilize (Machines CRUD, Issues workflow, Comments), patterns that 
 
 ---
 
-Last Updated: 2025-12-09 (Reaffirmed release notes requirement and CI guard)
+Last Updated: 2026-01-26 (Added explicit regression checks from recently merged PRs)

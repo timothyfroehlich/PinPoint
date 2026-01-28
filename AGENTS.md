@@ -26,13 +26,16 @@
 **YOU MUST LOAD RELEVANT SKILLS FOR EVERY TASK.**
 If your tool does not support skills, read the file path directly.
 
-| Category       | Skill Name            | Path                                          | When to Use                                        |
-| :------------- | :-------------------- | :-------------------------------------------- | :------------------------------------------------- |
-| **UI**         | `pinpoint-ui`         | `.gemini/skills/pinpoint-ui/SKILL.md`         | Components, shadcn/ui, forms, responsive design.   |
-| **TypeScript** | `pinpoint-typescript` | `.gemini/skills/pinpoint-typescript/SKILL.md` | Type errors, generics, strict mode, Drizzle types. |
-| **Testing**    | `pinpoint-testing`    | `.gemini/skills/pinpoint-testing/SKILL.md`    | Writing tests, PGlite setup, Playwright.           |
-| **Security**   | `pinpoint-security`   | `.gemini/skills/pinpoint-security/SKILL.md`   | Auth flows, CSP, Zod validation, Supabase SSR.     |
-| **Patterns**   | `pinpoint-patterns`   | `.gemini/skills/pinpoint-patterns/SKILL.md`   | Server Actions, architecture, data fetching.       |
+| Category       | Skill Name            | Path                                         | When to Use                                          |
+| :------------- | :-------------------- | :------------------------------------------- | :--------------------------------------------------- |
+| **UI**         | `pinpoint-ui`         | `.agent/skills/pinpoint-ui/SKILL.md`         | Components, shadcn/ui, forms, responsive design.     |
+| **TypeScript** | `pinpoint-typescript` | `.agent/skills/pinpoint-typescript/SKILL.md` | Type errors, generics, strict mode, Drizzle types.   |
+| **Testing**    | `pinpoint-testing`    | `.agent/skills/pinpoint-testing/SKILL.md`    | Writing tests, PGlite setup, Playwright.             |
+| **Testing**    | `pinpoint-e2e`        | `.agent/skills/pinpoint-e2e/SKILL.md`        | E2E tests, worker isolation, stability patterns.     |
+| **Security**   | `pinpoint-security`   | `.agent/skills/pinpoint-security/SKILL.md`   | Auth flows, CSP, Zod validation, Supabase SSR.       |
+| **Patterns**   | `pinpoint-patterns`   | `.agent/skills/pinpoint-patterns/SKILL.md`   | Server Actions, architecture, data fetching.         |
+| **Workflow**   | `pinpoint-commit`     | `.agent/skills/pinpoint-commit/SKILL.md`     | Intelligent commit-to-PR workflow and CI monitoring. |
+| **Workflow**   | `github-monitor`      | `.agent/skills/github-monitor/SKILL.md`      | Monitoring GitHub Actions and build status.          |
 
 ## 4. Environment & Workflow
 
@@ -57,6 +60,23 @@ We use git worktrees for parallel environments. Config is managed via templates 
 | Secondary   | 3100    | 55321        | 55322    |
 | Review      | 3200    | 56321        | 56322    |
 | AntiGravity | 3300    | 57321        | 57322    |
+
+### Branch Management
+
+**Creating branches** - Ensure proper remote tracking:
+
+- `git checkout -b feature/name` then `git push -u origin feature/name`
+- **NOT**: `git checkout -b feature/name origin/main` (tracks main, not your branch)
+- Verify: `git branch -vv` shows `[origin/feature/name]`, not `[origin/main]`
+
+**Why**: Proper tracking enables `git pull`/`git push` without arguments and prevents accidentally
+pushing to main.
+
+### Commit Safety
+
+- **NEVER use `--no-verify`** without explicit user permission
+- This flag bypasses pre-commit hooks (lint, format, type checks)
+- Only use when user explicitly requests it
 
 ### Key Commands
 
@@ -83,6 +103,25 @@ We use git worktrees for parallel environments. Config is managed via templates 
 - **Database Safety**:
   - Local: `db:reset` allowed.
   - Prod: **NEVER** `db:reset`. ONLY `db:migrate`.
+- **Connection Requirements**:
+  - **Session Pooler (IPv4)**: Use `DATABASE_URL` (port `:6543`) for external connections. The `DIRECT_URL` (port `:5432`) uses IPv6 which may be unreachable from some environments.
+  - Format: `postgresql://postgres.[project-ref]:password@aws-0-us-east-2.pooler.supabase.com:6543/postgres`
+
+### Migration Conflict Resolution
+
+When merging branches with competing migrations (both created same number):
+
+**Regeneration Protocol** (Standard):
+
+1. **Accept incoming** (main's migrations) - Keep main's SQL and meta files
+2. **Delete your migration files** - Remove conflicted `000N_*.sql` and `drizzle/meta/000N_snapshot.json`
+3. **Resolve schema.ts** - Manually merge both sets of changes
+4. **Regenerate**: `pnpm db:generate` creates fresh migration with correct number
+5. **Verify SQL** - Compare new SQL to deleted SQL, confirm intent preserved
+6. **Test**: `pnpm db:reset` to rebuild from scratch
+
+**Why this works**: Drizzle regenerates consistent meta files (prevId chain, journal idx).
+Eliminates manual JSON surgery and uncertainty.
 
 ### GitHub Copilot Reviews
 

@@ -19,6 +19,7 @@ import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { headers } from "next/headers";
 import { log } from "~/lib/logger";
+import { BLOB_CONFIG } from "~/lib/blob/config";
 
 /**
  * Rate limit check result
@@ -141,12 +142,29 @@ function createPublicIssueLimiter(): Ratelimit | null {
   });
 }
 
+/**
+ * Image Upload rate limiter
+ * - IP-based: 10 uploads per hour (sliding window)
+ */
+function createImageUploadLimiter(): Ratelimit | null {
+  const redis = getRedis();
+  if (!redis) return null;
+
+  return new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(BLOB_CONFIG.RATE_LIMIT.PER_HOUR, "1 h"),
+    prefix: "ratelimit:image-upload:ip",
+    analytics: true,
+  });
+}
+
 // Lazy-initialized rate limiters
 let loginIpLimiter: Ratelimit | null | undefined;
 let loginAccountLimiter: Ratelimit | null | undefined;
 let signupLimiter: Ratelimit | null | undefined;
 let forgotPasswordLimiter: Ratelimit | null | undefined;
 let publicIssueLimiter: Ratelimit | null | undefined;
+let imageUploadLimiter: Ratelimit | null | undefined;
 
 /**
  * Get client IP address from request headers
@@ -263,6 +281,53 @@ export async function checkPublicIssueLimit(
     log.error(
       { error: error instanceof Error ? error.message : "Unknown", ip },
       "Public issue rate limit check failed"
+    );
+    // Fail open - allow request if Redis is down
+    return { success: true, limit: 0, remaining: 0, reset: 0 };
+  }
+}
+
+/**
+ * Check image upload rate limit (IP-based)
+ *
+ * @param ip - Client IP address
+ * @returns Rate limit result, or success if Redis not configured
+ */
+export async function checkImageUploadLimit(
+  ip: string
+): Promise<RateLimitResult> {
+  if (ip === "unknown") {
+    log.warn(
+      { action: "rate-limit" },
+      "Client IP unavailable - skipping image upload rate limit (fail open)"
+    );
+    return { success: true, limit: 0, remaining: 0, reset: 0 };
+  }
+
+  if (imageUploadLimiter === undefined) {
+    imageUploadLimiter = createImageUploadLimiter();
+  }
+
+  if (!imageUploadLimiter) {
+    log.warn(
+      { action: "rate-limit" },
+      "Upstash Redis not configured - image upload rate limiting disabled"
+    );
+    return { success: true, limit: 0, remaining: 0, reset: 0 };
+  }
+
+  try {
+    const result = await imageUploadLimiter.limit(ip);
+    return {
+      success: result.success,
+      limit: result.limit,
+      remaining: result.remaining,
+      reset: result.reset,
+    };
+  } catch (error) {
+    log.error(
+      { error: error instanceof Error ? error.message : "Unknown", ip },
+      "Image upload rate limit check failed"
     );
     // Fail open - allow request if Redis is down
     return { success: true, limit: 0, remaining: 0, reset: 0 };

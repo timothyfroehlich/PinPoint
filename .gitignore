@@ -131,9 +131,15 @@ walkthrough.md
 implementation_plan.md
 task.md
 planning_task.md
+artifacts/superpowers/
+.agent/logs/
+.agent/tmp/
 .pytest_cache/
 __pycache__/
 *.pyc
 
 # Sentry Config File
 .env.sentry-build-plugin
+
+# Auto-generated test schema
+src/test/setup/schema.sql

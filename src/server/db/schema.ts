@@ -217,6 +217,36 @@ export const issueWatchers = pgTable(
 );
 
 /**
+ * Machine Watchers Table
+ *
+ * Users watching a machine for notifications on all its issues.
+ * Modes:
+ * - notify: Get notified of new issues
+ * - subscribe: Notify + auto-add to watchers for new issues
+ */
+export const machineWatchers = pgTable(
+  "machine_watchers",
+  {
+    machineId: uuid("machine_id")
+      .notNull()
+      .references(() => machines.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => userProfiles.id, { onDelete: "cascade" }),
+    watchMode: text("watch_mode", { enum: ["notify", "subscribe"] })
+      .notNull()
+      .default("notify"),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.machineId, t.userId] }),
+    userIdIdx: index("idx_machine_watchers_user_id").on(t.userId),
+  })
+);
+
+/**
  * Issue Comments Table
  *
  * Comments on issues, including system-generated timeline events.
@@ -248,6 +278,57 @@ export const issueComments = pgTable(
 );
 
 /**
+ * Issue Images Table
+ *
+ * Images attached to issues and comments with soft-delete support.
+ */
+export const issueImages = pgTable(
+  "issue_images",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    issueId: uuid("issue_id")
+      .notNull()
+      .references(() => issues.id, { onDelete: "cascade" }),
+    commentId: uuid("comment_id").references(() => issueComments.id, {
+      onDelete: "cascade",
+    }),
+    uploadedBy: uuid("uploaded_by").references(() => userProfiles.id, {
+      onDelete: "no action",
+    }),
+
+    // Vercel Blob URLs
+    fullImageUrl: text("full_image_url").notNull(),
+    croppedImageUrl: text("cropped_image_url"),
+
+    // For deletion from Blob
+    fullBlobPathname: text("full_blob_pathname").notNull(),
+    croppedBlobPathname: text("cropped_blob_pathname"),
+
+    // Metadata
+    fileSizeBytes: integer("file_size_bytes").notNull(),
+    mimeType: text("mime_type").notNull(),
+    originalFilename: text("original_filename"),
+
+    // Soft delete
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    deletedBy: uuid("deleted_by").references(() => userProfiles.id),
+
+    // Timestamps
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    issueIdIdx: index("idx_issue_images_issue_id").on(t.issueId),
+    uploadedByIdx: index("idx_issue_images_uploaded_by").on(t.uploadedBy),
+    deletedAtIdx: index("idx_issue_images_deleted_at").on(t.deletedAt),
+  })
+);
+
+/**
  * Notifications Table
  *
  * In-app notifications for users.
@@ -265,6 +346,7 @@ export const notifications = pgTable(
         "issue_status_changed",
         "new_comment",
         "new_issue",
+        "machine_ownership_changed",
       ],
     }).notNull(),
     resourceId: uuid("resource_id").notNull(), // Generic reference to issue or machine
@@ -338,6 +420,18 @@ export const notificationPreferences = pgTable(
     inAppWatchNewIssuesGlobal: boolean("in_app_watch_new_issues_global")
       .notNull()
       .default(false),
+
+    // Machine Ownership Changes
+    emailNotifyOnMachineOwnershipChange: boolean(
+      "email_notify_on_machine_ownership_change"
+    )
+      .notNull()
+      .default(true),
+    inAppNotifyOnMachineOwnershipChange: boolean(
+      "in_app_notify_on_machine_ownership_change"
+    )
+      .notNull()
+      .default(true),
   },
   (t) => ({
     globalWatchEmailIdx: index("idx_notif_prefs_global_watch_email").on(
@@ -356,6 +450,7 @@ export const userProfilesRelations = relations(
     reportedIssues: many(issues, { relationName: "reported_by" }),
     assignedIssues: many(issues, { relationName: "assigned_to" }),
     comments: many(issueComments),
+    uploadedImages: many(issueImages),
     ownedMachines: many(machines, { relationName: "owner" }),
     notificationPreferences: one(notificationPreferences, {
       fields: [userProfiles.id],
@@ -363,6 +458,7 @@ export const userProfilesRelations = relations(
     }),
     notifications: many(notifications),
     watchedIssues: many(issueWatchers),
+    watchedMachines: many(machineWatchers),
   })
 );
 
@@ -378,6 +474,7 @@ export const machinesRelations = relations(machines, ({ many, one }) => ({
     references: [invitedUsers.id],
     relationName: "invited_owner",
   }),
+  watchers: many(machineWatchers),
 }));
 
 export const issuesRelations = relations(issues, ({ one, many }) => ({
@@ -401,6 +498,7 @@ export const issuesRelations = relations(issues, ({ one, many }) => ({
     relationName: "invited_reporter",
   }),
   comments: many(issueComments),
+  images: many(issueImages),
   watchers: many(issueWatchers),
 }));
 
@@ -409,13 +507,32 @@ export const invitedUsersRelations = relations(invitedUsers, ({ many }) => ({
   reportedIssues: many(issues, { relationName: "invited_reporter" }),
 }));
 
-export const issueCommentsRelations = relations(issueComments, ({ one }) => ({
+export const issueCommentsRelations = relations(
+  issueComments,
+  ({ one, many }) => ({
+    issue: one(issues, {
+      fields: [issueComments.issueId],
+      references: [issues.id],
+    }),
+    author: one(userProfiles, {
+      fields: [issueComments.authorId],
+      references: [userProfiles.id],
+    }),
+    images: many(issueImages),
+  })
+);
+
+export const issueImagesRelations = relations(issueImages, ({ one }) => ({
   issue: one(issues, {
-    fields: [issueComments.issueId],
+    fields: [issueImages.issueId],
     references: [issues.id],
   }),
-  author: one(userProfiles, {
-    fields: [issueComments.authorId],
+  comment: one(issueComments, {
+    fields: [issueImages.commentId],
+    references: [issueComments.id],
+  }),
+  uploader: one(userProfiles, {
+    fields: [issueImages.uploadedBy],
     references: [userProfiles.id],
   }),
 }));
@@ -447,3 +564,22 @@ export const notificationPreferencesRelations = relations(
     }),
   })
 );
+
+export const machineWatchersRelations = relations(
+  machineWatchers,
+  ({ one }) => ({
+    machine: one(machines, {
+      fields: [machineWatchers.machineId],
+      references: [machines.id],
+    }),
+    user: one(userProfiles, {
+      fields: [machineWatchers.userId],
+      references: [userProfiles.id],
+    }),
+  })
+);
+
+/**
+ * Type exports
+ */
+export type IssueImage = typeof issueImages.$inferSelect;

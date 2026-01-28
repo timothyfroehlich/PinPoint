@@ -7,6 +7,7 @@ import {
   issues,
   issueWatchers,
   machines,
+  machineWatchers,
 } from "~/server/db/schema";
 import type { IssueWatcher } from "~/lib/types/database";
 import { sendEmail } from "~/lib/email/client";
@@ -17,7 +18,8 @@ export type NotificationType =
   | "issue_assigned"
   | "issue_status_changed"
   | "new_comment"
-  | "new_issue";
+  | "new_issue"
+  | "machine_ownership_changed";
 
 type ResourceType = "issue" | "machine";
 
@@ -34,11 +36,6 @@ export interface CreateNotificationProps {
   commentContent?: string | undefined;
   newStatus?: string | undefined;
   additionalRecipientIds?: string[];
-  issueContext?: {
-    reportedById?: string | null;
-    assignedToId?: string | null;
-    machineOwnerId?: string | null;
-  };
 }
 
 export async function createNotification(
@@ -54,7 +51,6 @@ export async function createNotification(
     commentContent,
     newStatus,
     additionalRecipientIds,
-    issueContext,
   }: CreateNotificationProps,
   tx: DbTransaction = db
 ): Promise<void> {
@@ -79,29 +75,27 @@ export async function createNotification(
   let resolvedFormattedIssueId = formattedIssueId;
 
   if (type === "new_issue") {
-    let ownerId = issueContext?.machineOwnerId ?? null;
+    let machineId: string | null = null;
 
-    // If we weren't given the owner, look it up to honour preferences
-    if (!ownerId) {
-      if (resourceType === "issue") {
-        const issue = await tx.query.issues.findFirst({
-          where: eq(issues.id, resourceId),
-          with: {
-            machine: true,
-          },
-        });
+    // Resolve machineId and metadata
+    if (resourceType === "issue") {
+      const issue = await tx.query.issues.findFirst({
+        where: eq(issues.id, resourceId),
+        with: {
+          machine: true,
+        },
+      });
 
-        ownerId = issue?.machine.ownerId ?? null;
-        resolvedIssueTitle = resolvedIssueTitle ?? issue?.title;
-        resolvedMachineName = resolvedMachineName ?? issue?.machine.name;
-      } else {
-        const machine = await tx.query.machines.findFirst({
-          where: eq(machines.id, resourceId),
-          columns: { ownerId: true, name: true },
-        });
-        ownerId = machine?.ownerId ?? null;
-        resolvedMachineName = resolvedMachineName ?? machine?.name;
-      }
+      machineId = issue?.machine.id ?? null;
+      resolvedIssueTitle = resolvedIssueTitle ?? issue?.title;
+      resolvedMachineName = resolvedMachineName ?? issue?.machine.name;
+    } else {
+      const machine = await tx.query.machines.findFirst({
+        where: eq(machines.id, resourceId),
+        columns: { id: true, name: true },
+      });
+      machineId = machine?.id ?? null;
+      resolvedMachineName = resolvedMachineName ?? machine?.name;
     }
 
     // Resolve formatted ID if missing
@@ -111,13 +105,11 @@ export async function createNotification(
         columns: { issueNumber: true, machineInitials: true },
       });
       if (issue) {
-        // Import dynamically to avoid circular dependency if needed, or just format here
-        // Simple format: INITIALS-01
         resolvedFormattedIssueId = `${issue.machineInitials}-${String(issue.issueNumber).padStart(2, "0")}`;
       }
     }
 
-    // Global subscribers (email or in-app)
+    // 1. Global subscribers (email or in-app)
     const globalSubscribers = await tx.query.notificationPreferences.findMany({
       where: (prefs, { or, eq }) =>
         or(
@@ -128,22 +120,32 @@ export async function createNotification(
 
     addRecipients(...globalSubscribers.map((p) => p.userId));
 
-    if (ownerId) {
-      const ownerPref = await tx.query.notificationPreferences.findFirst({
-        where: eq(notificationPreferences.userId, ownerId),
+    // 2. Machine watchers (consolidated - includes owners)
+    if (machineId) {
+      const watchersList = await tx.query.machineWatchers.findMany({
+        where: eq(machineWatchers.machineId, machineId),
       });
 
-      if (
-        ownerPref?.emailNotifyOnNewIssue ||
-        ownerPref?.inAppNotifyOnNewIssue
-      ) {
-        // console.log(`[DEBUG] Adding owner ${ownerId} to recipients`);
-        addRecipients(ownerId);
-      } else {
-        // console.log(`[DEBUG] Owner ${ownerId} has prefs disabled:`, ownerPref);
+      addRecipients(...watchersList.map((w) => w.userId));
+
+      // 3. Auto-subscribe full subscribers to issue watchers
+      if (resourceType === "issue") {
+        const fullSubscribers = watchersList.filter(
+          (w) => w.watchMode === "subscribe"
+        );
+
+        if (fullSubscribers.length > 0) {
+          await tx
+            .insert(issueWatchers)
+            .values(
+              fullSubscribers.map((w) => ({
+                issueId: resourceId,
+                userId: w.userId,
+              }))
+            )
+            .onConflictDoNothing();
+        }
       }
-    } else {
-      // console.log(`[DEBUG] No ownerId found for new_issue`);
     }
   } else if (resourceType === "issue") {
     const watchers = await tx.query.issueWatchers.findMany({
@@ -199,6 +201,8 @@ export async function createNotification(
       inAppNotifyOnNewIssue: true,
       emailWatchNewIssuesGlobal: false,
       inAppWatchNewIssuesGlobal: false,
+      emailNotifyOnMachineOwnershipChange: true,
+      inAppNotifyOnMachineOwnershipChange: true,
     };
 
     // Check specific toggle
@@ -228,6 +232,10 @@ export async function createNotification(
         inAppNotify = isInAppOwnerPref || isInAppGlobalPref;
         break;
       }
+      case "machine_ownership_changed":
+        emailNotify = prefs.emailNotifyOnMachineOwnershipChange;
+        inAppNotify = prefs.inAppNotifyOnMachineOwnershipChange;
+        break;
     }
 
     // In-App

@@ -11,11 +11,14 @@ import {
   getClientIp,
 } from "~/lib/rate-limit";
 import { parsePublicIssueForm } from "./validation";
+import { BLOB_CONFIG } from "~/lib/blob/config";
 import { db } from "~/server/db";
-import { machines, userProfiles } from "~/server/db/schema";
+import { machines, userProfiles, issueImages } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import type { ActionState } from "./unified-report-form";
+import { imagesMetadataArraySchema } from "../(app)/issues/schemas";
+import { deleteFromBlob } from "~/lib/blob/client";
 
 /**
  * Server Action: submit anonymous issue
@@ -76,6 +79,10 @@ export async function submitPublicIssueAction(
   } = await supabase.auth.getUser();
 
   let reportedBy: string | null = user?.id ?? null;
+  log.info(
+    { reportedBy, email: user?.email, action: "publicIssueReport" },
+    "Resolving reporter for public issue"
+  );
   let reporterName: string | null = null;
   let reporterEmail: string | null = null;
 
@@ -162,6 +169,77 @@ export async function submitPublicIssueAction(
       reporterName,
       reporterEmail,
     });
+
+    // 5. Link uploaded images
+    const imagesMetadataStr = formData.get("imagesMetadata");
+    if (imagesMetadataStr && typeof imagesMetadataStr === "string") {
+      try {
+        const rawJson = JSON.parse(imagesMetadataStr) as unknown;
+        const imagesMetadata = imagesMetadataArraySchema.parse(rawJson);
+
+        // Validate count respects limits (security measure against manual JSON editing)
+        const limit = reportedBy
+          ? BLOB_CONFIG.LIMITS.AUTHENTICATED_USER_MAX
+          : BLOB_CONFIG.LIMITS.PUBLIC_USER_MAX;
+
+        if (imagesMetadata.length > limit) {
+          log.warn(
+            { issueId: issue.id, count: imagesMetadata.length, limit },
+            "Blocked attempt to link too many images"
+          );
+          return {
+            error: `Too many images. Maximum ${limit} images allowed.`,
+          };
+        }
+
+        if (imagesMetadata.length > 0) {
+          log.info(
+            { issueId: issue.id, count: imagesMetadata.length },
+            "Linking images to issue..."
+          );
+          try {
+            await db.insert(issueImages).values(
+              imagesMetadata.map((img) => ({
+                issueId: issue.id,
+                uploadedBy: reportedBy,
+                fullImageUrl: img.blobUrl,
+                fullBlobPathname: img.blobPathname,
+                fileSizeBytes: img.fileSizeBytes,
+                mimeType: img.mimeType,
+                originalFilename: img.originalFilename,
+              }))
+            );
+          } catch (dbError) {
+            log.error(
+              {
+                error: dbError instanceof Error ? dbError.message : dbError,
+                issueId: issue.id,
+                orphanedBlobs: imagesMetadata.map((img) => img.blobPathname),
+              },
+              "Database failed to link images to issue. Cleaning up orphaned blobs."
+            );
+            // Immediate cleanup of orphaned blobs
+            await Promise.allSettled(
+              imagesMetadata.map((img) => deleteFromBlob(img.blobPathname))
+            );
+            // Don't return error here - issue was already created successfully
+            // User will be redirected, but images won't appear on the issue
+            // TODO: Consider implementing a flash message system to show warning
+          }
+        }
+      } catch (parseError) {
+        log.error(
+          {
+            error:
+              parseError instanceof Error ? parseError.message : parseError,
+            issueId: issue.id,
+          },
+          "Failed to parse images metadata"
+        );
+        // Non-blocking for the user
+      }
+    }
+
     log.info(
       { issueId: issue.id, issueNumber: issue.issueNumber },
       "Issue created, redirecting..."
@@ -170,6 +248,7 @@ export async function submitPublicIssueAction(
     revalidatePath("/m");
     revalidatePath(`/m/${machine.initials}`);
     revalidatePath(`/m/${machine.initials}/i`);
+    revalidatePath(`/m/${machine.initials}/i/${issue.issueNumber}`);
 
     // Redirect logic:
     // 1. Authenticated users go directly to the issue detail page
@@ -205,6 +284,10 @@ export async function submitPublicIssueAction(
       ? `/report/success?${successParams.toString()}`
       : "/report/success";
 
+    log.info(
+      { reportedBy, target: successUrl },
+      "Redirecting anonymous user to success page"
+    );
     redirect(successUrl);
   } catch (error) {
     if (isRedirectError(error)) {

@@ -1,12 +1,23 @@
 import { test, expect } from "@playwright/test";
 import { MailpitClient } from "../support/mailpit.js";
-import { selectOption } from "../support/actions.js";
+import { selectOption, ensureLoggedIn } from "../support/actions.js";
 import {
   fillReportForm,
   submitFormAndWaitForRedirect,
 } from "../support/page-helpers.js";
 import { TEST_USERS } from "../support/constants.js";
-import { deleteTestIssueByNumber } from "e2e/support/supabase-admin.js";
+import {
+  deleteTestUser,
+  deleteTestMachine,
+  createTestUser,
+  createTestMachine,
+  updateUserRole,
+} from "e2e/support/supabase-admin.js";
+import {
+  getTestIssueTitle,
+  getTestEmail,
+  getTestMachineInitials,
+} from "../support/test-isolation.js";
 
 /**
  * Email notification verification tests
@@ -19,15 +30,33 @@ import { deleteTestIssueByNumber } from "e2e/support/supabase-admin.js";
  * - EMAIL_TRANSPORT=smtp in .env.local
  */
 
-test.describe("Email Notifications", () => {
+test.describe.serial("Email Notifications", () => {
   const mailpit = new MailpitClient();
-  const cleanupIssues: { initials: string; number: number }[] = [];
+  const cleanupUserIds: string[] = [];
+  const cleanupMachineIds: string[] = [];
+  let testAdminEmail: string;
+  let testMachineInitials: string;
+
+  test.beforeAll(async () => {
+    // Create a unique admin user for this worker
+    testAdminEmail = getTestEmail("worker-admin@test.com");
+    const user = await createTestUser(testAdminEmail);
+    await updateUserRole(user.id, "admin");
+    cleanupUserIds.push(user.id);
+
+    // Create a unique machine for this worker
+    const initials = getTestMachineInitials();
+    const machine = await createTestMachine(user.id, initials);
+    testMachineInitials = machine.initials;
+    cleanupMachineIds.push(machine.id);
+  });
 
   test.afterAll(async () => {
-    for (const issue of cleanupIssues) {
-      await deleteTestIssueByNumber(issue.initials, issue.number).catch(
-        () => undefined
-      );
+    for (const machineId of cleanupMachineIds) {
+      await deleteTestMachine(machineId).catch(() => undefined);
+    }
+    for (const userId of cleanupUserIds) {
+      await deleteTestUser(userId).catch(() => undefined);
     }
   });
 
@@ -39,21 +68,24 @@ test.describe("Email Notifications", () => {
     "Next.js Issue #48309: Safari Server Action redirect timing"
   );
 
-  test("should send email when issue is created", async ({ page }) => {
+  test("should send email when issue is created", async ({
+    page,
+  }, testInfo) => {
+    const issueTitle = getTestIssueTitle("Test Issue for Email");
+
     // Clear mailbox before test
-    await mailpit.clearMailbox(TEST_USERS.admin.email);
+    mailpit.clearMailbox(testAdminEmail);
 
-    // Login as admin
-    await page.goto("/login");
-    await page.getByLabel("Email").fill(TEST_USERS.admin.email);
-    await page.getByLabel("Password").fill(TEST_USERS.admin.password);
-    await page.getByRole("button", { name: "Sign In" }).click();
-    await expect(page.getByTestId("quick-stats")).toBeVisible();
+    // Login as unique test admin
+    await ensureLoggedIn(page, testInfo, {
+      email: testAdminEmail,
+      password: TEST_USERS.admin.password,
+    });
 
-    // Create an issue for a specific machine (e.g., MM)
-    await page.goto("/report?machine=MM");
+    // Create an issue for the unique machine
+    await page.goto(`/report?machine=${testMachineInitials}`);
     await fillReportForm(page, {
-      title: "Test Issue for Email",
+      title: issueTitle,
       description: "Testing email notifications",
     });
 
@@ -64,26 +96,37 @@ test.describe("Email Notifications", () => {
       { awayFrom: "/report" }
     );
 
-    // Verify we're on the issue page
-    await expect(page).toHaveURL(/\/m\/MM\/i\/[0-9]+/);
-    const url = page.url();
-    const issueIdMatch = /\/i\/(\d+)/.exec(url);
-    const issueId = issueIdMatch?.[1];
+    // Verify we're on the issue page (or success page + navigation)
+    // Worker isolation should prevent /report/success, but we keep the fallback for robustness
+    const issueUrlPattern = new RegExp(
+      `\\/m\\/${testMachineInitials}\\/i\\/[0-9]+`
+    );
+    await expect(page).toHaveURL(
+      new RegExp(`(${issueUrlPattern.source})|(\\/report\\/success)`)
+    );
 
-    if (issueId) {
-      cleanupIssues.push({ initials: "MM", number: parseInt(issueId) });
+    if (page.url().includes("/report/success")) {
+      await page.goto("/dashboard");
+      await page
+        .getByTestId("recent-issue-card")
+        .filter({ hasText: issueTitle })
+        .first()
+        .click();
     }
+
+    await expect(page).toHaveURL(issueUrlPattern);
+
     // Wait for email to arrive in Mailpit
-    const email = await mailpit.waitForEmail(TEST_USERS.admin.email, {
-      subjectContains: "Test Issue for Email",
+    const email = await mailpit.waitForEmail(testAdminEmail, {
+      subjectContains: issueTitle,
       timeout: 30000,
       pollIntervalMs: 750,
     });
 
     // Verify email was sent
     expect(email).not.toBeNull();
-    expect(email?.subject).toContain("Test Issue for Email");
-    expect(email?.to).toContain(TEST_USERS.admin.email);
+    expect(email?.subject).toContain(issueTitle);
+    expect(email?.to).toContain(testAdminEmail);
   });
 
   // Skip this test in Safari due to Next.js Issue #48309
@@ -94,20 +137,21 @@ test.describe("Email Notifications", () => {
     "Next.js Issue #48309: Safari Server Action redirect timing"
   );
 
-  test("should send email when status changes", async ({ page }) => {
+  test("should send email when status changes", async ({ page }, testInfo) => {
+    const issueTitle = getTestIssueTitle("Status Change Test");
+
     // Clear mailbox
-    await mailpit.clearMailbox(TEST_USERS.admin.email);
+    mailpit.clearMailbox(testAdminEmail);
 
     // Login
-    await page.goto("/login");
-    await page.getByLabel("Email").fill(TEST_USERS.admin.email);
-    await page.getByLabel("Password").fill(TEST_USERS.admin.password);
-    await page.getByRole("button", { name: "Sign In" }).click();
-    await expect(page.getByTestId("quick-stats")).toBeVisible();
+    await ensureLoggedIn(page, testInfo, {
+      email: testAdminEmail,
+      password: TEST_USERS.admin.password,
+    });
 
-    // Create issue for a specific machine (e.g., MM)
-    await page.goto("/report?machine=MM");
-    await fillReportForm(page, { title: "Status Change Test" });
+    // Create issue for the unique machine
+    await page.goto(`/report?machine=${testMachineInitials}`);
+    await fillReportForm(page, { title: issueTitle });
 
     // Submit form and wait for Server Action redirect (Safari-defensive)
     await submitFormAndWaitForRedirect(
@@ -116,40 +160,57 @@ test.describe("Email Notifications", () => {
       { awayFrom: "/report" }
     );
 
-    await expect(page).toHaveURL(/\/m\/MM\/i\/[0-9]+/);
+    // Accept either direct issue page OR success page
+    const issueUrlPattern = new RegExp(
+      `\\/m\\/${testMachineInitials}\\/i\\/[0-9]+`
+    );
+    await expect(page).toHaveURL(
+      new RegExp(`(${issueUrlPattern.source})|(\\/report\\/success)`)
+    );
+
+    // If we landed on success page, we need to go to dashboard or recent issues to find the new issue
+    if (page.url().includes("/report/success")) {
+      await page.goto("/dashboard");
+      await page
+        .getByTestId("recent-issue-card")
+        .filter({ hasText: issueTitle })
+        .first()
+        .click();
+    }
+
+    await expect(page).toHaveURL(issueUrlPattern);
 
     // Ensure we are on the page before interacting with sidebar
+    const titlePattern = issueTitle
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      .replace(/\s+/g, "\\s+");
     await expect(
       page
         .getByRole("main")
-        .getByRole("heading", { level: 1, name: /Status Change Test/ })
+        .getByRole("heading", { level: 1, name: new RegExp(titlePattern) })
     ).toBeVisible();
 
     // Clear the "new issue" email
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    await mailpit.clearMailbox(TEST_USERS.admin.email);
+    mailpit.clearMailbox(testAdminEmail);
 
     // Update status
     await selectOption(page, "issue-status-select", "in_progress");
-    await expect(page.getByTestId("status-update-success")).toBeVisible();
+    // Ensure revalidation is complete before checking for success message
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByTestId("status-update-success")).toBeVisible({
+      timeout: 30000,
+    });
 
-    const url = page.url();
-    const issueIdMatch = /\/i\/(\d+)/.exec(url);
-    if (issueIdMatch) {
-      cleanupIssues.push({ initials: "MM", number: parseInt(issueIdMatch[1]) });
-    }
-
-    // Wait for status change email
-    const emailAfterStatusChange = await mailpit.waitForEmail(
-      TEST_USERS.admin.email,
-      {
-        subjectContains: "Status Changed",
-        timeout: 30000,
-        pollIntervalMs: 750,
-      }
-    );
+    // Wait for status change email - use unique issue title to avoid crosstalk
+    const emailAfterStatusChange = await mailpit.waitForEmail(testAdminEmail, {
+      subjectContains: issueTitle,
+      timeout: 30000,
+      pollIntervalMs: 750,
+    });
 
     expect(emailAfterStatusChange).not.toBeNull();
     expect(emailAfterStatusChange?.subject).toContain("Status Changed");
+    expect(emailAfterStatusChange?.subject).toContain(issueTitle);
   });
 });

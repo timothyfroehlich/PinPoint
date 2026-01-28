@@ -16,6 +16,7 @@ import { CLOSED_STATUSES } from "~/lib/issues/status";
 import type { Issue } from "~/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { IssueCard } from "~/components/issues/IssueCard";
+import { OrganizationBanner } from "~/components/dashboard/OrganizationBanner";
 
 /**
  * Cached dashboard data fetcher (CORE-PERF-001)
@@ -219,73 +220,83 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Quick Stats Section */}
-        <div className="lg:col-span-3" data-testid="quick-stats">
-          <h2 className="text-xl font-semibold text-foreground mb-4">
-            Quick Stats
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Total Open Issues */}
-            <Card className="border-primary/20 bg-card glow-primary">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Open Issues
-                  </CardTitle>
-                  <AlertTriangle className="size-4 text-muted-foreground" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div
-                  className="text-3xl font-bold text-foreground"
-                  data-testid="stat-open-issues-value"
-                >
-                  {totalOpenIssues}
-                </div>
-              </CardContent>
-            </Card>
+        {/* Quick Stats + Organization Banner Row */}
+        <div className="lg:col-span-3">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 items-stretch">
+            {/* Quick Stats Section */}
+            <div data-testid="quick-stats">
+              <h2 className="text-xl font-semibold text-foreground mb-4">
+                Quick Stats
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Total Open Issues */}
+                <Card className="border-primary/20 bg-card glow-primary">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">
+                        Open Issues
+                      </CardTitle>
+                      <AlertTriangle className="size-4 text-muted-foreground" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div
+                      className="text-3xl font-bold text-foreground"
+                      data-testid="stat-open-issues-value"
+                    >
+                      {totalOpenIssues}
+                    </div>
+                  </CardContent>
+                </Card>
 
-            {/* Machines Needing Service */}
-            <Card className="border-primary/20 bg-card glow-primary">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Machines Needing Service
-                  </CardTitle>
-                  <Wrench className="size-4 text-muted-foreground" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div
-                  className="text-3xl font-bold text-foreground"
-                  data-testid="stat-machines-needing-service-value"
-                >
-                  {machinesNeedingService}
-                </div>
-              </CardContent>
-            </Card>
+                {/* Machines Needing Service */}
+                <Card className="border-primary/20 bg-card glow-primary">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">
+                        Machines Needing Service
+                      </CardTitle>
+                      <Wrench className="size-4 text-muted-foreground" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div
+                      className="text-3xl font-bold text-foreground"
+                      data-testid="stat-machines-needing-service-value"
+                    >
+                      {machinesNeedingService}
+                    </div>
+                  </CardContent>
+                </Card>
 
-            {/* Issues Assigned to Me */}
-            {user && (
-              <Card className="border-primary/20 bg-card glow-primary">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
-                      Assigned to Me
-                    </CardTitle>
-                    <CheckCircle2 className="size-4 text-muted-foreground" />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div
-                    className="text-3xl font-bold text-foreground"
-                    data-testid="stat-assigned-to-me-value"
-                  >
-                    {myIssuesCount}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                {/* Issues Assigned to Me */}
+                {user && (
+                  <Card className="border-primary/20 bg-card glow-primary">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">
+                          Assigned to Me
+                        </CardTitle>
+                        <CheckCircle2 className="size-4 text-muted-foreground" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div
+                        className="text-3xl font-bold text-foreground"
+                        data-testid="stat-assigned-to-me-value"
+                      >
+                        {myIssuesCount}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </div>
+
+            {/* Organization Banner */}
+            <div className="hidden lg:block w-64">
+              <OrganizationBanner />
+            </div>
           </div>
         </div>
 

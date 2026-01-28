@@ -9,6 +9,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { type z } from "zod";
 import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
@@ -22,6 +23,7 @@ import {
   updateIssueFrequencySchema,
   assignIssueSchema,
   addCommentSchema,
+  imagesMetadataArraySchema,
 } from "./schemas";
 import { type Result, ok, err } from "~/lib/result";
 import {
@@ -135,14 +137,8 @@ export async function createIssueAction(
     return err("VALIDATION", firstError?.message ?? "Invalid input");
   }
 
-  const {
-    title,
-    description,
-    machineInitials,
-    severity,
-    priority,
-    frequency,
-  } = validation.data;
+  const { title, description, machineInitials, severity, priority, frequency } =
+    validation.data;
 
   // Create issue via service
   try {
@@ -697,6 +693,7 @@ export async function addCommentAction(
   const validation = addCommentSchema.safeParse({
     issueId: toOptionalString(formData.get("issueId")),
     comment: toOptionalString(formData.get("comment")),
+    imagesMetadata: toOptionalString(formData.get("imagesMetadata")),
   });
 
   if (!validation.success) {
@@ -706,13 +703,33 @@ export async function addCommentAction(
     );
   }
 
-  const { issueId, comment } = validation.data;
+  const {
+    issueId,
+    comment,
+    imagesMetadata: imagesMetadataStr,
+  } = validation.data;
+
+  let imagesMetadata: z.infer<typeof imagesMetadataArraySchema> = [];
+  if (imagesMetadataStr) {
+    try {
+      imagesMetadata = imagesMetadataArraySchema.parse(
+        JSON.parse(imagesMetadataStr)
+      );
+    } catch (e) {
+      log.error(
+        { error: e, issueId },
+        "Failed to parse comment images metadata"
+      );
+      // Non-blocking, but log it
+    }
+  }
 
   try {
     await addIssueComment({
       issueId,
       content: comment,
       userId: user.id,
+      imagesMetadata,
     });
   } catch (error) {
     log.error(

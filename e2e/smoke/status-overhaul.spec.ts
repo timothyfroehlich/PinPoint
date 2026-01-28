@@ -24,7 +24,7 @@ test.describe("Status Overhaul E2E", () => {
     await page.getByTestId("machine-select").selectOption(machine.id);
     await fillReportForm(page, {
       title: "E2E Status Overhaul Test",
-      severity: "major",
+      severity: "unplayable",
       priority: "high",
       frequency: "frequent",
     });
@@ -34,7 +34,9 @@ test.describe("Status Overhaul E2E", () => {
     await expect(page).toHaveURL(/\/m\/TAF\/i\/[0-9]+/);
 
     await expect(page.getByTestId("issue-status-badge")).toHaveText(/New/i);
-    await expect(page.getByTestId("issue-severity-badge")).toHaveText(/Major/i);
+    await expect(page.getByTestId("issue-severity-badge")).toHaveText(
+      /Unplayable/i
+    );
     await expect(page.getByTestId("issue-priority-badge")).toHaveText(/High/i);
     await expect(page.getByTestId("issue-frequency-badge")).toHaveText(
       /Frequent/i

@@ -92,33 +92,44 @@ export async function createTestUser(
 /**
  * Create a test machine directly in the database
  */
-export async function createTestMachine(ownerId: string) {
-  const initials = `TM${Math.floor(Math.random() * 10000)}`;
+export async function createTestMachine(ownerId: string, initials?: string) {
+  const finalInitials = initials ?? `TM${Math.floor(Math.random() * 10000)}`;
   const { data, error } = await supabaseAdmin
     .from("machines")
     .insert({
-      initials,
-      name: `Test Machine ${initials}`,
+      initials: finalInitials,
+      name: `Test Machine ${finalInitials}`,
       owner_id: ownerId,
       next_issue_number: 1,
     })
     .select()
     .single();
   if (error) throw error;
+
+  // Also add owner to machine_watchers (full subscribe)
+  const { error: watcherError } = await supabaseAdmin
+    .from("machine_watchers")
+    .insert({
+      machine_id: data.id,
+      user_id: ownerId,
+      watch_mode: "subscribe",
+    });
+  if (watcherError) throw watcherError;
+
   return data;
 }
 
 /**
- * Create an unconfirmed user directly in the database
+ * Create an invited user directly in the database
  */
-export async function createUnconfirmedUser(
+export async function createInvitedUser(
   email: string,
   firstName = "Test",
   lastName = "Invite",
   role: "guest" | "member" | "admin" = "member"
 ) {
   const { data, error } = await supabaseAdmin
-    .from("unconfirmed_users")
+    .from("invited_users")
     .insert({
       email,
       first_name: firstName,
@@ -176,7 +187,7 @@ export async function deleteTestIssueByNumber(
   const { error } = await supabaseAdmin
     .from("issues")
     .delete()
-    .eq("machine_id", machine.id)
+    .eq("machine_initials", machineInitials)
     .eq("issue_number", issueNumber);
 
   if (error) throw error;

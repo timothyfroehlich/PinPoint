@@ -4,8 +4,8 @@
  * CRITICAL: Per CORE-TEST-001, we use ONE worker-scoped PGlite instance
  * for all tests in a worker. Per-test instances cause system lockups.
  *
- * Schema is exported from src/server/db/schema.ts using drizzle-kit export.
- * Run `pnpm run test:_generate-schema` to regenerate when schema changes.
+ * Schema (schema.sql) is auto-generated from src/server/db/schema.ts and NOT committed.
+ * Run `pnpm run test:ensure-schema` to regenerate if missing or stale.
  */
 
 import { readFileSync } from "node:fs";
@@ -61,13 +61,14 @@ export async function cleanupTestDb() {
   if (!testDb) return;
 
   // Delete in order to respect foreign key constraints
-  await testDb.delete(schema.issueWatchers); // Added
+  await testDb.delete(schema.issueWatchers);
+  await testDb.delete(schema.issueImages); // Added
   await testDb.delete(schema.issueComments);
   await testDb.delete(schema.issues);
   await testDb.delete(schema.machines);
   await testDb.delete(schema.userProfiles);
-  await testDb.delete(schema.invitedUsers); // Added
-  await testDb.delete(schema.authUsers); // Added
+  await testDb.delete(schema.invitedUsers);
+  await testDb.delete(schema.authUsers);
 }
 
 /**

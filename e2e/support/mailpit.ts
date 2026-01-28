@@ -129,9 +129,17 @@ export class MailpitClient {
     const startTime = Date.now();
 
     while (Date.now() - startTime < timeout) {
-      const messages = await this.getMessages(email);
+      const allMessages = await this.getMessages(email);
 
-      const match = messages.find((msg) => {
+      // Filter messages to ensure they are addressed to the specific email
+      // and match the other criteria. This is extra defensive against Mailpit
+      // query broadness.
+      const match = allMessages.find((msg) => {
+        const isToRecipient = msg.to.some(
+          (addr) => addr.toLowerCase() === email.toLowerCase()
+        );
+        if (!isToRecipient) return false;
+
         if (criteria.subject && msg.Subject !== criteria.subject) {
           return false;
         }
@@ -221,11 +229,21 @@ export class MailpitClient {
   }
 
   /**
-   * Delete all messages for a specific email
-   */
-  async clearMailbox(_email: string): Promise<void> {
-    // Mailpit does not support mailbox-scoped delete; use global delete for test isolation.
-    await this.deleteAllMessages();
+
+     * Delete all messages for a specific email
+
+     */
+
+  clearMailbox(email: string): void {
+    // Mailpit does not support mailbox-scoped delete.
+
+    // For test isolation in parallel runs, we should avoid global deletes.
+
+    // Tests should instead rely on unique subjects or timestamps.
+
+    console.log(
+      `[Mailpit] clearMailbox(${email}) called (no-op for parallel stability)`
+    );
   }
 
   /**
@@ -272,7 +290,7 @@ const mailpitClient = new MailpitClient();
 
 export const deleteAllMessages = async (email?: string): Promise<void> => {
   if (email) {
-    await mailpitClient.clearMailbox(email);
+    mailpitClient.clearMailbox(email);
     return;
   }
   await mailpitClient.deleteAllMessages();

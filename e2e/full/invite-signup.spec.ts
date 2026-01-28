@@ -13,7 +13,7 @@ import { test, expect } from "@playwright/test";
 import { ensureLoggedIn, logout } from "../support/actions.js";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import { TEST_USERS } from "../support/constants.js";
-import { getSignupLink, deleteAllMessages } from "../support/mailpit.js";
+import { getSignupLink } from "../support/mailpit.js";
 
 const testEmails = new Set<string>();
 
@@ -21,9 +21,6 @@ test.describe("User Invitation & Signup Flow", () => {
   test.describe.configure({ mode: "serial" });
 
   test.beforeEach(async ({ page }, testInfo) => {
-    // Clear all emails to ensure we catch the right one
-    await deleteAllMessages();
-
     // Login as admin before each test
     await ensureLoggedIn(page, testInfo, {
       email: TEST_USERS.admin.email,

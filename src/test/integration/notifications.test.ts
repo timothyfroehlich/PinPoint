@@ -10,6 +10,7 @@ import {
   machines,
   issues,
   notifications,
+  machineWatchers,
 } from "~/server/db/schema";
 import {
   createTestUser,
@@ -265,6 +266,61 @@ describe("createNotification (Integration)", () => {
     expect(sendEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         to: "user2@test.com",
+      })
+    );
+  });
+
+  it("should notify machine watchers on new issue", async () => {
+    const db = await getTestDb();
+
+    const [recipient] = await db
+      .insert(userProfiles)
+      .values(createTestUser())
+      .returning();
+    const [machine] = await db
+      .insert(machines)
+      .values(createTestMachine({ initials: "WATCH" }))
+      .returning();
+
+    // Add as watcher
+    await db.insert(machineWatchers).values({
+      machineId: machine.id,
+      userId: recipient.id,
+      watchMode: "notify",
+    });
+
+    // Mock auth.users email
+    await db.execute(
+      `INSERT INTO auth.users (id, email) VALUES ('${recipient.id}', 'watcher@test.com')`
+    );
+
+    const [issue] = await db
+      .insert(issues)
+      .values(createTestIssue(machine.initials, { issueNumber: 1 }))
+      .returning();
+
+    await createNotification(
+      {
+        type: "new_issue",
+        resourceId: issue.id,
+        resourceType: "issue",
+        issueTitle: "New Machine Issue",
+        machineName: machine.name,
+      },
+      db
+    );
+
+    // Verify in-app insert
+    const notificationsList = await db.query.notifications.findMany({
+      where: eq(notifications.userId, recipient.id),
+    });
+    expect(notificationsList).toHaveLength(1);
+    expect(notificationsList[0].type).toBe("new_issue");
+
+    // Verify email sent
+    expect(sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "watcher@test.com",
       })
     );
   });

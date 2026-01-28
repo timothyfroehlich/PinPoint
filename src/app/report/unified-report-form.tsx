@@ -18,11 +18,10 @@ import { submitPublicIssueAction } from "./actions";
 import { SeveritySelect } from "~/components/issues/fields/SeveritySelect";
 import { FrequencySelect } from "~/components/issues/fields/FrequencySelect";
 import { PrioritySelect } from "~/components/issues/fields/PrioritySelect";
-import type {
-  IssueSeverity,
-  IssueFrequency,
-  IssuePriority,
-} from "~/lib/types";
+import type { IssueSeverity, IssueFrequency, IssuePriority } from "~/lib/types";
+import { ImageUploadButton } from "~/components/images/ImageUploadButton";
+import { ImageGallery } from "~/components/images/ImageGallery";
+import { type ImageMetadata } from "~/types/images";
 
 interface Machine {
   id: string;
@@ -73,6 +72,8 @@ export function UnifiedReportForm({
   const [severity, setSeverity] = useState<IssueSeverity | "">("");
   const [priority, setPriority] = useState<IssuePriority | "">("");
   const [frequency, setFrequency] = useState<IssueFrequency | "">("");
+
+  const [uploadedImages, setUploadedImages] = useState<ImageMetadata[]>([]);
 
   const [state, formAction, isPending] = useActionState(
     submitPublicIssueAction,
@@ -270,7 +271,6 @@ export function UnifiedReportForm({
                     <SeveritySelect
                       value={severity}
                       onValueChange={setSeverity}
-                      testId="severity-select"
                     />
                   </div>
 
@@ -278,15 +278,11 @@ export function UnifiedReportForm({
                     <Label htmlFor="frequency" className="text-on-surface">
                       Frequency *
                     </Label>
-                    <input
-                      type="hidden"
-                      name="frequency"
-                      value={frequency}
-                    />
+                    <input type="hidden" name="frequency" value={frequency} />
                     <FrequencySelect
                       value={frequency}
                       onValueChange={setFrequency}
-                      testId="frequency-select"
+                      testId="issue-frequency-select"
                     />
                   </div>
 
@@ -299,10 +295,43 @@ export function UnifiedReportForm({
                       <PrioritySelect
                         value={priority}
                         onValueChange={setPriority}
-                        testId="priority-select"
                       />
                     </div>
                   )}
+                </div>
+
+                <div className="space-y-3 pb-2 pt-1 border-t border-b border-outline-variant/30 py-4">
+                  <div className="flex flex-col gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-on-surface">Photos</Label>
+                      <ImageUploadButton
+                        issueId="new"
+                        currentCount={uploadedImages.length}
+                        maxCount={user ? 4 : 2}
+                        onUploadComplete={(img) =>
+                          setUploadedImages((prev) => [...prev, img])
+                        }
+                        disabled={isPending}
+                      />
+                    </div>
+
+                    {uploadedImages.length > 0 && (
+                      <div className="mt-2">
+                        <ImageGallery
+                          images={uploadedImages.map((img) => ({
+                            id: img.blobPathname,
+                            fullImageUrl: img.blobUrl,
+                            originalFilename: img.originalFilename,
+                          }))}
+                        />
+                      </div>
+                    )}
+                    <input
+                      type="hidden"
+                      name="imagesMetadata"
+                      value={JSON.stringify(uploadedImages)}
+                    />
+                  </div>
                 </div>
 
                 {/* Reporter Info (Only if NOT logged in) */}

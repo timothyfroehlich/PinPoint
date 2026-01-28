@@ -6,7 +6,7 @@ import {
   machines,
   issueComments,
   userProfiles,
-  notificationPreferences,
+  issueImages,
 } from "~/server/db/schema";
 import { createTimelineEvent } from "~/lib/timeline/events";
 import { createNotification } from "~/lib/notifications";
@@ -50,6 +50,13 @@ export interface AddIssueCommentParams {
   issueId: string;
   content: string;
   userId: string;
+  imagesMetadata?: {
+    blobUrl: string;
+    blobPathname: string;
+    originalFilename: string;
+    fileSizeBytes: number;
+    mimeType: string;
+  }[];
 }
 
 export interface AssignIssueParams {
@@ -152,24 +159,6 @@ export async function createIssue({
         .onConflictDoNothing();
     }
 
-    // Machine Owner (if prefs enabled)
-    if (updatedMachine.ownerId) {
-      const ownerPrefs = await tx.query.notificationPreferences.findFirst({
-        where: eq(notificationPreferences.userId, updatedMachine.ownerId),
-      });
-
-      // If owner wants notifications for new issues, auto-watch this specific issue
-      if (
-        ownerPrefs?.emailNotifyOnNewIssue ||
-        ownerPrefs?.inAppNotifyOnNewIssue
-      ) {
-        await tx
-          .insert(issueWatchers)
-          .values({ issueId: issue.id, userId: updatedMachine.ownerId })
-          .onConflictDoNothing();
-      }
-    }
-
     // 5. Notifications
     try {
       // Trigger Notification (actorId optional for public reports)
@@ -183,7 +172,6 @@ export async function createIssue({
           issueTitle: title,
           machineName: updatedMachine.name,
           formattedIssueId: formatIssueId(machineInitials, issueNumber),
-          issueContext: { machineOwnerId: updatedMachine.ownerId ?? null },
         },
         tx
       );
@@ -274,10 +262,6 @@ export async function updateIssueStatus({
             currentIssue.issueNumber
           ),
           newStatus: status,
-          issueContext: {
-            assignedToId: currentIssue.assignedTo ?? null,
-            reportedById: currentIssue.reportedBy ?? null,
-          },
         },
         tx
       );
@@ -300,64 +284,81 @@ export async function addIssueComment({
   issueId,
   content,
   userId,
+  imagesMetadata = [],
 }: AddIssueCommentParams): Promise<IssueComment> {
-  // 1. Insert Comment
-  const [comment] = await db
-    .insert(issueComments)
-    .values({
-      issueId,
-      authorId: userId,
-      content,
-      isSystem: false,
-    })
-    .returning();
+  return await db.transaction(async (tx) => {
+    // 1. Insert Comment
+    const [comment] = await tx
+      .insert(issueComments)
+      .values({
+        issueId,
+        authorId: userId,
+        content,
+        isSystem: false,
+      })
+      .returning();
 
-  if (!comment) throw new Error("Failed to create comment");
+    if (!comment) throw new Error("Failed to create comment");
 
-  // 2. Auto-watch for commenter
-  await db
-    .insert(issueWatchers)
-    .values({ issueId, userId })
-    .onConflictDoNothing();
+    // 2. Link Images
+    if (imagesMetadata.length > 0) {
+      await tx.insert(issueImages).values(
+        imagesMetadata.map((img) => ({
+          issueId,
+          commentId: comment.id,
+          uploadedBy: userId,
+          fullImageUrl: img.blobUrl,
+          fullBlobPathname: img.blobPathname,
+          fileSizeBytes: img.fileSizeBytes,
+          mimeType: img.mimeType,
+          originalFilename: img.originalFilename,
+        }))
+      );
+    }
 
-  // 3. Trigger Notification
-  try {
-    const issue = await db.query.issues.findFirst({
-      where: eq(issues.id, issueId),
-      columns: {
-        title: true,
-        assignedTo: true,
-        reportedBy: true,
-        machineInitials: true,
-        issueNumber: true,
-      },
-      with: { machine: true },
-    });
+    // 3. Auto-watch for commenter
+    await tx
+      .insert(issueWatchers)
+      .values({ issueId, userId })
+      .onConflictDoNothing();
 
-    await createNotification({
-      type: "new_comment",
-      resourceId: issueId,
-      resourceType: "issue",
-      actorId: userId,
-      issueTitle: issue?.title ?? undefined,
-      machineName: issue?.machine.name ?? undefined,
-      formattedIssueId: issue
-        ? formatIssueId(issue.machineInitials, issue.issueNumber)
-        : undefined,
-      commentContent: content,
-      issueContext: {
-        assignedToId: issue?.assignedTo ?? null,
-        reportedById: issue?.reportedBy ?? null,
-      },
-    });
-  } catch (error) {
-    log.error(
-      { error, action: "addIssueComment.notifications" },
-      "Failed to send notification"
-    );
-  }
+    // 4. Trigger Notification
+    try {
+      const issue = await tx.query.issues.findFirst({
+        where: eq(issues.id, issueId),
+        columns: {
+          title: true,
+          assignedTo: true,
+          reportedBy: true,
+          machineInitials: true,
+          issueNumber: true,
+        },
+        with: { machine: true },
+      });
 
-  return comment;
+      await createNotification(
+        {
+          type: "new_comment",
+          resourceId: issueId,
+          resourceType: "issue",
+          actorId: userId,
+          issueTitle: issue?.title ?? undefined,
+          machineName: issue?.machine.name ?? undefined,
+          formattedIssueId: issue
+            ? formatIssueId(issue.machineInitials, issue.issueNumber)
+            : undefined,
+          commentContent: content,
+        },
+        tx
+      );
+    } catch (error) {
+      log.error(
+        { error, action: "addIssueComment.notifications" },
+        "Failed to send notification"
+      );
+    }
+    return comment;
+  });
 }
 
 /**
@@ -484,10 +485,6 @@ export async function assignIssue({
               currentIssue.machineInitials,
               currentIssue.issueNumber
             ),
-            issueContext: {
-              assignedToId: assignedTo,
-              reportedById: currentIssue.reportedBy ?? null,
-            },
           },
           tx
         );

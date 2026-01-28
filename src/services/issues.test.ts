@@ -108,10 +108,6 @@ describe("Issue Service", () => {
           issueTitle: "Test Issue",
           machineName: "Test Machine",
           formattedIssueId: "MM-01",
-          issueContext: {
-            assignedToId: assigneeId,
-            reportedById: "reporter-1",
-          },
         },
         expect.anything()
       );
@@ -152,7 +148,6 @@ describe("Issue Service", () => {
           issueTitle: "New Issue",
           machineName: "Test Machine",
           formattedIssueId: "MM-01",
-          issueContext: { machineOwnerId: "owner-1" },
         },
         expect.anything()
       );
@@ -184,20 +179,19 @@ describe("Issue Service", () => {
 
       await addIssueComment(params);
 
-      expect(createNotification).toHaveBeenCalledWith({
-        type: "new_comment",
-        resourceId: "issue-1",
-        resourceType: "issue",
-        actorId: "user-1",
-        issueTitle: "Issue Title",
-        machineName: "Machine Name",
-        formattedIssueId: "MM-01",
-        commentContent: "My comment",
-        issueContext: {
-          assignedToId: "assignee-1",
-          reportedById: "reporter-1",
+      expect(createNotification).toHaveBeenCalledWith(
+        {
+          type: "new_comment",
+          resourceId: "issue-1",
+          resourceType: "issue",
+          actorId: "user-1",
+          issueTitle: "Issue Title",
+          machineName: "Machine Name",
+          formattedIssueId: "MM-01",
+          commentContent: "My comment",
         },
-      });
+        expect.anything()
+      );
     });
   });
 

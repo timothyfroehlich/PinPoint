@@ -7,6 +7,7 @@
 
 import { test, expect, type Page } from "@playwright/test";
 import { ensureLoggedIn } from "../support/actions.js";
+import { getTestPrefix } from "../support/test-isolation.js";
 
 async function getStatNumber(page: Page, testId: string): Promise<number> {
   const rawText = await page.getByTestId(testId).innerText();
@@ -99,8 +100,12 @@ test.describe.serial("Member Dashboard", () => {
   }, testInfo) => {
     await ensureLoggedIn(page, testInfo);
 
-    // Check if there are any issue cards
-    const issueCards = page.getByTestId("recent-issue-card");
+    // Check if there are any issue cards belonging to this worker
+    // Other workers might be creating issues simultaneously
+    const testPrefix = getTestPrefix();
+    const issueCards = page
+      .getByTestId("recent-issue-card")
+      .filter({ hasText: `[${testPrefix}]` });
     const count = await issueCards.count();
 
     if (count > 0) {
@@ -110,13 +115,25 @@ test.describe.serial("Member Dashboard", () => {
       const issueTitle = await firstIssue.getByRole("heading").innerText();
       await firstIssue.click();
 
-      // Should navigate to issue detail page
-      await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
+      // Should navigate to issue detail page OR login page with next param
+      await expect(page).toHaveURL(
+        /(\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+)|(login\?next=%2Fm%2F.+)/
+      );
+
+      // Add a small delay to allow the page to stabilize
+      await page.waitForTimeout(500);
 
       // Use filter to find the specific h1 containing the title, avoiding strict mode violation
-      // with the Dashboard h1
+      // with the Dashboard h1 or the Austin Pinball Collective logo
       // Verify title matches
-      const heading = page.getByRole("main").getByRole("heading", { level: 1 });
+      // Replace all spaces with \s+ in the regex for flexibility
+      const titlePattern = issueTitle
+        .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+        .replace(/\s+/g, "\\s+");
+      const heading = page.getByRole("main").getByRole("heading", {
+        level: 1,
+        name: new RegExp(titlePattern),
+      });
 
       await expect(heading).toBeVisible();
       // Allow for some whitespace variation

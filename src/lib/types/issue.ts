@@ -1,10 +1,17 @@
-import type { Issue, IssueComment, Machine, UserProfile } from "./database";
+import type {
+  Issue,
+  IssueComment,
+  Machine,
+  UserProfile,
+  IssueImage,
+} from "./database";
 
 export type IssueCommentWithAuthor = Pick<
   IssueComment,
   "id" | "content" | "createdAt" | "isSystem"
 > & {
   author?: Pick<UserProfile, "id" | "name" | "email"> | null;
+  images: IssueImage[];
 };
 
 export type IssueListItem = Issue & {
@@ -31,4 +38,5 @@ export type IssueWithAllRelations = Issue & {
   assignedToUser?: Pick<UserProfile, "id" | "name" | "email"> | null;
   comments: IssueCommentWithAuthor[];
   watchers: { userId: string }[];
+  images: IssueImage[];
 };
