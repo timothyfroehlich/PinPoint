@@ -282,10 +282,7 @@ describe("Email Privacy RLS Integration", () => {
         email: string | null;
       }[];
 
-      // Admin should see all emails
-      const profilesWithEmails = rows.filter((p) => p.email !== null);
-      // Wait, there might be other users in the DB without emails if we didn't seed them here.
-      // But for our test users, they should definitely have emails.
+      // Admin should see emails for our test users (other users in DB may not have emails)
       const testUsers = rows.filter(
         (r) => r.id === adminUser.id || r.id === memberUser.id
       );
