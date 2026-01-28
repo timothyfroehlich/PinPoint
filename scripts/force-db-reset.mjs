@@ -17,8 +17,10 @@ if (!databaseUrl) {
 
 // Tables live in the public schema; order ensures dependent tables drop first.
 const tables = [
+  "issue_images",
   "issue_comments",
   "issue_watchers",
+  "machine_watchers",
   "notifications",
   "notification_preferences",
   "issues",
