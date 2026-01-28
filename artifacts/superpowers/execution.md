@@ -1,51 +1,49 @@
-# Image Upload Feature - Execution Log
+# Execution Notes
 
-## PR 1: Basic Image Upload + Display (MVP)
+## Task 1: Create RLS Utility Module
 
-**Started**: 2026-01-24 16:02:13
-**Branch**: `feature/image-upload-mvp`
+- **Files changed**: `src/server/db/utils/rls.ts`
+- **Changes**:
+  - Added `withUserContext` helper to manage PostgreSQL session variables (`request.user_id`, `request.user_role`) within Drizzle transactions.
+- **Verification**: `pnpm run check` passed.
+- **Result**: PASS
 
----
+## Task 2: Create User Context Types
+- **Files changed**: `src/lib/types/user.ts`, `src/lib/types/index.ts`
+- **Changes**:
+  - Added `UserContext` interface and `USER_ROLES` constant.
+  - Exported them from `src/lib/types/index.ts`.
+- **Verification**: `pnpm run check` passed.
+- **Result**: PASS
 
-## Batch 1: Install Dependencies
+## Task 3: Create User Context Helper
+- **Files changed**: `src/lib/auth/context.ts`
+- **Changes**:
+  - Added `getUserContext` helper to fetch user profile and role.
+  - Fixed lint error (redundant nullish coalescing).
+- **Verification**: `pnpm run check` passed.
+- **Result**: PASS
 
-- Step 1.1: Install Dependencies [SUCCESS]
+## Task 4: Create RLS Migration
+- **Files changed**: `drizzle/0008_rls_session_context.sql`
+- **Changes**:
+  - Updated RLS policies to support session context with `auth.jwt()` fallback.
+  - Updated `public_profiles_view` to enforce email privacy using session context.
+- **Verification**: `pnpm run db:migrate` passed.
+- **Result**: PASS
 
----
+## Task 5: Write Integration Tests
+- **Files changed**: `src/test/integration/supabase/email-privacy-rls.test.ts`
+- **Changes**:
+  - Added Drizzle-specific tests for session context.
+  - Verified admin can see all emails.
+  - Verified member can only see own email.
+  - Verified transaction isolation.
+- **Verification**: `pnpm run check` passed.
+- **Result**: PASS
 
-## Batch 2: Core Libraries
-
-**Started**: 2026-01-24 16:11
-
-- Step 1.4: Blob Configuration [SUCCESS]
-- Step 1.5: Blob Client [SUCCESS]
-- Step 1.6: Compression Utilities [SUCCESS]
-- Step 1.12: Environment Variables (Example) [SUCCESS]
-
----
-
-## Batch 3: Actions & UI
-
-**Started**: 2026-01-24 16:11
-
-- Step 1.7: Upload Server Action [SUCCESS]
-- Step 1.8: ImageUploadButton Component [SUCCESS]
-- Step 1.9: ImageGallery Component [SUCCESS]
-- Step 1.2: Database Migration [SUCCESS]
-- Step 1.3: Drizzle Schema [SUCCESS]
-
----
-
-## Batch 4: Integration
-
-**Started**: 2026-01-24 16:11
-
-- Step 1.10: Integrate into Report Form [SUCCESS]
-- Step 1.11: Integrate into Issue Detail Page [SUCCESS]
-
----
-
-## Batch 5: Verification
-
-- Step 1.13: Basic Tests [SUCCESS]
-- Step 1.14: Final MVP Verification [SUCCESS] (Typecheck passed)
+## Task 6: Run Full Test Suite
+- **Changes**:
+  - Running full preflight suite.
+- **Verification**: `pnpm run preflight` (In progress).
+- **Result**: -

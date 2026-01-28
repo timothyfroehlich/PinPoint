@@ -16,7 +16,8 @@ export type {
   IssueFrequency,
 } from "./database";
 
-export type { UserRole } from "./user";
+export type { UserContext, UserRole } from "./user";
+export { USER_ROLES } from "./user";
 
 export type {
   IssueCommentWithAuthor,

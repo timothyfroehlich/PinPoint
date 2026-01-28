@@ -59,9 +59,6 @@ export default async function MachineDetailPage({
     columns: { role: true },
   });
 
-  const isMemberOrAdmin =
-    currentUserProfile?.role === "member" ||
-    currentUserProfile?.role === "admin";
   const isAdmin = currentUserProfile?.role === "admin";
 
   // Execute independent queries in parallel (CORE-PERF-001)
@@ -91,14 +88,14 @@ export default async function MachineDetailPage({
             id: true,
             name: true,
             avatarUrl: true,
-            ...(isMemberOrAdmin && { email: true }),
+            ...(isAdmin && { email: true }),
           },
         },
         invitedOwner: {
           columns: {
             id: true,
             name: true,
-            ...(isMemberOrAdmin && { email: true }),
+            ...(isAdmin && { email: true }),
           },
         },
         watchers: {
@@ -117,7 +114,7 @@ export default async function MachineDetailPage({
       .where(eq(issues.machineInitials, initials)),
 
     // Query 3: All users (if admin)
-    isAdmin ? getUnifiedUsers() : Promise.resolve([]),
+    isAdmin ? getUnifiedUsers({ includeEmails: true }) : Promise.resolve([]),
   ]);
 
   // 404 if machine not found

@@ -21,6 +21,7 @@ async function fastReset() {
     // We cascade to handle foreign keys
     await client`
       TRUNCATE TABLE
+        "issue_images",
         "issue_comments",
         "issue_watchers",
         "issues",
