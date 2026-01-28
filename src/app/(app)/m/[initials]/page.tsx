@@ -88,14 +88,12 @@ export default async function MachineDetailPage({
             id: true,
             name: true,
             avatarUrl: true,
-            ...(isAdmin && { email: true }),
           },
         },
         invitedOwner: {
           columns: {
             id: true,
             name: true,
-            ...(isAdmin && { email: true }),
           },
         },
         watchers: {
@@ -114,7 +112,7 @@ export default async function MachineDetailPage({
       .where(eq(issues.machineInitials, initials)),
 
     // Query 3: All users (if admin)
-    isAdmin ? getUnifiedUsers({ includeEmails: true }) : Promise.resolve([]),
+    isAdmin ? getUnifiedUsers({ includeEmails: false }) : Promise.resolve([]),
   ]);
 
   // 404 if machine not found

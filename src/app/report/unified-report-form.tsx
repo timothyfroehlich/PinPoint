@@ -406,7 +406,7 @@ export function UnifiedReportForm({
                 ) : (
                   <div className="flex items-center gap-2 rounded-lg bg-surface-container-high px-3 py-2 text-xs text-on-surface-variant mt-2">
                     <UserCheck className="h-4 w-4 text-primary" />
-                    <span>Logged in as {user.email ?? "unknown"}</span>
+                    <span>Logged in</span>
                   </div>
                 )}
 

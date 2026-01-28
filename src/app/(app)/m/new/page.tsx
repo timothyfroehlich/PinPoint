@@ -40,7 +40,7 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
 
   let allUsers: UnifiedUser[] = [];
   if (isAdmin) {
-    allUsers = await getUnifiedUsers({ includeEmails: true });
+    allUsers = await getUnifiedUsers({ includeEmails: false });
   }
 
   return (

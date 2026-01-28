@@ -88,21 +88,18 @@ export default async function IssuesPage({
         columns: {
           id: true,
           name: true,
-          ...(isAdmin && { email: true }),
         },
       },
       invitedReporter: {
         columns: {
           id: true,
           name: true,
-          ...(isAdmin && { email: true }),
         },
       },
       assignedToUser: {
         columns: {
           id: true,
           name: true,
-          ...(isAdmin && { email: true }),
         },
       },
     },

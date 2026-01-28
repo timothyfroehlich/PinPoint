@@ -7,7 +7,6 @@ import { Loader2 } from "lucide-react";
 interface PickerUser {
   id: string;
   name: string;
-  email: string | null;
 }
 
 interface AssigneePickerProps {
@@ -69,7 +68,7 @@ export function AssigneePicker({
       return users;
     }
     return users.filter((user) => {
-      const haystack = [user.name, user.email ?? ""]
+      const haystack = [user.name]
         .filter(Boolean)
         .map((value) => value.toLowerCase());
       return haystack.some((value) => value.includes(normalized));
@@ -194,11 +193,6 @@ export function AssigneePicker({
                     <span className="font-medium leading-none">
                       {user.name}
                     </span>
-                    {user.email && (
-                      <span className="text-xs text-muted-foreground">
-                        {user.email}
-                      </span>
-                    )}
                   </div>
                 </button>
               ))

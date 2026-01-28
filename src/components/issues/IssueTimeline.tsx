@@ -24,7 +24,6 @@ interface TimelineEvent {
     id?: string | null;
     name: string;
     avatarFallback: string;
-    email?: string | null | undefined;
   };
   createdAt: Date;
   content: string | null;
@@ -94,13 +93,6 @@ function TimelineItem({
                       {event.author.name}
                     </span>
                     {isOwner && <OwnerBadge size="sm" />}
-                    {event.author.email && (
-                      <span className="text-xs text-muted-foreground font-normal">
-                        {"<"}
-                        {event.author.email}
-                        {">"}
-                      </span>
-                    )}
                   </div>
                   {isIssue ? (
                     <span className="text-xs uppercase tracking-wide text-primary">
@@ -158,7 +150,6 @@ export function IssueTimeline({
       id: reporter.id ?? null,
       name: reporter.name,
       avatarFallback: reporter.initial,
-      email: reporter.email,
     },
     createdAt: new Date(issue.createdAt),
     content: issue.description,
@@ -175,7 +166,6 @@ export function IssueTimeline({
         id: c.author?.id ?? null,
         name: authorName,
         avatarFallback: authorName.slice(0, 2).toUpperCase(),
-        email: c.author?.email,
       },
       createdAt: new Date(c.createdAt),
       content: c.content,
