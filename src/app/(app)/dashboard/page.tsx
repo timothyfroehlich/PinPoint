@@ -420,19 +420,19 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
             >
               {recentlyFixedMachines.map((machine) => (
                 <Link key={machine.id} href={`/m/${machine.initials}`}>
-                  <Card className="border-green-500/30 bg-green-500/10 hover:border-green-500 transition-all cursor-pointer h-full">
+                  <Card className="border-success/30 bg-success/10 hover:border-success transition-all cursor-pointer h-full">
                     <CardHeader>
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1">
-                          <CardTitle className="text-base text-green-400 mb-1">
+                          <CardTitle className="text-base text-success mb-1">
                             {machine.name}
                           </CardTitle>
-                          <p className="text-xs text-green-400/80">
+                          <p className="text-xs text-success/80">
                             Fixed{" "}
                             {new Date(machine.fixedAt).toLocaleDateString()}
                           </p>
                         </div>
-                        <CheckCircle2 className="size-5 text-green-400" />
+                        <CheckCircle2 className="size-5 text-success" />
                       </div>
                     </CardHeader>
                   </Card>
