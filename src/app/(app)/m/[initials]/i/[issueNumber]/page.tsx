@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { issues, userProfiles } from "~/server/db/schema";
-import { eq, asc, and, notInArray, sql } from "drizzle-orm";
+import { eq, asc, and, notInArray } from "drizzle-orm";
 import { PageShell } from "~/components/layout/PageShell";
 import { IssueTimeline } from "~/components/issues/IssueTimeline";
 import { IssueSidebar } from "~/components/issues/IssueSidebar";
@@ -136,7 +136,6 @@ export default async function IssueDetailPage({
       .select({
         id: userProfiles.id,
         name: userProfiles.name,
-        email: sql<null>`null`,
       })
       .from(userProfiles)
       .where(notInArray(userProfiles.role, ["guest"]))

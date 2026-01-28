@@ -111,6 +111,6 @@ test.describe("User Invitation & Signup Flow", () => {
     await expect(userMenu).toBeVisible();
     await userMenu.click();
     await expect(page.getByText("Full Flow")).toBeVisible();
-    await expect(page.getByText(userEmail)).toBeVisible();
+    // Email is no longer displayed in user menu (removed in PR #871)
   });
 });
