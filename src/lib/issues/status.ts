@@ -7,11 +7,7 @@ import {
   Repeat,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type {
-  IssueSeverity,
-  IssuePriority,
-  IssueFrequency,
-} from "~/lib/types";
+import type { IssueSeverity, IssuePriority, IssueFrequency } from "~/lib/types";
 
 /**
  * Single Source of Truth for Issue Status Values
@@ -301,9 +297,7 @@ export function getIssuePriorityLabel(priority: IssuePriority): string {
   return PRIORITY_CONFIG[priority].label;
 }
 
-export function getIssueFrequencyLabel(
-  frequency: IssueFrequency
-): string {
+export function getIssueFrequencyLabel(frequency: IssueFrequency): string {
   return FREQUENCY_CONFIG[frequency].label;
 }
 
@@ -315,9 +309,7 @@ export function getIssuePriorityStyles(priority: IssuePriority): string {
   return PRIORITY_CONFIG[priority].styles;
 }
 
-export function getIssueFrequencyStyles(
-  frequency: IssueFrequency
-): string {
+export function getIssueFrequencyStyles(frequency: IssueFrequency): string {
   return FREQUENCY_CONFIG[frequency].styles;
 }
 

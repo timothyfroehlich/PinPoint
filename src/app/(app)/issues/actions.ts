@@ -120,7 +120,7 @@ export async function createIssueAction(
     machineInitials: toOptionalString(formData.get("machineInitials")),
     severity: toOptionalString(formData.get("severity")),
     priority: toOptionalString(formData.get("priority")),
-    consistency: toOptionalString(formData.get("consistency")),
+    frequency: toOptionalString(formData.get("frequency")),
   };
 
   const validation = createIssueSchema.safeParse(rawData);

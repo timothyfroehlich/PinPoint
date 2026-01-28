@@ -40,9 +40,7 @@ describe("Issue Field Selects Accessibility", () => {
 
   it("FrequencySelect has dynamic accessible name", () => {
     const onValueChange = vi.fn();
-    render(
-      <FrequencySelect value="frequent" onValueChange={onValueChange} />
-    );
+    render(<FrequencySelect value="frequent" onValueChange={onValueChange} />);
     const trigger = screen.getByRole("combobox");
     expect(trigger).toHaveAttribute("aria-label", "Frequency: Frequent");
   });

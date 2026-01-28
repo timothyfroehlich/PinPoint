@@ -1,11 +1,7 @@
 import type React from "react";
 import { IssueBadge } from "~/components/issues/IssueBadge";
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
-import type {
-  IssueSeverity,
-  IssuePriority,
-  IssueFrequency,
-} from "~/lib/types";
+import type { IssueSeverity, IssuePriority, IssueFrequency } from "~/lib/types";
 
 export default function BadgeDebugPage(): React.JSX.Element {
   const severities: IssueSeverity[] = [

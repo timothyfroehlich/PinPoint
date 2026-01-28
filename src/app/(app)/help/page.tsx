@@ -75,7 +75,7 @@ export default function HelpPage(): React.JSX.Element {
       </section>
 
       <section className="space-y-3 mb-8">
-        <h2 className="text-lg font-semibold">Consistency</h2>
+        <h2 className="text-lg font-semibold">Frequency</h2>
         <p className="text-sm text-muted-foreground">
           Helping us understand how often a problem occurs makes it much easier
           for our technicians to reproduce and fix it.

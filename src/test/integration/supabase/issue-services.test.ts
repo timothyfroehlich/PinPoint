@@ -19,7 +19,7 @@ import {
   updateIssueStatus,
   updateIssueSeverity,
   updateIssuePriority,
-  updateIssueConsistency,
+  updateIssueFrequency,
   createIssue,
 } from "~/services/issues";
 
@@ -192,25 +192,25 @@ describe("Issue Service Functions (Integration)", () => {
 
   it("should update frequency and create timeline event", async () => {
     const db = await getTestDb();
-    const newConsistency = "constant";
+    const newFrequency = "constant";
 
-    await updateIssueConsistency({
+    await updateIssueFrequency({
       issueId: testIssue.id,
-      frequency: newConsistency,
+      frequency: newFrequency,
     });
 
     const updated = await db.query.issues.findFirst({
       where: eq(issues.id, testIssue.id),
     });
 
-    expect(updated?.frequency).toBe(newConsistency);
+    expect(updated?.frequency).toBe(newFrequency);
 
     const event = await db.query.issueComments.findFirst({
       where: eq(issueComments.issueId, testIssue.id),
       orderBy: desc(issueComments.createdAt),
     });
 
-    expect(event?.content).toContain("Consistency changed");
+    expect(event?.content).toContain("Frequency changed");
     expect(event?.content).toContain("from Intermittent to Constant");
   });
 

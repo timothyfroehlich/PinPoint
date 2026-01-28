@@ -88,10 +88,7 @@ export function parseIssueFilters(params: URLSearchParams): IssueFilters {
   const reporter = params.get("reporter")?.split(",");
   if (reporter) filters.reporter = reporter;
 
-  const frequency = parseCommaList(
-    params.get("frequency"),
-    VALID_FREQUENCIES
-  );
+  const frequency = parseCommaList(params.get("frequency"), VALID_FREQUENCIES);
   if (frequency) filters.frequency = frequency;
 
   filters.sort = params.get("sort") ?? "updated_desc";
