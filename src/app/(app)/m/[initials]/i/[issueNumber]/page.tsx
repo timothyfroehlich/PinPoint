@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { issues, userProfiles, authUsers } from "~/server/db/schema";
+import { issues, userProfiles } from "~/server/db/schema";
 import { eq, asc, and, notInArray, sql } from "drizzle-orm";
 import { PageShell } from "~/components/layout/PageShell";
 import { IssueTimeline } from "~/components/issues/IssueTimeline";
@@ -45,14 +45,6 @@ export default async function IssueDetailPage({
     redirect(`/m/${initials}`);
   }
 
-  // Fetch current user profile to check roles for visibility
-  const currentUserProfile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-    columns: { role: true },
-  });
-
-  const isAdmin = currentUserProfile?.role === "admin";
-
   // CORE-PERF-003: Execute independent queries in parallel to avoid waterfall
   const [issue, allUsers] = await Promise.all([
     // Query issue with all relations
@@ -87,21 +79,18 @@ export default async function IssueDetailPage({
           columns: {
             id: true,
             name: true,
-            ...(isAdmin && { email: true }),
           },
         },
         invitedReporter: {
           columns: {
             id: true,
             name: true,
-            ...(isAdmin && { email: true }),
           },
         },
         assignedToUser: {
           columns: {
             id: true,
             name: true,
-            ...(isAdmin && { email: true }),
           },
         },
         comments: {
@@ -113,7 +102,6 @@ export default async function IssueDetailPage({
               columns: {
                 id: true,
                 name: true,
-                ...(isAdmin && { email: true }),
               },
             },
             images: {
@@ -141,7 +129,6 @@ export default async function IssueDetailPage({
         issueNumber: true,
         machineInitials: true,
         reporterName: true,
-        ...(isAdmin && { reporterEmail: true }),
       },
     }),
     // Fetch all members/admins for assignment dropdown (Restrict to actual users)
@@ -149,12 +136,9 @@ export default async function IssueDetailPage({
       .select({
         id: userProfiles.id,
         name: userProfiles.name,
-        email: isAdmin
-          ? sql<string | null>`COALESCE(${authUsers.email}, null)`
-          : sql<null>`null`,
+        email: sql<null>`null`,
       })
       .from(userProfiles)
-      .leftJoin(authUsers, eq(authUsers.id, userProfiles.id))
       .where(notInArray(userProfiles.role, ["guest"]))
       .orderBy(asc(userProfiles.name)),
   ]);

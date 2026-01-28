@@ -11,7 +11,7 @@ import { UpdateIssueConsistencyForm } from "~/app/(app)/m/[initials]/i/[issueNum
 
 interface SidebarActionsProps {
   issue: IssueWithAllRelations;
-  allUsers: { id: string; name: string; email: string | null }[];
+  allUsers: { id: string; name: string }[];
 }
 
 export function SidebarActions({

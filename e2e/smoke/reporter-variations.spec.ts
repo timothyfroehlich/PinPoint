@@ -95,8 +95,8 @@ test.describe("Reporter Variations E2E", () => {
     await page.goto("/m/AFM/i/1");
     const sidebar = page.getByTestId("issue-sidebar");
 
-    // Admins SHOULD see emails
+    // Admins should NOT see emails in the sidebar anymore
     await expect(sidebar).toContainText("Member User");
-    await expect(sidebar).toContainText("member@test.com");
+    await expect(sidebar).not.toContainText("member@test.com");
   });
 });

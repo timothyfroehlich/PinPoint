@@ -4,12 +4,11 @@ import { resolveIssueReporter } from "./utils";
 describe("resolveIssueReporter", () => {
   it("resolves reportedByUser", () => {
     const issue = {
-      reportedByUser: { id: "user-1", name: "User", email: "user@example.com" },
+      reportedByUser: { id: "user-1", name: "User" },
     };
     expect(resolveIssueReporter(issue)).toEqual({
       id: "user-1",
       name: "User",
-      email: "user@example.com",
       initial: "U",
     });
   });
@@ -19,26 +18,22 @@ describe("resolveIssueReporter", () => {
       invitedReporter: {
         id: "invited-1",
         name: "Invited",
-        email: "invited@example.com",
       },
     };
     expect(resolveIssueReporter(issue)).toEqual({
       id: "invited-1",
       name: "Invited",
-      email: "invited@example.com",
       initial: "I",
     });
   });
 
-  it("resolves reporterName/Email if no user/invited", () => {
+  it("resolves reporterName if no user/invited", () => {
     const issue = {
       reporterName: "Legacy",
-      reporterEmail: "legacy@example.com",
     };
     expect(resolveIssueReporter(issue)).toEqual({
       id: null,
       name: "Legacy",
-      email: "legacy@example.com",
       initial: "L",
     });
   });
@@ -48,7 +43,6 @@ describe("resolveIssueReporter", () => {
     expect(resolveIssueReporter(issue)).toEqual({
       id: null,
       name: "Anonymous",
-      email: null,
       initial: "A",
     });
   });

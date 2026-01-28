@@ -11,7 +11,6 @@ import { resolveIssueReporter } from "~/lib/issues/utils";
 interface SidebarUser {
   id: string;
   name: string;
-  email: string | null;
 }
 
 interface IssueSidebarProps {
@@ -64,11 +63,6 @@ export function IssueSidebar({
                         <OwnerBadge size="sm" />
                       )}
                     </div>
-                    {reporter.email && (
-                      <span className="truncate text-xs text-muted-foreground">
-                        {reporter.email}
-                      </span>
-                    )}
                   </div>
                 </div>
               </div>

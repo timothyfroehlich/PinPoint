@@ -7,8 +7,8 @@ import React from "react";
 // (AssigneePicker only uses local state and Lucide icons which are SVG, so simple render is fine)
 
 const mockUsers = [
-  { id: "1", name: "Alice", email: "alice@example.com" },
-  { id: "2", name: "Bob", email: "bob@example.com" },
+  { id: "1", name: "Alice" },
+  { id: "2", name: "Bob" },
 ];
 
 describe("AssigneePicker Accessibility", () => {

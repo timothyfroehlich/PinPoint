@@ -132,10 +132,7 @@ export async function MainLayout({
                     <Link href="/report">Report Issue</Link>
                   </Button>
                   <NotificationList notifications={enrichedNotifications} />
-                  <UserMenu
-                    userName={userProfile?.name ?? "User"}
-                    email={user.email}
-                  />
+                  <UserMenu userName={userProfile?.name ?? "User"} />
                 </>
               ) : (
                 <div className="flex items-center gap-3">

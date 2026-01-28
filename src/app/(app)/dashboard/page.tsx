@@ -22,7 +22,7 @@ import { OrganizationBanner } from "~/components/dashboard/OrganizationBanner";
  * Cached dashboard data fetcher (CORE-PERF-001)
  * Wraps all dashboard queries to prevent duplicate execution within a single request
  */
-const getDashboardData = cache(async (userId?: string, isAdmin = false) => {
+const getDashboardData = cache(async (userId?: string) => {
   // Query 1: User Profile
   // Fetch user profile to ensure existence or display name (parallelized)
   const userProfilePromise = userId
@@ -117,7 +117,6 @@ const getDashboardData = cache(async (userId?: string, isAdmin = false) => {
       issueNumber: true,
       createdAt: true,
       reporterName: true,
-      ...(isAdmin && { reporterEmail: true }),
     },
   });
 
@@ -205,18 +204,8 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Fetch current user profile to check role for visibility
-  const currentUserProfile = user
-    ? await db.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, user.id),
-        columns: { role: true },
-      })
-    : null;
-
-  const isAdmin = currentUserProfile?.role === "admin";
-
   // Fetch all dashboard data with caching (public allowed)
-  const data = await getDashboardData(user?.id, isAdmin);
+  const data = await getDashboardData(user?.id);
 
   const {
     assignedIssues,

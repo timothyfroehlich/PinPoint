@@ -11,7 +11,7 @@ import { AssigneePicker } from "~/components/issues/AssigneePicker";
 interface AssignIssueFormProps {
   issueId: string;
   assignedToId: string | null;
-  users: { id: string; name: string; email: string | null }[];
+  users: { id: string; name: string }[];
 }
 
 export function AssignIssueForm({

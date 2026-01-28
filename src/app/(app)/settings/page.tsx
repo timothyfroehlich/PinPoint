@@ -60,6 +60,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
           <ProfileForm
             firstName={profile.firstName}
             lastName={profile.lastName}
+            email={profile.email}
             role={profile.role}
           />
         </div>

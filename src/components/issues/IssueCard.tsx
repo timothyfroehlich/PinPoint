@@ -22,10 +22,9 @@ interface IssueCardProps {
     | "issueNumber"
     | "createdAt"
     | "reporterName"
-    | "reporterEmail"
   > & {
-    reportedByUser?: { name: string; email?: string | null } | null;
-    invitedReporter?: { name: string; email?: string | null } | null;
+    reportedByUser?: { name: string } | null;
+    invitedReporter?: { name: string } | null;
   };
   machine: { name: string };
   variant?: "normal" | "compact";

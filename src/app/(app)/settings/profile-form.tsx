@@ -11,12 +11,14 @@ import { cn } from "~/lib/utils";
 interface ProfileFormProps {
   firstName: string;
   lastName: string;
+  email: string;
   role: string;
 }
 
 export function ProfileForm({
   firstName,
   lastName,
+  email,
   role,
 }: ProfileFormProps): React.JSX.Element {
   const [state, formAction, isPending] = useActionState<
@@ -76,6 +78,16 @@ export function ProfileForm({
             placeholder="Doe"
             required
             className="max-w-[240px]"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            name="email"
+            value={email}
+            disabled
+            className="max-w-[240px] bg-muted"
           />
         </div>
         <div className="space-y-2">
