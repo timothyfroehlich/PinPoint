@@ -155,16 +155,12 @@ export async function loginAction(
 
     redirect(next);
   } catch (error) {
-    // If redirect was thrown, re-throw it
-    if (error instanceof Error && error.message === "NEXT_REDIRECT") {
-      throw error;
-    }
-    // Also check for digest property which Next.js uses
+    // Check for digest property which Next.js uses for redirects
     if (
       typeof error === "object" &&
       error !== null &&
       "digest" in error &&
-      String(error.digest).startsWith("NEXT_REDIRECT")
+      String((error as { digest: unknown }).digest).startsWith("NEXT_REDIRECT")
     ) {
       throw error;
     }

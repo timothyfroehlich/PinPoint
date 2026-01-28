@@ -61,6 +61,23 @@ We use git worktrees for parallel environments. Config is managed via templates 
 | Review      | 3200    | 56321        | 56322    |
 | AntiGravity | 3300    | 57321        | 57322    |
 
+### Branch Management
+
+**Creating branches** - Ensure proper remote tracking:
+
+- `git checkout -b feature/name` then `git push -u origin feature/name`
+- **NOT**: `git checkout -b feature/name origin/main` (tracks main, not your branch)
+- Verify: `git branch -vv` shows `[origin/feature/name]`, not `[origin/main]`
+
+**Why**: Proper tracking enables `git pull`/`git push` without arguments and prevents accidentally
+pushing to main.
+
+### Commit Safety
+
+- **NEVER use `--no-verify`** without explicit user permission
+- This flag bypasses pre-commit hooks (lint, format, type checks)
+- Only use when user explicitly requests it
+
 ### Key Commands
 
 - `pnpm run check` (**RUN OFTEN**): Fast check (types, lint, format, unit tests). ~5s.
@@ -89,6 +106,22 @@ We use git worktrees for parallel environments. Config is managed via templates 
 - **Connection Requirements**:
   - **Session Pooler (IPv4)**: Use `DATABASE_URL` (port `:6543`) for external connections. The `DIRECT_URL` (port `:5432`) uses IPv6 which may be unreachable from some environments.
   - Format: `postgresql://postgres.[project-ref]:password@aws-0-us-east-2.pooler.supabase.com:6543/postgres`
+
+### Migration Conflict Resolution
+
+When merging branches with competing migrations (both created same number):
+
+**Regeneration Protocol** (Standard):
+
+1. **Accept incoming** (main's migrations) - Keep main's SQL and meta files
+2. **Delete your migration files** - Remove conflicted `000N_*.sql` and `drizzle/meta/000N_snapshot.json`
+3. **Resolve schema.ts** - Manually merge both sets of changes
+4. **Regenerate**: `pnpm db:generate` creates fresh migration with correct number
+5. **Verify SQL** - Compare new SQL to deleted SQL, confirm intent preserved
+6. **Test**: `pnpm db:reset` to rebuild from scratch
+
+**Why this works**: Drizzle regenerates consistent meta files (prevId chain, journal idx).
+Eliminates manual JSON surgery and uncertainty.
 
 ### GitHub Copilot Reviews
 
