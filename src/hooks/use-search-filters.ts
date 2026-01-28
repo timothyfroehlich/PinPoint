@@ -88,8 +88,8 @@ export function useSearchFilters(
         params.set("owner", merged.owner.join(","));
       if (merged.reporter && merged.reporter.length > 0)
         params.set("reporter", merged.reporter.join(","));
-      if (merged.consistency && merged.consistency.length > 0)
-        params.set("consistency", merged.consistency.join(","));
+      if (merged.frequency && merged.frequency.length > 0)
+        params.set("frequency", merged.frequency.join(","));
 
       // Boolean filters
       if (merged.watching) params.set("watching", "true");

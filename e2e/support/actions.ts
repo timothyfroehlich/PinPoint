@@ -102,10 +102,10 @@ export async function selectOption(
     "issue-status-select": (value) => `status-option-${value}`,
     "issue-severity-select": (value) => `severity-option-${value}`,
     "issue-priority-select": (value) => `priority-option-${value}`,
-    "issue-consistency-select": (value) => `consistency-option-${value}`,
+    "issue-frequency-select": (value) => `frequency-option-${value}`,
     "severity-select": (value) => `severity-option-${value}`,
     "priority-select": (value) => `priority-option-${value}`,
-    "consistency-select": (value) => `consistency-option-${value}`,
+    "frequency-select": (value) => `frequency-option-${value}`,
   };
 
   // Get the test ID generator function, or create a default one

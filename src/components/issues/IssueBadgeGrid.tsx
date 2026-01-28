@@ -6,7 +6,7 @@ import { IssueBadge } from "~/components/issues/IssueBadge";
 import type { Issue } from "~/lib/types";
 
 interface IssueBadgeGridProps {
-  issue: Pick<Issue, "status" | "severity" | "priority" | "consistency">;
+  issue: Pick<Issue, "status" | "severity" | "priority" | "frequency">;
   variant?: "normal" | "strip";
   size?: "normal" | "lg";
   className?: string;
@@ -50,8 +50,8 @@ export function IssueBadgeGrid({
         size={size}
       />
       <IssueBadge
-        type="consistency"
-        value={issue.consistency}
+        type="frequency"
+        value={issue.frequency}
         variant={variant}
         size={size}
       />

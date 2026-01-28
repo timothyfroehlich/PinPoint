@@ -1,0 +1,1 @@
+ALTER TABLE "issues" RENAME COLUMN "consistency" TO "frequency";

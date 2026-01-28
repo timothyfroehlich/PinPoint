@@ -19,7 +19,7 @@ describe("Issue Validation Schemas", () => {
         machineInitials: validInitials,
         severity: "minor",
         priority: "low",
-        consistency: "intermittent",
+        frequency: "intermittent",
       });
       expect(result.success).toBe(true);
     });
@@ -30,7 +30,7 @@ describe("Issue Validation Schemas", () => {
         machineInitials: validInitials,
         severity: "cosmetic",
         priority: "medium",
-        consistency: "constant",
+        frequency: "constant",
       });
       expect(result.success).toBe(true);
     });

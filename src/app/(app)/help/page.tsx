@@ -34,7 +34,7 @@ export default function HelpPage(): React.JSX.Element {
           </li>
           <li>
             Choose a <strong>severity</strong> (how it affects play) and{" "}
-            <strong>consistency</strong> (how often it happens).
+            <strong>frequency</strong> (how often it happens).
           </li>
           <li>
             (Optional) Provide your name and email if you want to be notified
@@ -75,7 +75,7 @@ export default function HelpPage(): React.JSX.Element {
       </section>
 
       <section className="space-y-3 mb-8">
-        <h2 className="text-lg font-semibold">Consistency</h2>
+        <h2 className="text-lg font-semibold">Frequency</h2>
         <p className="text-sm text-muted-foreground">
           Helping us understand how often a problem occurs makes it much easier
           for our technicians to reproduce and fix it.

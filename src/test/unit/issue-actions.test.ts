@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   addCommentAction,
   updateIssueStatusAction,
-  updateIssueConsistencyAction,
+  updateIssueFrequencyAction,
 } from "~/app/(app)/issues/actions";
 import { canUpdateIssue } from "~/lib/permissions";
 
@@ -58,7 +58,7 @@ vi.mock("~/services/issues", () => ({
   updateIssueStatus: vi.fn(),
   updateIssueSeverity: vi.fn(),
   updateIssuePriority: vi.fn(),
-  updateIssueConsistency: vi.fn(),
+  updateIssueFrequency: vi.fn(),
   addIssueComment: vi.fn(),
 }));
 
@@ -72,7 +72,7 @@ import { createClient } from "~/lib/supabase/server";
 import {
   addIssueComment,
   updateIssueStatus,
-  updateIssueConsistency,
+  updateIssueFrequency,
 } from "~/services/issues";
 import { db } from "~/server/db";
 
@@ -259,7 +259,7 @@ describe("updateIssueStatusAction", () => {
   });
 });
 
-describe("updateIssueConsistencyAction", () => {
+describe("updateIssueFrequencyAction", () => {
   const validUuid = "123e4567-e89b-12d3-a456-426614174000";
   const mockUser = { id: "user-123" };
   const initialState = undefined;
@@ -273,7 +273,7 @@ describe("updateIssueConsistencyAction", () => {
     } as any);
   });
 
-  it("should successfully update consistency", async () => {
+  it("should successfully update frequency", async () => {
     vi.mocked(db.query.issues.findFirst).mockResolvedValue({
       machineInitials: "MM",
       issueNumber: 1,
@@ -285,20 +285,20 @@ describe("updateIssueConsistencyAction", () => {
       role: "member",
     } as any);
     vi.mocked(canUpdateIssue).mockReturnValue(true);
-    vi.mocked(updateIssueConsistency).mockResolvedValue({
+    vi.mocked(updateIssueFrequency).mockResolvedValue({
       issueId: validUuid,
-      oldConsistency: "intermittent",
-      newConsistency: "constant",
+      oldFrequency: "intermittent",
+      newFrequency: "constant",
     });
 
     const formData = new FormData();
     formData.append("issueId", validUuid);
-    formData.append("consistency", "constant");
+    formData.append("frequency", "constant");
 
-    const result = await updateIssueConsistencyAction(initialState, formData);
+    const result = await updateIssueFrequencyAction(initialState, formData);
 
     expect(result.ok).toBe(true);
     expect(canUpdateIssue).toHaveBeenCalled();
-    expect(updateIssueConsistency).toHaveBeenCalled();
+    expect(updateIssueFrequency).toHaveBeenCalled();
   });
 });

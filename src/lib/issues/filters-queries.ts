@@ -241,8 +241,8 @@ export function buildWhereConditions(
     );
   }
 
-  if (filters.consistency && filters.consistency.length > 0) {
-    conditions.push(inArray(issues.consistency, filters.consistency));
+  if (filters.frequency && filters.frequency.length > 0) {
+    conditions.push(inArray(issues.frequency, filters.frequency));
   }
 
   // Watching filter requires current user ID to be passed in

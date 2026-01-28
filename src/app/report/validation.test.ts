@@ -6,7 +6,7 @@ describe("Public Issue Form Validation", () => {
     const formData = new FormData();
     formData.set("title", "Test Issue");
     formData.set("severity", "minor");
-    formData.set("consistency", "intermittent");
+    formData.set("frequency", "intermittent");
 
     const result = parsePublicIssueForm(formData);
 
@@ -24,7 +24,7 @@ describe("Public Issue Form Validation", () => {
     const formData = new FormData();
     formData.set("machineId", "00000000-0000-0000-0000-000000000000");
     formData.set("title", "Test Issue");
-    formData.set("consistency", "intermittent");
+    formData.set("frequency", "intermittent");
 
     const result = parsePublicIssueForm(formData);
 
@@ -40,7 +40,7 @@ describe("Public Issue Form Validation", () => {
     formData.set("machineId", "00000000-0000-0000-0000-000000000000");
     formData.set("title", "");
     formData.set("severity", "minor");
-    formData.set("consistency", "intermittent");
+    formData.set("frequency", "intermittent");
 
     const result = parsePublicIssueForm(formData);
 
@@ -56,7 +56,7 @@ describe("Public Issue Form Validation", () => {
     formData.set("machineId", "00000000-0000-0000-0000-000000000000");
     formData.set("title", "Valid Title");
     formData.set("severity", "minor");
-    formData.set("consistency", "intermittent");
+    formData.set("frequency", "intermittent");
 
     const result = parsePublicIssueForm(formData);
 

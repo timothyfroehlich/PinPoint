@@ -149,7 +149,7 @@ export const issues = pgTable(
     priority: text("priority", { enum: ["low", "medium", "high"] })
       .notNull()
       .default("medium"),
-    consistency: text("consistency", {
+    frequency: text("frequency", {
       enum: ["intermittent", "frequent", "constant"],
     })
       .notNull()

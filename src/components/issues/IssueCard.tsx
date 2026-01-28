@@ -17,7 +17,7 @@ interface IssueCardProps {
     | "status"
     | "severity"
     | "priority"
-    | "consistency"
+    | "frequency"
     | "machineInitials"
     | "issueNumber"
     | "createdAt"

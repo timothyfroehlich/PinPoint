@@ -69,7 +69,7 @@ export async function submitPublicIssueAction(
     firstName,
     lastName,
     priority,
-    consistency,
+    frequency,
   } = parsedValue.data;
 
   // 3. Resolve reporter
@@ -164,7 +164,7 @@ export async function submitPublicIssueAction(
       machineInitials: machine.initials,
       severity,
       priority: finalPriority,
-      consistency,
+      frequency,
       reportedBy,
       reporterName,
       reporterEmail,

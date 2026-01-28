@@ -14,7 +14,7 @@ import {
   STATUS_GROUPS,
   SEVERITY_CONFIG,
   PRIORITY_CONFIG,
-  CONSISTENCY_CONFIG,
+  FREQUENCY_CONFIG,
   OPEN_STATUSES,
 } from "~/lib/issues/status";
 import { type IssueFilters as FilterState } from "~/lib/issues/filters";
@@ -22,7 +22,7 @@ import type {
   IssueStatus,
   IssueSeverity,
   IssuePriority,
-  IssueConsistency,
+  IssueFrequency,
 } from "~/lib/types";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -90,11 +90,11 @@ export function IssueFilters({
     []
   );
 
-  const consistencyOptions = React.useMemo(
+  const frequencyOptions = React.useMemo(
     () =>
-      Object.entries(CONSISTENCY_CONFIG).map(([value, config]) => ({
+      Object.entries(FREQUENCY_CONFIG).map(([value, config]) => ({
         label: config.label,
-        value: value as IssueConsistency,
+        value: value as IssueFrequency,
       })),
     []
   );
@@ -284,18 +284,18 @@ export function IssueFilters({
       });
     });
 
-    // Consistency
-    filters.consistency?.forEach((c) => {
-      const config = CONSISTENCY_CONFIG[c];
+    // Frequency
+    filters.frequency?.forEach((c) => {
+      const config = FREQUENCY_CONFIG[c];
       badges.push({
-        id: `consistency-${c}`,
+        id: `frequency-${c}`,
         label: config.label,
         icon: config.icon,
         iconColor: config.iconColor,
         clear: () => {
-          const current = filters.consistency ?? [];
+          const current = filters.frequency ?? [];
           pushFilters({
-            consistency: current.filter((v) => v !== c),
+            frequency: current.filter((v) => v !== c),
             page: 1,
           });
         },
@@ -479,7 +479,7 @@ export function IssueFilters({
                     assignee: [],
                     owner: [],
                     reporter: [],
-                    consistency: [],
+                    frequency: [],
                     watching: undefined,
                     createdFrom: undefined,
                     createdTo: undefined,
@@ -578,16 +578,16 @@ export function IssueFilters({
               }}
             />
             <MultiSelect
-              options={consistencyOptions}
-              value={filters.consistency ?? []}
+              options={frequencyOptions}
+              value={filters.frequency ?? []}
               onChange={(val) =>
                 pushFilters({
-                  consistency: val as IssueConsistency[],
+                  frequency: val as IssueFrequency[],
                   page: 1,
                 })
               }
-              placeholder="Consistency"
-              data-testid="filter-consistency"
+              placeholder="Frequency"
+              data-testid="filter-frequency"
             />
             <MultiSelect
               options={userOptions}
