@@ -129,9 +129,17 @@ export class MailpitClient {
     const startTime = Date.now();
 
     while (Date.now() - startTime < timeout) {
-      const messages = await this.getMessages(email);
+      const allMessages = await this.getMessages(email);
 
-      const match = messages.find((msg) => {
+      // Filter messages to ensure they are addressed to the specific email
+      // and match the other criteria. This is extra defensive against Mailpit
+      // query broadness.
+      const match = allMessages.find((msg) => {
+        const isToRecipient = msg.to.some(
+          (addr) => addr.toLowerCase() === email.toLowerCase()
+        );
+        if (!isToRecipient) return false;
+
         if (criteria.subject && msg.Subject !== criteria.subject) {
           return false;
         }

@@ -24,12 +24,12 @@ export async function compressImage(
   try {
     const compressedFile = await imageCompression(file, options);
     // Ensure the original filename is preserved as the output might be named 'blob'
-    return new File([compressedFile], file.name, {
-      type: compressedFile.type,
+    return new File([compressedFile as Blob], file.name, {
+      type: (compressedFile as Blob).type,
       lastModified: Date.now(),
     });
-  } catch (error) {
-    console.error("Compression failed:", error);
+  } catch (err) {
+    console.error("Compression failed:", err);
     return file; // Fallback to original
   }
 }

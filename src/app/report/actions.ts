@@ -79,6 +79,10 @@ export async function submitPublicIssueAction(
   } = await supabase.auth.getUser();
 
   let reportedBy: string | null = user?.id ?? null;
+  log.info(
+    { reportedBy, email: user?.email, action: "publicIssueReport" },
+    "Resolving reporter for public issue"
+  );
   let reporterName: string | null = null;
   let reporterEmail: string | null = null;
 
@@ -280,6 +284,10 @@ export async function submitPublicIssueAction(
       ? `/report/success?${successParams.toString()}`
       : "/report/success";
 
+    log.info(
+      { reportedBy, target: successUrl },
+      "Redirecting anonymous user to success page"
+    );
     redirect(successUrl);
   } catch (error) {
     if (isRedirectError(error)) {

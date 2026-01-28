@@ -113,12 +113,16 @@ export function getLogger(): pino.Logger {
 }
 
 export const log = {
-  info: (obj: object | string, msg?: string) =>
-    getOrCreateLogger().info(obj, msg),
-  error: (obj: object | string, msg?: string) =>
-    getOrCreateLogger().error(obj, msg),
-  warn: (obj: object | string, msg?: string) =>
-    getOrCreateLogger().warn(obj, msg),
-  debug: (obj: object | string, msg?: string) =>
-    getOrCreateLogger().debug(obj, msg),
+  info: (obj: object | string, msg?: string): void => {
+    getOrCreateLogger().info(obj, msg);
+  },
+  error: (obj: object | string, msg?: string): void => {
+    getOrCreateLogger().error(obj, msg);
+  },
+  warn: (obj: object | string, msg?: string): void => {
+    getOrCreateLogger().warn(obj, msg);
+  },
+  debug: (obj: object | string, msg?: string): void => {
+    getOrCreateLogger().debug(obj, msg);
+  },
 };
