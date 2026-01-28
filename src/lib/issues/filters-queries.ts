@@ -11,6 +11,7 @@ import {
   and,
   exists,
   isNull,
+  sql,
 } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type { Schema } from "~/server/db";
@@ -32,8 +33,10 @@ import type { IssueFilters } from "./filters";
  */
 export function buildWhereConditions(
   filters: IssueFilters,
-  db: PostgresJsDatabase<Schema>
+  db: PostgresJsDatabase<Schema>,
+  options: { isAdmin?: boolean } = {}
 ): SQL[] {
+  const { isAdmin = false } = options;
   const conditions: SQL[] = [];
 
   // Comprehensive search across all relevant text fields
@@ -45,8 +48,11 @@ export function buildWhereConditions(
       ilike(issues.description, search),
       ilike(issues.machineInitials, search),
       ilike(issues.reporterName, search),
-      ilike(issues.reporterEmail, search),
     ];
+
+    if (isAdmin) {
+      searchConditions.push(ilike(issues.reporterEmail, search));
+    }
 
     // Check if the query matches a pattern like "AFM-101" or "AFM 101"
     const issuePatternMatch = /^([a-zA-Z]{1,4})[- ](\d+)$/.exec(
@@ -89,7 +95,7 @@ export function buildWhereConditions(
               eq(userProfiles.id, issues.reportedBy),
               or(
                 ilike(userProfiles.name, search),
-                ilike(userProfiles.email, search)
+                isAdmin ? ilike(userProfiles.email, search) : sql`false`
               )
             )
           )
@@ -107,7 +113,7 @@ export function buildWhereConditions(
               eq(invitedUsers.id, issues.invitedReportedBy),
               or(
                 ilike(invitedUsers.name, search),
-                ilike(invitedUsers.email, search)
+                isAdmin ? ilike(invitedUsers.email, search) : sql`false`
               )
             )
           )
@@ -125,7 +131,7 @@ export function buildWhereConditions(
               eq(userProfiles.id, issues.assignedTo),
               or(
                 ilike(userProfiles.name, search),
-                ilike(userProfiles.email, search)
+                isAdmin ? ilike(userProfiles.email, search) : sql`false`
               )
             )
           )

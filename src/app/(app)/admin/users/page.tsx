@@ -36,7 +36,10 @@ function UserRow({
           </span>
         </div>
       </TableCell>
-      <TableCell className="max-w-[200px] truncate" title={user.email}>
+      <TableCell
+        className="max-w-[200px] truncate"
+        title={user.email ?? undefined}
+      >
         {user.email}
       </TableCell>
       <TableCell className="w-[150px]">
@@ -92,7 +95,7 @@ export default async function AdminUsersPage(): Promise<React.JSX.Element> {
   }
 
   // Fetch all users (active and invited)
-  const users = await getUnifiedUsers();
+  const users = await getUnifiedUsers({ includeEmails: true });
 
   return (
     <div className="space-y-6">

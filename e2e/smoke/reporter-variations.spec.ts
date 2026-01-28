@@ -1,5 +1,6 @@
 import { test, expect, type TestInfo, type Page } from "@playwright/test";
-import { loginAs } from "../support/actions.js";
+import { loginAs, logout } from "../support/actions.js";
+import { TEST_USERS } from "../support/constants.js";
 
 test.describe("Reporter Variations E2E", () => {
   test.beforeEach(async ({ page }: { page: Page }, testInfo: TestInfo) => {
@@ -16,7 +17,7 @@ test.describe("Reporter Variations E2E", () => {
 
     // Check for member name and email in the reporter section
     await expect(sidebar).toContainText("Member User");
-    await expect(sidebar).toContainText("member@test.com");
+    await expect(sidebar).not.toContainText("member@test.com");
 
     // Check timeline initial report
     await expect(
@@ -34,7 +35,7 @@ test.describe("Reporter Variations E2E", () => {
     const sidebar = page.getByTestId("issue-sidebar");
 
     await expect(sidebar).toContainText("John Guest");
-    await expect(sidebar).toContainText("john@guest.com");
+    await expect(sidebar).not.toContainText("john@guest.com");
   });
 
   test("should display guest with name only correctly", async ({ page }) => {
@@ -51,7 +52,7 @@ test.describe("Reporter Variations E2E", () => {
     const sidebar = page.getByTestId("issue-sidebar");
 
     await expect(sidebar).toContainText("Anonymous");
-    await expect(sidebar).toContainText("only@email.com");
+    await expect(sidebar).not.toContainText("only@email.com");
   });
 
   test("should display fully anonymous reporter correctly", async ({
@@ -72,9 +73,30 @@ test.describe("Reporter Variations E2E", () => {
     const sidebar = page.getByTestId("issue-sidebar");
 
     await expect(sidebar).toContainText("Jane Doe");
-    await expect(sidebar).toContainText("jane.doe@example.com");
+    await expect(sidebar).not.toContainText("jane.doe@example.com");
     await expect(
       page.getByTestId("timeline-author-name").filter({ hasText: "Jane Doe" })
     ).toBeVisible();
+  });
+
+  test("should display emails for administrators", async ({
+    page,
+  }, testInfo) => {
+    // Log out first to switch to admin
+    await logout(page);
+
+    // Log in as admin
+    await loginAs(page, testInfo, {
+      email: TEST_USERS.admin.email,
+      password: TEST_USERS.admin.password,
+    });
+
+    // AFM Issue 1 is reportedBy member@test.com
+    await page.goto("/m/AFM/i/1");
+    const sidebar = page.getByTestId("issue-sidebar");
+
+    // Admins SHOULD see emails
+    await expect(sidebar).toContainText("Member User");
+    await expect(sidebar).toContainText("member@test.com");
   });
 });

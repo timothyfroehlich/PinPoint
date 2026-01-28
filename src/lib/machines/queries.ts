@@ -5,20 +5,22 @@ import {
   userProfiles,
   invitedUsers,
 } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { MachineOwner } from "~/lib/types";
 
 export async function getMachineOwner(
-  machineId: string
+  machineId: string,
+  options: { includeEmail?: boolean } = {}
 ): Promise<MachineOwner | null> {
+  const { includeEmail = false } = options;
   const result = await db
     .select({
       ownerId: machines.ownerId,
       ownerName: userProfiles.name,
-      ownerEmail: authUsers.email,
+      ownerEmail: includeEmail ? authUsers.email : sql<null>`null`,
       invitedOwnerId: machines.invitedOwnerId,
       invitedOwnerName: invitedUsers.name,
-      invitedOwnerEmail: invitedUsers.email,
+      invitedOwnerEmail: includeEmail ? invitedUsers.email : sql<null>`null`,
     })
     .from(machines)
     .leftJoin(userProfiles, eq(machines.ownerId, userProfiles.id))

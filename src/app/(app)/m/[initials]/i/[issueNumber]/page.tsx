@@ -51,9 +51,7 @@ export default async function IssueDetailPage({
     columns: { role: true },
   });
 
-  const isMemberOrAdmin =
-    currentUserProfile?.role === "member" ||
-    currentUserProfile?.role === "admin";
+  const isAdmin = currentUserProfile?.role === "admin";
 
   // CORE-PERF-003: Execute independent queries in parallel to avoid waterfall
   const [issue, allUsers] = await Promise.all([
@@ -89,21 +87,21 @@ export default async function IssueDetailPage({
           columns: {
             id: true,
             name: true,
-            email: true,
+            ...(isAdmin && { email: true }),
           },
         },
         invitedReporter: {
           columns: {
             id: true,
             name: true,
-            email: true,
+            ...(isAdmin && { email: true }),
           },
         },
         assignedToUser: {
           columns: {
             id: true,
             name: true,
-            ...(isMemberOrAdmin && { email: true }),
+            ...(isAdmin && { email: true }),
           },
         },
         comments: {
@@ -115,6 +113,7 @@ export default async function IssueDetailPage({
               columns: {
                 id: true,
                 name: true,
+                ...(isAdmin && { email: true }),
               },
             },
             images: {
@@ -142,7 +141,7 @@ export default async function IssueDetailPage({
         issueNumber: true,
         machineInitials: true,
         reporterName: true,
-        reporterEmail: true,
+        ...(isAdmin && { reporterEmail: true }),
       },
     }),
     // Fetch all members/admins for assignment dropdown (Restrict to actual users)
@@ -150,7 +149,7 @@ export default async function IssueDetailPage({
       .select({
         id: userProfiles.id,
         name: userProfiles.name,
-        email: isMemberOrAdmin
+        email: isAdmin
           ? sql<string | null>`COALESCE(${authUsers.email}, null)`
           : sql<null>`null`,
       })
