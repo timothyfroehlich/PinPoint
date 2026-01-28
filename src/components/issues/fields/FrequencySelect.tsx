@@ -8,32 +8,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { CONSISTENCY_CONFIG } from "~/lib/issues/status";
-import { type IssueConsistency } from "~/lib/types";
+import { FREQUENCY_CONFIG } from "~/lib/issues/status";
+import { type IssueFrequency } from "~/lib/types";
 
-interface ConsistencySelectProps {
-  value: IssueConsistency | "";
-  onValueChange: (value: IssueConsistency) => void;
+interface FrequencySelectProps {
+  value: IssueFrequency | "";
+  onValueChange: (value: IssueFrequency) => void;
   disabled?: boolean;
   name?: string;
   placeholder?: string;
   testId?: string;
 }
 
-const consistencyOptions: IssueConsistency[] = [
+const frequencyOptions: IssueFrequency[] = [
   "intermittent",
   "frequent",
   "constant",
 ];
 
-export function ConsistencySelect({
+export function FrequencySelect({
   value,
   onValueChange,
   disabled = false,
-  name = "consistency",
-  placeholder = "Select consistency...",
-  testId = "issue-consistency-select",
-}: ConsistencySelectProps): React.JSX.Element {
+  name = "frequency",
+  placeholder = "Select frequency...",
+  testId = "issue-frequency-select",
+}: FrequencySelectProps): React.JSX.Element {
   return (
     <Select
       value={value}
@@ -45,15 +45,15 @@ export function ConsistencySelect({
         className="w-full border-outline-variant bg-surface text-on-surface"
         aria-label={
           value
-            ? `Consistency: ${CONSISTENCY_CONFIG[value].label}`
-            : "Select Consistency"
+            ? `Frequency: ${FREQUENCY_CONFIG[value].label}`
+            : "Select Frequency"
         }
         data-testid={testId}
       >
         <SelectValue placeholder={placeholder}>
           {value &&
             (() => {
-              const config = CONSISTENCY_CONFIG[value];
+              const config = FREQUENCY_CONFIG[value];
               const Icon = config.icon;
               return (
                 <div className="flex items-center gap-2">
@@ -65,14 +65,14 @@ export function ConsistencySelect({
         </SelectValue>
       </SelectTrigger>
       <SelectContent>
-        {consistencyOptions.map((consistency) => {
-          const config = CONSISTENCY_CONFIG[consistency];
+        {frequencyOptions.map((frequency) => {
+          const config = FREQUENCY_CONFIG[frequency];
           const Icon = config.icon;
           return (
             <SelectItem
-              key={consistency}
-              value={consistency}
-              data-testid={`consistency-option-${consistency}`}
+              key={frequency}
+              value={frequency}
+              data-testid={`frequency-option-${frequency}`}
             >
               <Icon className={`size-4 ${config.iconColor}`} />
               <span>{config.label}</span>

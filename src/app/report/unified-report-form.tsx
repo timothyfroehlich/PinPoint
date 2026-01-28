@@ -16,13 +16,9 @@ import { UserCheck } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { submitPublicIssueAction } from "./actions";
 import { SeveritySelect } from "~/components/issues/fields/SeveritySelect";
-import { ConsistencySelect } from "~/components/issues/fields/ConsistencySelect";
+import { FrequencySelect } from "~/components/issues/fields/FrequencySelect";
 import { PrioritySelect } from "~/components/issues/fields/PrioritySelect";
-import type {
-  IssueSeverity,
-  IssueConsistency,
-  IssuePriority,
-} from "~/lib/types";
+import type { IssueSeverity, IssueFrequency, IssuePriority } from "~/lib/types";
 import { ImageUploadButton } from "~/components/images/ImageUploadButton";
 import { ImageGallery } from "~/components/images/ImageGallery";
 import { type ImageMetadata } from "~/types/images";
@@ -75,7 +71,7 @@ export function UnifiedReportForm({
   const [description, setDescription] = useState("");
   const [severity, setSeverity] = useState<IssueSeverity | "">("");
   const [priority, setPriority] = useState<IssuePriority | "">("");
-  const [consistency, setConsistency] = useState<IssueConsistency | "">("");
+  const [frequency, setFrequency] = useState<IssueFrequency | "">("");
 
   const [uploadedImages, setUploadedImages] = useState<ImageMetadata[]>([]);
 
@@ -102,7 +98,7 @@ export function UnifiedReportForm({
           description: string;
           severity: IssueSeverity | "";
           priority: IssuePriority | "";
-          consistency: IssueConsistency | "";
+          frequency: IssueFrequency | "";
         }>;
 
         // Only restore machineId if not provided via prop or URL already
@@ -122,7 +118,7 @@ export function UnifiedReportForm({
         if (parsed.description) setDescription(parsed.description);
         if (parsed.severity) setSeverity(parsed.severity);
         if (parsed.priority) setPriority(parsed.priority);
-        if (parsed.consistency) setConsistency(parsed.consistency);
+        if (parsed.frequency) setFrequency(parsed.frequency);
       } catch {
         // Clear corrupted localStorage
         window.localStorage.removeItem("report_form_state");
@@ -139,13 +135,13 @@ export function UnifiedReportForm({
       description,
       severity,
       priority,
-      consistency,
+      frequency,
     };
     window.localStorage.setItem(
       "report_form_state",
       JSON.stringify(stateToSave)
     );
-  }, [selectedMachineId, title, description, severity, priority, consistency]);
+  }, [selectedMachineId, title, description, severity, priority, frequency]);
 
   // Cleanup: Clear storage on success (handled by redirect usually, but good for robust logic if no redirect)
   // Actually, review says: "cleanup effect will never execute because action redirects".
@@ -279,17 +275,14 @@ export function UnifiedReportForm({
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="consistency" className="text-on-surface">
-                      Consistency *
+                    <Label htmlFor="frequency" className="text-on-surface">
+                      Frequency *
                     </Label>
-                    <input
-                      type="hidden"
-                      name="consistency"
-                      value={consistency}
-                    />
-                    <ConsistencySelect
-                      value={consistency}
-                      onValueChange={setConsistency}
+                    <input type="hidden" name="frequency" value={frequency} />
+                    <FrequencySelect
+                      value={frequency}
+                      onValueChange={setFrequency}
+                      testId="issue-frequency-select"
                     />
                   </div>
 

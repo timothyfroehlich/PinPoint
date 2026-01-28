@@ -2,7 +2,7 @@ import type {
   IssueStatus,
   IssueSeverity,
   IssuePriority,
-  IssueConsistency,
+  IssueFrequency,
 } from "~/lib/types";
 import { ALL_ISSUE_STATUSES } from "~/lib/issues/status";
 
@@ -18,7 +18,7 @@ export interface IssueFilters {
   assignee?: string[] | undefined;
   owner?: string[] | undefined;
   reporter?: string[] | undefined;
-  consistency?: IssueConsistency[] | undefined;
+  frequency?: IssueFrequency[] | undefined;
   watching?: boolean | undefined;
   createdFrom?: Date | undefined;
   createdTo?: Date | undefined;
@@ -37,7 +37,7 @@ const VALID_SEVERITIES: IssueSeverity[] = [
   "unplayable",
 ];
 const VALID_PRIORITIES: IssuePriority[] = ["low", "medium", "high"];
-const VALID_CONSISTENCIES: IssueConsistency[] = [
+const VALID_FREQUENCIES: IssueFrequency[] = [
   "intermittent",
   "frequent",
   "constant",
@@ -88,11 +88,8 @@ export function parseIssueFilters(params: URLSearchParams): IssueFilters {
   const reporter = params.get("reporter")?.split(",");
   if (reporter) filters.reporter = reporter;
 
-  const consistency = parseCommaList(
-    params.get("consistency"),
-    VALID_CONSISTENCIES
-  );
-  if (consistency) filters.consistency = consistency;
+  const frequency = parseCommaList(params.get("frequency"), VALID_FREQUENCIES);
+  if (frequency) filters.frequency = frequency;
 
   filters.sort = params.get("sort") ?? "updated_desc";
   const p = parseInt(params.get("page") ?? "1", 10);
@@ -144,7 +141,7 @@ export function hasActiveIssueFilters(params: URLSearchParams): boolean {
     "assignee",
     "owner",
     "reporter",
-    "consistency",
+    "frequency",
     "watching",
     "created_from",
     "created_to",

@@ -164,6 +164,6 @@ See [src/lib/issues/status.ts](file:///home/froeht/Code/PinPoint/src/lib/issues/
 - `IssueStatus` (11 values, 3 groups)
 - `IssueSeverity` (4 values)
 - `IssuePriority` (3 values)
-- `IssueConsistency` (3 values)
+- `IssueFrequency` (3 values)
 
 All with labels, descriptions, Tailwind styles, and Lucide icons.

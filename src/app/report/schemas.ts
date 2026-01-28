@@ -20,8 +20,8 @@ export const publicIssueSchema = z.object({
       message: "Select a priority",
     })
     .optional(),
-  consistency: z.enum(["intermittent", "frequent", "constant"], {
-    message: "Select consistency",
+  frequency: z.enum(["intermittent", "frequent", "constant"], {
+    message: "Select frequency",
   }),
   firstName: z.string().trim().max(100, "First name too long").optional(),
   lastName: z.string().trim().max(100, "Last name too long").optional(),

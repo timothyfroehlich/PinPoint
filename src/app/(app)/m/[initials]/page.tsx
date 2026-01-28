@@ -77,7 +77,7 @@ export default async function MachineDetailPage({
             status: true,
             severity: true,
             priority: true,
-            consistency: true,
+            frequency: true,
             machineInitials: true,
             createdAt: true,
           },
