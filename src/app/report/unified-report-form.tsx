@@ -239,7 +239,7 @@ export function UnifiedReportForm({
                     id="title"
                     name="title"
                     required
-                    maxLength={200}
+                    maxLength={100}
                     placeholder="e.g., Left flipper not responding"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
