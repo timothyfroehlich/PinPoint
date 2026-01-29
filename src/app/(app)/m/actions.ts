@@ -93,6 +93,15 @@ export async function createMachineAction(
     return err("UNAUTHORIZED", "User profile not found.");
   }
 
+  // Access control: only admins can create machines
+  if (profile.role !== "admin") {
+    log.warn(
+      { userId: user.id, action: "createMachineAction" },
+      "Non-admin user attempted to create a machine"
+    );
+    return err("UNAUTHORIZED", "You must be an admin to create a machine.");
+  }
+
   // Extract form data
   const rawData = {
     name: formData.get("name"),
@@ -117,7 +126,9 @@ export async function createMachineAction(
   let finalOwnerId: string | undefined = undefined;
   let finalInvitedOwnerId: string | undefined = undefined;
 
-  if (profile.role === "admin" && ownerId) {
+  // At this point, user is guaranteed to be an admin.
+  // If an owner is specified, we resolve them. Otherwise, the admin is the owner.
+  if (ownerId) {
     const isActive = await db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, ownerId),
     });

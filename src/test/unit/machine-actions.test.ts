@@ -95,7 +95,7 @@ describe("createMachineAction", () => {
   it("should successfully create a machine", async () => {
     // Mock profile found
     vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
-      role: "member",
+      role: "admin",
     } as any);
 
     // Mock successful insert
