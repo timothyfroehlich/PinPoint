@@ -27,6 +27,7 @@ import { buildMachineReportUrl } from "~/lib/machines/report-url";
 import { generateQrPngDataUrl } from "~/lib/machines/qr";
 import { IssueCard } from "~/components/issues/IssueCard";
 import { WatchMachineButton } from "~/components/machines/WatchMachineButton";
+import { MachineEmptyState } from "~/components/machines/MachineEmptyState";
 
 /**
  * Machine Detail Page (Protected Route)
@@ -314,17 +315,7 @@ export default async function MachineDetailPage({
               </CardHeader>
               <CardContent>
                 {openIssues.length === 0 ? (
-                  <div className="py-16 text-center">
-                    <div className="inline-flex size-12 items-center justify-center rounded-full bg-surface-variant mb-4">
-                      <Plus className="size-6 text-on-surface-variant" />
-                    </div>
-                    <p className="text-lg font-medium text-on-surface mb-1">
-                      No open issues
-                    </p>
-                    <p className="text-sm text-on-surface-variant">
-                      The game is operational. Great job!
-                    </p>
-                  </div>
+                  <MachineEmptyState machineInitials={machine.initials} />
                 ) : (
                   <div className="space-y-3">
                     {openIssues.slice(0, 50).map((issue) => (
