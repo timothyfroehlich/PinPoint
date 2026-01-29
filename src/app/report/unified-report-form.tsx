@@ -89,6 +89,13 @@ export function UnifiedReportForm({
   useEffect(() => {
     if (typeof window === "undefined" || hasRestored.current) return;
     hasRestored.current = true;
+
+    // If a specific machine is requested via URL, treat as a new report and clear any draft
+    if (defaultMachineId) {
+      window.localStorage.removeItem("report_form_state");
+      return;
+    }
+
     const saved = window.localStorage.getItem("report_form_state");
     if (saved) {
       try {
@@ -182,7 +189,13 @@ export function UnifiedReportForm({
                 </div>
               )}
 
-              <form action={formAction} className="space-y-4">
+              <form
+                action={(formData) => {
+                  window.localStorage.removeItem("report_form_state");
+                  formAction(formData);
+                }}
+                className="space-y-4"
+              >
                 {/* Honeypot field for bot detection */}
                 <input
                   type="text"
