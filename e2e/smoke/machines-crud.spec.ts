@@ -7,7 +7,7 @@
 import { test, expect } from "@playwright/test";
 import { ensureLoggedIn } from "../support/actions";
 import { cleanupTestEntities } from "../support/cleanup";
-import { seededMachines } from "../support/constants";
+import { seededMachines, TEST_USERS } from "../support/constants";
 
 const createdMachineIds = new Set<string>();
 
@@ -15,8 +15,12 @@ test.describe("Machines CRUD", () => {
   test.describe.configure({ mode: "serial" });
 
   // Login before each test (required for protected routes)
+  // Use admin user since machine creation is admin-only
   test.beforeEach(async ({ page }, testInfo) => {
-    await ensureLoggedIn(page, testInfo);
+    await ensureLoggedIn(page, testInfo, {
+      email: TEST_USERS.admin.email,
+      password: TEST_USERS.admin.password,
+    });
   });
 
   test.afterEach(async ({ request }) => {
