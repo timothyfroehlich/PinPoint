@@ -1,0 +1,25 @@
+# yamllint configuration for GitHub Actions workflows
+extends: default
+
+rules:
+  # GitHub Actions workflows often have long lines due to nested structure
+  line-length:
+    max: 120
+    level: warning
+
+  # Document start is optional for GitHub Actions
+  document-start:
+    present: false
+
+  # Allow yes/no in addition to true/false (GitHub Actions convention)
+  truthy:
+    allowed-values: ['true', 'false', 'yes', 'no', 'on', 'off']
+    check-keys: false
+
+  # Allow trailing spaces (some editors add them)
+  trailing-spaces:
+    level: warning
+
+  # Comments can be indented
+  comments-indentation:
+    level: warning

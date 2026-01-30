@@ -143,10 +143,25 @@ jobs:
       - name: Check formatting
         run: pnpm run format
 
+  yamllint:
+    name: YAML Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install yamllint
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y yamllint
+
+      - name: Run yamllint
+        run: yamllint .github/workflows/
+
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [setup, typecheck, lint, format, test-unit, test-integration]
+    needs: [setup, typecheck, lint, format, yamllint, test-unit, test-integration]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -324,7 +339,7 @@ jobs:
     name: Supabase Integration Tests
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' }}
-    needs: [setup, typecheck, lint, format, test-unit, test-integration, test-migrations]
+    needs: [setup, typecheck, lint, format, yamllint, test-unit, test-integration, test-migrations]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -374,7 +389,7 @@ jobs:
     name: E2E Smoke Tests (Chromium)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' }}
-    needs: [setup, typecheck, lint, format, test-unit, test-integration, test-migrations]
+    needs: [setup, typecheck, lint, format, yamllint, test-unit, test-integration, test-migrations]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -443,6 +458,85 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
+  test-e2e-smoke-mobile-chrome:
+    # ==============================================================================
+    # E2E Smoke Tests (Mobile Chrome)
+    #
+    # Runs smoke tests with Mobile Chrome browser to catch mobile-specific issues.
+    # ==============================================================================
+    name: E2E Smoke Tests (Mobile Chrome)
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' }}
+    needs: [setup, typecheck, lint, format, yamllint, test-unit, test-integration, test-migrations]
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Restore node_modules
+        id: cache-restore
+        uses: actions/cache/restore@v5
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install dependencies (if cache miss)
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Generate config.toml from template
+        run: cp supabase/config.toml.template supabase/config.toml
+
+      - name: Make E2E script executable
+        run: chmod +x ./scripts/supabase-init-for-tests.sh
+
+      - name: Initialize Supabase
+        run: ./scripts/supabase-init-for-tests.sh
+
+      - name: Run Smoke Tests (Mobile Chrome)
+        env:
+          MOCK_BLOB_STORAGE: "true"
+          PLAYWRIGHT_STDOUT: "pipe"
+          PLAYWRIGHT_STDERR: "pipe"
+        run: pnpm exec playwright test e2e/smoke --project="Mobile Chrome" --reporter=dot
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: playwright-report-smoke-mobile-chrome
+          path: playwright-report/
+          retention-days: 7
+
   test-e2e-full-chromium:
     # ==============================================================================
     # E2E Full Tests (Chromium)
@@ -452,7 +546,7 @@ jobs:
     name: E2E Full Tests (Chromium)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' }}
-    needs: [setup, typecheck, lint, format, test-unit, test-integration, test-migrations]
+    needs: [setup, typecheck, lint, format, yamllint, test-unit, test-integration, test-migrations]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -530,7 +624,7 @@ jobs:
     name: E2E Full Tests (Mobile Chrome)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' }}
-    needs: [setup, typecheck, lint, format, test-unit, test-integration, test-migrations]
+    needs: [setup, typecheck, lint, format, yamllint, test-unit, test-integration, test-migrations]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -608,7 +702,7 @@ jobs:
     name: E2E Full Tests (Mobile Safari)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' }}
-    needs: [setup, typecheck, lint, format, test-unit, test-integration, test-migrations]
+    needs: [setup, typecheck, lint, format, yamllint, test-unit, test-integration, test-migrations]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
