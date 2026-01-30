@@ -1,0 +1,30 @@
+{
+  "comments": [
+    {
+      "id": "IC_kwDOPB_pGs7jyOQS",
+      "author": { "login": "vercel" },
+      "authorAssociation": "NONE",
+      "body": "[vc]: #4ZgftuzSD8s8YuMHOTZQNY62mqdk3XlMtLgzRy5NJj4=:eyJpc01vbm9yZXBvIjp0cnVlLCJ0eXBlIjoiZ2l0aHViIiwicHJvamVjdHMiOlt7Im5hbWUiOiJwaW4tcG9pbnQiLCJwcm9qZWN0SWQiOiJwcmpfMUFrYWd4eXNmcU5iOWFQNEFIczh5dmc5RHZJdiIsInYwIjpmYWxzZSwiaW5zcGVjdG9yVXJsIjoiaHR0cHM6Ly92ZXJjZWwuY29tL2FkdmFjYXIvcGluLXBvaW50LzQ0YnpDM0RCaXE5Q0ZtZ2lrZkdqeUUxUUhkRkMiLCJwcmV2aWV3VXJsIjoicGluLXBvaW50LWdpdC1mZWF0dXJlLTg0MS1tYWNoaW5lLWZpbHRlcmluZy1zb3J0aW5nLWFkdmFjYXIudmVyY2VsLmFwcCIsIm5leHRDb21taXRTdGF0dXMiOiJERVBMT1lFRCIsImxpdmVGZWVkYmFjayI6eyJyZXNvbHZlZCI6MCwidW5yZXNvbHZlZCI6MCwidG90YWwiOjAsImxpbmsiOiJwaW4tcG9pbnQtZ2l0LWZlYXR1cmUtODQxLW1hY2hpbmUtZmlsdGVyaW5nLXNvcnRpbmctYWR2YWNhci52ZXJjZWwuYXBwIn0sInJvb3REaXJlY3RvcnkiOm51bGx9XX0=\nThe latest updates on your projects. Learn more about [Vercel for GitHub](https://vercel.link/github-learn-more).\n\n| Project | Deployment | Actions | Updated (UTC) |\n| :--- | :----- | :------ | :------ |\n| [pin-point](https://vercel.com/advacar/pin-point) | ![Ready](https://vercel.com/static/status/ready.svg) [Ready](https://vercel.com/advacar/pin-point/44bzC3DBiq9CFmgikfGjyE1QHdFC) | [Preview](https://pin-point-git-feature-841-machine-filtering-sorting-advacar.vercel.app), [Comment](https://vercel.live/open-feedback/pin-point-git-feature-841-machine-filtering-sorting-advacar.vercel.app?via=pr-comment-feedback-link) | Jan 30, 2026 3:28am |\n\n",
+      "createdAt": "2026-01-30T03:21:52Z",
+      "includesCreatedEdit": true,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/timothyfroehlich/PinPoint/pull/881#issuecomment-3821593618",
+      "viewerDidAuthor": false
+    }
+  ],
+  "reviews": [
+    {
+      "id": "PRR_kwDOPB_pGs7eGGBW",
+      "author": { "login": "copilot-pull-request-reviewer" },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "## Pull request overview\n\nThis PR implements comprehensive filtering and sorting capabilities for the Machines list page, following a hybrid server-side approach with in-memory filtering. The implementation generalizes the existing `useSearchFilters` hook to support both Issues and Machines with type safety.\n\n**Changes:**\n- Adds search by machine name or initials with exact match priority for initials\n- Adds multi-select filters for machine status (operational, needs_service, unplayable) and owner\n- Adds 8 sort options including name, status, open issues count, and date added\n- Generalizes the `useSearchFilters` hook to work with both IssueFilters and MachineFilters using TypeScript generics\n\n### Reviewed changes\n\nCopilot reviewed 9 out of 9 changed files in this pull request and generated 3 comments.\n\n<details>\n<summary>Show a summary per file</summary>\n\n| File | Description |\r\n| ---- | ----------- |\r\n| `src/lib/machines/filters.ts` | Defines MachineStatus type, MachineFilters interface, and URL parameter parsing logic |\r\n| `src/lib/machines/filters-queries.ts` | Implements in-memory filtering and sorting functions for machine lists |\r\n| `src/hooks/use-search-filters.ts` | Generalizes hook to support both IssueFilters and MachineFilters with type-safe generic implementation |\r\n| `src/components/machines/MachineFilters.tsx` | Client component providing search bar, filter dropdowns, and sort controls |\r\n| `src/app/(app)/m/page.tsx` | Integrates filtering/sorting into machines page with server-side data fetching and client-side filter UI |\r\n| `src/test/unit/lib/machines/filters.test.ts` | Unit tests for filter parsing including edge cases and validation |\r\n| `src/test/unit/lib/machines/filters-queries.test.ts` | Unit tests for filter application and sorting logic |\r\n| `e2e/machines-filtering.spec.ts` | E2E tests covering search, filter, and sort user interactions |\r\n| `docs/plans/2026-01-29-machine-filtering-sorting-design.md` | Comprehensive design document explaining architecture, rationale, and implementation approach |\n</details>\n\n\n\n\n",
+      "submittedAt": "2026-01-30T03:26:56Z",
+      "includesCreatedEdit": false,
+      "reactionGroups": [],
+      "state": "COMMENTED",
+      "commit": { "oid": "c5090748b9019d39809fc4d184e51887e8a8d421" }
+    }
+  ]
+}

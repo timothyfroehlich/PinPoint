@@ -3,34 +3,34 @@
 import { useRouter, usePathname } from "next/navigation";
 import { useCallback, useRef, useEffect } from "react";
 import type { IssueFilters } from "~/lib/issues/filters";
+import type { MachineFilters } from "~/lib/machines/filters";
 import { storeLastIssuesPath } from "~/hooks/use-issue-link";
+
+type GenericFilters = IssueFilters | MachineFilters;
 
 interface UseSearchFiltersOptions {
   resetPagination?: boolean;
 }
 
-interface UseSearchFiltersReturn {
-  pushFilters: (
-    updates: Partial<IssueFilters>,
-    options?: UseSearchFiltersOptions
-  ) => void;
+interface UseSearchFiltersReturn<T extends GenericFilters> {
+  pushFilters: (updates: Partial<T>, options?: UseSearchFiltersOptions) => void;
   setSort: (sort: string) => void;
   setPage: (page: number) => void;
   setPageSize: (pageSize: number) => void;
 }
 
 /**
- * Hook for managing issue filter state in URL search params
+ * Hook for managing filter state in URL search params
  *
  * Provides utilities for updating filters, sorting, and pagination
  * while preserving other URL parameters.
  *
- * @param filters - Current filter state (from parseIssueFilters)
+ * @param filters - Current filter state
  * @returns Object with filter update functions
  */
-export function useSearchFilters(
-  filters: IssueFilters
-): UseSearchFiltersReturn {
+export function useSearchFilters<T extends GenericFilters>(
+  filters: T
+): UseSearchFiltersReturn<T> {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -51,23 +51,22 @@ export function useSearchFilters(
    * @param options.resetPagination - Reset to page 1 (default: false)
    */
   const pushFilters = useCallback(
-    (
-      updates: Partial<IssueFilters>,
-      options: UseSearchFiltersOptions = {}
-    ): void => {
+    (updates: Partial<T>, options: UseSearchFiltersOptions = {}): void => {
       const params = new URLSearchParams();
       const currentFilters = filtersRef.current;
-      const merged = { ...currentFilters, ...updates };
+      const merged = { ...currentFilters, ...updates } as T;
 
       // Apply pagination reset if requested
-      if (options.resetPagination) {
-        merged.page = 1;
+      if (options.resetPagination && "page" in merged) {
+        // We know page exists because of the in check, but Partial<T> doesn't guarantee it's writable
+        // for these specific types, so we use a safe type assertion for internal hook logic
+        (merged as T & { page: number }).page = 1;
       }
 
-      // Search query
+      // 1. Common Filters
       if (merged.q) params.set("q", merged.q);
 
-      // Status (special handling for empty array = show all)
+      // Status handling (common but with different types)
       if (merged.status) {
         if (merged.status.length > 0) {
           params.set("status", merged.status.join(","));
@@ -76,43 +75,83 @@ export function useSearchFilters(
         }
       }
 
-      // Multi-select filters
-      if (merged.machine && merged.machine.length > 0)
-        params.set("machine", merged.machine.join(","));
-      if (merged.severity && merged.severity.length > 0)
-        params.set("severity", merged.severity.join(","));
-      if (merged.priority && merged.priority.length > 0)
-        params.set("priority", merged.priority.join(","));
-      if (merged.assignee && merged.assignee.length > 0)
-        params.set("assignee", merged.assignee.join(","));
+      // Owner handling (common)
       if (merged.owner && merged.owner.length > 0)
         params.set("owner", merged.owner.join(","));
-      if (merged.reporter && merged.reporter.length > 0)
+
+      // 2. Issue-specific Filters
+      if (
+        "machine" in merged &&
+        Array.isArray(merged.machine) &&
+        merged.machine.length > 0
+      )
+        params.set("machine", merged.machine.join(","));
+      if (
+        "severity" in merged &&
+        Array.isArray(merged.severity) &&
+        merged.severity.length > 0
+      )
+        params.set("severity", merged.severity.join(","));
+      if (
+        "priority" in merged &&
+        Array.isArray(merged.priority) &&
+        merged.priority.length > 0
+      )
+        params.set("priority", merged.priority.join(","));
+      if (
+        "assignee" in merged &&
+        Array.isArray(merged.assignee) &&
+        merged.assignee.length > 0
+      )
+        params.set("assignee", merged.assignee.join(","));
+      if (
+        "reporter" in merged &&
+        Array.isArray(merged.reporter) &&
+        merged.reporter.length > 0
+      )
         params.set("reporter", merged.reporter.join(","));
-      if (merged.frequency && merged.frequency.length > 0)
+      if (
+        "frequency" in merged &&
+        Array.isArray(merged.frequency) &&
+        merged.frequency.length > 0
+      )
         params.set("frequency", merged.frequency.join(","));
 
       // Boolean filters
-      if (merged.watching) params.set("watching", "true");
+      if ("watching" in merged && merged.watching)
+        params.set("watching", "true");
 
       // Date range filters
-      if (merged.createdFrom)
+      if ("createdFrom" in merged && merged.createdFrom instanceof Date)
         params.set("created_from", merged.createdFrom.toISOString());
-      if (merged.createdTo)
+      if ("createdTo" in merged && merged.createdTo instanceof Date)
         params.set("created_to", merged.createdTo.toISOString());
-      if (merged.updatedFrom)
+      if ("updatedFrom" in merged && merged.updatedFrom instanceof Date)
         params.set("updated_from", merged.updatedFrom.toISOString());
-      if (merged.updatedTo)
+      if ("updatedTo" in merged && merged.updatedTo instanceof Date)
         params.set("updated_to", merged.updatedTo.toISOString());
 
-      // Sorting (omit default)
-      if (merged.sort && merged.sort !== "updated_desc")
-        params.set("sort", merged.sort);
+      // 3. Sorting (common field, different defaults)
+      if (merged.sort) {
+        const isIssue = "machine" in merged;
+        const defaultSort = isIssue ? "updated_desc" : "name_asc";
+        if (merged.sort !== defaultSort) {
+          params.set("sort", merged.sort);
+        }
+      }
 
-      // Pagination (omit defaults)
-      if (merged.page && merged.page > 1)
+      // 4. Pagination
+      if (
+        "page" in merged &&
+        typeof merged.page === "number" &&
+        merged.page > 1
+      )
         params.set("page", merged.page.toString());
-      if (merged.pageSize && merged.pageSize !== 15)
+      if (
+        "pageSize" in merged &&
+        typeof merged.pageSize === "number" &&
+        merged.pageSize !== 15
+      )
         params.set("page_size", merged.pageSize.toString());
 
       const newPath = `${pathname}?${params.toString()}`;
@@ -129,7 +168,7 @@ export function useSearchFilters(
    */
   const setSort = useCallback(
     (newSort: string): void => {
-      pushFilters({ sort: newSort, page: 1 });
+      pushFilters({ sort: newSort, page: 1 } as Partial<T>);
     },
     [pushFilters]
   );
@@ -139,7 +178,7 @@ export function useSearchFilters(
    */
   const setPageSize = useCallback(
     (size: number): void => {
-      pushFilters({ pageSize: size, page: 1 });
+      pushFilters({ pageSize: size, page: 1 } as Partial<T>);
     },
     [pushFilters]
   );
@@ -149,7 +188,7 @@ export function useSearchFilters(
    */
   const setPage = useCallback(
     (newPage: number): void => {
-      pushFilters({ page: newPage });
+      pushFilters({ page: newPage } as Partial<T>);
     },
     [pushFilters]
   );
