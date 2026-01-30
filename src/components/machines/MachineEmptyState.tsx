@@ -1,3 +1,4 @@
+import type React from "react";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 
@@ -5,7 +6,9 @@ interface MachineEmptyStateProps {
   machineInitials: string;
 }
 
-export function MachineEmptyState({ machineInitials }: MachineEmptyStateProps) {
+export function MachineEmptyState({
+  machineInitials,
+}: MachineEmptyStateProps): React.JSX.Element {
   return (
     <div className="py-16 text-center">
       <Link
