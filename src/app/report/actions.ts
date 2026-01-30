@@ -70,6 +70,7 @@ export async function submitPublicIssueAction(
     lastName,
     priority,
     frequency,
+    assignedTo,
   } = parsedValue.data;
 
   // 3. Resolve reporter
@@ -126,6 +127,7 @@ export async function submitPublicIssueAction(
 
   // Enforce priority for non-members
   let finalPriority = priority;
+  let finalAssignedTo: string | null | undefined = undefined;
   let isMemberOrAdmin = false;
 
   if (reportedBy) {
@@ -141,7 +143,9 @@ export async function submitPublicIssueAction(
     }
   }
 
-  if (!isMemberOrAdmin) {
+  if (isMemberOrAdmin) {
+    finalAssignedTo = assignedTo;
+  } else {
     // Force medium for guests/anonymous
     finalPriority = "medium";
   }
@@ -153,6 +157,7 @@ export async function submitPublicIssueAction(
       reporterName,
       reporterEmail,
       finalPriority,
+      finalAssignedTo,
       isMemberOrAdmin,
     },
     "Submitting unified issue report..."
@@ -168,6 +173,7 @@ export async function submitPublicIssueAction(
       reportedBy,
       reporterName,
       reporterEmail,
+      assignedTo: finalAssignedTo,
     });
 
     // 5. Link uploaded images
