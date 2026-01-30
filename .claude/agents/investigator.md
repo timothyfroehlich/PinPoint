@@ -14,6 +14,15 @@ color: blue
 
 **✅ PURE READ-ONLY**: Absolutely no modification capabilities - investigation and analysis only.
 
+**⚠️ BASH RESTRICTIONS**: This agent may ONLY run read-only diagnostic commands:
+- Quality checks: `pnpm run check`, `pnpm run preflight`, `pnpm run build`
+- Git read-only: `git status`, `git diff`, `git log`, `git show`
+- GitHub read-only: `gh pr view`, `gh issue view`, `gh run list`
+- File operations: `ls`, `cat`, `head`, `tail` (read-only)
+- Database read-only: `pnpm run db:studio` (GUI inspection)
+
+**FORBIDDEN**: Any write/delete/modify operations (rm, git reset, git checkout, etc.)
+
 ---
 
 ## Investigation Methodology
@@ -21,7 +30,7 @@ color: blue
 ### Phase 1: Systematic Analysis
 
 - Run comprehensive quality checks (lint, typecheck, test, build)
-- Execute both brief and verbose versions for complete coverage
+- Execute both fast (`check`) and full (`preflight`) checks for complete coverage
 - Analyze patterns and anti-patterns across the codebase
 
 ### Phase 2: Deep Diagnostics
@@ -51,7 +60,7 @@ color: blue
 
 ### Error Analysis Workflow
 
-1. **Quality Assessment**: Run `pnpm run typecheck:verbose`, `pnpm run lint:verbose`, `pnpm run test`
+1. **Quality Assessment**: Run `pnpm run check` (fast) or `pnpm run preflight` (comprehensive)
 2. **Pattern Detection**: Use `rg` searches for systematic issues and anti-patterns
 3. **Context Analysis**: Analyze related files, imports, and dependencies
 4. **Historical Analysis**: Review git history and GitHub issues for correlation
@@ -77,34 +86,58 @@ color: blue
 ### Quality & Compilation Analysis
 
 ```bash
-# TypeScript Analysis (Brief & Verbose)
-pnpm run typecheck
-pnpm run typecheck:brief
-pnpm run typecheck:verbose
+# Fast Quality Check (recommended for quick feedback)
+pnpm run check  # Runs: typecheck, lint, test, format:fix in parallel (~5s)
 
-# Linting Analysis (Brief & Verbose)
-pnpm run lint
-pnpm run lint:brief
-pnpm run lint:verbose
-pnpm run lint:eslint:verbose
+# Comprehensive Pre-Commit Check
+pnpm run preflight  # Full suite: check + build + integration + smoke tests
 
-# Format Checking (Read-Only)
-pnpm run format
-pnpm run format:brief
+# Individual Component Checks
+pnpm run typecheck       # TypeScript type checking
+pnpm run lint            # ESLint (quiet mode)
+pnpm run lint:fix        # ESLint with auto-fix
+pnpm run format          # Prettier check (error level)
+pnpm run format:fix      # Prettier auto-fix
 
 # Build Analysis
-pnpm run build
+pnpm run build           # Next.js production build
 ```
 
 ### Test Analysis
 
 ```bash
-# Test Execution & Analysis
-pnpm run test
-pnpm run test:watch
-pnpm run test:brief
-pnpm run test:rls
-pnpm run test:all
+# Unit Tests
+pnpm run test            # Unit tests (silent, dot reporter)
+pnpm run test:watch      # Unit tests in watch mode
+pnpm run test:coverage   # Unit tests with coverage
+
+# Integration Tests
+pnpm run test:integration          # PGlite integration tests
+pnpm run test:integration:supabase # Supabase integration tests
+
+# End-to-End Tests
+pnpm run smoke           # Smoke tests (chromium + mobile chrome)
+pnpm run smoke:headed    # Smoke tests with browser UI
+pnpm run e2e:full        # Full E2E suite
+pnpm run e2e:full:headed # Full E2E with browser UI
+pnpm run e2e:mobile      # Mobile Chrome E2E tests
+```
+
+### Database Analysis
+
+```bash
+# Database Inspection (Read-Only)
+pnpm run db:studio       # Launch Drizzle Studio (GUI)
+
+# Database State (Development Only)
+pnpm run db:reset        # Full reset: restart -> drop -> migrate -> seed
+pnpm run db:fast-reset   # Fast reset for testing (silent output)
+pnpm run db:migrate      # Apply pending migrations
+pnpm run db:generate     # Generate new migration from schema changes
+
+# Production Database (Read-Only Investigation)
+pnpm run db:backup               # Backup production to ~/.pinpoint/db-backups
+pnpm run db:seed:from-prod      # Seed local from latest backup
 ```
 
 ### Search & Pattern Detection
@@ -117,7 +150,8 @@ rg -A 3 -B 3 "error_pattern"
 
 # File Discovery & Analysis
 ls -la directory/
-find . -name "*.ts" -type f
+fd "*.ts" --type f
+fd --changed-within 1day
 ```
 
 ### Repository Intelligence
@@ -224,10 +258,10 @@ Phase 3: Performance & Security (Optimization)
 
 ## Integration Guidelines
 
-### Working with Enforcer Agent
+### Working with PinPoint-Reviewer Agent
 
 - **Investigator**: Finds and analyzes systematic issues
-- **Enforcer**: Validates fixes and enforces compliance
+- **PinPoint-Reviewer**: Validates fixes and enforces compliance
 - **Clean Separation**: Investigation vs. enforcement roles
 
 ### Evidence Collection Process
