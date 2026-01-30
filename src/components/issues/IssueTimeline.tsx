@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 import { formatDistanceToNow } from "date-fns";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
@@ -7,9 +9,37 @@ import { isUserMachineOwner } from "~/lib/issues/owner";
 import { type IssueWithAllRelations } from "~/lib/types";
 import { cn } from "~/lib/utils";
 import { resolveIssueReporter } from "~/lib/issues/utils";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { ImageGallery } from "~/components/images/ImageGallery";
 import { type IssueImage } from "~/server/db/schema";
+import { useUser } from "~/hooks/useUser";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
+import { Button } from "~/components/ui/button";
+import { useActionState } from "react";
+import { SaveCancelButtons } from "~/components/save-cancel-buttons";
+import { toast } from "sonner";
+import { Textarea } from "~/components/ui/textarea";
+import {
+  editCommentAction,
+  deleteCommentAction,
+  type EditCommentResult,
+  type DeleteCommentResult,
+} from "~/app/(app)/issues/actions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "~/components/ui/alert-dialog";
 
 // ----------------------------------------------------------------------
 // Types
@@ -17,6 +47,7 @@ import { type IssueImage } from "~/server/db/schema";
 
 type TimelineEventType = "issue" | "comment" | "system";
 
+// Note: This is a normalized type for rendering, not a direct DB type.
 interface TimelineEvent {
   id: string;
   type: TimelineEventType;
@@ -26,13 +57,96 @@ interface TimelineEvent {
     avatarFallback: string;
   };
   createdAt: Date;
+  updatedAt: Date;
   content: string | null;
   images?: IssueImage[];
+  isSystem: boolean;
 }
 
-// ----------------------------------------------------------------------
 // Components
 // ----------------------------------------------------------------------
+
+function CommentEditForm({
+  commentId,
+  initialContent,
+  onCancel,
+}: {
+  commentId: string;
+  initialContent: string;
+  onCancel: () => void;
+}) {
+  const [state, formAction] = useActionState<EditCommentResult | undefined, FormData>(
+    editCommentAction,
+    undefined
+  );
+
+  React.useEffect(() => {
+    if (state?.ok) {
+      toast.success("Comment updated");
+      onCancel();
+    } else if (state?.ok === false) {
+      toast.error(state.message);
+    }
+  }, [state, onCancel]);
+
+  return (
+    <form action={formAction} className="space-y-4">
+      <input type="hidden" name="commentId" value={commentId} />
+      <Textarea
+        name="comment"
+        defaultValue={initialContent}
+        className="min-h-32"
+        required
+      />
+      <SaveCancelButtons onCancel={onCancel} />
+    </form>
+  );
+}
+
+function DeleteCommentDialog({
+  commentId,
+  isOpen,
+  onOpenChange,
+}: {
+  commentId: string;
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+}) {
+  const [state, formAction] = useActionState<DeleteCommentResult | undefined, FormData>(
+    deleteCommentAction,
+    undefined
+  );
+
+  React.useEffect(() => {
+    if (state?.ok) {
+      toast.success("Comment deleted");
+      onOpenChange(false);
+    } else if (state?.ok === false) {
+      toast.error(state.message);
+    }
+  }, [state, onOpenChange]);
+
+  return (
+    <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This action cannot be undone. This will permanently delete the
+            comment.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <form action={formAction}>
+            <input type="hidden" name="commentId" value={commentId} />
+            <AlertDialogAction type="submit">Delete</AlertDialogAction>
+          </form>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
 
 function TimelineItem({
   event,
@@ -41,12 +155,30 @@ function TimelineItem({
   event: TimelineEvent;
   issue: IssueWithAllRelations;
 }): React.JSX.Element {
+  const { user } = useUser();
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
+
   const isSystem = event.type === "system";
   const isIssue = event.type === "issue";
   const isOwner = isUserMachineOwner(issue, event.author.id);
+  const isEdited = event.updatedAt.getTime() - event.createdAt.getTime() > 1000;
+
+  // --- Permissions ---
+  const canEdit =
+    user && user.id === event.author.id && !event.isSystem && !isIssue;
+  const canDelete =
+    user &&
+    (user.id === event.author.id || user.role === "admin") &&
+    !event.isSystem &&
+    !isIssue;
+  const canShowActions = canEdit || canDelete;
 
   return (
-    <div className="relative flex gap-4">
+    <div
+      className="relative flex gap-4 group"
+      data-testid={`timeline-item-${event.id}`}
+    >
       {/* Left: Marker (Fixed width track) */}
       <div className="flex w-16 flex-none flex-col items-center">
         {isSystem ? (
@@ -106,25 +238,74 @@ function TimelineItem({
                 </div>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                {isEdited && !isIssue && (
+                  <span title={event.updatedAt.toLocaleString()}>(edited)</span>
+                )}
                 <span title={event.createdAt.toLocaleString()}>
                   {formatDistanceToNow(event.createdAt, { addSuffix: true })}
                 </span>
+                {canShowActions && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="-my-1 -mr-2 ml-1"
+                        aria-label="Comment actions"
+                      >
+                        <MoreHorizontal className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {canEdit && (
+                        <DropdownMenuItem onSelect={() => setIsEditing(true)}>
+                          <Pencil className="mr-2 size-4" />
+                          <span>Edit</span>
+                        </DropdownMenuItem>
+                      )}
+                      {canDelete && (
+                        <DropdownMenuItem
+                          className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                          onSelect={() => setIsDeleteDialogOpen(true)}
+                        >
+                          <Trash2 className="mr-2 size-4" />
+                          <span>Delete</span>
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
             </div>
-            {event.content && (
-              <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-                {event.content}
-              </div>
-            )}
+            {isEditing ? (
+              <CommentEditForm
+                commentId={event.id}
+                initialContent={event.content ?? ""}
+                onCancel={() => setIsEditing(false)}
+              />
+            ) : (
+              <>
+                {event.content && (
+                  <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+                    {event.content}
+                  </div>
+                )}
 
-            {event.images && event.images.length > 0 && (
-              <div className="mt-4">
-                <ImageGallery images={event.images} />
-              </div>
+                {event.images && event.images.length > 0 && (
+                  <div className="mt-4">
+                    <ImageGallery images={event.images} />
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
       </div>
+      <DeleteCommentDialog
+        commentId={event.id}
+        isOpen={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      />
     </div>
   );
 }
@@ -140,8 +321,10 @@ interface IssueTimelineProps {
 export function IssueTimeline({
   issue,
 }: IssueTimelineProps): React.JSX.Element {
+  console.log("Rendering IssueTimeline");
   // 1. Normalize Issue as the first event
   const reporter = resolveIssueReporter(issue);
+  console.log("Reporter:", reporter);
 
   const issueEvent: TimelineEvent = {
     id: `issue-${issue.id}`,
@@ -152,8 +335,10 @@ export function IssueTimeline({
       avatarFallback: reporter.initial,
     },
     createdAt: new Date(issue.createdAt),
+    updatedAt: new Date(issue.updatedAt),
     content: issue.description,
     images: issue.images,
+    isSystem: false,
   };
 
   // 2. Normalize Comments
@@ -168,8 +353,10 @@ export function IssueTimeline({
         avatarFallback: authorName.slice(0, 2).toUpperCase(),
       },
       createdAt: new Date(c.createdAt),
+      updatedAt: new Date(c.updatedAt),
       content: c.content,
       images: c.images,
+      isSystem: c.isSystem,
     };
   });
 
