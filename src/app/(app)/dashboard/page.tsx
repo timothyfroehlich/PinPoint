@@ -275,65 +275,71 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Total Open Issues */}
-                <Card className="border-primary/20 bg-card glow-primary">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">
-                        Open Issues
-                      </CardTitle>
-                      <AlertTriangle className="size-4 text-muted-foreground" />
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div
-                      className="text-3xl font-bold text-foreground"
-                      data-testid="stat-open-issues-value"
-                    >
-                      {totalOpenIssues}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Machines Needing Service */}
-                <Card className="border-primary/20 bg-card glow-primary">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">
-                        Machines Needing Service
-                      </CardTitle>
-                      <Wrench className="size-4 text-muted-foreground" />
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div
-                      className="text-3xl font-bold text-foreground"
-                      data-testid="stat-machines-needing-service-value"
-                    >
-                      {machinesNeedingService}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Issues Assigned to Me */}
-                {user && (
-                  <Card className="border-primary/20 bg-card glow-primary">
+                <Link href="/issues?status=new,confirmed,in_progress,need_parts,need_help,wait_owner">
+                  <Card className="border-primary/20 bg-card glow-primary hover:border-primary transition-all cursor-pointer h-full">
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-sm font-medium text-muted-foreground">
-                          Assigned to Me
+                          Open Issues
                         </CardTitle>
-                        <CheckCircle2 className="size-4 text-muted-foreground" />
+                        <AlertTriangle className="size-4 text-muted-foreground" />
                       </div>
                     </CardHeader>
                     <CardContent>
                       <div
                         className="text-3xl font-bold text-foreground"
-                        data-testid="stat-assigned-to-me-value"
+                        data-testid="stat-open-issues-value"
                       >
-                        {myIssuesCount}
+                        {totalOpenIssues}
                       </div>
                     </CardContent>
                   </Card>
+                </Link>
+
+                {/* Machines Needing Service */}
+                <Link href="/m?status=unplayable,needs_service">
+                  <Card className="border-primary/20 bg-card glow-primary hover:border-primary transition-all cursor-pointer h-full">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">
+                          Machines Needing Service
+                        </CardTitle>
+                        <Wrench className="size-4 text-muted-foreground" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div
+                        className="text-3xl font-bold text-foreground"
+                        data-testid="stat-machines-needing-service-value"
+                      >
+                        {machinesNeedingService}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+
+                {/* Issues Assigned to Me */}
+                {user && (
+                  <Link href={`/issues?assignee=${user.id}`}>
+                    <Card className="border-primary/20 bg-card glow-primary hover:border-primary transition-all cursor-pointer h-full">
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-sm font-medium text-muted-foreground">
+                            Assigned to Me
+                          </CardTitle>
+                          <CheckCircle2 className="size-4 text-muted-foreground" />
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div
+                          className="text-3xl font-bold text-foreground"
+                          data-testid="stat-assigned-to-me-value"
+                        >
+                          {myIssuesCount}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
                 )}
               </div>
             </div>
