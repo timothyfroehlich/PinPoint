@@ -38,10 +38,13 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
 
   const isAdmin = currentUserProfile?.role === "admin";
 
-  let allUsers: UnifiedUser[] = [];
-  if (isAdmin) {
-    allUsers = await getUnifiedUsers({ includeEmails: false });
+  if (!isAdmin) {
+    redirect("/m");
   }
+
+  const allUsers: UnifiedUser[] = await getUnifiedUsers({
+    includeEmails: false,
+  });
 
   return (
     <main className="min-h-screen bg-surface">

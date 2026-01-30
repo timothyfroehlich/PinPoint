@@ -3,8 +3,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { machines as machinesTable } from "~/server/db/schema";
-import { desc } from "drizzle-orm";
+import { machines as machinesTable, userProfiles } from "~/server/db/schema";
+import { desc, eq } from "drizzle-orm";
 import {
   deriveMachineStatus,
   getMachineStatusLabel,
@@ -49,6 +49,16 @@ export default async function MachinesPage({
   if (!user) {
     redirect("/login?next=%2Fm");
   }
+
+  // Check admin status
+  const userProfile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, user.id),
+    columns: {
+      role: true,
+    },
+  });
+
+  const isAdmin = userProfile?.role === "admin";
 
   // Parse filters from search params
   const rawParams = await searchParams;
@@ -145,15 +155,17 @@ export default async function MachinesPage({
                   Manage pinball machines and view their status
                 </p>
               </div>
-              <Button
-                asChild
-                className="bg-primary text-on-primary hover:bg-primary/90 rounded-full h-11 px-6"
-              >
-                <Link href="/m/new">
-                  <Plus className="mr-2 size-4" />
-                  Add Machine
-                </Link>
-              </Button>
+              {isAdmin && (
+                <Button
+                  asChild
+                  className="bg-primary text-on-primary hover:bg-primary/90 rounded-full h-11 px-6"
+                >
+                  <Link href="/m/new">
+                    <Plus className="mr-2 size-4" />
+                    Add Machine
+                  </Link>
+                </Button>
+              )}
             </div>
 
             <MachineFilters users={allUsers} filters={filters} />
@@ -189,15 +201,18 @@ export default async function MachinesPage({
                       No machines yet
                     </p>
                     <p className="text-on-surface-variant mb-4">
-                      Get started by adding your first machine to the
-                      collection.
+                      {isAdmin
+                        ? "Get started by adding your first machine to the collection."
+                        : "No machines have been added to the collection yet."}
                     </p>
-                    <Link href="/m/new">
-                      <Button className="bg-primary text-on-primary hover:bg-primary/90 rounded-full h-11 px-6">
-                        <Plus className="mr-2 size-4" />
-                        Add Your First Machine
-                      </Button>
-                    </Link>
+                    {isAdmin && (
+                      <Link href="/m/new">
+                        <Button className="bg-primary text-on-primary hover:bg-primary/90 rounded-full h-11 px-6">
+                          <Plus className="mr-2 size-4" />
+                          Add Your First Machine
+                        </Button>
+                      </Link>
+                    )}
                   </>
                 )}
               </div>
