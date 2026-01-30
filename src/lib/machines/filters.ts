@@ -1,4 +1,5 @@
-export type MachineStatus = "operational" | "needs_service" | "unplayable";
+import type { MachineStatus } from "~/lib/machines/status";
+export type { MachineStatus };
 
 export const VALID_MACHINE_STATUSES: MachineStatus[] = [
   "operational",

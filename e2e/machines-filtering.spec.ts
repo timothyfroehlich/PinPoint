@@ -17,8 +17,11 @@ test.describe("Machine Filtering and Sorting", () => {
       "Search machines by name or initials..."
     );
     await searchInput.fill(seededMachines.attackFromMars.initials);
-    // Wait for debounce
-    await page.waitForTimeout(500);
+
+    // Wait for debounce via URL check (semantic wait)
+    await expect(page).toHaveURL(
+      new RegExp(`q=${seededMachines.attackFromMars.initials}`)
+    );
 
     await expect(
       page.getByText(seededMachines.attackFromMars.name)
@@ -32,7 +35,8 @@ test.describe("Machine Filtering and Sorting", () => {
 
     // 2. Test Search by Name
     await searchInput.fill("Medieval");
-    await page.waitForTimeout(500);
+    // Wait for debounce via URL check (semantic wait)
+    await expect(page).toHaveURL(/q=Medieval/);
 
     await expect(
       page.getByText(seededMachines.medievalMadness.name)
@@ -43,6 +47,7 @@ test.describe("Machine Filtering and Sorting", () => {
 
     // 3. Test Clear Search
     await page.getByRole("button", { name: "Clear All" }).click();
+    await expect(page).not.toHaveURL(/q=/);
     await expect(
       page.getByText(seededMachines.attackFromMars.name)
     ).toBeVisible();
