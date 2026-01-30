@@ -144,6 +144,14 @@
       "Skill(superpowers:executing-plans)",
       "Skill(superpowers:receiving-code-review)"
     ],
+    "deny": [
+      "Bash(find:*)",
+      "Bash(psql:*)",
+      "Bash(shutdown:*)",
+      "Bash(reboot:*)",
+      "Bash(mkfs:*)",
+      "Bash(supabase db push:*)"
+    ],
     "ask": [
       "Bash(git push:*)",
       "Bash(gh pr create:*)",
@@ -156,18 +164,9 @@
       "Bash(pkill:*)",
       "Bash(chmod:*)",
       "mcp__github__issue_write"
-    ],
-    "deny": [
-      "Bash(find:*)",
-      "Bash(psql:*)",
-      "Bash(shutdown:*)",
-      "Bash(reboot:*)",
-      "Bash(mkfs:*)",
-      "Bash(supabase db push:*)"
     ]
   },
   "enableAllProjectMcpServers": true,
-  "outputStyle": "Explanatory",
   "hooks": {
     "PostToolUse": [
       {
@@ -201,6 +200,9 @@
     "supabase@claude-plugins-official": true,
     "vercel@claude-plugins-official": true,
     "code-simplifier@claude-plugins-official": true,
-    "typescript-lsp@claude-plugins-official": true
-  }
+    "typescript-lsp@claude-plugins-official": true,
+    "episodic-memory@superpowers-marketplace": true,
+    "security-guidance@claude-plugins-official": true
+  },
+  "outputStyle": "Explanatory"
 }
