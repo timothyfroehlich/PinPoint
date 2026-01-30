@@ -123,43 +123,39 @@ export async function MainLayout({
             </div>
           </div>
 
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-4">
-              <FeedbackWidget />
-              {user ? (
-                <>
-                  <Button asChild variant="ghost" size="sm">
-                    <Link href="/report">Report Issue</Link>
-                  </Button>
-                  <NotificationList notifications={enrichedNotifications} />
-                  <UserMenu userName={userProfile?.name ?? "User"} />
-                </>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <Button
-                    asChild
-                    variant="ghost"
-                    size="sm"
-                    data-testid="nav-report-issue"
-                  >
-                    <Link href="/report">Report Issue</Link>
-                  </Button>
-                  <div className="h-4 w-px bg-border mx-1 hidden lg:block" />
-                  <Button
-                    asChild
-                    variant="ghost"
-                    size="sm"
-                    className="text-muted-foreground hover:text-foreground"
-                    data-testid="nav-signin"
-                  >
-                    <Link href="/login">Sign In</Link>
-                  </Button>
-                  <Button asChild size="sm" data-testid="nav-signup">
-                    <Link href="/signup">Sign Up</Link>
-                  </Button>
-                </div>
-              )}
-            </div>
+          <div className="flex items-center gap-4">
+            <FeedbackWidget />
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              data-testid="nav-report-issue"
+            >
+              <Link href="/report">Report Issue</Link>
+            </Button>
+
+            {user ? (
+              <div className="flex items-center gap-4">
+                <NotificationList notifications={enrichedNotifications} />
+                <UserMenu userName={userProfile?.name ?? "User"} />
+              </div>
+            ) : (
+              <div className="flex items-center gap-4">
+                <div className="h-4 w-px bg-border mx-1 hidden lg:block" />
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-foreground"
+                  data-testid="nav-signin"
+                >
+                  <Link href="/login">Sign In</Link>
+                </Button>
+                <Button asChild size="sm" data-testid="nav-signup">
+                  <Link href="/signup">Sign Up</Link>
+                </Button>
+              </div>
+            )}
           </div>
         </header>
 
