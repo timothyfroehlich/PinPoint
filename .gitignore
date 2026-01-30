@@ -143,3 +143,4 @@ __pycache__/
 
 # Auto-generated test schema
 src/test/setup/schema.sql
+supabase/migrations/
