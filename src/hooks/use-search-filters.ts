@@ -3,6 +3,7 @@
 import { useRouter, usePathname } from "next/navigation";
 import { useCallback, useRef, useEffect } from "react";
 import type { IssueFilters } from "~/lib/issues/filters";
+import { storeLastIssuesPath } from "~/hooks/use-issue-link";
 
 interface UseSearchFiltersOptions {
   resetPagination?: boolean;
@@ -114,7 +115,11 @@ export function useSearchFilters(
       if (merged.pageSize && merged.pageSize !== 15)
         params.set("page_size", merged.pageSize.toString());
 
-      router.push(`${pathname}?${params.toString()}`);
+      const newPath = `${pathname}?${params.toString()}`;
+      if (pathname.startsWith("/issues")) {
+        storeLastIssuesPath(newPath);
+      }
+      router.push(newPath);
     },
     [router, pathname]
   );

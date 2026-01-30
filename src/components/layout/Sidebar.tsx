@@ -4,6 +4,7 @@ import type React from "react";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useIssueLink } from "~/hooks/use-issue-link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -53,7 +54,7 @@ export function Sidebar({
 }): React.JSX.Element {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
-
+  const issuesLink = useIssueLink();
   // Load state from localStorage on mount
   useEffect(() => {
     if (isMobile) return; // Don't load/save collapse state on mobile
@@ -79,12 +80,14 @@ export function Sidebar({
       variant?: string;
     };
   }): React.JSX.Element => {
-    const isActive = pathname === item.href;
+    const href = item.href === "/issues" ? issuesLink : item.href;
+    const hrefPath = href.split("?")[0];
+    const isActive = pathname === hrefPath;
     const isReport = item.variant === "accent";
 
     const content = (
       <Link
-        href={item.href}
+        href={href}
         {...(onNavigate ? { onClick: onNavigate } : {})}
         className={cn(
           "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors relative group",
