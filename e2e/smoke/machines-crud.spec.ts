@@ -48,6 +48,13 @@ test.describe("Machines CRUD", () => {
     await expect(
       page.getByRole("link", { name: /Add Machine/i })
     ).toBeVisible();
+
+    // Restore default user for subsequent tests to maintain isolation
+    await logout(page);
+    await loginAs(page, testInfo, {
+      email: TEST_USERS.member.email,
+      password: TEST_USERS.member.password,
+    });
   });
 
   test("should display seeded test machines with correct statuses", async ({
