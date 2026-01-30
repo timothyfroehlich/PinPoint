@@ -23,6 +23,21 @@ export const publicIssueSchema = z.object({
   frequency: z.enum(["intermittent", "frequent", "constant"], {
     message: "Select frequency",
   }),
+  status: z
+    .enum([
+      "new",
+      "confirmed",
+      "in_progress",
+      "need_parts",
+      "need_help",
+      "wait_owner",
+      "fixed",
+      "wont_fix",
+      "wai",
+      "no_repro",
+      "duplicate",
+    ])
+    .optional(),
   firstName: z.string().trim().max(100, "First name too long").optional(),
   lastName: z.string().trim().max(100, "Last name too long").optional(),
   email: z
