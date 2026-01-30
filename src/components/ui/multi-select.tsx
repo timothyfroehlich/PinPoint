@@ -65,6 +65,30 @@ export function MultiSelect({
     onChange(newValue);
   };
 
+  const sortedOptions = React.useMemo(() => {
+    return [...options].sort((a, b) => {
+      const aIsSelected = value.includes(a.value);
+      const bIsSelected = value.includes(b.value);
+      if (aIsSelected && !bIsSelected) return -1;
+      if (!aIsSelected && bIsSelected) return 1;
+      return 0;
+    });
+  }, [options, value]);
+
+  const sortedGroups = React.useMemo(() => {
+    if (!groups) return;
+    return groups.map((group) => ({
+      ...group,
+      options: [...group.options].sort((a, b) => {
+        const aIsSelected = value.includes(a.value);
+        const bIsSelected = value.includes(b.value);
+        if (aIsSelected && !bIsSelected) return -1;
+        if (!aIsSelected && bIsSelected) return 1;
+        return 0;
+      }),
+    }));
+  }, [groups, value]);
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -108,8 +132,8 @@ export function MultiSelect({
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
             <CommandEmpty>No results found.</CommandEmpty>
-            {groups ? (
-              groups.map((group) => {
+            {sortedGroups ? (
+              sortedGroups.map((group) => {
                 const groupOptionValues = group.options.map((opt) => opt.value);
                 const groupSelectedCount = group.options.filter((opt) =>
                   value.includes(opt.value)
@@ -192,7 +216,7 @@ export function MultiSelect({
               })
             ) : (
               <CommandGroup>
-                {options.map((option) => {
+                {sortedOptions.map((option) => {
                   const isSelected = value.includes(option.value);
                   return (
                     <CommandItem
