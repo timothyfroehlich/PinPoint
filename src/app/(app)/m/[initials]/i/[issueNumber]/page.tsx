@@ -129,6 +129,9 @@ export default async function IssueDetailPage({
         issueNumber: true,
         machineInitials: true,
         reporterName: true,
+        assignedTo: true,
+        reportedBy: true,
+        invitedReportedBy: true,
       },
     }),
     // Fetch all members/admins for assignment dropdown (Restrict to actual users)
