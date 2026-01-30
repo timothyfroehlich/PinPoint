@@ -17,12 +17,14 @@ interface IssueSidebarProps {
   issue: IssueWithAllRelations;
   allUsers: SidebarUser[];
   currentUserId: string;
+  canUpdate: boolean;
 }
 
 export function IssueSidebar({
   issue,
   allUsers,
   currentUserId,
+  canUpdate,
 }: IssueSidebarProps): React.JSX.Element {
   const isWatching = issue.watchers.some((w) => w.userId === currentUserId);
   const reporter = resolveIssueReporter(issue);
@@ -36,7 +38,11 @@ export function IssueSidebar({
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
-              <SidebarActions issue={issue} allUsers={allUsers} />
+              <SidebarActions
+                issue={issue}
+                allUsers={allUsers}
+                canUpdate={canUpdate}
+              />
               <WatchButton issueId={issue.id} initialIsWatching={isWatching} />
             </div>
 

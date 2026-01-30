@@ -34,13 +34,13 @@ interface UpdateMachineFormProps {
     } | null;
   };
   allUsers: UnifiedUser[];
-  isAdmin: boolean;
+  canUpdate: boolean;
 }
 
 export function UpdateMachineForm({
   machine,
   allUsers,
-  isAdmin,
+  canUpdate,
 }: UpdateMachineFormProps): React.JSX.Element {
   const [state, formAction, isPending] = useActionState<
     UpdateMachineResult | undefined,
@@ -101,6 +101,7 @@ export function UpdateMachineForm({
           defaultValue={machine.name}
           placeholder="e.g., Medieval Madness"
           className="border-outline bg-surface text-on-surface placeholder:text-on-surface-variant"
+          readOnly={!canUpdate}
           autoFocus
         />
         <p className="text-xs text-on-surface-variant">
@@ -109,7 +110,7 @@ export function UpdateMachineForm({
       </div>
 
       {/* Machine Owner */}
-      {isAdmin ? (
+      {canUpdate ? (
         <OwnerSelect
           users={allUsers}
           defaultValue={machine.ownerId ?? machine.invitedOwnerId ?? null}
@@ -145,15 +146,17 @@ export function UpdateMachineForm({
       )}
 
       {/* Actions */}
-      <div className="flex gap-3 pt-4">
-        <Button
-          type="submit"
-          className="flex-1 bg-primary text-on-primary hover:bg-primary/90"
-          loading={isPending}
-        >
-          Update Machine
-        </Button>
-      </div>
+      {canUpdate && (
+        <div className="flex gap-3 pt-4">
+          <Button
+            type="submit"
+            className="flex-1 bg-primary text-on-primary hover:bg-primary/90"
+            loading={isPending}
+          >
+            Update Machine
+          </Button>
+        </div>
+      )}
     </form>
   );
 }

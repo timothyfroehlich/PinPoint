@@ -8,16 +8,23 @@ import { UpdateIssueStatusForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/
 import { UpdateIssueSeverityForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/update-issue-severity-form";
 import { UpdateIssuePriorityForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/update-issue-priority-form";
 import { UpdateIssueFrequencyForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/update-issue-frequency-form";
+import { SidebarReadOnly } from "./SidebarReadOnly";
 
 interface SidebarActionsProps {
   issue: IssueWithAllRelations;
   allUsers: { id: string; name: string }[];
+  canUpdate: boolean;
 }
 
 export function SidebarActions({
   issue,
   allUsers,
+  canUpdate,
 }: SidebarActionsProps): React.JSX.Element {
+  if (!canUpdate) {
+    return <SidebarReadOnly issue={issue} />;
+  }
+
   return (
     <div className="space-y-5">
       {/* Assignee */}
