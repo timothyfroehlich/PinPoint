@@ -1,7 +1,6 @@
 import type React from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { issues, userProfiles } from "~/server/db/schema";
@@ -15,6 +14,7 @@ import { getMachineOwnerName } from "~/lib/issues/owner";
 import { formatIssueId } from "~/lib/issues/utils";
 import { ImageGallery } from "~/components/images/ImageGallery";
 import type { Issue, IssueWithAllRelations } from "~/lib/types";
+import { BackToIssuesLink } from "~/components/issues/BackToIssuesLink";
 
 /**
  * Issue Detail Page (Protected Route)
@@ -153,13 +153,7 @@ export default async function IssueDetailPage({
   return (
     <PageShell className="space-y-8" size="wide">
       {/* Back button */}
-      <Link
-        href={`/m/${initials}/i`}
-        className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" />
-        Back to Issues
-      </Link>
+      <BackToIssuesLink />
 
       {/* Header */}
       <div className="space-y-3">

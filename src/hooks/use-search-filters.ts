@@ -4,6 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useCallback, useRef, useEffect } from "react";
 import type { IssueFilters } from "~/lib/issues/filters";
 import type { MachineFilters } from "~/lib/machines/filters";
+import { storeLastIssuesPath } from "~/hooks/use-issue-link";
 
 type GenericFilters = IssueFilters | MachineFilters;
 
@@ -153,7 +154,11 @@ export function useSearchFilters<T extends GenericFilters>(
       )
         params.set("page_size", merged.pageSize.toString());
 
-      router.push(`${pathname}?${params.toString()}`);
+      const newPath = `${pathname}?${params.toString()}`;
+      if (pathname.startsWith("/issues")) {
+        storeLastIssuesPath(newPath);
+      }
+      router.push(newPath);
     },
     [router, pathname]
   );
