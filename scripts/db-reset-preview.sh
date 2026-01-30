@@ -97,6 +97,10 @@ if [ "$TABLE_COUNT" -ne 0 ]; then
 fi
 echo "✅ Schema reset"
 
+# Clear drizzle migration tracking (survives schema drop since it's in drizzle schema)
+echo "   Clearing drizzle migration tracking..."
+psql "$DATABASE_URL" -c "DELETE FROM drizzle.__drizzle_migrations;" 2>&1 | grep -v "^NOTICE:" | grep -v "^DETAIL:" || true
+
 echo ""
 echo "2️⃣  Applying schema with drizzle-kit migrations..."
 # Uses DIRECT_URL from env (Session Mode pooler, IPv4-compatible)

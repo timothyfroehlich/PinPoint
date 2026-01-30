@@ -11,7 +11,7 @@
 ## 2. Critical Non-Negotiables (The "10 Commandments")
 
 1. **Escape parentheses** in paths (e.g., `src/app/\(app\)/page.tsx`).
-2. **Migrations ONLY**: Never use `drizzle-kit push`. Use `db:generate` + `db:migrate`.
+2. **Drizzle Migrations**: We use Drizzle ORM, NOT Supabase migrations. Never use `drizzle-kit push`. Use `db:generate` + `db:migrate`. Supabase migration config is disabled (`db.migrations.enabled = false`).
 3. **Worker-Scoped PGlite**: No per-test DB instances (causes lockups). Use shared worker.
 4. **Server Components Default**: "use client" only for interaction leaves.
 5. **Progressive Enhancement**: `<form action={serverAction}>`. No inline handlers.
