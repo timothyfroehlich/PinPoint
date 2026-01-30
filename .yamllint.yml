@@ -17,9 +17,7 @@ rules:
     check-keys: false
 
   # Allow trailing spaces (some editors add them)
-  trailing-spaces:
-    level: warning
+  trailing-spaces: disable
 
   # Comments can be indented
-  comments-indentation:
-    level: warning
+  comments-indentation: disable
