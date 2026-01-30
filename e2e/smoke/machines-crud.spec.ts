@@ -5,7 +5,7 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { ensureLoggedIn } from "../support/actions";
+import { ensureLoggedIn, logout, loginAs } from "../support/actions";
 import { cleanupTestEntities } from "../support/cleanup";
 import { seededMachines, TEST_USERS } from "../support/constants";
 
@@ -15,12 +15,8 @@ test.describe("Machines CRUD", () => {
   test.describe.configure({ mode: "serial" });
 
   // Login before each test (required for protected routes)
-  // Use admin user since machine creation is admin-only
   test.beforeEach(async ({ page }, testInfo) => {
-    await ensureLoggedIn(page, testInfo, {
-      email: TEST_USERS.admin.email,
-      password: TEST_USERS.admin.password,
-    });
+    await ensureLoggedIn(page, testInfo);
   });
 
   test.afterEach(async ({ request }) => {
@@ -33,7 +29,14 @@ test.describe("Machines CRUD", () => {
     createdMachineIds.clear();
   });
 
-  test("should display machine list page", async ({ page }) => {
+  test("should display machine list page", async ({ page }, testInfo) => {
+    // Logout and login as admin since "Add Machine" button is admin-only
+    await logout(page);
+    await loginAs(page, testInfo, {
+      email: TEST_USERS.admin.email,
+      password: TEST_USERS.admin.password,
+    });
+
     // Navigate to machines page (new URL: /m)
     await page.goto("/m");
 
@@ -41,7 +44,7 @@ test.describe("Machines CRUD", () => {
     await expect(page).toHaveURL("/m");
     await expect(page.getByRole("heading", { name: "Machines" })).toBeVisible();
 
-    // Should have an "Add Machine" button
+    // Should have an "Add Machine" button (visible to admins only)
     await expect(
       page.getByRole("link", { name: /Add Machine/i })
     ).toBeVisible();
