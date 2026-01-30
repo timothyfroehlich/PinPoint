@@ -13,6 +13,8 @@ describe("MachineEmptyState", () => {
 
     // Check if the content is visible
     expect(screen.getByText("No open issues")).toBeInTheDocument();
-    expect(screen.getByText("The game is operational. Great job!")).toBeInTheDocument();
+    expect(
+      screen.getByText("The game is operational. Great job!")
+    ).toBeInTheDocument();
   });
 });
