@@ -85,6 +85,13 @@ export function UnifiedReportForm({
     [machinesList, selectedMachineId]
   );
 
+  // Clear localStorage on successful submission
+  useEffect(() => {
+    if (state.success) {
+      window.localStorage.removeItem("report_form_state");
+    }
+  }, [state.success]);
+
   // Persistence: Restore from localStorage on mount
   useEffect(() => {
     if (typeof window === "undefined" || hasRestored.current) return;
@@ -189,13 +196,7 @@ export function UnifiedReportForm({
                 </div>
               )}
 
-              <form
-                action={(formData) => {
-                  window.localStorage.removeItem("report_form_state");
-                  formAction(formData);
-                }}
-                className="space-y-4"
-              >
+              <form action={formAction} className="space-y-4">
                 {/* Honeypot field for bot detection */}
                 <input
                   type="text"
