@@ -81,7 +81,8 @@ export function Sidebar({
     };
   }): React.JSX.Element => {
     const href = item.href === "/issues" ? issuesLink : item.href;
-    const isActive = pathname === href;
+    const hrefPath = href.split("?")[0];
+    const isActive = pathname === hrefPath;
     const isReport = item.variant === "accent";
 
     const content = (

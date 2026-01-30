@@ -116,7 +116,9 @@ export function useSearchFilters(
         params.set("page_size", merged.pageSize.toString());
 
       const newPath = `${pathname}?${params.toString()}`;
-      storeLastIssuesPath(newPath);
+      if (pathname.startsWith("/issues")) {
+        storeLastIssuesPath(newPath);
+      }
       router.push(newPath);
     },
     [router, pathname]

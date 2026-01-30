@@ -1,5 +1,6 @@
 import type React from "react";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { issues, userProfiles } from "~/server/db/schema";
