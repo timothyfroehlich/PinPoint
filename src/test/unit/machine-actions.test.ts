@@ -95,7 +95,7 @@ describe("createMachineAction", () => {
   it("should successfully create a machine", async () => {
     // Mock profile found
     vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
-      role: "member",
+      role: "admin",
     } as any);
 
     // Mock successful insert
@@ -120,6 +120,26 @@ describe("createMachineAction", () => {
         ownerId: mockUser.id,
       })
     );
+  });
+
+  it("should reject creation for non-admin users", async () => {
+    // Mock profile with member role
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      role: "member",
+    } as any);
+
+    const formData = new FormData();
+    formData.append("name", "Medieval Madness");
+    formData.append("initials", "MM");
+
+    const result = await createMachineAction(initialState, formData);
+
+    expect(result).toEqual({
+      ok: false,
+      code: "UNAUTHORIZED",
+      message: "You must be an admin to create a machine.",
+    });
+    expect(db.insert).not.toHaveBeenCalled();
   });
 });
 

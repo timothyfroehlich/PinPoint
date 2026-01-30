@@ -3,8 +3,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { machines } from "~/server/db/schema";
-import { desc } from "drizzle-orm";
+import { machines, userProfiles } from "~/server/db/schema";
+import { desc, eq } from "drizzle-orm";
 import {
   deriveMachineStatus,
   getMachineStatusLabel,
@@ -34,6 +34,15 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
   if (!user) {
     redirect("/login?next=%2Fm");
   }
+
+  const userProfile = await db.query.userProfiles.findFirst({
+    where: eq(userProfiles.id, user.id),
+    columns: {
+      role: true,
+    },
+  });
+
+  const isAdmin = userProfile?.role === "admin";
 
   // Query machines with their open issues (direct Drizzle query - no DAL)
   const allMachines = await db.query.machines.findMany({
@@ -84,15 +93,17 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
                 Manage pinball machines and view their status
               </p>
             </div>
-            <Button
-              asChild
-              className="bg-primary text-on-primary hover:bg-primary/90"
-            >
-              <Link href="/m/new">
-                <Plus className="mr-2 size-4" />
-                Add Machine
-              </Link>
-            </Button>
+            {isAdmin && (
+              <Button
+                asChild
+                className="bg-primary text-on-primary hover:bg-primary/90"
+              >
+                <Link href="/m/new">
+                  <Plus className="mr-2 size-4" />
+                  Add Machine
+                </Link>
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -104,14 +115,17 @@ export default async function MachinesPage(): Promise<React.JSX.Element> {
           <Card className="border-outline-variant">
             <CardContent className="py-12 text-center">
               <p className="text-lg text-on-surface-variant mb-4">
-                No machines yet
+                No machines yet.
+                {isAdmin ? " Add the first one!" : ""}
               </p>
-              <Link href="/m/new">
-                <Button className="bg-primary text-on-primary hover:bg-primary/90">
-                  <Plus className="mr-2 size-4" />
-                  Add Your First Machine
-                </Button>
-              </Link>
+              {isAdmin && (
+                <Link href="/m/new">
+                  <Button className="bg-primary text-on-primary hover:bg-primary/90">
+                    <Plus className="mr-2 size-4" />
+                    Add Your First Machine
+                  </Button>
+                </Link>
+              )}
             </CardContent>
           </Card>
         ) : (
