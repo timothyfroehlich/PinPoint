@@ -177,6 +177,7 @@ gh api graphql -f query='{ repository(owner: "timothyfroehlich", name: "PinPoint
 7. **Hand off** - Provide context for next session
 
 **CRITICAL RULES:**
+
 - Work is NOT complete until `git push` succeeds
 - NEVER stop before pushing - that leaves work stranded locally
 - NEVER say "ready to push when you are" - YOU must push
