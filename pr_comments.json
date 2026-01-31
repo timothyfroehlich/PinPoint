@@ -1,0 +1,209 @@
+[
+  {
+    "url": "https://api.github.com/repos/timothyfroehlich/PinPoint/pulls/comments/2744455794",
+    "pull_request_review_id": 3726139478,
+    "id": 2744455794,
+    "node_id": "PRRC_kwDOPB_pGs6jlRJy",
+    "diff_hunk": "@@ -0,0 +1,68 @@\n+import { test, expect } from \"@playwright/test\";\n+import { ensureLoggedIn } from \"./support/actions\";\n+import { seededMachines } from \"./support/constants\";\n+\n+test.describe(\"Machine Filtering and Sorting\", () => {\n+  test.beforeEach(async ({ page }, testInfo) => {\n+    await ensureLoggedIn(page, testInfo);\n+  });\n+\n+  test(\"user can search and filter machines\", async ({ page }) => {\n+    // Navigate to machines page\n+    await page.goto(\"/m\");\n+    await expect(page.getByRole(\"heading\", { name: \"Machines\" })).toBeVisible();\n+\n+    // 1. Test Search by Initials\n+    const searchInput = page.getByPlaceholder(\n+      \"Search machines by name or initials...\"\n+    );\n+    await searchInput.fill(seededMachines.attackFromMars.initials);\n+    // Wait for debounce\n+    await page.waitForTimeout(500);",
+    "path": "e2e/machines-filtering.spec.ts",
+    "commit_id": "c5090748b9019d39809fc4d184e51887e8a8d421",
+    "original_commit_id": "c5090748b9019d39809fc4d184e51887e8a8d421",
+    "user": {
+      "login": "Copilot",
+      "id": 175728472,
+      "node_id": "BOT_kgDOCnlnWA",
+      "avatar_url": "https://avatars.githubusercontent.com/in/946600?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/Copilot",
+      "html_url": "https://github.com/apps/copilot-pull-request-reviewer",
+      "followers_url": "https://api.github.com/users/Copilot/followers",
+      "following_url": "https://api.github.com/users/Copilot/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Copilot/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/Copilot/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Copilot/subscriptions",
+      "organizations_url": "https://api.github.com/users/Copilot/orgs",
+      "repos_url": "https://api.github.com/users/Copilot/repos",
+      "events_url": "https://api.github.com/users/Copilot/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/Copilot/received_events",
+      "type": "Bot",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "body": "The test uses hard-coded `page.waitForTimeout(500)` calls which violates E2E best practices. According to `docs/E2E_BEST_PRACTICES.md`, we should avoid `page.waitForTimeout()` as it's brittle and slow. Instead, use semantic waits with expectations.\n\nFor debounced search input, wait for the URL to update or wait for a specific element state change rather than using arbitrary timeouts.",
+    "created_at": "2026-01-30T03:26:56Z",
+    "updated_at": "2026-01-30T03:26:57Z",
+    "html_url": "https://github.com/timothyfroehlich/PinPoint/pull/881#discussion_r2744455794",
+    "pull_request_url": "https://api.github.com/repos/timothyfroehlich/PinPoint/pulls/881",
+    "_links": {
+      "self": {
+        "href": "https://api.github.com/repos/timothyfroehlich/PinPoint/pulls/comments/2744455794"
+      },
+      "html": {
+        "href": "https://github.com/timothyfroehlich/PinPoint/pull/881#discussion_r2744455794"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/timothyfroehlich/PinPoint/pulls/881"
+      }
+    },
+    "reactions": {
+      "url": "https://api.github.com/repos/timothyfroehlich/PinPoint/pulls/comments/2744455794/reactions",
+      "total_count": 0,
+      "+1": 0,
+      "-1": 0,
+      "laugh": 0,
+      "hooray": 0,
+      "confused": 0,
+      "heart": 0,
+      "rocket": 0,
+      "eyes": 0
+    },
+    "start_line": null,
+    "original_start_line": null,
+    "start_side": null,
+    "line": 21,
+    "original_line": 21,
+    "side": "RIGHT",
+    "author_association": "CONTRIBUTOR",
+    "original_position": 21,
+    "position": 21,
+    "subject_type": "line"
+  },
+  {
+    "url": "https://api.github.com/repos/timothyfroehlich/PinPoint/pulls/comments/2744455809",
+    "pull_request_review_id": 3726139478,
+    "id": 2744455809,
+    "node_id": "PRRC_kwDOPB_pGs6jlRKB",
+    "diff_hunk": "@@ -0,0 +1,68 @@\n+import { test, expect } from \"@playwright/test\";\n+import { ensureLoggedIn } from \"./support/actions\";\n+import { seededMachines } from \"./support/constants\";\n+\n+test.describe(\"Machine Filtering and Sorting\", () => {\n+  test.beforeEach(async ({ page }, testInfo) => {\n+    await ensureLoggedIn(page, testInfo);\n+  });\n+\n+  test(\"user can search and filter machines\", async ({ page }) => {\n+    // Navigate to machines page\n+    await page.goto(\"/m\");\n+    await expect(page.getByRole(\"heading\", { name: \"Machines\" })).toBeVisible();\n+\n+    // 1. Test Search by Initials\n+    const searchInput = page.getByPlaceholder(\n+      \"Search machines by name or initials...\"\n+    );\n+    await searchInput.fill(seededMachines.attackFromMars.initials);\n+    // Wait for debounce\n+    await page.waitForTimeout(500);\n+\n+    await expect(\n+      page.getByText(seededMachines.attackFromMars.name)\n+    ).toBeVisible();\n+    await expect(\n+      page.getByText(seededMachines.medievalMadness.name)\n+    ).not.toBeVisible();\n+    await expect(\n+      page.getByText(seededMachines.addamsFamily.name)\n+    ).not.toBeVisible();\n+\n+    // 2. Test Search by Name\n+    await searchInput.fill(\"Medieval\");\n+    await page.waitForTimeout(500);",
+    "path": "e2e/machines-filtering.spec.ts",
+    "commit_id": "c5090748b9019d39809fc4d184e51887e8a8d421",
+    "original_commit_id": "c5090748b9019d39809fc4d184e51887e8a8d421",
+    "user": {
+      "login": "Copilot",
+      "id": 175728472,
+      "node_id": "BOT_kgDOCnlnWA",
+      "avatar_url": "https://avatars.githubusercontent.com/in/946600?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/Copilot",
+      "html_url": "https://github.com/apps/copilot-pull-request-reviewer",
+      "followers_url": "https://api.github.com/users/Copilot/followers",
+      "following_url": "https://api.github.com/users/Copilot/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Copilot/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/Copilot/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Copilot/subscriptions",
+      "organizations_url": "https://api.github.com/users/Copilot/orgs",
+      "repos_url": "https://api.github.com/users/Copilot/repos",
+      "events_url": "https://api.github.com/users/Copilot/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/Copilot/received_events",
+      "type": "Bot",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "body": "Another hard-coded timeout here. Replace with a semantic wait that checks for URL parameter changes or element visibility state.",
+    "created_at": "2026-01-30T03:26:56Z",
+    "updated_at": "2026-01-30T03:26:57Z",
+    "html_url": "https://github.com/timothyfroehlich/PinPoint/pull/881#discussion_r2744455809",
+    "pull_request_url": "https://api.github.com/repos/timothyfroehlich/PinPoint/pulls/881",
+    "_links": {
+      "self": {
+        "href": "https://api.github.com/repos/timothyfroehlich/PinPoint/pulls/comments/2744455809"
+      },
+      "html": {
+        "href": "https://github.com/timothyfroehlich/PinPoint/pull/881#discussion_r2744455809"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/timothyfroehlich/PinPoint/pulls/881"
+      }
+    },
+    "reactions": {
+      "url": "https://api.github.com/repos/timothyfroehlich/PinPoint/pulls/comments/2744455809/reactions",
+      "total_count": 0,
+      "+1": 0,
+      "-1": 0,
+      "laugh": 0,
+      "hooray": 0,
+      "confused": 0,
+      "heart": 0,
+      "rocket": 0,
+      "eyes": 0
+    },
+    "start_line": null,
+    "original_start_line": null,
+    "start_side": null,
+    "line": 35,
+    "original_line": 35,
+    "side": "RIGHT",
+    "author_association": "CONTRIBUTOR",
+    "original_position": 35,
+    "position": 35,
+    "subject_type": "line"
+  },
+  {
+    "url": "https://api.github.com/repos/timothyfroehlich/PinPoint/pulls/comments/2744455816",
+    "pull_request_review_id": 3726139478,
+    "id": 2744455816,
+    "node_id": "PRRC_kwDOPB_pGs6jlRKI",
+    "diff_hunk": "@@ -0,0 +1,81 @@\n+export type MachineStatus = \"operational\" | \"needs_service\" | \"unplayable\";",
+    "path": "src/lib/machines/filters.ts",
+    "commit_id": "c5090748b9019d39809fc4d184e51887e8a8d421",
+    "original_commit_id": "c5090748b9019d39809fc4d184e51887e8a8d421",
+    "user": {
+      "login": "Copilot",
+      "id": 175728472,
+      "node_id": "BOT_kgDOCnlnWA",
+      "avatar_url": "https://avatars.githubusercontent.com/in/946600?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/Copilot",
+      "html_url": "https://github.com/apps/copilot-pull-request-reviewer",
+      "followers_url": "https://api.github.com/users/Copilot/followers",
+      "following_url": "https://api.github.com/users/Copilot/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Copilot/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/Copilot/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Copilot/subscriptions",
+      "organizations_url": "https://api.github.com/users/Copilot/orgs",
+      "repos_url": "https://api.github.com/users/Copilot/repos",
+      "events_url": "https://api.github.com/users/Copilot/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/Copilot/received_events",
+      "type": "Bot",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "body": "The `MachineStatus` type is duplicated in two files. It's defined here as `\"operational\" | \"needs_service\" | \"unplayable\"` and also in `src/lib/machines/status.ts:4` as `\"unplayable\" | \"needs_service\" | \"operational\"`. \n\nTo maintain DRY principles and avoid potential inconsistencies, this type should be imported from `status.ts` which is the source of truth for machine status types. The `VALID_MACHINE_STATUSES` array could then be defined using the imported type.\n```suggestion\nimport type { MachineStatus } from \"~/lib/machines/status\";\n```",
+    "created_at": "2026-01-30T03:26:56Z",
+    "updated_at": "2026-01-30T03:26:57Z",
+    "html_url": "https://github.com/timothyfroehlich/PinPoint/pull/881#discussion_r2744455816",
+    "pull_request_url": "https://api.github.com/repos/timothyfroehlich/PinPoint/pulls/881",
+    "_links": {
+      "self": {
+        "href": "https://api.github.com/repos/timothyfroehlich/PinPoint/pulls/comments/2744455816"
+      },
+      "html": {
+        "href": "https://github.com/timothyfroehlich/PinPoint/pull/881#discussion_r2744455816"
+      },
+      "pull_request": {
+        "href": "https://api.github.com/repos/timothyfroehlich/PinPoint/pulls/881"
+      }
+    },
+    "reactions": {
+      "url": "https://api.github.com/repos/timothyfroehlich/PinPoint/pulls/comments/2744455816/reactions",
+      "total_count": 0,
+      "+1": 0,
+      "-1": 0,
+      "laugh": 0,
+      "hooray": 0,
+      "confused": 0,
+      "heart": 0,
+      "rocket": 0,
+      "eyes": 0
+    },
+    "start_line": null,
+    "original_start_line": null,
+    "start_side": null,
+    "line": 1,
+    "original_line": 1,
+    "side": "RIGHT",
+    "author_association": "CONTRIBUTOR",
+    "original_position": 1,
+    "position": 1,
+    "subject_type": "line"
+  }
+]
