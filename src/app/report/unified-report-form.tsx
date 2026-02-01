@@ -14,6 +14,7 @@ import { Textarea } from "~/components/ui/textarea";
 import { Button } from "~/components/ui/button";
 import { UserCheck } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { cn } from "~/lib/utils";
 import { submitPublicIssueAction } from "./actions";
 import { SeveritySelect } from "~/components/issues/fields/SeveritySelect";
 import { FrequencySelect } from "~/components/issues/fields/FrequencySelect";
@@ -253,14 +254,25 @@ export function UnifiedReportForm({
                 <div className="lg:hidden">{recentIssuesPanelMobile}</div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="title" className="text-on-surface">
-                    Issue Title *
-                  </Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="title" className="text-on-surface">
+                      Issue Title *
+                    </Label>
+                    <span
+                      className={cn(
+                        "text-xs text-muted-foreground transition-opacity duration-200",
+                        title.length < 40 && "opacity-0 select-none"
+                      )}
+                      aria-hidden={title.length < 40}
+                    >
+                      {60 - title.length}/60
+                    </span>
+                  </div>
                   <Input
                     id="title"
                     name="title"
                     required
-                    maxLength={200}
+                    maxLength={60}
                     placeholder="e.g., Left flipper not responding"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
