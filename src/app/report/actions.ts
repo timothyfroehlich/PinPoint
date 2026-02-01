@@ -146,7 +146,7 @@ export async function submitPublicIssueAction(
 
   let finalStatus = status;
   if (isMemberOrAdmin) {
-    finalAssignedTo = assignedTo;
+    finalAssignedTo = assignedTo === "" ? undefined : assignedTo;
   } else {
     // Force medium priority and new status for guests/anonymous
     finalPriority = "medium";
