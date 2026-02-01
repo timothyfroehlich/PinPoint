@@ -143,7 +143,9 @@ test.describe.serial("Comment Edit and Delete", () => {
       await page.getByRole("menuitem", { name: "Edit" }).click();
 
       // The textarea should appear with the comment content
-      const editTextarea = page.locator("textarea[name='comment']");
+      // Scope to the specific comment card to avoid matching the "Add Comment" textarea
+      const commentCard = getCommentCard(page, testCommentText);
+      const editTextarea = commentCard.locator("textarea[name='comment']");
       await expect(editTextarea).toBeVisible();
 
       // Clear and enter new content
