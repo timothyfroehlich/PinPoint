@@ -178,7 +178,10 @@ export default async function IssueDetailPage({
           )}
         </div>
         <div className="space-y-3">
-          <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight">
+          <h1
+            className="text-3xl lg:text-4xl font-extrabold tracking-tight"
+            title={issue.title.length > 60 ? issue.title : undefined}
+          >
             {issue.title.length > 60
               ? `${issue.title.slice(0, 60)}...`
               : issue.title}

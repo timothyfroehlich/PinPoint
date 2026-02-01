@@ -205,6 +205,16 @@
       "priority": "high",
       "frequency": "intermittent",
       "reporter": { "type": "user", "role": "admin" }
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000019",
+      "num": 2,
+      "title": "Left flipper button intermittent",
+      "status": "new",
+      "severity": "minor",
+      "priority": "medium",
+      "frequency": "intermittent",
+      "reporter": { "type": "anonymous" }
     }
   ]
 }

@@ -60,10 +60,12 @@ test.describe("Reporter Variations E2E", () => {
   test("should display fully anonymous reporter correctly", async ({
     page,
   }) => {
-    // NOTE: There is currently NO truly anonymous issue in seed data (all have at least one reporter field)
-    // HD Issue 1 is reported by admin user, not anonymous. Skipping this test until seed data is updated.
-    // When adding a truly anonymous issue, use an issue with no reportedBy, reporterName, reporterEmail, or invitedUserId
-    await page.close(); // Skip test gracefully
+    // GDZ Issue 2 is truly anonymous - no reportedBy, reporterName, reporterEmail, or invitedUserId
+    const issue = seededIssues.GDZ[1];
+    await page.goto(`/m/GDZ/i/${issue.num}`);
+    const sidebar = page.getByTestId("issue-sidebar");
+
+    await expect(sidebar).toContainText("Anonymous");
   });
 
   test("should display invited user reporter correctly (legacy logic)", async ({

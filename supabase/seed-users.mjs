@@ -425,23 +425,39 @@ async function seedUsersAndData() {
         frequency: "intermittent",
         reportedBy: userIds.admin,
       },
+      // Truly anonymous issue - no reporter info at all
+      {
+        id: "10000000-0000-4000-8000-000000000019",
+        initials: "GDZ",
+        num: 2,
+        title: "Left flipper button intermittent",
+        desc: "The left flipper button sometimes doesn't register when pressed quickly. May need switch adjustment.",
+        status: "new",
+        severity: "minor",
+        priority: "medium",
+        frequency: "intermittent",
+        // No reportedBy, reporterName, reporterEmail, or invitedUserId
+      },
     ];
 
     for (const issue of issueSeed) {
       await sql`
         INSERT INTO issues (
           id, machine_initials, issue_number, title, description,
-          status, severity, reported_by, invited_reported_by,
+          status, severity, priority, frequency, reported_by, invited_reported_by,
           reporter_name, reporter_email, created_at, updated_at
         ) VALUES (
           ${issue.id}, ${issue.initials}, ${issue.num}, ${issue.title}, ${issue.desc},
-          ${issue.status}, ${issue.severity}, ${issue.reportedBy ?? null}, ${issue.invitedUserId ?? null},
+          ${issue.status}, ${issue.severity}, ${issue.priority}, ${issue.frequency},
+          ${issue.reportedBy ?? null}, ${issue.invitedUserId ?? null},
           ${issue.reporterName ?? null}, ${issue.reporterEmail ?? null}, NOW(), NOW()
         ) ON CONFLICT (id) DO UPDATE SET
           reported_by = EXCLUDED.reported_by,
           invited_reported_by = EXCLUDED.invited_reported_by,
           reporter_name = EXCLUDED.reporter_name,
           reporter_email = EXCLUDED.reporter_email,
+          priority = EXCLUDED.priority,
+          frequency = EXCLUDED.frequency,
           updated_at = NOW()
       `;
 
@@ -487,7 +503,7 @@ async function seedUsersAndData() {
     await sql`UPDATE machines SET next_issue_number = 3 WHERE initials = 'AFM'`;
     await sql`UPDATE machines SET next_issue_number = 3 WHERE initials = 'MM'`;
     await sql`UPDATE machines SET next_issue_number = 2 WHERE initials = 'SM'`;
-    await sql`UPDATE machines SET next_issue_number = 2 WHERE initials = 'GDZ'`;
+    await sql`UPDATE machines SET next_issue_number = 3 WHERE initials = 'GDZ'`;
 
     console.log("✅ Issues seeded.");
 
