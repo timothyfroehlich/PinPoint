@@ -86,8 +86,8 @@ test.describe.serial("Comment Edit and Delete", () => {
     const page = await context.newPage();
 
     await loginAs(page, testInfo);
-    // Wait for network idle to ensure session is fully established
-    await page.waitForLoadState("networkidle");
+    // Reload to ensure Supabase SSR cookies are properly set for subsequent requests
+    await page.reload({ waitUntil: "networkidle" });
     issueUrl = await createTestIssue(page, testInfo);
 
     await context.close();
