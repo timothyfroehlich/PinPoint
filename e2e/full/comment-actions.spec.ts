@@ -86,6 +86,8 @@ test.describe.serial("Comment Edit and Delete", () => {
     const page = await context.newPage();
 
     await loginAs(page, testInfo);
+    // Wait for network idle to ensure session is fully established
+    await page.waitForLoadState("networkidle");
     issueUrl = await createTestIssue(page, testInfo);
 
     await context.close();
@@ -160,7 +162,7 @@ test.describe.serial("Comment Edit and Delete", () => {
 
       // Verify the comment is updated
       await expect(page.getByText(editedCommentText)).toBeVisible();
-      await expect(page.getByText("(edited)")).toBeVisible();
+      await expect(page.getByText(/\(edited .+ ago\)/)).toBeVisible();
     });
 
     test("author can delete their own comment", async ({ page }, testInfo) => {
