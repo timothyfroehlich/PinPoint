@@ -35,6 +35,7 @@ export interface CreateIssueParams {
   severity: IssueSeverity;
   priority?: IssuePriority | undefined;
   frequency?: IssueFrequency | undefined;
+  status?: IssueStatus | undefined;
   reportedBy?: string | null;
   reporterName?: string | null;
   reporterEmail?: string | null;
@@ -96,6 +97,7 @@ export async function createIssue({
   severity,
   priority,
   frequency,
+  status,
   reportedBy,
   reporterName,
   reporterEmail,
@@ -133,7 +135,7 @@ export async function createIssue({
         reportedBy: reportedBy ?? null,
         reporterName: reporterName ?? null,
         reporterEmail: reporterEmail ?? null,
-        status: "new",
+        status: status ?? "new",
       })
       .returning();
 
