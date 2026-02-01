@@ -44,7 +44,7 @@ Update `test-unit` job in `.github/workflows/ci.yml`:
     pnpm run test:coverage -- --reporter=verbose
 
 - name: Upload coverage to Codecov
-  uses: codecov/codecov-action@v5
+  uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5
   with:
     files: ./coverage/lcov.info
     fail_ci_if_error: true
@@ -68,5 +68,5 @@ Update `test-unit` job in `.github/workflows/ci.yml`:
 ## Not Included
 
 - E2E coverage tracking (complexity outweighs value)
-- Integration test coverage (unit tests only)
+- Integration test coverage (only unit test coverage is uploaded/enforced in Codecov; integration tests are not part of the coverage signal)
 - PR comments (status check sufficient)
