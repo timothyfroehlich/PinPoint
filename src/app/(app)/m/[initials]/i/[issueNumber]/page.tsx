@@ -9,7 +9,6 @@ import { PageShell } from "~/components/layout/PageShell";
 import { IssueTimeline } from "~/components/issues/IssueTimeline";
 import { IssueSidebar } from "~/components/issues/IssueSidebar";
 import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
-import { OwnerBadge } from "~/components/issues/OwnerBadge";
 import { getMachineOwnerName } from "~/lib/issues/owner";
 import { formatIssueId } from "~/lib/issues/utils";
 import { ImageGallery } from "~/components/images/ImageGallery";
@@ -161,6 +160,9 @@ export default async function IssueDetailPage({
       {/* Header */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
+          <span className="text-muted-foreground font-mono font-bold">
+            {formatIssueId(initials, issue.issueNumber)}
+          </span>
           <Link
             href={`/m/${initials}`}
             className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
@@ -172,16 +174,17 @@ export default async function IssueDetailPage({
               <span>•</span>
               <span>Game Owner:</span>
               <span className="font-medium text-foreground">{ownerName}</span>
-              <OwnerBadge size="sm" />
             </div>
           )}
         </div>
         <div className="space-y-3">
-          <h1 className="flex items-center gap-3">
-            <span className="text-muted-foreground font-mono text-2xl">
-              {formatIssueId(initials, issue.issueNumber)}
-            </span>{" "}
-            {issue.title}
+          <h1
+            className="text-3xl lg:text-4xl font-extrabold tracking-tight"
+            title={issue.title.length > 60 ? issue.title : undefined}
+          >
+            {issue.title.length > 60
+              ? `${issue.title.slice(0, 60)}...`
+              : issue.title}
           </h1>
           <div className="flex flex-wrap items-center gap-2">
             <IssueBadgeGrid
