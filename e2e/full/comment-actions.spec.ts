@@ -56,11 +56,10 @@ async function createTestIssue(
 }
 
 async function addComment(page: Page, content: string): Promise<void> {
-  const commentTextarea = page.getByRole("textbox", {
-    name: /add a comment/i,
-  });
+  // The textarea has aria-label="Comment" per AddCommentForm.tsx
+  const commentTextarea = page.getByRole("textbox", { name: "Comment" });
   await commentTextarea.fill(content);
-  await page.getByRole("button", { name: /add comment/i }).click();
+  await page.getByRole("button", { name: "Add Comment" }).click();
   await page.waitForLoadState("networkidle");
   // Wait for comment to appear
   await expect(page.getByText(content)).toBeVisible({ timeout: 10000 });

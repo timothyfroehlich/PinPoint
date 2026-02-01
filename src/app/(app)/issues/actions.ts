@@ -808,6 +808,11 @@ export async function editCommentAction(
       return err("NOT_FOUND", "Comment not found");
     }
 
+    // System comments (audit events) cannot be edited
+    if (existingComment.isSystem) {
+      return err("UNAUTHORIZED", "System comments cannot be edited");
+    }
+
     if (existingComment.authorId !== user.id) {
       return err("UNAUTHORIZED", "You can only edit your own comments");
     }
@@ -875,6 +880,11 @@ export async function deleteCommentAction(
 
     if (!existingComment) {
       return err("NOT_FOUND", "Comment not found");
+    }
+
+    // System comments (audit events) cannot be deleted
+    if (existingComment.isSystem) {
+      return err("UNAUTHORIZED", "System comments cannot be deleted");
     }
 
     const userProfile = await db.query.userProfiles.findFirst({
