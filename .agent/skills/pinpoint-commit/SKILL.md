@@ -23,16 +23,30 @@ This skill provides a guided, 6-phase workflow that handles the entire commit-to
 
 **Key Features**:
 
+- **Branch validation first**: Ensures you're on the right branch before any work
 - Smart E2E test selection based on file patterns
 - Conventional commit message generation
-- Automatic branch validation/creation
+- Automatic branch creation when needed
 - GitHub issue linking support
 - PR creation with detailed descriptions
 - Optional CI monitoring
 
+**Phase Order**:
+
+1. **Branch Validation** - Verify branch is appropriate for the work
+2. **File Review** - Review and stage changes
+3. **Testing** - Run preflight and E2E tests
+4. **Commit** - Generate conventional commit message
+5. **Push & PR** - Push and create/update PR
+6. **CI Monitoring** - Watch GitHub Actions (optional)
+
 ---
 
-## Phase 1: Pre-Commit File Review
+## Phase 1: Branch Validation
+
+**Run this FIRST before file review or testing**
+
+### 1.1 Validate Current Branch
 
 ### 1.1 Check Git Status
 
@@ -162,16 +176,36 @@ pnpm run e2e:full
 
 ## Phase 3: Branch Management
 
-### 3.1 Check Current Branch
+### 3.1 Validate Current Branch
+
+Run comprehensive branch validation to ensure clean state:
 
 ```bash
-git rev-parse --abbrev-ref HEAD
+# Get current branch
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# Check if branch tracks a remote
+UPSTREAM=$(git rev-parse --abbrev-ref @{upstream} 2>/dev/null || echo "")
+
+# Get merge base with main
+MERGE_BASE=$(git merge-base HEAD main 2>/dev/null || echo "")
+MAIN_HEAD=$(git rev-parse main 2>/dev/null || echo "")
 ```
+
+**Validation checks**:
+
+1. **Not on main**: `HEAD` != `main`
+2. **Not detached**: `HEAD` is a branch name
+3. **Proper naming**: Matches `feature/*`, `fix/*`, `chore/*`, `docs/*`
+4. **Based on main**: Merge base is current `main` HEAD (no stale branches)
+5. **Upstream set**: Remote tracking branch exists
 
 **Branch types**:
 
-- ✅ **Feature branches**: `feature/*`, `fix/*`, `chore/*`, `docs/*`
-- ⚠️ **Main branch**: Don't commit directly
+- ✅ **Valid feature branch**: Passes all checks
+- ⚠️ **Main branch**: Don't commit directly → Create new branch
+- ⚠️ **Stale branch**: Merge base != main HEAD → Offer rebase or new branch
+- ⚠️ **No upstream**: Missing remote tracking → Will set on push
 - ❌ **Detached HEAD**: Create a branch first
 
 ### 3.2 Handle Branch Scenarios
@@ -193,10 +227,56 @@ I'll create a new branch for you.
 
 → Jump to **3.3 Create Branch**
 
-**Scenario C: Valid feature branch**
+**Scenario C: Stale branch (not based on current main)**
 
 ```
-✅ On branch: feature/issue-filter-search
+⚠️  Branch 'chore/enable-sentry-plugin' is stale (based on old main).
+
+This branch was created from:  commit abc123
+Current main is at:            commit def456
+
+Options:
+1. Create new branch from current main (recommended)
+2. Rebase onto main (advanced - may have conflicts)
+3. Continue anyway (not recommended)
+```
+
+**If option 1**: → Jump to **3.3 Create Branch**
+**If option 2**: Run `git rebase main`, then continue
+**If option 3**: Warn user, then continue
+
+**Scenario D: Misnamed branch**
+
+```
+⚠️  Branch 'my-work' doesn't follow naming convention.
+Expected: feature/*, fix/*, chore/*, docs/*
+
+Options:
+1. Create properly named branch
+2. Continue anyway
+```
+
+**If option 1**: → Jump to **3.3 Create Branch**
+
+**Scenario E: Valid feature branch**
+
+```
+✅ Branch: feature/issue-filter-search
+✅ Based on: main (up to date)
+✅ Upstream: origin/feature/issue-filter-search
+
+Proceeding...
+```
+
+→ Continue to **Phase 4**
+
+**Scenario F: Valid branch, no upstream**
+
+```
+✅ Branch: feature/new-work
+✅ Based on: main (up to date)
+⚠️  No upstream (will be set on push)
+
 Proceeding...
 ```
 
