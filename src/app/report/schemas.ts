@@ -31,6 +31,7 @@ export const publicIssueSchema = z.object({
     .max(254, "Email is too long")
     .optional()
     .or(z.literal("")),
+  assignedTo: z.string().uuid("Invalid assignee").optional(),
 });
 
 export type PublicIssueInput = z.infer<typeof publicIssueSchema>;

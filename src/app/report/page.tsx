@@ -21,10 +21,36 @@ export default async function PublicReportPage({
     source?: string;
   }>;
 }): Promise<React.JSX.Element> {
-  const machinesList = await db.query.machines.findMany({
+  const machinesListPromise = db.query.machines.findMany({
     orderBy: asc(machines.name),
     columns: { id: true, name: true, initials: true },
   });
+
+  // Auth context for the form
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  let userProfile;
+  let assignees: { id: string; name: string | null }[] = [];
+  if (user) {
+    userProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true },
+    });
+
+    if (userProfile?.role === "admin" || userProfile?.role === "member") {
+      assignees = await db.query.userProfiles.findMany({
+        where: (profile) =>
+          sql`${profile.role} = 'admin' OR ${profile.role} = 'member'`,
+        columns: { id: true, name: true },
+        orderBy: asc(userProfiles.name),
+      });
+    }
+  }
+
+  const [machinesList] = await Promise.all([machinesListPromise]);
 
   const params = await searchParams;
   const errorMessage = params.error
@@ -40,20 +66,6 @@ export default async function PublicReportPage({
     machineInitialsFromQuery
   );
 
-  // Auth context for the form
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  let userProfile;
-  if (user) {
-    userProfile = await db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, user.id),
-      columns: { role: true },
-    });
-  }
-
   const selectedMachine = machinesList.find((m) => m.id === defaultMachineId);
 
   return (
@@ -64,6 +76,7 @@ export default async function PublicReportPage({
           defaultMachineId={defaultMachineId}
           user={user}
           userProfile={userProfile}
+          assignees={assignees}
           initialError={errorMessage}
           recentIssuesPanelMobile={
             <RecentIssuesPanel
