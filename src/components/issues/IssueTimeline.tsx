@@ -110,6 +110,7 @@ function CommentEditForm({
         name="comment"
         defaultValue={initialContent}
         className="min-h-32"
+        aria-label="Edit comment"
         required
       />
       <CommentEditFormButtons onCancel={onCancel} />
