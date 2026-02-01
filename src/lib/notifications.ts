@@ -44,7 +44,7 @@ export async function createNotification(
     resourceId,
     resourceType,
     actorId,
-    includeActor,
+    includeActor = true,
     issueTitle,
     machineName,
     formattedIssueId,
@@ -155,13 +155,13 @@ export async function createNotification(
     addRecipients(...watchers.map((w: IssueWatcher) => w.userId));
   }
 
-  if (includeActor && actorId) {
-    recipientIds.add(actorId);
-  }
-
-  // Exclude actor and dedupe
-  if (actorId && !includeActor) {
-    recipientIds.delete(actorId);
+  // Handle actor inclusion/exclusion
+  if (actorId) {
+    if (includeActor) {
+      recipientIds.add(actorId);
+    } else {
+      recipientIds.delete(actorId);
+    }
   }
 
   if (recipientIds.size === 0) return;
