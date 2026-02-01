@@ -41,7 +41,7 @@
     {
       "id": "10000000-0000-4000-8000-000000000004",
       "num": 1,
-      "title": "Zipper flippers intermittent",
+      "title": "Zipper flippers intermittent (with photo)",
       "status": "confirmed",
       "severity": "major",
       "priority": "high",
@@ -85,7 +85,7 @@
     {
       "id": "10000000-0000-4000-8000-000000000008",
       "num": 1,
-      "title": "8-ball target stuck",
+      "title": "8-ball target stuck (with photo)",
       "status": "in_progress",
       "severity": "unplayable",
       "priority": "high",
@@ -143,7 +143,7 @@
     {
       "id": "10000000-0000-4000-8000-000000000013",
       "num": 1,
-      "title": "Saucer doesn't eject reliably",
+      "title": "Saucer doesn't eject reliably (with photo)",
       "status": "in_progress",
       "severity": "major",
       "priority": "high",
@@ -165,7 +165,7 @@
     {
       "id": "10000000-0000-4000-8000-000000000015",
       "num": 1,
-      "title": "Castle gate motor loud",
+      "title": "Castle gate motor loud (with photo)",
       "status": "confirmed",
       "severity": "minor",
       "priority": "medium",
