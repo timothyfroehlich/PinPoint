@@ -15,7 +15,7 @@ test.describe("Reporter Variations E2E", () => {
     await page.goto("/m/AFM/i/1");
     const sidebar = page.getByTestId("issue-sidebar");
 
-    // Check for member name and email in the reporter section
+    // Check for member name in the reporter section
     await expect(sidebar).toContainText("Member User");
 
     // Check timeline initial report
@@ -91,7 +91,7 @@ test.describe("Reporter Variations E2E", () => {
     await page.goto("/m/AFM/i/1");
     const sidebar = page.getByTestId("issue-sidebar");
 
-    // Admins should NOT see emails in the sidebar anymore
+    // Check for reporter name in sidebar
     await expect(sidebar).toContainText("Member User");
   });
 });
