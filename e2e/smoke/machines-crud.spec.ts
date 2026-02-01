@@ -7,7 +7,12 @@
 import { test, expect } from "@playwright/test";
 import { ensureLoggedIn, logout, loginAs } from "../support/actions";
 import { cleanupTestEntities } from "../support/cleanup";
-import { seededMachines, TEST_USERS } from "../support/constants";
+import {
+  seededMachines,
+  TEST_USERS,
+  machineStatuses,
+  seededIssues,
+} from "../support/constants";
 
 const createdMachineIds = new Set<string>();
 
@@ -66,8 +71,8 @@ test.describe("Machines CRUD", () => {
     const machineCards = page.getByTestId("machine-card");
     const cardCount = await machineCards.count();
 
-    // We seed 3 machines; other tests may add more but we should always have at least the seeds
-    expect(cardCount).toBeGreaterThanOrEqual(3);
+    // We seed 10 machines; other tests may add more but we should always have at least the seeds
+    expect(cardCount).toBeGreaterThanOrEqual(10);
 
     // Every card should surface a status badge and an open-issue count
     for (let i = 0; i < cardCount; i += 1) {
@@ -81,11 +86,13 @@ test.describe("Machines CRUD", () => {
       expect(Number.isNaN(Number.parseInt(countText, 10))).toBe(false);
     }
 
-    // Sanity: the seeded unplayable machine should surface as unplayable
+    // Sanity: verify The Addams Family shows correct status (Needs Service from major severity issues)
     const addamsCard = page.locator(
       `a:has-text("${seededMachines.addamsFamily.name}")`
     );
-    await expect(addamsCard.getByText("Unplayable")).toBeVisible();
+    await expect(
+      addamsCard.getByText(machineStatuses.addamsFamily)
+    ).toBeVisible();
   });
 
   // Machine creation moved to integration/full suite
@@ -118,9 +125,9 @@ test.describe("Machines CRUD", () => {
     expect(actualCardCount).toBe(displayedCount);
     expect(actualCardCount).toBeGreaterThan(0); // Ensure we have issues to display
 
-    // Verify specific seed issues are listed
-    await expect(page.getByText("Ball stuck in Thing's box")).toBeVisible();
-    await expect(page.getByText("Bear Kick opto not working")).toBeVisible();
+    // Verify specific seed issues are listed (using actual TAF seeded issues)
+    await expect(page.getByText(seededIssues.TAF[0].title)).toBeVisible(); // "Thing flips the bird"
+    await expect(page.getByText(seededIssues.TAF[1].title)).toBeVisible(); // "Bookcase not registering"
   });
 
   test("should display machine owner to all logged-in users", async ({

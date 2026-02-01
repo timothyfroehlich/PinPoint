@@ -144,95 +144,286 @@ async function seedUsersAndData() {
     console.warn("⚠️ Could not seed invited user");
   }
 
-  // 3. Seed Machines (Owned by Admin)
+  // 3. Seed Machines (Distributed ownership)
   if (userIds.admin) {
     console.log("\n🎰 Seeding machines...");
 
     const machines = Object.values(machinesData);
 
+    // Machine ownership distribution:
+    // Admin: Humpty Dumpty, Black Knight, Medieval Madness, Godzilla
+    // Member: Slick Chick, Eight Ball Deluxe, Attack from Mars
+    // Guest: Fireball, Spider-Man
+    // Invited: The Addams Family
+    const ownerMap = {
+      "HD": userIds.admin,
+      "SC": userIds.member,
+      "FB": userIds.guest,
+      "BK": userIds.admin,
+      "EBD": userIds.member,
+      "TAF": null, // Will use invited owner
+      "AFM": userIds.member,
+      "MM": userIds.admin,
+      "SM": userIds.guest,
+      "GDZ": userIds.admin,
+    };
+
     for (const machine of machines) {
+      const ownerId = ownerMap[machine.initials];
+      const invitedOwnerId = machine.initials === "TAF" ? invitedUserId : null;
+
       await sql`
-        INSERT INTO machines (id, name, initials, owner_id, created_at, updated_at)
-        VALUES (${machine.id}, ${machine.name}, ${machine.initials}, ${userIds.admin}, NOW(), NOW())
+        INSERT INTO machines (id, name, initials, owner_id, invited_owner_id, created_at, updated_at)
+        VALUES (${machine.id}, ${machine.name}, ${machine.initials}, ${ownerId}, ${invitedOwnerId}, NOW(), NOW())
         ON CONFLICT (id) DO UPDATE SET
-          owner_id = ${userIds.admin},
+          owner_id = ${ownerId},
+          invited_owner_id = ${invitedOwnerId},
           initials = ${machine.initials}
       `;
 
-      // Also add owner to machine_watchers (full subscribe)
-      await sql`
-        INSERT INTO machine_watchers (machine_id, user_id, watch_mode)
-        VALUES (${machine.id}, ${userIds.admin}, 'subscribe')
-        ON CONFLICT (machine_id, user_id) DO UPDATE SET
-          watch_mode = 'subscribe'
-      `;
+      // Add owner to machine_watchers (full subscribe)
+      if (ownerId) {
+        await sql`
+          INSERT INTO machine_watchers (machine_id, user_id, watch_mode)
+          VALUES (${machine.id}, ${ownerId}, 'subscribe')
+          ON CONFLICT (machine_id, user_id) DO UPDATE SET
+            watch_mode = 'subscribe'
+        `;
+      }
     }
-    console.log("✅ Machines seeded with Admin owner.");
+    console.log("✅ Machines seeded with distributed ownership.");
 
-    // 3. Seed Issues
+    // 3. Seed Issues (18 issues with comprehensive permutations)
     console.log("\n🔧 Seeding issues...");
 
     const issueSeed = [
+      // HD (Humpty Dumpty) - 1947
       {
         id: "10000000-0000-4000-8000-000000000001",
-        initials: "AFM",
+        initials: "HD",
         num: 1,
-        title: "Right flipper feels weak",
-        desc: "The right flipper doesn't have full strength. Can still play but makes ramp shots difficult.",
-        status: "confirmed",
+        title: "Worn flipper bushings",
+        desc: "The flippers have excessive play due to worn bushings. This is expected for a 1947 game but affects gameplay precision.",
+        status: "new",
         severity: "minor",
-        reportedBy: userIds.member,
+        priority: "low",
+        frequency: "constant",
+        reportedBy: userIds.admin,
       },
       {
         id: "10000000-0000-4000-8000-000000000002",
-        initials: "TAF",
+        initials: "HD",
+        num: 2,
+        title: "This is an extremely long issue title designed to test the two hundred and fifty character maximum title length limit that we've implemented in the application to ensure proper display truncation and database constraint validation across all user interfaces and screen sizes",
+        desc: "Testing maximum title length (250 characters). The scoring reels occasionally stick when incrementing, requiring manual adjustment. This appears to be related to the mechanical linkage between the score motor and the reel assemblies.",
+        status: "in_progress",
+        severity: "major",
+        priority: "medium",
+        frequency: "intermittent",
+        reportedBy: userIds.member,
+      },
+      // SC (Slick Chick) - 1963
+      {
+        id: "10000000-0000-4000-8000-000000000003",
+        initials: "SC",
         num: 1,
-        title: "Ball stuck in Thing's box",
-        desc: "Extended sample issue with many timeline updates.",
+        title: "Woodrail finish deteriorating",
+        desc: "The original woodrail finish is cracking and peeling in several spots.",
+        status: "wont_fix",
+        severity: "cosmetic",
+        priority: "low",
+        frequency: "constant",
+        reporterName: "Vintage Collector",
+        reporterEmail: "collector@pinball.com",
+      },
+      // FB (Fireball) - 1972
+      {
+        id: "10000000-0000-4000-8000-000000000004",
+        initials: "FB",
+        num: 1,
+        title: "Zipper flippers intermittent",
+        desc: "The famous zipper flippers sometimes fail to activate when the ball rolls over them.",
+        status: "confirmed",
+        severity: "major",
+        priority: "high",
+        frequency: "frequent",
+        reportedBy: userIds.guest,
+      },
+      {
+        id: "10000000-0000-4000-8000-000000000005",
+        initials: "FB",
+        num: 2,
+        title: "Backglass art fading",
+        desc: "UV damage to backglass.",
+        status: "resolved",
+        severity: "cosmetic",
+        priority: "low",
+        frequency: "constant",
+        reporterEmail: "anon@player.com",
+      },
+      // BK (Black Knight) - 1980
+      {
+        id: "10000000-0000-4000-8000-000000000006",
+        initials: "BK",
+        num: 1,
+        title: "Upper playfield magna-save weak",
+        desc: "The magna-save on the upper playfield doesn't have enough magnetic strength to reliably save the ball from the outlanes.",
+        status: "need_parts",
+        severity: "major",
+        priority: "high",
+        frequency: "constant",
+        reportedBy: userIds.admin,
+      },
+      {
+        id: "10000000-0000-4000-8000-000000000007",
+        initials: "BK",
+        num: 2,
+        title: "Speech board crackles",
+        desc: "Famous 'You will never defeat the Black Knight!' speech occasionally crackles or cuts out.",
+        status: "wait_owner",
+        severity: "minor",
+        priority: "medium",
+        frequency: "intermittent",
+        reporterName: "League Player",
+      },
+      // EBD (Eight Ball Deluxe) - 1981
+      {
+        id: "10000000-0000-4000-8000-000000000008",
+        initials: "EBD",
+        num: 1,
+        title: "8-ball target stuck",
+        desc: "The center 8-ball target is stuck in the up position and won't register hits.",
         status: "in_progress",
         severity: "unplayable",
+        priority: "high",
+        frequency: "always",
+        reportedBy: userIds.member,
+      },
+      {
+        id: "10000000-0000-4000-8000-000000000009",
+        initials: "EBD",
+        num: 2,
+        title: "Drop target bank misaligned",
+        desc: "The 3-bank drop targets don't reset properly, causing balls to get stuck.",
+        status: "fixed",
+        severity: "major",
+        priority: "high",
+        frequency: "frequent",
+        reportedBy: userIds.admin,
+      },
+      // TAF (The Addams Family) - 1992
+      {
+        id: "10000000-0000-4000-8000-000000000010",
+        initials: "TAF",
+        num: 1,
+        title: "Thing flips the bird",
+        desc: "Thing's mechanism occasionally gets stuck in the extended position, blocking the ball path.",
+        status: "new",
+        severity: "major",
+        priority: "high",
+        frequency: "intermittent",
         reporterName: "John Guest",
         reporterEmail: "john@guest.com",
       },
       {
-        id: "10000000-0000-4000-8000-000000000003",
+        id: "10000000-0000-4000-8000-000000000011",
         initials: "TAF",
         num: 2,
-        title: "Bookcase not registering hits",
-        desc: "The bookcase target doesn't registering when hit.",
-        status: "need_parts",
+        title: "Bookcase not registering",
+        desc: "The bookcase target doesn't register when hit, preventing mansion room awards.",
+        status: "confirmed",
         severity: "major",
-        reporterName: "Only Name",
+        priority: "medium",
+        frequency: "frequent",
+        invitedUserId: invitedUserId,
       },
       {
-        id: "10000000-0000-4000-8000-000000000004",
+        id: "10000000-0000-4000-8000-000000000012",
         initials: "TAF",
         num: 3,
-        title: "Dim GI lighting on left side",
-        desc: "General illumination bulbs on left side are dim.",
-        status: "new",
+        title: "DMD ghosting",
+        desc: "Display shows faint ghost images.",
+        status: "wai",
         severity: "cosmetic",
-        reporterEmail: "only@email.com",
+        priority: "low",
+        frequency: "constant",
+        reporterEmail: "display@bug.com",
       },
+      // AFM (Attack from Mars) - 1995
       {
-        id: "10000000-0000-4000-8000-000000000005",
-        initials: "TAF",
-        num: 4,
-        title: "Bear Kick opto not working",
-        desc: "Bear Kick feature not detecting ball.",
-        status: "wait_owner",
+        id: "10000000-0000-4000-8000-000000000013",
+        initials: "AFM",
+        num: 1,
+        title: "Saucer doesn't eject reliably",
+        desc: "The flying saucer fails to eject the ball about 20% of the time, requiring nudging or intervention.",
+        status: "in_progress",
         severity: "major",
-        // Anonymous
+        priority: "high",
+        frequency: "intermittent",
+        reportedBy: userIds.member,
       },
       {
-        id: "10000000-0000-4000-8000-000000000006",
-        initials: "TAF",
-        num: 5,
-        title: "Magnet throwing ball to Drain",
-        desc: "The Power magnet seems too strong or mistimed.",
-        status: "wont_fix",
+        id: "10000000-0000-4000-8000-000000000014",
+        initials: "AFM",
+        num: 2,
+        title: "Stroke of Luck not awarding",
+        desc: "The Stroke of Luck random award feature isn't triggering when it should during multiball.",
+        status: "no_repro",
         severity: "minor",
-        invitedUserId: invitedUserId,
+        priority: "low",
+        frequency: "intermittent",
+        reportedBy: userIds.guest,
+      },
+      // MM (Medieval Madness) - 1997
+      {
+        id: "10000000-0000-4000-8000-000000000015",
+        initials: "MM",
+        num: 1,
+        title: "Castle gate motor loud",
+        desc: "The castle gate motor makes an unusually loud grinding noise when opening and closing. Mechanism works but may indicate wear.",
+        status: "confirmed",
+        severity: "minor",
+        priority: "medium",
+        frequency: "constant",
+        reportedBy: userIds.admin,
+      },
+      {
+        id: "10000000-0000-4000-8000-000000000016",
+        initials: "MM",
+        num: 2,
+        title: "Troll bomb doesn't register",
+        desc: "Hitting the troll with the ball doesn't always register, preventing troll bomb completion.",
+        status: "duplicate",
+        severity: "major",
+        priority: "high",
+        frequency: "frequent",
+        reporterName: "Tournament Director",
+      },
+      // SM (Spider-Man) - 2007
+      {
+        id: "10000000-0000-4000-8000-000000000017",
+        initials: "SM",
+        num: 1,
+        title: "Doc Ock target assembly binding",
+        desc: "The Doc Ock tentacle target assembly binds when retracting, causing slow resets and occasional ball traps.",
+        status: "new",
+        severity: "major",
+        priority: "high",
+        frequency: "intermittent",
+        reportedBy: userIds.guest,
+      },
+      // GDZ (Godzilla) - 2021
+      {
+        id: "10000000-0000-4000-8000-000000000018",
+        initials: "GDZ",
+        num: 1,
+        title: "Building bash toy sticking",
+        desc: "The motorized building bash toy occasionally sticks in the down position after being hit, blocking shots to the upper playfield.",
+        status: "new",
+        severity: "major",
+        priority: "high",
+        frequency: "intermittent",
+        reportedBy: userIds.admin,
       },
     ];
 
@@ -286,103 +477,224 @@ async function seedUsersAndData() {
       `;
     }
 
-    // Update next issue numbers
-    await sql`UPDATE machines SET next_issue_number = 2 WHERE initials = 'AFM'`;
-    await sql`UPDATE machines SET next_issue_number = 6 WHERE initials = 'TAF'`;
+    // Update next issue numbers for all machines
+    await sql`UPDATE machines SET next_issue_number = 3 WHERE initials = 'HD'`;
+    await sql`UPDATE machines SET next_issue_number = 2 WHERE initials = 'SC'`;
+    await sql`UPDATE machines SET next_issue_number = 3 WHERE initials = 'FB'`;
+    await sql`UPDATE machines SET next_issue_number = 3 WHERE initials = 'BK'`;
+    await sql`UPDATE machines SET next_issue_number = 3 WHERE initials = 'EBD'`;
+    await sql`UPDATE machines SET next_issue_number = 4 WHERE initials = 'TAF'`;
+    await sql`UPDATE machines SET next_issue_number = 3 WHERE initials = 'AFM'`;
+    await sql`UPDATE machines SET next_issue_number = 3 WHERE initials = 'MM'`;
+    await sql`UPDATE machines SET next_issue_number = 2 WHERE initials = 'SM'`;
+    await sql`UPDATE machines SET next_issue_number = 2 WHERE initials = 'GDZ'`;
 
     console.log("✅ Issues seeded.");
 
-    // 4. Seed Comments (using real user IDs)
+    // 4. Seed Comments (distributed across multiple issues)
     if (userIds.member && userIds.admin) {
       console.log("\n💬 Seeding comments...");
 
-      // Clear existing comments for the main issue to avoid duplicates/mess
-      // await sql`DELETE FROM issue_comments WHERE issue_id = '10000000-0000-4000-8000-000000000002'`;
+      const commentsByIssue = {
+        // HD-02: Issue with progression (long title, in_progress)
+        "10000000-0000-4000-8000-000000000002": [
+          {
+            author: userIds.admin,
+            content: "Confirmed. Will need to disassemble the score motor assembly.",
+            isSystem: false,
+            daysAgo: 3,
+          },
+          {
+            author: userIds.admin,
+            content: "Status changed from New to In Progress",
+            isSystem: true,
+            daysAgo: 2.5,
+          },
+          {
+            author: userIds.member,
+            content: "Found the issue - linkage arm needs adjustment. Working on it now.",
+            isSystem: false,
+            daysAgo: 1,
+          },
+        ],
+        // FB-01: Multiple comments showing active discussion
+        "10000000-0000-4000-8000-000000000004": [
+          {
+            author: userIds.admin,
+            content: "This is a known issue with Fireball. The zipper flippers use a complex relay system.",
+            isSystem: false,
+            daysAgo: 5,
+          },
+          {
+            author: userIds.guest,
+            content: "Happens about 1 in 5 balls. Very frustrating during tournament play.",
+            isSystem: false,
+            daysAgo: 4,
+          },
+          {
+            author: userIds.member,
+            content: "I can take a look at the relay board this weekend.",
+            isSystem: false,
+            daysAgo: 2,
+          },
+          {
+            author: userIds.admin,
+            content: "Status changed from New to Confirmed",
+            isSystem: true,
+            daysAgo: 1,
+          },
+        ],
+        // EBD-01: Active repair with updates
+        "10000000-0000-4000-8000-000000000008": [
+          {
+            author: userIds.member,
+            content: "Opened up the playfield. The 8-ball target solenoid is binding.",
+            isSystem: false,
+            daysAgo: 2,
+          },
+          {
+            author: userIds.member,
+            content: "Ordered replacement solenoid. ETA 3-5 days.",
+            isSystem: false,
+            daysAgo: 1.5,
+          },
+          {
+            author: userIds.admin,
+            content: "Status changed from New to In Progress",
+            isSystem: true,
+            daysAgo: 1,
+          },
+        ],
+        // TAF-01: Simple status update
+        "10000000-0000-4000-8000-000000000010": [
+          {
+            author: userIds.admin,
+            content: "I'll check this out tomorrow during maintenance.",
+            isSystem: false,
+            daysAgo: 0.5,
+          },
+        ],
+        // AFM-01: Detailed troubleshooting
+        "10000000-0000-4000-8000-000000000013": [
+          {
+            author: userIds.member,
+            content: "Cleaned the saucer opto sensors. Testing now.",
+            isSystem: false,
+            daysAgo: 3,
+          },
+          {
+            author: userIds.member,
+            content: "Still having issues. Might be the coil itself.",
+            isSystem: false,
+            daysAgo: 2,
+          },
+          {
+            author: userIds.admin,
+            content: "Status changed from New to In Progress",
+            isSystem: true,
+            daysAgo: 1.5,
+          },
+          {
+            author: userIds.admin,
+            content: "Assigned to Member User",
+            isSystem: true,
+            daysAgo: 1.5,
+          },
+          {
+            author: userIds.member,
+            content: "Ordered replacement saucer coil from Marco. Should arrive next week.",
+            isSystem: false,
+            daysAgo: 1,
+          },
+        ],
+        // MM-01: Quick fix documented
+        "10000000-0000-4000-8000-000000000015": [
+          {
+            author: userIds.admin,
+            content: "Added some white lithium grease to the motor gears. Much quieter now.",
+            isSystem: false,
+            daysAgo: 2,
+          },
+          {
+            author: userIds.admin,
+            content: "Will monitor over the next few weeks.",
+            isSystem: false,
+            daysAgo: 2,
+          },
+        ],
+      };
 
-      const comments = [
-        // {
-        //   author: null,
-        //   content: "Issue reported by John Guest",
-        //   isSystem: true,
-        //   daysAgo: 10,
-        // },
-        {
-          author: userIds.member,
-          content: "Initial report logged from the front desk.",
-          isSystem: false,
-          daysAgo: 9,
-        },
-        {
-          author: userIds.admin,
-          content: "Severity changed from minor to unplayable",
-          isSystem: true,
-          daysAgo: 8,
-        },
-        {
-          author: userIds.admin,
-          content: "Ordering a replacement opto board.",
-          isSystem: false,
-          daysAgo: 7,
-        },
-        {
-          author: userIds.admin,
-          content: "Status changed from New to In Progress",
-          isSystem: true,
-          daysAgo: 6,
-        },
-        {
-          author: userIds.member,
-          content: "Installed new opto board. Ball still sticks occasionally.",
-          isSystem: false,
-          daysAgo: 5,
-        },
-        {
-          author: userIds.admin,
-          content: "Assigned to Member User",
-          isSystem: true,
-          daysAgo: 4,
-        },
-        {
-          author: userIds.member,
-          content: "Adjusted coil stop tension. Ball ejects reliably now.",
-          isSystem: false,
-          daysAgo: 3,
-        },
-        {
-          author: userIds.member,
-          content: "Status changed from In Progress to Fixed",
-          isSystem: true,
-          daysAgo: 2,
-        },
-        {
-          author: userIds.member,
-          content: "Severity changed from Unplayable to Minor",
-          isSystem: true,
-          daysAgo: 1.5,
-        },
-        {
-          author: userIds.admin,
-          content: "Monitoring for another 48 hours.",
-          isSystem: false,
-          daysAgo: 0.75,
-        },
-      ];
-
-      for (const comment of comments) {
-        await sql`
-                INSERT INTO issue_comments (issue_id, author_id, content, is_system, created_at, updated_at)
-                VALUES (
-                    '10000000-0000-4000-8000-000000000002',
-                    ${comment.author},
-                    ${comment.content},
-                    ${comment.isSystem},
-                    NOW() - (${comment.daysAgo} || ' days')::INTERVAL,
-                    NOW() - (${comment.daysAgo} || ' days')::INTERVAL
-                )
-            `;
+      for (const [issueId, comments] of Object.entries(commentsByIssue)) {
+        for (const comment of comments) {
+          await sql`
+            INSERT INTO issue_comments (issue_id, author_id, content, is_system, created_at, updated_at)
+            VALUES (
+              ${issueId},
+              ${comment.author},
+              ${comment.content},
+              ${comment.isSystem},
+              NOW() - (${comment.daysAgo} || ' days')::INTERVAL,
+              NOW() - (${comment.daysAgo} || ' days')::INTERVAL
+            )
+          `;
+        }
       }
       console.log("✅ Comments seeded.");
     }
+
+    // Seed issue images (MC Escher-style pinball images)
+    console.log("\n📷 Seeding issue images...");
+
+    const imageSeeds = [
+      {
+        issueId: "10000000-0000-4000-8000-000000000004", // FB-01 (Fireball zipper flippers)
+        uploadedBy: userIds.guest,
+        filename: "impossible-flipper-loop.png",
+        sizeBytes: 761755,
+      },
+      {
+        issueId: "10000000-0000-4000-8000-000000000008", // EBD-01 (8-ball target stuck)
+        uploadedBy: userIds.member,
+        filename: "paradox-ramp-network.png",
+        sizeBytes: 792547,
+      },
+      {
+        issueId: "10000000-0000-4000-8000-000000000013", // AFM-01 (Saucer eject issue)
+        uploadedBy: userIds.member,
+        filename: "bumper-tessellation.png",
+        sizeBytes: 1133608,
+      },
+      {
+        issueId: "10000000-0000-4000-8000-000000000015", // MM-01 (Castle gate motor)
+        uploadedBy: userIds.admin,
+        filename: "recursive-playfield.png",
+        sizeBytes: 1010743,
+      },
+    ];
+
+    for (const img of imageSeeds) {
+      // Note: Using public folder URLs for seed data
+      // These serve from /public/test-fixtures/images/
+      // In production, images are uploaded through the proper Vercel Blob flow
+      await sql`
+        INSERT INTO issue_images (
+          issue_id, uploaded_by, full_image_url, full_blob_pathname,
+          file_size_bytes, mime_type, original_filename, created_at, updated_at
+        ) VALUES (
+          ${img.issueId},
+          ${img.uploadedBy},
+          ${`/test-fixtures/images/${img.filename}`},
+          ${`test-fixtures/images/${img.filename}`},
+          ${img.sizeBytes},
+          'image/png',
+          ${img.filename},
+          NOW() - INTERVAL '1 day',
+          NOW() - INTERVAL '1 day'
+        )
+        ON CONFLICT DO NOTHING
+      `;
+    }
+    console.log("✅ Issue images seeded.");
   } else {
     console.warn("⚠️ Admin user not found, skipping machine/issue seeding.");
   }
@@ -397,13 +709,6 @@ async function seedUsersAndData() {
         VALUES
           (
             ${userIds.admin},
-            'issue_assigned',
-            '10000000-0000-4000-8000-000000000002',
-            'issue',
-            NOW() - INTERVAL '2 hours'
-          ),
-          (
-            ${userIds.admin},
             'new_comment',
             '10000000-0000-4000-8000-000000000002',
             'issue',
@@ -412,9 +717,16 @@ async function seedUsersAndData() {
           (
             ${userIds.admin},
             'issue_status_changed',
-            '10000000-0000-4000-8000-000000000003',
+            '10000000-0000-4000-8000-000000000008',
             'issue',
             NOW() - INTERVAL '3 hours'
+          ),
+          (
+            ${userIds.admin},
+            'new_comment',
+            '10000000-0000-4000-8000-000000000015',
+            'issue',
+            NOW() - INTERVAL '2 hours'
           )
         ON CONFLICT DO NOTHING
       `;
