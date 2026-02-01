@@ -258,12 +258,15 @@ function TimelineItem({
                 </div>
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                {isEdited && !isIssue && (
-                  <span title={event.updatedAt.toLocaleString()}>(edited)</span>
-                )}
                 <span title={event.createdAt.toLocaleString()}>
                   {formatDistanceToNow(event.createdAt, { addSuffix: true })}
                 </span>
+                {isEdited && !isIssue && (
+                  <span title={event.updatedAt.toLocaleString()}>
+                    (edited{" "}
+                    {formatDistanceToNow(event.updatedAt, { addSuffix: true })})
+                  </span>
+                )}
                 {canShowActions && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
