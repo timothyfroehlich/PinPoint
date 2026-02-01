@@ -76,7 +76,7 @@
     "@sentry/nextjs": "^10.34.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.90.1",
-    "@types/nodemailer": "^7.0.5",
+    "@types/nodemailer": "^7.0.9",
     "@types/zxcvbn": "^4.4.5",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.36.1",
@@ -146,6 +146,11 @@
     "vite": "^7.3.1",
     "vitest": "^4.0.17",
     "vitest-mock-extended": "^3.1.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "esbuild": ">=0.25.0"
+    }
   },
   "lint-staged": {
     "*.{ts,tsx}": [
