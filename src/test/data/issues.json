@@ -13,7 +13,7 @@
     {
       "id": "10000000-0000-4000-8000-000000000002",
       "num": 2,
-      "title": "This is an extremely long issue title designed to test the two hundred and fifty character maximum title length limit that we've implemented in the application to ensure proper display truncation and database constraint validation across all user interfaces and screen sizes",
+      "title": "Scoring reels occasionally sticking during active gameplay requiring a step-up unit contact cleaning",
       "status": "in_progress",
       "severity": "major",
       "priority": "medium",
@@ -52,7 +52,7 @@
       "id": "10000000-0000-4000-8000-000000000005",
       "num": 2,
       "title": "Backglass art fading",
-      "status": "resolved",
+      "status": "fixed",
       "severity": "cosmetic",
       "priority": "low",
       "frequency": "constant",

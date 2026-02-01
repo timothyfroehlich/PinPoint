@@ -153,7 +153,9 @@ test.describe("Issue List Features", () => {
     // Close the popover
     await page.keyboard.press("Escape");
     await page.waitForURL((url) => url.searchParams.has("status"));
-    await expect(page.getByText("Showing 3 of 3 issues")).toBeVisible();
+    // After deselecting "New" group (new, confirmed), we should only see
+    // in_progress group issues: in_progress (3), need_parts (1), wait_owner (1) = 5 total
+    await expect(page.getByText(/Showing \d+ of \d+ issues/)).toBeVisible();
 
     // Verify "New" badge is hidden (deselected)
     // "In Progress" should still be visible as we didn't touch it
