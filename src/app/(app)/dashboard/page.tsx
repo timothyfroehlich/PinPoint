@@ -320,7 +320,9 @@ export default async function DashboardPage(): Promise<React.JSX.Element> {
 
                 {/* Issues Assigned to Me */}
                 {user && (
-                  <Link href={`/issues?assignee=${user.id}`}>
+                  <Link
+                    href={`/issues?assignee=${user.id}&status=new,confirmed,in_progress,need_parts,need_help,wait_owner`}
+                  >
                     <Card className="border-primary/20 bg-card glow-primary hover:border-primary transition-all cursor-pointer h-full">
                       <CardHeader>
                         <div className="flex items-center justify-between">
