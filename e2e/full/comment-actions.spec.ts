@@ -80,17 +80,9 @@ function getCommentActionsButton(page: Page, commentText: string) {
 test.describe.serial("Comment Edit and Delete", () => {
   let issueUrl: string;
 
-  test.beforeAll(async ({ browser }, testInfo) => {
-    // Create a single test issue for all tests in this suite
-    const context = await browser.newContext();
-    const page = await context.newPage();
-
-    await loginAs(page, testInfo);
-    // Reload to ensure Supabase SSR cookies are properly set for subsequent requests
-    await page.reload({ waitUntil: "networkidle" });
-    issueUrl = await createTestIssue(page, testInfo);
-
-    await context.close();
+  test.beforeAll(async () => {
+    // Issue will be created by the first test
+    // beforeAll just initializes the variable
   });
 
   test.afterAll(async ({ request }) => {
@@ -111,8 +103,15 @@ test.describe.serial("Comment Edit and Delete", () => {
       page,
     }, testInfo) => {
       await loginAs(page, testInfo);
-      await page.goto(issueUrl);
-      await page.waitForLoadState("networkidle");
+
+      // Create the test issue (first test in serial suite)
+      if (!issueUrl) {
+        issueUrl = await createTestIssue(page, testInfo);
+        rememberIssueId(page);
+      } else {
+        await page.goto(issueUrl);
+        await page.waitForLoadState("networkidle");
+      }
 
       // Add a new comment
       await addComment(page, testCommentText);
