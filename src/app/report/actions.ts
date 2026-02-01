@@ -70,6 +70,7 @@ export async function submitPublicIssueAction(
     lastName,
     priority,
     frequency,
+    status,
     assignedTo,
   } = parsedValue.data;
 
@@ -143,11 +144,13 @@ export async function submitPublicIssueAction(
     }
   }
 
+  let finalStatus = status;
   if (isMemberOrAdmin) {
     finalAssignedTo = assignedTo;
   } else {
-    // Force medium for guests/anonymous
+    // Force medium priority and new status for guests/anonymous
     finalPriority = "medium";
+    finalStatus = "new";
   }
 
   log.info(
@@ -170,10 +173,11 @@ export async function submitPublicIssueAction(
       severity,
       priority: finalPriority,
       frequency,
+      status: finalStatus,
       reportedBy,
       reporterName,
       reporterEmail,
-      assignedTo: finalAssignedTo,
+      assignedTo: finalAssignedTo ?? null,
     });
 
     // 5. Link uploaded images

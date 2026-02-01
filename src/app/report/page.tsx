@@ -1,5 +1,5 @@
 import type React from "react";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { db } from "~/server/db";
 import { machines, userProfiles } from "~/server/db/schema";
 import { MainLayout } from "~/components/layout/MainLayout";

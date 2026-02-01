@@ -35,6 +35,7 @@ export interface CreateIssueParams {
   severity: IssueSeverity;
   priority?: IssuePriority | undefined;
   frequency?: IssueFrequency | undefined;
+  status?: IssueStatus | undefined;
   reportedBy?: string | null;
   reporterName?: string | null;
   reporterEmail?: string | null;
@@ -97,6 +98,7 @@ export async function createIssue({
   severity,
   priority,
   frequency,
+  status,
   reportedBy,
   reporterName,
   reporterEmail,
@@ -135,7 +137,7 @@ export async function createIssue({
         reportedBy: reportedBy ?? null,
         reporterName: reporterName ?? null,
         reporterEmail: reporterEmail ?? null,
-        status: "new",
+        status: status ?? "new",
         assignedTo: assignedTo ?? null,
       })
       .returning();
@@ -162,11 +164,7 @@ export async function createIssue({
         columns: { name: true },
       });
       const assigneeName = assignee?.name ?? "Unknown User";
-      await createTimelineEvent(
-        issue.id,
-        `Assigned to ${assigneeName}`,
-        tx
-      );
+      await createTimelineEvent(issue.id, `Assigned to ${assigneeName}`, tx);
 
       // Auto-watch for assignee
       await tx

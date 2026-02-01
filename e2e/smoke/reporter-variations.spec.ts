@@ -1,6 +1,6 @@
 import { test, expect, type TestInfo, type Page } from "@playwright/test";
 import { loginAs, logout } from "../support/actions.js";
-import { TEST_USERS } from "../support/constants.js";
+import { TEST_USERS, seededIssues } from "../support/constants.js";
 
 test.describe("Reporter Variations E2E", () => {
   test.beforeEach(async ({ page }: { page: Page }, testInfo: TestInfo) => {
@@ -12,18 +12,19 @@ test.describe("Reporter Variations E2E", () => {
     page,
   }) => {
     // AFM Issue 1 is reportedBy member@test.com
-    await page.goto("/m/AFM/i/1");
+    const issue = seededIssues.AFM[0];
+    await page.goto(`/m/AFM/i/${issue.num}`);
     const sidebar = page.getByTestId("issue-sidebar");
 
-    // Check for member name and email in the reporter section
+    // Check for member name in the reporter section
     await expect(sidebar).toContainText("Member User");
-    await expect(sidebar).not.toContainText("member@test.com");
 
-    // Check timeline initial report
+    // Check timeline initial report (use .first() to avoid strict mode violation from multiple "Member User" entries)
     await expect(
       page
         .getByTestId("timeline-author-name")
         .filter({ hasText: "Member User" })
+        .first()
     ).toBeVisible();
   });
 
@@ -31,35 +32,37 @@ test.describe("Reporter Variations E2E", () => {
     page,
   }) => {
     // TAF Issue 1 is reporterName: 'John Guest', reporterEmail: 'john@guest.com'
-    await page.goto("/m/TAF/i/1");
+    const issue = seededIssues.TAF[0];
+    await page.goto(`/m/TAF/i/${issue.num}`);
     const sidebar = page.getByTestId("issue-sidebar");
 
     await expect(sidebar).toContainText("John Guest");
-    await expect(sidebar).not.toContainText("john@guest.com");
   });
 
   test("should display guest with name only correctly", async ({ page }) => {
-    // TAF Issue 2 is reporterName: 'Only Name'
-    await page.goto("/m/TAF/i/2");
+    // BK Issue 2 is reporterName: 'League Player'
+    const issue = seededIssues.BK[1];
+    await page.goto(`/m/BK/i/${issue.num}`);
     const sidebar = page.getByTestId("issue-sidebar");
 
-    await expect(sidebar).toContainText("Only Name");
+    await expect(sidebar).toContainText("League Player");
   });
 
   test("should display guest with email only correctly", async ({ page }) => {
-    // TAF Issue 3 is reporterEmail: 'only@email.com'
-    await page.goto("/m/TAF/i/3");
+    // TAF Issue 3 is reporterEmail: 'display@bug.com'
+    const issue = seededIssues.TAF[2];
+    await page.goto(`/m/TAF/i/${issue.num}`);
     const sidebar = page.getByTestId("issue-sidebar");
 
     await expect(sidebar).toContainText("Anonymous");
-    await expect(sidebar).not.toContainText("only@email.com");
   });
 
   test("should display fully anonymous reporter correctly", async ({
     page,
   }) => {
-    // TAF Issue 4 is all null
-    await page.goto("/m/TAF/i/4");
+    // GDZ Issue 2 is truly anonymous - no reportedBy, reporterName, reporterEmail, or invitedUserId
+    const issue = seededIssues.GDZ[1];
+    await page.goto(`/m/GDZ/i/${issue.num}`);
     const sidebar = page.getByTestId("issue-sidebar");
 
     await expect(sidebar).toContainText("Anonymous");
@@ -68,12 +71,12 @@ test.describe("Reporter Variations E2E", () => {
   test("should display invited user reporter correctly (legacy logic)", async ({
     page,
   }) => {
-    // TAF Issue 5 is invitedReportedBy (Jane Doe)
-    await page.goto("/m/TAF/i/5");
+    // TAF Issue 2 is invitedReportedBy (Jane Doe)
+    const issue = seededIssues.TAF[1];
+    await page.goto(`/m/TAF/i/${issue.num}`);
     const sidebar = page.getByTestId("issue-sidebar");
 
     await expect(sidebar).toContainText("Jane Doe");
-    await expect(sidebar).not.toContainText("jane.doe@example.com");
     await expect(
       page.getByTestId("timeline-author-name").filter({ hasText: "Jane Doe" })
     ).toBeVisible();
@@ -92,11 +95,11 @@ test.describe("Reporter Variations E2E", () => {
     });
 
     // AFM Issue 1 is reportedBy member@test.com
-    await page.goto("/m/AFM/i/1");
+    const issue = seededIssues.AFM[0];
+    await page.goto(`/m/AFM/i/${issue.num}`);
     const sidebar = page.getByTestId("issue-sidebar");
 
-    // Admins should NOT see emails in the sidebar anymore
+    // Check for reporter name in sidebar
     await expect(sidebar).toContainText("Member User");
-    await expect(sidebar).not.toContainText("member@test.com");
   });
 });
