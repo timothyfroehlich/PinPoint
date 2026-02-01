@@ -150,9 +150,9 @@ test.describe("Issues System", () => {
           .getByRole("heading", { level: 1, name: issueTitle })
       ).toBeVisible();
 
-      // Check issue ID is visible (now in a separate element above the title)
+      // Check ID is displayed (in layout above title, not in H1)
       const idText = `${machineInitials}-${String(issueNumber).padStart(2, "0")}`;
-      await expect(page.getByText(idText, { exact: true })).toBeVisible();
+      await expect(page.getByRole("main").getByText(idText)).toBeVisible();
 
       // Should show metadata
       await expect(
