@@ -222,7 +222,8 @@
     "typescript-lsp@claude-plugins-official": true,
     "episodic-memory@superpowers-marketplace": true,
     "security-guidance@claude-plugins-official": true,
-    "beads@beads-marketplace": true
+    "beads@beads-marketplace": true,
+    "sentry@claude-plugins-official": true
   },
   "outputStyle": "Explanatory"
 }
