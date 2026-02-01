@@ -46,7 +46,7 @@ export default async function IssueDetailPage({
   }
 
   // CORE-PERF-003: Execute independent queries in parallel to avoid waterfall
-  const [issue, allUsers] = await Promise.all([
+  const [issue, allUsers, currentUserProfile] = await Promise.all([
     // Query issue with all relations
     db.query.issues.findFirst({
       where: and(
@@ -143,6 +143,11 @@ export default async function IssueDetailPage({
       .from(userProfiles)
       .where(notInArray(userProfiles.role, ["guest"]))
       .orderBy(asc(userProfiles.name)),
+    // Fetch current user's profile for timeline permissions
+    db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { name: true, role: true },
+    }),
   ]);
 
   if (!issue) {
@@ -218,7 +223,14 @@ export default async function IssueDetailPage({
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             Activity
           </h2>
-          <IssueTimeline issue={issueWithRelations} />
+          <IssueTimeline
+            issue={issueWithRelations}
+            currentUserId={user.id}
+            currentUserRole={currentUserProfile?.role ?? "guest"}
+            currentUserInitials={
+              currentUserProfile?.name.slice(0, 2).toUpperCase() ?? "ME"
+            }
+          />
         </section>
 
         {/* Sticky Sidebar */}

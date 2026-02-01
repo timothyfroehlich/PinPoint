@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useTransition } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { AddCommentForm } from "~/components/issues/AddCommentForm";
@@ -12,7 +12,6 @@ import { resolveIssueReporter } from "~/lib/issues/utils";
 import { MessageSquare, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { ImageGallery } from "~/components/images/ImageGallery";
 import { type IssueImage } from "~/server/db/schema";
-import { useUser } from "~/hooks/useUser";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,7 +28,6 @@ import {
   editCommentAction,
   deleteCommentAction,
   type EditCommentResult,
-  type DeleteCommentResult,
 } from "~/app/(app)/issues/actions";
 import {
   AlertDialog,
@@ -62,6 +60,12 @@ interface TimelineEvent {
   content: string | null;
   images?: IssueImage[];
   isSystem: boolean;
+}
+
+interface UserContext {
+  currentUserId: string;
+  currentUserRole: string;
+  currentUserInitials: string;
 }
 
 // Components
@@ -122,19 +126,21 @@ function DeleteCommentDialog({
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
 }): React.JSX.Element {
-  const [state, formAction] = useActionState<
-    DeleteCommentResult | undefined,
-    FormData
-  >(deleteCommentAction, undefined);
+  const [isPending, startTransition] = useTransition();
 
-  React.useEffect(() => {
-    if (state?.ok) {
-      toast.success("Comment deleted");
-      onOpenChange(false);
-    } else if (state?.ok === false) {
-      toast.error(state.message);
-    }
-  }, [state, onOpenChange]);
+  const handleDelete = (): void => {
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.append("commentId", commentId);
+      const result = await deleteCommentAction(undefined, formData);
+      if (result.ok) {
+        toast.success("Comment deleted");
+        onOpenChange(false);
+      } else {
+        toast.error(result.message);
+      }
+    });
+  };
 
   return (
     <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
@@ -147,11 +153,10 @@ function DeleteCommentDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <form action={formAction}>
-            <input type="hidden" name="commentId" value={commentId} />
-            <AlertDialogAction type="submit">Delete</AlertDialogAction>
-          </form>
+          <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleDelete} disabled={isPending}>
+            {isPending ? "Deleting..." : "Delete"}
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -161,13 +166,16 @@ function DeleteCommentDialog({
 function TimelineItem({
   event,
   issue,
+  userContext,
 }: {
   event: TimelineEvent;
   issue: IssueWithAllRelations;
+  userContext: UserContext;
 }): React.JSX.Element {
-  const { user } = useUser();
   const [isEditing, setIsEditing] = React.useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
+
+  const { currentUserId, currentUserRole } = userContext;
 
   const isSystem = event.type === "system";
   const isIssue = event.type === "issue";
@@ -175,14 +183,15 @@ function TimelineItem({
   const isEdited = event.updatedAt.getTime() - event.createdAt.getTime() > 1000;
 
   // --- Permissions ---
+  // Edit: only the comment author can edit their own comments
   const canEdit =
-    user && user.id === event.author.id && !event.isSystem && !isIssue;
+    currentUserId === event.author.id && !event.isSystem && !isIssue;
+  // Delete: author can delete own comments, admins can delete any comment
   const canDelete =
-    user &&
-    (user.id === event.author.id || user.role === "admin") &&
+    (currentUserId === event.author.id || currentUserRole === "admin") &&
     !event.isSystem &&
     !isIssue;
-  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- This is boolean OR logic, not nullish coalescing
+
   const canShowActions = canEdit || canDelete;
 
   return (
@@ -327,15 +336,25 @@ function TimelineItem({
 
 interface IssueTimelineProps {
   issue: IssueWithAllRelations;
+  currentUserId: string;
+  currentUserRole: string;
+  currentUserInitials: string;
 }
 
 export function IssueTimeline({
   issue,
+  currentUserId,
+  currentUserRole,
+  currentUserInitials,
 }: IssueTimelineProps): React.JSX.Element {
-  console.log("Rendering IssueTimeline");
+  const userContext: UserContext = {
+    currentUserId,
+    currentUserRole,
+    currentUserInitials,
+  };
+
   // 1. Normalize Issue as the first event
   const reporter = resolveIssueReporter(issue);
-  console.log("Reporter:", reporter);
 
   const issueEvent: TimelineEvent = {
     id: `issue-${issue.id}`,
@@ -386,7 +405,12 @@ export function IssueTimeline({
         {/* Events List */}
         <div className="relative flex flex-col space-y-6">
           {allEvents.map((event) => (
-            <TimelineItem key={event.id} event={event} issue={issue} />
+            <TimelineItem
+              key={event.id}
+              event={event}
+              issue={issue}
+              userContext={userContext}
+            />
           ))}
 
           {/* Delightful Empty State when no comments yet */}
@@ -410,7 +434,7 @@ export function IssueTimeline({
           <div className="flex w-16 flex-none flex-col items-center">
             <Avatar className="relative z-10 size-10 border border-border/60 ring-4 ring-background">
               <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
-                ME
+                {currentUserInitials}
               </AvatarFallback>
             </Avatar>
           </div>
