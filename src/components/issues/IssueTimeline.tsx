@@ -182,7 +182,8 @@ function TimelineItem({
     (user.id === event.author.id || user.role === "admin") &&
     !event.isSystem &&
     !isIssue;
-  const canShowActions = canEdit ?? canDelete;
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- This is boolean OR logic, not nullish coalescing
+  const canShowActions = canEdit || canDelete;
 
   return (
     <div
