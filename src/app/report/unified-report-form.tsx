@@ -18,7 +18,13 @@ import { submitPublicIssueAction } from "./actions";
 import { SeveritySelect } from "~/components/issues/fields/SeveritySelect";
 import { FrequencySelect } from "~/components/issues/fields/FrequencySelect";
 import { PrioritySelect } from "~/components/issues/fields/PrioritySelect";
-import type { IssueSeverity, IssueFrequency, IssuePriority } from "~/lib/types";
+import { StatusSelect } from "~/components/issues/fields/StatusSelect";
+import type {
+  IssueSeverity,
+  IssueFrequency,
+  IssuePriority,
+  IssueStatus,
+} from "~/lib/types";
 import { ImageUploadButton } from "~/components/images/ImageUploadButton";
 import { ImageGallery } from "~/components/images/ImageGallery";
 import { type ImageMetadata } from "~/types/images";
@@ -69,9 +75,10 @@ export function UnifiedReportForm({
   );
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [severity, setSeverity] = useState<IssueSeverity | "">("");
-  const [priority, setPriority] = useState<IssuePriority | "">("");
-  const [frequency, setFrequency] = useState<IssueFrequency | "">("");
+  const [severity, setSeverity] = useState<IssueSeverity | "">("minor");
+  const [priority, setPriority] = useState<IssuePriority | "">("medium");
+  const [frequency, setFrequency] = useState<IssueFrequency | "">("constant");
+  const [status, setStatus] = useState<IssueStatus>("new");
 
   const [uploadedImages, setUploadedImages] = useState<ImageMetadata[]>([]);
 
@@ -246,9 +253,16 @@ export function UnifiedReportForm({
                 <div className="lg:hidden">{recentIssuesPanelMobile}</div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="title" className="text-on-surface">
-                    Issue Title *
-                  </Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="title" className="text-on-surface">
+                      Issue Title *
+                    </Label>
+                    {title.length >= 40 && (
+                      <span className="text-xs text-muted-foreground">
+                        {60 - title.length}/60
+                      </span>
+                    )}
+                  </div>
                   <Input
                     id="title"
                     name="title"
@@ -259,11 +273,6 @@ export function UnifiedReportForm({
                     onChange={(e) => setTitle(e.target.value)}
                     className="h-9 border-outline-variant bg-surface text-on-surface focus:border-primary"
                   />
-                  {title.length >= 40 && (
-                    <p className="text-xs text-muted-foreground">
-                      {60 - title.length}/60 characters remaining
-                    </p>
-                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -315,6 +324,15 @@ export function UnifiedReportForm({
                         value={priority}
                         onValueChange={setPriority}
                       />
+                    </div>
+                  )}
+                  {isAdminOrMember && (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="status" className="text-on-surface">
+                        Status *
+                      </Label>
+                      <input type="hidden" name="status" value={status} />
+                      <StatusSelect value={status} onValueChange={setStatus} />
                     </div>
                   )}
                 </div>
