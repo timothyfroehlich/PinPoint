@@ -26,7 +26,8 @@ try {
 // See AGENTS.md for port allocation table
 const port = Number(process.env["PORT"] ?? "3000");
 // Keep host consistent with Supabase site_url to avoid cookie host mismatches
-const hostname = process.env["PLAYWRIGHT_HOST"] ?? "localhost";
+// Use 127.0.0.1 instead of localhost to match Supabase URL and avoid cookie domain mismatch
+const hostname = process.env["PLAYWRIGHT_HOST"] ?? "127.0.0.1";
 const baseURL = `http://${hostname}:${port}`;
 const webServerStdout = process.env["PLAYWRIGHT_STDOUT"] ?? "ignore";
 const webServerStderr = process.env["PLAYWRIGHT_STDERR"] ?? "pipe";
