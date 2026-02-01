@@ -70,6 +70,7 @@ export async function submitPublicIssueAction(
     lastName,
     priority,
     frequency,
+    status,
   } = parsedValue.data;
 
   // 3. Resolve reporter
@@ -141,9 +142,11 @@ export async function submitPublicIssueAction(
     }
   }
 
+  let finalStatus = status;
   if (!isMemberOrAdmin) {
-    // Force medium for guests/anonymous
+    // Force medium priority and new status for guests/anonymous
     finalPriority = "medium";
+    finalStatus = "new";
   }
 
   log.info(
@@ -165,6 +168,7 @@ export async function submitPublicIssueAction(
       severity,
       priority: finalPriority,
       frequency,
+      status: finalStatus,
       reportedBy,
       reporterName,
       reporterEmail,
