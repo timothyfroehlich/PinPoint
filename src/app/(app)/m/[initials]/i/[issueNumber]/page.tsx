@@ -2,6 +2,8 @@ import type React from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "~/lib/supabase/server";
+import { getUserContext } from "~/lib/auth/context";
+import { canUpdateIssueMetadata } from "~/lib/auth/permissions";
 import { db } from "~/server/db";
 import { issues, userProfiles } from "~/server/db/schema";
 import { eq, asc, and, notInArray } from "drizzle-orm";
@@ -44,6 +46,10 @@ export default async function IssueDetailPage({
   if (isNaN(issueNum) || issueNum < 1) {
     redirect(`/m/${initials}`);
   }
+
+  // Fetch user context for permission checks
+  const userContext = await getUserContext(user.id);
+  const canUpdate = canUpdateIssueMetadata(userContext);
 
   // CORE-PERF-003: Execute independent queries in parallel to avoid waterfall
   const [issue, allUsers] = await Promise.all([
@@ -226,6 +232,7 @@ export default async function IssueDetailPage({
           issue={issueWithRelations}
           allUsers={allUsers}
           currentUserId={user.id}
+          canUpdate={canUpdate}
         />
       </div>
     </PageShell>

@@ -4,6 +4,8 @@ import { getUnifiedUsers } from "~/lib/users/queries";
 import { cn } from "~/lib/utils";
 import Link from "next/link";
 import { createClient } from "~/lib/supabase/server";
+import { getUserContext } from "~/lib/auth/context";
+import { canUpdateMachine } from "~/lib/auth/permissions";
 import { db } from "~/server/db";
 import { machines, issues, userProfiles } from "~/server/db/schema";
 import { eq, notInArray, sql } from "drizzle-orm";
@@ -54,13 +56,9 @@ export default async function MachineDetailPage({
     redirect(`/login?next=${next}`);
   }
 
-  // Fetch current user profile to check role
-  const currentUserProfile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-    columns: { role: true },
-  });
-
-  const isAdmin = currentUserProfile?.role === "admin";
+  // Fetch user context for permission checks
+  const userContext = await getUserContext(user.id);
+  const canUserUpdateMachine = canUpdateMachine(userContext);
 
   // Execute independent queries in parallel (CORE-PERF-001)
   const [machine, totalIssuesCountResult, allUsers] = await Promise.all([
@@ -113,7 +111,9 @@ export default async function MachineDetailPage({
       .where(eq(issues.machineInitials, initials)),
 
     // Query 3: All users (if admin)
-    isAdmin ? getUnifiedUsers({ includeEmails: false }) : Promise.resolve([]),
+    canUserUpdateMachine
+      ? getUnifiedUsers({ includeEmails: false })
+      : Promise.resolve([]),
   ]);
 
   // 404 if machine not found
@@ -224,7 +224,7 @@ export default async function MachineDetailPage({
                 <UpdateMachineForm
                   machine={machine}
                   allUsers={allUsers}
-                  isAdmin={isAdmin}
+                  canUpdate={canUserUpdateMachine}
                 />
 
                 <div className="pt-6 border-t border-outline-variant/50 space-y-4">
