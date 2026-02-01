@@ -144,7 +144,7 @@ export async function submitPublicIssueAction(
 
   let finalStatus = status;
   if (!isMemberOrAdmin) {
-    // Force medium for guests/anonymous
+    // Force medium priority and new status for guests/anonymous
     finalPriority = "medium";
     finalStatus = "new";
   }
