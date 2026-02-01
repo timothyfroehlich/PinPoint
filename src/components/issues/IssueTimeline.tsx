@@ -21,6 +21,7 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { Button } from "~/components/ui/button";
 import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
 import { SaveCancelButtons } from "~/components/save-cancel-buttons";
 import { toast } from "sonner";
 import { Textarea } from "~/components/ui/textarea";
@@ -66,6 +67,15 @@ interface TimelineEvent {
 // Components
 // ----------------------------------------------------------------------
 
+function CommentEditFormButtons({
+  onCancel,
+}: {
+  onCancel: () => void;
+}): React.JSX.Element {
+  const { pending } = useFormStatus();
+  return <SaveCancelButtons isPending={pending} onCancel={onCancel} />;
+}
+
 function CommentEditForm({
   commentId,
   initialContent,
@@ -74,11 +84,11 @@ function CommentEditForm({
   commentId: string;
   initialContent: string;
   onCancel: () => void;
-}) {
-  const [state, formAction] = useActionState<EditCommentResult | undefined, FormData>(
-    editCommentAction,
-    undefined
-  );
+}): React.JSX.Element {
+  const [state, formAction] = useActionState<
+    EditCommentResult | undefined,
+    FormData
+  >(editCommentAction, undefined);
 
   React.useEffect(() => {
     if (state?.ok) {
@@ -98,7 +108,7 @@ function CommentEditForm({
         className="min-h-32"
         required
       />
-      <SaveCancelButtons onCancel={onCancel} />
+      <CommentEditFormButtons onCancel={onCancel} />
     </form>
   );
 }
@@ -111,11 +121,11 @@ function DeleteCommentDialog({
   commentId: string;
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-}) {
-  const [state, formAction] = useActionState<DeleteCommentResult | undefined, FormData>(
-    deleteCommentAction,
-    undefined
-  );
+}): React.JSX.Element {
+  const [state, formAction] = useActionState<
+    DeleteCommentResult | undefined,
+    FormData
+  >(deleteCommentAction, undefined);
 
   React.useEffect(() => {
     if (state?.ok) {
@@ -172,7 +182,7 @@ function TimelineItem({
     (user.id === event.author.id || user.role === "admin") &&
     !event.isSystem &&
     !isIssue;
-  const canShowActions = canEdit || canDelete;
+  const canShowActions = canEdit ?? canDelete;
 
   return (
     <div

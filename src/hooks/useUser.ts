@@ -1,13 +1,12 @@
-
 import { useMemo } from "react";
 import { useSession } from "~/hooks/useSession";
 
-export function useUser() {
+export function useUser(): {
+  user: { id: null; email: string; role: string } | null;
+} {
   const { session } = useSession();
 
   const user = useMemo(() => {
-    if (!session?.user) return null;
-
     return {
       id: session.user.id,
       email: session.user.email,

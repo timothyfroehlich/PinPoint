@@ -1,12 +1,13 @@
-
-import { useAuth } from "@clerk/nextjs";
-
-export function useSession() {
-  const { userId, isLoaded, isSignedIn } = useAuth();
-
+// TODO: This is dead code from the old Clerk auth system.
+// The project now uses Supabase auth. This should be removed or refactored.
+export function useSession(): {
+  session: {
+    user: { id: null; email: string; app_metadata: { role: string } };
+  };
+} {
   const session = {
     user: {
-      id: userId,
+      id: null,
       email: "test-user@test.com",
       app_metadata: {
         role: "admin",

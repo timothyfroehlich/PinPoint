@@ -882,10 +882,7 @@ export async function deleteCommentAction(
       columns: { role: true },
     });
 
-    if (
-      existingComment.authorId !== user.id &&
-      userProfile?.role !== "admin"
-    ) {
+    if (existingComment.authorId !== user.id && userProfile?.role !== "admin") {
       return err(
         "UNAUTHORIZED",
         "You can only delete your own comments, or you must be an admin"
