@@ -253,12 +253,17 @@ export function UnifiedReportForm({
                     id="title"
                     name="title"
                     required
-                    maxLength={100}
+                    maxLength={60}
                     placeholder="e.g., Left flipper not responding"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     className="h-9 border-outline-variant bg-surface text-on-surface focus:border-primary"
                   />
+                  {title.length >= 40 && (
+                    <p className="text-xs text-muted-foreground">
+                      {60 - title.length}/60 characters remaining
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">

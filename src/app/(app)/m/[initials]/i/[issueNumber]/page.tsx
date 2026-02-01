@@ -179,8 +179,8 @@ export default async function IssueDetailPage({
         </div>
         <div className="space-y-3">
           <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight">
-            {issue.title.length > 100
-              ? `${issue.title.slice(0, 100)}...`
+            {issue.title.length > 60
+              ? `${issue.title.slice(0, 60)}...`
               : issue.title}
           </h1>
           <div className="flex flex-wrap items-center gap-2">

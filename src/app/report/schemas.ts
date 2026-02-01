@@ -5,7 +5,7 @@ export const publicIssueSchema = z.object({
   title: z
     .string()
     .min(1, "Title is required")
-    .max(100, "Title must be less than 100 characters")
+    .max(60, "Title must be 60 characters or less")
     .trim(),
   description: z
     .string()
