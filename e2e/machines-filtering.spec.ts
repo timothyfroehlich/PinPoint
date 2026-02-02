@@ -92,15 +92,21 @@ test.describe("Machine Filtering and Sorting", () => {
 
     // Eight Ball Deluxe should be visible (it has an unplayable issue)
     await expect(
-      page.getByRole("link", { name: /Eight Ball Deluxe/i })
+      page.getByRole("link", {
+        name: new RegExp(seededMachines.eightBallDeluxe.name, "i"),
+      })
     ).toBeVisible();
 
     // Machines without unplayable status should not be visible
     await expect(
-      page.getByRole("link", { name: /Attack from Mars/i })
+      page.getByRole("link", {
+        name: new RegExp(seededMachines.attackFromMars.name, "i"),
+      })
     ).not.toBeVisible();
     await expect(
-      page.getByRole("link", { name: /Medieval Madness/i })
+      page.getByRole("link", {
+        name: new RegExp(seededMachines.medievalMadness.name, "i"),
+      })
     ).not.toBeVisible();
 
     // Verify filter badge appears (shows count)
@@ -121,23 +127,31 @@ test.describe("Machine Filtering and Sorting", () => {
     // Close the dropdown
     await page.keyboard.press("Escape");
 
-    // Wait for URL to update with owner filter
-    await expect(page).toHaveURL(/owner=/);
+    // Wait for URL to update with owner filter (ensure non-empty value)
+    await expect(page).toHaveURL(/owner=[^&]+/);
 
     // Member owns: Slick Chick, Eight Ball Deluxe, Attack from Mars
     await expect(
-      page.getByRole("link", { name: /Eight Ball Deluxe/i })
+      page.getByRole("link", {
+        name: new RegExp(seededMachines.eightBallDeluxe.name, "i"),
+      })
     ).toBeVisible();
     await expect(
-      page.getByRole("link", { name: /Attack from Mars/i })
+      page.getByRole("link", {
+        name: new RegExp(seededMachines.attackFromMars.name, "i"),
+      })
     ).toBeVisible();
 
     // Admin-owned machines should not be visible
     await expect(
-      page.getByRole("link", { name: /Medieval Madness/i })
+      page.getByRole("link", {
+        name: new RegExp(seededMachines.medievalMadness.name, "i"),
+      })
     ).not.toBeVisible();
     await expect(
-      page.getByRole("link", { name: /Godzilla/i })
+      page.getByRole("link", {
+        name: new RegExp(seededMachines.godzilla.name, "i"),
+      })
     ).not.toBeVisible();
   });
 
@@ -166,12 +180,16 @@ test.describe("Machine Filtering and Sorting", () => {
 
     // Only Eight Ball Deluxe matches both "Ball" search AND "Unplayable" status
     await expect(
-      page.getByRole("link", { name: /Eight Ball Deluxe/i })
+      page.getByRole("link", {
+        name: new RegExp(seededMachines.eightBallDeluxe.name, "i"),
+      })
     ).toBeVisible();
 
     // Fireball matches "Ball" but isn't unplayable
     await expect(
-      page.getByRole("link", { name: /Fireball/i })
+      page.getByRole("link", {
+        name: new RegExp(seededMachines.fireball.name, "i"),
+      })
     ).not.toBeVisible();
   });
 
@@ -190,10 +208,14 @@ test.describe("Machine Filtering and Sorting", () => {
 
     // Only Eight Ball Deluxe should be visible before clearing
     await expect(
-      page.getByRole("link", { name: /Eight Ball Deluxe/i })
+      page.getByRole("link", {
+        name: new RegExp(seededMachines.eightBallDeluxe.name, "i"),
+      })
     ).toBeVisible();
     await expect(
-      page.getByRole("link", { name: /Attack from Mars/i })
+      page.getByRole("link", {
+        name: new RegExp(seededMachines.attackFromMars.name, "i"),
+      })
     ).not.toBeVisible();
 
     // Click Clear All
@@ -204,13 +226,19 @@ test.describe("Machine Filtering and Sorting", () => {
 
     // All machines should be visible again
     await expect(
-      page.getByRole("link", { name: /Attack from Mars/i })
+      page.getByRole("link", {
+        name: new RegExp(seededMachines.attackFromMars.name, "i"),
+      })
     ).toBeVisible();
     await expect(
-      page.getByRole("link", { name: /Medieval Madness/i })
+      page.getByRole("link", {
+        name: new RegExp(seededMachines.medievalMadness.name, "i"),
+      })
     ).toBeVisible();
     await expect(
-      page.getByRole("link", { name: /Eight Ball Deluxe/i })
+      page.getByRole("link", {
+        name: new RegExp(seededMachines.eightBallDeluxe.name, "i"),
+      })
     ).toBeVisible();
   });
 });
