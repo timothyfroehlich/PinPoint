@@ -179,4 +179,37 @@ test.describe("Issues System", () => {
 
     // Update tests moved to integration/full suite
   });
+
+  test.describe("Issue Detail Display", () => {
+    test("should display assignee on issue detail page", async ({ page }) => {
+      // Navigate to HD-02 (reported by member, so member has permission)
+      await page.goto("/m/HD/i/2");
+
+      // Verify we're on the issue detail page
+      await expect(
+        page.getByRole("heading", {
+          level: 1,
+          name: /Scoring reels sticking/,
+        })
+      ).toBeVisible();
+
+      // Find the assignee picker - initially shows "Unassigned"
+      const assigneePicker = page.getByTestId("assignee-picker-trigger");
+      await expect(assigneePicker).toBeVisible();
+      await expect(assigneePicker).toContainText("Unassigned");
+
+      // Assign to Member User (self-assign)
+      await assigneePicker.click();
+      await page.getByRole("option", { name: /Member User/i }).click();
+
+      // Verify the assignee name is now displayed
+      await expect(assigneePicker).toContainText("Member User");
+
+      // Reload page to verify persistence
+      await page.reload();
+      await expect(page.getByTestId("assignee-picker-trigger")).toContainText(
+        "Member User"
+      );
+    });
+  });
 });
