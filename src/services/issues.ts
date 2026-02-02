@@ -35,11 +35,9 @@ export interface CreateIssueParams {
   severity: IssueSeverity;
   priority?: IssuePriority | undefined;
   frequency?: IssueFrequency | undefined;
-  status?: IssueStatus | undefined;
   reportedBy?: string | null;
   reporterName?: string | null;
   reporterEmail?: string | null;
-  assignedTo?: string | null;
 }
 
 export interface UpdateIssueStatusParams {
@@ -82,11 +80,6 @@ export interface UpdateIssueFrequencyParams {
   frequency: IssueFrequency;
 }
 
-export interface UpdateIssueCommentParams {
-  commentId: string;
-  content: string;
-}
-
 export type Issue = InferSelectModel<typeof issues>;
 export type IssueComment = InferSelectModel<typeof issueComments>;
 
@@ -103,11 +96,9 @@ export async function createIssue({
   severity,
   priority,
   frequency,
-  status,
   reportedBy,
   reporterName,
   reporterEmail,
-  assignedTo,
 }: CreateIssueParams): Promise<Issue> {
   return await db.transaction(async (tx) => {
     // 1. Lock machine row and get next number (Atomic increment)
@@ -142,8 +133,7 @@ export async function createIssue({
         reportedBy: reportedBy ?? null,
         reporterName: reporterName ?? null,
         reporterEmail: reporterEmail ?? null,
-        status: status ?? "new",
-        assignedTo: assignedTo ?? null,
+        status: "new",
       })
       .returning();
 
@@ -155,28 +145,10 @@ export async function createIssue({
         machineInitials,
         issueNumber,
         reportedBy,
-        assignedTo,
         action: "createIssue",
       },
       "Issue created successfully"
     );
-
-    // 3. Assignment Logic (if applicable)
-    if (assignedTo) {
-      // Create timeline event
-      const assignee = await tx.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, assignedTo),
-        columns: { name: true },
-      });
-      const assigneeName = assignee?.name ?? "Unknown User";
-      await createTimelineEvent(issue.id, `Assigned to ${assigneeName}`, tx);
-
-      // Auto-watch for assignee
-      await tx
-        .insert(issueWatchers)
-        .values({ issueId: issue.id, userId: assignedTo })
-        .onConflictDoNothing();
-    }
 
     // 4. Auto-Watch Logic
     // Reporter
@@ -368,7 +340,6 @@ export async function addIssueComment({
           resourceId: issueId,
           resourceType: "issue",
           actorId: userId,
-          includeActor: false,
           issueTitle: issue?.title ?? undefined,
           machineName: issue?.machine.name ?? undefined,
           formattedIssueId: issue
@@ -681,29 +652,4 @@ export async function updateIssueFrequency({
   );
 
   return { issueId, oldFrequency, newFrequency: frequency };
-}
-
-/**
- * Update a comment on an issue
- */
-export async function updateIssueComment({
-  commentId,
-  content,
-}: UpdateIssueCommentParams): Promise<IssueComment> {
-  const [updatedComment] = await db
-    .update(issueComments)
-    .set({
-      content,
-      updatedAt: new Date(),
-    })
-    .where(eq(issueComments.id, commentId))
-    .returning();
-
-  if (!updatedComment) {
-    throw new Error("Comment not found or update failed");
-  }
-
-  log.info({ commentId, action: "updateIssueComment" }, "Comment updated");
-
-  return updatedComment;
 }

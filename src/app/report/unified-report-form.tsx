@@ -14,18 +14,11 @@ import { Textarea } from "~/components/ui/textarea";
 import { Button } from "~/components/ui/button";
 import { UserCheck } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { cn } from "~/lib/utils";
 import { submitPublicIssueAction } from "./actions";
 import { SeveritySelect } from "~/components/issues/fields/SeveritySelect";
 import { FrequencySelect } from "~/components/issues/fields/FrequencySelect";
 import { PrioritySelect } from "~/components/issues/fields/PrioritySelect";
-import { StatusSelect } from "~/components/issues/fields/StatusSelect";
-import type {
-  IssueSeverity,
-  IssueFrequency,
-  IssuePriority,
-  IssueStatus,
-} from "~/lib/types";
+import type { IssueSeverity, IssueFrequency, IssuePriority } from "~/lib/types";
 import { ImageUploadButton } from "~/components/images/ImageUploadButton";
 import { ImageGallery } from "~/components/images/ImageGallery";
 import { type ImageMetadata } from "~/types/images";
@@ -49,17 +42,11 @@ export interface ActionState {
   success?: boolean;
 }
 
-interface Assignee {
-  id: string;
-  name: string | null;
-}
-
 interface UnifiedReportFormProps {
   machinesList: Machine[];
   defaultMachineId?: string;
   user: User | null; // Supabase User
   userProfile?: UserProfile | undefined;
-  assignees?: Assignee[];
   initialError?: string | undefined;
   recentIssuesPanelMobile?: React.ReactNode;
   recentIssuesPanelDesktop?: React.ReactNode;
@@ -70,7 +57,6 @@ export function UnifiedReportForm({
   defaultMachineId,
   user,
   userProfile,
-  assignees = [],
   initialError,
   recentIssuesPanelMobile,
   recentIssuesPanelDesktop,
@@ -83,11 +69,9 @@ export function UnifiedReportForm({
   );
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [severity, setSeverity] = useState<IssueSeverity | "">("minor");
-  const [priority, setPriority] = useState<IssuePriority | "">("medium");
-  const [frequency, setFrequency] = useState<IssueFrequency | "">("constant");
-  const [status, setStatus] = useState<IssueStatus>("new");
-  const [assignedTo, setAssignedTo] = useState("");
+  const [severity, setSeverity] = useState<IssueSeverity | "">("");
+  const [priority, setPriority] = useState<IssuePriority | "">("");
+  const [frequency, setFrequency] = useState<IssueFrequency | "">("");
 
   const [uploadedImages, setUploadedImages] = useState<ImageMetadata[]>([]);
 
@@ -185,7 +169,7 @@ export function UnifiedReportForm({
   }, [defaultMachineId]);
 
   const isAdminOrMember =
-    !!user && (userProfile?.role === "admin" || userProfile?.role === "member");
+    user && (userProfile?.role === "admin" || userProfile?.role === "member");
 
   return (
     <div className="w-full max-w-5xl mx-auto">
@@ -262,25 +246,14 @@ export function UnifiedReportForm({
                 <div className="lg:hidden">{recentIssuesPanelMobile}</div>
 
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="title" className="text-on-surface">
-                      Issue Title *
-                    </Label>
-                    <span
-                      className={cn(
-                        "text-xs text-muted-foreground transition-opacity duration-200",
-                        title.length < 40 && "opacity-0 select-none"
-                      )}
-                      aria-hidden={title.length < 40}
-                    >
-                      {60 - title.length}/60
-                    </span>
-                  </div>
+                  <Label htmlFor="title" className="text-on-surface">
+                    Issue Title *
+                  </Label>
                   <Input
                     id="title"
                     name="title"
                     required
-                    maxLength={60}
+                    maxLength={200}
                     placeholder="e.g., Left flipper not responding"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
@@ -337,38 +310,6 @@ export function UnifiedReportForm({
                         value={priority}
                         onValueChange={setPriority}
                       />
-                    </div>
-                  )}
-                  {isAdminOrMember && (
-                    <div className="space-y-1.5">
-                      <Label htmlFor="status" className="text-on-surface">
-                        Status *
-                      </Label>
-                      <input type="hidden" name="status" value={status} />
-                      <StatusSelect value={status} onValueChange={setStatus} />
-                    </div>
-                  )}
-
-                  {isAdminOrMember && assignees.length > 0 && (
-                    <div className="space-y-1.5 md:col-span-2">
-                      <Label htmlFor="assignedTo" className="text-on-surface">
-                        Assign To
-                      </Label>
-                      <select
-                        id="assignedTo"
-                        name="assignedTo"
-                        data-testid="assigned-to-select"
-                        value={assignedTo}
-                        onChange={(e) => setAssignedTo(e.target.value)}
-                        className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                      >
-                        <option value="">Unassigned</option>
-                        {assignees.map((assignee) => (
-                          <option key={assignee.id} value={assignee.id}>
-                            {assignee.name ?? "Unnamed User"}
-                          </option>
-                        ))}
-                      </select>
                     </div>
                   )}
                 </div>

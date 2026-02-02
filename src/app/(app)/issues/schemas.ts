@@ -140,22 +140,3 @@ export const addCommentSchema = z.object({
     .max(5000, "Comment is too long"),
   imagesMetadata: z.string().nullish(), // JSON string from hidden input
 });
-
-/**
- * Schema for editing a comment
- */
-export const editCommentSchema = z.object({
-  commentId: uuidish,
-  comment: z
-    .string()
-    .trim()
-    .min(1, "Comment cannot be empty")
-    .max(5000, "Comment is too long"),
-});
-
-/**
- * Schema for deleting a comment
- */
-export const deleteCommentSchema = z.object({
-  commentId: uuidish,
-});

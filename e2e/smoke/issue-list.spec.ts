@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { loginAs } from "../support/actions";
-import { TEST_USERS, seededIssues } from "../support/constants";
+import { TEST_USERS } from "../support/constants";
 
 test.describe("Issue List Features", () => {
   test.beforeEach(async ({ page }, testInfo) => {
@@ -14,18 +14,16 @@ test.describe("Issue List Features", () => {
 
   test("should filter and search issues", async ({ page }) => {
     // 1. Setup: Use seeded issues
-    // Issue 1: "Thing flips the bird" (TAF-01)
-    // Issue 2: "Bookcase not registering" (TAF-02)
-    const title1 = seededIssues.TAF[0].title;
-    const title2 = seededIssues.TAF[1].title;
+    // Issue 1: "Ball stuck in Thing's box" (TAF-01)
+    // Issue 2: "Bookcase not registering hits" (TAF-02)
+    const title1 = "Ball stuck in Thing's box";
+    const title2 = "Bookcase not registering hits";
 
     await page.goto("/issues");
 
     // 2. Test Searching
     // Search for Issue 1
-    await page
-      .getByPlaceholder("Search issues...")
-      .fill("Thing flips the bird");
+    await page.getByPlaceholder("Search issues...").fill("Thing's box");
     await page.keyboard.press("Enter");
     await page.waitForURL((url) => url.searchParams.has("q"));
     await expect(page.getByText("Showing 1 of 1 issues")).toBeVisible();
@@ -40,14 +38,14 @@ test.describe("Issue List Features", () => {
     await expect(page.getByText(title2)).toBeVisible();
 
     // 3. Test Filtering
-    // Filter by Severity: Major (TAF-01 and TAF-02 are both Major)
+    // Filter by Severity: Unplayable (TAF-01 is Unplayable, TAF-02 is Major)
+    // Note: seed-users.mjs says TAF-01 is unplayable
     await page.getByTestId("filter-severity").click();
-    await page.getByRole("option", { name: "Major" }).click();
+    await page.getByRole("option", { name: "Unplayable" }).click();
     await page.keyboard.press("Escape"); // Close popover
 
-    // Both TAF-01 and TAF-02 have major severity, so both should be visible
     await expect(page.getByText(title1)).toBeVisible();
-    await expect(page.getByText(title2)).toBeVisible();
+    await expect(page.getByText(title2)).toBeHidden();
 
     // Clear Severity Filter
     // The clear button may disappear/reappear during state changes; wait for it to stabilize
@@ -61,7 +59,7 @@ test.describe("Issue List Features", () => {
   });
 
   test.skip("should inline-edit issues (Flaky Env)", async ({ page }) => {
-    const title1 = seededIssues.TAF[0].title;
+    const title1 = "Ball stuck in Thing's box";
     await page.goto("/issues");
 
     // 4. Test Inline Editing & Stable Sorting
@@ -153,9 +151,7 @@ test.describe("Issue List Features", () => {
     // Close the popover
     await page.keyboard.press("Escape");
     await page.waitForURL((url) => url.searchParams.has("status"));
-    // After deselecting "New" group (new, confirmed), we should only see
-    // in_progress group issues: in_progress (3), need_parts (1), wait_owner (1) = 5 total
-    await expect(page.getByText(/Showing \d+ of \d+ issues/)).toBeVisible();
+    await expect(page.getByText("Showing 3 of 3 issues")).toBeVisible();
 
     // Verify "New" badge is hidden (deselected)
     // "In Progress" should still be visible as we didn't touch it

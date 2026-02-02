@@ -183,7 +183,6 @@ describe("Issue Service", () => {
           resourceId: "issue-1",
           resourceType: "issue",
           actorId: "user-1",
-          includeActor: false,
           issueTitle: "Issue Title",
           machineName: "Machine Name",
           formattedIssueId: "MM-01",

@@ -1,12 +1,11 @@
 import { z } from "zod";
-import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
 
 export const publicIssueSchema = z.object({
   machineId: z.string().uuid({ message: "Please select a machine" }),
   title: z
     .string()
     .min(1, "Title is required")
-    .max(60, "Title must be 60 characters or less")
+    .max(200, "Title must be less than 200 characters")
     .trim(),
   description: z
     .string()
@@ -24,7 +23,6 @@ export const publicIssueSchema = z.object({
   frequency: z.enum(["intermittent", "frequent", "constant"], {
     message: "Select frequency",
   }),
-  status: z.enum(ISSUE_STATUS_VALUES).optional(),
   firstName: z.string().trim().max(100, "First name too long").optional(),
   lastName: z.string().trim().max(100, "Last name too long").optional(),
   email: z
@@ -33,7 +31,6 @@ export const publicIssueSchema = z.object({
     .max(254, "Email is too long")
     .optional()
     .or(z.literal("")),
-  assignedTo: z.string().uuid("Invalid assignee").optional().or(z.literal("")),
 });
 
 export type PublicIssueInput = z.infer<typeof publicIssueSchema>;

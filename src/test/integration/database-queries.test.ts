@@ -277,8 +277,7 @@ describe("Database Queries (PGlite)", () => {
           type: "new_issue",
           resourceId: issue.id,
           resourceType: "issue",
-          actorId: "00000000-0000-0000-0000-000000000002", // Actor is someone else
-          includeActor: false, // Exclude actor to test recipient global watch behavior
+          actorId: "some-other-user-id", // Actor is someone else
           issueTitle: "Test Issue",
           machineName: "Test Machine",
           issueContext: {

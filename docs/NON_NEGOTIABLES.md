@@ -30,7 +30,6 @@ trigger: always_on
 10. Forms work without JavaScript (progressive enhancement)
 11. Use Drizzle migrations for schema changes (no ad-hoc `push` to production/preview)
 12. Keep auth host consistent: use `localhost` everywhere (Supabase site_url, Next dev, Playwright baseURL) to prevent cookie host mismatches
-13. E2E interaction coverage: if you add a clickable element, click it in a test
 
 ---
 
@@ -223,13 +222,6 @@ trigger: always_on
 - **Do:** Use integration tests (with PGlite) for service layer logic that primarily interacts with the database
 - **Don't:** Write unit tests that require extensive mocking of `db.query`, `db.transaction`, or method chains
 
-**CORE-TEST-005:** E2E Interaction Coverage for Clickable Elements
-
-- **Severity:** Required
-- **Why:** Tests that verify element existence without clicking miss broken handlers (PR #894 pattern)
-- **Do:** If you add a clickable element (button, link, icon), write an E2E test that clicks it and verifies the outcome
-- **Don't:** Only assert `toBeVisible()` without testing the actual interaction
-
 ---
 
 ## Architecture
@@ -373,7 +365,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 - CORE‑SSR‑001..006: Supabase SSR and auth
 - CORE‑SEC‑001..004: Security
 - CORE‑PERF‑001..002: Performance
-- CORE‑TEST‑001..005: Testing
+- CORE‑TEST‑001..003: Testing
 - CORE‑ARCH‑001..007: Architecture
 
 **Cross-References:**
