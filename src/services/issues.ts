@@ -81,6 +81,15 @@ export interface UpdateIssueFrequencyParams {
   frequency: IssueFrequency;
 }
 
+export interface UpdateIssueCommentParams {
+  commentId: string;
+  content: string;
+}
+
+export interface DeleteIssueCommentParams {
+  commentId: string;
+}
+
 export type Issue = InferSelectModel<typeof issues>;
 export type IssueComment = InferSelectModel<typeof issueComments>;
 
@@ -657,4 +666,48 @@ export async function updateIssueFrequency({
   );
 
   return { issueId, oldFrequency, newFrequency: frequency };
+}
+
+/**
+ * Update a comment on an issue
+ */
+export async function updateIssueComment({
+  commentId,
+  content,
+}: UpdateIssueCommentParams): Promise<IssueComment> {
+  const [updatedComment] = await db
+    .update(issueComments)
+    .set({
+      content,
+      updatedAt: new Date(),
+    })
+    .where(eq(issueComments.id, commentId))
+    .returning();
+
+  if (!updatedComment) {
+    throw new Error("Comment not found or update failed");
+  }
+
+  log.info({ commentId, action: "updateIssueComment" }, "Comment updated");
+
+  return updatedComment;
+}
+
+/**
+ * Delete a comment from an issue
+ */
+export async function deleteIssueComment({
+  commentId,
+}: DeleteIssueCommentParams): Promise<{ deletedId: string }> {
+  const [deletedComment] = await db
+    .delete(issueComments)
+    .where(eq(issueComments.id, commentId))
+    .returning({ id: issueComments.id });
+
+  if (!deletedComment) {
+    throw new Error("Comment not found or delete failed");
+  }
+
+  log.info({ commentId, action: "deleteIssueComment" }, "Comment deleted");
+  return { deletedId: deletedComment.id };
 }

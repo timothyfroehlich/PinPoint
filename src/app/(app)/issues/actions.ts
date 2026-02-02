@@ -23,6 +23,8 @@ import {
   updateIssueFrequencySchema,
   assignIssueSchema,
   addCommentSchema,
+  editCommentSchema,
+  deleteCommentSchema,
   imagesMetadataArraySchema,
 } from "./schemas";
 import { type Result, ok, err } from "~/lib/result";
@@ -34,9 +36,11 @@ import {
   updateIssueSeverity,
   updateIssuePriority,
   updateIssueFrequency,
+  updateIssueComment,
+  deleteIssueComment,
 } from "~/services/issues";
 import { canUpdateIssue } from "~/lib/permissions";
-import { userProfiles } from "~/server/db/schema";
+import { userProfiles, issueComments } from "~/server/db/schema";
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
 
@@ -87,6 +91,16 @@ export type AssignIssueResult = Result<
 export type AddCommentResult = Result<
   { issueId: string },
   "VALIDATION" | "UNAUTHORIZED" | "SERVER"
+>;
+
+export type EditCommentResult = Result<
+  { commentId: string },
+  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+>;
+
+export type DeleteCommentResult = Result<
+  { commentId: string },
+  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
 >;
 
 /**
@@ -753,4 +767,160 @@ export async function addCommentAction(
     revalidatePath(`/m/${issue.machineInitials}/i/${issue.issueNumber}`);
   }
   return ok({ issueId });
+}
+
+/**
+ * Edits a comment on an issue.
+ */
+export async function editCommentAction(
+  _prevState: EditCommentResult | undefined,
+  formData: FormData
+): Promise<EditCommentResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return err("UNAUTHORIZED", "Unauthorized");
+  }
+
+  const validation = editCommentSchema.safeParse({
+    commentId: toOptionalString(formData.get("commentId")),
+    comment: toOptionalString(formData.get("comment")),
+  });
+
+  if (!validation.success) {
+    return err(
+      "VALIDATION",
+      validation.error.issues[0]?.message ?? "Invalid input"
+    );
+  }
+
+  const { commentId, comment } = validation.data;
+
+  try {
+    const existingComment = await db.query.issueComments.findFirst({
+      where: eq(issueComments.id, commentId),
+    });
+
+    if (!existingComment) {
+      return err("NOT_FOUND", "Comment not found");
+    }
+
+    // System comments (audit events) cannot be edited
+    if (existingComment.isSystem) {
+      return err("UNAUTHORIZED", "System comments cannot be edited");
+    }
+
+    if (existingComment.authorId !== user.id) {
+      return err("UNAUTHORIZED", "You can only edit your own comments");
+    }
+
+    await updateIssueComment({
+      commentId,
+      content: comment,
+    });
+
+    // Revalidate the issue page
+    const issue = await db.query.issues.findFirst({
+      where: eq(issues.id, existingComment.issueId),
+      columns: { machineInitials: true, issueNumber: true },
+    });
+    if (issue) {
+      revalidatePath(`/m/${issue.machineInitials}/i/${issue.issueNumber}`);
+    }
+
+    return ok({ commentId });
+  } catch (error) {
+    log.error(
+      {
+        error: error instanceof Error ? error.message : "Unknown",
+        action: "editComment",
+      },
+      "Failed to edit issue comment"
+    );
+    return err("SERVER", "Failed to edit comment");
+  }
+}
+
+/**
+ * Deletes a comment from an issue.
+ */
+export async function deleteCommentAction(
+  _prevState: DeleteCommentResult | undefined,
+  formData: FormData
+): Promise<DeleteCommentResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return err("UNAUTHORIZED", "Unauthorized");
+  }
+
+  const validation = deleteCommentSchema.safeParse({
+    commentId: toOptionalString(formData.get("commentId")),
+  });
+
+  if (!validation.success) {
+    return err(
+      "VALIDATION",
+      validation.error.issues[0]?.message ?? "Invalid input"
+    );
+  }
+
+  const { commentId } = validation.data;
+
+  try {
+    const existingComment = await db.query.issueComments.findFirst({
+      where: eq(issueComments.id, commentId),
+    });
+
+    if (!existingComment) {
+      return err("NOT_FOUND", "Comment not found");
+    }
+
+    // System comments (audit events) cannot be deleted
+    if (existingComment.isSystem) {
+      return err("UNAUTHORIZED", "System comments cannot be deleted");
+    }
+
+    const userProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true },
+    });
+
+    if (existingComment.authorId !== user.id && userProfile?.role !== "admin") {
+      return err(
+        "UNAUTHORIZED",
+        "You can only delete your own comments, or you must be an admin"
+      );
+    }
+
+    await deleteIssueComment({
+      commentId,
+    });
+
+    // Revalidate the issue page
+    const issue = await db.query.issues.findFirst({
+      where: eq(issues.id, existingComment.issueId),
+      columns: { machineInitials: true, issueNumber: true },
+    });
+    if (issue) {
+      revalidatePath(`/m/${issue.machineInitials}/i/${issue.issueNumber}`);
+    }
+
+    return ok({ commentId });
+  } catch (error) {
+    log.error(
+      {
+        error: error instanceof Error ? error.message : "Unknown",
+        action: "deleteComment",
+      },
+      "Failed to delete issue comment"
+    );
+    return err("SERVER", "Failed to delete comment");
+  }
 }
