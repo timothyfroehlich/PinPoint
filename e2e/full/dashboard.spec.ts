@@ -110,6 +110,47 @@ test.describe.serial("Member Dashboard", () => {
     );
   });
 
+  test("stat cards navigate to filtered lists", async ({ page }, testInfo) => {
+    await ensureLoggedIn(page, testInfo);
+
+    // Test 1: Click 'Open Issues' stat card
+    const openIssuesCard = page
+      .getByTestId("quick-stats")
+      .getByRole("link")
+      .filter({ hasText: "Open Issues" });
+    await openIssuesCard.click();
+    await expect(page).toHaveURL(
+      /\/issues\?status=new,confirmed,in_progress,need_parts,need_help,wait_owner/
+    );
+
+    // Navigate back to dashboard
+    await page.goto("/dashboard");
+    await page.waitForLoadState("networkidle");
+
+    // Test 2: Click 'Machines Needing Service' stat card
+    const machinesCard = page
+      .getByTestId("quick-stats")
+      .getByRole("link")
+      .filter({ hasText: "Machines Needing Service" });
+    await machinesCard.click();
+    await expect(page).toHaveURL(/\/m\?status=unplayable,needs_service/);
+
+    // Navigate back to dashboard
+    await page.goto("/dashboard");
+    await page.waitForLoadState("networkidle");
+
+    // Test 3: Click 'Assigned to Me' stat card (only visible when logged in)
+    const assignedCard = page
+      .getByTestId("quick-stats")
+      .getByRole("link")
+      .filter({ hasText: "Assigned to Me" });
+    await assignedCard.click();
+    // URL should contain assignee= with a UUID and the status filter
+    await expect(page).toHaveURL(
+      /\/issues\?assignee=[a-f0-9-]+&status=new,confirmed,in_progress,need_parts,need_help,wait_owner/
+    );
+  });
+
   test("dashboard issue cards link to issue detail pages", async ({
     page,
   }, testInfo) => {
