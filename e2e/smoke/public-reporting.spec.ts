@@ -7,6 +7,8 @@
 import { test, expect } from "@playwright/test";
 import { cleanupTestEntities } from "../support/cleanup";
 import { fillReportForm } from "../support/page-helpers";
+import { loginAs } from "../support/actions";
+import { TEST_USERS } from "../support/constants";
 
 const PUBLIC_PREFIX = "E2E Public Report";
 
@@ -214,5 +216,48 @@ test.describe("Public Issue Reporting", () => {
     const machineAfterReset = await select.inputValue();
     expect(machineAfterReset).toBe(defaultMachineId);
     expect(machineAfterReset).not.toBe(selectedMachineId);
+  });
+
+  test("anonymous issue should have status forced to 'new'", async ({
+    page,
+  }, testInfo) => {
+    // Security test: Verify server-side enforcement of status='new' for anonymous users
+    // Even if form data were manipulated, the server should force status to 'new'
+
+    const issueTitle = `${PUBLIC_PREFIX} Security Test ${Date.now()}`;
+
+    // 1. Submit anonymous issue
+    await page.goto("/report");
+    await page.getByTestId("machine-select").selectOption({ index: 1 });
+    await expect(page).toHaveURL(/machine=/);
+
+    await fillReportForm(page, {
+      title: issueTitle,
+      description: "Testing that status is forced to new for anonymous users.",
+      includePriority: false,
+    });
+
+    await page.getByRole("button", { name: "Submit Issue Report" }).click();
+    await expect(page).toHaveURL("/report/success");
+
+    // 2. Login as admin to verify the issue
+    await loginAs(page, testInfo, {
+      email: TEST_USERS.admin.email,
+      password: TEST_USERS.admin.password,
+    });
+
+    // 3. Search for the issue we just created
+    await page.goto("/issues");
+    await page.getByPlaceholder("Search issues...").fill(issueTitle);
+    await page.keyboard.press("Enter");
+    await page.waitForURL((url) => url.searchParams.has("q"));
+
+    // 4. Verify the issue appears and has status 'New'
+    const issueRow = page.getByRole("row", { name: new RegExp(issueTitle) });
+    await expect(issueRow).toBeVisible();
+
+    // The status cell should show 'New' (rendered as a button for inline editing)
+    const statusCell = issueRow.getByRole("cell", { name: "New" });
+    await expect(statusCell).toBeVisible();
   });
 });
