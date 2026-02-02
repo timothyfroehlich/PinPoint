@@ -252,12 +252,16 @@ test.describe("Public Issue Reporting", () => {
     await page.keyboard.press("Enter");
     await page.waitForURL((url) => url.searchParams.has("q"));
 
-    // 4. Verify the issue appears and has status 'New'
+    // 4. Verify the issue appears in search results
     const issueRow = page.getByRole("row", { name: new RegExp(issueTitle) });
     await expect(issueRow).toBeVisible();
 
-    // The status cell should show 'New' (rendered as a button for inline editing)
-    const statusCell = issueRow.getByRole("cell", { name: "New" });
-    await expect(statusCell).toBeVisible();
+    // 5. Click the issue title link to navigate to detail page (status column may be hidden on mobile)
+    await issueRow.getByTestId("issue-title").click();
+    await expect(page).toHaveURL(/\/m\/[A-Z0-9]+\/i\/\d+/);
+
+    // 6. Verify status badge shows 'New' on the detail page
+    const statusBadge = page.getByTestId("issue-status-badge");
+    await expect(statusBadge).toHaveText(/New/i);
   });
 });
