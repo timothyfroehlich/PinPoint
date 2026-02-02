@@ -66,6 +66,7 @@ describe("createNotification (Integration)", () => {
         resourceId: issue.id,
         resourceType: "issue",
         actorId: actor.id,
+        includeActor: false, // Explicitly test actor exclusion
         commentContent: "Test comment",
       },
       db
@@ -127,6 +128,7 @@ describe("createNotification (Integration)", () => {
         resourceId: issue.id,
         resourceType: "issue",
         actorId: actor.id,
+        includeActor: false, // Exclude actor to test recipient preferences
         commentContent: "Test comment",
       },
       db
@@ -186,6 +188,7 @@ describe("createNotification (Integration)", () => {
         resourceId: issue.id,
         resourceType: "issue",
         actorId: actor.id,
+        includeActor: false, // Exclude actor to test recipient granular toggles
         commentContent: "Test comment",
       },
       db

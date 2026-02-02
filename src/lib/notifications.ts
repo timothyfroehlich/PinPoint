@@ -44,7 +44,7 @@ export async function createNotification(
     resourceId,
     resourceType,
     actorId,
-    includeActor,
+    includeActor = true,
     issueTitle,
     machineName,
     formattedIssueId,
