@@ -340,6 +340,7 @@ export async function addIssueComment({
           resourceId: issueId,
           resourceType: "issue",
           actorId: userId,
+          includeActor: false,
           issueTitle: issue?.title ?? undefined,
           machineName: issue?.machine.name ?? undefined,
           formattedIssueId: issue
