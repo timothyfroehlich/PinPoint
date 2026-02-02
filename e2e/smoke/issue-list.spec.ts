@@ -242,4 +242,101 @@ test.describe("Issue List Features", () => {
     ).toBeVisible();
     await page.keyboard.press("Escape");
   });
+
+  test("should persist filters when navigating to issue detail and back", async ({
+    page,
+  }) => {
+    // 1. Go to issues and apply a severity filter
+    await page.goto("/issues");
+    await page.getByTestId("filter-severity").click();
+    await page.getByRole("option", { name: "Major" }).click();
+    await page.keyboard.press("Escape");
+
+    // Wait for URL to update with filter
+    await page.waitForURL(/severity=major/);
+    const filteredUrl = page.url();
+
+    // 2. Click on an issue title link to navigate to detail page
+    const issueLink = page.getByRole("link", {
+      name: seededIssues.TAF[0].title,
+    });
+    await issueLink.click();
+
+    // Wait for navigation to issue detail
+    await expect(page).toHaveURL(/\/m\/[A-Z]+\/i\/\d+/);
+
+    // 3. Click "Back to Issues" and verify filters preserved
+    await page.getByRole("link", { name: "Back to Issues" }).click();
+    await expect(page).toHaveURL(/severity=major/);
+
+    // Verify filter badge is still visible
+    await expect(
+      page
+        .getByTestId("filter-bar")
+        .locator('[data-slot="badge"]')
+        .filter({ hasText: "Major" })
+    ).toBeVisible();
+  });
+
+  test("should persist filters when using sidebar Issues link", async ({
+    page,
+  }, testInfo) => {
+    // 1. Go to issues and apply a search filter
+    await page.goto("/issues");
+    await page.getByPlaceholder("Search issues...").fill("Thing");
+    await page.keyboard.press("Enter");
+    await page.waitForURL(/q=Thing/);
+
+    // 2. Navigate to a different page (dashboard)
+    await page.goto("/dashboard");
+    await expect(page).toHaveURL("/dashboard");
+
+    // 3. Click Issues in sidebar - should preserve filters
+    // On mobile, need to open the hamburger menu first
+    const isMobile = testInfo.project.name.includes("Mobile");
+    if (isMobile) {
+      await page.getByTestId("mobile-menu-trigger").click();
+    }
+
+    // The sidebar link uses useIssueLink which reads from localStorage
+    await page.getByRole("link", { name: "Issues", exact: true }).click();
+    await expect(page).toHaveURL(/q=Thing/);
+
+    // Verify search term is still in the input
+    await expect(page.getByPlaceholder("Search issues...")).toHaveValue(
+      "Thing"
+    );
+  });
+
+  test("should persist filters across page reload", async ({ page }) => {
+    // 1. Go to issues and apply multiple filters
+    await page.goto("/issues");
+
+    // Apply severity filter
+    await page.getByTestId("filter-severity").click();
+    await page.getByRole("option", { name: "Major" }).click();
+    await page.keyboard.press("Escape");
+    await page.waitForURL(/severity=major/);
+
+    // Apply search
+    await page.getByPlaceholder("Search issues...").fill("bird");
+    await page.keyboard.press("Enter");
+    await page.waitForURL(/q=bird/);
+
+    // 2. Reload the page
+    await page.reload();
+
+    // 3. Verify filters are restored from URL (URL params are the source of truth)
+    await expect(page).toHaveURL(/severity=major/);
+    await expect(page).toHaveURL(/q=bird/);
+
+    // Verify UI reflects the filters
+    await expect(
+      page
+        .getByTestId("filter-bar")
+        .locator('[data-slot="badge"]')
+        .filter({ hasText: "Major" })
+    ).toBeVisible();
+    await expect(page.getByPlaceholder("Search issues...")).toHaveValue("bird");
+  });
 });
