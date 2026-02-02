@@ -123,9 +123,9 @@ test.describe.serial("Member Dashboard", () => {
       /\/issues\?status=new,confirmed,in_progress,need_parts,need_help,wait_owner/
     );
 
-    // Navigate back to dashboard
+    // Navigate back to dashboard and wait for content
     await page.goto("/dashboard");
-    await page.waitForLoadState("networkidle");
+    await expect(page.getByTestId("quick-stats")).toBeVisible();
 
     // Test 2: Click 'Machines Needing Service' stat card
     const machinesCard = page
@@ -135,9 +135,9 @@ test.describe.serial("Member Dashboard", () => {
     await machinesCard.click();
     await expect(page).toHaveURL(/\/m\?status=unplayable,needs_service/);
 
-    // Navigate back to dashboard
+    // Navigate back to dashboard and wait for content
     await page.goto("/dashboard");
-    await page.waitForLoadState("networkidle");
+    await expect(page.getByTestId("quick-stats")).toBeVisible();
 
     // Test 3: Click 'Assigned to Me' stat card (only visible when logged in)
     const assignedCard = page
