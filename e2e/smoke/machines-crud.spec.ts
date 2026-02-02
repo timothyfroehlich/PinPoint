@@ -62,6 +62,27 @@ test.describe("Machines CRUD", () => {
     });
   });
 
+  test("non-admin cannot access /m/new page", async ({ page }) => {
+    // Default login is member (non-admin) from beforeEach
+
+    // Verify "Add Machine" button is NOT visible to non-admin on /m page
+    await page.goto("/m");
+    await expect(page.getByRole("heading", { name: "Machines" })).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /Add Machine/i })
+    ).not.toBeVisible();
+
+    // Attempt direct navigation to /m/new - should redirect to /m
+    await page.goto("/m/new");
+    await expect(page).toHaveURL("/m");
+
+    // Verify we're back on machines list, not the create form
+    await expect(page.getByRole("heading", { name: "Machines" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Add New Machine" })
+    ).not.toBeVisible();
+  });
+
   test("should display seeded test machines with correct statuses", async ({
     page,
   }) => {
