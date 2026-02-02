@@ -132,26 +132,7 @@ Fetch all comments (including hidden ones):
 gh api graphql -f query='{ repository(owner: "timothyfroehlich", name: "PinPoint") { pullRequest(number: <PR_NUMBER>) { reviews(last: 5) { nodes { author { login } state comments(first: 20) { nodes { path line body } } } } } } }'
 ```
 
-## 5. Current Priorities (MVP+ Polish)
-
-**Status**: Soft-launched. Active users.
-
-1.  **Critical Fixes**:
-    - Fix Password Reset in Prod (Issue #792).
-    - Security: Fix Host Header Injection in Auth (PR #781).
-2.  **Feature Development**:
-    - **Search & Filtering**: Build out search pane (`feature/issue-filter-search`).
-    - **Photo Uploads**: Attach photos to issues/machines.
-3.  **UI Polish**:
-    - Redesign Issue Status/Priority Dropdowns (#744).
-    - Pagination for Issue List (#752).
-    - Highlight machine owners (#753).
-    - Refactor MainLayout Header (#693).
-4.  **Code Hygiene**:
-    - Delete CHANGELOG.md and references (#776).
-    - General DRY/refactoring.
-
-## 6. Documentation Philosophy
+## 5. Documentation Philosophy
 
 - Actionable information only - focus on "what" and "how", not "why"
 - Designed for efficient LLM consumption
