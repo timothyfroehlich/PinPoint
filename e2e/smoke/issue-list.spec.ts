@@ -254,7 +254,6 @@ test.describe("Issue List Features", () => {
 
     // Wait for URL to update with filter
     await page.waitForURL(/severity=major/);
-    const filteredUrl = page.url();
 
     // 2. Click on an issue title link to navigate to detail page
     const issueLink = page.getByRole("link", {
