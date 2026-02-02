@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { createNotification } from "~/lib/notifications";
 import { sendEmail } from "~/lib/email/client";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
@@ -76,6 +76,53 @@ describe("createNotification (Integration)", () => {
     const result = await db.query.notifications.findMany();
     expect(result).toHaveLength(0);
     expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("should notify the actor by default", async () => {
+    const db = await getTestDb();
+
+    // Setup: Actor is also a watcher
+    const [actor] = await db
+      .insert(userProfiles)
+      .values(createTestUser())
+      .returning();
+    const [machine] = await db
+      .insert(machines)
+      .values(createTestMachine({ initials: "DEF" }))
+      .returning();
+    const [issue] = await db
+      .insert(issues)
+      .values(createTestIssue(machine.initials, { issueNumber: 1 }))
+      .returning();
+
+    await db.insert(issueWatchers).values({
+      issueId: issue.id,
+      userId: actor.id,
+    });
+
+    // Mock auth.users email for actor
+    await db.execute(
+      sql`INSERT INTO auth.users (id, email) VALUES (${actor.id}, 'actor@test.com')`
+    );
+
+    // Don't specify includeActor - should default to true
+    await createNotification(
+      {
+        type: "new_comment",
+        resourceId: issue.id,
+        resourceType: "issue",
+        actorId: actor.id,
+        commentContent: "Test comment",
+      },
+      db
+    );
+
+    // Verify actor receives notification (new default behavior)
+    const result = await db.query.notifications.findMany({
+      where: eq(notifications.userId, actor.id),
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].type).toBe("new_comment");
   });
 
   it("should respect main switches", async () => {
