@@ -169,7 +169,9 @@ test.describe.serial("Comment Edit and Delete", () => {
       await expect(page.getByText(/\(edited .+ ago\)/)).toBeVisible();
     });
 
-    test("author can delete their own comment", async ({ page }, testInfo) => {
+    test("author can delete their own comment - leaves audit trail", async ({
+      page,
+    }, testInfo) => {
       await loginAs(page, testInfo);
       await page.goto(issueUrl);
       await page.waitForLoadState("networkidle");
@@ -195,8 +197,21 @@ test.describe.serial("Comment Edit and Delete", () => {
       // Wait for deletion
       await page.waitForLoadState("networkidle");
 
-      // Comment should be gone
+      // Original comment text should be gone
       await expect(page.getByText(editedCommentText)).not.toBeVisible();
+
+      // Audit trail message should appear instead
+      await expect(page.getByText("User deleted their comment")).toBeVisible();
+
+      // The audit message should not have actions button (it's a system comment)
+      const auditCard = page
+        .locator('[data-testid^="timeline-item-"]')
+        .filter({ hasText: "User deleted their comment" });
+      await expect(auditCard).toBeVisible();
+      const auditActionsButton = auditCard.getByRole("button", {
+        name: "Comment actions",
+      });
+      await expect(auditActionsButton).not.toBeVisible();
     });
   });
 
@@ -244,7 +259,9 @@ test.describe.serial("Comment Edit and Delete", () => {
       await page.keyboard.press("Escape");
     });
 
-    test("admin can delete others comments", async ({ page }, testInfo) => {
+    test("admin can delete others comments - leaves admin audit trail", async ({
+      page,
+    }, testInfo) => {
       // Login as admin
       await loginAs(page, testInfo, {
         email: TEST_USERS.admin.email,
@@ -270,8 +287,21 @@ test.describe.serial("Comment Edit and Delete", () => {
       // Wait for deletion
       await page.waitForLoadState("networkidle");
 
-      // Comment should be gone
+      // Original comment text should be gone
       await expect(page.getByText(memberComment)).not.toBeVisible();
+
+      // Admin audit trail message should appear
+      await expect(page.getByText("Comment removed by admin")).toBeVisible();
+
+      // The audit message should not have actions button (it's a system comment)
+      const auditCard = page
+        .locator('[data-testid^="timeline-item-"]')
+        .filter({ hasText: "Comment removed by admin" });
+      await expect(auditCard).toBeVisible();
+      const auditActionsButton = auditCard.getByRole("button", {
+        name: "Comment actions",
+      });
+      await expect(auditActionsButton).not.toBeVisible();
     });
   });
 
@@ -312,8 +342,10 @@ test.describe.serial("Comment Edit and Delete", () => {
       await expect(actionsButton).not.toBeVisible();
     });
 
-    test("cleanup: admin deletes their comment", async ({ page }, testInfo) => {
-      // Log back in as admin and delete the comment
+    test("cleanup: admin deletes their own comment - shows user deleted message", async ({
+      page,
+    }, testInfo) => {
+      // Log back in as admin and delete their own comment
       await loginAs(page, testInfo, {
         email: TEST_USERS.admin.email,
         password: TEST_USERS.admin.password,
@@ -329,6 +361,15 @@ test.describe.serial("Comment Edit and Delete", () => {
         .getByRole("button", { name: "Delete" })
         .click();
       await page.waitForLoadState("networkidle");
+
+      // When admin deletes their OWN comment, it shows "User deleted their comment"
+      // (not "Comment removed by admin" since they're the author)
+      await expect(page.getByText(adminComment)).not.toBeVisible();
+
+      // Count the "User deleted their comment" messages - there should be 2 now
+      // (one from the author test, one from this cleanup)
+      const userDeletedMessages = page.getByText("User deleted their comment");
+      await expect(userDeletedMessages).toHaveCount(2);
     });
   });
 

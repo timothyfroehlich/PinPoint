@@ -37,7 +37,6 @@ import {
   updateIssuePriority,
   updateIssueFrequency,
   updateIssueComment,
-  deleteIssueComment,
 } from "~/services/issues";
 import { canUpdateIssue } from "~/lib/permissions";
 import { userProfiles, issueComments } from "~/server/db/schema";
@@ -899,9 +898,26 @@ export async function deleteCommentAction(
       );
     }
 
-    await deleteIssueComment({
-      commentId,
-    });
+    // Instead of deleting, convert to an audit trail message
+    const isOwnComment = existingComment.authorId === user.id;
+    const content = isOwnComment
+      ? "User deleted their comment"
+      : "Comment removed by admin";
+
+    await db
+      .update(issueComments)
+      .set({
+        isSystem: true,
+        authorId: null,
+        content,
+        updatedAt: new Date(),
+      })
+      .where(eq(issueComments.id, commentId));
+
+    log.info(
+      { commentId, isOwnComment, action: "deleteComment" },
+      "Comment converted to audit trail"
+    );
 
     // Revalidate the issue page
     const issue = await db.query.issues.findFirst({
