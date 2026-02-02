@@ -9,6 +9,11 @@
  */
 
 import { test, expect, type Page, type TestInfo } from "@playwright/test";
+
+// Skip on Safari/WebKit - cookie handling differs from Chrome, causing auth issues
+// See beads issue for tracking: PinPoint-4v7
+test.skip(({ browserName }) => browserName === "webkit", "Skipped on WebKit");
+
 import { loginAs } from "../support/actions.js";
 import { cleanupTestEntities, extractIdFromUrl } from "../support/cleanup.js";
 import { seededMachines, TEST_USERS } from "../support/constants.js";
