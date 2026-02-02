@@ -40,11 +40,14 @@ echo "🔧 Exporting Supabase CLI environment variables..."
 eval "$(supabase status -o env | sed 's/=/="/;s/$/"/')"
 
 echo "🔧 Mapping Supabase env vars into application env names..."
-export NEXT_PUBLIC_SUPABASE_URL="${API_URL}"
+# IMPORTANT: Replace 127.0.0.1 with localhost for cookie domain consistency
+# See NON_NEGOTIABLES.md - browsers treat these as different domains
+export NEXT_PUBLIC_SUPABASE_URL="${API_URL//127.0.0.1/localhost}"
 export NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="${PUBLISHABLE_KEY}"
 export SUPABASE_SERVICE_ROLE_KEY="${SECRET_KEY}"
-export DATABASE_URL="${DB_URL}"
-export DIRECT_URL="${DB_URL}"
+# Also fix DB URLs for consistency (though less critical than API_URL)
+export DATABASE_URL="${DB_URL//127.0.0.1/localhost}"
+export DIRECT_URL="${DB_URL//127.0.0.1/localhost}"
 export NEXT_PUBLIC_SITE_URL="${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}"
 export PORT="${PORT:-3000}"
 
