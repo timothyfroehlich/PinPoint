@@ -196,7 +196,6 @@ export async function createIssue({
           resourceId: issue.id,
           resourceType: "issue",
           ...(reportedBy ? { actorId: reportedBy } : {}),
-          includeActor: true,
           issueTitle: title,
           machineName: updatedMachine.name,
           formattedIssueId: formatIssueId(machineInitials, issueNumber),
@@ -282,7 +281,6 @@ export async function updateIssueStatus({
           resourceId: issueId,
           resourceType: "issue",
           actorId: userId,
-          includeActor: true,
           issueTitle: currentIssue.title,
           machineName: currentIssue.machine.name,
           formattedIssueId: formatIssueId(
@@ -506,7 +504,6 @@ export async function assignIssue({
             resourceId: issueId,
             resourceType: "issue",
             actorId,
-            includeActor: true,
             issueTitle: currentIssue.title,
             machineName: currentIssue.machine.name,
             formattedIssueId: formatIssueId(
