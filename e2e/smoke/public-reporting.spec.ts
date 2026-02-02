@@ -157,4 +157,62 @@ test.describe("Public Issue Reporting", () => {
     await page.getByRole("link", { name: "Report Another Issue" }).click();
     await expect(page).toHaveURL("/report");
   });
+
+  test("should clear form draft after successful submission", async ({
+    page,
+  }) => {
+    // Submit an issue first - select the SECOND machine (index 1)
+    await page.goto("/report");
+    const select = page.getByTestId("machine-select");
+
+    // Get the first (default) machine value before changing
+    const defaultMachineId = await select.inputValue();
+    expect(defaultMachineId).toBeTruthy(); // Should have a default
+
+    // Select a different machine (use index 3 to ensure it's different from default)
+    await select.selectOption({ index: 3 });
+    const selectedMachineId = await select.inputValue();
+    expect(selectedMachineId).not.toBe(defaultMachineId);
+    await expect(page).toHaveURL(/machine=/);
+
+    const issueTitle = `${PUBLIC_PREFIX} Draft Clear Test ${Date.now()}`;
+    await fillReportForm(page, {
+      title: issueTitle,
+      description: "This should not persist after submission.",
+      includePriority: false,
+    });
+
+    await page.getByRole("button", { name: "Submit Issue Report" }).click();
+    await expect(page).toHaveURL("/report/success");
+
+    // Wait for success page to load and ClearReportDraft effect to run
+    await expect(
+      page.getByRole("heading", { name: "Issue Sent!" })
+    ).toBeVisible();
+
+    // Verify localStorage was cleared on success page
+    const draftAfterSuccess = await page.evaluate(() =>
+      window.localStorage.getItem("report_form_state")
+    );
+    expect(draftAfterSuccess).toBeNull();
+
+    // Click "Report Another Issue"
+    await page.getByRole("link", { name: "Report Another Issue" }).click();
+
+    // Wait for the report page to load
+    await expect(page).toHaveURL("/report");
+    await expect(
+      page.getByRole("heading", { name: "Report an Issue" })
+    ).toBeVisible();
+
+    // Verify text fields are empty (draft cleared, not restored)
+    await expect(page.getByLabel("Issue Title")).toHaveValue("");
+    await expect(page.getByLabel("Description")).toHaveValue("");
+
+    // Machine should be back to DEFAULT (first in list), not the one we selected
+    // This verifies draft wasn't restored - the form uses first machine as default
+    const machineAfterReset = await select.inputValue();
+    expect(machineAfterReset).toBe(defaultMachineId);
+    expect(machineAfterReset).not.toBe(selectedMachineId);
+  });
 });
