@@ -45,6 +45,7 @@ vi.mock("~/server/db", () => {
 vi.mock("~/server/db/schema", () => ({
   issues: { id: "issues.id" },
   issueComments: { id: "issueComments.id" },
+  issueImages: { commentId: "issueImages.commentId" },
   userProfiles: { id: "userProfiles.id" },
 }));
 
@@ -93,12 +94,6 @@ function getMockSet() {
   const mockUpdate = getMockUpdate();
   const result = mockUpdate();
   return result.set as Mock;
-}
-
-function getMockWhere() {
-  const mockSet = getMockSet();
-  const result = mockSet({});
-  return result.where as Mock;
 }
 
 describe("deleteCommentAction - Audit Trail", () => {
