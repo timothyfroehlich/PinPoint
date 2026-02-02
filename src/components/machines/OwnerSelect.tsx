@@ -77,6 +77,7 @@ export function OwnerSelect({
           id="ownerId"
           className="border-outline bg-surface text-on-surface"
           aria-describedby="owner-help"
+          data-testid="owner-select"
         >
           <SelectValue placeholder="Select an owner" />
         </SelectTrigger>

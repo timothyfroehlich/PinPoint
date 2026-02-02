@@ -113,4 +113,75 @@ test.describe("User Invitation & Signup Flow", () => {
     await expect(page.getByText("Full Flow")).toBeVisible();
     // Email is no longer displayed in user menu (removed in PR #871)
   });
+
+  test("should transfer machine ownership when invited user signs up", async ({
+    page,
+  }) => {
+    test.slow(); // Triple the timeout - complex multi-step flow
+    const testId = Math.random().toString(36).substring(7);
+    const userEmail = `owner-invite-${testId}@example.com`;
+    testEmails.add(userEmail);
+
+    // 1. Invite user via admin panel
+    await page.goto("/admin/users");
+    await page.getByRole("button", { name: /Invite User/i }).click();
+    await page.getByLabel(/First Name/i).fill("Owner");
+    await page.getByLabel(/Last Name/i).fill("Transfer");
+    await page.getByRole("textbox", { name: "Email" }).fill(userEmail);
+
+    const inviteSwitch = page.getByRole("switch", {
+      name: /Send invitation email/i,
+    });
+    if ((await inviteSwitch.getAttribute("aria-checked")) === "false") {
+      await inviteSwitch.click();
+    }
+
+    await page
+      .getByRole("button", { name: /Invite User/i, includeHidden: false })
+      .click();
+    await expect(page.getByRole("dialog")).not.toBeVisible();
+
+    // 2. Assign the invited user as owner of a machine (use Humpty Dumpty - HD)
+    await page.goto("/m/HD");
+    await expect(
+      page.getByRole("heading", { name: /Humpty Dumpty/i })
+    ).toBeVisible();
+
+    // Click the owner dropdown and select the invited user (shown with "(Invited)" suffix)
+    const ownerSelect = page.getByTestId("owner-select");
+    await ownerSelect.click();
+    await page
+      .getByRole("option", { name: /Owner Transfer.*\(Invited\)/i })
+      .click();
+
+    // Save the machine
+    await page.getByRole("button", { name: /Update Machine/i }).click();
+    await expect(page.getByText(/Machine updated/i)).toBeVisible();
+
+    // 3. Logout and complete signup
+    await logout(page);
+
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const signupLink = await getSignupLink(userEmail);
+    await page.goto(signupLink);
+
+    await page.getByLabel("Password", { exact: true }).fill("TestPassword123!");
+    await page.getByLabel(/Confirm Password/i).fill("TestPassword123!");
+    await page.getByRole("button", { name: /Create Account/i }).click();
+
+    await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
+
+    // 4. Verify machine ownership transferred
+    await page.goto("/m/HD");
+    await expect(
+      page.getByRole("heading", { name: /Humpty Dumpty/i })
+    ).toBeVisible();
+
+    // The owner display should show the real user name without "(Invited)" suffix
+    // Note: User is a member now, so they see the read-only owner display
+    const ownerDisplay = page.getByTestId("owner-display");
+    await expect(ownerDisplay).toContainText("Owner Transfer");
+    // After signup, the user is no longer "invited" - they're a real user
+    await expect(ownerDisplay).not.toContainText("(Invited)");
+  });
 });

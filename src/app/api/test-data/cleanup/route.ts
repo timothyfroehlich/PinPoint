@@ -133,6 +133,35 @@ export async function POST(request: Request): Promise<Response> {
 
     const removedUsers: string[] = [];
     if (userEmails.length) {
+      // First, get user IDs from both invited_users and auth.users
+      const invitedUserIds = await db
+        .select({ id: invitedUsers.id })
+        .from(invitedUsers)
+        .where(inArray(invitedUsers.email, userEmails));
+
+      const authUserIds = await db
+        .select({ id: authUsers.id })
+        .from(authUsers)
+        .where(inArray(authUsers.email, userEmails));
+
+      const allUserIds = [
+        ...invitedUserIds.map((r) => r.id),
+        ...authUserIds.map((r) => r.id),
+      ];
+
+      // Clear machine ownership references BEFORE deleting users (FK constraint)
+      if (allUserIds.length) {
+        await db
+          .update(machines)
+          .set({ ownerId: null, invitedOwnerId: null })
+          .where(
+            or(
+              inArray(machines.ownerId, allUserIds),
+              inArray(machines.invitedOwnerId, allUserIds)
+            )
+          );
+      }
+
       const deletedInvited = await db
         .delete(invitedUsers)
         .where(inArray(invitedUsers.email, userEmails))
