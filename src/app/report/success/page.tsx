@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CheckCircle } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { ClearReportDraft } from "./clear-draft";
 
 export default async function ReportSuccessPage({
   searchParams,
@@ -35,6 +36,7 @@ export default async function ReportSuccessPage({
 
   return (
     <main className="min-h-screen bg-surface py-12">
+      <ClearReportDraft />
       <div className="container mx-auto max-w-xl px-4">
         <Card className="border-outline-variant bg-surface shadow-lg text-center p-6">
           <CardHeader className="space-y-3 pb-4">
