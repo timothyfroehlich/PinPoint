@@ -88,4 +88,176 @@ describe("Public Issue Reporting Security", () => {
     expect(result.error).not.toContain("duplicate key");
     expect(result.error).toBe("Unable to submit the issue. Please try again.");
   });
+
+  describe("assignedTo permission handling", () => {
+    const validUuid = "00000000-0000-0000-0000-000000000000";
+    const assigneeUuid = "11111111-1111-1111-8111-111111111111";
+
+    const createValidFormData = (assignedTo?: string) => {
+      const formData = new FormData();
+      formData.set("machineId", validUuid);
+      formData.set("title", "Test Issue");
+      formData.set("severity", "minor");
+      formData.set("frequency", "intermittent");
+      if (assignedTo !== undefined) {
+        formData.set("assignedTo", assignedTo);
+      }
+      return formData;
+    };
+
+    it("member can assign issue to another user", async () => {
+      // Setup: authenticated member
+      const { createClient } = await import("~/lib/supabase/server");
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: validUuid } },
+          }),
+        },
+      } as never);
+
+      const { db } = await import("~/server/db");
+      // Must mock both machines and userProfiles since clearAllMocks resets them
+      vi.mocked(db.query.machines.findFirst).mockResolvedValue({
+        initials: "MCH",
+      } as never);
+      vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+        role: "member",
+      } as never);
+
+      vi.mocked(createIssue).mockResolvedValue({
+        id: "issue-1",
+        issueNumber: 1,
+      } as never);
+
+      const formData = createValidFormData(assigneeUuid);
+      await submitPublicIssueAction({ error: "" }, formData);
+
+      expect(createIssue).toHaveBeenCalledWith(
+        expect.objectContaining({ assignedTo: assigneeUuid })
+      );
+    });
+
+    it("admin can assign issue to another user", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: validUuid } },
+          }),
+        },
+      } as never);
+
+      const { db } = await import("~/server/db");
+      vi.mocked(db.query.machines.findFirst).mockResolvedValue({
+        initials: "MCH",
+      } as never);
+      vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+        role: "admin",
+      } as never);
+
+      vi.mocked(createIssue).mockResolvedValue({
+        id: "issue-1",
+        issueNumber: 1,
+      } as never);
+
+      const formData = createValidFormData(assigneeUuid);
+      await submitPublicIssueAction({ error: "" }, formData);
+
+      expect(createIssue).toHaveBeenCalledWith(
+        expect.objectContaining({ assignedTo: assigneeUuid })
+      );
+    });
+
+    it("member with empty assignedTo normalizes to null", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: validUuid } },
+          }),
+        },
+      } as never);
+
+      const { db } = await import("~/server/db");
+      vi.mocked(db.query.machines.findFirst).mockResolvedValue({
+        initials: "MCH",
+      } as never);
+      vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+        role: "member",
+      } as never);
+
+      vi.mocked(createIssue).mockResolvedValue({
+        id: "issue-1",
+        issueNumber: 1,
+      } as never);
+
+      const formData = createValidFormData(""); // Empty string = Unassigned
+      await submitPublicIssueAction({ error: "" }, formData);
+
+      expect(createIssue).toHaveBeenCalledWith(
+        expect.objectContaining({ assignedTo: null })
+      );
+    });
+
+    it("guest assignedTo is stripped (unauthenticated)", async () => {
+      // Default mock: user = null (unauthenticated)
+      const { createClient } = await import("~/lib/supabase/server");
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: null },
+          }),
+        },
+      } as never);
+
+      const { db } = await import("~/server/db");
+      vi.mocked(db.query.machines.findFirst).mockResolvedValue({
+        initials: "MCH",
+      } as never);
+
+      vi.mocked(createIssue).mockResolvedValue({
+        id: "issue-1",
+        issueNumber: 1,
+      } as never);
+
+      const formData = createValidFormData(assigneeUuid);
+      await submitPublicIssueAction({ error: "" }, formData);
+
+      expect(createIssue).toHaveBeenCalledWith(
+        expect.objectContaining({ assignedTo: null })
+      );
+    });
+
+    it("non-member authenticated user assignedTo is stripped", async () => {
+      const { createClient } = await import("~/lib/supabase/server");
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: validUuid } },
+          }),
+        },
+      } as never);
+
+      const { db } = await import("~/server/db");
+      vi.mocked(db.query.machines.findFirst).mockResolvedValue({
+        initials: "MCH",
+      } as never);
+      vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+        role: "guest", // Not member or admin
+      } as never);
+
+      vi.mocked(createIssue).mockResolvedValue({
+        id: "issue-1",
+        issueNumber: 1,
+      } as never);
+
+      const formData = createValidFormData(assigneeUuid);
+      await submitPublicIssueAction({ error: "" }, formData);
+
+      expect(createIssue).toHaveBeenCalledWith(
+        expect.objectContaining({ assignedTo: null })
+      );
+    });
+  });
 });

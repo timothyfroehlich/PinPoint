@@ -49,11 +49,17 @@ export interface ActionState {
   success?: boolean;
 }
 
+interface Assignee {
+  id: string;
+  name: string | null;
+}
+
 interface UnifiedReportFormProps {
   machinesList: Machine[];
   defaultMachineId?: string;
   user: User | null; // Supabase User
   userProfile?: UserProfile | undefined;
+  assignees?: Assignee[];
   initialError?: string | undefined;
   recentIssuesPanelMobile?: React.ReactNode;
   recentIssuesPanelDesktop?: React.ReactNode;
@@ -64,6 +70,7 @@ export function UnifiedReportForm({
   defaultMachineId,
   user,
   userProfile,
+  assignees = [],
   initialError,
   recentIssuesPanelMobile,
   recentIssuesPanelDesktop,
@@ -80,6 +87,7 @@ export function UnifiedReportForm({
   const [priority, setPriority] = useState<IssuePriority | "">("medium");
   const [frequency, setFrequency] = useState<IssueFrequency | "">("constant");
   const [status, setStatus] = useState<IssueStatus>("new");
+  const [assignedTo, setAssignedTo] = useState("");
 
   const [uploadedImages, setUploadedImages] = useState<ImageMetadata[]>([]);
 
@@ -177,7 +185,7 @@ export function UnifiedReportForm({
   }, [defaultMachineId]);
 
   const isAdminOrMember =
-    user && (userProfile?.role === "admin" || userProfile?.role === "member");
+    !!user && (userProfile?.role === "admin" || userProfile?.role === "member");
 
   return (
     <div className="w-full max-w-5xl mx-auto">
@@ -338,6 +346,29 @@ export function UnifiedReportForm({
                       </Label>
                       <input type="hidden" name="status" value={status} />
                       <StatusSelect value={status} onValueChange={setStatus} />
+                    </div>
+                  )}
+
+                  {isAdminOrMember && assignees.length > 0 && (
+                    <div className="space-y-1.5 md:col-span-2">
+                      <Label htmlFor="assignedTo" className="text-on-surface">
+                        Assign To
+                      </Label>
+                      <select
+                        id="assignedTo"
+                        name="assignedTo"
+                        data-testid="assigned-to-select"
+                        value={assignedTo}
+                        onChange={(e) => setAssignedTo(e.target.value)}
+                        className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                      >
+                        <option value="">Unassigned</option>
+                        {assignees.map((assignee) => (
+                          <option key={assignee.id} value={assignee.id}>
+                            {assignee.name ?? "Unnamed User"}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   )}
                 </div>

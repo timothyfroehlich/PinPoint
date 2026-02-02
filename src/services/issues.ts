@@ -39,6 +39,7 @@ export interface CreateIssueParams {
   reportedBy?: string | null;
   reporterName?: string | null;
   reporterEmail?: string | null;
+  assignedTo?: string | null;
 }
 
 export interface UpdateIssueStatusParams {
@@ -110,6 +111,7 @@ export async function createIssue({
   reportedBy,
   reporterName,
   reporterEmail,
+  assignedTo,
 }: CreateIssueParams): Promise<Issue> {
   return await db.transaction(async (tx) => {
     // 1. Lock machine row and get next number (Atomic increment)
@@ -145,6 +147,7 @@ export async function createIssue({
         reporterName: reporterName ?? null,
         reporterEmail: reporterEmail ?? null,
         status: status ?? "new",
+        assignedTo: assignedTo ?? null,
       })
       .returning();
 
@@ -156,10 +159,28 @@ export async function createIssue({
         machineInitials,
         issueNumber,
         reportedBy,
+        assignedTo,
         action: "createIssue",
       },
       "Issue created successfully"
     );
+
+    // 3. Assignment Logic (if applicable)
+    if (assignedTo) {
+      // Create timeline event
+      const assignee = await tx.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, assignedTo),
+        columns: { name: true },
+      });
+      const assigneeName = assignee?.name ?? "Unknown User";
+      await createTimelineEvent(issue.id, `Assigned to ${assigneeName}`, tx);
+
+      // Auto-watch for assignee
+      await tx
+        .insert(issueWatchers)
+        .values({ issueId: issue.id, userId: assignedTo })
+        .onConflictDoNothing();
+    }
 
     // 4. Auto-Watch Logic
     // Reporter
