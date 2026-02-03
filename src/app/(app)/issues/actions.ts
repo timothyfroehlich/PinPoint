@@ -8,7 +8,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { type z } from "zod";
 import { eq } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
@@ -16,7 +15,6 @@ import { db } from "~/server/db";
 import { issues } from "~/server/db/schema";
 import { log } from "~/lib/logger";
 import {
-  createIssueSchema,
   updateIssueStatusSchema,
   updateIssueSeveritySchema,
   updateIssuePrioritySchema,
@@ -29,7 +27,6 @@ import {
 } from "./schemas";
 import { type Result, ok, err } from "~/lib/result";
 import {
-  createIssue,
   updateIssueStatus,
   addIssueComment,
   assignIssue,
@@ -56,11 +53,6 @@ const isNextRedirectError = (error: unknown): error is { digest: string } => {
     typeof digest === "string" && digest.startsWith(NEXT_REDIRECT_DIGEST_PREFIX)
   );
 };
-
-export type CreateIssueResult = Result<
-  { issueId: string },
-  "VALIDATION" | "UNAUTHORIZED" | "SERVER"
->;
 
 export type UpdateIssueStatusResult = Result<
   { issueId: string },
@@ -101,92 +93,6 @@ export type DeleteCommentResult = Result<
   { commentId: string },
   "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
 >;
-
-/**
- * Create Issue Action
- *
- * Creates a new issue with validation and timeline event.
- * Requires authentication (CORE-SEC-001).
- * Validates input with Zod (CORE-SEC-002).
- * Enforces machine requirement (CORE-ARCH-004).
- *
- * @param formData - Form data from issue creation form
- */
-export async function createIssueAction(
-  _prevState: CreateIssueResult | undefined,
-  formData: FormData
-): Promise<CreateIssueResult> {
-  // Auth check (CORE-SEC-001)
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return err("UNAUTHORIZED", "Unauthorized. Please log in.");
-  }
-
-  // Extract and validate form data (CORE-SEC-002)
-  const rawData = {
-    title: toOptionalString(formData.get("title")),
-    description: toOptionalString(formData.get("description")),
-    machineInitials: toOptionalString(formData.get("machineInitials")),
-    severity: toOptionalString(formData.get("severity")),
-    priority: toOptionalString(formData.get("priority")),
-    frequency: toOptionalString(formData.get("frequency")),
-  };
-
-  const validation = createIssueSchema.safeParse(rawData);
-  if (!validation.success) {
-    const firstError = validation.error.issues[0];
-    log.warn(
-      {
-        errors: validation.error.issues,
-        action: "createIssue",
-        rawMachineInitials: rawData.machineInitials,
-      },
-      "Issue creation validation failed"
-    );
-    return err("VALIDATION", firstError?.message ?? "Invalid input");
-  }
-
-  const { title, description, machineInitials, severity, priority, frequency } =
-    validation.data;
-
-  // Create issue via service
-  try {
-    const issue = await createIssue({
-      title,
-      description: description ?? null,
-      machineInitials,
-      severity,
-      priority,
-      frequency,
-      reportedBy: user.id,
-    });
-
-    // Revalidate machine issues list
-    // Note: URL changed to /m/[initials]
-    revalidatePath(`/m/${machineInitials}`);
-    revalidatePath(`/m/${machineInitials}/i`);
-
-    // Redirect to new issue page
-    redirect(`/m/${machineInitials}/i/${issue.issueNumber}`);
-  } catch (error: unknown) {
-    if (isNextRedirectError(error)) {
-      throw error;
-    }
-    log.error(
-      {
-        error: error instanceof Error ? error.message : "Unknown",
-        stack: error instanceof Error ? error.stack : undefined,
-        action: "createIssue",
-      },
-      "Issue creation server error"
-    );
-    return err("SERVER", "Failed to create issue. Please try again.");
-  }
-}
 
 /**
  * Update Issue Status Action

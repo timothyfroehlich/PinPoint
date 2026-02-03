@@ -16,38 +16,6 @@ const uuidish = z
   );
 
 /**
- * Schema for creating a new issue
- *
- * Validates:
- * - title: Required, trimmed, 1-200 characters
- * - description: Nullish (can be null, undefined, or string), trimmed
- * - machineInitials: Required (Plan: Machine Initials)
- * - severity: Enum of 'minor' | 'playable' | 'unplayable'
- */
-export const createIssueSchema = z.object({
-  title: z
-    .string()
-    .min(1, "Title is required")
-    .max(200, "Title must be less than 200 characters")
-    .trim(),
-  description: z.string().trim().max(5000, "Description is too long").nullish(),
-  machineInitials: z
-    .string()
-    .min(2, "Machine initials invalid")
-    .max(6, "Machine initials invalid")
-    .regex(/^[A-Z0-9]+$/, "Machine initials invalid"),
-  severity: z.enum(["cosmetic", "minor", "major", "unplayable"], {
-    message: "Invalid severity level",
-  }),
-  priority: z.enum(["low", "medium", "high"], {
-    message: "Invalid priority level",
-  }),
-  frequency: z.enum(["intermittent", "frequent", "constant"], {
-    message: "Invalid frequency level",
-  }),
-});
-
-/**
  * Schema for updating issue status
  * Based on _issue-status-redesign/README.md - Final design with 11 statuses
  * Status values imported from single source of truth
