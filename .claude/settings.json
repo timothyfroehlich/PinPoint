@@ -94,6 +94,12 @@
       "Bash(./scripts/check-db-schema.sh:*)",
       "Bash(./scripts/check-pnpm-audit.sh:*)",
       "Bash(gitleaks detect:*)",
+      "Bash(./pinpoint-wt create:*)",
+      "Bash(./pinpoint-wt list:*)",
+      "Bash(./pinpoint-wt sync:*)",
+      "Bash(python3 pinpoint-wt create:*)",
+      "Bash(python3 pinpoint-wt list:*)",
+      "Bash(python3 pinpoint-wt sync:*)",
       "Bash(vercel --version:*)",
       "Bash(vercel ls:*)",
       "Bash(vercel logs:*)",
@@ -182,6 +188,8 @@
       "Bash(kill:*)",
       "Bash(pkill:*)",
       "Bash(chmod:*)",
+      "Bash(./pinpoint-wt remove:*)",
+      "Bash(python3 pinpoint-wt remove:*)",
       "mcp__github__issue_write"
     ]
   },

@@ -1,0 +1,654 @@
+#!/usr/bin/env python3
+"""
+PinPoint Worktree Manager (pinpoint-wt)
+
+A command-line tool for managing ephemeral git worktrees with automatic
+port allocation and Supabase isolation for parallel development.
+
+Commands:
+  create <branch>     Create ephemeral worktree with auto port allocation
+  sync [--all]        Regenerate config.toml and .env.local from templates
+  remove <branch>     Clean teardown (Supabase, Docker, worktree)
+  list                Show all worktrees with port assignments
+
+Port Allocation:
+  Static worktrees (PinPoint, Secondary, review, AntiGravity): offsets 0-3000
+  Ephemeral worktrees: offsets 4000-9900 (hash-based with linear probing)
+"""
+
+import argparse
+import hashlib
+import os
+import re
+import stat
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional
+
+
+# =============================================================================
+# Configuration
+# =============================================================================
+
+# Base ports (Supabase defaults)
+BASE_PORT_NEXTJS = 3000
+BASE_PORT_API = 54321
+BASE_PORT_DB = 54322
+BASE_PORT_SHADOW = 54320
+BASE_PORT_POOLER = 54329
+BASE_PORT_INBUCKET = 54324
+BASE_PORT_SMTP = 54325
+BASE_PORT_POP3 = 54326
+
+# Static worktree mappings (preserved from sync_worktrees.py)
+STATIC_WORKTREES = {
+    "PinPoint": {"nextjs_offset": 0, "supabase_offset": 0, "project_id": "pinpoint"},
+    "PinPoint-Secondary": {"nextjs_offset": 100, "supabase_offset": 1000, "project_id": "pinpoint-secondary"},
+    "PinPoint-review": {"nextjs_offset": 200, "supabase_offset": 2000, "project_id": "pinpoint-review"},
+    "PinPoint-AntiGravity": {"nextjs_offset": 300, "supabase_offset": 3000, "project_id": "pinpoint-antigravity"},
+}
+
+# Ephemeral worktree configuration
+EPHEMERAL_OFFSET_MIN = 4000
+EPHEMERAL_OFFSET_MAX = 9900
+EPHEMERAL_OFFSET_STEP = 100
+EPHEMERAL_SLOTS = (EPHEMERAL_OFFSET_MAX - EPHEMERAL_OFFSET_MIN) // EPHEMERAL_OFFSET_STEP + 1  # 60 slots
+
+# Worktree directories
+EPHEMERAL_WORKTREE_BASE = Path("../pinpoint-worktrees")
+
+
+@dataclass
+class PortConfig:
+    """Port configuration for a worktree."""
+    name: str
+    nextjs_offset: int
+    supabase_offset: int
+    project_id: str
+    is_static: bool = False
+
+    @property
+    def nextjs_port(self) -> int:
+        return BASE_PORT_NEXTJS + self.nextjs_offset
+
+    @property
+    def api_port(self) -> int:
+        return BASE_PORT_API + self.supabase_offset
+
+    @property
+    def db_port(self) -> int:
+        return BASE_PORT_DB + self.supabase_offset
+
+    @property
+    def shadow_port(self) -> int:
+        return BASE_PORT_SHADOW + self.supabase_offset
+
+    @property
+    def pooler_port(self) -> int:
+        return BASE_PORT_POOLER + self.supabase_offset
+
+    @property
+    def inbucket_port(self) -> int:
+        return BASE_PORT_INBUCKET + self.supabase_offset
+
+    @property
+    def smtp_port(self) -> int:
+        return BASE_PORT_SMTP + self.supabase_offset
+
+    @property
+    def pop3_port(self) -> int:
+        return BASE_PORT_POP3 + self.supabase_offset
+
+    @property
+    def site_url(self) -> str:
+        return f"http://localhost:{self.nextjs_port}"
+
+
+# =============================================================================
+# Port Allocation
+# =============================================================================
+
+def compute_base_offset(branch_name: str) -> int:
+    """
+    Compute the base Supabase offset for a branch using SHA-256 hash.
+    Returns a value in the ephemeral range (4000-9900, step 100).
+    """
+    h = int(hashlib.sha256(branch_name.encode()).hexdigest(), 16)
+    slot = h % EPHEMERAL_SLOTS
+    return EPHEMERAL_OFFSET_MIN + (slot * EPHEMERAL_OFFSET_STEP)
+
+
+def get_offset_from_env(worktree_path: Path) -> Optional[int]:
+    """
+    Extract the Supabase offset from a worktree's .env.local file.
+    Returns None if the file doesn't exist or can't be parsed.
+    """
+    env_file = worktree_path / ".env.local"
+    if not env_file.exists():
+        return None
+
+    try:
+        content = env_file.read_text()
+        # Look for NEXT_PUBLIC_SUPABASE_URL=http://localhost:XXXXX
+        match = re.search(r'NEXT_PUBLIC_SUPABASE_URL=http://localhost:(\d+)', content)
+        if match:
+            api_port = int(match.group(1))
+            return api_port - BASE_PORT_API
+    except (OSError, ValueError):
+        pass
+
+    return None
+
+
+def get_all_worktree_paths() -> list[Path]:
+    """Get paths to all git worktrees."""
+    try:
+        result = subprocess.run(
+            ["git", "worktree", "list", "--porcelain"],
+            capture_output=True, text=True, check=True
+        )
+
+        paths = []
+        for line in result.stdout.strip().split('\n'):
+            if line.startswith("worktree "):
+                paths.append(Path(line[9:]))
+        return paths
+    except subprocess.CalledProcessError:
+        return []
+
+
+def get_used_offsets() -> set[int]:
+    """Scan all worktrees to find currently used Supabase offsets."""
+    used = set()
+
+    # Add static offsets
+    for config in STATIC_WORKTREES.values():
+        used.add(config["supabase_offset"])
+
+    # Scan all worktrees for their offsets
+    for path in get_all_worktree_paths():
+        offset = get_offset_from_env(path)
+        if offset is not None:
+            used.add(offset)
+
+    return used
+
+
+def find_free_offset(branch_name: str) -> int:
+    """
+    Find a free Supabase offset for the given branch.
+    Uses hash-based allocation with linear probing for collisions.
+    """
+    used = get_used_offsets()
+    base = compute_base_offset(branch_name)
+
+    # Linear probing: try base, then base+100, base+200, etc.
+    for i in range(EPHEMERAL_SLOTS):
+        candidate = EPHEMERAL_OFFSET_MIN + ((base - EPHEMERAL_OFFSET_MIN + i * EPHEMERAL_OFFSET_STEP) % (EPHEMERAL_SLOTS * EPHEMERAL_OFFSET_STEP))
+        if candidate not in used:
+            return candidate
+
+    raise RuntimeError("No free port offsets available (all 60 ephemeral slots in use)")
+
+
+def branch_to_project_id(branch_name: str) -> str:
+    """
+    Convert a branch name to a valid Supabase project ID.
+    Must be lowercase alphanumeric with hyphens.
+    """
+    project_id = re.sub(r'[^a-z0-9-]', '-', branch_name.lower())
+    project_id = re.sub(r'-+', '-', project_id)
+    project_id = f"pinpoint-{project_id}".strip('-')
+    # Truncate if too long (Supabase limit)
+    return project_id[:50]
+
+
+# =============================================================================
+# Config Generation
+# =============================================================================
+
+CONFIG_HEADER = """\
+# ⚠️ AUTO-GENERATED - DO NOT EDIT ⚠️
+# Managed by: pinpoint-wt
+# To modify: Edit supabase/config.toml.template, then run `./pinpoint-wt sync`
+#
+"""
+
+ENV_HEADER = """\
+# ⚠️ AUTO-GENERATED - DO NOT EDIT ⚠️
+# Managed by: pinpoint-wt
+# To modify: Edit .env.example, then run `./pinpoint-wt sync`
+#
+"""
+
+
+def generate_config_toml(worktree_path: Path, port_config: PortConfig) -> str:
+    """Generate config.toml content from template with port substitutions."""
+    template_path = worktree_path / "supabase" / "config.toml.template"
+    if not template_path.exists():
+        raise FileNotFoundError(f"Template not found: {template_path}")
+
+    content = template_path.read_text()
+
+    # Replace project_id
+    content = re.sub(
+        r'^project_id = ".*"',
+        f'project_id = "{port_config.project_id}"',
+        content,
+        flags=re.MULTILINE
+    )
+
+    # Replace ports in sections using section-aware replacement
+    def replace_in_section(content: str, section: str, key: str, value: int) -> str:
+        pattern = rf'(\[{re.escape(section)}\].*?)^({key} = )\d+'
+        replacement = rf'\g<1>\g<2>{value}'
+        return re.sub(pattern, replacement, content, flags=re.MULTILINE | re.DOTALL)
+
+    content = replace_in_section(content, "api", "port", port_config.api_port)
+    content = replace_in_section(content, "db", "port", port_config.db_port)
+    content = replace_in_section(content, "db", "shadow_port", port_config.shadow_port)
+    content = replace_in_section(content, "db.pooler", "port", port_config.pooler_port)
+    content = replace_in_section(content, "inbucket", "port", port_config.inbucket_port)
+    content = replace_in_section(content, "inbucket", "smtp_port", port_config.smtp_port)
+    content = replace_in_section(content, "inbucket", "pop3_port", port_config.pop3_port)
+
+    # Update site_url in auth section
+    content = re.sub(
+        r'^(site_url = )"[^"]*"',
+        rf'\1"{port_config.site_url}"',
+        content,
+        flags=re.MULTILINE
+    )
+
+    return CONFIG_HEADER + content
+
+
+def generate_env_local(port_config: PortConfig) -> str:
+    """Generate .env.local content with port substitutions."""
+    return f"""{ENV_HEADER}# Local Supabase + Next.js configuration for {port_config.name}
+# Ports: Next.js={port_config.nextjs_port}, Supabase API={port_config.api_port}, DB={port_config.db_port}
+
+NEXT_PUBLIC_SUPABASE_URL=http://localhost:{port_config.api_port}
+DATABASE_URL=postgresql://postgres:postgres@localhost:{port_config.db_port}/postgres
+PORT={port_config.nextjs_port}
+NEXT_PUBLIC_SITE_URL={port_config.site_url}
+
+# Email Configuration (Mailpit)
+EMAIL_TRANSPORT=smtp
+MAILPIT_PORT={port_config.inbucket_port}
+MAILPIT_SMTP_PORT={port_config.smtp_port}
+INBUCKET_PORT={port_config.inbucket_port}
+INBUCKET_SMTP_PORT={port_config.smtp_port}
+
+# Fill these from 'supabase start' output for this worktree
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+# Dev autologin (optional)
+DEV_AUTOLOGIN_ENABLED=true
+DEV_AUTOLOGIN_EMAIL=admin@test.com
+DEV_AUTOLOGIN_PASSWORD=TestPassword123
+"""
+
+
+def write_protected_file(path: Path, content: str) -> None:
+    """Write a file and set it to read-only."""
+    # Remove read-only if it exists (so we can overwrite)
+    if path.exists():
+        path.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+
+    path.write_text(content)
+
+    # Set read-only (444)
+    path.chmod(stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
+
+
+# =============================================================================
+# Commands
+# =============================================================================
+
+def cmd_create(args: argparse.Namespace) -> int:
+    """Create a new ephemeral worktree."""
+    branch = args.branch
+    repo_root = Path.cwd()
+
+    print(f"🌿 Creating ephemeral worktree for branch: {branch}")
+
+    # Validate branch doesn't already exist as a worktree
+    worktree_dir = (repo_root / EPHEMERAL_WORKTREE_BASE / branch).resolve()
+    if worktree_dir.exists():
+        print(f"❌ Error: Worktree already exists at {worktree_dir}")
+        return 1
+
+    # Check if branch already exists
+    result = subprocess.run(
+        ["git", "rev-parse", "--verify", f"refs/heads/{branch}"],
+        capture_output=True
+    )
+    if result.returncode == 0:
+        print(f"❌ Error: Branch '{branch}' already exists locally")
+        return 1
+
+    # Fetch latest from origin
+    print("  📥 Fetching from origin...")
+    subprocess.run(["git", "fetch", "origin"], check=True, capture_output=True)
+
+    # Allocate port offset
+    try:
+        supabase_offset = find_free_offset(branch)
+    except RuntimeError as e:
+        print(f"❌ Error: {e}")
+        return 1
+
+    # Calculate nextjs offset (supabase_offset / 10 to keep in range)
+    nextjs_offset = supabase_offset // 10
+
+    project_id = branch_to_project_id(branch)
+    port_config = PortConfig(
+        name=branch,
+        nextjs_offset=nextjs_offset,
+        supabase_offset=supabase_offset,
+        project_id=project_id,
+        is_static=False
+    )
+
+    print(f"  🔌 Allocated ports: Next.js={port_config.nextjs_port}, API={port_config.api_port}, DB={port_config.db_port}")
+
+    # Create parent directories
+    worktree_dir.parent.mkdir(parents=True, exist_ok=True)
+
+    # Create worktree with new branch from origin/main
+    print(f"  📂 Creating worktree at {worktree_dir}...")
+    result = subprocess.run(
+        ["git", "worktree", "add", "-b", branch, str(worktree_dir), "origin/main"],
+        capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        print(f"❌ Error creating worktree: {result.stderr}")
+        return 1
+
+    # Generate config.toml
+    print("  ⚙️  Generating supabase/config.toml...")
+    config_content = generate_config_toml(worktree_dir, port_config)
+    config_path = worktree_dir / "supabase" / "config.toml"
+    write_protected_file(config_path, config_content)
+
+    # Generate .env.local
+    print("  📝 Generating .env.local...")
+    env_content = generate_env_local(port_config)
+    env_path = worktree_dir / ".env.local"
+    write_protected_file(env_path, env_content)
+
+    # Install dependencies
+    print("  📦 Installing dependencies (pnpm install)...")
+    result = subprocess.run(
+        ["pnpm", "install", "--frozen-lockfile"],
+        cwd=worktree_dir,
+        capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        print(f"  ⚠️  Warning: pnpm install failed: {result.stderr[:200]}")
+
+    print()
+    print("✅ Ephemeral worktree created successfully!")
+    print()
+    print(f"   Path:      {worktree_dir}")
+    print(f"   Branch:    {branch}")
+    print(f"   Next.js:   http://localhost:{port_config.nextjs_port}")
+    print(f"   Supabase:  http://localhost:{port_config.api_port}")
+    print()
+    print("   Next steps:")
+    print(f"   1. cd {worktree_dir}")
+    print("   2. supabase start")
+    print("   3. pnpm dev")
+    print()
+
+    return 0
+
+
+def cmd_list(args: argparse.Namespace) -> int:
+    """List all worktrees with their port assignments."""
+    print()
+    print(f"{'WORKTREE':<40} {'BRANCH':<30} {'OFFSET':>8} {'TYPE':<10}")
+    print("-" * 92)
+
+    worktree_paths = get_all_worktree_paths()
+
+    for path in sorted(worktree_paths):
+        name = path.name
+        offset = get_offset_from_env(path)
+
+        # Get branch name
+        try:
+            result = subprocess.run(
+                ["git", "-C", str(path), "rev-parse", "--abbrev-ref", "HEAD"],
+                capture_output=True, text=True, check=True
+            )
+            branch = result.stdout.strip()
+        except subprocess.CalledProcessError:
+            branch = "unknown"
+
+        # Determine type
+        if name in STATIC_WORKTREES:
+            worktree_type = "static"
+            offset = STATIC_WORKTREES[name]["supabase_offset"]
+        elif "pinpoint-worktrees" in str(path):
+            worktree_type = "ephemeral"
+        else:
+            worktree_type = "other"
+
+        offset_str = str(offset) if offset is not None else "-"
+        print(f"{name:<40} {branch:<30} {offset_str:>8} {worktree_type:<10}")
+
+    print()
+    return 0
+
+
+def cmd_remove(args: argparse.Namespace) -> int:
+    """Remove an ephemeral worktree with full cleanup."""
+    branch = args.branch
+    repo_root = Path.cwd()
+
+    # Find the worktree path
+    worktree_dir = (repo_root / EPHEMERAL_WORKTREE_BASE / branch).resolve()
+
+    if not worktree_dir.exists():
+        print(f"❌ Error: Worktree not found at {worktree_dir}")
+        return 1
+
+    # Get project_id for Docker cleanup
+    project_id = branch_to_project_id(branch)
+
+    print(f"🗑️  Removing ephemeral worktree: {branch}")
+
+    # Stop Supabase if running
+    print("  🛑 Stopping Supabase...")
+    subprocess.run(
+        ["supabase", "stop"],
+        cwd=worktree_dir,
+        capture_output=True
+    )
+
+    # Remove Docker volumes
+    print(f"  🐳 Removing Docker volumes for project: {project_id}...")
+    result = subprocess.run(
+        ["docker", "volume", "ls", "--filter", f"label=com.supabase.cli.project={project_id}", "-q"],
+        capture_output=True, text=True
+    )
+    volumes = result.stdout.strip().split('\n')
+    volumes = [v for v in volumes if v]  # Filter empty strings
+
+    if volumes:
+        subprocess.run(
+            ["docker", "volume", "rm"] + volumes,
+            capture_output=True
+        )
+        print(f"     Removed {len(volumes)} volume(s)")
+    else:
+        print("     No volumes found")
+
+    # Remove worktree
+    print("  📂 Removing worktree...")
+    result = subprocess.run(
+        ["git", "worktree", "remove", "--force", str(worktree_dir)],
+        capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        print(f"  ⚠️  Warning: {result.stderr}")
+
+    # Prune worktrees
+    subprocess.run(["git", "worktree", "prune"], capture_output=True)
+
+    # Delete the branch
+    print(f"  🌿 Deleting branch: {branch}...")
+    subprocess.run(
+        ["git", "branch", "-D", branch],
+        capture_output=True
+    )
+
+    print()
+    print("✅ Worktree removed successfully!")
+    print()
+
+    return 0
+
+
+def cmd_sync(args: argparse.Namespace) -> int:
+    """Sync/regenerate config files for worktrees."""
+    if args.all:
+        worktree_paths = get_all_worktree_paths()
+        print(f"🔄 Syncing {len(worktree_paths)} worktree(s)...")
+    else:
+        worktree_paths = [Path.cwd()]
+        print("🔄 Syncing current worktree...")
+
+    for path in worktree_paths:
+        name = path.name
+        print(f"\n  {name}:")
+
+        # Determine port config
+        if name in STATIC_WORKTREES:
+            config = STATIC_WORKTREES[name]
+            port_config = PortConfig(
+                name=name,
+                nextjs_offset=config["nextjs_offset"],
+                supabase_offset=config["supabase_offset"],
+                project_id=config["project_id"],
+                is_static=True
+            )
+        else:
+            # Extract offset from existing .env.local or compute new
+            offset = get_offset_from_env(path)
+            if offset is None:
+                # Get branch name for new allocation
+                try:
+                    result = subprocess.run(
+                        ["git", "-C", str(path), "rev-parse", "--abbrev-ref", "HEAD"],
+                        capture_output=True, text=True, check=True
+                    )
+                    branch = result.stdout.strip()
+                    offset = find_free_offset(branch)
+                except (subprocess.CalledProcessError, RuntimeError):
+                    print(f"    ⚠️  Skipping: Could not determine offset")
+                    continue
+
+            # Get branch for project_id
+            try:
+                result = subprocess.run(
+                    ["git", "-C", str(path), "rev-parse", "--abbrev-ref", "HEAD"],
+                    capture_output=True, text=True, check=True
+                )
+                branch = result.stdout.strip()
+            except subprocess.CalledProcessError:
+                branch = name
+
+            port_config = PortConfig(
+                name=branch,
+                nextjs_offset=offset // 10,
+                supabase_offset=offset,
+                project_id=branch_to_project_id(branch),
+                is_static=False
+            )
+
+        # Check if template exists
+        template_path = path / "supabase" / "config.toml.template"
+        if not template_path.exists():
+            print(f"    ⚠️  Skipping: No template found")
+            continue
+
+        # Generate and write config.toml
+        try:
+            config_content = generate_config_toml(path, port_config)
+            config_path = path / "supabase" / "config.toml"
+            write_protected_file(config_path, config_content)
+            print(f"    ✅ config.toml (API={port_config.api_port})")
+        except Exception as e:
+            print(f"    ❌ config.toml: {e}")
+
+        # Generate and write .env.local
+        try:
+            env_content = generate_env_local(port_config)
+            env_path = path / ".env.local"
+            write_protected_file(env_path, env_content)
+            print(f"    ✅ .env.local (Port={port_config.nextjs_port})")
+        except Exception as e:
+            print(f"    ❌ .env.local: {e}")
+
+    print()
+    print("✅ Sync complete!")
+    print()
+
+    return 0
+
+
+# =============================================================================
+# Main
+# =============================================================================
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="PinPoint Worktree Manager - Manage ephemeral worktrees with auto port allocation",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  ./pinpoint-wt create feat/new-feature   Create ephemeral worktree
+  ./pinpoint-wt list                      Show all worktrees
+  ./pinpoint-wt sync                      Regenerate config for current worktree
+  ./pinpoint-wt sync --all                Regenerate config for all worktrees
+  ./pinpoint-wt remove feat/new-feature   Remove worktree and cleanup
+        """
+    )
+
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    # create
+    create_parser = subparsers.add_parser("create", help="Create ephemeral worktree")
+    create_parser.add_argument("branch", help="Branch name (e.g., feat/new-feature)")
+
+    # list
+    subparsers.add_parser("list", help="List all worktrees with port assignments")
+
+    # remove
+    remove_parser = subparsers.add_parser("remove", help="Remove ephemeral worktree")
+    remove_parser.add_argument("branch", help="Branch name to remove")
+
+    # sync
+    sync_parser = subparsers.add_parser("sync", help="Regenerate config files")
+    sync_parser.add_argument("--all", action="store_true", help="Sync all worktrees")
+
+    args = parser.parse_args()
+
+    commands = {
+        "create": cmd_create,
+        "list": cmd_list,
+        "remove": cmd_remove,
+        "sync": cmd_sync,
+    }
+
+    return commands[args.command](args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
