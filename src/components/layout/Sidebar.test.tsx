@@ -1,7 +1,7 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Sidebar } from "./Sidebar";
 
 // Mock dependencies
@@ -23,11 +23,12 @@ vi.mock("next/image", () => ({
   ),
 }));
 
-describe("Sidebar Accessibility", () => {
-  beforeEach(() => {
-    window.localStorage.clear();
-  });
+// Mock client-side cookie storage
+vi.mock("~/lib/cookies/client", () => ({
+  storeSidebarCollapsed: vi.fn(),
+}));
 
+describe("Sidebar Accessibility", () => {
   it("provides accessible names for links when collapsed", async () => {
     const user = userEvent.setup();
     render(<Sidebar />);

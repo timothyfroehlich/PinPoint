@@ -4,7 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useCallback, useRef, useEffect } from "react";
 import type { IssueFilters } from "~/lib/issues/filters";
 import type { MachineFilters } from "~/lib/machines/filters";
-import { storeLastIssuesPath } from "~/hooks/use-issue-link";
+import { storeLastIssuesPath } from "~/lib/cookies/client";
 
 type GenericFilters = IssueFilters | MachineFilters;
 
@@ -156,6 +156,7 @@ export function useSearchFilters<T extends GenericFilters>(
 
       const newPath = `${pathname}?${params.toString()}`;
       if (pathname.startsWith("/issues")) {
+        // Set cookie synchronously so it's available on next navigation
         storeLastIssuesPath(newPath);
       }
       router.push(newPath);

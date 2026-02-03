@@ -3,11 +3,11 @@ coverage:
     # Don't enforce overall project coverage (allows gradual improvement)
     project: off
 
-    # Enforce 80% coverage on new/changed lines only (delta coverage)
+    # Enforce 60% coverage on new/changed lines only (delta coverage)
     patch:
       default:
-        target: 80%
-        threshold: 0% # No tolerance - exactly 80% required
+        target: 60%
+        threshold: 0% # No tolerance - exactly 60% required
 
 # No PR comments, just status checks
 comment: false

@@ -1,11 +1,11 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useIssueLink } from "~/hooks/use-issue-link";
 import { usePathname } from "next/navigation";
+import { storeSidebarCollapsed } from "~/lib/cookies/client";
 import {
   LayoutDashboard,
   Gamepad2,
@@ -47,27 +47,27 @@ export function Sidebar({
   role,
   onNavigate,
   isMobile = false,
+  issuesPath,
+  initialCollapsed = false,
 }: {
   role?: "guest" | "member" | "admin" | undefined;
   onNavigate?: () => void;
   isMobile?: boolean;
+  /** The issues link path, read from cookie on the server */
+  issuesPath?: string | undefined;
+  /** Initial collapsed state, read from cookie on the server */
+  initialCollapsed?: boolean;
 }): React.JSX.Element {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(initialCollapsed);
   const pathname = usePathname();
-  const issuesLink = useIssueLink();
-  // Load state from localStorage on mount
-  useEffect(() => {
-    if (isMobile) return; // Don't load/save collapse state on mobile
-    const savedState = window.localStorage.getItem("sidebar-collapsed");
-    if (savedState) {
-      setCollapsed(JSON.parse(savedState) as boolean);
-    }
-  }, [isMobile]);
+  // Default to /issues if no path provided
+  const resolvedIssuesPath = issuesPath ?? "/issues";
 
   const toggleSidebar = (): void => {
     const newState = !collapsed;
     setCollapsed(newState);
-    window.localStorage.setItem("sidebar-collapsed", JSON.stringify(newState));
+    // Persist to cookie synchronously
+    storeSidebarCollapsed(newState);
   };
 
   const NavItem = ({
@@ -80,7 +80,7 @@ export function Sidebar({
       variant?: string;
     };
   }): React.JSX.Element => {
-    const href = item.href === "/issues" ? issuesLink : item.href;
+    const href = item.href === "/issues" ? resolvedIssuesPath : item.href;
     const hrefPath = href.split("?")[0];
     const isActive = pathname === hrefPath;
     const isReport = item.variant === "accent";
