@@ -42,25 +42,41 @@ If your tool does not support skills, read the file path directly.
 
 ### Worktrees & Ports
 
-We use git worktrees for parallel environments. Config is managed via templates to prevent local leaks.
+We use git worktrees for parallel environments. There are two types:
 
-**Workflow**:
+**Static Worktrees** (4 permanent environments with fixed ports):
 
-1. Run `python3 scripts/sync_worktrees.py` to generate `supabase/config.toml` and `.env.local` from templates.
-2. `supabase/config.toml` is ignored by git; do not track it.
+| Worktree    | Next.js | Supabase API | Postgres | Purpose                   |
+| :---------- | :------ | :----------- | :------- | :------------------------ |
+| Main (root) | 3000    | 54321        | 54322    | Primary development       |
+| Secondary   | 3100    | 55321        | 55322    | Parallel feature work     |
+| Review      | 3200    | 56321        | 56322    | PR reviews                |
+| AntiGravity | 3300    | 57321        | 57322    | Experimental/long-running |
+
+**Ephemeral Worktrees** (on-demand, port offsets 4000-9900 → Next.js 3400-3990, API 58321-63821):
+
+Created with `./pinpoint-wt` for quick PR reviews or parallel development. Ports are hash-allocated to avoid conflicts.
+
+**Commands**:
+
+```bash
+./pinpoint-wt create feat/my-feature   # Create ephemeral worktree
+./pinpoint-wt list                     # Show all worktrees with ports
+./pinpoint-wt sync [--all]             # Regenerate config files
+./pinpoint-wt remove feat/my-feature   # Clean teardown (Supabase + Docker + worktree)
+```
+
+**Config Management**:
+
+- `supabase/config.toml` and `.env.local` are auto-generated from templates
+- Generated files are **read-only** (chmod 444) with warning headers
+- To modify: Edit templates, then run `./pinpoint-wt sync`
 
 **Troubleshooting**:
 
-- _Config Mismatch_: If ports don't match the table below, re-run `python3 scripts/sync_worktrees.py`.
-- _Supabase Failures_: Run `supabase stop --all` then re-run the sync script.
-- _Template Changes_: If you need to change shared config, edit `supabase/config.toml.template` in the project root.
-
-| Worktree    | Next.js | Supabase API | Postgres |
-| :---------- | :------ | :----------- | :------- |
-| Main        | 3000    | 54321        | 54322    |
-| Secondary   | 3100    | 55321        | 55322    |
-| Review      | 3200    | 56321        | 56322    |
-| AntiGravity | 3300    | 57321        | 57322    |
+- _Config Mismatch_: Run `./pinpoint-wt sync` to regenerate
+- _Supabase Failures_: Run `supabase stop --all` then restart
+- _Template Changes_: Edit `supabase/config.toml.template`, then `./pinpoint-wt sync --all`
 
 ### Branch Management
 
