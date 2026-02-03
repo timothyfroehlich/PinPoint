@@ -89,6 +89,20 @@ export async function logout(page: Page): Promise<void> {
 }
 
 /**
+ * Opens the mobile sidebar menu if running on a mobile viewport.
+ * No-op on desktop viewports where sidebar is always visible.
+ */
+export async function openSidebarIfMobile(
+  page: Page,
+  testInfo: TestInfo
+): Promise<void> {
+  const isMobile = testInfo.project.name.includes("Mobile");
+  if (isMobile) {
+    await page.getByTestId("mobile-menu-trigger").click();
+  }
+}
+
+/**
  * Selects an option from a shadcn/ui Select component.
  * Clicks the trigger, waits for the dropdown, then clicks the option.
  */

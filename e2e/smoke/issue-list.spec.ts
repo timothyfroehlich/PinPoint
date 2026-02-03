@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loginAs } from "../support/actions";
+import { loginAs, openSidebarIfMobile } from "../support/actions";
 import { TEST_USERS, seededIssues } from "../support/constants";
 
 test.describe("Issue List Features", () => {
@@ -291,13 +291,8 @@ test.describe("Issue List Features", () => {
     await expect(page).toHaveURL("/dashboard");
 
     // 3. Click Issues in sidebar - should preserve filters
-    // On mobile, need to open the hamburger menu first
-    const isMobile = testInfo.project.name.includes("Mobile");
-    if (isMobile) {
-      await page.getByTestId("mobile-menu-trigger").click();
-    }
-
     // The sidebar link uses issuesPath prop read from cookie on the server
+    await openSidebarIfMobile(page, testInfo);
     await page.getByRole("link", { name: "Issues", exact: true }).click();
     await expect(page).toHaveURL(/q=Thing/);
 
