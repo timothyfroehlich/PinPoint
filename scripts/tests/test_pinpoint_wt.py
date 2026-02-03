@@ -12,6 +12,7 @@ from pinpoint_wt_lib import (
     MANAGED_ENV_KEYS,
     USER_PROVIDED_KEYS,
     PortConfig,
+    branch_to_project_id,
     merge_env_local,
     parse_env_file,
 )
@@ -232,6 +233,49 @@ class TestPortConfig:
         assert config.inbucket_port == 58324  # 54324 + 4000
         assert config.smtp_port == 58325  # 54325 + 4000
         assert config.site_url == "http://localhost:3400"
+
+
+class TestBranchToProjectId:
+    """Test branch name to project ID conversion."""
+
+    def test_simple_branch_name(self) -> None:
+        """Test simple branch names are converted correctly."""
+        assert branch_to_project_id("my-feature") == "pinpoint-my-feature"
+
+    def test_feature_branch_with_slash(self) -> None:
+        """Test feature branches with slashes."""
+        assert branch_to_project_id("feat/my-feature") == "pinpoint-feat-my-feature"
+
+    def test_uppercase_is_lowercased(self) -> None:
+        """Test uppercase characters are lowercased."""
+        assert branch_to_project_id("Fix/MyBug") == "pinpoint-fix-mybug"
+
+    def test_special_characters_replaced(self) -> None:
+        """Test special characters are replaced with hyphens."""
+        # Trailing special chars become hyphens, then get stripped
+        assert branch_to_project_id("feat/add_new@feature!") == "pinpoint-feat-add-new-feature"
+
+    def test_no_double_hyphens(self) -> None:
+        """Test that double hyphens are collapsed (Copilot bug fix)."""
+        # Branch starting with slash would create leading hyphen
+        result = branch_to_project_id("/my-feature")
+        assert "--" not in result
+        assert result == "pinpoint-my-feature"
+
+    def test_multiple_consecutive_special_chars(self) -> None:
+        """Test multiple consecutive special characters become single hyphen."""
+        assert branch_to_project_id("feat///multiple___chars") == "pinpoint-feat-multiple-chars"
+
+    def test_long_branch_name_truncated(self) -> None:
+        """Test very long branch names are truncated to 50 chars."""
+        long_name = "a" * 100
+        result = branch_to_project_id(long_name)
+        assert len(result) <= 50
+
+    def test_trailing_special_chars_stripped(self) -> None:
+        """Test trailing special characters are stripped."""
+        result = branch_to_project_id("my-feature///")
+        assert not result.endswith("-")
 
 
 if __name__ == "__main__":

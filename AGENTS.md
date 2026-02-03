@@ -53,7 +53,7 @@ We use git worktrees for parallel environments. There are two types:
 | Review      | 3200    | 56321        | 56322    | PR reviews                |
 | AntiGravity | 3300    | 57321        | 57322    | Experimental/long-running |
 
-**Ephemeral Worktrees** (on-demand, auto-allocated ports 4000-9900):
+**Ephemeral Worktrees** (on-demand, port offsets 4000-9900 → Next.js 3400-3990, API 58321-63821):
 
 Created with `./pinpoint-wt` for quick PR reviews or parallel development. Ports are hash-allocated to avoid conflicts.
 

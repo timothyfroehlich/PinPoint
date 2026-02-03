@@ -222,6 +222,8 @@ def branch_to_project_id(branch_name: str) -> str:
     """
     project_id = re.sub(r"[^a-z0-9-]", "-", branch_name.lower())
     project_id = re.sub(r"-+", "-", project_id)
-    project_id = f"pinpoint-{project_id}".strip("-")
+    # Prepend prefix and collapse any double-hyphens that result
+    # (e.g., "/my-feature" -> "-my-feature" -> "pinpoint--my-feature" without this fix)
+    project_id = re.sub(r"-+", "-", f"pinpoint-{project_id}").strip("-")
     # Truncate if too long (Supabase limit)
     return project_id[:50]

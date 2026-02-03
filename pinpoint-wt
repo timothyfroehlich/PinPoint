@@ -89,6 +89,8 @@ def get_offset_from_env(worktree_path: Path) -> Optional[int]:
             api_port = int(match.group(1))
             return api_port - BASE_PORT_API
     except (OSError, ValueError):
+        # If the .env.local file cannot be read or parsed, treat it as if
+        # no valid Supabase offset is configured for this worktree.
         pass
 
     return None
@@ -238,7 +240,15 @@ def cmd_create(args: argparse.Namespace) -> int:
 
     # Fetch latest from origin
     print("  📥 Fetching from origin...")
-    subprocess.run(["git", "fetch", "origin"], check=True, capture_output=True)
+    try:
+        subprocess.run(["git", "fetch", "origin"], check=True, capture_output=True)
+    except subprocess.CalledProcessError as e:
+        print("❌ Error: Failed to fetch from origin. Check your network connection.")
+        if e.stderr:
+            stderr_text = e.stderr.decode() if isinstance(e.stderr, bytes) else e.stderr
+            if stderr_text.strip():
+                print(f"   git error: {stderr_text.strip()}")
+        return 1
 
     # Allocate port offset
     try:
