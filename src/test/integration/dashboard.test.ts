@@ -446,30 +446,33 @@ describe("Dashboard Queries (PGlite)", () => {
     it("should correctly calculate machines needing service", async () => {
       const db = await getTestDb();
 
-      // Create 4 machines
-      const [machine1, machine2, machine3] = await db
+      // Create 5 machines
+      const [machine1, machine2, machine3, machine4, machine5] = await db
         .insert(machines)
         .values([
           createTestMachine({ name: "Machine 1", initials: "M1" }),
           createTestMachine({ name: "Machine 2", initials: "M2" }),
           createTestMachine({ name: "Machine 3", initials: "M3" }),
           createTestMachine({ name: "Machine 4", initials: "M4" }),
+          createTestMachine({ name: "Machine 5", initials: "M5" }),
         ])
         .returning();
 
-      // Machine 1: open issue (needs service)
+      // Machine 1: open major issue (needs service)
       await db.insert(issues).values(
         createTestIssue(machine1.initials, {
           issueNumber: 1,
           status: "new",
+          severity: "major",
         })
       );
 
-      // Machine 2: open issue (needs service)
+      // Machine 2: open unplayable issue (needs service)
       await db.insert(issues).values(
         createTestIssue(machine2.initials, {
           issueNumber: 1,
           status: "in_progress",
+          severity: "unplayable",
         })
       );
 
@@ -482,6 +485,20 @@ describe("Dashboard Queries (PGlite)", () => {
       );
 
       // Machine 4: no issues (operational)
+
+      // Machine 5: only minor/cosmetic open issues (operational)
+      await db.insert(issues).values([
+        createTestIssue(machine5.initials, {
+          issueNumber: 1,
+          status: "new",
+          severity: "minor",
+        }),
+        createTestIssue(machine5.initials, {
+          issueNumber: 2,
+          status: "new",
+          severity: "cosmetic",
+        }),
+      ]);
 
       // Query all machines with issues (dashboard query pattern)
       const allMachines = await db.query.machines.findMany({

@@ -178,7 +178,7 @@ describe("Machine CRUD Operations (PGlite)", () => {
       expect(status).toBe("operational");
     });
 
-    it("should derive 'needs_service' status when machine has playable/minor issues", async () => {
+    it("should derive 'needs_service' status when machine has major issues", async () => {
       const db = await getTestDb();
 
       // Create machine
@@ -223,6 +223,53 @@ describe("Machine CRUD Operations (PGlite)", () => {
       // Derive status
       const status = deriveMachineStatus(result?.issues ?? []);
       expect(status).toBe("needs_service");
+    });
+
+    it("should derive 'operational' status when machine has only minor/cosmetic issues", async () => {
+      const db = await getTestDb();
+
+      // Create machine
+      const testMachine = createTestMachine({
+        name: "Operational with issues",
+        initials: "OWI",
+      });
+      const [machine] = await db
+        .insert(machines)
+        .values(testMachine)
+        .returning();
+
+      // Create minor and cosmetic issues
+      await db.insert(issues).values([
+        createTestIssue(machine.initials, {
+          title: "Minor issue",
+          issueNumber: 1,
+          severity: "minor",
+          status: "new",
+        }),
+        createTestIssue(machine.initials, {
+          title: "Cosmetic issue",
+          issueNumber: 2,
+          severity: "cosmetic",
+          status: "new",
+        }),
+      ]);
+
+      // Query machine with issues
+      const result = await db.query.machines.findFirst({
+        where: eq(machines.id, machine.id),
+        with: {
+          issues: {
+            columns: {
+              status: true,
+              severity: true,
+            },
+          },
+        },
+      });
+
+      // Derive status
+      const status = deriveMachineStatus(result?.issues ?? []);
+      expect(status).toBe("operational");
     });
 
     it("should derive 'unplayable' status when machine has at least one unplayable issue", async () => {
@@ -285,7 +332,7 @@ describe("Machine CRUD Operations (PGlite)", () => {
         .values(testMachine)
         .returning();
 
-      // Create fixed unplayable issue and open minor issue
+      // Create fixed unplayable issue and open major issue
       await db.insert(issues).values([
         createTestIssue(machine.initials, {
           title: "Fixed unplayable issue",
@@ -295,9 +342,9 @@ describe("Machine CRUD Operations (PGlite)", () => {
           closedAt: new Date(),
         }),
         createTestIssue(machine.initials, {
-          title: "Current minor issue",
+          title: "Current major issue",
           issueNumber: 2,
-          severity: "minor",
+          severity: "major",
           status: "new",
         }),
       ]);
