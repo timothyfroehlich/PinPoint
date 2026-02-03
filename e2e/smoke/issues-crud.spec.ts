@@ -181,15 +181,31 @@ test.describe("Issues System", () => {
   });
 
   test.describe("Issue Detail Display", () => {
+    let issueUrl: string;
+    let issueTitle: string;
+
+    test.beforeEach(async ({ page }) => {
+      // Create a fresh issue for this worker to avoid parallel test conflicts
+      const machineInitials = seededMachines.humptyDumpty.initials;
+      issueTitle = `Assignee Test ${Date.now()}`;
+      await page.goto(`/report?machine=${machineInitials}`);
+      await fillReportForm(page, { title: issueTitle, priority: "medium" });
+      await page.getByRole("button", { name: "Submit Issue Report" }).click();
+
+      await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
+      issueUrl = page.url();
+      rememberIssueId(page);
+    });
+
     test("should display assignee on issue detail page", async ({ page }) => {
-      // Navigate to HD-02 (reported by member, so member has permission)
-      await page.goto("/m/HD/i/2");
+      // Navigate to the freshly created issue
+      await page.goto(issueUrl);
 
       // Verify we're on the issue detail page
       await expect(
         page.getByRole("heading", {
           level: 1,
-          name: /Scoring reels sticking/,
+          name: new RegExp(issueTitle),
         })
       ).toBeVisible();
 
