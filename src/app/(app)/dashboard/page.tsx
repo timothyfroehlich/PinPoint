@@ -196,8 +196,8 @@ const getDashboardData = cache(async (userId?: string) => {
     .where(
       and(
         notInArray(issues.status, [...CLOSED_STATUSES]),
-        inArray(issues.severity, ["major", "unplayable"]),
-      ),
+        inArray(issues.severity, ["major", "unplayable"])
+      )
     );
 
   // Execute all queries in parallel

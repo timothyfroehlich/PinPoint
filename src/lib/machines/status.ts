@@ -19,7 +19,7 @@ export interface IssueForStatus {
 export function deriveMachineStatus(issues: IssueForStatus[]): MachineStatus {
   // Filter to only open issues (not in CLOSED_STATUSES)
   const openIssues = issues.filter(
-    (issue) => !(CLOSED_STATUSES as readonly string[]).includes(issue.status),
+    (issue) => !(CLOSED_STATUSES as readonly string[]).includes(issue.status)
   );
 
   const severities = new Set(openIssues.map((issue) => issue.severity));
