@@ -1,7 +1,10 @@
 "use client";
 
-const LAST_ISSUES_PATH_KEY = "lastIssuesPath";
-const SIDEBAR_COLLAPSED_KEY = "sidebarCollapsed";
+import {
+  LAST_ISSUES_PATH_KEY,
+  SIDEBAR_COLLAPSED_KEY,
+  PREFERENCE_MAX_AGE_SECONDS,
+} from "./constants";
 
 /**
  * Sets a cookie on the client side (synchronous).
@@ -19,14 +22,16 @@ function setClientCookie(name: string, value: string, maxAge: number): void {
  * available immediately for the next navigation.
  */
 export function storeLastIssuesPath(path: string): void {
-  const maxAge = 60 * 60 * 24 * 365; // 1 year
-  setClientCookie(LAST_ISSUES_PATH_KEY, path, maxAge);
+  setClientCookie(LAST_ISSUES_PATH_KEY, path, PREFERENCE_MAX_AGE_SECONDS);
 }
 
 /**
  * Stores the sidebar collapsed state in a cookie (client-side, synchronous).
  */
 export function storeSidebarCollapsed(collapsed: boolean): void {
-  const maxAge = 60 * 60 * 24 * 365; // 1 year
-  setClientCookie(SIDEBAR_COLLAPSED_KEY, collapsed.toString(), maxAge);
+  setClientCookie(
+    SIDEBAR_COLLAPSED_KEY,
+    collapsed.toString(),
+    PREFERENCE_MAX_AGE_SECONDS
+  );
 }

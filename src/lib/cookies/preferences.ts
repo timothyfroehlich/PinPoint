@@ -1,9 +1,10 @@
 import { cookies } from "next/headers";
-
-const LAST_ISSUES_PATH_KEY = "lastIssuesPath";
-const DEFAULT_ISSUES_PATH = "/issues";
-
-const SIDEBAR_COLLAPSED_KEY = "sidebarCollapsed";
+import {
+  LAST_ISSUES_PATH_KEY,
+  SIDEBAR_COLLAPSED_KEY,
+  DEFAULT_ISSUES_PATH,
+  PREFERENCE_MAX_AGE_SECONDS,
+} from "./constants";
 
 /**
  * Cookie options for user preferences.
@@ -14,7 +15,7 @@ const PREFERENCE_COOKIE_OPTIONS = {
   secure: process.env.NODE_ENV === "production",
   sameSite: "lax" as const,
   path: "/",
-  maxAge: 60 * 60 * 24 * 365, // 1 year
+  maxAge: PREFERENCE_MAX_AGE_SECONDS,
 };
 
 /**
