@@ -18,29 +18,27 @@ Port Allocation:
 
 import argparse
 import hashlib
-import os
 import re
 import stat
 import subprocess
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
+
+# Add scripts directory to path for library import
+sys.path.insert(0, str(Path(__file__).parent / "scripts"))
+
+from pinpoint_wt_lib import (
+    BASE_PORT_API,
+    PortConfig,
+    branch_to_project_id,
+    merge_env_local,
+)
 
 
 # =============================================================================
 # Configuration
 # =============================================================================
-
-# Base ports (Supabase defaults)
-BASE_PORT_NEXTJS = 3000
-BASE_PORT_API = 54321
-BASE_PORT_DB = 54322
-BASE_PORT_SHADOW = 54320
-BASE_PORT_POOLER = 54329
-BASE_PORT_INBUCKET = 54324
-BASE_PORT_SMTP = 54325
-BASE_PORT_POP3 = 54326
 
 # Static worktree mappings (preserved from sync_worktrees.py)
 STATIC_WORKTREES = {
@@ -58,52 +56,6 @@ EPHEMERAL_SLOTS = (EPHEMERAL_OFFSET_MAX - EPHEMERAL_OFFSET_MIN) // EPHEMERAL_OFF
 
 # Worktree directories
 EPHEMERAL_WORKTREE_BASE = Path("../pinpoint-worktrees")
-
-
-@dataclass
-class PortConfig:
-    """Port configuration for a worktree."""
-    name: str
-    nextjs_offset: int
-    supabase_offset: int
-    project_id: str
-    is_static: bool = False
-
-    @property
-    def nextjs_port(self) -> int:
-        return BASE_PORT_NEXTJS + self.nextjs_offset
-
-    @property
-    def api_port(self) -> int:
-        return BASE_PORT_API + self.supabase_offset
-
-    @property
-    def db_port(self) -> int:
-        return BASE_PORT_DB + self.supabase_offset
-
-    @property
-    def shadow_port(self) -> int:
-        return BASE_PORT_SHADOW + self.supabase_offset
-
-    @property
-    def pooler_port(self) -> int:
-        return BASE_PORT_POOLER + self.supabase_offset
-
-    @property
-    def inbucket_port(self) -> int:
-        return BASE_PORT_INBUCKET + self.supabase_offset
-
-    @property
-    def smtp_port(self) -> int:
-        return BASE_PORT_SMTP + self.supabase_offset
-
-    @property
-    def pop3_port(self) -> int:
-        return BASE_PORT_POP3 + self.supabase_offset
-
-    @property
-    def site_url(self) -> str:
-        return f"http://localhost:{self.nextjs_port}"
 
 
 # =============================================================================
@@ -193,18 +145,6 @@ def find_free_offset(branch_name: str) -> int:
     raise RuntimeError("No free port offsets available (all 60 ephemeral slots in use)")
 
 
-def branch_to_project_id(branch_name: str) -> str:
-    """
-    Convert a branch name to a valid Supabase project ID.
-    Must be lowercase alphanumeric with hyphens.
-    """
-    project_id = re.sub(r'[^a-z0-9-]', '-', branch_name.lower())
-    project_id = re.sub(r'-+', '-', project_id)
-    project_id = f"pinpoint-{project_id}".strip('-')
-    # Truncate if too long (Supabase limit)
-    return project_id[:50]
-
-
 # =============================================================================
 # Config Generation
 # =============================================================================
@@ -213,13 +153,6 @@ CONFIG_HEADER = """\
 # ⚠️ AUTO-GENERATED - DO NOT EDIT ⚠️
 # Managed by: pinpoint-wt
 # To modify: Edit supabase/config.toml.template, then run `./pinpoint-wt sync`
-#
-"""
-
-ENV_HEADER = """\
-# ⚠️ AUTO-GENERATED - DO NOT EDIT ⚠️
-# Managed by: pinpoint-wt
-# To modify: Edit .env.example, then run `./pinpoint-wt sync`
 #
 """
 
@@ -263,34 +196,6 @@ def generate_config_toml(worktree_path: Path, port_config: PortConfig) -> str:
     )
 
     return CONFIG_HEADER + content
-
-
-def generate_env_local(port_config: PortConfig) -> str:
-    """Generate .env.local content with port substitutions."""
-    return f"""{ENV_HEADER}# Local Supabase + Next.js configuration for {port_config.name}
-# Ports: Next.js={port_config.nextjs_port}, Supabase API={port_config.api_port}, DB={port_config.db_port}
-
-NEXT_PUBLIC_SUPABASE_URL=http://localhost:{port_config.api_port}
-DATABASE_URL=postgresql://postgres:postgres@localhost:{port_config.db_port}/postgres
-PORT={port_config.nextjs_port}
-NEXT_PUBLIC_SITE_URL={port_config.site_url}
-
-# Email Configuration (Mailpit)
-EMAIL_TRANSPORT=smtp
-MAILPIT_PORT={port_config.inbucket_port}
-MAILPIT_SMTP_PORT={port_config.smtp_port}
-INBUCKET_PORT={port_config.inbucket_port}
-INBUCKET_SMTP_PORT={port_config.smtp_port}
-
-# Fill these from 'supabase start' output for this worktree
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-
-# Dev autologin (optional)
-DEV_AUTOLOGIN_ENABLED=true
-DEV_AUTOLOGIN_EMAIL=admin@test.com
-DEV_AUTOLOGIN_PASSWORD=TestPassword123
-"""
 
 
 def write_protected_file(path: Path, content: str) -> None:
@@ -377,7 +282,7 @@ def cmd_create(args: argparse.Namespace) -> int:
 
     # Generate .env.local
     print("  📝 Generating .env.local...")
-    env_content = generate_env_local(port_config)
+    env_content = merge_env_local(worktree_dir, port_config)
     env_path = worktree_dir / ".env.local"
     write_protected_file(env_path, env_content)
 
@@ -551,7 +456,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
                     branch = result.stdout.strip()
                     offset = find_free_offset(branch)
                 except (subprocess.CalledProcessError, RuntimeError):
-                    print(f"    ⚠️  Skipping: Could not determine offset")
+                    print("    ⚠️  Skipping: Could not determine offset")
                     continue
 
             # Get branch for project_id
@@ -575,7 +480,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
         # Check if template exists
         template_path = path / "supabase" / "config.toml.template"
         if not template_path.exists():
-            print(f"    ⚠️  Skipping: No template found")
+            print("    ⚠️  Skipping: No template found")
             continue
 
         # Generate and write config.toml
@@ -587,12 +492,12 @@ def cmd_sync(args: argparse.Namespace) -> int:
         except Exception as e:
             print(f"    ❌ config.toml: {e}")
 
-        # Generate and write .env.local
+        # Merge and write .env.local (preserves user keys)
         try:
-            env_content = generate_env_local(port_config)
+            env_content = merge_env_local(path, port_config)
             env_path = path / ".env.local"
             write_protected_file(env_path, env_content)
-            print(f"    ✅ .env.local (Port={port_config.nextjs_port})")
+            print(f"    ✅ .env.local (Port={port_config.nextjs_port}, user keys preserved)")
         except Exception as e:
             print(f"    ❌ .env.local: {e}")
 
