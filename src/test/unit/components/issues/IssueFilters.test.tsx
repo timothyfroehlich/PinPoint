@@ -29,6 +29,11 @@ vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) =>
   setTimeout(cb, 0)
 );
 
+// Mock client-side cookie storage
+vi.mock("~/lib/cookies/client", () => ({
+  storeLastIssuesPath: vi.fn(),
+}));
+
 describe("IssueFilters", () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -19,12 +19,22 @@ import Link from "next/link";
 import { Button } from "~/components/ui/button";
 import { MobileNav } from "./MobileNav";
 import { FeedbackWidget } from "~/components/feedback/FeedbackWidget";
+import {
+  getLastIssuesPath,
+  getSidebarCollapsed,
+} from "~/lib/cookies/preferences";
 
 export async function MainLayout({
   children,
 }: {
   children: React.ReactNode;
 }): Promise<React.JSX.Element> {
+  // Read user preferences from cookies (server-side)
+  const [issuesPath, sidebarCollapsed] = await Promise.all([
+    getLastIssuesPath(),
+    getSidebarCollapsed(),
+  ]);
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -109,7 +119,11 @@ export async function MainLayout({
     <div className="flex h-full bg-background text-foreground">
       {/* Sidebar - Hidden on mobile */}
       <aside className="hidden md:block h-full">
-        <Sidebar role={userProfile?.role} />
+        <Sidebar
+          role={userProfile?.role}
+          issuesPath={issuesPath}
+          initialCollapsed={sidebarCollapsed}
+        />
       </aside>
 
       {/* Main Content */}
@@ -119,7 +133,7 @@ export async function MainLayout({
           {/* Mobile Menu Trigger & Left Spacer */}
           <div className="flex-1 flex items-center">
             <div className="md:hidden mr-4">
-              <MobileNav role={userProfile?.role} />
+              <MobileNav role={userProfile?.role} issuesPath={issuesPath} />
             </div>
           </div>
 

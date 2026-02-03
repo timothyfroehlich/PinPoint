@@ -297,7 +297,7 @@ test.describe("Issue List Features", () => {
       await page.getByTestId("mobile-menu-trigger").click();
     }
 
-    // The sidebar link uses useIssueLink which reads from localStorage
+    // The sidebar link uses issuesPath prop read from cookie on the server
     await page.getByRole("link", { name: "Issues", exact: true }).click();
     await expect(page).toHaveURL(/q=Thing/);
 

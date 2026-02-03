@@ -14,6 +14,7 @@ import { formatIssueId } from "~/lib/issues/utils";
 import { ImageGallery } from "~/components/images/ImageGallery";
 import type { Issue, IssueWithAllRelations } from "~/lib/types";
 import { BackToIssuesLink } from "~/components/issues/BackToIssuesLink";
+import { getLastIssuesPath } from "~/lib/cookies/preferences";
 
 /**
  * Issue Detail Page (Protected Route)
@@ -27,6 +28,9 @@ export default async function IssueDetailPage({
 }): Promise<React.JSX.Element> {
   // Get params (Next.js 16: params is a Promise)
   const { initials, issueNumber } = await params;
+
+  // Read user preferences from cookies
+  const issuesPath = await getLastIssuesPath();
 
   // Auth guard
   const supabase = await createClient();
@@ -160,7 +164,7 @@ export default async function IssueDetailPage({
   return (
     <PageShell className="space-y-8" size="wide">
       {/* Back button */}
-      <BackToIssuesLink />
+      <BackToIssuesLink href={issuesPath} />
 
       {/* Header */}
       <div className="space-y-3">

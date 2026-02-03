@@ -15,8 +15,10 @@ import {
 
 export function MobileNav({
   role,
+  issuesPath,
 }: {
   role?: "guest" | "member" | "admin" | undefined;
+  issuesPath?: string;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
 
@@ -44,6 +46,7 @@ export function MobileNav({
           role={role}
           onNavigate={() => setOpen(false)}
           isMobile={true}
+          issuesPath={issuesPath}
         />
       </SheetContent>
     </Sheet>
