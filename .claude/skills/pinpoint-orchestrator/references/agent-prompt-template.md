@@ -32,11 +32,18 @@ Use this template when dispatching subagents to work in worktrees.
 
 {specific_task_instructions}
 
+### Environment Setup
+
+If tests fail with `DATABASE_URL is not set`:
+- The worktree is missing `.env.local` (orchestrator setup issue, not your problem)
+- Verify your changes pass typecheck and lint: `pnpm exec tsc --noEmit && pnpm exec eslint .`
+- CI will have proper env vars - proceed with commit if typecheck/lint pass
+
 ### Verification
 
 Before completing:
 
-1. `cd {worktree_path} && pnpm run check` - Must pass
+1. `cd {worktree_path} && pnpm run check` - Must pass (or typecheck+lint if env missing)
 2. `cd {worktree_path} && git status` - All changes staged
 3. `cd {worktree_path} && git diff --cached` - Review changes
 

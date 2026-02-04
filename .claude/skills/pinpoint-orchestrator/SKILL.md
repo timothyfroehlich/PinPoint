@@ -65,11 +65,28 @@ Before proceeding, verify:
 
 ### 2.1 Create Worktrees
 
-For each selected task:
+**For NEW branches** (creating fresh work):
 
 ```bash
 ./pinpoint-wt create feat/<task-branch>
 ```
+
+This creates the worktree, generates `.env.local`, installs dependencies, and allocates ports.
+
+**For EXISTING branches** (e.g., addressing PR feedback):
+
+```bash
+# Step 1: Create worktree for existing branch
+git worktree add /home/froeht/Code/pinpoint-worktrees/<branch-name> <branch-name>
+
+# Step 2: Generate .env.local and config.toml (CRITICAL - don't skip!)
+cd /home/froeht/Code/pinpoint-worktrees/<branch-name> && ../PinPoint-Secondary/pinpoint-wt sync
+
+# Step 3: Install dependencies
+cd /home/froeht/Code/pinpoint-worktrees/<branch-name> && pnpm install
+```
+
+**Why sync is required:** The `pinpoint-wt sync` command generates `.env.local` with correct port allocations and database URLs. Without it, tests requiring `DATABASE_URL` will fail locally.
 
 ### 2.2 Record Worktree Paths
 
@@ -83,7 +100,10 @@ Task: PinPoint-def → /home/froeht/Code/pinpoint-worktrees/feat/task-def
 ### 2.3 Verify Setup
 
 ```bash
-./pinpoint-wt list   # Confirm all worktrees created
+./pinpoint-wt list   # Confirm all worktrees created with port assignments
+
+# Verify .env.local exists in each worktree
+ls /home/froeht/Code/pinpoint-worktrees/*/.env.local
 ```
 
 ---
