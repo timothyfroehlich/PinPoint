@@ -2,10 +2,11 @@ import type React from "react";
 import Link from "next/link";
 
 import { Button } from "~/components/ui/button";
+import type { UserRole } from "~/lib/types";
 
 interface ForbiddenProps {
   /** The user's current role, if authenticated */
-  role?: "guest" | "member" | "admin" | null;
+  role?: UserRole | null;
   /** Optional custom message */
   message?: string;
   /** Where to redirect when clicking "Go Back" - defaults to /dashboard */
