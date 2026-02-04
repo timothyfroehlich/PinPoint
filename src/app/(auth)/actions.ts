@@ -19,6 +19,9 @@ import {
   formatResetTime,
 } from "~/lib/rate-limit";
 import { getSiteUrl, getSafeRedirect } from "~/lib/url";
+import { db } from "~/server/db";
+import { userProfiles } from "~/server/db/schema";
+import { eq } from "drizzle-orm";
 
 /**
  * Result Types
@@ -201,6 +204,7 @@ export async function signupAction(
     email: formData.get("email"),
     password: formData.get("password"),
     confirmPassword: formData.get("confirmPassword"),
+    termsAccepted: formData.get("termsAccepted") === "on",
   });
 
   if (!parsed.success) {
@@ -208,6 +212,14 @@ export async function signupAction(
       { errors: parsed.error.issues, action: "signup" },
       "Signup validation failed"
     );
+
+    // If the error is specifically about terms, return a more specific message
+    const termsError = parsed.error.issues.find(
+      (issue) => issue.path[0] === "termsAccepted"
+    );
+    if (termsError) {
+      return err("VALIDATION", termsError.message);
+    }
 
     return err("VALIDATION", "Invalid input");
   }
@@ -267,6 +279,19 @@ export async function signupAction(
       log.error({ action: "signup" }, "Signup failed: no user returned");
       return err("SERVER", "No user returned");
     }
+
+    // Record terms acceptance timestamp
+    // The user profile is created by database trigger, so we update it here
+    const termsAcceptedAt = new Date();
+    await db
+      .update(userProfiles)
+      .set({ termsAcceptedAt })
+      .where(eq(userProfiles.id, data.user.id));
+
+    log.info(
+      { userId: data.user.id, action: "signup" },
+      "Terms of service accepted"
+    );
 
     // Check if email confirmation is required (user created but no session)
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- data.user check might be redundant by types but ensuring safety

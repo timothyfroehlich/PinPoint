@@ -70,13 +70,14 @@ describe("loginSchema", () => {
 });
 
 describe("signupSchema", () => {
-  it("should validate correct name, email, and password", () => {
+  it("should validate correct name, email, password, and terms", () => {
     const result = signupSchema.safeParse({
       firstName: "John",
       lastName: "Doe",
       email: "john@example.com",
       password: "SecurePass123",
       confirmPassword: "SecurePass123",
+      termsAccepted: true,
     });
 
     expect(result.success).toBe(true);
@@ -85,6 +86,7 @@ describe("signupSchema", () => {
       expect(result.data.lastName).toBe("Doe");
       expect(result.data.email).toBe("john@example.com");
       expect(result.data.password).toBe("SecurePass123");
+      expect(result.data.termsAccepted).toBe(true);
     }
   });
 
@@ -95,6 +97,7 @@ describe("signupSchema", () => {
       email: "john@example.com",
       password: "SecurePass123",
       confirmPassword: "SecurePass123",
+      termsAccepted: true,
     });
 
     expect(result.success).toBe(true);
@@ -111,6 +114,7 @@ describe("signupSchema", () => {
       email: "john@example.com",
       password: "SecurePass123",
       confirmPassword: "SecurePass123",
+      termsAccepted: true,
     });
 
     expect(result.success).toBe(false);
@@ -128,6 +132,7 @@ describe("signupSchema", () => {
       email: "john@example.com",
       password: "SecurePass123",
       confirmPassword: "SecurePass123",
+      termsAccepted: true,
     });
 
     expect(result.success).toBe(false);
@@ -143,6 +148,7 @@ describe("signupSchema", () => {
       email: "invalid-email",
       password: "SecurePass123",
       confirmPassword: "SecurePass123",
+      termsAccepted: true,
     });
 
     expect(result.success).toBe(false);
@@ -158,6 +164,7 @@ describe("signupSchema", () => {
       email: "john@example.com",
       password: "short",
       confirmPassword: "short",
+      termsAccepted: true,
     });
 
     expect(result.success).toBe(false);
@@ -173,6 +180,7 @@ describe("signupSchema", () => {
       email: "john@example.com",
       password: "a".repeat(129),
       confirmPassword: "a".repeat(129),
+      termsAccepted: true,
     });
 
     expect(result.success).toBe(false);
@@ -188,6 +196,7 @@ describe("signupSchema", () => {
       email: "john@example.com",
       password: "12345678",
       confirmPassword: "12345678",
+      termsAccepted: true,
     });
 
     expect(result.success).toBe(true);
@@ -200,6 +209,7 @@ describe("signupSchema", () => {
       email: "john@example.com",
       password: "a".repeat(128),
       confirmPassword: "a".repeat(128),
+      termsAccepted: true,
     });
 
     expect(result.success).toBe(true);
@@ -212,6 +222,7 @@ describe("signupSchema", () => {
       email: "john@example.com",
       password: "SecurePass123",
       confirmPassword: "DifferentPass456",
+      termsAccepted: true,
     });
 
     expect(result.success).toBe(false);
@@ -230,6 +241,7 @@ describe("signupSchema", () => {
       email: "john@example.com",
       password: "SecurePass123",
       confirmPassword: "a".repeat(129),
+      termsAccepted: true,
     });
 
     expect(result.success).toBe(false);
@@ -237,5 +249,36 @@ describe("signupSchema", () => {
       (i) => i.path.includes("confirmPassword") && i.code === "too_big"
     );
     expect(confirmPasswordError).toBeDefined();
+  });
+
+  it("should reject when terms are not accepted", () => {
+    const result = signupSchema.safeParse({
+      firstName: "John",
+      lastName: "Doe",
+      email: "john@example.com",
+      password: "SecurePass123",
+      confirmPassword: "SecurePass123",
+      termsAccepted: false,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const termsError = result.error.issues.find((i) =>
+        i.path.includes("termsAccepted")
+      );
+      expect(termsError?.message).toContain("Terms of Service");
+    }
+  });
+
+  it("should reject when terms field is missing", () => {
+    const result = signupSchema.safeParse({
+      firstName: "John",
+      lastName: "Doe",
+      email: "john@example.com",
+      password: "SecurePass123",
+      confirmPassword: "SecurePass123",
+    });
+
+    expect(result.success).toBe(false);
   });
 });

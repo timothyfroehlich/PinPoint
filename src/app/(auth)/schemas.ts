@@ -44,6 +44,9 @@ export const signupSchema = z
       .string()
       .min(1, "Please confirm your password")
       .max(128, "Password must be less than 128 characters"),
+    termsAccepted: z.literal(true, {
+      message: "You must accept the Terms of Service to create an account",
+    }),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",

@@ -72,6 +72,7 @@ describe("Auth Actions Security - Error Handling", () => {
     formData.set("confirmPassword", "Password123!");
     formData.set("firstName", "John");
     formData.set("lastName", "Doe");
+    formData.set("termsAccepted", "on");
 
     const result = await signupAction(undefined, formData);
 
@@ -100,6 +101,7 @@ describe("Auth Actions Security - Error Handling", () => {
     formData.set("confirmPassword", "Password123!");
     formData.set("firstName", "John");
     formData.set("lastName", "Doe");
+    formData.set("termsAccepted", "on");
 
     const result = await signupAction(undefined, formData);
 
