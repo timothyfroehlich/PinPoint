@@ -46,7 +46,7 @@ export function OwnerSelect({
     }
   }, [users]);
 
-  const sortedUsers = [...users].sort((a, b) => a.name.localeCompare(b.name));
+  // Users come pre-sorted from getUnifiedUsers: confirmed first, by machine count, then by last name
 
   return (
     <div className="space-y-2">
@@ -82,10 +82,15 @@ export function OwnerSelect({
           <SelectValue placeholder="Select an owner" />
         </SelectTrigger>
         <SelectContent>
-          {sortedUsers.map((user) => (
+          {users.map((user) => (
             <SelectItem key={user.id} value={user.id}>
               <div className="flex items-center gap-2">
                 <span>{user.name}</span>
+                {user.machineCount > 0 && (
+                  <span className="text-[10px] text-on-surface-variant/70">
+                    ({user.machineCount})
+                  </span>
+                )}
                 {user.status === "invited" && (
                   <span className="text-[10px] font-medium uppercase tracking-wider text-on-surface-variant/70">
                     (Invited)
