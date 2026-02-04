@@ -25,6 +25,9 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 # Monitoring
 gh pr checks <PR_NUMBER>                   # CI status
 gh api repos/timothyfroehlich/PinPoint/pulls/<PR>/comments  # Copilot comments
+
+# Labeling (when CI passes + no Copilot comments)
+gh pr edit <PR_NUMBER> --add-label "ready-for-review"
 ```
 
 ---
@@ -185,11 +188,11 @@ Format for user:
 ```
 ## Agent Status Report
 
-| Task | Agent | PR | CI Status | Copilot |
-|------|-------|----|-----------|---------|
-| PinPoint-abc | Complete | #123 | All passing | 0 comments |
-| PinPoint-def | Complete | #124 | E2E failing | 2 comments |
-| PinPoint-ghi | Running | - | - | - |
+| Task | Agent | PR | CI Status | Copilot | Labeled |
+|------|-------|----|-----------|---------|---------|
+| PinPoint-abc | Complete | #123 | All passing | 0 comments | ✅ ready-for-review |
+| PinPoint-def | Complete | #124 | E2E failing | 2 comments | ❌ |
+| PinPoint-ghi | Running | - | - | - | - |
 ```
 
 ### 4.4 Handle Issues
@@ -204,6 +207,36 @@ Format for user:
 - Show comment summary
 - Offer to re-dispatch agent with feedback
 
+### 4.5 Label Ready PRs
+
+When a PR passes all CI checks AND has no unresolved Copilot comments, label it as ready for review:
+
+```bash
+# Check if PR is ready (all checks pass, no Copilot comments)
+# Use the status check from 4.2 - if all checks are SUCCESS and Copilot count is 0
+
+# Add ready-for-review label
+gh pr edit <PR> --add-label "ready-for-review"
+```
+
+**One-time setup** (if label doesn't exist):
+
+```bash
+gh label create "ready-for-review" --description "PR passed CI and has no unresolved review comments" --color "0E8A16"
+```
+
+**Criteria for labeling**:
+
+- ✅ All CI checks show `SUCCESS` (ignore `codecov/patch` which is informational)
+- ✅ Zero Copilot comments on the PR
+- ✅ PR is not a draft
+
+**Note**: Remove the label if subsequent changes cause CI failure or new Copilot comments appear:
+
+```bash
+gh pr edit <PR> --remove-label "ready-for-review"
+```
+
 ---
 
 ## Phase 5: Completion
@@ -213,9 +246,9 @@ Format for user:
 ```
 ## Orchestration Complete
 
-PRs Ready for Review:
-- #123: Fix machine dropdown - All checks passing
-- #125: Sort owner dropdown - All checks passing
+PRs Ready for Review (labeled `ready-for-review`):
+- #123: Fix machine dropdown - All checks passing ✅
+- #125: Sort owner dropdown - All checks passing ✅
 
 PRs Needing Attention:
 - #124: Add owner link - 2 Copilot comments to address
