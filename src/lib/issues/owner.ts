@@ -33,3 +33,13 @@ export function getMachineOwnerName(
 ): string | null {
   return issue.machine.owner?.name ?? issue.machine.invitedOwner?.name ?? null;
 }
+
+/**
+ * Gets the machine owner's ID
+ *
+ * @param issue - The issue with machine owner information
+ * @returns The owner's ID or null if no owner
+ */
+export function getMachineOwnerId(issue: IssueWithAllRelations): string | null {
+  return issue.machine.owner?.id ?? issue.machine.invitedOwner?.id ?? null;
+}
