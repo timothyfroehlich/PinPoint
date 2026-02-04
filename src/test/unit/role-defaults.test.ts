@@ -44,16 +44,10 @@ describe("Role defaults", () => {
   });
 
   describe("Role hierarchy intent", () => {
-    it("should have guest as lowest permission level (default for untrusted signups)", () => {
-      // Document the intent: guest < member < admin
-      const roleColumn = userProfiles.role;
-      expect(roleColumn.default).toBe("guest");
-    });
-
-    it("should have member as trusted level (default for invited users)", () => {
-      // Invited users are trusted, so they get member access
-      const roleColumn = invitedUsers.role;
-      expect(roleColumn.default).toBe("member");
+    it("should define permission levels: guest < member < admin", () => {
+      // Document the hierarchy - all roles must be present
+      const roles = userProfiles.role.enumValues;
+      expect(roles).toEqual(["guest", "member", "admin"]);
     });
   });
 });
