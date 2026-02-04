@@ -186,14 +186,19 @@ const getDashboardData = cache(async (userId?: string) => {
     .from(issues)
     .where(notInArray(issues.status, [...CLOSED_STATUSES]));
 
-  // Query 6: Machines needing service (machines with at least one open issue)
+  // Query 6: Machines needing service (machines with `major` or `unplayable` open issues)
   // Optimized to use count(distinct) on issues table, removing unnecessary JOIN with machines
   const machinesNeedingServicePromise = db
     .select({
       count: sql<number>`count(distinct ${issues.machineInitials})::int`,
     })
     .from(issues)
-    .where(notInArray(issues.status, [...CLOSED_STATUSES]));
+    .where(
+      and(
+        notInArray(issues.status, [...CLOSED_STATUSES]),
+        inArray(issues.severity, ["major", "unplayable"])
+      )
+    );
 
   // Execute all queries in parallel
   const [

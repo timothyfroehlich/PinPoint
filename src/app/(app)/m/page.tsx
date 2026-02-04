@@ -257,11 +257,11 @@ export default async function MachinesPage({
                         <span
                           className={cn(
                             "font-bold",
-                            machine.openIssuesCount > 0
-                              ? machine.status === "unplayable"
-                                ? "text-error"
-                                : "text-warning"
-                              : "text-on-surface-variant"
+                            machine.status === "unplayable"
+                              ? "text-error"
+                              : machine.status === "needs_service"
+                                ? "text-warning"
+                                : "text-on-surface-variant"
                           )}
                           data-testid={`machine-open-issues-count-${machine.id}`}
                         >

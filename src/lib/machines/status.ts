@@ -12,9 +12,9 @@ export interface IssueForStatus {
  * Derive machine status from its issues
  *
  * Logic:
- * - `unplayable`: At least one unplayable issue that's not closed
- * - `needs_service`: At least one non-closed issue (major/minor/cosmetic), or a major issue
- * - `operational`: No open issues
+ * - `unplayable`: At least one open issue with severity `unplayable`.
+ * - `needs_service`: At least one open issue with severity `major` (and no `unplayable` issues).
+ * - `operational`: No open issues, or only open issues with `minor` or `cosmetic` severity.
  */
 export function deriveMachineStatus(issues: IssueForStatus[]): MachineStatus {
   // Filter to only open issues (not in CLOSED_STATUSES)
@@ -22,21 +22,16 @@ export function deriveMachineStatus(issues: IssueForStatus[]): MachineStatus {
     (issue) => !(CLOSED_STATUSES as readonly string[]).includes(issue.status)
   );
 
-  // No open issues = operational
-  if (openIssues.length === 0) {
-    return "operational";
-  }
+  const severities = new Set(openIssues.map((issue) => issue.severity));
 
-  // Check for unplayable issues
-  const hasUnplayable = openIssues.some(
-    (issue) => issue.severity === "unplayable"
-  );
-  if (hasUnplayable) {
+  if (severities.has("unplayable")) {
     return "unplayable";
   }
+  if (severities.has("major")) {
+    return "needs_service";
+  }
 
-  // Has open issues but none are unplayable = needs service
-  return "needs_service";
+  return "operational";
 }
 
 /**
