@@ -10,10 +10,11 @@ import {
 import { Label } from "~/components/ui/label";
 import { Button } from "~/components/ui/button";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import type { UnifiedUser } from "~/lib/types";
 import { InviteUserDialog } from "~/components/users/InviteUserDialog";
 import { Plus } from "lucide-react";
+import { compareUnifiedUsers } from "~/lib/users/queries";
 
 interface OwnerSelectProps {
   users: UnifiedUser[];
@@ -46,7 +47,12 @@ export function OwnerSelect({
     }
   }, [users]);
 
-  // Users come pre-sorted from getUnifiedUsers: confirmed first, by machine count, then by last name
+  // Re-sort users after client-side mutations (e.g., inviting a new user)
+  // to maintain consistent ordering: confirmed first, by machine count desc, then by last name
+  const sortedUsers = useMemo(
+    () => [...users].sort(compareUnifiedUsers),
+    [users]
+  );
 
   return (
     <div className="space-y-2">
@@ -82,7 +88,7 @@ export function OwnerSelect({
           <SelectValue placeholder="Select an owner" />
         </SelectTrigger>
         <SelectContent>
-          {users.map((user) => (
+          {sortedUsers.map((user) => (
             <SelectItem key={user.id} value={user.id}>
               <div className="flex items-center gap-2">
                 <span>{user.name}</span>

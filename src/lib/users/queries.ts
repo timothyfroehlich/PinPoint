@@ -1,7 +1,43 @@
 import { db } from "~/server/db";
 import { userProfiles, invitedUsers, machines } from "~/server/db/schema";
 import { sql, eq, count } from "drizzle-orm";
-import type { UnifiedUser } from "~/lib/types";
+import type { UnifiedUser, UserStatus } from "~/lib/types";
+
+/**
+ * Comparator for sorting unified users.
+ * Order: confirmed users first, then by machine count desc, then by last name, name, and id.
+ * Exported so it can be reused for client-side re-sorting after mutations.
+ */
+export function compareUnifiedUsers(a: UnifiedUser, b: UnifiedUser): number {
+  // 1. Confirmed (active) users before unconfirmed (invited)
+  if (a.status !== b.status) {
+    return a.status === "active" ? -1 : 1;
+  }
+
+  // 2. Higher machine count first
+  const machineCountA = a.machineCount;
+  const machineCountB = b.machineCount;
+  if (machineCountA !== machineCountB) {
+    return machineCountB - machineCountA;
+  }
+
+  // 3. Alphabetically by last name
+  const lastNameA = a.lastName || "";
+  const lastNameB = b.lastName || "";
+  const lastNameCompare = lastNameA.localeCompare(lastNameB);
+  if (lastNameCompare !== 0) {
+    return lastNameCompare;
+  }
+
+  // 4. Tie-breaker: full name
+  const nameCompare = a.name.localeCompare(b.name);
+  if (nameCompare !== 0) {
+    return nameCompare;
+  }
+
+  // 5. Final tie-breaker: id for deterministic ordering
+  return a.id.localeCompare(b.id);
+}
 
 export async function getUnifiedUsers(
   options: { includeEmails?: boolean } = {}
@@ -31,17 +67,17 @@ export async function getUnifiedUsers(
     .as("invited_machine_count");
 
   // Fetch activated users with machine count
-  const activatedUsers = await db
+  const activatedUsersRaw = await db
     .select({
       id: userProfiles.id,
       name: userProfiles.name,
       lastName: userProfiles.lastName,
-      ...(includeEmails ? { email: userProfiles.email } : {}),
+      email: userProfiles.email,
       role: userProfiles.role,
       avatarUrl: userProfiles.avatarUrl,
-      status: sql<"active">`'active'`,
-      inviteSentAt: sql<null>`null`,
-      machineCount: sql<number>`COALESCE(${activatedMachineCount.count}, 0)`,
+      status: sql<UserStatus>`'active'`,
+      inviteSentAt: sql<Date | null>`null`,
+      machineCount: sql<number>`COALESCE(${activatedMachineCount.count}::int, 0)`,
     })
     .from(userProfiles)
     .leftJoin(
@@ -50,17 +86,17 @@ export async function getUnifiedUsers(
     );
 
   // Fetch invited users with machine count
-  const invitedUsersList = await db
+  const invitedUsersRaw = await db
     .select({
       id: invitedUsers.id,
       name: invitedUsers.name,
       lastName: invitedUsers.lastName,
-      ...(includeEmails ? { email: invitedUsers.email } : {}),
+      email: invitedUsers.email,
       role: invitedUsers.role,
-      avatarUrl: sql<null>`null`,
-      status: sql<"invited">`'invited'`,
+      avatarUrl: sql<string | null>`null`,
+      status: sql<UserStatus>`'invited'`,
       inviteSentAt: invitedUsers.inviteSentAt,
-      machineCount: sql<number>`COALESCE(${invitedMachineCount.count}, 0)`,
+      machineCount: sql<number>`COALESCE(${invitedMachineCount.count}::int, 0)`,
     })
     .from(invitedUsers)
     .leftJoin(
@@ -68,25 +104,31 @@ export async function getUnifiedUsers(
       eq(invitedUsers.id, invitedMachineCount.invitedOwnerId)
     );
 
-  // Merge and sort by: confirmed first, then machine count desc, then last name
-  const allUsers = [...activatedUsers, ...invitedUsersList].sort((a, b) => {
-    // 1. Confirmed (active) users before unconfirmed (invited)
-    if (a.status !== b.status) {
-      return a.status === "active" ? -1 : 1;
-    }
+  // Transform to UnifiedUser[], optionally excluding emails
+  const activatedUsers: UnifiedUser[] = activatedUsersRaw.map((u) => ({
+    id: u.id,
+    name: u.name,
+    lastName: u.lastName,
+    role: u.role,
+    avatarUrl: u.avatarUrl,
+    status: u.status,
+    inviteSentAt: u.inviteSentAt,
+    machineCount: u.machineCount,
+    ...(includeEmails && { email: u.email }),
+  }));
 
-    // 2. Higher machine count first
-    const machineCountA = Number(a.machineCount) || 0;
-    const machineCountB = Number(b.machineCount) || 0;
-    if (machineCountA !== machineCountB) {
-      return machineCountB - machineCountA;
-    }
+  const invitedUsersList: UnifiedUser[] = invitedUsersRaw.map((u) => ({
+    id: u.id,
+    name: u.name,
+    lastName: u.lastName,
+    role: u.role,
+    avatarUrl: u.avatarUrl,
+    status: u.status,
+    inviteSentAt: u.inviteSentAt,
+    machineCount: u.machineCount,
+    ...(includeEmails && { email: u.email }),
+  }));
 
-    // 3. Alphabetically by last name
-    const lastNameA = a.lastName || "";
-    const lastNameB = b.lastName || "";
-    return lastNameA.localeCompare(lastNameB);
-  });
-
-  return allUsers as UnifiedUser[];
+  // Merge and sort using the exported comparator
+  return [...activatedUsers, ...invitedUsersList].sort(compareUnifiedUsers);
 }
