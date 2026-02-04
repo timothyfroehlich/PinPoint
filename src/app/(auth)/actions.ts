@@ -283,15 +283,29 @@ export async function signupAction(
     // Record terms acceptance timestamp
     // The user profile is created by database trigger, so we update it here
     const termsAcceptedAt = new Date();
-    await db
-      .update(userProfiles)
-      .set({ termsAcceptedAt })
-      .where(eq(userProfiles.id, data.user.id));
+    try {
+      await db
+        .update(userProfiles)
+        .set({ termsAcceptedAt })
+        .where(eq(userProfiles.id, data.user.id));
 
-    log.info(
-      { userId: data.user.id, action: "signup" },
-      "Terms of service accepted"
-    );
+      log.info(
+        { userId: data.user.id, action: "signup" },
+        "Terms of service accepted"
+      );
+    } catch (termsError) {
+      // Log the error but allow signup to proceed
+      // The user account was already created in Supabase Auth
+      // We can address missing terms acceptance separately (e.g., prompt on next login)
+      log.error(
+        {
+          userId: data.user.id,
+          action: "signup",
+          error: termsError instanceof Error ? termsError.message : "Unknown",
+        },
+        "Failed to record terms acceptance timestamp"
+      );
+    }
 
     // Check if email confirmation is required (user created but no session)
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- data.user check might be redundant by types but ensuring safety
