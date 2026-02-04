@@ -25,7 +25,7 @@ export default function LandingPage(): React.JSX.Element {
               alt="Austin Pinball Collective"
               width={200}
               height={133}
-              className="drop-shadow-[0_0_20px_rgba(74,222,128,0.6)]"
+              className="glow-primary"
               priority
             />
           </div>

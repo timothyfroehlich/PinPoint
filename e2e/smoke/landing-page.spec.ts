@@ -41,22 +41,30 @@ test.describe("Landing Page", () => {
     await expect(page.getByTestId("nav-signin")).toBeVisible();
   });
 
-  test("Browse Machines CTA is clickable and links to /m", async ({ page }) => {
+  test("Browse Machines CTA is clickable and navigates", async ({ page }) => {
     await page.goto("/");
 
-    // Verify the CTA has the correct href (even if middleware redirects for now)
+    // Click the CTA (per E2E Interaction Coverage rule)
     const browseLink = page.getByTestId("cta-browse-machines");
     await expect(browseLink).toHaveAttribute("href", "/m");
+    await browseLink.click();
+
+    // Unauthenticated users are redirected to login with return URL
+    await expect(page).toHaveURL(/\/login\?next=%2Fm/);
   });
 
-  test("Report Issue CTA is clickable and links to /report", async ({
+  test("Report Issue CTA is clickable and navigates to /report", async ({
     page,
   }) => {
     await page.goto("/");
 
-    // Verify the CTA has the correct href
+    // Click the CTA (per E2E Interaction Coverage rule)
     const reportLink = page.getByTestId("cta-report-issue");
     await expect(reportLink).toHaveAttribute("href", "/report");
+    await reportLink.click();
+
+    // /report is a public route, should navigate directly
+    await expect(page).toHaveURL(/\/report/);
   });
 
   test("Dashboard link navigates to dashboard", async ({ page }) => {
