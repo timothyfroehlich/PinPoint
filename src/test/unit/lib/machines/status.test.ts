@@ -23,6 +23,11 @@ describe("deriveMachineStatus", () => {
     expect(deriveMachineStatus(issues)).toBe("operational");
   });
 
+  it("returns operational when open issues are only cosmetic", () => {
+    const issues: IssueForStatus[] = [{ status: "new", severity: "cosmetic" }];
+    expect(deriveMachineStatus(issues)).toBe("operational");
+  });
+
   it("returns needs_service when there is at least one major issue", () => {
     const issues: IssueForStatus[] = [
       { status: "new", severity: "minor" },
