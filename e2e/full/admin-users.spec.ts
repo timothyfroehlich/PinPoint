@@ -43,8 +43,8 @@ test.describe("Admin User Management", () => {
     const row = page.getByRole("row").filter({ hasText: targetEmail });
     const selectTrigger = row.getByRole("combobox");
 
-    // Initial role should be Member (default)
-    await expect(selectTrigger).toHaveText("Member");
+    // Initial role should be Guest (signup default for non-invited users)
+    await expect(selectTrigger).toHaveText("Guest");
     await expect(selectTrigger).toBeEnabled();
 
     // Change to Admin
