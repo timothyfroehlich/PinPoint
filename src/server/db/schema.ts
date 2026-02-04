@@ -51,7 +51,7 @@ export const userProfiles = pgTable("user_profiles", {
   avatarUrl: text("avatar_url"),
   role: text("role", { enum: ["guest", "member", "admin"] })
     .notNull()
-    .default("member"),
+    .default("guest"), // Default for new signups (no invitation)
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -76,7 +76,7 @@ export const invitedUsers = pgTable("invited_users", {
   email: text("email").notNull().unique(),
   role: text("role", { enum: ["guest", "member", "admin"] })
     .notNull()
-    .default("guest"),
+    .default("member"), // Default for invited users (trusted)
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

@@ -1,18 +1,10 @@
--- Auto-create user profiles when new users sign up
--- This runs automatically on `supabase db reset` and `supabase start`
+ALTER TABLE "invited_users" ALTER COLUMN "role" SET DEFAULT 'member';--> statement-breakpoint
+ALTER TABLE "user_profiles" ALTER COLUMN "role" SET DEFAULT 'guest';--> statement-breakpoint
 
--- Add foreign key constraint from user_profiles.id to auth.users.id
--- Note: This constraint is added manually because Drizzle doesn't support cross-schema references
-ALTER TABLE public.user_profiles
-  DROP CONSTRAINT IF EXISTS user_profiles_id_fkey;
-
-ALTER TABLE public.user_profiles
-  ADD CONSTRAINT user_profiles_id_fkey
-  FOREIGN KEY (id)
-  REFERENCES auth.users(id)
-  ON DELETE CASCADE;
-
--- Function to handle new user creation
+-- Update the handle_new_user trigger function to default to 'guest' for new signups
+-- Previously defaulted to 'member', but now:
+-- - New signups (no invitation) → guest
+-- - Invited users → inherit role from invitation (typically 'member')
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -114,34 +106,6 @@ BEGIN
 END;
 $$;
 
--- Trigger on auth.users table (AFTER INSERT)
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW
-  EXECUTE FUNCTION public.handle_new_user();
-
--- Add helpful comments
+-- Add helpful comment
 COMMENT ON FUNCTION public.handle_new_user() IS
-  'Automatically creates a user_profile and notification_preferences when a new user signs up via Supabase Auth. Works for both email/password and OAuth (Google, GitHub). Also transfers guest issues (by reporter_email) and handles legacy invited_users cleanup by transferring their machines/issues and removing the invited_users record.';
-
-COMMENT ON CONSTRAINT user_profiles_id_fkey ON public.user_profiles IS
-  'Foreign key constraint to auth.users. Ensures user_profiles.id always references a valid auth.users.id. CASCADE delete removes profile when auth user is deleted.';
-
--- ============================================================================
--- Test Users, Machines, and Issues
--- ============================================================================
--- Note: All seed data is now handled in supabase/seed-users.mjs to ensure
--- proper foreign key relationships (machines need owners which are auth users).
-
--- Ensure public schema permissions for PostgREST/Supabase roles
--- These tables are created via Drizzle and need explicit grants
-GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
-
--- Ensure default privileges for future tables created in public schema
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
+  'Automatically creates a user_profile and notification_preferences when a new user signs up via Supabase Auth. Works for both email/password and OAuth (Google, GitHub). Also transfers guest issues (by reporter_email) and handles legacy invited_users cleanup by transferring their machines/issues and removing the invited_users record. Non-invited signups default to guest role.';
