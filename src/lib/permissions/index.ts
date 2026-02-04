@@ -4,6 +4,7 @@
  * Single source of truth for all permissions in PinPoint.
  */
 
+// Matrix exports
 export {
   // Types
   type PermissionValue,
@@ -19,3 +20,33 @@ export {
   hasPermission,
   requiresOwnershipCheck,
 } from "./matrix";
+
+// Helper exports
+export {
+  type OwnershipContext,
+  type PermissionState,
+  getAccessLevel,
+  checkPermission,
+  getPermissionState,
+  getPermissionDeniedReason,
+  checkPermissions,
+  checkAnyPermission,
+  getGrantedPermissions,
+  getRawPermissionValue,
+  isConditionalPermission,
+} from "./helpers";
+
+// Hook exports (client-side only)
+export {
+  type PermissionUser,
+  type IssueContext,
+  type MachineContext,
+  usePermission,
+  usePermissionState,
+  usePermissions,
+  usePermissionStates,
+  useAccessLevel,
+  useIsAuthenticated,
+  useIsConditionalPermission,
+  useRawPermission,
+} from "./hooks";
