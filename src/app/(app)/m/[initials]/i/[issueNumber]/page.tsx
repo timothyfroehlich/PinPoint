@@ -9,7 +9,7 @@ import { PageShell } from "~/components/layout/PageShell";
 import { IssueTimeline } from "~/components/issues/IssueTimeline";
 import { IssueSidebar } from "~/components/issues/IssueSidebar";
 import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
-import { getMachineOwnerName } from "~/lib/issues/owner";
+import { getMachineOwnerName, getMachineOwnerId } from "~/lib/issues/owner";
 import { formatIssueId } from "~/lib/issues/utils";
 import { ImageGallery } from "~/components/images/ImageGallery";
 import type { Issue, IssueWithAllRelations } from "~/lib/types";
@@ -160,6 +160,7 @@ export default async function IssueDetailPage({
   // Cast issue to IssueWithAllRelations for type safety
   const issueWithRelations = issue as unknown as IssueWithAllRelations;
   const ownerName = getMachineOwnerName(issueWithRelations);
+  const ownerId = getMachineOwnerId(issueWithRelations);
 
   return (
     <PageShell className="space-y-8" size="wide">
@@ -182,7 +183,16 @@ export default async function IssueDetailPage({
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <span>•</span>
               <span>Game Owner:</span>
-              <span className="font-medium text-foreground">{ownerName}</span>
+              {ownerId ? (
+                <Link
+                  href={`/issues?owner=${ownerId}`}
+                  className="font-medium text-foreground transition-colors hover:text-primary"
+                >
+                  {ownerName}
+                </Link>
+              ) : (
+                <span className="font-medium text-foreground">{ownerName}</span>
+              )}
             </div>
           )}
         </div>
