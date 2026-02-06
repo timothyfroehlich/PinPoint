@@ -240,6 +240,66 @@ describe("isConditionalPermission", () => {
   });
 });
 
+describe("Integration: Comment ownership flow", () => {
+  const userId = "user-123";
+  const otherUserId = "user-456";
+
+  it("should allow guest to edit own comment via ownership check", () => {
+    const context: OwnershipContext = {
+      userId,
+      reporterId: userId, // reporterId maps to comment author for "own" checks
+    };
+    expect(checkPermission("comments.edit.own", "guest", context)).toBe(true);
+    expect(checkPermission("comments.delete.own", "guest", context)).toBe(true);
+  });
+
+  it("should deny guest editing others comments", () => {
+    const context: OwnershipContext = {
+      userId,
+      reporterId: otherUserId,
+    };
+    expect(checkPermission("comments.edit.own", "guest", context)).toBe(false);
+    expect(checkPermission("comments.delete.own", "guest", context)).toBe(
+      false
+    );
+  });
+
+  it("should allow member to edit own comment via ownership check", () => {
+    const context: OwnershipContext = {
+      userId,
+      reporterId: userId,
+    };
+    expect(checkPermission("comments.edit.own", "member", context)).toBe(true);
+    expect(checkPermission("comments.delete.own", "member", context)).toBe(
+      true
+    );
+  });
+
+  it("should deny member editing others comments", () => {
+    const context: OwnershipContext = {
+      userId,
+      reporterId: otherUserId,
+    };
+    expect(checkPermission("comments.edit.own", "member", context)).toBe(false);
+    expect(checkPermission("comments.delete.own", "member", context)).toBe(
+      false
+    );
+  });
+
+  it("should allow admin to edit any comment unconditionally", () => {
+    // Admin has true, not "own", so context doesn't matter
+    expect(checkPermission("comments.edit.own", "admin")).toBe(true);
+    expect(checkPermission("comments.delete.own", "admin")).toBe(true);
+  });
+
+  it("should deny unauthenticated from editing any comment", () => {
+    expect(checkPermission("comments.edit.own", "unauthenticated")).toBe(false);
+    expect(checkPermission("comments.delete.own", "unauthenticated")).toBe(
+      false
+    );
+  });
+});
+
 describe("Integration: Guest issue update flow", () => {
   const guestId = "guest-user";
   const memberId = "member-user";

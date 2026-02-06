@@ -137,10 +137,15 @@ describe("hasPermission", () => {
     expect(hasPermission("admin.access", "member")).toBe(false);
   });
 
-  it("should return false for conditional permissions (does not resolve ownership)", () => {
-    // hasPermission doesn't handle ownership - returns false for 'own'/'owner'
-    expect(hasPermission("issues.update.status", "guest")).toBe(false);
-    expect(hasPermission("machines.edit", "member")).toBe(false);
+  it("should throw for ownership-based permissions to prevent silent bugs", () => {
+    // hasPermission throws for 'own'/'owner' values to force callers to use
+    // requiresOwnershipCheck() or checkPermission() from helpers.ts
+    expect(() => hasPermission("issues.update.status", "guest")).toThrow(
+      /ownership-based permissions/
+    );
+    expect(() => hasPermission("machines.edit", "member")).toThrow(
+      /ownership-based permissions/
+    );
   });
 });
 
@@ -190,8 +195,17 @@ describe("Permission hierarchy", () => {
         const guestValue = permission.access.guest;
         const memberValue = permission.access.member;
 
-        // If guest has permission, member should too
+        // If guest has unconditional permission, member should too
         if (guestValue === true) {
+          expect(
+            memberValue === true ||
+              memberValue === "own" ||
+              memberValue === "owner"
+          ).toBe(true);
+        }
+
+        // If guest has conditional permission, member should have at least the same
+        if (guestValue === "own" || guestValue === "owner") {
           expect(
             memberValue === true ||
               memberValue === "own" ||
@@ -261,6 +275,22 @@ describe("Specific permission rules from design", () => {
     it("should require authentication to add comments", () => {
       expect(getPermission("comments.add", "unauthenticated")).toBe(false);
       expect(getPermission("comments.add", "guest")).toBe(true);
+    });
+
+    it("should use ownership checks for editing own comments", () => {
+      expect(getPermission("comments.edit.own", "unauthenticated")).toBe(false);
+      expect(getPermission("comments.edit.own", "guest")).toBe("own");
+      expect(getPermission("comments.edit.own", "member")).toBe("own");
+      expect(getPermission("comments.edit.own", "admin")).toBe(true);
+    });
+
+    it("should use ownership checks for deleting own comments", () => {
+      expect(getPermission("comments.delete.own", "unauthenticated")).toBe(
+        false
+      );
+      expect(getPermission("comments.delete.own", "guest")).toBe("own");
+      expect(getPermission("comments.delete.own", "member")).toBe("own");
+      expect(getPermission("comments.delete.own", "admin")).toBe(true);
     });
 
     it("should only allow admin to delete others comments", () => {

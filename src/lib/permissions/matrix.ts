@@ -11,17 +11,48 @@
  * - guest: New account holder (default for signup)
  * - member: Trusted contributor (default for invited users)
  * - admin: Full control
+ *
+ * Naming conventions:
+ * - Permission IDs use "update" for modifying resources (issues.update.status)
+ * - Comment permissions use "edit" / "delete" to match the UI actions
+ *   TODO: Standardize to "update" for comments too (comments.update.own)
+ *         when migrating existing comment action code.
+ *
+ * Migration notes:
+ * - The legacy src/lib/permissions.ts (canUpdateIssue) predates this matrix
+ *   and should be migrated to use checkPermission() from helpers.ts.
+ *   TODO: Replace canUpdateIssue() with matrix-based permission checks.
+ * - src/lib/permissions.ts uses UserRole; this file uses AccessLevel.
+ *   AccessLevel extends UserRole with "unauthenticated" (a state, not a DB role).
  */
 
 /**
  * Permission value types:
  * - true: Always allowed
  * - false: Never allowed
- * - 'own': Allowed only for user's own resources (e.g., own issues)
- * - 'owner': Allowed only for resource owner (e.g., machine owner)
+ * - 'own': Allowed only for resources the user created
+ *     e.g., a guest can update the severity on issues they reported themselves
+ * - 'owner': Allowed only for resources the user owns / is designated as owner of
+ *     e.g., a machine owner can edit details for machines where they are recorded as the owner
+ *
+ * Use:
+ * - 'own' when the relationship is "created by this user" (reporter, comment author, etc.)
+ * - 'owner' when the relationship is "owns/maintains this resource" (machine owner, etc.)
+ *
+ * Both require ownership context to resolve. See checkPermission() in helpers.ts,
+ * which resolves 'own' via userId === reporterId and 'owner' via userId === machineOwnerId.
+ * The simpler hasPermission() in this file throws on these values to prevent silent bugs.
  */
 export type PermissionValue = boolean | "own" | "owner";
 
+/**
+ * Access levels represent authentication + authorization state.
+ *
+ * This differs from UserRole ("guest" | "member" | "admin") because AccessLevel
+ * includes "unauthenticated" — a state, not a persisted role. UserRole is the
+ * role stored in the database for authenticated users. Use getAccessLevel() from
+ * helpers.ts to convert a UserRole (or null) into an AccessLevel.
+ */
 export type AccessLevel = "unauthenticated" | "guest" | "member" | "admin";
 
 export const ACCESS_LEVELS = [
@@ -98,12 +129,19 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         label: "Report issues",
         description: "Submit new issue reports",
         access: {
+          // Unauthenticated issue reporting is rate-limited and protected by
+          // Turnstile CAPTCHA. See src/app/report/actions.ts and src/lib/rate-limit.ts
           unauthenticated: true,
           guest: true,
           member: true,
           admin: true,
         },
       },
+      // Report-time field permissions control which fields are VISIBLE in the
+      // report form. When a restricted user (unauth/guest) reports an issue,
+      // these fields use server-side defaults: status="open", priority=null,
+      // assignee=null. This is distinct from issues.update.* which controls
+      // editing fields on existing issues.
       {
         id: "issues.report.status",
         label: "Set status when reporting",
@@ -237,8 +275,8 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         description: "Modify your own comments",
         access: {
           unauthenticated: false,
-          guest: true,
-          member: true,
+          guest: "own",
+          member: "own",
           admin: true,
         },
       },
@@ -248,8 +286,8 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         description: "Remove your own comments",
         access: {
           unauthenticated: false,
-          guest: true,
-          member: true,
+          guest: "own",
+          member: "own",
           admin: true,
         },
       },
@@ -325,7 +363,10 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         label: "Upload images",
         description: "Attach images to issues and comments",
         access: {
-          unauthenticated: true, // Limited to 2 images
+          // Image count limits are enforced in the upload handler, not here.
+          // See src/app/report/actions.ts for per-submission limits.
+          // The matrix only tracks whether the action is permitted at all.
+          unauthenticated: true,
           guest: true,
           member: true,
           admin: true,
@@ -405,19 +446,38 @@ export function getPermission(
 }
 
 /**
- * Check if a permission is granted for a given access level.
- * Does not handle 'own' or 'owner' - use specific check functions for those.
+ * Check if a permission is unconditionally granted for a given access level.
+ *
+ * This only handles unconditional permissions (`true`/`false`).
+ * If the permission value is "own" or "owner", this function will throw
+ * to prevent silent permission bugs. Callers must use `requiresOwnershipCheck`
+ * first, or use `checkPermission` from helpers.ts for ownership-aware checks.
+ *
+ * @throws Error if the permission value is "own" or "owner"
  */
 export function hasPermission(
   permissionId: string,
   accessLevel: AccessLevel
 ): boolean {
   const value = getPermission(permissionId, accessLevel);
+
+  if (value === "own" || value === "owner") {
+    throw new Error(
+      `hasPermission cannot be used for ownership-based permissions ` +
+        `(permissionId="${permissionId}", accessLevel="${accessLevel}", value="${value}"). ` +
+        `Use requiresOwnershipCheck() first, or use checkPermission() from ` +
+        `helpers.ts for ownership-aware checks.`
+    );
+  }
+
   return value === true;
 }
 
 /**
  * Check if a permission requires ownership context ('own' or 'owner').
+ *
+ * Use this to determine whether you need to provide an OwnershipContext
+ * to checkPermission() in helpers.ts for an accurate result.
  */
 export function requiresOwnershipCheck(
   permissionId: string,
