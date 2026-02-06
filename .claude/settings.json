@@ -237,7 +237,6 @@
       "Bash(wget:*)",
       "Bash(kill:*)",
       "Bash(pkill:*)",
-      "Bash(chmod:*)",
       "Bash(./pinpoint-wt.py remove:*)",
       "Bash(python3 pinpoint-wt.py remove:*)",
       "Bash(python3 ./pinpoint-wt.py remove:*)",
