@@ -40,7 +40,8 @@ export async function ensureUserProfile(user: User): Promise<void> {
     const avatarUrl = (user.user_metadata["avatar_url"] as string) || null;
 
     // Check for existing invited user to inherit role
-    let role: "member" | "admin" | "guest" = "member";
+    // Default to "guest" for non-invited signups (least-privilege)
+    let role: "member" | "admin" | "guest" = "guest";
     if (user.email) {
       const invitedUser = await db.query.invitedUsers.findFirst({
         where: eq(invitedUsers.email, user.email),
@@ -57,7 +58,7 @@ export async function ensureUserProfile(user: User): Promise<void> {
       firstName,
       lastName,
       avatarUrl,
-      role, // Inherited from invited user or default "member"
+      role, // Inherited from invited user or default "guest"
     });
 
     // Recreate notification preferences

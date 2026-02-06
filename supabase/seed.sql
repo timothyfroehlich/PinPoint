@@ -38,7 +38,7 @@ BEGIN
     COALESCE(NEW.raw_user_meta_data->>'first_name', ''),
     COALESCE(NEW.raw_user_meta_data->>'last_name', ''),
     NEW.raw_user_meta_data->>'avatar_url',
-    COALESCE(v_role, 'member') -- Use invited role if exists, else default to member
+    COALESCE(v_role, 'guest') -- Use invited role if exists, else default to guest
   );
 
   -- Create default notification preferences
@@ -81,13 +81,7 @@ BEGIN
     AND reported_by IS NULL
     AND invited_reported_by IS NULL;
 
-  -- Handle legacy invited_users (if any exist)
-  -- Find matching invited user by email
-  SELECT id INTO v_invited_user_id
-  FROM public.invited_users
-  WHERE email = NEW.email
-  LIMIT 1;
-
+  -- Handle legacy invited_users transfer (v_invited_user_id already populated above)
   IF v_invited_user_id IS NOT NULL THEN
     -- Transfer machines owned by invited user
     UPDATE public.machines
@@ -123,7 +117,7 @@ CREATE TRIGGER on_auth_user_created
 
 -- Add helpful comments
 COMMENT ON FUNCTION public.handle_new_user() IS
-  'Automatically creates a user_profile and notification_preferences when a new user signs up via Supabase Auth. Works for both email/password and OAuth (Google, GitHub). Also transfers guest issues (by reporter_email) and handles legacy invited_users cleanup by transferring their machines/issues and removing the invited_users record.';
+  'Automatically creates a user_profile and notification_preferences when a new user signs up via Supabase Auth. Works for both email/password and OAuth (Google, GitHub). Also transfers guest issues (by reporter_email) and handles legacy invited_users cleanup by transferring their machines/issues and removing the invited_users record. Non-invited signups default to guest role.';
 
 COMMENT ON CONSTRAINT user_profiles_id_fkey ON public.user_profiles IS
   'Foreign key constraint to auth.users. Ensures user_profiles.id always references a valid auth.users.id. CASCADE delete removes profile when auth user is deleted.';
