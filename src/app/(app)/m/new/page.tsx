@@ -9,6 +9,7 @@ import { CreateMachineForm } from "./create-machine-form";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
+import { Forbidden } from "~/components/errors/Forbidden";
 
 import { getUnifiedUsers } from "~/lib/users/queries";
 import type { UnifiedUser } from "~/lib/types";
@@ -39,7 +40,7 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
   const isAdmin = currentUserProfile?.role === "admin";
 
   if (!isAdmin) {
-    redirect("/m");
+    return <Forbidden role={currentUserProfile?.role ?? null} backUrl="/m" />;
   }
 
   const allUsers: UnifiedUser[] = await getUnifiedUsers({

@@ -4,6 +4,7 @@ import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import type React from "react";
+import { Forbidden } from "~/components/errors/Forbidden";
 
 export default async function AdminLayout({
   children,
@@ -25,7 +26,7 @@ export default async function AdminLayout({
   });
 
   if (profile?.role !== "admin") {
-    redirect("/dashboard");
+    return <Forbidden role={profile?.role ?? null} />;
   }
 
   return <>{children}</>;
