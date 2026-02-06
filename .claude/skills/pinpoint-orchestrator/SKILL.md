@@ -103,28 +103,15 @@ Before proceeding, verify:
 
 ### 2.1 Create Worktrees
 
-**For NEW branches** (creating fresh work):
-
 ```bash
-./pinpoint-wt.py create feat/<task-branch>
+./pinpoint-wt.py create <branch-name>
 ```
 
-This creates the worktree, generates `.env.local`, installs dependencies, and allocates ports.
+This works for both new and existing branches:
+- **New branch**: Creates branch from `origin/main` (or use `--base` for a different parent)
+- **Existing branch**: Detects the branch exists and checks it out
 
-**For EXISTING branches** (e.g., addressing PR feedback):
-
-```bash
-# Step 1: Create worktree for existing branch
-git worktree add /home/froeht/Code/pinpoint-worktrees/<branch-name> <branch-name>
-
-# Step 2: Generate .env.local and config.toml (CRITICAL - don't skip!)
-cd /home/froeht/Code/pinpoint-worktrees/<branch-name> && ../PinPoint-Secondary/pinpoint-wt.py sync
-
-# Step 3: Install dependencies
-cd /home/froeht/Code/pinpoint-worktrees/<branch-name> && pnpm install
-```
-
-**Why sync is required:** The `pinpoint-wt.py sync` command generates `.env.local` with correct port allocations and database URLs. Without it, tests requiring `DATABASE_URL` will fail locally.
+In all cases, it allocates ports, generates `.env.local` and `config.toml`, and runs `pnpm install`.
 
 ### 2.2 Record Worktree Paths
 
@@ -352,10 +339,7 @@ gh pr edit <PR> --remove-label "ready-for-review"
 To address feedback, re-create the worktree and re-dispatch:
 
 ```bash
-# Re-create worktree for the branch
-git worktree add /home/froeht/Code/pinpoint-worktrees/<branch-name> <branch-name>
-cd /home/froeht/Code/pinpoint-worktrees/<branch-name> && ../PinPoint-Secondary/pinpoint-wt.py sync
-cd /home/froeht/Code/pinpoint-worktrees/<branch-name> && pnpm install
+./pinpoint-wt.py create <branch-name>
 ```
 
 Then dispatch an agent with the user's feedback in the prompt context.

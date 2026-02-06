@@ -6,7 +6,7 @@ A command-line tool for managing ephemeral git worktrees with automatic
 port allocation and Supabase isolation for parallel development.
 
 Commands:
-  create <branch> [--base REF]  Create ephemeral worktree (default: from origin/main)
+  create <branch> [--base REF]  Create worktree (new or existing branch)
   sync [--all]                  Regenerate config.toml and .env.local from templates
   remove <branch>               Clean teardown (Supabase, Docker, worktree)
   list                          Show all worktrees with port assignments
@@ -223,20 +223,24 @@ def cmd_create(args: argparse.Namespace) -> int:
 
     print(f"🌿 Creating ephemeral worktree for branch: {branch}")
 
-    # Validate branch doesn't already exist as a worktree
+    # Validate worktree doesn't already exist at target path
     worktree_dir = (repo_root / EPHEMERAL_WORKTREE_BASE / branch).resolve()
     if worktree_dir.exists():
         print(f"❌ Error: Worktree already exists at {worktree_dir}")
         return 1
 
-    # Check if branch already exists
-    result = subprocess.run(
+    # Check if branch already exists (local or remote)
+    branch_exists_locally = subprocess.run(
         ["git", "rev-parse", "--verify", f"refs/heads/{branch}"],
         capture_output=True
-    )
-    if result.returncode == 0:
-        print(f"❌ Error: Branch '{branch}' already exists locally")
-        return 1
+    ).returncode == 0
+
+    branch_exists_remote = False
+    if not branch_exists_locally:
+        branch_exists_remote = subprocess.run(
+            ["git", "rev-parse", "--verify", f"refs/remotes/origin/{branch}"],
+            capture_output=True
+        ).returncode == 0
 
     # Fetch latest from origin
     print("  📥 Fetching from origin...")
@@ -274,13 +278,27 @@ def cmd_create(args: argparse.Namespace) -> int:
     # Create parent directories
     worktree_dir.parent.mkdir(parents=True, exist_ok=True)
 
-    # Create worktree with new branch from base revision
-    base_ref = args.base
-    print(f"  📂 Creating worktree at {worktree_dir} (from {base_ref})...")
-    result = subprocess.run(
-        ["git", "worktree", "add", "-b", branch, str(worktree_dir), base_ref],
-        capture_output=True, text=True
-    )
+    # Create worktree — use existing branch or create new one
+    if branch_exists_locally:
+        print(f"  📂 Creating worktree for existing local branch: {branch}")
+        result = subprocess.run(
+            ["git", "worktree", "add", str(worktree_dir), branch],
+            capture_output=True, text=True
+        )
+    elif branch_exists_remote:
+        print(f"  📂 Creating worktree for existing remote branch: {branch}")
+        result = subprocess.run(
+            ["git", "worktree", "add", str(worktree_dir), branch],
+            capture_output=True, text=True
+        )
+    else:
+        base_ref = args.base
+        print(f"  📂 Creating worktree with new branch at {worktree_dir} (from {base_ref})...")
+        result = subprocess.run(
+            ["git", "worktree", "add", "-b", branch, str(worktree_dir), base_ref],
+            capture_output=True, text=True
+        )
+
     if result.returncode != 0:
         print(f"❌ Error creating worktree: {result.stderr}")
         return 1
