@@ -32,38 +32,36 @@ async function main() {
     process.exit(0);
   }
 
-  // Match dangerous commands at the start of a command or after && / ; / |
-  // This catches: "chmod ...", "sudo chmod ...", "cd foo && chmod ..."
+  // Strip heredoc content before checking patterns.
+  // Heredocs (<<'EOF' ... EOF) contain user text like commit messages
+  // that shouldn't trigger command-level blocks.
+  const stripped = command.replace(/<<'?(\w+)'?[\s\S]*?\n\1/g, "");
+
   const patterns = [
     {
       regex: /(?:^|&&|;|\|)\s*(?:sudo\s+)?chmod\b/,
       reason:
-        "chmod is blocked by project policy to prevent prompt injection attacks. " +
-        "If you need to set executable bits, ask Tim to run chmod manually. " +
-        "For pinpoint-wt.py, it already has the executable bit set.",
+        "Blocked: chmod. Ask Tim to run the command himself.",
     },
     {
       regex: /(?:^|&&|;|\|)\s*(?:sudo\s+)?chown\b/,
       reason:
-        "chown is blocked by project policy to prevent prompt injection attacks. " +
-        "File ownership changes must be done manually by the user.",
+        "Blocked: chown. Ask Tim to run the command himself.",
     },
     {
       regex: /(?:^|&&|;|\|)\s*(?:sudo\s+)?chgrp\b/,
       reason:
-        "chgrp is blocked by project policy to prevent prompt injection attacks. " +
-        "File group changes must be done manually by the user.",
+        "Blocked: chgrp. Ask Tim to run the command himself.",
     },
     {
       regex: /git\s+update-index\s+--chmod/,
       reason:
-        "git update-index --chmod is blocked by project policy. " +
-        "Executable bit changes in git must be done manually by the user.",
+        "Blocked: git update-index --chmod. Ask Tim to run the command himself.",
     },
   ];
 
   for (const { regex, reason } of patterns) {
-    if (regex.test(command)) {
+    if (regex.test(stripped)) {
       // Output JSON deny decision — agent sees the reason
       const decision = {
         hookSpecificOutput: {
