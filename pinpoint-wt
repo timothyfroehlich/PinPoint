@@ -6,10 +6,10 @@ A command-line tool for managing ephemeral git worktrees with automatic
 port allocation and Supabase isolation for parallel development.
 
 Commands:
-  create <branch>     Create ephemeral worktree with auto port allocation
-  sync [--all]        Regenerate config.toml and .env.local from templates
-  remove <branch>     Clean teardown (Supabase, Docker, worktree)
-  list                Show all worktrees with port assignments
+  create <branch> [--base REF]  Create ephemeral worktree (default: from origin/main)
+  sync [--all]                  Regenerate config.toml and .env.local from templates
+  remove <branch>               Clean teardown (Supabase, Docker, worktree)
+  list                          Show all worktrees with port assignments
 
 Port Allocation:
   Static worktrees (PinPoint, Secondary, review, AntiGravity): offsets 0-3000
@@ -274,10 +274,11 @@ def cmd_create(args: argparse.Namespace) -> int:
     # Create parent directories
     worktree_dir.parent.mkdir(parents=True, exist_ok=True)
 
-    # Create worktree with new branch from origin/main
-    print(f"  📂 Creating worktree at {worktree_dir}...")
+    # Create worktree with new branch from base revision
+    base_ref = args.base
+    print(f"  📂 Creating worktree at {worktree_dir} (from {base_ref})...")
     result = subprocess.run(
-        ["git", "worktree", "add", "-b", branch, str(worktree_dir), "origin/main"],
+        ["git", "worktree", "add", "-b", branch, str(worktree_dir), base_ref],
         capture_output=True, text=True
     )
     if result.returncode != 0:
@@ -528,11 +529,12 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  ./pinpoint-wt create feat/new-feature   Create ephemeral worktree
-  ./pinpoint-wt list                      Show all worktrees
-  ./pinpoint-wt sync                      Regenerate config for current worktree
-  ./pinpoint-wt sync --all                Regenerate config for all worktrees
-  ./pinpoint-wt remove feat/new-feature   Remove worktree and cleanup
+  ./pinpoint-wt create feat/new-feature              Create worktree from origin/main
+  ./pinpoint-wt create feat/fix --base feat/parent   Create worktree from specific branch
+  ./pinpoint-wt list                                 Show all worktrees
+  ./pinpoint-wt sync                                 Regenerate config for current worktree
+  ./pinpoint-wt sync --all                           Regenerate config for all worktrees
+  ./pinpoint-wt remove feat/new-feature              Remove worktree and cleanup
         """
     )
 
@@ -541,6 +543,8 @@ Examples:
     # create
     create_parser = subparsers.add_parser("create", help="Create ephemeral worktree")
     create_parser.add_argument("branch", help="Branch name (e.g., feat/new-feature)")
+    create_parser.add_argument("--base", "-b", default="origin/main",
+                               help="Base revision/branch to create from (default: origin/main)")
 
     # list
     subparsers.add_parser("list", help="List all worktrees with port assignments")

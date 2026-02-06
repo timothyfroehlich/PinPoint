@@ -27,16 +27,17 @@
 **YOU MUST LOAD RELEVANT SKILLS FOR EVERY TASK.**
 If your tool does not support skills, read the file path directly.
 
-| Category       | Skill Name            | Path                                         | When to Use                                          |
-| :------------- | :-------------------- | :------------------------------------------- | :--------------------------------------------------- |
-| **UI**         | `pinpoint-ui`         | `.agent/skills/pinpoint-ui/SKILL.md`         | Components, shadcn/ui, forms, responsive design.     |
-| **TypeScript** | `pinpoint-typescript` | `.agent/skills/pinpoint-typescript/SKILL.md` | Type errors, generics, strict mode, Drizzle types.   |
-| **Testing**    | `pinpoint-testing`    | `.agent/skills/pinpoint-testing/SKILL.md`    | Writing tests, PGlite setup, Playwright.             |
-| **Testing**    | `pinpoint-e2e`        | `.agent/skills/pinpoint-e2e/SKILL.md`        | E2E tests, worker isolation, stability patterns.     |
-| **Security**   | `pinpoint-security`   | `.agent/skills/pinpoint-security/SKILL.md`   | Auth flows, CSP, Zod validation, Supabase SSR.       |
-| **Patterns**   | `pinpoint-patterns`   | `.agent/skills/pinpoint-patterns/SKILL.md`   | Server Actions, architecture, data fetching.         |
-| **Workflow**   | `pinpoint-commit`     | `.agent/skills/pinpoint-commit/SKILL.md`     | Intelligent commit-to-PR workflow and CI monitoring. |
-| **Workflow**   | `github-monitor`      | `.agent/skills/github-monitor/SKILL.md`      | Monitoring GitHub Actions and build status.          |
+| Category       | Skill Name              | Path                                            | When to Use                                          |
+| :------------- | :---------------------- | :---------------------------------------------- | :--------------------------------------------------- |
+| **UI**         | `pinpoint-ui`           | `.agent/skills/pinpoint-ui/SKILL.md`            | Components, shadcn/ui, forms, responsive design.     |
+| **TypeScript** | `pinpoint-typescript`   | `.agent/skills/pinpoint-typescript/SKILL.md`    | Type errors, generics, strict mode, Drizzle types.   |
+| **Testing**    | `pinpoint-testing`      | `.agent/skills/pinpoint-testing/SKILL.md`       | Writing tests, PGlite setup, Playwright.             |
+| **Testing**    | `pinpoint-e2e`          | `.agent/skills/pinpoint-e2e/SKILL.md`           | E2E tests, worker isolation, stability patterns.     |
+| **Security**   | `pinpoint-security`     | `.agent/skills/pinpoint-security/SKILL.md`      | Auth flows, CSP, Zod validation, Supabase SSR.       |
+| **Patterns**   | `pinpoint-patterns`     | `.agent/skills/pinpoint-patterns/SKILL.md`      | Server Actions, architecture, data fetching.         |
+| **Workflow**   | `pinpoint-commit`       | `.agent/skills/pinpoint-commit/SKILL.md`        | Intelligent commit-to-PR workflow and CI monitoring. |
+| **Workflow**   | `github-monitor`        | `.agent/skills/github-monitor/SKILL.md`         | Monitoring GitHub Actions and build status.          |
+| **Workflow**   | `pinpoint-orchestrator` | `.claude/skills/pinpoint-orchestrator/SKILL.md` | Parallel subagent work in worktrees.                 |
 
 ## 4. Environment & Workflow
 
@@ -88,6 +89,14 @@ Created with `./pinpoint-wt` for quick PR reviews or parallel development. Ports
 
 **Why**: Proper tracking enables `git pull`/`git push` without arguments and prevents accidentally
 pushing to main.
+
+**Syncing with main** - Always merge, never rebase:
+
+- `git fetch origin && git merge origin/main` (preferred)
+- **NOT**: `git rebase origin/main` (rewrites history, causes issues with worktrees and PRs)
+
+**Why**: Merge commits preserve history and work cleanly with git worktrees. Rebasing can cause
+conflicts across worktrees and force-push requirements on open PRs.
 
 ### Commit Safety
 
@@ -147,6 +156,43 @@ Fetch all comments (including hidden ones):
 ```bash
 gh api graphql -f query='{ repository(owner: "timothyfroehlich", name: "PinPoint") { pullRequest(number: <PR_NUMBER>) { reviews(last: 5) { nodes { author { login } state comments(first: 20) { nodes { path line body } } } } } } }'
 ```
+
+### Parallel Subagent Workflow
+
+For multiple independent tasks (UI fixes, Copilot feedback, parallel features), use worktree-isolated subagents.
+
+**When to Use**:
+
+- 2+ independent beads issues ready to work
+- Copilot review feedback on multiple PRs
+- Parallel feature development
+
+**Permission Requirements**:
+Worktree permissions must be in `.claude/settings.json`:
+
+```json
+"Read(//home/froeht/Code/pinpoint-worktrees/**)",
+"Glob(//home/froeht/Code/pinpoint-worktrees/**)",
+"Edit(//home/froeht/Code/pinpoint-worktrees/**)",
+"Write(//home/froeht/Code/pinpoint-worktrees/**)"
+```
+
+**Workflow**:
+
+1. Create worktrees: `./pinpoint-wt create <branch>` for each task
+2. Dispatch subagents with full worktree paths in prompts
+3. Monitor: `gh pr checks`, Copilot comments
+4. Clean up: `./pinpoint-wt remove <branch>`
+
+**Critical**: Agent prompts must include the full worktree path and instruct agents to work ONLY in that path. Agents inherit the parent session's cwd - they will NOT cd into worktrees on their own.
+
+**Anti-patterns**:
+
+- DON'T spawn agents from parent dir with `cd /path/to/worktree` instructions
+- DON'T assume agents will respect directory instructions without explicit paths
+- DON'T forget to check Copilot comments before merging
+
+See `pinpoint-orchestrator` skill for the full workflow.
 
 ## 5. Documentation Philosophy
 
