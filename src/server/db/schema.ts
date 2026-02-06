@@ -52,6 +52,7 @@ export const userProfiles = pgTable("user_profiles", {
   role: text("role", { enum: ["guest", "member", "admin"] })
     .notNull()
     .default("guest"), // Default for new signups (no invitation)
+  termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

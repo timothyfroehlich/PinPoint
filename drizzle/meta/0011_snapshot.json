@@ -1,6 +1,6 @@
 {
-  "id": "54a327ec-20af-479d-8ad0-86d7dc337d78",
-  "prevId": "153ea110-036c-4240-99e2-1323492cb14e",
+  "id": "ee262dd7-721c-4dd4-8630-750eacaf2c1f",
+  "prevId": "54a327ec-20af-479d-8ad0-86d7dc337d78",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -73,7 +73,7 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "'guest'"
+          "default": "'member'"
         },
         "created_at": {
           "name": "created_at",
@@ -1259,7 +1259,7 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "'member'"
+          "default": "'guest'"
         },
         "terms_accepted_at": {
           "name": "terms_accepted_at",

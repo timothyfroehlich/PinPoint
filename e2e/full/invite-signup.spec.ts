@@ -98,6 +98,7 @@ test.describe("User Invitation & Signup Flow", () => {
     // 5. Complete signup
     await page.getByLabel("Password", { exact: true }).fill("TestPassword123!");
     await page.getByLabel(/Confirm Password/i).fill("TestPassword123!");
+    await page.getByLabel(/terms of service/i).check();
     await page.getByRole("button", { name: /Create Account/i }).click();
 
     // 6. Verify redirect to dashboard
@@ -167,6 +168,7 @@ test.describe("User Invitation & Signup Flow", () => {
 
     await page.getByLabel("Password", { exact: true }).fill("TestPassword123!");
     await page.getByLabel(/Confirm Password/i).fill("TestPassword123!");
+    await page.getByLabel(/terms of service/i).check();
     await page.getByRole("button", { name: /Create Account/i }).click();
 
     await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
