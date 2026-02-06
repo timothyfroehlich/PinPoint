@@ -48,7 +48,7 @@ export default function LandingPage(): React.JSX.Element {
               href="https://austinpinballcollective.org"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-primary font-medium hover:underline"
+              className="text-link font-medium"
             >
               Austin Pinball Collective
             </a>
