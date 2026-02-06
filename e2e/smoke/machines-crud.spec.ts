@@ -72,12 +72,10 @@ test.describe("Machines CRUD", () => {
       page.getByRole("link", { name: /Add Machine/i })
     ).not.toBeVisible();
 
-    // Attempt direct navigation to /m/new - should redirect to /m
+    // Attempt direct navigation to /m/new - should see 403 Forbidden
     await page.goto("/m/new");
-    await expect(page).toHaveURL("/m");
-
-    // Verify we're back on machines list, not the create form
-    await expect(page.getByRole("heading", { name: "Machines" })).toBeVisible();
+    await expect(page.getByText("403")).toBeVisible();
+    await expect(page.getByText("Access Denied")).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "Add New Machine" })
     ).not.toBeVisible();

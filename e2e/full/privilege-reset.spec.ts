@@ -46,9 +46,9 @@ test.describe("Privilege Reset on Account Switch", () => {
     // 4. Try to access Admin Page
     await page.goto("/admin/users");
 
-    // Verify Redirect to Dashboard (Access Denied)
-    await expect(page).toHaveURL("/dashboard");
-    await expect(page.getByTestId("quick-stats")).toBeVisible();
+    // Verify 403 Forbidden page (Access Denied)
+    await expect(page.getByText("403")).toBeVisible();
+    await expect(page.getByText("Access Denied")).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "User Management" })
     ).not.toBeVisible();

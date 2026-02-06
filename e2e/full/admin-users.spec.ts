@@ -90,8 +90,8 @@ test.describe("Admin User Management", () => {
     // Try to navigate to Admin Page
     await page.goto("/admin/users");
 
-    // Should be redirected to dashboard
-    await expect(page).toHaveURL("/dashboard");
-    await expect(page.getByTestId("quick-stats")).toBeVisible();
+    // Should see 403 Forbidden page
+    await expect(page.getByText("403")).toBeVisible();
+    await expect(page.getByText("Access Denied")).toBeVisible();
   });
 });
