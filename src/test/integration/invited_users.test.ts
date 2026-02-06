@@ -10,10 +10,11 @@ import {
   issues,
   notificationPreferences,
 } from "~/server/db/schema";
-import { getUnifiedUsers } from "~/lib/users/queries";
+import { getUnifiedUsers, compareUnifiedUsers } from "~/lib/users/queries";
 import { getMachineOwner } from "~/lib/machines/queries";
 import { createTestMachine } from "~/test/helpers/factories";
 import { ensureUserProfile } from "~/lib/auth/profile";
+import type { UnifiedUser } from "~/lib/types";
 
 // Mock the database to use the PGlite instance
 vi.mock("~/server/db", async () => {
@@ -82,6 +83,171 @@ describe("Invited Users Integration", () => {
     expect(unifiedUsers.find((u: any) => u.status === "invited")?.email).toBe(
       "unified@example.com"
     );
+  });
+
+  it("should sort unified users: active first, then by machine count desc, then by last name", async () => {
+    const db = await getTestDb();
+
+    // Create active users with different machine counts
+    const activeUser1Id = "00000000-0000-0000-0000-000000000010";
+    const activeUser2Id = "00000000-0000-0000-0000-000000000011";
+    const activeUser3Id = "00000000-0000-0000-0000-000000000012";
+
+    await db.insert(authUsers).values([
+      { id: activeUser1Id, email: "active1@example.com" },
+      { id: activeUser2Id, email: "active2@example.com" },
+      { id: activeUser3Id, email: "active3@example.com" },
+    ]);
+
+    // User 1: Zebra with 1 machine
+    await db.insert(userProfiles).values({
+      id: activeUser1Id,
+      email: "active1@example.com",
+      firstName: "Zebra",
+      lastName: "User",
+      role: "member",
+    });
+
+    // User 2: Alpha with 0 machines
+    await db.insert(userProfiles).values({
+      id: activeUser2Id,
+      email: "active2@example.com",
+      firstName: "Alpha",
+      lastName: "User",
+      role: "member",
+    });
+
+    // User 3: Beta with 2 machines
+    await db.insert(userProfiles).values({
+      id: activeUser3Id,
+      email: "active3@example.com",
+      firstName: "Beta",
+      lastName: "User",
+      role: "member",
+    });
+
+    // Create invited user - should be last despite having machines
+    const [invitedUser] = await db
+      .insert(invitedUsers)
+      .values({
+        firstName: "Invited",
+        lastName: "First",
+        email: "invited-sort@example.com",
+        role: "member",
+      })
+      .returning();
+
+    // Create machines: User3 has 2, User1 has 1, invited has 1
+    await db
+      .insert(machines)
+      .values([
+        createTestMachine({ initials: "M01", ownerId: activeUser3Id }),
+        createTestMachine({ initials: "M02", ownerId: activeUser3Id }),
+        createTestMachine({ initials: "M03", ownerId: activeUser1Id }),
+        createTestMachine({ initials: "M04", invitedOwnerId: invitedUser.id }),
+      ]);
+
+    const unifiedUsers = await getUnifiedUsers();
+
+    // Expected order:
+    // 1. Beta User (active, 2 machines)
+    // 2. Zebra User (active, 1 machine)
+    // 3. Alpha User (active, 0 machines)
+    // 4. Invited First (invited, 1 machine - invited users come after active)
+    expect(unifiedUsers).toHaveLength(4);
+    expect(unifiedUsers[0].name).toBe("Beta User");
+    expect(unifiedUsers[0].machineCount).toBe(2);
+    expect(unifiedUsers[0].status).toBe("active");
+
+    expect(unifiedUsers[1].name).toBe("Zebra User");
+    expect(unifiedUsers[1].machineCount).toBe(1);
+    expect(unifiedUsers[1].status).toBe("active");
+
+    expect(unifiedUsers[2].name).toBe("Alpha User");
+    expect(unifiedUsers[2].machineCount).toBe(0);
+    expect(unifiedUsers[2].status).toBe("active");
+
+    expect(unifiedUsers[3].name).toBe("Invited First");
+    expect(unifiedUsers[3].machineCount).toBe(1);
+    expect(unifiedUsers[3].status).toBe("invited");
+  });
+
+  it("should use deterministic tie-breakers (lastName, name, id)", () => {
+    // Test the comparator directly for tie-breaking scenarios
+    const userA: UnifiedUser = {
+      id: "aaa",
+      name: "Alice Smith",
+      lastName: "Smith",
+      role: "member",
+      status: "active",
+      avatarUrl: null,
+      machineCount: 0,
+    };
+
+    const userB: UnifiedUser = {
+      id: "bbb",
+      name: "Bob Smith",
+      lastName: "Smith",
+      role: "member",
+      status: "active",
+      avatarUrl: null,
+      machineCount: 0,
+    };
+
+    const userC: UnifiedUser = {
+      id: "ccc",
+      name: "Alice Smith",
+      lastName: "Smith",
+      role: "member",
+      status: "active",
+      avatarUrl: null,
+      machineCount: 0,
+    };
+
+    // Same lastName, different name - should sort by name
+    expect(compareUnifiedUsers(userA, userB)).toBeLessThan(0);
+    expect(compareUnifiedUsers(userB, userA)).toBeGreaterThan(0);
+
+    // Same lastName and name, different id - should sort by id
+    expect(compareUnifiedUsers(userA, userC)).toBeLessThan(0);
+    expect(compareUnifiedUsers(userC, userA)).toBeGreaterThan(0);
+
+    // Identical comparison should return 0 (same object)
+    expect(compareUnifiedUsers(userA, userA)).toBe(0);
+  });
+
+  it("should return correct machineCount values", async () => {
+    const db = await getTestDb();
+
+    // Create user with known machine count
+    const userId = "00000000-0000-0000-0000-000000000020";
+    await db
+      .insert(authUsers)
+      .values({ id: userId, email: "count@example.com" });
+    await db.insert(userProfiles).values({
+      id: userId,
+      email: "count@example.com",
+      firstName: "Count",
+      lastName: "Test",
+      role: "member",
+    });
+
+    // Create 3 machines for this user
+    await db
+      .insert(machines)
+      .values([
+        createTestMachine({ initials: "CT1", ownerId: userId }),
+        createTestMachine({ initials: "CT2", ownerId: userId }),
+        createTestMachine({ initials: "CT3", ownerId: userId }),
+      ]);
+
+    const unifiedUsers = await getUnifiedUsers();
+    const countUser = unifiedUsers.find((u) => u.id === userId);
+
+    expect(countUser).toBeDefined();
+    expect(countUser?.machineCount).toBe(3);
+    // Verify it's a number, not a bigint string
+    expect(typeof countUser?.machineCount).toBe("number");
   });
 
   it("should enforce ownerCheck constraint on machines", async () => {
