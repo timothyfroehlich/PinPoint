@@ -290,10 +290,13 @@
     "vercel@claude-plugins-official": true,
     "code-simplifier@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": true,
-    "episodic-memory@superpowers-marketplace": true,
     "security-guidance@claude-plugins-official": true,
     "beads@beads-marketplace": true,
-    "sentry@claude-plugins-official": true
+    "sentry@claude-plugins-official": true,
+    "superpowers@claude-plugins-official": true,
+    "pr-review-toolkit@claude-plugins-official": true,
+    "explanatory-output-style@claude-plugins-official": true,
+    "postgres-best-practices@supabase-agent-skills": true
   },
   "outputStyle": "Explanatory"
 }
