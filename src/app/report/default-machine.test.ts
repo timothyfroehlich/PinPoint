@@ -15,12 +15,16 @@ describe("resolveDefaultMachineId", () => {
     expect(resolveDefaultMachineId(machines, undefined, "BB")).toBe("b");
   });
 
-  it("falls back to first machine when query missing or invalid", () => {
-    expect(resolveDefaultMachineId(machines, "missing", "missing")).toBe("a");
-    expect(resolveDefaultMachineId(machines, undefined, undefined)).toBe("a");
+  it("returns undefined when query missing or invalid", () => {
+    expect(resolveDefaultMachineId(machines, "missing", "missing")).toBe(
+      undefined
+    );
+    expect(resolveDefaultMachineId(machines, undefined, undefined)).toBe(
+      undefined
+    );
   });
 
-  it("returns empty string when no machines", () => {
-    expect(resolveDefaultMachineId([], "a", "AA")).toBe("");
+  it("returns undefined when no machines", () => {
+    expect(resolveDefaultMachineId([], "a", "AA")).toBe(undefined);
   });
 });

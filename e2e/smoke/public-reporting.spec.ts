@@ -163,18 +163,18 @@ test.describe("Public Issue Reporting", () => {
   test("should clear form draft after successful submission", async ({
     page,
   }) => {
-    // Submit an issue first - select the SECOND machine (index 1)
+    // Submit an issue first - select a machine (dropdown starts unselected)
     await page.goto("/report");
     const select = page.getByTestId("machine-select");
 
-    // Get the first (default) machine value before changing
-    const defaultMachineId = await select.inputValue();
-    expect(defaultMachineId).toBeTruthy(); // Should have a default
+    // Verify machine dropdown starts with no selection (empty value)
+    const initialMachineId = await select.inputValue();
+    expect(initialMachineId).toBe(""); // Should be unselected by default
 
-    // Select a different machine (use index 3 to ensure it's different from default)
-    await select.selectOption({ index: 3 });
+    // Select a machine (use index 1 to select the first actual machine option)
+    await select.selectOption({ index: 1 });
     const selectedMachineId = await select.inputValue();
-    expect(selectedMachineId).not.toBe(defaultMachineId);
+    expect(selectedMachineId).toBeTruthy(); // Should have a valid selection now
     await expect(page).toHaveURL(/machine=/);
 
     const issueTitle = `${PUBLIC_PREFIX} Draft Clear Test ${Date.now()}`;
@@ -211,10 +211,10 @@ test.describe("Public Issue Reporting", () => {
     await expect(page.getByLabel("Issue Title")).toHaveValue("");
     await expect(page.getByLabel("Description")).toHaveValue("");
 
-    // Machine should be back to DEFAULT (first in list), not the one we selected
-    // This verifies draft wasn't restored - the form uses first machine as default
+    // Machine should be back to unselected state (empty), not the one we selected
+    // This verifies draft wasn't restored - the form starts with no machine selected
     const machineAfterReset = await select.inputValue();
-    expect(machineAfterReset).toBe(defaultMachineId);
+    expect(machineAfterReset).toBe(""); // Should be unselected again
     expect(machineAfterReset).not.toBe(selectedMachineId);
   });
 
