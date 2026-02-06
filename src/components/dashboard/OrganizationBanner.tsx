@@ -17,7 +17,7 @@ export function OrganizationBanner(): React.JSX.Element {
           alt="Austin Pinball Collective"
           width={180}
           height={120}
-          className="w-auto h-auto max-h-full object-contain drop-shadow-[0_0_15px_rgba(74,222,128,0.5)] hover:drop-shadow-[0_0_20px_rgba(74,222,128,0.7)] transition-all duration-300"
+          className="w-auto h-auto max-h-full object-contain drop-shadow-[0_0_15px_color-mix(in_srgb,var(--color-primary)_50%,transparent)] hover:drop-shadow-[0_0_20px_color-mix(in_srgb,var(--color-primary)_70%,transparent)] transition-all duration-300"
           priority
         />
       </div>

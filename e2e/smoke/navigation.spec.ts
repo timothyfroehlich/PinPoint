@@ -11,18 +11,20 @@ test.describe.serial("Navigation", () => {
   test("unauthenticated navigation - show Sign In and Sign Up buttons", async ({
     page,
   }) => {
-    // Navigate to home page
+    // Navigate to home page (landing page for unauthenticated users)
     await page.goto("/");
 
-    // Verify Quick Stats are visible instead of old landing page text
-    await expect(page.getByTestId("quick-stats")).toBeVisible();
+    // Verify landing page welcome heading is visible
+    await expect(
+      page.getByRole("heading", { name: /Welcome to PinPoint/i })
+    ).toBeVisible();
 
     // Verify Sign In and Sign Up buttons are visible (use test ids)
     await expect(page.getByTestId("nav-signin")).toBeVisible();
     await expect(page.getByTestId("nav-signup")).toBeVisible();
 
-    // Verify Report Issue shortcut is available to guests
-    await expect(page.getByTestId("nav-report-issue")).toBeVisible();
+    // Verify Report Issue CTA is available on landing page
+    await expect(page.getByTestId("cta-report-issue")).toBeVisible();
   });
 
   test("authenticated navigation - show quick links and user menu", async ({

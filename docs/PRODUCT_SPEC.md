@@ -180,7 +180,7 @@ Support multiple organizations with full data isolation.
   - Quick stats (open issues, machines needing service)
 - Issues list with filtering (status, severity, machine, assignee)
 - Machine list (simple, no search yet)
-- **Public landing page**: Dashboard serves as public landing for unauthenticated users (read-only view)
+- **Public landing page**: Standalone welcome page at `/` with hero section, feature highlights, and CTAs for browsing machines and reporting issues
 
 **Not Included:**
 
