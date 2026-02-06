@@ -73,13 +73,7 @@ BEGIN
     AND reported_by IS NULL
     AND invited_reported_by IS NULL;
 
-  -- Handle legacy invited_users (if any exist)
-  -- Find matching invited user by email
-  SELECT id INTO v_invited_user_id
-  FROM public.invited_users
-  WHERE email = NEW.email
-  LIMIT 1;
-
+  -- Handle legacy invited_users transfer (v_invited_user_id already populated above)
   IF v_invited_user_id IS NOT NULL THEN
     -- Transfer machines owned by invited user
     UPDATE public.machines

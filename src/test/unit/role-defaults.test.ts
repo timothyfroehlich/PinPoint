@@ -13,10 +13,13 @@ import { userProfiles, invitedUsers } from "~/server/db/schema";
  * level for new users.
  */
 
+// Note: These tests introspect Drizzle column objects via `.default` and `.enumValues`.
+// These are not stable public API and may break on Drizzle ORM upgrades.
+// They serve as regression guards for role default configuration, not database-level validation.
+// Actual database defaults are enforced by the migration SQL and the handle_new_user() trigger.
 describe("Role defaults", () => {
   describe("userProfiles.role", () => {
     it("should default to 'guest' for new signups", () => {
-      // Access the default value from the Drizzle column definition
       const roleColumn = userProfiles.role;
       expect(roleColumn.default).toBe("guest");
     });
@@ -43,11 +46,6 @@ describe("Role defaults", () => {
     });
   });
 
-  describe("Role hierarchy intent", () => {
-    it("should define permission levels: guest < member < admin", () => {
-      // Document the hierarchy - all roles must be present
-      const roles = userProfiles.role.enumValues;
-      expect(roles).toEqual(["guest", "member", "admin"]);
-    });
-  });
+  // Role hierarchy: guest < member < admin
+  // Verified by enumValues assertions above (order matches privilege level).
 });
