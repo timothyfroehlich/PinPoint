@@ -327,7 +327,7 @@ gh pr edit <PR> --add-label "ready-for-review"
 
 **Criteria for labeling**:
 
-- ✅ All CI checks show `SUCCESS` (ignore `codecov/patch` which is informational)
+- ✅ All CI checks show `SUCCESS`
 - ✅ Zero Copilot comments on the PR
 - ✅ PR is not a draft
 
