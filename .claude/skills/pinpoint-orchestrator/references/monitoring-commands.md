@@ -126,6 +126,57 @@ for pr in $(gh pr list --author @me --state open --json number --jq '.[].number'
 done
 ```
 
+## Teams Monitoring (Interactive Mode)
+
+### Send Message to Teammate
+
+```
+SendMessage(
+  type: "message",
+  recipient: "<teammate-name>",
+  content: "<instructions or feedback>",
+  summary: "<5-10 word preview>"
+)
+```
+
+### Steer a Teammate Mid-Flight
+
+```
+SendMessage(
+  type: "message",
+  recipient: "dropdown-fix",
+  content: "E2E test failed on navigation.spec.ts:18. Update the test to check for the welcome heading instead of quick-stats.",
+  summary: "Fix failing E2E test"
+)
+```
+
+### Check Task List for Unblocked Tasks
+
+```
+TaskList()   # Shows all tasks with status, owner, and blockedBy
+```
+
+### Assign Newly Unblocked Task
+
+```
+TaskUpdate(taskId: "2", owner: "agent-name", status: "in_progress")
+SendMessage(type: "message", recipient: "agent-name", content: "Task 1 is done. Start on Task 2 now.")
+```
+
+### Shutdown Sequence
+
+```
+# Step 1: Request shutdown
+SendMessage(type: "shutdown_request", recipient: "<name>", content: "All tasks done")
+
+# Step 2: Wait for shutdown_response(approve: true)
+
+# Step 3: After ALL teammates shut down
+Teammate(operation: "cleanup")
+```
+
+---
+
 ## Status Report Template
 
 ```markdown
