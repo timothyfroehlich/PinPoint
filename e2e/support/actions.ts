@@ -129,15 +129,19 @@ export async function selectOption(
       `${triggerTestId.replace("issue-", "").replace("-select", "")}-option-${value}`);
 
   // Wait for and click the Select trigger
+  // Scroll trigger into view first to help position the dropdown on mobile viewports
   const trigger = page.getByTestId(triggerTestId);
   await expect(trigger).toBeVisible({ timeout: 10000 });
+  await trigger.scrollIntoViewIfNeeded();
   await trigger.click();
 
   // Wait for the dropdown to appear and find the option
   const optionTestId = getOptionTestId(optionValue);
   const option = page.getByTestId(optionTestId);
   await expect(option).toBeVisible({ timeout: 5000 });
-  await option.click();
+  // Use force:true for Mobile Chrome where Radix Select dropdown options
+  // can be positioned outside the viewport despite being visible in the DOM
+  await option.click({ force: true });
 
   // Wait for dropdown to close
   await expect(option).toBeHidden({ timeout: 5000 });
