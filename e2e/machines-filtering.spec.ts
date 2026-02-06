@@ -116,7 +116,7 @@ test.describe("Machine Filtering and Sorting", () => {
     await ownerFilter.click();
 
     // Select "Member User" as owner
-    await page.getByRole("option", { name: "Member User" }).click();
+    await page.getByRole("option", { name: /Member User/ }).click();
 
     // Close the dropdown
     await page.keyboard.press("Escape");
