@@ -56,7 +56,7 @@ interface Assignee {
 
 interface UnifiedReportFormProps {
   machinesList: Machine[];
-  defaultMachineId?: string;
+  defaultMachineId?: string | undefined;
   user: User | null; // Supabase User
   userProfile?: UserProfile | undefined;
   assignees?: Assignee[];

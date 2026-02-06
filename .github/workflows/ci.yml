@@ -233,12 +233,6 @@ jobs:
           set +a
           pnpm run test:coverage -- --reporter=verbose
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5
-        with:
-          files: ./coverage/lcov.info
-          fail_ci_if_error: true
-          verbose: false
 
   test-integration:
     name: Integration Tests

@@ -1,6 +1,13 @@
-# Agent Prompt Template
+# Teams Agent Prompt Template
 
-Use this template when dispatching subagents to work in worktrees.
+Use this template when dispatching teammates in Claude Teams mode. For background agents, use `agent-prompt-template.md` instead.
+
+## Key Differences from Background Template
+
+- Adds Team/Name fields for team awareness
+- Adds **Team Communication** section (SendMessage usage)
+- Completion includes TaskUpdate + SendMessage notification steps
+- Success criteria includes team coordination items
 
 ## Template
 
@@ -10,6 +17,8 @@ Use this template when dispatching subagents to work in worktrees.
 **Worktree**: {worktree_path}
 **Branch**: {branch_name}
 **Beads Issue**: {beads_id}
+**Team**: {team_name}
+**Your Name**: {agent_name}
 
 ### Context
 
@@ -27,6 +36,15 @@ Use this template when dispatching subagents to work in worktrees.
 2. **Read AGENTS.md first**: `{worktree_path}/AGENTS.md`
 
 3. **Follow project patterns** from the skills referenced in AGENTS.md
+
+### Team Communication
+
+- Use **SendMessage** (type: "message", recipient: "lead") to report status or ask questions
+- When you complete your task, use **TaskUpdate** to mark it completed
+- If you are blocked or need clarification, message the lead immediately
+- Do NOT use broadcast — always use direct message to the lead
+- Messages from teammates arrive automatically; do NOT poll for them
+- Going idle between turns is normal — you'll be woken when messaged
 
 ### Specific Instructions
 
@@ -52,6 +70,8 @@ Before completing:
 1. Commit with conventional commit message
 2. Push: `cd {worktree_path} && git push -u origin {branch_name}`
 3. Create PR: `cd {worktree_path} && gh pr create --title "..." --body "..."`
+4. **Mark task completed**: Use TaskUpdate to set your task status to "completed"
+5. **Notify lead**: Use SendMessage to report completion with the PR URL
 
 ### Success Criteria
 
@@ -59,6 +79,8 @@ Before completing:
 - [ ] PR created with descriptive title and body
 - [ ] `pnpm run check` passes
 - [ ] No unrelated changes included
+- [ ] Task marked completed in task list
+- [ ] Lead notified via SendMessage with PR URL
 ```
 
 ## Example: Filled Template
@@ -69,6 +91,8 @@ Before completing:
 **Worktree**: /home/froeht/Code/pinpoint-worktrees/feat/machine-dropdown-fix
 **Branch**: feat/machine-dropdown-fix
 **Beads Issue**: PinPoint-23v
+**Team**: pinpoint-public-launch
+**Your Name**: dropdown-fix
 
 ### Context
 
@@ -84,6 +108,13 @@ The machine dropdown on the public report form currently defaults to the first m
 2. **Read AGENTS.md first**: `/home/froeht/Code/pinpoint-worktrees/feat/machine-dropdown-fix/AGENTS.md`
 
 3. **Follow project patterns** from the skills referenced in AGENTS.md
+
+### Team Communication
+
+- Use **SendMessage** (type: "message", recipient: "lead") to report status or ask questions
+- When you complete your task, use **TaskUpdate** to mark it completed
+- If you are blocked or need clarification, message the lead immediately
+- Do NOT use broadcast — always use direct message to the lead
 
 ### Specific Instructions
 
@@ -105,6 +136,8 @@ Before completing:
 1. Commit with conventional commit message
 2. Push: `cd /home/froeht/Code/pinpoint-worktrees/feat/machine-dropdown-fix && git push -u origin feat/machine-dropdown-fix`
 3. Create PR: `cd /home/froeht/Code/pinpoint-worktrees/feat/machine-dropdown-fix && gh pr create --title "fix(report): machine dropdown defaults to unselected" --body "..."`
+4. Mark task completed: TaskUpdate(status: "completed")
+5. Notify lead: SendMessage(type: "message", recipient: "lead", content: "PR #XXX created for machine dropdown fix", summary: "PR created for dropdown fix")
 
 ### Success Criteria
 
@@ -112,6 +145,8 @@ Before completing:
 - [ ] PR created with descriptive title and body
 - [ ] `pnpm run check` passes
 - [ ] No unrelated changes included
+- [ ] Task marked completed in task list
+- [ ] Lead notified via SendMessage with PR URL
 ```
 
 ## Key Points
@@ -120,3 +155,4 @@ Before completing:
 2. **Repeat the worktree path** - Redundancy prevents mistakes
 3. **Include verification steps** - Ensures agent validates before completing
 4. **Reference AGENTS.md** - Ensures agent follows project conventions
+5. **TaskUpdate + SendMessage** - Teams completion requires both task tracking and lead notification

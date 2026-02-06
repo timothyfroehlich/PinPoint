@@ -6,15 +6,16 @@ export interface MachineOption {
 
 /**
  * Chooses the default machine ID for the public report form.
- * Prefers a valid query param (machine or machineId); otherwise falls back to the first machine.
+ * Returns a valid machine ID only if explicitly requested via query param (machine or machineId).
+ * Returns undefined when no machine is requested, allowing the form to start unselected.
  */
 export function resolveDefaultMachineId(
   machines: MachineOption[],
   requestedMachineId: string | undefined,
   requestedMachineInitials: string | undefined
-): string {
+): string | undefined {
   if (machines.length === 0) {
-    return "";
+    return undefined;
   }
 
   const byInitials =
@@ -29,5 +30,5 @@ export function resolveDefaultMachineId(
 
   if (byId) return byId.id;
 
-  return machines[0]?.id ?? "";
+  return undefined;
 }
