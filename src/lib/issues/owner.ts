@@ -35,10 +35,18 @@ export function getMachineOwnerName(
 }
 
 /**
- * Gets the machine owner's ID
+ * Gets the machine owner's ID for display purposes.
+ *
+ * NOTE: This returns IDs from different tables depending on the owner type:
+ * - Registered owners: Returns `user_profiles.id` (from `issue.machine.owner`)
+ * - Invited owners: Returns `invited_users.id` (from `issue.machine.invitedOwner`)
+ *
+ * These IDs are NOT interchangeable and come from different tables.
+ * For filtering by owner (e.g., issues list), use `issue.machine.owner?.id`
+ * directly since the owner filter only matches registered owners.
  *
  * @param issue - The issue with machine owner information
- * @returns The owner's ID or null if no owner
+ * @returns The owner's ID or null if no owner. May be from user_profiles or invited_users table.
  */
 export function getMachineOwnerId(issue: IssueWithAllRelations): string | null {
   return issue.machine.owner?.id ?? issue.machine.invitedOwner?.id ?? null;
