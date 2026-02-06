@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useState, useActionState } from "react";
+import Link from "next/link";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { Checkbox } from "~/components/ui/checkbox";
 import { PasswordStrength } from "~/components/password-strength";
 import { signupAction, type SignupResult } from "~/app/(auth)/actions";
 
@@ -81,7 +83,6 @@ export function SignupForm({
             id="firstName"
             name="firstName"
             type="text"
-            placeholder="Jane"
             autoComplete="given-name"
             required
             maxLength={50}
@@ -97,7 +98,6 @@ export function SignupForm({
             id="lastName"
             name="lastName"
             type="text"
-            placeholder="Doe"
             autoComplete="family-name"
             required
             maxLength={50}
@@ -114,7 +114,6 @@ export function SignupForm({
           id="email"
           name="email"
           type="email"
-          placeholder="you@example.com"
           autoComplete="email"
           required
           className="bg-surface-variant"
@@ -155,6 +154,29 @@ export function SignupForm({
           required
           className="bg-surface-variant"
         />
+      </div>
+
+      {/* Terms Agreement */}
+      <div className="flex items-start space-x-3">
+        <Checkbox
+          id="termsAccepted"
+          name="termsAccepted"
+          required
+          className="mt-1"
+        />
+        <Label
+          htmlFor="termsAccepted"
+          className="text-sm text-on-surface-variant leading-relaxed cursor-pointer"
+        >
+          I agree to the{" "}
+          <Link
+            href="/terms"
+            target="_blank"
+            className="text-link hover:underline"
+          >
+            Terms of Service
+          </Link>
+        </Label>
       </div>
 
       <Button

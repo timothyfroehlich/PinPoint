@@ -38,6 +38,7 @@ test.describe("Extended Authentication", () => {
     await page.getByLabel("Email").fill(testEmail);
     await page.getByLabel("Password", { exact: true }).fill(password);
     await page.getByLabel("Confirm Password").fill(password);
+    await page.getByLabel(/terms of service/i).check();
 
     // Submit form
     await page.getByRole("button", { name: "Create Account" }).click();
@@ -119,6 +120,7 @@ test.describe("Extended Authentication", () => {
     await page.getByLabel("Email").fill(testEmail);
     await page.getByLabel("Password", { exact: true }).fill(oldPassword);
     await page.getByLabel("Confirm Password").fill(oldPassword);
+    await page.getByLabel(/terms of service/i).check();
     await page.getByRole("button", { name: "Create Account" }).click();
 
     // Local env has enable_confirmations = false, so we are redirected to dashboard immediately
