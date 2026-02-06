@@ -56,28 +56,28 @@ We use git worktrees for parallel environments. There are two types:
 
 **Ephemeral Worktrees** (on-demand, port offsets 4000-9900 → Next.js 3400-3990, API 58321-63821):
 
-Created with `./pinpoint-wt` for quick PR reviews or parallel development. Ports are hash-allocated to avoid conflicts.
+Created with `./pinpoint-wt.py` for quick PR reviews or parallel development. Ports are hash-allocated to avoid conflicts.
 
 **Commands**:
 
 ```bash
-./pinpoint-wt create feat/my-feature   # Create ephemeral worktree
-./pinpoint-wt list                     # Show all worktrees with ports
-./pinpoint-wt sync [--all]             # Regenerate config files
-./pinpoint-wt remove feat/my-feature   # Clean teardown (Supabase + Docker + worktree)
+./pinpoint-wt.py create feat/my-feature   # Create ephemeral worktree
+./pinpoint-wt.py list                     # Show all worktrees with ports
+./pinpoint-wt.py sync [--all]             # Regenerate config files
+./pinpoint-wt.py remove feat/my-feature   # Clean teardown (Supabase + Docker + worktree)
 ```
 
 **Config Management**:
 
 - `supabase/config.toml` and `.env.local` are auto-generated from templates
 - Generated files are **read-only** (chmod 444) with warning headers
-- To modify: Edit templates, then run `./pinpoint-wt sync`
+- To modify: Edit templates, then run `./pinpoint-wt.py sync`
 
 **Troubleshooting**:
 
-- _Config Mismatch_: Run `./pinpoint-wt sync` to regenerate
+- _Config Mismatch_: Run `./pinpoint-wt.py sync` to regenerate
 - _Supabase Failures_: Run `supabase stop --all` then restart
-- _Template Changes_: Edit `supabase/config.toml.template`, then `./pinpoint-wt sync --all`
+- _Template Changes_: Edit `supabase/config.toml.template`, then `./pinpoint-wt.py sync --all`
 
 ### Branch Management
 
@@ -179,10 +179,10 @@ Worktree permissions must be in `.claude/settings.json`:
 
 **Workflow**:
 
-1. Create worktrees: `./pinpoint-wt create <branch>` for each task
+1. Create worktrees: `./pinpoint-wt.py create <branch>` for each task
 2. Dispatch subagents with full worktree paths in prompts
 3. Monitor: `gh pr checks`, Copilot comments
-4. Clean up: `./pinpoint-wt remove <branch>`
+4. Clean up: `./pinpoint-wt.py remove <branch>`
 
 **Critical**: Agent prompts must include the full worktree path and instruct agents to work ONLY in that path. Agents inherit the parent session's cwd - they will NOT cd into worktrees on their own.
 

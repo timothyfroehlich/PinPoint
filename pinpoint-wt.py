@@ -153,8 +153,8 @@ def find_free_offset(branch_name: str) -> int:
 
 CONFIG_HEADER = """\
 # ⚠️ AUTO-GENERATED - DO NOT EDIT ⚠️
-# Managed by: pinpoint-wt
-# To modify: Edit supabase/config.toml.template, then run `./pinpoint-wt sync`
+# Managed by: pinpoint-wt.py
+# To modify: Edit supabase/config.toml.template, then run `./pinpoint-wt.py sync`
 #
 """
 
@@ -529,12 +529,12 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  ./pinpoint-wt create feat/new-feature              Create worktree from origin/main
-  ./pinpoint-wt create feat/fix --base feat/parent   Create worktree from specific branch
-  ./pinpoint-wt list                                 Show all worktrees
-  ./pinpoint-wt sync                                 Regenerate config for current worktree
-  ./pinpoint-wt sync --all                           Regenerate config for all worktrees
-  ./pinpoint-wt remove feat/new-feature              Remove worktree and cleanup
+  ./pinpoint-wt.py create feat/new-feature              Create worktree from origin/main
+  ./pinpoint-wt.py create feat/fix --base feat/parent   Create worktree from specific branch
+  ./pinpoint-wt.py list                                 Show all worktrees
+  ./pinpoint-wt.py sync                                 Regenerate config for current worktree
+  ./pinpoint-wt.py sync --all                           Regenerate config for all worktrees
+  ./pinpoint-wt.py remove feat/new-feature              Remove worktree and cleanup
         """
     )
 

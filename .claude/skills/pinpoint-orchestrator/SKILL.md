@@ -26,9 +26,9 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 
 ```bash
 # Worktree management
-./pinpoint-wt create feat/my-feature      # Create worktree (new branch)
-./pinpoint-wt list                         # Show all worktrees
-./pinpoint-wt remove feat/my-feature       # Clean teardown
+./pinpoint-wt.py create feat/my-feature      # Create worktree (new branch)
+./pinpoint-wt.py list                         # Show all worktrees
+./pinpoint-wt.py remove feat/my-feature       # Clean teardown
 
 # Monitoring
 gh pr checks <PR_NUMBER>                   # CI status
@@ -36,7 +36,7 @@ gh api repos/timothyfroehlich/PinPoint/pulls/<PR>/comments  # Copilot comments
 
 # Ready-for-review workflow
 gh pr edit <PR_NUMBER> --add-label "ready-for-review"    # Label ready PR
-./pinpoint-wt remove <branch>                             # Free branch for review tool
+./pinpoint-wt.py remove <branch>                             # Free branch for review tool
 
 # Teams mode (requires CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1)
 Teammate(operation: "spawnTeam", team_name: "pinpoint-<summary>")
@@ -106,7 +106,7 @@ Before proceeding, verify:
 **For NEW branches** (creating fresh work):
 
 ```bash
-./pinpoint-wt create feat/<task-branch>
+./pinpoint-wt.py create feat/<task-branch>
 ```
 
 This creates the worktree, generates `.env.local`, installs dependencies, and allocates ports.
@@ -118,13 +118,13 @@ This creates the worktree, generates `.env.local`, installs dependencies, and al
 git worktree add /home/froeht/Code/pinpoint-worktrees/<branch-name> <branch-name>
 
 # Step 2: Generate .env.local and config.toml (CRITICAL - don't skip!)
-cd /home/froeht/Code/pinpoint-worktrees/<branch-name> && ../PinPoint-Secondary/pinpoint-wt sync
+cd /home/froeht/Code/pinpoint-worktrees/<branch-name> && ../PinPoint-Secondary/pinpoint-wt.py sync
 
 # Step 3: Install dependencies
 cd /home/froeht/Code/pinpoint-worktrees/<branch-name> && pnpm install
 ```
 
-**Why sync is required:** The `pinpoint-wt sync` command generates `.env.local` with correct port allocations and database URLs. Without it, tests requiring `DATABASE_URL` will fail locally.
+**Why sync is required:** The `pinpoint-wt.py sync` command generates `.env.local` with correct port allocations and database URLs. Without it, tests requiring `DATABASE_URL` will fail locally.
 
 ### 2.2 Record Worktree Paths
 
@@ -138,7 +138,7 @@ Task: PinPoint-def → /home/froeht/Code/pinpoint-worktrees/feat/task-def
 ### 2.3 Verify Setup
 
 ```bash
-./pinpoint-wt list   # Confirm all worktrees created with port assignments
+./pinpoint-wt.py list   # Confirm all worktrees created with port assignments
 
 # Verify .env.local exists in each worktree
 ls /home/froeht/Code/pinpoint-worktrees/*/.env.local
@@ -320,7 +320,7 @@ gh pr edit <PR> --add-label "ready-for-review"
 **Step 2: Clean up the worktree** (frees the branch for the review tool)
 
 ```bash
-./pinpoint-wt remove <branch-name>
+./pinpoint-wt.py remove <branch-name>
 ```
 
 **Why cleanup at labeling**: The review tool needs to check out the PR branch. Git won't allow two worktrees to have the same branch checked out. Cleaning up the worktree releases the branch for review.
@@ -354,7 +354,7 @@ To address feedback, re-create the worktree and re-dispatch:
 ```bash
 # Re-create worktree for the branch
 git worktree add /home/froeht/Code/pinpoint-worktrees/<branch-name> <branch-name>
-cd /home/froeht/Code/pinpoint-worktrees/<branch-name> && ../PinPoint-Secondary/pinpoint-wt sync
+cd /home/froeht/Code/pinpoint-worktrees/<branch-name> && ../PinPoint-Secondary/pinpoint-wt.py sync
 cd /home/froeht/Code/pinpoint-worktrees/<branch-name> && pnpm install
 ```
 
@@ -462,7 +462,7 @@ Only worktrees for PRs that still need work should remain. Ready PRs were alread
 If the user wants to clean up remaining worktrees:
 
 ```bash
-./pinpoint-wt remove feat/task-def
+./pinpoint-wt.py remove feat/task-def
 ```
 
 ---
@@ -518,9 +518,9 @@ Ensure `.claude/settings.json` has worktree permissions:
 ### Worktree Creation Fails
 
 ```bash
-./pinpoint-wt sync          # Regenerate configs
+./pinpoint-wt.py sync          # Regenerate configs
 supabase stop --all         # Clear Supabase state
-./pinpoint-wt create ...    # Retry
+./pinpoint-wt.py create ...    # Retry
 ```
 
 ### Teams-Specific Recovery
@@ -533,7 +533,7 @@ supabase stop --all         # Clear Supabase state
 
 **Cleanup fails**: Usually means teammates are still active. Check `TaskList` for `in_progress` tasks, send `shutdown_request` to remaining teammates, wait for confirmation, then retry cleanup.
 
-**Session dies with active team**: Team state persists in `~/.claude/teams/<name>/`. Manual cleanup: `rm -rf ~/.claude/teams/<name> ~/.claude/tasks/<name>`. Worktrees are unaffected — clean up separately with `./pinpoint-wt remove`.
+**Session dies with active team**: Team state persists in `~/.claude/teams/<name>/`. Manual cleanup: `rm -rf ~/.claude/teams/<name> ~/.claude/tasks/<name>`. Worktrees are unaffected — clean up separately with `./pinpoint-wt.py remove`.
 
 ---
 

@@ -99,7 +99,7 @@ tail -50 /tmp/claude-1000/-home-froeht-Code-PinPoint-AntiGravity/tasks/<agent_id
 ### List All Worktrees
 
 ```bash
-./pinpoint-wt list
+./pinpoint-wt.py list
 ```
 
 ### Check Worktree Git Status
