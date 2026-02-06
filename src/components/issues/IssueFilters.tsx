@@ -25,6 +25,7 @@ import type {
   IssueFrequency,
 } from "~/lib/types";
 import type { LucideIcon } from "lucide-react";
+import type { UnifiedUser } from "~/lib/types";
 import {
   Tooltip,
   TooltipContent,
@@ -37,14 +38,9 @@ interface MachineOption {
   name: string;
 }
 
-interface UserOption {
-  id: string;
-  name: string;
-}
-
 interface IssueFiltersProps {
   machines: MachineOption[];
-  users: UserOption[];
+  users: UnifiedUser[];
   filters: FilterState;
 }
 
@@ -107,6 +103,23 @@ export function IssueFilters({
         value: u.id,
       })),
     ],
+    [users]
+  );
+
+  const ownerOptions = React.useMemo(
+    () =>
+      users.map((u) => {
+        const suffix = [
+          u.machineCount > 0 ? `(${String(u.machineCount)})` : "",
+          u.status === "invited" ? "(Invited)" : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
+        return {
+          label: suffix ? `${u.name} ${suffix}` : u.name,
+          value: u.id,
+        };
+      }),
     [users]
   );
 
@@ -590,7 +603,7 @@ export function IssueFilters({
               data-testid="filter-frequency"
             />
             <MultiSelect
-              options={userOptions}
+              options={ownerOptions}
               value={filters.owner ?? []}
               onChange={(val) => pushFilters({ owner: val, page: 1 })}
               placeholder="Owner"
