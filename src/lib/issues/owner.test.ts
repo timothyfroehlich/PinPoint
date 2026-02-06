@@ -39,6 +39,7 @@ describe("isUserMachineOwner", () => {
       },
       comments: [],
       watchers: [],
+      images: [],
     };
   };
 
@@ -106,6 +107,7 @@ describe("getMachineOwnerName", () => {
       },
       comments: [],
       watchers: [],
+      images: [],
     };
   };
 
@@ -163,6 +165,7 @@ describe("getMachineOwnerId", () => {
       },
       comments: [],
       watchers: [],
+      images: [],
     };
   };
 
