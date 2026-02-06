@@ -10,10 +10,11 @@ import {
 import { Label } from "~/components/ui/label";
 import { Button } from "~/components/ui/button";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import type { UnifiedUser } from "~/lib/types";
 import { InviteUserDialog } from "~/components/users/InviteUserDialog";
 import { Plus } from "lucide-react";
+import { compareUnifiedUsers } from "~/lib/users/comparators";
 
 interface OwnerSelectProps {
   users: UnifiedUser[];
@@ -46,7 +47,12 @@ export function OwnerSelect({
     }
   }, [users]);
 
-  const sortedUsers = [...users].sort((a, b) => a.name.localeCompare(b.name));
+  // Re-sort users after client-side mutations (e.g., inviting a new user)
+  // to maintain consistent ordering: confirmed first, by machine count desc, then by last name
+  const sortedUsers = useMemo(
+    () => [...users].sort(compareUnifiedUsers),
+    [users]
+  );
 
   return (
     <div className="space-y-2">
@@ -86,6 +92,11 @@ export function OwnerSelect({
             <SelectItem key={user.id} value={user.id}>
               <div className="flex items-center gap-2">
                 <span>{user.name}</span>
+                {user.machineCount > 0 && (
+                  <span className="text-[10px] text-on-surface-variant/70">
+                    ({user.machineCount})
+                  </span>
+                )}
                 {user.status === "invited" && (
                   <span className="text-[10px] font-medium uppercase tracking-wider text-on-surface-variant/70">
                     (Invited)

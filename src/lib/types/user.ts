@@ -15,11 +15,13 @@ export type UserStatus = "active" | "invited";
 export interface UnifiedUser {
   id: string;
   name: string;
+  lastName: string;
   email?: string | null;
   role: UserRole;
   status: UserStatus;
   avatarUrl: string | null;
   inviteSentAt?: Date | null; // Only for invited users
+  machineCount: number; // Number of machines owned by this user
 }
 
 export interface MachineOwner {
