@@ -83,7 +83,6 @@ export function SignupForm({
             id="firstName"
             name="firstName"
             type="text"
-            placeholder="Jane"
             autoComplete="given-name"
             required
             maxLength={50}
@@ -99,7 +98,6 @@ export function SignupForm({
             id="lastName"
             name="lastName"
             type="text"
-            placeholder="Doe"
             autoComplete="family-name"
             required
             maxLength={50}
@@ -116,7 +114,6 @@ export function SignupForm({
           id="email"
           name="email"
           type="email"
-          placeholder="you@example.com"
           autoComplete="email"
           required
           className="bg-surface-variant"
