@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { isUserMachineOwner, getMachineOwnerName } from "./owner";
+import {
+  isUserMachineOwner,
+  getMachineOwnerName,
+  getMachineOwnerId,
+} from "./owner";
 import type { IssueWithAllRelations } from "~/lib/types";
 
 describe("isUserMachineOwner", () => {
@@ -35,6 +39,7 @@ describe("isUserMachineOwner", () => {
       },
       comments: [],
       watchers: [],
+      images: [],
     };
   };
 
@@ -102,6 +107,7 @@ describe("getMachineOwnerName", () => {
       },
       comments: [],
       watchers: [],
+      images: [],
     };
   };
 
@@ -123,5 +129,63 @@ describe("getMachineOwnerName", () => {
   it("returns null when there is no owner", () => {
     const issue = createMockIssue(null, null);
     expect(getMachineOwnerName(issue)).toBe(null);
+  });
+});
+
+describe("getMachineOwnerId", () => {
+  const createMockIssue = (
+    ownerId?: string | null,
+    invitedOwnerId?: string | null
+  ): IssueWithAllRelations => {
+    return {
+      id: "issue-1",
+      machineInitials: "MM",
+      issueNumber: 1,
+      title: "Test Issue",
+      description: null,
+      status: "new",
+      severity: "minor",
+      priority: "medium",
+      frequency: "intermittent",
+      reportedBy: null,
+      invitedReportedBy: null,
+      reporterName: null,
+      reporterEmail: null,
+      assignedTo: null,
+      closedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      machine: {
+        id: "machine-1",
+        name: "Medieval Madness",
+        owner: ownerId ? { id: ownerId, name: "Test Owner" } : null,
+        invitedOwner: invitedOwnerId
+          ? { id: invitedOwnerId, name: "Invited Owner" }
+          : null,
+      },
+      comments: [],
+      watchers: [],
+      images: [],
+    };
+  };
+
+  it("returns registered owner ID when present", () => {
+    const issue = createMockIssue("user-123");
+    expect(getMachineOwnerId(issue)).toBe("user-123");
+  });
+
+  it("returns invited owner ID when registered owner is not present", () => {
+    const issue = createMockIssue(null, "invited-456");
+    expect(getMachineOwnerId(issue)).toBe("invited-456");
+  });
+
+  it("prefers registered owner over invited owner", () => {
+    const issue = createMockIssue("user-123", "invited-456");
+    expect(getMachineOwnerId(issue)).toBe("user-123");
+  });
+
+  it("returns null when there is no owner", () => {
+    const issue = createMockIssue(null, null);
+    expect(getMachineOwnerId(issue)).toBe(null);
   });
 });

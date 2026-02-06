@@ -31,7 +31,7 @@ export default defineConfig(({ mode }) => {
           "**/types.ts",
           "**/*.config.{ts,js}",
         ],
-        // No thresholds - Codecov handles enforcement on PRs
+        // No thresholds enforced in CI
       },
       // Project-based test suites
       projects: [
