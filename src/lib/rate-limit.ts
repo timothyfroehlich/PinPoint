@@ -53,13 +53,11 @@ function createRedisClient(): Redis | null {
     return null;
   }
 
-  // Fallback pattern if Redis.fromEnv() fails or doesn't find the expected names
+  // Explicitly support both Upstash and Vercel KV environment variable naming conventions
   const url =
     process.env["UPSTASH_REDIS_REST_URL"] ?? process.env["KV_REST_API_URL"];
   const token =
     process.env["UPSTASH_REDIS_REST_TOKEN"] ?? process.env["KV_REST_API_TOKEN"];
-
-  if (!url || !token) return null;
 
   return new Redis({
     url,
