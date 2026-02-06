@@ -295,7 +295,8 @@
     "sentry@claude-plugins-official": true,
     "superpowers@claude-plugins-official": true,
     "pr-review-toolkit@claude-plugins-official": true,
-    "explanatory-output-style@claude-plugins-official": true
+    "explanatory-output-style@claude-plugins-official": true,
+    "postgres-best-practices@supabase-agent-skills": true
   },
   "outputStyle": "Explanatory"
 }
