@@ -1,5 +1,5 @@
 """
-Shared library functions for pinpoint-wt.
+Shared library functions for pinpoint-wt.py.
 
 This module contains the core logic that can be imported and tested
 without triggering argparse/sys.exit() from the main CLI script.
@@ -23,7 +23,7 @@ BASE_PORT_INBUCKET = 54324
 BASE_PORT_SMTP = 54325
 BASE_PORT_POP3 = 54326
 
-# Keys that pinpoint-wt manages (port-dependent and local dev defaults)
+# Keys that pinpoint-wt.py manages (port-dependent and local dev defaults)
 MANAGED_ENV_KEYS = {
     # Port-dependent
     "NEXT_PUBLIC_SUPABASE_URL",
@@ -48,9 +48,9 @@ USER_PROVIDED_KEYS = {
 }
 
 ENV_HEADER = """\
-# ⚠️ PORTS MANAGED BY pinpoint-wt - Other keys preserved ⚠️
+# ⚠️ PORTS MANAGED BY pinpoint-wt.py - Other keys preserved ⚠️
 # Port-related keys are auto-updated on sync. Other keys (like Supabase keys) are preserved.
-# To add custom vars: chmod +w .env.local, edit, then run `./pinpoint-wt sync`
+# To add custom vars: chmod +w .env.local, edit, then run `./pinpoint-wt.py sync`
 #
 """
 
@@ -135,7 +135,7 @@ def format_env_file(
         f"# Local Supabase + Next.js configuration for {port_config.name}",
         f"# Ports: Next.js={port_config.nextjs_port}, Supabase API={port_config.api_port}, DB={port_config.db_port}",
         "",
-        "# === Managed by pinpoint-wt (do not edit) ===",
+        "# === Managed by pinpoint-wt.py (do not edit) ===",
         f"NEXT_PUBLIC_SUPABASE_URL={managed_values['NEXT_PUBLIC_SUPABASE_URL']}",
         f"DATABASE_URL={managed_values['DATABASE_URL']}",
         f"PORT={managed_values['PORT']}",

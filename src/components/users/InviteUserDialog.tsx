@@ -83,10 +83,12 @@ export function InviteUserDialog({
           const newUser: UnifiedUser = {
             id: result.userId,
             name: `${values.firstName} ${values.lastName}`,
+            lastName: values.lastName,
             email: values.email,
             role: values.role,
             status: "invited",
             avatarUrl: null,
+            machineCount: 0, // New user has no machines yet
           };
           // Call onSuccess with both the ID and full user object, then close dialog
           // Note: router.refresh() removed - parent manages users state directly
