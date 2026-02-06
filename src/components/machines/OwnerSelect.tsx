@@ -14,7 +14,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import type { UnifiedUser } from "~/lib/types";
 import { InviteUserDialog } from "~/components/users/InviteUserDialog";
 import { Plus } from "lucide-react";
-import { compareUnifiedUsers } from "~/lib/users/queries";
+import { compareUnifiedUsers } from "~/lib/users/comparators";
 
 interface OwnerSelectProps {
   users: UnifiedUser[];

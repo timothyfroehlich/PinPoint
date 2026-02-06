@@ -3,41 +3,10 @@ import { userProfiles, invitedUsers, machines } from "~/server/db/schema";
 import { sql, eq, count } from "drizzle-orm";
 import type { UnifiedUser, UserStatus } from "~/lib/types";
 
-/**
- * Comparator for sorting unified users.
- * Order: confirmed users first, then by machine count desc, then by last name, name, and id.
- * Exported so it can be reused for client-side re-sorting after mutations.
- */
-export function compareUnifiedUsers(a: UnifiedUser, b: UnifiedUser): number {
-  // 1. Confirmed (active) users before unconfirmed (invited)
-  if (a.status !== b.status) {
-    return a.status === "active" ? -1 : 1;
-  }
-
-  // 2. Higher machine count first
-  const machineCountA = a.machineCount;
-  const machineCountB = b.machineCount;
-  if (machineCountA !== machineCountB) {
-    return machineCountB - machineCountA;
-  }
-
-  // 3. Alphabetically by last name
-  const lastNameA = a.lastName || "";
-  const lastNameB = b.lastName || "";
-  const lastNameCompare = lastNameA.localeCompare(lastNameB);
-  if (lastNameCompare !== 0) {
-    return lastNameCompare;
-  }
-
-  // 4. Tie-breaker: full name
-  const nameCompare = a.name.localeCompare(b.name);
-  if (nameCompare !== 0) {
-    return nameCompare;
-  }
-
-  // 5. Final tie-breaker: id for deterministic ordering
-  return a.id.localeCompare(b.id);
-}
+// Import comparator from its own module (safe for client-side imports)
+import { compareUnifiedUsers } from "./comparators";
+// Re-export for backwards compatibility with server-side consumers
+export { compareUnifiedUsers } from "./comparators";
 
 export async function getUnifiedUsers(
   options: { includeEmails?: boolean } = {}
