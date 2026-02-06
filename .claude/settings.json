@@ -93,16 +93,22 @@
       "Bash(./scripts/check-file-security.sh:*)",
       "Bash(./scripts/check-db-schema.sh:*)",
       "Bash(./scripts/check-pnpm-audit.sh:*)",
+      "Bash(bash scripts/copilot-comments.sh:*)",
+      "Bash(bash scripts/label-ready.sh:*)",
+      "Bash(bash scripts/pr-dashboard.sh:*)",
+      "Bash(./scripts/copilot-comments.sh:*)",
+      "Bash(./scripts/label-ready.sh:*)",
+      "Bash(./scripts/pr-dashboard.sh:*)",
       "Bash(gitleaks detect:*)",
-      "Bash(./pinpoint-wt create:*)",
-      "Bash(./pinpoint-wt list:*)",
-      "Bash(./pinpoint-wt sync:*)",
-      "Bash(python3 pinpoint-wt create:*)",
-      "Bash(python3 pinpoint-wt list:*)",
-      "Bash(python3 pinpoint-wt sync:*)",
-      "Bash(python3 ./pinpoint-wt create:*)",
-      "Bash(python3 ./pinpoint-wt list:*)",
-      "Bash(python3 ./pinpoint-wt sync:*)",
+      "Bash(./pinpoint-wt.py create:*)",
+      "Bash(./pinpoint-wt.py list:*)",
+      "Bash(./pinpoint-wt.py sync:*)",
+      "Bash(python3 pinpoint-wt.py create:*)",
+      "Bash(python3 pinpoint-wt.py list:*)",
+      "Bash(python3 pinpoint-wt.py sync:*)",
+      "Bash(python3 ./pinpoint-wt.py create:*)",
+      "Bash(python3 ./pinpoint-wt.py list:*)",
+      "Bash(python3 ./pinpoint-wt.py sync:*)",
       "Bash(vercel --version:*)",
       "Bash(vercel ls:*)",
       "Bash(vercel logs:*)",
@@ -231,15 +237,26 @@
       "Bash(wget:*)",
       "Bash(kill:*)",
       "Bash(pkill:*)",
-      "Bash(chmod:*)",
-      "Bash(./pinpoint-wt remove:*)",
-      "Bash(python3 pinpoint-wt remove:*)",
-      "Bash(python3 ./pinpoint-wt remove:*)",
+      "Bash(./pinpoint-wt.py remove:*)",
+      "Bash(python3 pinpoint-wt.py remove:*)",
+      "Bash(python3 ./pinpoint-wt.py remove:*)",
       "mcp__github__issue_write"
     ]
   },
   "enableAllProjectMcpServers": true,
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/block-dangerous-commands.cjs",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit",
