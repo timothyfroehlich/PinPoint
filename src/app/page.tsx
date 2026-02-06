@@ -15,6 +15,9 @@ import { MainLayout } from "~/components/layout/MainLayout";
  */
 export default function LandingPage(): React.JSX.Element {
   return (
+    // TODO: Consider a lighter public layout instead of MainLayout, which includes
+    // the client-side Sidebar. A minimal layout without auth-dependent components
+    // would reduce bundle size for unauthenticated visitors.
     <MainLayout>
       <div className="space-y-12">
         {/* Hero Section */}
