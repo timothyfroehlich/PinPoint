@@ -1,4 +1,4 @@
-"""Unit tests for pinpoint-wt env merging functionality."""
+"""Unit tests for pinpoint-wt.py env merging functionality."""
 
 import sys
 from pathlib import Path
@@ -153,7 +153,7 @@ class TestMergeEnvLocal:
         """Test that the output includes the header explaining management."""
         result = merge_env_local(tmp_path, port_config)
 
-        assert "PORTS MANAGED BY pinpoint-wt" in result
+        assert "PORTS MANAGED BY pinpoint-wt.py" in result
         assert "Other keys preserved" in result
 
     def test_includes_dev_autologin_defaults(
