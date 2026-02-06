@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { machines as machinesTable, userProfiles } from "~/server/db/schema";
+import { getUnifiedUsers } from "~/lib/users/queries";
 import { desc, eq } from "drizzle-orm";
 import {
   deriveMachineStatus,
@@ -107,14 +108,8 @@ export default async function MachinesPage({
     },
   });
 
-  // Fetch all users for the owner filter
-  const allUsers = await db.query.userProfiles.findMany({
-    orderBy: (u, { asc }) => [asc(u.name)],
-    columns: {
-      id: true,
-      name: true,
-    },
-  });
+  // Fetch all users for the owner filter (smart sorted: confirmed first, by machine count)
+  const allUsers = await getUnifiedUsers();
 
   // Derive status and prepare for filtering
   const machinesWithStatus = allMachines.map((machine) => {

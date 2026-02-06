@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { cn } from "~/lib/utils";
+import type { UnifiedUser } from "~/lib/types";
 import type {
   MachineFilters as FilterState,
   MachineStatus,
@@ -22,13 +23,8 @@ import type {
 } from "~/lib/machines/filters";
 import { getMachineStatusLabel } from "~/lib/machines/status";
 
-interface UserOption {
-  id: string;
-  name: string;
-}
-
 interface MachineFiltersProps {
-  users: UserOption[];
+  users: UnifiedUser[];
   filters: FilterState;
 }
 
@@ -59,10 +55,18 @@ export function MachineFilters({
 
   const userOptions = React.useMemo(
     () =>
-      users.map((u) => ({
-        label: u.name,
-        value: u.id,
-      })),
+      users.map((u) => {
+        const suffix = [
+          u.machineCount > 0 ? `(${String(u.machineCount)})` : "",
+          u.status === "invited" ? "(Invited)" : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
+        return {
+          label: suffix ? `${u.name} ${suffix}` : u.name,
+          value: u.id,
+        };
+      }),
     [users]
   );
 

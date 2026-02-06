@@ -4,6 +4,7 @@ import { and } from "drizzle-orm";
 import { db } from "~/server/db";
 import { issues, userProfiles } from "~/server/db/schema";
 import { IssueFilters } from "~/components/issues/IssueFilters";
+import { getUnifiedUsers } from "~/lib/users/queries";
 import { IssueList } from "~/components/issues/IssueList";
 import { createClient } from "~/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -72,10 +73,7 @@ export default async function IssuesPage({
     columns: { initials: true, name: true },
   });
 
-  const usersPromise = db.query.userProfiles.findMany({
-    orderBy: (u, { asc }) => [asc(u.name)],
-    columns: { id: true, name: true },
-  });
+  const usersPromise = getUnifiedUsers();
 
   const issuesPromise = db.query.issues.findMany({
     where: and(...where),
