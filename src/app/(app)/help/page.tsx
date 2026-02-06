@@ -189,6 +189,20 @@ export default function HelpPage(): React.JSX.Element {
         </ul>
       </section>
 
+      <section className="space-y-3 mb-8">
+        <h2 className="text-lg font-semibold">Roles &amp; Permissions</h2>
+        <p className="text-sm text-muted-foreground">
+          PinPoint has four access tiers — from anonymous visitors to admins.
+          Each tier unlocks more actions (editing issues, managing machines,
+          inviting users, etc.).
+        </p>
+        <p className="text-sm">
+          <Link href="/help/permissions" className="text-primary underline">
+            View the full permissions matrix
+          </Link>
+        </p>
+      </section>
+
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">If Something Looks Wrong</h2>
         <p className="text-sm text-muted-foreground">

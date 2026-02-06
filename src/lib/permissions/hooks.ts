@@ -149,7 +149,8 @@ export function usePermissions(
     }
     return result;
   }, [
-    // Stringify the array for stable dependency
+    // Stringify the array for stable dependency.
+    // Safe: permission IDs use dots (e.g. "issues.update.status"), never commas.
     permissionIds.join(","),
     user?.id,
     user?.role,
@@ -196,6 +197,7 @@ export function usePermissionStates(
     }
     return result;
   }, [
+    // Safe: permission IDs use dots (e.g. "issues.update.status"), never commas.
     permissionIds.join(","),
     user?.id,
     user?.role,

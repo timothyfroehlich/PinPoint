@@ -134,6 +134,9 @@ export function getPermissionDeniedReason(
       if (accessLevel === "guest") {
         return "Members can perform this action";
       }
+      if (accessLevel === "member") {
+        return "Only admins can perform this action";
+      }
       return "You don't have permission to perform this action";
     case "ownership":
       return "Only the owner can perform this action";

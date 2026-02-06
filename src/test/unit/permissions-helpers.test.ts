@@ -172,6 +172,11 @@ describe("getPermissionDeniedReason", () => {
     expect(reason).toContain("Members");
   });
 
+  it("should return admin message for member role denial", () => {
+    const reason = getPermissionDeniedReason("machines.create", "member");
+    expect(reason).toContain("admin");
+  });
+
   it("should return ownership message for ownership denial", () => {
     const context: OwnershipContext = {
       userId: "user-123",
