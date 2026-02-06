@@ -15,9 +15,10 @@ Handles the final merge of a reviewed PR and cleans up ephemeral resources.
       ```
 
 2.  **Cleanup**:
-    - Use `pinpoint-wt` to remove the worktree and the local branch:
+    - Switch back to main and delete the local PR branch:
       ```bash
-      ./pinpoint-wt remove <branch_name>
+      git checkout main
+      git branch -D <branch_name>
       ```
 
 3.  **Sync**:

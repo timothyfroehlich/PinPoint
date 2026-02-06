@@ -13,30 +13,25 @@ Automates the process of checking out, updating, and reviewing a Pull Request.
 - [ ] `pnpm` installed.
 - [ ] `./pinpoint-wt` script available in repo root.
 
-## Phase 1: Environment Setup
+## Phase 1: Checkout & Sync
 
-1.  **Fetch & Sync**:
+1. **Initialize**:
 
-    ```bash
-    git fetch origin main
-    ```
+   ```bash
+   git fetch origin main
+   ```
 
-2.  **Worktree Management**:
-    - Check if a worktree already exists for the PR branch:
-      ```bash
-      git worktree list | grep <branch_name>
-      ```
-    - If it exists, `cd` into that directory.
-    - If it DOES NOT exist, create it:
-      ```bash
-      ./pinpoint-wt create <branch_name>
-      cd ../pinpoint-worktrees/<branch_name>
-      ```
+2. **Checkout PR**:
 
-3.  **Update Branch**:
-    ```bash
-    git rebase origin/main
-    ```
+   ```bash
+   gh pr checkout <PR_NUMBER>
+   ```
+
+3. **Sync with Main**:
+   - Project non-negotiable: Always merge main into your branch.
+   ```bash
+   git merge origin/main
+   ```
 
 ## Phase 2: Context & Quality
 
