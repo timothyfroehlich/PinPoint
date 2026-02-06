@@ -25,6 +25,9 @@ export default function NotFound(): React.JSX.Element {
           <Button variant="outline" asChild>
             <Link href="/m">Browse Machines</Link>
           </Button>
+          <Button variant="outline" asChild>
+            <Link href="/issues">Browse Issues</Link>
+          </Button>
         </div>
       </div>
     </div>
