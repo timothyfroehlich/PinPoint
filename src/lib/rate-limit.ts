@@ -32,15 +32,16 @@ export interface RateLimitResult {
 }
 
 /**
- * Check if Redis is configured via environment variables
+ * Check if Redis is configured via environment variables.
+ * Supports both standard Upstash names and Vercel KV names.
  */
 function isRedisConfigured(): boolean {
-  const url = process.env["UPSTASH_REDIS_REST_URL"];
-  return !!(
-    url &&
-    process.env["UPSTASH_REDIS_REST_TOKEN"] &&
-    !url.includes("your-redis-instance")
-  );
+  const url =
+    process.env["UPSTASH_REDIS_REST_URL"] ?? process.env["KV_REST_API_URL"];
+  const token =
+    process.env["UPSTASH_REDIS_REST_TOKEN"] ?? process.env["KV_REST_API_TOKEN"];
+
+  return !!(url && token && !url.includes("your-redis-instance"));
 }
 
 /**
@@ -51,8 +52,17 @@ function createRedisClient(): Redis | null {
   if (!isRedisConfigured()) {
     return null;
   }
-  // Redis.fromEnv() reads UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN
-  return Redis.fromEnv();
+
+  // Explicitly support both Upstash and Vercel KV environment variable naming conventions
+  const url =
+    process.env["UPSTASH_REDIS_REST_URL"] ?? process.env["KV_REST_API_URL"];
+  const token =
+    process.env["UPSTASH_REDIS_REST_TOKEN"] ?? process.env["KV_REST_API_TOKEN"];
+
+  return new Redis({
+    url,
+    token,
+  });
 }
 
 // Lazy-initialized Redis client
