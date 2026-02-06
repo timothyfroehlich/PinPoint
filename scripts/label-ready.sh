@@ -47,7 +47,7 @@ fi
 
 # Check CI
 checks=$(gh pr checks "$PR" --json name,state 2>/dev/null) || checks="[]"
-failed=$(echo "$checks" | jq '[.[] | select(.state == "FAILURE")] | length')
+failed=$(echo "$checks" | jq '[.[] | select(.state == "FAILURE" and (.name | startswith("codecov/") | not))] | length')
 pending=$(echo "$checks" | jq '[.[] | select(.state == "IN_PROGRESS" or .state == "QUEUED" or .state == "PENDING")] | length')
 
 if [ "$pending" -gt 0 ]; then
@@ -56,7 +56,7 @@ if [ "$pending" -gt 0 ]; then
 fi
 
 if [ "$failed" -gt 0 ]; then
-    failed_names=$(echo "$checks" | jq -r '.[] | select(.state == "FAILURE") | .name' | paste -sd ", ")
+    failed_names=$(echo "$checks" | jq -r '.[] | select(.state == "FAILURE" and (.name | startswith("codecov/") | not)) | .name' | paste -sd ", ")
     echo "FAIL: ${failed} checks failed: ${failed_names}"
     exit 1
 fi

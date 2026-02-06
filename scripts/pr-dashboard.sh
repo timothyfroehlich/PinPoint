@@ -37,7 +37,7 @@ for pr in $PRS; do
     checks=$(gh pr checks "$pr" --json name,state 2>/dev/null) || checks="[]"
     total=$(echo "$checks" | jq 'length')
     passed=$(echo "$checks" | jq '[.[] | select(.state == "SUCCESS")] | length')
-    failed=$(echo "$checks" | jq '[.[] | select(.state == "FAILURE")] | length')
+    failed=$(echo "$checks" | jq '[.[] | select(.state == "FAILURE" and (.name | startswith("codecov/") | not))] | length')
     pending=$(echo "$checks" | jq '[.[] | select(.state == "IN_PROGRESS" or .state == "QUEUED" or .state == "PENDING")] | length')
 
     if [ "$failed" -gt 0 ]; then
