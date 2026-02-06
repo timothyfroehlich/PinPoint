@@ -3,7 +3,6 @@ import Link from "next/link";
 import { Check, Minus } from "lucide-react";
 
 import { PageShell } from "~/components/layout/PageShell";
-import { Badge } from "~/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -17,6 +16,7 @@ import {
   ACCESS_LEVEL_DESCRIPTIONS,
   ACCESS_LEVEL_LABELS,
   PERMISSIONS_MATRIX,
+  type AccessLevel,
   type PermissionValue,
 } from "~/lib/permissions/matrix";
 
@@ -31,31 +31,96 @@ function PermissionValueCell({
 }): React.JSX.Element {
   if (value === true) {
     return (
-      <span className="text-green-600 dark:text-green-400">
+      <span className="flex justify-center text-green-600 dark:text-green-400">
         <Check className="size-4" aria-label="Allowed" />
       </span>
     );
   }
   if (value === false) {
     return (
-      <span className="text-muted-foreground">
+      <span className="flex justify-center text-muted-foreground">
         <Minus className="size-4" aria-label="Not allowed" />
       </span>
     );
   }
-  if (value === "own") {
-    return (
-      <Badge variant="secondary" className="text-xs">
-        Own only
-      </Badge>
-    );
-  }
-  // value === "owner"
+  // Both "own" and "owner" mean "only if it's yours" from a user perspective
   return (
-    <Badge variant="secondary" className="text-xs">
-      Owner only
-    </Badge>
+    <span className="flex justify-center text-xs text-muted-foreground italic">
+      Yours only
+    </span>
   );
+}
+
+interface PermissionDefinition {
+  id: string;
+  label: string;
+  description: string;
+  access: Record<AccessLevel, PermissionValue>;
+}
+
+interface GroupedPermission {
+  id: string;
+  label: string;
+  description: string;
+  access: Record<AccessLevel, PermissionValue>;
+  isGroup: boolean;
+}
+
+/**
+ * Group consecutive permissions with identical access patterns
+ */
+function groupPermissions(
+  permissions: PermissionDefinition[]
+): GroupedPermission[] {
+  const grouped: GroupedPermission[] = [];
+  let i = 0;
+
+  while (i < permissions.length) {
+    const current = permissions[i];
+    if (!current) break; // Should never happen, but satisfies strict checks
+
+    const accessPattern = JSON.stringify(current.access);
+
+    // Look ahead to find consecutive permissions with the same access pattern
+    const group: PermissionDefinition[] = [current];
+    let j = i + 1;
+
+    while (j < permissions.length) {
+      const next = permissions[j];
+      if (!next) break; // Should never happen, but satisfies strict checks
+
+      if (JSON.stringify(next.access) === accessPattern) {
+        group.push(next);
+        j++;
+      } else {
+        break;
+      }
+    }
+
+    if (group.length > 1) {
+      // Multiple permissions with identical access - group them
+      grouped.push({
+        id: group.map((p) => p.id).join(","),
+        label: group.map((p) => p.label).join(" / "),
+        description: group.map((p) => p.description).join("; "),
+        access: current.access,
+        isGroup: true,
+      });
+      i = j;
+    } else {
+      // Single permission - keep as is
+      grouped.push({
+        id: current.id,
+        label: current.label,
+        description: current.description,
+        access: current.access,
+        isGroup: false,
+      });
+      i++;
+    }
+  }
+
+  return grouped;
 }
 
 export default function PermissionsPage(): React.JSX.Element {
@@ -105,56 +170,53 @@ export default function PermissionsPage(): React.JSX.Element {
             Not allowed
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <Badge variant="secondary" className="text-xs">
-              Own only
-            </Badge>
-            Only for resources you reported
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <Badge variant="secondary" className="text-xs">
-              Owner only
-            </Badge>
-            Only for resources you own
+            <span className="text-xs text-muted-foreground italic">
+              Yours only
+            </span>
+            Only for resources you created or own
           </span>
         </div>
       </section>
 
       {/* Permission tables by category */}
-      {PERMISSIONS_MATRIX.map((category) => (
-        <section key={category.id} className="space-y-3 mb-8">
-          <h2 className="text-lg font-semibold">{category.label}</h2>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="min-w-[200px]">Permission</TableHead>
-                {ACCESS_LEVELS.map((level) => (
-                  <TableHead key={level} className="text-center">
-                    {ACCESS_LEVEL_LABELS[level]}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {category.permissions.map((permission) => (
-                <TableRow key={permission.id}>
-                  <TableCell>
-                    <span className="font-medium">{permission.label}</span>
-                    <br />
-                    <span className="text-xs text-muted-foreground">
-                      {permission.description}
-                    </span>
-                  </TableCell>
+      {PERMISSIONS_MATRIX.map((category) => {
+        const groupedPermissions = groupPermissions(category.permissions);
+        return (
+          <section key={category.id} className="space-y-3 mb-8">
+            <h2 className="text-lg font-semibold">{category.label}</h2>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="min-w-[200px]">Permission</TableHead>
                   {ACCESS_LEVELS.map((level) => (
-                    <TableCell key={level} className="text-center">
-                      <PermissionValueCell value={permission.access[level]} />
-                    </TableCell>
+                    <TableHead key={level} className="w-28 text-center">
+                      {ACCESS_LEVEL_LABELS[level]}
+                    </TableHead>
                   ))}
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </section>
-      ))}
+              </TableHeader>
+              <TableBody>
+                {groupedPermissions.map((permission) => (
+                  <TableRow key={permission.id}>
+                    <TableCell>
+                      <span className="font-medium">{permission.label}</span>
+                      <br />
+                      <span className="text-xs text-muted-foreground">
+                        {permission.description}
+                      </span>
+                    </TableCell>
+                    {ACCESS_LEVELS.map((level) => (
+                      <TableCell key={level} className="w-28 text-center">
+                        <PermissionValueCell value={permission.access[level]} />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </section>
+        );
+      })}
     </PageShell>
   );
 }
