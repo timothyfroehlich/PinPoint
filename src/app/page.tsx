@@ -23,23 +23,35 @@ export default function LandingPage(): React.JSX.Element {
         {/* Hero Section */}
         <section className="text-center space-y-6">
           <div className="flex justify-center mb-8">
-            <Image
-              src="/apc-logo.png"
-              alt="Austin Pinball Collective"
-              width={200}
-              height={133}
-              className="glow-primary"
-              priority
-            />
+            <a
+              href="https://austinpinballcollective.org"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Visit Austin Pinball Collective website"
+            >
+              <Image
+                src="/apc-logo.png"
+                alt="Austin Pinball Collective"
+                width={200}
+                height={133}
+                className="drop-shadow-[0_0_15px_color-mix(in_srgb,var(--color-primary)_50%,transparent)] hover:drop-shadow-[0_0_20px_color-mix(in_srgb,var(--color-primary)_70%,transparent)] transition-all duration-300"
+                priority
+              />
+            </a>
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-foreground">
             Welcome to PinPoint
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            The issue tracker for{" "}
-            <span className="text-primary font-medium">
+            The issue tracker for the{" "}
+            <a
+              href="https://austinpinballcollective.org"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-link font-medium"
+            >
               Austin Pinball Collective
-            </span>
+            </a>
             . Help keep the machines running by reporting problems, tracking
             repairs, and staying informed.
           </p>
