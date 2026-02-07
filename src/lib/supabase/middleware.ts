@@ -105,10 +105,16 @@ export async function updateSession(
 
   // Protected routes logic
   const path = request.nextUrl.pathname;
+
+  // Check if this is a machine detail route (e.g., /m/AB)
+  // Pattern: /m/[2-char-initials] but NOT /m/new
+  const machineDetailPattern = /^\/m\/[a-zA-Z]{2}(?:\/|$)/;
+  const isMachineDetail = machineDetailPattern.test(path);
+
   const isPublic =
     path === "/" ||
     path === "/m" ||
-    path.startsWith("/m/") ||
+    isMachineDetail ||
     path.startsWith("/login") ||
     path.startsWith("/signup") ||
     path.startsWith("/forgot-password") ||
