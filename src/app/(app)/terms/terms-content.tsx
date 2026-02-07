@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 
 /**
  * Terms of Service Content
@@ -83,7 +84,12 @@ export function TermsContent(): React.JSX.Element {
         <p className="text-muted-foreground">
           We collect your email address and name to operate your account. Issue
           reports and comments you create are visible to other users. We
-          don&apos;t sell your personal information to third parties.
+          don&apos;t sell your personal information to third parties. For full
+          details on how we handle your data, please see our{" "}
+          <Link href="/privacy" className="text-primary hover:underline">
+            Privacy Policy
+          </Link>
+          .
         </p>
       </section>
 
