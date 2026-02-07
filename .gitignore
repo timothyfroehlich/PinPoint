@@ -147,3 +147,6 @@ __pycache__/
 # Auto-generated test schema
 src/test/setup/schema.sql
 supabase/migrations/
+
+# bv (beads viewer) local config and caches
+.bv/
