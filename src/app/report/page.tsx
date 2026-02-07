@@ -40,19 +40,18 @@ export default async function PublicReportPage({
       where: eq(userProfiles.id, user.id),
       columns: { role: true },
     });
-
-    const accessLevel = getAccessLevel(userProfile?.role);
-    if (accessLevel === "admin" || accessLevel === "member") {
-      assignees = await db.query.userProfiles.findMany({
-        where: (profile) =>
-          sql`${profile.role} = 'admin' OR ${profile.role} = 'member'`,
-        columns: { id: true, name: true },
-        orderBy: asc(userProfiles.name),
-      });
-    }
   }
 
   const accessLevel = getAccessLevel(userProfile?.role);
+
+  if (accessLevel === "admin" || accessLevel === "member") {
+    assignees = await db.query.userProfiles.findMany({
+      where: (profile) =>
+        sql`${profile.role} = 'admin' OR ${profile.role} = 'member'`,
+      columns: { id: true, name: true },
+      orderBy: asc(userProfiles.name),
+    });
+  }
 
   const [machinesList] = await Promise.all([machinesListPromise]);
 
