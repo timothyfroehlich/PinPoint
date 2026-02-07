@@ -107,6 +107,8 @@ export async function updateSession(
   const path = request.nextUrl.pathname;
   const isPublic =
     path === "/" ||
+    path === "/m" ||
+    path.startsWith("/m/") ||
     path.startsWith("/login") ||
     path.startsWith("/signup") ||
     path.startsWith("/forgot-password") ||
