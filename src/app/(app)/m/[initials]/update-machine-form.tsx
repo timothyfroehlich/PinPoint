@@ -67,6 +67,7 @@ export function EditMachineDialog({
   const [open, setOpen] = useState(false);
   const [showTransferConfirm, setShowTransferConfirm] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
+  const transferConfirmedRef = useRef(false);
   const [selectedOwnerId, setSelectedOwnerId] = useState(
     machine.ownerId ?? machine.invitedOwnerId ?? ""
   );
@@ -84,6 +85,14 @@ export function EditMachineDialog({
     }
   }, [state]);
 
+  // Reset selectedOwnerId when dialog reopens to avoid stale selection
+  useEffect(() => {
+    if (open) {
+      setSelectedOwnerId(currentOwnerId);
+      transferConfirmedRef.current = false;
+    }
+  }, [open, currentOwnerId]);
+
   // Find the selected owner's name for the confirmation dialog
   const selectedOwnerName =
     allUsers.find((u) => u.id === selectedOwnerId)?.name ?? "the selected user";
@@ -93,6 +102,11 @@ export function EditMachineDialog({
     !isAdmin && isOwner && selectedOwnerId !== currentOwnerId;
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
+    // If transfer was already confirmed via the dialog, skip the guard
+    if (transferConfirmedRef.current) {
+      transferConfirmedRef.current = false;
+      return;
+    }
     // Only prevent default when we need to show the transfer confirmation dialog
     if (needsTransferConfirm) {
       e.preventDefault();
@@ -104,6 +118,7 @@ export function EditMachineDialog({
 
   const handleConfirmTransfer = (): void => {
     setShowTransferConfirm(false);
+    transferConfirmedRef.current = true;
     // Use requestSubmit to trigger the form's action attribute
     formRef.current?.requestSubmit();
   };

@@ -10,7 +10,12 @@
 import { redirect } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { machines, machineWatchers, userProfiles } from "~/server/db/schema";
+import {
+  machines,
+  machineWatchers,
+  userProfiles,
+  invitedUsers,
+} from "~/server/db/schema";
 import { createMachineSchema, updateMachineSchema } from "./schemas";
 import { type Result, ok, err } from "~/lib/result";
 import { eq, and } from "drizzle-orm";
@@ -135,6 +140,13 @@ export async function createMachineAction(
     if (isActive) {
       finalOwnerId = ownerId;
     } else {
+      // Verify the ID exists in invited_users before assigning
+      const isInvited = await db.query.invitedUsers.findFirst({
+        where: eq(invitedUsers.id, ownerId),
+      });
+      if (!isInvited) {
+        return err("VALIDATION", "Selected owner does not exist.");
+      }
       finalInvitedOwnerId = ownerId;
     }
   } else {
@@ -276,6 +288,13 @@ export async function updateMachineAction(
         finalOwnerId = ownerId;
         finalInvitedOwnerId = null; // Reset invited if setting active
       } else {
+        // Verify the ID exists in invited_users before assigning
+        const isInvited = await db.query.invitedUsers.findFirst({
+          where: eq(invitedUsers.id, ownerId),
+        });
+        if (!isInvited) {
+          return err("VALIDATION", "Selected owner does not exist.");
+        }
         finalInvitedOwnerId = ownerId;
         finalOwnerId = null; // Reset active if setting invited
       }

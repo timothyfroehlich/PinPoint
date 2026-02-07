@@ -70,6 +70,9 @@ vi.mock("~/server/db", () => ({
       machineWatchers: {
         findFirst: vi.fn(),
       },
+      invitedUsers: {
+        findFirst: vi.fn(),
+      },
     },
   },
 }));
@@ -298,6 +301,86 @@ describe("updateMachineAction", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe("VALIDATION");
+    }
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it("should allow member owner to transfer ownership", async () => {
+    // Mock member profile (owner, not admin)
+    vi.mocked(db.query.userProfiles.findFirst).mockImplementation(() => {
+      // First call: profile lookup for the authenticated user
+      // Second call: checking if newOwnerId is an active user
+      const calls = vi.mocked(db.query.userProfiles.findFirst).mock.calls;
+      if (calls.length <= 1) {
+        return Promise.resolve({ id: mockUser.id, role: "member" } as any);
+      }
+      // Second call: the new owner exists as an active user
+      return Promise.resolve({ id: newOwnerId, role: "member" } as any);
+    });
+
+    // Mock successful update
+    const mockMachine = {
+      id: machineId,
+      initials: "TM",
+      name: "Test Machine",
+      ownerId: newOwnerId,
+    };
+    chain.returning.mockResolvedValue([mockMachine]);
+
+    const formData = new FormData();
+    formData.append("id", machineId);
+    formData.append("name", "Test Machine");
+    formData.append("ownerId", newOwnerId);
+
+    const result = await updateMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.machineId).toBe(machineId);
+    }
+    expect(db.update).toHaveBeenCalled();
+    expect(chain.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ownerId: newOwnerId,
+        invitedOwnerId: null,
+      })
+    );
+  });
+
+  it("should reject ownerId not found in user_profiles or invited_users", async () => {
+    const bogusOwnerId = "550e8400-e29b-41d4-a716-446655440099";
+
+    // Mock admin profile
+    vi.mocked(db.query.userProfiles.findFirst).mockImplementation(() => {
+      const calls = vi.mocked(db.query.userProfiles.findFirst).mock.calls;
+      if (calls.length <= 1) {
+        return Promise.resolve({ id: mockAdminUser.id, role: "admin" } as any);
+      }
+      // Second call: bogus owner not found in user_profiles
+      return Promise.resolve(undefined);
+    });
+
+    // Update auth to admin
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({ data: { user: mockAdminUser } }),
+      },
+    } as unknown as SupabaseClient);
+
+    // Not found in invited_users either
+    vi.mocked(db.query.invitedUsers.findFirst).mockResolvedValue(undefined);
+
+    const formData = new FormData();
+    formData.append("id", machineId);
+    formData.append("name", "Test Machine");
+    formData.append("ownerId", bogusOwnerId);
+
+    const result = await updateMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("VALIDATION");
+      expect(result.message).toBe("Selected owner does not exist.");
     }
     expect(db.update).not.toHaveBeenCalled();
   });
