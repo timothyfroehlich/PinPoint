@@ -1,7 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const ISSUE_DETAIL_PATH_PATTERN = /^\/m\/[^/]+\/i\/[^/]+$/;
+/** Matches only issue detail pages: /m/{initials}/i/{issueNumber} */
+const ISSUE_DETAIL_PATTERN = /^\/m\/[^/]+\/i\/[^/]+$/;
 
 /**
  * Updates the Supabase session for the request
@@ -115,7 +116,7 @@ export async function updateSession(
     path.startsWith("/reset-password") ||
     path.startsWith("/auth") ||
     path.startsWith("/report") ||
-    ISSUE_DETAIL_PATH_PATTERN.test(path) ||
+    ISSUE_DETAIL_PATTERN.test(path) ||
     path.startsWith("/dashboard") ||
     path.startsWith("/api");
 

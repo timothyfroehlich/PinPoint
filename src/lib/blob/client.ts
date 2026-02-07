@@ -3,7 +3,7 @@ import type { PutBlobResult } from "@vercel/blob";
 import path from "path";
 import fs from "fs/promises";
 import { log } from "~/lib/logger";
-import { shouldUseMockBlobStorage } from "~/lib/blob/mock-storage";
+import { shouldUseMockBlobStorage } from "~/lib/blob/config";
 
 /**
  * Uploads a file to Vercel Blob storage.

@@ -7,7 +7,7 @@
 
 import { z } from "zod";
 import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
-import { shouldUseMockBlobStorage } from "~/lib/blob/mock-storage";
+import { shouldUseMockBlobStorage } from "~/lib/blob/config";
 
 const uuidish = z
   .string()
@@ -79,8 +79,9 @@ export const imageMetadataSchema = z.object({
         const isVercelBlob = parsedUrl.hostname.endsWith(
           ".public.blob.vercel-storage.com"
         );
+        const allowLocalhostBlob = shouldUseMockBlobStorage();
         const isLocalhost =
-          shouldUseMockBlobStorage() && parsedUrl.hostname === "localhost";
+          allowLocalhostBlob && parsedUrl.hostname === "localhost";
         return isVercelBlob || isLocalhost;
       },
       {

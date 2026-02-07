@@ -34,3 +34,22 @@ export const BLOB_CONFIG = {
 } as const;
 
 export type AllowedMimeType = (typeof BLOB_CONFIG.ALLOWED_MIME_TYPES)[number];
+
+/**
+ * Check if mock blob storage should be used instead of Vercel Blob.
+ *
+ * Returns true when MOCK_BLOB_STORAGE=true or when running in a non-production
+ * environment without a blob token configured.
+ */
+export function shouldUseMockBlobStorage(): boolean {
+  if (process.env["MOCK_BLOB_STORAGE"] === "true") {
+    return true;
+  }
+
+  // Local/dev fallback: if no blob token is configured, use mock storage.
+  // Production should fail loudly when blob credentials are missing.
+  return (
+    process.env.NODE_ENV !== "production" &&
+    !process.env["BLOB_READ_WRITE_TOKEN"]
+  );
+}

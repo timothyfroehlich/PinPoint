@@ -162,6 +162,7 @@ export default async function IssueDetailPage({
   // Cast issue to IssueWithAllRelations for type safety
   const issueWithRelations = issue as unknown as IssueWithAllRelations;
   const ownerName = getMachineOwnerName(issueWithRelations);
+  // Default to "guest" when user is authenticated but profile/role is missing
   const accessLevel = getAccessLevel(
     currentUserProfile?.role ?? (user ? "guest" : undefined)
   );
