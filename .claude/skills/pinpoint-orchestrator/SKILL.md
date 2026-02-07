@@ -47,6 +47,40 @@ Teammate(operation: "cleanup")
 
 ---
 
+## Definition of Done
+
+A task is **NOT done** until ALL of the following are true. Agents must complete every item before creating a PR.
+
+### Quality Gates (Mandatory)
+
+1. **`pnpm run preflight` passes** — This runs typecheck, lint, format, unit tests, AND build. Not just `pnpm run check`.
+2. **Unit tests cover new logic** — Server actions, utility functions, permission checks, and validation logic must have unit tests.
+3. **Integration tests cover data flows** — Database queries, server action side effects, and multi-step operations must have integration tests using PGlite.
+4. **E2E tests cover new UI interactions** — Per AGENTS.md rule #11: "If you add a clickable UI element, you must click it in an E2E test." This includes buttons, links, dialogs, form submissions, and conditional UI states.
+5. **E2E tests pass locally** — Run the relevant E2E test file(s) with `pnpm exec playwright test <file> --project=chromium` and confirm they pass.
+
+### Test Coverage Expectations by Change Type
+
+| Change Type | Unit Tests | Integration Tests | E2E Tests |
+|-------------|-----------|-------------------|-----------|
+| New server action | Required | Required | Required (for the UI that calls it) |
+| New UI component | — | — | Required (click every interactive element) |
+| Permission changes | Required (matrix tests) | — | Required (verify visible/hidden/disabled states) |
+| Bug fix | Required (regression test) | If data-related | If UI-related |
+| Config/middleware change | — | Required | Required (verify route behavior) |
+
+### What Happens If Tests Are Missing
+
+The orchestrator will **not label a PR as ready-for-review** if:
+- The PR adds clickable UI elements without E2E tests
+- The PR adds server actions without unit tests
+- The PR modifies permissions without matrix tests
+- CI E2E jobs fail
+
+Instead, the orchestrator will re-dispatch an agent to add the missing tests or fix failures.
+
+---
+
 ## Phase 1: Task Selection
 
 ### 1.1 Load Available Work
@@ -143,6 +177,7 @@ ls /home/froeht/Code/pinpoint-worktrees/*/.env.local
 2. Explicit instruction to work ONLY in that path
 3. Beads issue context
 4. Reference to AGENTS.md
+5. The Definition of Done checklist (see above)
 
 Use the template in `references/agent-prompt-template.md`.
 
@@ -520,6 +555,40 @@ supabase stop --all         # Clear Supabase state
 **Session dies with active team**: Team state persists in `~/.claude/teams/<name>/`. Manual cleanup: `rm -rf ~/.claude/teams/<name> ~/.claude/tasks/<name>`. Worktrees are unaffected — clean up separately with `./pinpoint-wt.py remove`.
 
 ---
+
+## Proactive Beads Maintenance
+
+The orchestrator is responsible for keeping beads state accurate throughout the session. Don't wait for the user to notice stale data — fix it as you go.
+
+### On Session Start
+
+- Run `bd ready -n 50` (default limit is 10, which hides work)
+- Run `bd list --status=in_progress` to check for stale in-progress issues
+- Cross-reference: any in-progress issues whose PRs are already merged? Close them
+- Check for closed issues that still appear as blockers (`bd blocked` → `bd dep remove`)
+
+### During Work
+
+- When a PR merges, immediately close the corresponding beads issue
+- When an agent completes and creates a PR, update the beads issue (close or note the PR)
+- When you discover new work while investigating, create beads issues (`bd create`)
+- When a task gets absorbed into another (e.g., a bug fix becomes part of a feature), close it with `--reason`
+- Clean stale dependencies: if a closed issue blocks open issues, run `bd dep remove` to unblock them
+
+### On Session End
+
+- Run `bd list --status=in_progress` — anything still in-progress that's actually done? Close it
+- Run `bd sync --from-main` to pull beads updates
+- Verify all completed work has corresponding closed issues
+
+### Common Stale Patterns
+
+| Pattern | Fix |
+|---------|-----|
+| Closed issue still blocking others | `bd dep remove <blocked> <closed-blocker>` |
+| PR merged but beads still open | `bd close <id> --reason="PR #N merged"` |
+| Issue marked in_progress but abandoned | `bd update <id> --status=open` |
+| Duplicate issues | Close the duplicate with `--reason="Duplicate of <id>"` |
 
 ## Integration with Other Skills
 
