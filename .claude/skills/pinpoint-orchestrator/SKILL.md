@@ -466,12 +466,17 @@ Remaining Worktrees (PRs still need work):
 - feat/task-def (PR #124 needs work)
 ```
 
-### 5.2 Close Beads Issues
+### 5.2 Beads Issue Lifecycle
 
-For successful PRs:
+**Do NOT close beads issues when a PR is created.** Issues stay open (in_progress) until the PR **merges**.
+
+- **PR created** → Issue stays `in_progress`. Note the PR number if useful.
+- **PR merged** → Close the issue: `bd close <id> --reason="PR #N merged"`
+- **PR closed without merge** → Reopen the issue: `bd update <id> --status=open`
 
 ```bash
-bd close PinPoint-abc PinPoint-ghi --reason="PR created and passing"
+# Only after PR merges:
+bd close PinPoint-abc PinPoint-ghi --reason="PR #123 and #125 merged"
 ```
 
 ### 5.3 Remaining Cleanup
@@ -569,8 +574,8 @@ The orchestrator is responsible for keeping beads state accurate throughout the 
 
 ### During Work
 
-- When a PR merges, immediately close the corresponding beads issue
-- When an agent completes and creates a PR, update the beads issue (close or note the PR)
+- When a PR **merges**, immediately close the corresponding beads issue
+- When an agent completes and creates a PR, the beads issue stays `in_progress` — do NOT close it yet
 - When you discover new work while investigating, create beads issues (`bd create`)
 - When a task gets absorbed into another (e.g., a bug fix becomes part of a feature), close it with `--reason`
 - Clean stale dependencies: if a closed issue blocks open issues, run `bd dep remove` to unblock them
