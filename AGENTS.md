@@ -176,6 +176,7 @@ bash scripts/respond-to-copilot.sh <PR> <path:line> <msg>  # Reply + resolve one
 ```
 
 **Rules:**
+
 - Every Copilot comment gets a reply — no silent fixes or silent ignores
 - Keep replies to one sentence
 - If Copilot is wrong, say why (helps future reviews)

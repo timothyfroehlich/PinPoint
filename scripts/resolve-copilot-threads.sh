@@ -83,15 +83,22 @@ if [ "$MODE" != "--all" ]; then
         exit 1
     fi
 
-    if [[ "$last_commit_date" > "$last_review_date" ]]; then
-        echo "Last commit ($last_commit_date) is NEWER than last Copilot review ($last_review_date)"
-        echo "→ All threads are likely addressed."
-        echo ""
-    else
-        echo "Last Copilot review ($last_review_date) is NEWER than last commit ($last_commit_date)"
-        echo "→ Some threads may contain new feedback. Use --all to override."
+    echo "Last commit: $last_commit_date"
+    echo ""
+
+    # Filter to only threads older than the last commit (per-thread check)
+    unresolved=$(echo "$unresolved" | jq --arg cutoff "$last_commit_date" '
+      [.[] | select(.createdAt < $cutoff)]')
+    count=$(echo "$unresolved" | jq 'length')
+
+    if [ "$count" -eq 0 ]; then
+        echo "All threads are newer than the last commit — nothing to resolve."
+        echo "Use --all to resolve regardless."
         exit 0
     fi
+
+    echo "$count thread(s) predate the last commit and are likely addressed."
+    echo ""
 fi
 
 # Show and resolve each thread
