@@ -25,8 +25,9 @@ bash scripts/pr-dashboard.sh [PR numbers...]       # CI + Copilot status table (
 bash scripts/copilot-comments.sh <PR>              # Copilot details formatted for agent prompts
 bash scripts/copilot-comments.sh <PR> --raw        # JSON output for parsing
 
-# Copilot thread management
-bash scripts/resolve-copilot-threads.sh <PR>              # Resolve addressed threads (compares timestamps)
+# Copilot thread management (see AGENTS.md "GitHub Copilot Reviews" for full protocol)
+bash scripts/respond-to-copilot.sh <PR> <path:line> <msg> # Reply + resolve one thread
+bash scripts/resolve-copilot-threads.sh <PR>              # Bulk-resolve addressed threads (compares timestamps)
 bash scripts/resolve-copilot-threads.sh <PR> --dry-run    # Preview without resolving
 bash scripts/resolve-copilot-threads.sh <PR> --all        # Resolve ALL unresolved threads
 
@@ -180,7 +181,7 @@ gh run view <run-id> --log-failed | tail -50
 bash scripts/copilot-comments.sh <PR>
 ```
 
-Include the full output in the new agent's prompt so it knows exactly what to fix.
+Include the full output in the new agent's prompt. **Agents MUST resolve each thread** as they address it using `bash scripts/respond-to-copilot.sh` (see AGENTS.md "GitHub Copilot Reviews").
 
 **Infrastructure failures** (e.g., "Setup Supabase CLI: failure") → Not code issues. Re-run:
 

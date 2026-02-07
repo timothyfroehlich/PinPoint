@@ -151,11 +151,35 @@ Eliminates manual JSON surgery and uncertainty.
 
 ### GitHub Copilot Reviews
 
-Fetch all comments (including hidden ones):
+**MANDATORY**: When addressing Copilot review comments on a PR, you MUST resolve each thread as you go.
+
+**Workflow for each comment:**
+
+1. Read the comment via `bash scripts/copilot-comments.sh <PR>`
+2. Fix the code (or decide to ignore with justification)
+3. Reply and resolve the thread:
 
 ```bash
-gh api graphql -f query='{ repository(owner: "timothyfroehlich", name: "PinPoint") { pullRequest(number: <PR_NUMBER>) { reviews(last: 5) { nodes { author { login } state comments(first: 20) { nodes { path line body } } } } } } }'
+bash scripts/respond-to-copilot.sh <PR> "<path>:<line>" "Fixed: <what you did>. —Claude"
+bash scripts/respond-to-copilot.sh <PR> "<path>:<line>" "Ignored: <why this is wrong/unnecessary>. —Claude"
 ```
+
+Sign replies with your agent name (`—Claude`, `—Codex`, etc.).
+
+**Scripts:**
+
+```bash
+bash scripts/copilot-comments.sh <PR>              # Show UNRESOLVED comments only
+bash scripts/copilot-comments.sh <PR> --all         # Include resolved
+bash scripts/resolve-copilot-threads.sh <PR>        # Bulk-resolve addressed threads
+bash scripts/respond-to-copilot.sh <PR> <path:line> <msg>  # Reply + resolve one thread
+```
+
+**Rules:**
+- Every Copilot comment gets a reply — no silent fixes or silent ignores
+- Keep replies to one sentence
+- If Copilot is wrong, say why (helps future reviews)
+- Resolve threads immediately after replying, not in bulk at the end
 
 ### Parallel Subagent Workflow
 
