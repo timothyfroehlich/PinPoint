@@ -185,6 +185,7 @@ export function Sidebar({
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Austin Pinball Collective"
+                {...(onNavigate ? { onClick: onNavigate } : {})}
               >
                 <Image
                   src="/apc-logo.png"
