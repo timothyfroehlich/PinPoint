@@ -91,7 +91,7 @@ export function MachineInfoDisplay({
       </div>
 
       {/* Owner */}
-      <div className="space-y-1">
+      <div className="space-y-1" data-testid="owner-display">
         <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
           Machine Owner
         </p>
