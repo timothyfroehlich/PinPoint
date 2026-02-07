@@ -30,125 +30,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "~/components/ui/tooltip";
 import { Pencil } from "lucide-react";
 
 import type { UnifiedUser } from "~/lib/types";
-
-// --- Static Display Component ---
-
-interface MachineInfoDisplayProps {
-  machine: {
-    name: string;
-    initials: string;
-    ownerId: string | null;
-    invitedOwnerId: string | null;
-    owner?: {
-      id: string;
-      name: string;
-      avatarUrl?: string | null;
-    } | null;
-    invitedOwner?: {
-      id: string;
-      name: string;
-    } | null;
-  };
-  canEdit: boolean;
-  editDeniedReason: string | null;
-  /** Whether the user is authenticated. When false, edit button is hidden entirely. */
-  isAuthenticated: boolean;
-}
-
-export function MachineInfoDisplay({
-  machine,
-  canEdit,
-  editDeniedReason,
-  isAuthenticated,
-}: MachineInfoDisplayProps): React.JSX.Element {
-  return (
-    <div className="space-y-4">
-      {/* Machine Name */}
-      <div className="space-y-1">
-        <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
-          Name
-        </p>
-        <p className="text-sm font-medium text-on-surface">{machine.name}</p>
-      </div>
-
-      {/* Initials */}
-      <div className="space-y-1">
-        <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
-          Initials
-        </p>
-        <p className="text-sm font-medium text-on-surface">
-          {machine.initials}
-        </p>
-      </div>
-
-      {/* Owner */}
-      <div className="space-y-1" data-testid="owner-display">
-        <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
-          Machine Owner
-        </p>
-        {machine.owner || machine.invitedOwner ? (
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-medium text-on-surface">
-              {machine.owner?.name ?? machine.invitedOwner?.name}
-            </p>
-            {machine.invitedOwner && !machine.owner && (
-              <span className="text-[10px] font-medium uppercase tracking-wider text-on-surface-variant/70">
-                (Invited)
-              </span>
-            )}
-          </div>
-        ) : (
-          <p className="text-sm text-on-surface-variant">No owner assigned</p>
-        )}
-      </div>
-
-      {/* Edit button: hidden for unauth, disabled+tooltip for guest/non-owner member, active for owner/admin */}
-      {!canEdit && isAuthenticated && editDeniedReason !== null && (
-        <EditButtonWithTooltip reason={editDeniedReason} />
-      )}
-      {/* When canEdit is true, the EditMachineDialog trigger is rendered by the parent */}
-    </div>
-  );
-}
-
-function EditButtonWithTooltip({
-  reason,
-}: {
-  reason: string;
-}): React.JSX.Element {
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span tabIndex={0} className="inline-block w-full">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled
-              className="w-full border-outline text-on-surface-variant"
-              data-testid="edit-machine-button-disabled"
-            >
-              <Pencil className="mr-2 size-4" />
-              Edit Machine
-            </Button>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>{reason}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
-}
 
 // --- Edit Machine Dialog ---
 
@@ -204,26 +88,24 @@ export function EditMachineDialog({
   const selectedOwnerName =
     allUsers.find((u) => u.id === selectedOwnerId)?.name ?? "the selected user";
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
-    e.preventDefault();
+  // Only intercept submission for ownership-transfer confirmation (non-admin owners)
+  const needsTransferConfirm =
+    !isAdmin && isOwner && selectedOwnerId !== currentOwnerId;
 
-    // If non-admin owner is changing ownership, show confirmation
-    if (!isAdmin && isOwner && selectedOwnerId !== currentOwnerId) {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
+    // Only prevent default when we need to show the transfer confirmation dialog
+    if (needsTransferConfirm) {
+      e.preventDefault();
       setShowTransferConfirm(true);
       return;
     }
-
-    // Otherwise submit directly
-    const formData = new FormData(e.currentTarget);
-    formAction(formData);
+    // Otherwise, let the form submit naturally via the action attribute
   };
 
   const handleConfirmTransfer = (): void => {
     setShowTransferConfirm(false);
-    if (formRef.current) {
-      const formData = new FormData(formRef.current);
-      formAction(formData);
-    }
+    // Use requestSubmit to trigger the form's action attribute
+    formRef.current?.requestSubmit();
   };
 
   return (
@@ -248,7 +130,12 @@ export function EditMachineDialog({
             </DialogDescription>
           </DialogHeader>
 
-          <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
+          <form
+            ref={formRef}
+            action={formAction}
+            onSubmit={handleSubmit}
+            className="space-y-6"
+          >
             <input type="hidden" name="id" value={machine.id} />
 
             {/* Flash message */}

@@ -44,10 +44,11 @@ export function OwnerSelect({
       // Check if the pending ID now exists in the users list
       if (users.some((u) => u.id === pendingId)) {
         setSelectedId(pendingId);
+        onValueChange?.(pendingId);
         pendingSelectionRef.current = null;
       }
     }
-  }, [users]);
+  }, [users, onValueChange]);
 
   // Re-sort users after client-side mutations (e.g., inviting a new user)
   // to maintain consistent ordering: confirmed first, by machine count desc, then by last name

@@ -21,7 +21,8 @@ import { Badge } from "~/components/ui/badge";
 import { ArrowLeft, Calendar, Plus } from "lucide-react";
 import { headers } from "next/headers";
 import { resolveRequestUrl } from "~/lib/url";
-import { MachineInfoDisplay, EditMachineDialog } from "./update-machine-form";
+import { MachineInfoDisplay } from "./machine-info-display";
+import { EditMachineDialog } from "./update-machine-form";
 import { QrCodeDialog } from "./qr-code-dialog";
 import { buildMachineReportUrl } from "~/lib/machines/report-url";
 import { generateQrPngDataUrl } from "~/lib/machines/qr";
@@ -126,7 +127,7 @@ export default async function MachineDetailPage({
   // Build ownership context for permission checks
   const ownershipContext: OwnershipContext = {
     userId: user?.id,
-    machineOwnerId: machine.ownerId ?? machine.invitedOwnerId,
+    machineOwnerId: machine.ownerId ?? undefined,
   };
 
   // Permission computations

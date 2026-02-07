@@ -243,27 +243,6 @@ export async function updateMachineAction(
   const { id, name, ownerId } = validation.data;
 
   try {
-    // Resolve owner type if provided
-    let finalOwnerId: string | null | undefined = undefined;
-    let finalInvitedOwnerId: string | null | undefined = undefined;
-    let shouldUpdateOwner = false;
-
-    // Admins and machine owners can change ownership
-    const isOwnerOrAdmin = profile.role === "admin" || !!ownerId;
-    if (isOwnerOrAdmin && ownerId) {
-      shouldUpdateOwner = true;
-      const isActive = await db.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, ownerId),
-      });
-      if (isActive) {
-        finalOwnerId = ownerId;
-        finalInvitedOwnerId = null; // Reset invited if setting active
-      } else {
-        finalInvitedOwnerId = ownerId;
-        finalOwnerId = null; // Reset active if setting invited
-      }
-    }
-
     // Admins can update any machine, non-admins can only update their own machines
     const whereConditions =
       profile.role === "admin"
@@ -278,6 +257,28 @@ export async function updateMachineAction(
 
     if (!currentMachine) {
       return err("NOT_FOUND", "Machine not found.");
+    }
+
+    // Resolve owner type if provided
+    let finalOwnerId: string | null | undefined = undefined;
+    let finalInvitedOwnerId: string | null | undefined = undefined;
+    let shouldUpdateOwner = false;
+
+    // Derive ownership from the actual machine record, not from form fields
+    const isActualOwner = currentMachine.ownerId === user.id;
+    const isOwnerOrAdmin = profile.role === "admin" || isActualOwner;
+    if (isOwnerOrAdmin && ownerId) {
+      shouldUpdateOwner = true;
+      const isActive = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, ownerId),
+      });
+      if (isActive) {
+        finalOwnerId = ownerId;
+        finalInvitedOwnerId = null; // Reset invited if setting active
+      } else {
+        finalInvitedOwnerId = ownerId;
+        finalOwnerId = null; // Reset active if setting invited
+      }
     }
 
     const [machine] = await db
