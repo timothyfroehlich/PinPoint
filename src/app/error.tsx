@@ -1,7 +1,8 @@
 "use client";
 
-import type React from "react";
+import * as Sentry from "@sentry/nextjs";
 import Link from "next/link";
+import type React from "react";
 import { useEffect } from "react";
 
 import { Button } from "~/components/ui/button";
@@ -22,8 +23,16 @@ export default function ErrorPage({
   reset,
 }: ErrorPageProps): React.JSX.Element {
   useEffect(() => {
-    // Log to console for development; Sentry captures automatically via integration
-    console.error("Unhandled error:", error);
+    // Capture to Sentry (matches global-error.tsx pattern)
+    Sentry.captureException(error);
+
+    // Log full error details only in development to avoid leaking stack traces
+    // in production DevTools. In production, log digest only for correlation.
+    if (process.env.NODE_ENV !== "production") {
+      console.error("Unhandled error:", error);
+    } else if (error.digest) {
+      console.error("Unhandled error (digest only):", error.digest);
+    }
   }, [error]);
 
   return (
