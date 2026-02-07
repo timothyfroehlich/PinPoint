@@ -144,15 +144,13 @@ export function Sidebar({
             collapsed ? "px-0" : "px-4"
           )}
         >
-          <Link
-            href="/dashboard"
-            {...(onNavigate ? { onClick: onNavigate } : {})}
-            className="flex size-full items-center justify-center gap-2"
-            aria-label={
-              collapsed ? "PinPoint" : "PinPoint - Austin Pinball Collective"
-            }
-          >
-            {collapsed ? (
+          {collapsed ? (
+            <Link
+              href="/dashboard"
+              {...(onNavigate ? { onClick: onNavigate } : {})}
+              className="flex size-full items-center justify-center gap-2"
+              aria-label="PinPoint"
+            >
               <Image
                 src="/logo-pinpoint-transparent.png"
                 alt="P"
@@ -161,8 +159,15 @@ export function Sidebar({
                 className="animate-in fade-in zoom-in duration-300 object-contain h-[56px] w-[56px]"
                 priority
               />
-            ) : (
-              <div className="flex items-center justify-between w-full px-2 animate-in fade-in slide-in-from-left-4 duration-300">
+            </Link>
+          ) : (
+            <div className="flex items-center justify-between w-full px-2 animate-in fade-in slide-in-from-left-4 duration-300">
+              <Link
+                href="/dashboard"
+                {...(onNavigate ? { onClick: onNavigate } : {})}
+                className="flex items-center gap-2 min-w-0"
+                aria-label="PinPoint - Austin Pinball Collective"
+              >
                 <Image
                   src="/logo-pinpoint-transparent.png"
                   alt="PinPoint"
@@ -171,9 +176,17 @@ export function Sidebar({
                   className="object-contain h-[50px] w-[50px] shrink-0"
                   priority
                 />
-                <span className="text-xl font-bold tracking-tight text-foreground mx-auto">
+                <span className="text-xl font-bold tracking-tight text-foreground">
                   PinPoint
                 </span>
+              </Link>
+              <a
+                href="https://austinpinballcollective.org"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Austin Pinball Collective"
+                {...(onNavigate ? { onClick: onNavigate } : {})}
+              >
                 <Image
                   src="/apc-logo.png"
                   alt="Austin Pinball Collective"
@@ -181,9 +194,9 @@ export function Sidebar({
                   height={38}
                   className="h-9 w-auto object-contain shrink-0"
                 />
-              </div>
-            )}
-          </Link>
+              </a>
+            </div>
+          )}
         </div>
 
         {/* Navigation */}
