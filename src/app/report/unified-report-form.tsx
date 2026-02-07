@@ -29,15 +29,12 @@ import type {
 import { ImageUploadButton } from "~/components/images/ImageUploadButton";
 import { ImageGallery } from "~/components/images/ImageGallery";
 import { type ImageMetadata } from "~/types/images";
+import type { AccessLevel } from "~/lib/permissions/matrix";
 
 interface Machine {
   id: string;
   name: string;
   initials: string;
-}
-
-interface UserProfile {
-  role: string;
 }
 
 interface User {
@@ -58,7 +55,7 @@ interface UnifiedReportFormProps {
   machinesList: Machine[];
   defaultMachineId?: string | undefined;
   user: User | null; // Supabase User
-  userProfile?: UserProfile | undefined;
+  accessLevel: AccessLevel;
   assignees?: Assignee[];
   initialError?: string | undefined;
   recentIssuesPanelMobile?: React.ReactNode;
@@ -69,7 +66,7 @@ export function UnifiedReportForm({
   machinesList,
   defaultMachineId,
   user,
-  userProfile,
+  accessLevel,
   assignees = [],
   initialError,
   recentIssuesPanelMobile,
@@ -184,8 +181,7 @@ export function UnifiedReportForm({
     }
   }, [defaultMachineId]);
 
-  const isAdminOrMember =
-    !!user && (userProfile?.role === "admin" || userProfile?.role === "member");
+  const isAdminOrMember = accessLevel === "admin" || accessLevel === "member";
 
   return (
     <div className="w-full max-w-5xl mx-auto">
