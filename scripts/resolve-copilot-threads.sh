@@ -72,16 +72,8 @@ echo ""
 
 # If not --all, check timestamps to find addressed threads
 if [ "$MODE" != "--all" ]; then
-    # Get last commit date on the PR
+    # Get last commit date on the PR (used as per-thread cutoff)
     last_commit_date=$(gh pr view "$PR" --json commits --jq '.commits[-1].committedDate')
-    # Get last Copilot review date
-    last_review_date=$(gh api "repos/${OWNER}/${REPO}/pulls/${PR}/reviews" \
-        --jq '[.[] | select(.user.login | test("copilot"))] | last | .submitted_at' 2>/dev/null)
-
-    if [ -z "$last_review_date" ] || [ "$last_review_date" = "null" ]; then
-        echo "Could not determine Copilot review date. Use --all to force resolve."
-        exit 1
-    fi
 
     echo "Last commit: $last_commit_date"
     echo ""

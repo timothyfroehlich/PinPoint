@@ -6,7 +6,7 @@
 # The reply is visible on GitHub and the thread is resolved.
 #
 # Usage:
-#   bash scripts/respond-to-copilot.sh <PR> <path:line> <message> [--agent=Claude]
+#   bash scripts/respond-to-copilot.sh <PR> <path:line> <message>
 #
 # Examples:
 #   bash scripts/respond-to-copilot.sh 945 "src/lib/blob/config.ts:N/A" "Fixed: extracted pathname before passing to deleteFromBlob. —Claude"
@@ -14,6 +14,7 @@
 #
 # The <path:line> must match a Copilot comment's file path and line number.
 # Use "N/A" for line when the comment has no specific line.
+# Sign your replies with your agent name (e.g., "—Claude") in the message itself.
 
 set -euo pipefail
 
@@ -21,24 +22,16 @@ OWNER="timothyfroehlich"
 REPO="PinPoint"
 
 if [ $# -lt 3 ]; then
-    echo "Usage: $0 <PR_NUMBER> <path:line> <message> [--agent=Claude]"
+    echo "Usage: $0 <PR_NUMBER> <path:line> <message>"
     echo ""
     echo "  path:line   File path and line from copilot-comments.sh output (e.g. 'src/foo.ts:42' or 'src/foo.ts:N/A')"
-    echo "  message     Brief reply (1 sentence). Will be posted as a PR comment."
-    echo "  --agent=X   Agent name for signature (default: Claude)"
+    echo "  message     Brief reply (1 sentence). Sign with agent name (e.g., '—Claude')."
     exit 1
 fi
 
 PR=$1
 PATH_LINE=$2
 MESSAGE=$3
-AGENT="Claude"
-
-for arg in "$@"; do
-    case $arg in
-        --agent=*) AGENT="${arg#*=}" ;;
-    esac
-done
 
 # Parse path and line
 TARGET_PATH="${PATH_LINE%%:*}"
