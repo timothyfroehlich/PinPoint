@@ -124,10 +124,17 @@ export async function uploadAvatarAction(
 
     // 7. Delete old avatar blob if it's ours (not an OAuth URL)
     if (oldAvatarUrl && isOurBlobUrl(oldAvatarUrl)) {
-      // Extract pathname from URL for deletion
-      // For Vercel Blob URLs, we need the full URL for deletion
-      // For local mock URLs, we need the pathname portion
-      await deleteFromBlob(oldAvatarUrl);
+      try {
+        const url = new URL(oldAvatarUrl);
+        const pathname = url.pathname.startsWith("/")
+          ? url.pathname.slice(1)
+          : url.pathname;
+        if (pathname) {
+          await deleteFromBlob(pathname);
+        }
+      } catch {
+        // If the URL is malformed, skip blob deletion
+      }
     }
 
     // 8. Revalidate layout so avatar updates everywhere
@@ -203,7 +210,17 @@ export async function deleteAvatarAction(): Promise<DeleteAvatarResult> {
 
   // 4. Delete blob if it's ours
   if (oldAvatarUrl && isOurBlobUrl(oldAvatarUrl)) {
-    await deleteFromBlob(oldAvatarUrl);
+    try {
+      const url = new URL(oldAvatarUrl);
+      const pathname = url.pathname.startsWith("/")
+        ? url.pathname.slice(1)
+        : url.pathname;
+      if (pathname) {
+        await deleteFromBlob(pathname);
+      }
+    } catch {
+      // If the URL is malformed, skip blob deletion
+    }
   }
 
   // 5. Revalidate layout

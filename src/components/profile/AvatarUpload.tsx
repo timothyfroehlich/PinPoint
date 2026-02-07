@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -23,6 +24,7 @@ export function AvatarUpload({
   currentAvatarUrl,
   userName,
 }: AvatarUploadProps): React.JSX.Element {
+  const router = useRouter();
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -46,6 +48,9 @@ export function AvatarUpload({
     const validation = validateImageFile(file);
     if (!validation.valid) {
       toast.error(validation.error ?? "Selected file is not a valid image.");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
       return;
     }
 
@@ -54,13 +59,16 @@ export function AvatarUpload({
       toast.error(
         `File too large. Maximum size is ${BLOB_CONFIG.AVATAR.MAX_FILE_SIZE_BYTES / 1024 / 1024}MB.`
       );
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
       return;
     }
 
     setIsUploading(true);
     try {
       // Compress before upload
-      const compressedFile = await compressImage(file, "cropped");
+      const compressedFile = await compressImage(file, "avatar");
 
       // Upload via server action
       const formData = new FormData();
@@ -70,6 +78,7 @@ export function AvatarUpload({
 
       if (result.ok) {
         toast.success("Avatar updated successfully.");
+        router.refresh();
       } else {
         toast.error(`Upload failed: ${result.message}`);
       }
@@ -91,6 +100,7 @@ export function AvatarUpload({
 
       if (result.ok) {
         toast.success("Avatar removed.");
+        router.refresh();
       } else {
         toast.error(`Failed to remove avatar: ${result.message}`);
       }

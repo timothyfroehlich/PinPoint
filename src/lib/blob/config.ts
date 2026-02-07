@@ -32,7 +32,6 @@ export const BLOB_CONFIG = {
     MAX_FILE_SIZE_BYTES: 2 * 1024 * 1024, // 2MB
     COMPRESSION_MAX_MB: 1,
     COMPRESSION_QUALITY: 0.9,
-    RATE_LIMIT_PER_HOUR: 10,
   },
 
   // Cleanup
