@@ -2,9 +2,10 @@ import { defineConfig } from "@playwright/test";
 import baseConfig from "./playwright.config";
 
 const shouldSkipSafariOnThisHost =
-  process.platform === "linux" ||
-  process.env["PLAYWRIGHT_SKIP_SAFARI"] === "true" ||
-  process.env["PLAYWRIGHT_SKIP_SAFARI"] === "1";
+  !process.env["CI"] &&
+  (process.platform === "linux" ||
+    process.env["PLAYWRIGHT_SKIP_SAFARI"] === "true" ||
+    process.env["PLAYWRIGHT_SKIP_SAFARI"] === "1");
 const shouldSkipFirefoxOnThisHost =
   process.platform === "linux" &&
   process.env["PLAYWRIGHT_FULL_INCLUDE_FIREFOX"] !== "true" &&

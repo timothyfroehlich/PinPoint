@@ -169,4 +169,34 @@ describe("updateSession autologin", () => {
 
     expect(response.headers.get("location")).toBeNull();
   });
+
+  it("redirects unauthenticated users from /m/new to login", async () => {
+    const supabase = createSupabaseAuthMocks(null, null);
+    createServerClientMock.mockReturnValue(supabase);
+
+    const request = makeRequest("http://localhost/m/new");
+    const response = await updateSession(request);
+
+    expect(response.headers.get("location")?.includes("/login")).toBe(true);
+  });
+
+  it("redirects unauthenticated users from /m to login", async () => {
+    const supabase = createSupabaseAuthMocks(null, null);
+    createServerClientMock.mockReturnValue(supabase);
+
+    const request = makeRequest("http://localhost/m");
+    const response = await updateSession(request);
+
+    expect(response.headers.get("location")?.includes("/login")).toBe(true);
+  });
+
+  it("redirects unauthenticated users from /m/AFM (machine page) to login", async () => {
+    const supabase = createSupabaseAuthMocks(null, null);
+    createServerClientMock.mockReturnValue(supabase);
+
+    const request = makeRequest("http://localhost/m/AFM");
+    const response = await updateSession(request);
+
+    expect(response.headers.get("location")?.includes("/login")).toBe(true);
+  });
 });
