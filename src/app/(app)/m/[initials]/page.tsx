@@ -1,5 +1,5 @@
 import type React from "react";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { cn } from "~/lib/utils";
 import Link from "next/link";
@@ -30,10 +30,12 @@ import { WatchMachineButton } from "~/components/machines/WatchMachineButton";
 import { MachineEmptyState } from "~/components/machines/MachineEmptyState";
 
 /**
- * Machine Detail Page (Protected Route)
+ * Machine Detail Page (Public Route)
  *
  * Shows machine details and its associated issues.
  * Displays derived status based on open issues.
+ * Accessible to unauthenticated users (view-only).
+ * Admin features (edit machine, manage owners) require authentication.
  */
 export default async function MachineDetailPage({
   params,
@@ -43,22 +45,19 @@ export default async function MachineDetailPage({
   // Await params (Next.js 15+ requirement)
   const { initials } = await params;
 
-  // Auth guard - check if user is authenticated (CORE-SSR-002)
+  // Optional auth - machine detail pages are publicly accessible
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    const next = encodeURIComponent(`/m/${initials}`);
-    redirect(`/login?next=${next}`);
-  }
-
-  // Fetch current user profile to check role
-  const currentUserProfile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-    columns: { role: true },
-  });
+  // Fetch current user profile to check role (only if authenticated)
+  const currentUserProfile = user
+    ? await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, user.id),
+        columns: { role: true },
+      })
+    : undefined;
 
   const isAdmin = currentUserProfile?.role === "admin";
 
@@ -139,7 +138,9 @@ export default async function MachineDetailPage({
   });
   const qrDataUrl = await generateQrPngDataUrl(reportUrl);
 
-  const currentUserWatch = machine.watchers.find((w) => w.userId === user.id);
+  const currentUserWatch = user
+    ? machine.watchers.find((w) => w.userId === user.id)
+    : undefined;
   const isWatching = !!currentUserWatch;
   const watchMode = currentUserWatch?.watchMode ?? "notify";
 
@@ -181,11 +182,13 @@ export default async function MachineDetailPage({
               </div>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
-              <WatchMachineButton
-                machineId={machine.id}
-                initialIsWatching={isWatching}
-                initialWatchMode={watchMode}
-              />
+              {user && (
+                <WatchMachineButton
+                  machineId={machine.id}
+                  initialIsWatching={isWatching}
+                  initialWatchMode={watchMode}
+                />
+              )}
               <Button
                 className="bg-primary text-on-primary hover:bg-primary/90"
                 asChild
