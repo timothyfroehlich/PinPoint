@@ -63,9 +63,26 @@ fi
 
 echo "CI: All checks passed."
 
-# Check Copilot comments
-copilot_count=$(gh api "repos/${REPO}/pulls/${PR}/comments" \
-    --jq '[.[] | select(.user.login == "Copilot")] | length' 2>/dev/null) || copilot_count=0
+# Check Copilot comments (unresolved threads only via GraphQL)
+copilot_count=$(gh api graphql -f query="
+  {
+    repository(owner: \"timothyfroehlich\", name: \"PinPoint\") {
+      pullRequest(number: $PR) {
+        reviewThreads(first: 100) {
+          nodes {
+            isResolved
+            comments(first: 1) {
+              nodes { author { login } }
+            }
+          }
+        }
+      }
+    }
+  }" --jq '
+  [.data.repository.pullRequest.reviewThreads.nodes[]
+   | select(.isResolved == false)
+   | select(.comments.nodes[0].author.login == "copilot-pull-request-reviewer[bot]")]
+   | length' 2>/dev/null) || copilot_count=0
 
 if [ "$copilot_count" -gt 0 ] && [ "$FORCE" = "false" ]; then
     echo "BLOCK: ${copilot_count} Copilot comments. Use --force to label anyway."

@@ -25,6 +25,11 @@ bash scripts/pr-dashboard.sh [PR numbers...]       # CI + Copilot status table (
 bash scripts/copilot-comments.sh <PR>              # Copilot details formatted for agent prompts
 bash scripts/copilot-comments.sh <PR> --raw        # JSON output for parsing
 
+# Copilot thread management
+bash scripts/resolve-copilot-threads.sh <PR>              # Resolve addressed threads (compares timestamps)
+bash scripts/resolve-copilot-threads.sh <PR> --dry-run    # Preview without resolving
+bash scripts/resolve-copilot-threads.sh <PR> --all        # Resolve ALL unresolved threads
+
 # Readiness + cleanup
 bash scripts/label-ready.sh <PR>                   # Label ready-for-review (checks CI + Copilot + draft)
 bash scripts/label-ready.sh <PR> --cleanup         # Also remove associated worktree

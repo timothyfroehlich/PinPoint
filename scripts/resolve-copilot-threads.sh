@@ -1,0 +1,120 @@
+#!/bin/bash
+# scripts/resolve-copilot-threads.sh
+# Resolve Copilot review threads that have been addressed by subsequent commits.
+#
+# A thread is considered "addressed" if the last commit on the PR is newer
+# than the Copilot review that created the thread.
+#
+# Usage:
+#   ./scripts/resolve-copilot-threads.sh <PR>              # Resolve addressed threads
+#   ./scripts/resolve-copilot-threads.sh <PR> --dry-run    # Preview without resolving
+#   ./scripts/resolve-copilot-threads.sh <PR> --all        # Resolve ALL unresolved Copilot threads
+
+set -euo pipefail
+
+OWNER="timothyfroehlich"
+REPO="PinPoint"
+
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 <PR_NUMBER> [--dry-run|--all]"
+    exit 1
+fi
+
+PR=$1
+MODE="${2:-}"
+
+# Get unresolved Copilot review threads
+threads_json=$(gh api graphql -f query="
+{
+  repository(owner: \"$OWNER\", name: \"$REPO\") {
+    pullRequest(number: $PR) {
+      reviewThreads(first: 100) {
+        nodes {
+          id
+          isResolved
+          comments(first: 1) {
+            nodes {
+              author { login }
+              body
+              path
+              line
+              createdAt
+            }
+          }
+        }
+      }
+    }
+  }
+}")
+
+# Filter to unresolved Copilot threads
+unresolved=$(echo "$threads_json" | jq -r '
+  [.data.repository.pullRequest.reviewThreads.nodes[]
+   | select(.isResolved == false)
+   | select(.comments.nodes[0].author.login == "copilot-pull-request-reviewer[bot]")
+   | {
+       id: .id,
+       path: .comments.nodes[0].path,
+       line: .comments.nodes[0].line,
+       body: (.comments.nodes[0].body | split("\n")[0] | .[0:80]),
+       createdAt: .comments.nodes[0].createdAt
+     }]')
+
+count=$(echo "$unresolved" | jq 'length')
+
+if [ "$count" -eq 0 ]; then
+    echo "No unresolved Copilot threads on PR #${PR}."
+    exit 0
+fi
+
+echo "Found $count unresolved Copilot thread(s) on PR #${PR}:"
+echo ""
+
+# If not --all, check timestamps to find addressed threads
+if [ "$MODE" != "--all" ]; then
+    # Get last commit date on the PR
+    last_commit_date=$(gh pr view "$PR" --json commits --jq '.commits[-1].committedDate')
+    # Get last Copilot review date
+    last_review_date=$(gh api "repos/${OWNER}/${REPO}/pulls/${PR}/reviews" \
+        --jq '[.[] | select(.user.login | test("copilot"))] | last | .submitted_at' 2>/dev/null)
+
+    if [ -z "$last_review_date" ] || [ "$last_review_date" = "null" ]; then
+        echo "Could not determine Copilot review date. Use --all to force resolve."
+        exit 1
+    fi
+
+    if [[ "$last_commit_date" > "$last_review_date" ]]; then
+        echo "Last commit ($last_commit_date) is NEWER than last Copilot review ($last_review_date)"
+        echo "→ All threads are likely addressed."
+        echo ""
+    else
+        echo "Last Copilot review ($last_review_date) is NEWER than last commit ($last_commit_date)"
+        echo "→ Some threads may contain new feedback. Use --all to override."
+        exit 0
+    fi
+fi
+
+# Show and resolve each thread
+echo "$unresolved" | jq -c '.[]' | while read -r thread; do
+    thread_id=$(echo "$thread" | jq -r '.id')
+    path=$(echo "$thread" | jq -r '.path')
+    line=$(echo "$thread" | jq -r '.line')
+    body=$(echo "$thread" | jq -r '.body')
+
+    echo "  ${path}:${line} — ${body}..."
+
+    if [ "$MODE" = "--dry-run" ]; then
+        echo "    → Would resolve (dry-run)"
+    else
+        gh api graphql -f query="
+        mutation {
+          resolveReviewThread(input: {threadId: \"$thread_id\"}) {
+            thread { isResolved }
+          }
+        }" --silent 2>/dev/null
+        echo "    → Resolved ✓"
+    fi
+done
+
+echo ""
+echo "Done. $count thread(s) processed."

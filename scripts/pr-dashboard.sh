@@ -48,8 +48,26 @@ for pr in $PRS; do
         ci_status="All passed"
     fi
 
-    # Copilot comments
-    copilot_count=$(gh api "repos/${REPO}/pulls/${pr}/comments" --jq '[.[] | select(.user.login == "Copilot")] | length' 2>/dev/null) || copilot_count="?"
+    # Copilot comments (unresolved threads only)
+    copilot_count=$(gh api graphql -f query="
+      {
+        repository(owner: \"timothyfroehlich\", name: \"PinPoint\") {
+          pullRequest(number: $pr) {
+            reviewThreads(first: 100) {
+              nodes {
+                isResolved
+                comments(first: 1) {
+                  nodes { author { login } }
+                }
+              }
+            }
+          }
+        }
+      }" --jq '
+      [.data.repository.pullRequest.reviewThreads.nodes[]
+       | select(.isResolved == false)
+       | select(.comments.nodes[0].author.login == "copilot-pull-request-reviewer[bot]")]
+       | length' 2>/dev/null) || copilot_count="?"
 
     # Draft status
     draft_str=""
