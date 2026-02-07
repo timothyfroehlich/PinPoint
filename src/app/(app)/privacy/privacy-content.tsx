@@ -122,10 +122,17 @@ export function PrivacyContent(): React.JSX.Element {
             Used to remember your UI preferences, such as sidebar state and last
             visited page. These cookies expire after one year.
           </li>
+          <li>
+            <strong className="text-foreground">Local storage</strong> — Used by
+            your browser to store certain app data on your device, such as
+            in-progress report form drafts or similar UI state. This data stays
+            on your device, is not shared with third parties, and you can clear
+            it at any time through your browser settings.
+          </li>
         </ul>
         <p className="text-muted-foreground">
           We do not use any analytics cookies, advertising cookies, or
-          third-party tracking cookies.
+          third-party tracking technologies based on cookies or local storage.
         </p>
       </section>
 
@@ -212,7 +219,9 @@ export function PrivacyContent(): React.JSX.Element {
           <li>
             <strong className="text-foreground">Uploaded images</strong> —
             Retained while associated with active issues. Soft-deleted images
-            are permanently removed after 24 hours.
+            are marked for permanent removal and may be deleted during future
+            cleanup cycles; we do not currently guarantee a specific deletion
+            timeframe.
           </li>
           <li>
             <strong className="text-foreground">Rate limit data</strong> —
@@ -237,7 +246,8 @@ export function PrivacyContent(): React.JSX.Element {
           </li>
           <li>
             <strong className="text-foreground">Correct your data</strong> —
-            Update your name, email, or avatar through your account settings.
+            Update your name through your account settings. For other account
+            details, contact us to request corrections.
           </li>
           <li>
             <strong className="text-foreground">Delete your account</strong> —
