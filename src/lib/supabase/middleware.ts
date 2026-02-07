@@ -113,6 +113,7 @@ export async function updateSession(
     path.startsWith("/reset-password") ||
     path.startsWith("/auth") ||
     path.startsWith("/report") ||
+    path.startsWith("/m/") ||
     path.startsWith("/dashboard") ||
     path.startsWith("/api");
 

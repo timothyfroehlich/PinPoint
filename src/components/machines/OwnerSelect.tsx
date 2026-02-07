@@ -21,6 +21,7 @@ interface OwnerSelectProps {
   defaultValue?: string | null;
   disabled?: boolean;
   onUsersChange?: (users: UnifiedUser[]) => void;
+  onValueChange?: (id: string) => void;
 }
 
 export function OwnerSelect({
@@ -28,6 +29,7 @@ export function OwnerSelect({
   defaultValue,
   disabled,
   onUsersChange,
+  onValueChange,
 }: OwnerSelectProps): React.JSX.Element {
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [selectedId, setSelectedId] = useState(defaultValue ?? "");
@@ -76,7 +78,10 @@ export function OwnerSelect({
       <Select
         name="ownerId"
         value={selectedId}
-        onValueChange={setSelectedId}
+        onValueChange={(value) => {
+          setSelectedId(value);
+          onValueChange?.(value);
+        }}
         disabled={!!disabled}
       >
         <SelectTrigger

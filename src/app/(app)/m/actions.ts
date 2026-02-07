@@ -248,7 +248,9 @@ export async function updateMachineAction(
     let finalInvitedOwnerId: string | null | undefined = undefined;
     let shouldUpdateOwner = false;
 
-    if (profile.role === "admin" && ownerId) {
+    // Admins and machine owners can change ownership
+    const isOwnerOrAdmin = profile.role === "admin" || !!ownerId;
+    if (isOwnerOrAdmin && ownerId) {
       shouldUpdateOwner = true;
       const isActive = await db.query.userProfiles.findFirst({
         where: eq(userProfiles.id, ownerId),

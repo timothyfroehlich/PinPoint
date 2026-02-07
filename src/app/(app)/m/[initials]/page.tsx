@@ -1,5 +1,5 @@
 import type React from "react";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { cn } from "~/lib/utils";
 import Link from "next/link";
@@ -21,19 +21,26 @@ import { Badge } from "~/components/ui/badge";
 import { ArrowLeft, Calendar, Plus } from "lucide-react";
 import { headers } from "next/headers";
 import { resolveRequestUrl } from "~/lib/url";
-import { UpdateMachineForm } from "./update-machine-form";
+import { MachineInfoDisplay, EditMachineDialog } from "./update-machine-form";
 import { QrCodeDialog } from "./qr-code-dialog";
 import { buildMachineReportUrl } from "~/lib/machines/report-url";
 import { generateQrPngDataUrl } from "~/lib/machines/qr";
 import { IssueCard } from "~/components/issues/IssueCard";
 import { WatchMachineButton } from "~/components/machines/WatchMachineButton";
 import { MachineEmptyState } from "~/components/machines/MachineEmptyState";
+import {
+  getAccessLevel,
+  checkPermission,
+  getPermissionDeniedReason,
+  type OwnershipContext,
+} from "~/lib/permissions/index";
 
 /**
- * Machine Detail Page (Protected Route)
+ * Machine Detail Page (Public Route)
  *
  * Shows machine details and its associated issues.
  * Displays derived status based on open issues.
+ * Permission-aware: unauthenticated users can view but not edit.
  */
 export default async function MachineDetailPage({
   params,
@@ -43,27 +50,25 @@ export default async function MachineDetailPage({
   // Await params (Next.js 15+ requirement)
   const { initials } = await params;
 
-  // Auth guard - check if user is authenticated (CORE-SSR-002)
+  // Auth check - user may be null (public route)
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    const next = encodeURIComponent(`/m/${initials}`);
-    redirect(`/login?next=${next}`);
-  }
+  // Fetch current user profile only when authenticated
+  const currentUserProfile = user
+    ? await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, user.id),
+        columns: { role: true },
+      })
+    : null;
 
-  // Fetch current user profile to check role
-  const currentUserProfile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-    columns: { role: true },
-  });
-
-  const isAdmin = currentUserProfile?.role === "admin";
+  // Compute access level and permissions
+  const accessLevel = getAccessLevel(currentUserProfile?.role);
 
   // Execute independent queries in parallel (CORE-PERF-001)
-  const [machine, totalIssuesCountResult, allUsers] = await Promise.all([
+  const [machine, totalIssuesCountResult] = await Promise.all([
     // Query 1: Machine with OPEN issues only
     db.query.machines.findFirst({
       where: eq(machines.initials, initials),
@@ -111,15 +116,40 @@ export default async function MachineDetailPage({
       .select({ count: sql<number>`count(*)::int` })
       .from(issues)
       .where(eq(issues.machineInitials, initials)),
-
-    // Query 3: All users (if admin)
-    isAdmin ? getUnifiedUsers({ includeEmails: false }) : Promise.resolve([]),
   ]);
 
   // 404 if machine not found
   if (!machine) {
     notFound();
   }
+
+  // Build ownership context for permission checks
+  const ownershipContext: OwnershipContext = {
+    userId: user?.id,
+    machineOwnerId: machine.ownerId ?? machine.invitedOwnerId,
+  };
+
+  // Permission computations
+  const canEdit = checkPermission(
+    "machines.edit",
+    accessLevel,
+    ownershipContext
+  );
+  const canWatch = checkPermission("machines.watch", accessLevel);
+  const editDeniedReason = getPermissionDeniedReason(
+    "machines.edit",
+    accessLevel,
+    ownershipContext
+  );
+  const isAdmin = accessLevel === "admin";
+  const isOwner =
+    !!user &&
+    (user.id === machine.ownerId || user.id === machine.invitedOwnerId);
+
+  // Only fetch allUsers when user can edit (needs OwnerSelect data)
+  const allUsers = canEdit
+    ? await getUnifiedUsers({ includeEmails: false })
+    : [];
 
   const totalIssuesCount = totalIssuesCountResult[0]?.count ?? 0;
   // machine.issues now contains only open issues due to the filter in the query
@@ -139,7 +169,10 @@ export default async function MachineDetailPage({
   });
   const qrDataUrl = await generateQrPngDataUrl(reportUrl);
 
-  const currentUserWatch = machine.watchers.find((w) => w.userId === user.id);
+  // Watch state (only for authenticated users)
+  const currentUserWatch = user
+    ? machine.watchers.find((w) => w.userId === user.id)
+    : undefined;
   const isWatching = !!currentUserWatch;
   const watchMode = currentUserWatch?.watchMode ?? "notify";
 
@@ -181,11 +214,13 @@ export default async function MachineDetailPage({
               </div>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
-              <WatchMachineButton
-                machineId={machine.id}
-                initialIsWatching={isWatching}
-                initialWatchMode={watchMode}
-              />
+              {canWatch && (
+                <WatchMachineButton
+                  machineId={machine.id}
+                  initialIsWatching={isWatching}
+                  initialWatchMode={watchMode}
+                />
+              )}
               <Button
                 className="bg-primary text-on-primary hover:bg-primary/90"
                 asChild
@@ -221,11 +256,23 @@ export default async function MachineDetailPage({
                 />
               </CardHeader>
               <CardContent className="space-y-6">
-                <UpdateMachineForm
+                {/* Static read-only display */}
+                <MachineInfoDisplay
                   machine={machine}
-                  allUsers={allUsers}
-                  isAdmin={isAdmin}
+                  canEdit={canEdit}
+                  editDeniedReason={editDeniedReason}
+                  isAuthenticated={!!user}
                 />
+
+                {/* Edit button (active) - only shown when user has permission */}
+                {canEdit && user && (
+                  <EditMachineDialog
+                    machine={machine}
+                    allUsers={allUsers}
+                    isAdmin={isAdmin}
+                    isOwner={isOwner}
+                  />
+                )}
 
                 <div className="pt-6 border-t border-outline-variant/50 space-y-4">
                   {/* Status & Issues Count Row */}
