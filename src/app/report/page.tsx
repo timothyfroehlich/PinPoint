@@ -6,6 +6,7 @@ import { MainLayout } from "~/components/layout/MainLayout";
 import { resolveDefaultMachineId } from "./default-machine";
 import { UnifiedReportForm } from "./unified-report-form";
 import { createClient } from "~/lib/supabase/server";
+import { getAccessLevel } from "~/lib/permissions/helpers";
 import { RecentIssuesPanel } from "~/components/issues/RecentIssuesPanel";
 
 // Avoid SSG hitting Supabase during builds that run parallel to db resets
@@ -40,7 +41,8 @@ export default async function PublicReportPage({
       columns: { role: true },
     });
 
-    if (userProfile?.role === "admin" || userProfile?.role === "member") {
+    const accessLevel = getAccessLevel(userProfile?.role);
+    if (accessLevel === "admin" || accessLevel === "member") {
       assignees = await db.query.userProfiles.findMany({
         where: (profile) =>
           sql`${profile.role} = 'admin' OR ${profile.role} = 'member'`,
@@ -49,6 +51,8 @@ export default async function PublicReportPage({
       });
     }
   }
+
+  const accessLevel = getAccessLevel(userProfile?.role);
 
   const [machinesList] = await Promise.all([machinesListPromise]);
 
@@ -75,7 +79,7 @@ export default async function PublicReportPage({
           machinesList={machinesList}
           defaultMachineId={defaultMachineId}
           user={user}
-          userProfile={userProfile}
+          accessLevel={accessLevel}
           assignees={assignees}
           initialError={errorMessage}
           recentIssuesPanelMobile={
