@@ -148,6 +148,10 @@ test.describe("User Invitation & Signup Flow", () => {
       page.getByRole("heading", { name: /Humpty Dumpty/i })
     ).toBeVisible();
 
+    // Open the Edit Machine dialog (admin has edit permission)
+    await page.getByTestId("edit-machine-button").click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+
     // Click the owner dropdown and select the invited user (shown with "(Invited)" suffix)
     const ownerSelect = page.getByTestId("owner-select");
     await ownerSelect.click();
@@ -155,9 +159,9 @@ test.describe("User Invitation & Signup Flow", () => {
       .getByRole("option", { name: /Owner Transfer.*\(Invited\)/i })
       .click();
 
-    // Save the machine
+    // Save the machine (dialog closes on success)
     await page.getByRole("button", { name: /Update Machine/i }).click();
-    await expect(page.getByText(/Machine updated/i)).toBeVisible();
+    await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 10000 });
 
     // 3. Logout and complete signup
     await logout(page);
