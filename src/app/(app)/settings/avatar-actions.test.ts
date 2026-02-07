@@ -56,8 +56,15 @@ vi.mock("~/lib/logger", () => ({
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function createMockFile(name: string, type: string, sizeInBytes: number): File {
-  const content = new Array(sizeInBytes).fill("x").join("");
-  return new File([content], name, { type });
+  // For small files, create real content. For large files, use Object.defineProperty
+  // to avoid allocating huge buffers in tests.
+  const file = new File(["x"], name, { type });
+  if (sizeInBytes > 10_000) {
+    Object.defineProperty(file, "size", { value: sizeInBytes });
+  }
+  return sizeInBytes <= 10_000
+    ? new File([new Uint8Array(sizeInBytes)], name, { type })
+    : file;
 }
 
 function authenticateUser(userId = "test-user"): void {

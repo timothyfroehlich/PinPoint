@@ -101,7 +101,7 @@ async function seedUsersAndData() {
       // Ensure user profile exists and has correct role (Upsert)
       // This handles cases where auth.users exists but public.user_profiles was wiped
       // Avatar URLs are deterministic based on user initials for consistent test data
-      const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.firstName)}+${encodeURIComponent(user.lastName)}&background=random&bold=true`;
+      const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.firstName)}+${encodeURIComponent(user.lastName)}&bold=true`;
       await sql`
         INSERT INTO user_profiles (id, email, first_name, last_name, role, avatar_url)
         VALUES (${userId}, ${user.email}, ${user.firstName}, ${user.lastName}, ${user.role}, ${avatarUrl})
@@ -131,14 +131,12 @@ async function seedUsersAndData() {
   // 2. Seed Invited Users (for testing invited reporter display)
   console.log("\n👤 Seeding invited users...");
 
-  const invitedAvatarUrl = `https://ui-avatars.com/api/?name=Jane+Doe&background=random&bold=true`;
   const invitedUserId = await sql`
-    INSERT INTO invited_users (first_name, last_name, email, role, avatar_url)
-    VALUES ('Jane', 'Doe', 'jane.doe@example.com', 'guest', ${invitedAvatarUrl})
+    INSERT INTO invited_users (first_name, last_name, email, role)
+    VALUES ('Jane', 'Doe', 'jane.doe@example.com', 'guest')
     ON CONFLICT (email) DO UPDATE SET
       first_name = 'Jane',
-      last_name = 'Doe',
-      avatar_url = ${invitedAvatarUrl}
+      last_name = 'Doe'
     RETURNING id
   `.then((rows) => rows[0]?.id);
 
@@ -146,7 +144,6 @@ async function seedUsersAndData() {
     console.log(
       `✅ Invited user seeded: jane.doe@example.com (ID: ${invitedUserId})`
     );
-    console.log(`   └─ Avatar: ${invitedAvatarUrl}`);
   } else {
     console.warn("⚠️ Could not seed invited user");
   }
