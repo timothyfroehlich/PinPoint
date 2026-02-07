@@ -47,6 +47,9 @@ test.describe("Image Upload Reporting", () => {
     await expect(
       page.getByRole("img", { name: "test-image.png" })
     ).toBeVisible();
+    await expect(page.locator('input[name="imagesMetadata"]')).not.toHaveValue(
+      "[]"
+    );
 
     // 5. Submit
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
@@ -106,6 +109,9 @@ test.describe("Image Upload Reporting", () => {
     // ImageUploadButton: 1. Validate, 2. Compress, 3. Upload, 4. Show success toast & call onUploadComplete
     // We should wait for the toast or the image to appear.
     await expect(page.getByText("Image uploaded successfully")).toBeVisible();
+    await expect(page.locator('input[name="imagesMetadata"]')).not.toHaveValue(
+      "[]"
+    );
 
     // 5. Submit
     await page.getByRole("button", { name: "Submit Issue Report" }).click();

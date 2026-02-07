@@ -1,16 +1,25 @@
-import { test, expect } from "@playwright/test";
-import { loginAs, openSidebarIfMobile } from "../support/actions";
+import { test, expect, type Page } from "@playwright/test";
+import { ensureLoggedIn, openSidebarIfMobile } from "../support/actions";
 import { TEST_USERS, seededIssues } from "../support/constants";
 
 test.describe("Issue List Features", () => {
   test.beforeEach(async ({ page }, testInfo) => {
     test.setTimeout(60000);
     // Use Admin to ensure permissions for all inline edits
-    await loginAs(page, testInfo, {
+    await ensureLoggedIn(page, testInfo, {
       email: TEST_USERS.admin.email,
       password: TEST_USERS.admin.password,
     });
   });
+
+  const waitForIssueListReady = async (page: Page): Promise<void> => {
+    await expect(page).toHaveURL(/\/issues(\?|$)/);
+    await expect(
+      page.getByRole("heading", { name: "All Issues" })
+    ).toBeVisible();
+    await expect(page.getByTestId("filter-severity")).toBeVisible();
+    await expect(page.getByPlaceholder("Search issues...")).toBeVisible();
+  };
 
   test("should filter and search issues", async ({ page }) => {
     // 1. Setup: Use seeded issues
@@ -20,6 +29,7 @@ test.describe("Issue List Features", () => {
     const title2 = seededIssues.TAF[1].title;
 
     await page.goto("/issues");
+    await waitForIssueListReady(page);
 
     // 2. Test Searching
     // Search for Issue 1
@@ -63,6 +73,7 @@ test.describe("Issue List Features", () => {
   test.skip("should inline-edit issues (Flaky Env)", async ({ page }) => {
     const title1 = seededIssues.TAF[0].title;
     await page.goto("/issues");
+    await waitForIssueListReady(page);
 
     // 4. Test Inline Editing & Stable Sorting
     // Isolate TAF-01
@@ -132,6 +143,7 @@ test.describe("Issue List Features", () => {
 
   test("should handle status group toggling in filters", async ({ page }) => {
     await page.goto("/issues");
+    await waitForIssueListReady(page);
 
     // Verify badges ARE visible by default (Open statuses)
     await expect(
@@ -214,6 +226,7 @@ test.describe("Issue List Features", () => {
     // 1. Setup
     // All seeded issues are created "NOW()" so they are today.
     await page.goto("/issues");
+    await waitForIssueListReady(page);
 
     // 2. Expand "More Filters" to see date pickers
     await page.getByRole("button", { name: "More Filters" }).click();
@@ -248,6 +261,7 @@ test.describe("Issue List Features", () => {
   }) => {
     // 1. Go to issues and apply a severity filter
     await page.goto("/issues");
+    await waitForIssueListReady(page);
     await page.getByTestId("filter-severity").click();
     await page.getByRole("option", { name: "Major" }).click();
     await page.keyboard.press("Escape");
@@ -282,6 +296,14 @@ test.describe("Issue List Features", () => {
   }, testInfo) => {
     // 1. Go to issues and apply a search filter
     await page.goto("/issues");
+    if (page.url().includes("/login?next=%2Fissues")) {
+      await ensureLoggedIn(page, testInfo, {
+        email: TEST_USERS.admin.email,
+        password: TEST_USERS.admin.password,
+      });
+      await page.goto("/issues");
+    }
+    await waitForIssueListReady(page);
     await page.getByPlaceholder("Search issues...").fill("Thing");
     await page.keyboard.press("Enter");
     await page.waitForURL(/q=Thing/);
@@ -289,12 +311,27 @@ test.describe("Issue List Features", () => {
     // 2. Navigate to a different page (dashboard)
     await page.goto("/dashboard");
     await expect(page).toHaveURL("/dashboard");
+    await ensureLoggedIn(page, testInfo, {
+      email: TEST_USERS.admin.email,
+      password: TEST_USERS.admin.password,
+    });
 
     // 3. Click Issues in sidebar - should preserve filters
     // The sidebar link uses issuesPath prop read from cookie on the server
     await openSidebarIfMobile(page, testInfo);
-    await page.getByRole("link", { name: "Issues", exact: true }).click();
+    let issuesLink = page.getByRole("link", { name: "Issues", exact: true });
+    await issuesLink.click();
+    if (page.url().includes("/login?next=")) {
+      await ensureLoggedIn(page, testInfo, {
+        email: TEST_USERS.admin.email,
+        password: TEST_USERS.admin.password,
+      });
+      await openSidebarIfMobile(page, testInfo);
+      issuesLink = page.getByRole("link", { name: "Issues", exact: true });
+      await issuesLink.click();
+    }
     await expect(page).toHaveURL(/q=Thing/);
+    await waitForIssueListReady(page);
 
     // Verify search term is still in the input
     await expect(page.getByPlaceholder("Search issues...")).toHaveValue(
@@ -302,9 +339,12 @@ test.describe("Issue List Features", () => {
     );
   });
 
-  test("should persist filters across page reload", async ({ page }) => {
+  test("should persist filters across page reload", async ({
+    page,
+  }, testInfo) => {
     // 1. Go to issues and apply multiple filters
     await page.goto("/issues");
+    await waitForIssueListReady(page);
 
     // Apply severity filter
     await page.getByTestId("filter-severity").click();
@@ -319,6 +359,14 @@ test.describe("Issue List Features", () => {
 
     // 2. Reload the page
     await page.reload();
+    if (page.url().includes("/login?next=%2Fissues")) {
+      await ensureLoggedIn(page, testInfo, {
+        email: TEST_USERS.admin.email,
+        password: TEST_USERS.admin.password,
+      });
+      await page.goto("/issues?severity=major&q=bird");
+    }
+    await waitForIssueListReady(page);
 
     // 3. Verify filters are restored from URL (URL params are the source of truth)
     await expect(page).toHaveURL(/severity=major/);

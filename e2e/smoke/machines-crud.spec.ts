@@ -62,11 +62,22 @@ test.describe("Machines CRUD", () => {
     });
   });
 
-  test("non-admin cannot access /m/new page", async ({ page }) => {
+  test("non-admin cannot access /m/new page", async ({ page }, testInfo) => {
     // Default login is member (non-admin) from beforeEach
+    await ensureLoggedIn(page, testInfo, {
+      email: TEST_USERS.member.email,
+      password: TEST_USERS.member.password,
+    });
 
     // Verify "Add Machine" button is NOT visible to non-admin on /m page
     await page.goto("/m");
+    if (page.url().includes("/login?next=%2Fm")) {
+      await ensureLoggedIn(page, testInfo, {
+        email: TEST_USERS.member.email,
+        password: TEST_USERS.member.password,
+      });
+      await page.goto("/m");
+    }
     await expect(page.getByRole("heading", { name: "Machines" })).toBeVisible();
     await expect(
       page.getByRole("link", { name: /Add Machine/i })

@@ -121,13 +121,16 @@ test.describe("User Invitation & Signup Flow", () => {
     test.slow(); // Triple the timeout - complex multi-step flow
     const testId = Math.random().toString(36).substring(7);
     const userEmail = `owner-invite-${testId}@example.com`;
+    const firstName = `Owner${testId.slice(0, 4)}`;
+    const lastName = `Transfer${testId.slice(4, 8)}`;
+    const fullName = `${firstName} ${lastName}`;
     testEmails.add(userEmail);
 
     // 1. Invite user via admin panel
     await page.goto("/admin/users");
     await page.getByRole("button", { name: /Invite User/i }).click();
-    await page.getByLabel(/First Name/i).fill("Owner");
-    await page.getByLabel(/Last Name/i).fill("Transfer");
+    await page.getByLabel(/First Name/i).fill(firstName);
+    await page.getByLabel(/Last Name/i).fill(lastName);
     await page.getByRole("textbox", { name: "Email" }).fill(userEmail);
 
     const inviteSwitch = page.getByRole("switch", {
@@ -148,11 +151,13 @@ test.describe("User Invitation & Signup Flow", () => {
       page.getByRole("heading", { name: /Humpty Dumpty/i })
     ).toBeVisible();
 
-    // Click the owner dropdown and select the invited user (shown with "(Invited)" suffix)
+    // Select the uniquely named invited owner.
     const ownerSelect = page.getByTestId("owner-select");
     await ownerSelect.click();
     await page
-      .getByRole("option", { name: /Owner Transfer.*\(Invited\)/i })
+      .getByRole("option", {
+        name: new RegExp(`${fullName}.*\\(Invited\\)`, "i"),
+      })
       .click();
 
     // Save the machine
@@ -182,7 +187,7 @@ test.describe("User Invitation & Signup Flow", () => {
     // The owner display should show the real user name without "(Invited)" suffix
     // Note: User is a member now, so they see the read-only owner display
     const ownerDisplay = page.getByTestId("owner-display");
-    await expect(ownerDisplay).toContainText("Owner Transfer");
+    await expect(ownerDisplay).toContainText(fullName);
     // After signup, the user is no longer "invited" - they're a real user
     await expect(ownerDisplay).not.toContainText("(Invited)");
   });

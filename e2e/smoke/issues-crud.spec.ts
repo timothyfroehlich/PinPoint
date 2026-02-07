@@ -5,8 +5,8 @@
  * Requires Supabase to be running.
  */
 
-import { test, expect, type Page } from "@playwright/test";
-import { loginAs } from "../support/actions.js";
+import { test, expect, type Page, type TestInfo } from "@playwright/test";
+import { ensureLoggedIn, loginAs } from "../support/actions.js";
 import { cleanupTestEntities, extractIdFromUrl } from "../support/cleanup.js";
 import { seededMachines } from "../support/constants.js";
 import { fillReportForm } from "../support/page-helpers.js";
@@ -18,6 +18,17 @@ const rememberIssueId = (page: Page): void => {
   if (issueId) {
     createdIssueIds.add(issueId);
   }
+};
+
+const ensureAuthenticatedOnReportPage = async (
+  page: Page,
+  testInfo: TestInfo
+): Promise<void> => {
+  const userMenu = page.getByTestId("user-menu-button");
+  if (!(await userMenu.isVisible())) {
+    await loginAs(page, testInfo);
+  }
+  await expect(page.getByTestId("user-menu-button")).toBeVisible();
 };
 
 test.describe("Issues System", () => {
@@ -39,11 +50,14 @@ test.describe("Issues System", () => {
   });
 
   test.describe("Issue Creation Flow", () => {
-    test("should create an issue for a specific machine", async ({ page }) => {
+    test("should create an issue for a specific machine", async ({
+      page,
+    }, testInfo) => {
       const machineInitials = seededMachines.addamsFamily.initials;
 
       // Navigate to report page for The Addams Family
       await page.goto(`/report?machine=${machineInitials}`);
+      await ensureAuthenticatedOnReportPage(page, testInfo);
 
       // Fill out form
       await fillReportForm(page, {
@@ -71,7 +85,7 @@ test.describe("Issues System", () => {
 
     test("should create an issue from machine page with pre-filled machine", async ({
       page,
-    }) => {
+    }, testInfo) => {
       // Navigate to machines list page
       await page.goto("/m");
       await expect(
@@ -90,6 +104,7 @@ test.describe("Issues System", () => {
 
       // Should be on new issue page for TAF
       await page.waitForURL(/\/report\?machine=TAF/);
+      await ensureAuthenticatedOnReportPage(page, testInfo);
 
       // Verify machine name is displayed
       await expect(
@@ -124,13 +139,36 @@ test.describe("Issues System", () => {
     let machineInitials: string;
     let issueNumber: number;
 
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, testInfo) => {
+      await ensureLoggedIn(page, testInfo);
+
       // Create an issue first to navigate to via UI interaction
       machineInitials = seededMachines.addamsFamily.initials;
       issueTitle = `Test Issue for Details ${Date.now()}`;
       await page.goto(`/report?machine=${machineInitials}`);
+      await ensureAuthenticatedOnReportPage(page, testInfo);
+      const issueTitleInput = page.getByLabel("Issue Title *");
+      if (!(await issueTitleInput.isVisible())) {
+        await loginAs(page, testInfo);
+        await page.goto(`/report?machine=${machineInitials}`);
+        await ensureAuthenticatedOnReportPage(page, testInfo);
+      }
+      await expect(page.getByLabel("Issue Title *")).toBeVisible();
       await fillReportForm(page, { title: issueTitle, priority: "medium" });
       await page.getByRole("button", { name: "Submit Issue Report" }).click();
+
+      if (page.url().includes("/report/success")) {
+        await loginAs(page, testInfo);
+        await page.goto("/issues");
+        await page.getByPlaceholder("Search issues...").fill(issueTitle);
+        await page.keyboard.press("Enter");
+        await page.waitForURL((url) => url.searchParams.has("q"));
+        const issueRow = page.getByRole("row", {
+          name: new RegExp(issueTitle),
+        });
+        await expect(issueRow).toBeVisible();
+        await issueRow.getByTestId("issue-title").click();
+      }
 
       await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
       issueUrl = page.url();
@@ -166,8 +204,10 @@ test.describe("Issues System", () => {
       await expect(sidebar.getByText("Created", { exact: true })).toBeVisible();
 
       // Should show status and severity badges
-      await expect(page.getByTestId("issue-status-badge")).toHaveText(/New/i);
-      await expect(page.getByTestId("issue-severity-badge")).toHaveText(
+      await expect(page.getByTestId("issue-status-badge").first()).toHaveText(
+        /New/i
+      );
+      await expect(page.getByTestId("issue-severity-badge").first()).toHaveText(
         /Minor/i
       );
 
@@ -210,7 +250,10 @@ test.describe("Issues System", () => {
       ).toBeVisible();
 
       // Find the assignee picker - initially shows "Unassigned"
-      const assigneePicker = page.getByTestId("assignee-picker-trigger");
+      const assigneePicker = page
+        .getByTestId("issue-sidebar")
+        .getByTestId("assignee-picker-trigger")
+        .first();
       await expect(assigneePicker).toBeVisible();
       await expect(assigneePicker).toContainText("Unassigned");
 
@@ -223,9 +266,12 @@ test.describe("Issues System", () => {
 
       // Reload page to verify persistence
       await page.reload();
-      await expect(page.getByTestId("assignee-picker-trigger")).toContainText(
-        "Member User"
-      );
+      await expect(
+        page
+          .getByTestId("issue-sidebar")
+          .getByTestId("assignee-picker-trigger")
+          .first()
+      ).toContainText("Member User");
     });
   });
 });

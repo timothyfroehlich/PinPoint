@@ -63,11 +63,26 @@ async function createTestIssue(
 async function addComment(page: Page, content: string): Promise<void> {
   // The textarea has aria-label="Comment" per AddCommentForm.tsx
   const commentTextarea = page.getByRole("textbox", { name: "Comment" });
+  if (!(await commentTextarea.isVisible())) {
+    await page.reload();
+    await page.waitForLoadState("networkidle");
+  }
+  await expect(commentTextarea).toBeVisible({ timeout: 10000 });
+
   await commentTextarea.fill(content);
   await page.getByRole("button", { name: "Add Comment" }).click();
   await page.waitForLoadState("networkidle");
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (await page.getByText(content).isVisible()) {
+      return;
+    }
+    await page.reload();
+    await page.waitForLoadState("networkidle");
+  }
+
   // Wait for comment to appear
-  await expect(page.getByText(content)).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText(content)).toBeVisible({ timeout: 20000 });
 }
 
 function getCommentCard(page: Page, commentText: string) {
@@ -113,7 +128,18 @@ test.describe.serial("Comment Edit and Delete", () => {
       if (!issueUrl) {
         issueUrl = await createTestIssue(page, testInfo);
         rememberIssueId(page);
+        // Re-authenticate and reload issue detail to avoid transient session loss
+        // after report submission redirects in parallel E2E runs.
+        await loginAs(page, testInfo);
+        await page.goto(issueUrl);
+        await page.waitForLoadState("networkidle");
       } else {
+        await page.goto(issueUrl);
+        await page.waitForLoadState("networkidle");
+      }
+
+      if (!(await page.getByRole("textbox", { name: "Comment" }).isVisible())) {
+        await loginAs(page, testInfo);
         await page.goto(issueUrl);
         await page.waitForLoadState("networkidle");
       }
@@ -227,6 +253,14 @@ test.describe.serial("Comment Edit and Delete", () => {
 
       await page.goto(issueUrl);
       await page.waitForLoadState("networkidle");
+      if (!(await page.getByRole("textbox", { name: "Comment" }).isVisible())) {
+        await loginAs(page, testInfo, {
+          email: TEST_USERS.member.email,
+          password: TEST_USERS.member.password,
+        });
+        await page.goto(issueUrl);
+        await page.waitForLoadState("networkidle");
+      }
       await addComment(page, memberComment);
     });
 

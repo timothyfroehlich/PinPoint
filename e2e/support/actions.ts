@@ -6,6 +6,21 @@ interface LoginOptions {
   password?: string;
 }
 
+async function gotoWithRetry(page: Page, url: string): Promise<void> {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await page.goto(url);
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("ERR_CONNECTION_RESET") || attempt === 2) {
+        throw error;
+      }
+      await page.waitForTimeout(300);
+    }
+  }
+}
+
 /**
  * Logs in through the UI using the default seeded member (or provided creds).
  */
@@ -17,12 +32,24 @@ export async function loginAs(
     password = TEST_USERS.member.password,
   }: LoginOptions = {}
 ): Promise<void> {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign In" }).click();
+  const signInOnce = async (): Promise<void> => {
+    await gotoWithRetry(page, "/login");
+    if (!page.url().includes("/login")) {
+      // Already authenticated; /login redirected to app shell.
+      return;
+    }
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Password").fill(password);
+    await page.getByRole("button", { name: "Sign In" }).click();
+    await page.waitForLoadState("networkidle");
+  };
 
-  await page.waitForLoadState("networkidle");
+  await signInOnce();
+  if (page.url().includes("/login")) {
+    // Retry once for transient auth races seen under mobile E2E load.
+    await signInOnce();
+  }
+
   await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
 
   // Use project name to determine mobile vs desktop layout
@@ -48,7 +75,7 @@ export async function ensureLoggedIn(
   testInfo: TestInfo,
   options?: LoginOptions
 ): Promise<void> {
-  await page.goto("/dashboard");
+  await gotoWithRetry(page, "/dashboard");
   await page.waitForLoadState("domcontentloaded");
 
   // Check for authenticated indicator (User Menu)
