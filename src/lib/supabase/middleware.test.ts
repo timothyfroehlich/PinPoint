@@ -169,4 +169,14 @@ describe("updateSession autologin", () => {
 
     expect(response.headers.get("location")).toBeNull();
   });
+
+  it("still redirects unauthenticated users for non-issue /m routes", async () => {
+    const supabase = createSupabaseAuthMocks(null, null);
+    createServerClientMock.mockReturnValue(supabase);
+
+    const request = makeRequest("http://localhost/m/new");
+    const response = await updateSession(request);
+
+    expect(response.headers.get("location")?.includes("/login")).toBe(true);
+  });
 });
