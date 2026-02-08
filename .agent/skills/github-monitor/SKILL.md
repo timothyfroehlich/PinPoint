@@ -14,7 +14,7 @@ Identify your agent type to choose the correct monitoring strategy.
 ### Pattern A: Claude Code / Antigravity (Asynchronous)
 
 1. Run the monitor script in the background:
-   `./scripts/monitor-gh-actions.sh &`
+   `./scripts/workflow/monitor-gh-actions.sh &`
 2. Periodically (every few turns or after significant actions) check for the existence of `tmp/monitor-gh-actions/MONITOR_FAILED`.
 3. If the signal file exists:
    - READ `tmp/monitor-gh-actions/action-failure.md`.
@@ -25,7 +25,7 @@ Identify your agent type to choose the correct monitoring strategy.
 1. Since background processes may block, run a foreground watch loop that polls until completion:
    ```bash
    while true; do
-     ./scripts/monitor-gh-actions.sh
+     ./scripts/workflow/monitor-gh-actions.sh
      STATUS=$?
      if [ $STATUS -eq 0 ]; then
        echo "PASS: All actions green."
