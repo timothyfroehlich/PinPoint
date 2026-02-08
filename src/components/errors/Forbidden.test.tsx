@@ -46,10 +46,10 @@ describe("Forbidden", () => {
   });
 
   it("renders Go Back link with custom URL", () => {
-    render(<Forbidden backUrl="/machines" />);
+    render(<Forbidden backUrl="/m" />);
 
     const backLink = screen.getByRole("link", { name: /go back/i });
-    expect(backLink).toHaveAttribute("href", "/machines");
+    expect(backLink).toHaveAttribute("href", "/m");
   });
 
   it("renders Home link", () => {

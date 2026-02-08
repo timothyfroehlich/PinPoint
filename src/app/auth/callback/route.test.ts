@@ -10,7 +10,7 @@ describe("isInternalUrl", () => {
   it("should return true for internal paths", () => {
     expect(isInternalUrl("/dashboard")).toBe(true);
     expect(isInternalUrl("/reset-password")).toBe(true);
-    expect(isInternalUrl("/machines/123")).toBe(true);
+    expect(isInternalUrl("/m/ABC")).toBe(true);
   });
 
   it("should return false for external URLs", () => {
