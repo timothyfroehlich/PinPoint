@@ -74,7 +74,12 @@ test.describe("Issue List Features", () => {
     await clearButton.click();
   });
 
-  test("should inline-edit issues", async ({ page }) => {
+  test("should inline-edit issues", async ({ page }, testInfo) => {
+    // Inline-edit columns (priority, assignee) are hidden on mobile viewports
+    // via responsive column visibility (useTableResponsiveColumns)
+    const isMobile = testInfo.project.name.includes("Mobile");
+    test.skip(isMobile, "Inline-edit columns hidden on mobile viewports");
+
     // Create a unique test issue to avoid parallel worker conflicts
     const issueTitle = `Inline Edit Test ${Date.now()}`;
     createdIssueTitlePrefix = "Inline Edit Test";
