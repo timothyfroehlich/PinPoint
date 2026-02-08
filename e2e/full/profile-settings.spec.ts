@@ -1,6 +1,12 @@
 import { test, expect } from "@playwright/test";
+import { Buffer } from "node:buffer";
 import { loginAs } from "../support/actions";
 import { TEST_USERS } from "../support/constants";
+import {
+  createTestUser,
+  deleteTestUser,
+  updateUserAvatar,
+} from "../support/supabase-admin";
 
 test.describe("Profile Settings", () => {
   test("should display user email in settings", async ({ page }, testInfo) => {
@@ -53,5 +59,51 @@ test.describe("Profile Settings", () => {
     await expect(
       profileForm.getByRole("button", { name: "Saved!" })
     ).toBeVisible();
+  });
+
+  test("should upload and remove avatar from settings", async ({
+    page,
+  }, testInfo) => {
+    const sanitizedProjectName = testInfo.project.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "-");
+    const email = `avatar-${sanitizedProjectName}-${Date.now()}@example.com`;
+    const password = "TestPassword123";
+    const user = await createTestUser(email, password);
+
+    try {
+      await updateUserAvatar(
+        user.id,
+        "https://avatars.githubusercontent.com/u/12345?v=4"
+      );
+
+      await loginAs(page, testInfo, { email, password });
+      await page.goto("/settings");
+
+      const uploadButton = page.getByRole("button", { name: "Upload Photo" });
+      const removeButton = page.getByRole("button", { name: "Remove" });
+
+      await expect(uploadButton).toBeVisible();
+      await expect(removeButton).toBeVisible();
+
+      const [fileChooser] = await Promise.all([
+        page.waitForEvent("filechooser"),
+        uploadButton.click(),
+      ]);
+      await fileChooser.setFiles({
+        name: "not-image.txt",
+        mimeType: "text/plain",
+        buffer: Buffer.from("not an image"),
+      });
+
+      await expect(page.getByText(/Invalid file type/i)).toBeVisible();
+      await removeButton.click();
+      await expect(page.getByText("Avatar removed.")).toBeVisible({
+        timeout: 15000,
+      });
+      await expect(removeButton).toHaveCount(0);
+    } finally {
+      await deleteTestUser(user.id).catch(() => undefined);
+    }
   });
 });

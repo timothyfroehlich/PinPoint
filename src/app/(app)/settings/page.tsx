@@ -6,6 +6,7 @@ import { userProfiles, notificationPreferences } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { ProfileForm } from "./profile-form";
 import { NotificationPreferencesForm } from "./notifications/notification-preferences-form";
+import { AvatarUpload } from "~/components/profile/AvatarUpload";
 import { Separator } from "~/components/ui/separator";
 
 export default async function SettingsPage(): Promise<React.JSX.Element> {
@@ -57,6 +58,12 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
       <div className="space-y-6">
         <div>
           <h2 className="text-xl font-semibold mb-4">Profile Settings</h2>
+          <div className="mb-6">
+            <AvatarUpload
+              currentAvatarUrl={profile.avatarUrl}
+              userName={profile.name}
+            />
+          </div>
           <ProfileForm
             firstName={profile.firstName}
             lastName={profile.lastName}

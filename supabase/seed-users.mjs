@@ -97,20 +97,24 @@ async function seedUsersAndData() {
 
       userIds[user.role] = userId;
 
-      // Update user profile role
+      // Update user profile role and avatar
       // Ensure user profile exists and has correct role (Upsert)
       // This handles cases where auth.users exists but public.user_profiles was wiped
+      // Avatar URLs are deterministic based on user initials for consistent test data
+      const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.firstName)}+${encodeURIComponent(user.lastName)}&bold=true`;
       await sql`
-        INSERT INTO user_profiles (id, email, first_name, last_name, role)
-        VALUES (${userId}, ${user.email}, ${user.firstName}, ${user.lastName}, ${user.role})
+        INSERT INTO user_profiles (id, email, first_name, last_name, role, avatar_url)
+        VALUES (${userId}, ${user.email}, ${user.firstName}, ${user.lastName}, ${user.role}, ${avatarUrl})
         ON CONFLICT (id) DO UPDATE SET
           email = ${user.email},
           role = ${user.role},
           first_name = ${user.firstName},
           last_name = ${user.lastName},
+          avatar_url = ${avatarUrl},
           updated_at = NOW()
       `;
       console.log(`   └─ Role set to: ${user.role}`);
+      console.log(`   └─ Avatar: ${avatarUrl}`);
 
       // Ensure notification preferences exist
       await sql`

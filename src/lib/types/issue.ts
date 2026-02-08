@@ -10,7 +10,7 @@ export type IssueCommentWithAuthor = Pick<
   IssueComment,
   "id" | "content" | "createdAt" | "updatedAt" | "isSystem"
 > & {
-  author?: Pick<UserProfile, "id" | "name"> | null;
+  author?: Pick<UserProfile, "id" | "name" | "avatarUrl"> | null;
   images: IssueImage[];
 };
 
@@ -29,7 +29,7 @@ export type IssueWithAllRelations = Issue & {
       name: string;
     } | null;
   };
-  reportedByUser?: Pick<UserProfile, "id" | "name"> | null;
+  reportedByUser?: Pick<UserProfile, "id" | "name" | "avatarUrl"> | null;
   invitedReporter?: {
     id: string;
     name: string;
