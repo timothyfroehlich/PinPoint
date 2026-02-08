@@ -219,6 +219,11 @@ function TimelineItem({
       <div className="flex-1">
         {isSystem ? (
           <div className="flex items-center gap-2 py-1 text-xs leading-snug text-muted-foreground">
+            {event.author.id && (
+              <span className="font-medium text-foreground/80">
+                {event.author.name}
+              </span>
+            )}
             <span>{event.content}</span>
             <span className="text-muted-foreground/40">&bull;</span>
             <span
