@@ -37,6 +37,27 @@ vi.mock("~/server/db", () => ({
         returning: vi.fn(() => Promise.resolve([{ id: "new-image-id" }])),
       })),
     })),
+    query: {
+      issues: {
+        findFirst: vi.fn(() =>
+          Promise.resolve({
+            reportedBy: "test-user",
+            assignedTo: null,
+            machine: { ownerId: null },
+          })
+        ),
+      },
+      userProfiles: {
+        findFirst: vi.fn(() => Promise.resolve({ role: "member" })),
+      },
+      issueComments: {
+        findFirst: vi.fn(() =>
+          Promise.resolve({
+            issueId: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+          })
+        ),
+      },
+    },
   },
 }));
 

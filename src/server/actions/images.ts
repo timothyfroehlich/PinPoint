@@ -4,7 +4,12 @@ import { createClient } from "~/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "~/server/db";
-import { issueImages } from "~/server/db/schema";
+import {
+  issueImages,
+  issues,
+  issueComments,
+  userProfiles,
+} from "~/server/db/schema";
 import { uploadToBlob, deleteFromBlob } from "~/lib/blob/client";
 import { validateImageFile } from "~/lib/blob/validation";
 import { BLOB_CONFIG } from "~/lib/blob/config";
@@ -16,6 +21,7 @@ import {
 } from "~/lib/rate-limit";
 import { eq, count, and, isNull } from "drizzle-orm";
 import { log } from "~/lib/logger";
+import { canUpdateIssue } from "~/lib/permissions";
 
 const uploadSchema = z.object({
   issueId: z.string(), // Can be real UUID or 'new'
@@ -67,6 +73,63 @@ export async function uploadIssueImage(formData: FormData): Promise<
 
     const { issueId, commentId } = validated.data;
     const isNewIssue = issueId === "new";
+
+    // 3a. Issue-level authorization (clb.1)
+    if (!isNewIssue) {
+      if (!user) {
+        return err(
+          "AUTH",
+          "You must be signed in to upload to an existing issue"
+        );
+      }
+
+      const currentIssue = await db.query.issues.findFirst({
+        where: eq(issues.id, issueId),
+        columns: {
+          reportedBy: true,
+          assignedTo: true,
+        },
+        with: {
+          machine: {
+            columns: { ownerId: true },
+          },
+        },
+      });
+
+      if (!currentIssue) {
+        return err("VALIDATION", "Issue not found");
+      }
+
+      const userProfile = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, user.id),
+        columns: { role: true },
+      });
+
+      if (
+        !canUpdateIssue(
+          { id: user.id, role: userProfile?.role ?? "guest" },
+          currentIssue,
+          currentIssue.machine
+        )
+      ) {
+        return err(
+          "AUTH",
+          "You do not have permission to upload to this issue"
+        );
+      }
+
+      // 3b. Comment-issue relationship validation (clb.2)
+      if (commentId) {
+        const comment = await db.query.issueComments.findFirst({
+          where: eq(issueComments.id, commentId),
+          columns: { issueId: true },
+        });
+
+        if (comment?.issueId !== issueId) {
+          return err("VALIDATION", "Comment does not belong to this issue");
+        }
+      }
+    }
 
     // 4. Get and Validate image file (Server-side)
     const file = formData.get("image");
