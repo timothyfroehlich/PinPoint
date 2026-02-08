@@ -437,7 +437,7 @@ def cmd_remove(args: argparse.Namespace) -> int:
 
     print()
     print("✅ Worktree removed successfully!")
-    print(f"   Branch '{branch}' preserved (delete manually with: git branch -d {branch})")
+    print(f"   Branch '{branch}' preserved (delete manually with: git branch -d -- '{branch}' (or: git branch -D -- '{branch}' to force))")
     print()
 
     return 0
