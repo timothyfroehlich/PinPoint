@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { canUpdateIssue, type UserRole } from "./permissions";
+import {
+  canUpdateIssue,
+  canEditIssueTitle,
+  type UserRole,
+} from "./permissions";
 
 describe("canUpdateIssue", () => {
   const adminUser = { id: "admin-1", role: "admin" as UserRole };
@@ -34,5 +38,30 @@ describe("canUpdateIssue", () => {
 
   it("should deny guest user", () => {
     expect(canUpdateIssue(guestUser, issue, machine)).toBe(false);
+  });
+});
+
+describe("canEditIssueTitle", () => {
+  const adminUser = { id: "admin-1", role: "admin" as UserRole };
+  const memberUser = { id: "user-1", role: "member" as UserRole };
+  const guestCreator = { id: "guest-1", role: "guest" as UserRole };
+  const otherGuest = { id: "guest-2", role: "guest" as UserRole };
+
+  const issue = { reportedBy: "guest-1", assignedTo: "user-2" };
+
+  it("should allow admins to edit any issue title", () => {
+    expect(canEditIssueTitle(adminUser, issue)).toBe(true);
+  });
+
+  it("should allow members to edit any issue title", () => {
+    expect(canEditIssueTitle(memberUser, issue)).toBe(true);
+  });
+
+  it("should allow guest creators to edit their own issue title", () => {
+    expect(canEditIssueTitle(guestCreator, issue)).toBe(true);
+  });
+
+  it("should deny guests from editing other users' issue titles", () => {
+    expect(canEditIssueTitle(otherGuest, issue)).toBe(false);
   });
 });
