@@ -244,6 +244,20 @@ describe("uploadAvatarAction", () => {
     expect(blobClient.deleteFromBlob).not.toHaveBeenCalled();
   });
 
+  it("should not delete blob belonging to a different user", async () => {
+    authenticateUser();
+    passRateLimit();
+    mockBlobUpload();
+    mockProfileLookup(
+      "https://abc.blob.vercel-storage.com/avatars/other-user/stolen-avatar.jpg"
+    );
+
+    const result = await uploadAvatarAction(makeAvatarFormData(validFile()));
+
+    expect(result.ok).toBe(true);
+    expect(blobClient.deleteFromBlob).not.toHaveBeenCalled();
+  });
+
   it("should not delete old blob for external URLs that only contain /uploads/", async () => {
     authenticateUser();
     passRateLimit();
