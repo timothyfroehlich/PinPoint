@@ -1,5 +1,14 @@
 import { sendEmail } from "./client";
 
+function escapeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 interface InviteEmailParams {
   to: string;
   firstName: string;
@@ -46,9 +55,9 @@ export function renderInviteEmailHtml({
       <body>
         <div class="container">
           <h2>You've been invited to PinPoint!</h2>
-          <p>Hi ${firstName},</p>
+          <p>Hi ${escapeHtml(firstName)},</p>
           <p>
-            ${inviterName} has added you as an owner of pinball machines in PinPoint, the
+            ${escapeHtml(inviterName)} has added you as an owner of pinball machines in PinPoint, the
             issue tracking system for Austin Pinball Collective.
           </p>
           <p><strong>Create your account to get started:</strong></p>

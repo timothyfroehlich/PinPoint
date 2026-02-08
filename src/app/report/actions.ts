@@ -104,7 +104,7 @@ export async function submitPublicIssueAction(
         );
         return {
           error:
-            "This email is associated with an existing account. Please log in to report this issue.",
+            "Unable to submit this report. Please try again or contact support.",
         };
       }
       reporterEmail = email;
