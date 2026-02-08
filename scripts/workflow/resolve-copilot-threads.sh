@@ -1,14 +1,14 @@
 #!/bin/bash
-# scripts/resolve-copilot-threads.sh
+# scripts/workflow/resolve-copilot-threads.sh
 # Resolve Copilot review threads that have been addressed by subsequent commits.
 #
 # A thread is considered "addressed" if the last commit on the PR is newer
 # than the Copilot review that created the thread.
 #
 # Usage:
-#   ./scripts/resolve-copilot-threads.sh <PR>              # Resolve addressed threads
-#   ./scripts/resolve-copilot-threads.sh <PR> --dry-run    # Preview without resolving
-#   ./scripts/resolve-copilot-threads.sh <PR> --all        # Resolve ALL unresolved Copilot threads
+#   ./scripts/workflow/resolve-copilot-threads.sh <PR>              # Resolve addressed threads
+#   ./scripts/workflow/resolve-copilot-threads.sh <PR> --dry-run    # Preview without resolving
+#   ./scripts/workflow/resolve-copilot-threads.sh <PR> --all        # Resolve ALL unresolved Copilot threads
 
 set -euo pipefail
 

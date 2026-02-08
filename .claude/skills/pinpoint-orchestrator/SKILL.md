@@ -21,24 +21,24 @@ All monitoring and readiness commands are handled by scripts. Use these instead 
 
 ```bash
 # PR monitoring
-bash scripts/pr-dashboard.sh [PR numbers...]       # CI + Copilot status table (all open PRs if no args)
-bash scripts/copilot-comments.sh <PR>              # Copilot details formatted for agent prompts
-bash scripts/copilot-comments.sh <PR> --raw        # JSON output for parsing
+bash scripts/workflow/pr-dashboard.sh [PR numbers...]       # CI + Copilot status table (all open PRs if no args)
+bash scripts/workflow/copilot-comments.sh <PR>              # Copilot details formatted for agent prompts
+bash scripts/workflow/copilot-comments.sh <PR> --raw        # JSON output for parsing
 
 # Copilot thread management (see AGENTS.md "GitHub Copilot Reviews" for full protocol)
-bash scripts/respond-to-copilot.sh <PR> <path:line> <msg> # Reply + resolve one thread
-bash scripts/resolve-copilot-threads.sh <PR>              # Bulk-resolve addressed threads (compares timestamps)
-bash scripts/resolve-copilot-threads.sh <PR> --dry-run    # Preview without resolving
-bash scripts/resolve-copilot-threads.sh <PR> --all        # Resolve ALL unresolved threads
+bash scripts/workflow/respond-to-copilot.sh <PR> <path:line> <msg> # Reply + resolve one thread
+bash scripts/workflow/resolve-copilot-threads.sh <PR>              # Bulk-resolve addressed threads (compares timestamps)
+bash scripts/workflow/resolve-copilot-threads.sh <PR> --dry-run    # Preview without resolving
+bash scripts/workflow/resolve-copilot-threads.sh <PR> --all        # Resolve ALL unresolved threads
 
 # Readiness + cleanup
-bash scripts/label-ready.sh <PR>                   # Label ready-for-review (checks CI + Copilot + draft)
-bash scripts/label-ready.sh <PR> --cleanup         # Also remove associated worktree
-bash scripts/label-ready.sh <PR> --force           # Label even with Copilot comments
-bash scripts/label-ready.sh <PR> --dry-run         # Preview without acting
+bash scripts/workflow/label-ready.sh <PR>                   # Label ready-for-review (checks CI + Copilot + draft)
+bash scripts/workflow/label-ready.sh <PR> --cleanup         # Also remove associated worktree
+bash scripts/workflow/label-ready.sh <PR> --force           # Label even with Copilot comments
+bash scripts/workflow/label-ready.sh <PR> --dry-run         # Preview without acting
 
 # CI watching
-bash scripts/monitor-gh-actions.sh                 # Watch all active CI runs in parallel, report failures
+bash scripts/workflow/monitor-gh-actions.sh                 # Watch all active CI runs in parallel, report failures
 bash .agent/skills/pinpoint-commit/scripts/watch-ci.sh <PR> [timeout]  # Poll single PR CI (default 10min)
 
 # Worktree management
@@ -156,8 +156,8 @@ Agent def456 → PinPoint-def → PR TBD
 Run periodically to see all PR status at a glance:
 
 ```bash
-bash scripts/pr-dashboard.sh 940 941 942       # Specific PRs
-bash scripts/pr-dashboard.sh                    # All open PRs
+bash scripts/workflow/pr-dashboard.sh 940 941 942       # Specific PRs
+bash scripts/workflow/pr-dashboard.sh                    # All open PRs
 ```
 
 ### 4.2 On Agent Completion
@@ -165,7 +165,7 @@ bash scripts/pr-dashboard.sh                    # All open PRs
 Check the agent's output with `TaskOutput`. Then:
 
 1. **Get PR number**: `gh pr list --head <branch> --json number,url`
-2. **Check dashboard**: `bash scripts/pr-dashboard.sh <PR>`
+2. **Check dashboard**: `bash scripts/workflow/pr-dashboard.sh <PR>`
 
 ### 4.3 Handle Failures
 
@@ -178,10 +178,10 @@ gh run view <run-id> --log-failed | tail -50
 **Copilot comments** → Get details and re-dispatch:
 
 ```bash
-bash scripts/copilot-comments.sh <PR>
+bash scripts/workflow/copilot-comments.sh <PR>
 ```
 
-Include the full output in the new agent's prompt. **Agents MUST resolve each thread** as they address it using `bash scripts/respond-to-copilot.sh` (see AGENTS.md "GitHub Copilot Reviews").
+Include the full output in the new agent's prompt. **Agents MUST resolve each thread** as they address it using `bash scripts/workflow/respond-to-copilot.sh` (see AGENTS.md "GitHub Copilot Reviews").
 
 **Infrastructure failures** (e.g., "Setup Supabase CLI: failure") → Not code issues. Re-run:
 
@@ -194,7 +194,7 @@ gh run rerun <run-id> --failed
 When a PR passes CI and has 0 Copilot comments:
 
 ```bash
-bash scripts/label-ready.sh <PR> --cleanup     # Label + remove worktree
+bash scripts/workflow/label-ready.sh <PR> --cleanup     # Label + remove worktree
 ```
 
 The script checks: all CI passed, 0 Copilot comments, not draft. `--cleanup` frees the branch for the review tool (git won't allow two worktrees on the same branch).

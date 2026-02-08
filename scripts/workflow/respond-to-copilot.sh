@@ -1,16 +1,16 @@
 #!/bin/bash
-# scripts/respond-to-copilot.sh
+# scripts/workflow/respond-to-copilot.sh
 # Reply to and resolve a single Copilot review thread on a PR.
 #
 # Agents call this after addressing (or deciding to skip) each Copilot comment.
 # The reply is visible on GitHub and the thread is resolved.
 #
 # Usage:
-#   bash scripts/respond-to-copilot.sh <PR> <path:line> <message>
+#   bash scripts/workflow/respond-to-copilot.sh <PR> <path:line> <message>
 #
 # Examples:
-#   bash scripts/respond-to-copilot.sh 945 "src/lib/blob/config.ts:N/A" "Fixed: extracted pathname before passing to deleteFromBlob. —Claude"
-#   bash scripts/respond-to-copilot.sh 945 "src/lib/blob/config.ts:N/A" "Ignored: these fields ARE used by compression.ts. —Claude"
+#   bash scripts/workflow/respond-to-copilot.sh 945 "src/lib/blob/config.ts:N/A" "Fixed: extracted pathname before passing to deleteFromBlob. —Claude"
+#   bash scripts/workflow/respond-to-copilot.sh 945 "src/lib/blob/config.ts:N/A" "Ignored: these fields ARE used by compression.ts. —Claude"
 #
 # The <path:line> must match a Copilot comment's file path and line number.
 # Use "N/A" for line when the comment has no specific line.

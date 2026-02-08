@@ -1,10 +1,10 @@
 #!/bin/bash
-# scripts/pr-dashboard.sh
+# scripts/workflow/pr-dashboard.sh
 # Shows all open PRs with CI status, Copilot comment count, and readiness.
 #
 # Usage:
-#   ./scripts/pr-dashboard.sh          # All open PRs
-#   ./scripts/pr-dashboard.sh 918 920  # Specific PRs only
+#   ./scripts/workflow/pr-dashboard.sh          # All open PRs
+#   ./scripts/workflow/pr-dashboard.sh 918 920  # Specific PRs only
 
 set -euo pipefail
 

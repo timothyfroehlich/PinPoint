@@ -1,5 +1,5 @@
 #!/bin/bash
-# scripts/copilot-comments.sh
+# scripts/workflow/copilot-comments.sh
 # Fetches and formats UNRESOLVED Copilot review comments for a PR.
 # Output is ready to paste into agent prompts.
 #
@@ -7,9 +7,9 @@
 # actionable comments are shown. Resolved threads are hidden.
 #
 # Usage:
-#   ./scripts/copilot-comments.sh 918          # Show unresolved Copilot comments
-#   ./scripts/copilot-comments.sh 918 --raw    # JSON output
-#   ./scripts/copilot-comments.sh 918 --all    # Include resolved threads too
+#   ./scripts/workflow/copilot-comments.sh 918          # Show unresolved Copilot comments
+#   ./scripts/workflow/copilot-comments.sh 918 --raw    # JSON output
+#   ./scripts/workflow/copilot-comments.sh 918 --all    # Include resolved threads too
 
 set -euo pipefail
 

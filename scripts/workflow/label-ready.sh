@@ -1,13 +1,13 @@
 #!/bin/bash
-# scripts/label-ready.sh
+# scripts/workflow/label-ready.sh
 # Labels a PR as ready-for-review if it passes all CI checks and has 0 Copilot comments.
 # Optionally cleans up the associated worktree.
 #
 # Usage:
-#   ./scripts/label-ready.sh 918                    # Check and label if ready
-#   ./scripts/label-ready.sh 918 --cleanup          # Also remove worktree
-#   ./scripts/label-ready.sh 918 --force             # Label even with Copilot comments
-#   ./scripts/label-ready.sh 918 --dry-run           # Show what would happen
+#   ./scripts/workflow/label-ready.sh 918                    # Check and label if ready
+#   ./scripts/workflow/label-ready.sh 918 --cleanup          # Also remove worktree
+#   ./scripts/workflow/label-ready.sh 918 --force             # Label even with Copilot comments
+#   ./scripts/workflow/label-ready.sh 918 --dry-run           # Show what would happen
 
 set -euo pipefail
 

@@ -155,13 +155,13 @@ Eliminates manual JSON surgery and uncertainty.
 
 **Workflow for each comment:**
 
-1. Read the comment via `bash scripts/copilot-comments.sh <PR>`
+1. Read the comment via `bash scripts/workflow/copilot-comments.sh <PR>`
 2. Fix the code (or decide to ignore with justification)
 3. Reply and resolve the thread:
 
 ```bash
-bash scripts/respond-to-copilot.sh <PR> "<path>:<line>" "Fixed: <what you did>. —Claude"
-bash scripts/respond-to-copilot.sh <PR> "<path>:<line>" "Ignored: <why this is wrong/unnecessary>. —Claude"
+bash scripts/workflow/respond-to-copilot.sh <PR> "<path>:<line>" "Fixed: <what you did>. —Claude"
+bash scripts/workflow/respond-to-copilot.sh <PR> "<path>:<line>" "Ignored: <why this is wrong/unnecessary>. —Claude"
 ```
 
 Sign replies with your agent name (`—Claude`, `—Codex`, etc.).
@@ -169,10 +169,10 @@ Sign replies with your agent name (`—Claude`, `—Codex`, etc.).
 **Scripts:**
 
 ```bash
-bash scripts/copilot-comments.sh <PR>              # Show UNRESOLVED comments only
-bash scripts/copilot-comments.sh <PR> --all         # Include resolved
-bash scripts/resolve-copilot-threads.sh <PR>        # Bulk-resolve addressed threads
-bash scripts/respond-to-copilot.sh <PR> <path:line> <msg>  # Reply + resolve one thread
+bash scripts/workflow/copilot-comments.sh <PR>              # Show UNRESOLVED comments only
+bash scripts/workflow/copilot-comments.sh <PR> --all         # Include resolved
+bash scripts/workflow/resolve-copilot-threads.sh <PR>        # Bulk-resolve addressed threads
+bash scripts/workflow/respond-to-copilot.sh <PR> <path:line> <msg>  # Reply + resolve one thread
 ```
 
 **Rules:**
