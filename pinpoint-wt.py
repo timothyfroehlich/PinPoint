@@ -435,15 +435,9 @@ def cmd_remove(args: argparse.Namespace) -> int:
     # Prune worktrees
     subprocess.run(["git", "worktree", "prune"], capture_output=True)
 
-    # Delete the branch
-    print(f"  🌿 Deleting branch: {branch}...")
-    subprocess.run(
-        ["git", "branch", "-D", branch],
-        capture_output=True
-    )
-
     print()
     print("✅ Worktree removed successfully!")
+    print(f"   Branch '{branch}' preserved (delete manually with: git branch -d -- '{branch}' (or: git branch -D -- '{branch}' to force))")
     print()
 
     return 0
