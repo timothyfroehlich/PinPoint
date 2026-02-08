@@ -3,6 +3,7 @@ import { loginAs, openSidebarIfMobile } from "../support/actions";
 import { cleanupTestEntities } from "../support/cleanup";
 import { TEST_USERS, seededIssues, seededMachines } from "../support/constants";
 import { fillReportForm } from "../support/page-helpers";
+import { getTestIssueTitle } from "../support/test-isolation";
 
 test.describe("Issue List Features", () => {
   // Track issue title prefix for cleanup across tests that create issues
@@ -81,7 +82,7 @@ test.describe("Issue List Features", () => {
     test.skip(isMobile, "Inline-edit columns hidden on mobile viewports");
 
     // Create a unique test issue to avoid parallel worker conflicts
-    const issueTitle = `Inline Edit Test ${Date.now()}`;
+    const issueTitle = getTestIssueTitle("Inline Edit Test");
     createdIssueTitlePrefix = issueTitle;
     const machineInitials = seededMachines.addamsFamily.initials;
 
@@ -94,7 +95,7 @@ test.describe("Issue List Features", () => {
     await page.goto("/issues");
     await page.getByPlaceholder("Search issues...").fill(issueTitle);
     await page.keyboard.press("Enter");
-    await page.waitForURL((url) => url.searchParams.has("q"));
+    await page.waitForURL((url) => url.searchParams.get("q") === issueTitle);
     await expect(page.getByText("Showing 1 of 1 issues")).toBeVisible();
 
     const row = page.getByRole("row", { name: issueTitle });
@@ -118,7 +119,7 @@ test.describe("Issue List Features", () => {
     await page.reload();
     await page.getByPlaceholder("Search issues...").fill(issueTitle);
     await page.keyboard.press("Enter");
-    await page.waitForURL((url) => url.searchParams.has("q"));
+    await page.waitForURL((url) => url.searchParams.get("q") === issueTitle);
 
     const rowAfterReload = page.getByRole("row", { name: issueTitle });
     await expect(
