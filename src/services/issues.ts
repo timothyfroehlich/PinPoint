@@ -519,6 +519,8 @@ export async function assignIssue({
             resourceId: issueId,
             resourceType: "issue",
             actorId,
+            includeActor: false,
+            additionalRecipientIds: [assignedTo],
             issueTitle: currentIssue.title,
             machineName: currentIssue.machine.name,
             formattedIssueId: formatIssueId(

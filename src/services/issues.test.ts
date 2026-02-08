@@ -108,6 +108,8 @@ describe("Issue Service", () => {
           resourceId: issueId,
           resourceType: "issue",
           actorId,
+          includeActor: false,
+          additionalRecipientIds: [assigneeId],
           issueTitle: "Test Issue",
           machineName: "Test Machine",
           formattedIssueId: "MM-01",
