@@ -124,7 +124,8 @@ class TestMergeEnvLocal:
         # New Next.js port = 3000 + 400 = 3400
         assert "PORT=3400" in result
         # New DB port = 54322 + 4000 = 58322
-        assert "postgresql://postgres:postgres@localhost:58322/postgres" in result
+        assert "DATABASE_URL=postgresql://postgres:postgres@localhost:58322/postgres" in result
+        assert "DIRECT_URL=postgresql://postgres:postgres@localhost:58322/postgres" in result
 
     def test_preserves_custom_variables(self, tmp_path: Path, port_config: PortConfig) -> None:
         """Test that user-added custom variables are preserved."""
@@ -193,6 +194,7 @@ class TestManagedAndUserKeys:
         expected_managed = {
             "NEXT_PUBLIC_SUPABASE_URL",
             "DATABASE_URL",
+            "DIRECT_URL",
             "PORT",
             "NEXT_PUBLIC_SITE_URL",
             "EMAIL_TRANSPORT",
