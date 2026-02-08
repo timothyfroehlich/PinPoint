@@ -125,7 +125,10 @@ export async function uploadIssueImage(formData: FormData): Promise<
           columns: { issueId: true },
         });
 
-        if (comment?.issueId !== issueId) {
+        if (!comment) {
+          return err("VALIDATION", "Comment not found");
+        }
+        if (comment.issueId !== issueId) {
           return err("VALIDATION", "Comment does not belong to this issue");
         }
       }
