@@ -110,7 +110,13 @@ export default async function MachinesPage({
   });
 
   // Fetch all users for the owner filter (smart sorted: confirmed first, by machine count)
-  const allUsers = await getUnifiedUsers();
+  // Map to minimal shape — only send what MachineFilters needs to the client
+  const allUsers = (await getUnifiedUsers()).map((u) => ({
+    id: u.id,
+    name: u.name,
+    machineCount: u.machineCount,
+    status: u.status,
+  }));
 
   // Derive status and prepare for filtering
   const machinesWithStatus = allMachines.map((machine) => {
