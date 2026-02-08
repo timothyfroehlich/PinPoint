@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { cn } from "~/lib/utils";
-import type { UnifiedUser } from "~/lib/types";
+import type { UserStatus } from "~/lib/types/user";
 import type {
   MachineFilters as FilterState,
   MachineStatus,
@@ -23,8 +23,15 @@ import type {
 } from "~/lib/machines/filters";
 import { getMachineStatusLabel } from "~/lib/machines/status";
 
+interface FilterUser {
+  id: string;
+  name: string;
+  machineCount: number;
+  status: UserStatus;
+}
+
 interface MachineFiltersProps {
-  users: UnifiedUser[];
+  users: FilterUser[];
   filters: FilterState;
 }
 
