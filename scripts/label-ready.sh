@@ -81,7 +81,7 @@ copilot_count=$(gh api graphql -f query="
   }" --jq '
   [.data.repository.pullRequest.reviewThreads.nodes[]
    | select(.isResolved == false)
-   | select(.comments.nodes[0].author.login == "copilot-pull-request-reviewer[bot]")]
+   | select(.comments.nodes[0].author.login | test("copilot-pull-request-reviewer"))]
    | length' 2>/dev/null) || { echo "FAIL: Could not fetch Copilot threads (API error). Use --force to skip."; exit 1; }
 
 if [ "$copilot_count" -gt 0 ] && [ "$FORCE" = "false" ]; then

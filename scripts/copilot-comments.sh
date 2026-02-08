@@ -57,7 +57,7 @@ fi
 comments=$(echo "$threads_json" | jq -r "
   [.data.repository.pullRequest.reviewThreads.nodes[]
    $resolved_filter
-   | select(.comments.nodes[0].author.login == \"copilot-pull-request-reviewer[bot]\")
+   | select(.comments.nodes[0].author.login | test(\"copilot-pull-request-reviewer\"))
    | {
        path: .comments.nodes[0].path,
        line: .comments.nodes[0].line,

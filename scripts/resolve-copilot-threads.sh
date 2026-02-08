@@ -51,7 +51,7 @@ threads_json=$(gh api graphql -f query="
 unresolved=$(echo "$threads_json" | jq -r '
   [.data.repository.pullRequest.reviewThreads.nodes[]
    | select(.isResolved == false)
-   | select(.comments.nodes[0].author.login == "copilot-pull-request-reviewer[bot]")
+   | select(.comments.nodes[0].author.login | test("copilot-pull-request-reviewer"))
    | {
        id: .id,
        path: .comments.nodes[0].path,

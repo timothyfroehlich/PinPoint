@@ -67,20 +67,22 @@ thread_data=$(gh api graphql -f query="
 # Find matching thread (match on path, optionally line)
 if [ "$TARGET_LINE" = "null" ]; then
     match=$(echo "$thread_data" | jq -r --arg path "$TARGET_PATH" '
-      .data.repository.pullRequest.reviewThreads.nodes[]
+      [.data.repository.pullRequest.reviewThreads.nodes[]
       | select(.isResolved == false)
-      | select(.comments.nodes[0].author.login == "copilot-pull-request-reviewer[bot]")
+      | select(.comments.nodes[0].author.login | test("copilot-pull-request-reviewer"))
       | select(.comments.nodes[0].path == $path)
       | select(.comments.nodes[0].line == null)
-      | {threadId: .id, commentDbId: .comments.nodes[0].databaseId, body: (.comments.nodes[0].body | split("\n")[0] | .[0:60])}' | head -1)
+      | {threadId: .id, commentDbId: .comments.nodes[0].databaseId, body: (.comments.nodes[0].body | split("\n")[0] | .[0:60])}]
+      | first // empty')
 else
     match=$(echo "$thread_data" | jq -r --arg path "$TARGET_PATH" --argjson line "$TARGET_LINE" '
-      .data.repository.pullRequest.reviewThreads.nodes[]
+      [.data.repository.pullRequest.reviewThreads.nodes[]
       | select(.isResolved == false)
-      | select(.comments.nodes[0].author.login == "copilot-pull-request-reviewer[bot]")
+      | select(.comments.nodes[0].author.login | test("copilot-pull-request-reviewer"))
       | select(.comments.nodes[0].path == $path)
       | select(.comments.nodes[0].line == $line)
-      | {threadId: .id, commentDbId: .comments.nodes[0].databaseId, body: (.comments.nodes[0].body | split("\n")[0] | .[0:60])}' | head -1)
+      | {threadId: .id, commentDbId: .comments.nodes[0].databaseId, body: (.comments.nodes[0].body | split("\n")[0] | .[0:60])}]
+      | first // empty')
 fi
 
 if [ -z "$match" ] || [ "$match" = "" ]; then

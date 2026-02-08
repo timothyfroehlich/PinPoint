@@ -66,7 +66,7 @@ for pr in $PRS; do
       }" --jq '
       [.data.repository.pullRequest.reviewThreads.nodes[]
        | select(.isResolved == false)
-       | select(.comments.nodes[0].author.login == "copilot-pull-request-reviewer[bot]")]
+       | select(.comments.nodes[0].author.login | test("copilot-pull-request-reviewer"))]
        | length' 2>/dev/null) || copilot_count="?"
 
     # Draft status
