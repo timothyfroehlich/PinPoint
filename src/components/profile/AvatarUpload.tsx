@@ -44,21 +44,21 @@ export function AvatarUpload({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Client-side validation
-    const validation = validateImageFile(file);
-    if (!validation.valid) {
-      toast.error(validation.error ?? "Selected file is not a valid image.");
+    // Check avatar-specific size limit first so users see the correct 2MB message
+    if (file.size > BLOB_CONFIG.AVATAR.MAX_FILE_SIZE_BYTES) {
+      toast.error(
+        `File too large. Maximum size is ${BLOB_CONFIG.AVATAR.MAX_FILE_SIZE_BYTES / 1024 / 1024}MB.`
+      );
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
       return;
     }
 
-    // Check avatar-specific size limit
-    if (file.size > BLOB_CONFIG.AVATAR.MAX_FILE_SIZE_BYTES) {
-      toast.error(
-        `File too large. Maximum size is ${BLOB_CONFIG.AVATAR.MAX_FILE_SIZE_BYTES / 1024 / 1024}MB.`
-      );
+    // General image validation (type, dimensions, etc.)
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      toast.error(validation.error ?? "Selected file is not a valid image.");
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
