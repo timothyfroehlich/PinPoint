@@ -255,6 +255,7 @@ describe("Issue Service", () => {
         oldStatus: "in_progress",
         newStatus: "in_progress",
       });
+      expect(mockDb.update).not.toHaveBeenCalled();
       expect(createTimelineEvent).not.toHaveBeenCalled();
       expect(createNotification).not.toHaveBeenCalled();
     });
