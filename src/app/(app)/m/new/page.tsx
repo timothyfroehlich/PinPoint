@@ -53,7 +53,7 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
       <div className="border-b border-outline-variant bg-surface-container">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center gap-4">
-            <Link href="/machines">
+            <Link href="/m">
               <Button
                 variant="outline"
                 size="sm"

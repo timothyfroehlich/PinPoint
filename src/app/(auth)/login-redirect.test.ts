@@ -154,7 +154,7 @@ describe("loginAction - Redirect Logic", () => {
     const mockSupabase = createMockSupabase();
     mockCreateClient(mockSupabase);
 
-    const testCases = ["/machines", "/issues/123", "/m/abc-def", "/settings"];
+    const testCases = ["/dashboard", "/issues/123", "/m/abc-def", "/settings"];
 
     for (const nextPath of testCases) {
       vi.clearAllMocks();
