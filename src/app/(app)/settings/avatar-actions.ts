@@ -17,11 +17,44 @@ import {
 import { log } from "~/lib/logger";
 
 /**
- * Check if a URL is a Vercel Blob or local upload URL (i.e., one we manage).
- * OAuth avatar URLs (Google, GitHub) should not be deleted.
+ * Parse avatar URLs and return a managed blob pathname if it belongs to us.
+ * Returns null for OAuth/external URLs.
  */
-function isOurBlobUrl(url: string): boolean {
-  return url.includes("blob.vercel-storage.com") || url.includes("/uploads/");
+function getManagedAvatarPathname(url: string): string | null {
+  try {
+    const parsedUrl = new URL(url);
+    const pathname = parsedUrl.pathname.startsWith("/")
+      ? parsedUrl.pathname.slice(1)
+      : parsedUrl.pathname;
+
+    if (!pathname) {
+      return null;
+    }
+
+    // Production Vercel Blob URL
+    if (parsedUrl.hostname.endsWith("blob.vercel-storage.com")) {
+      return pathname;
+    }
+
+    // Local mock storage URL: http://localhost:<port>/uploads/<pathname>
+    const configuredHost = process.env["NEXT_PUBLIC_SITE_URL"]
+      ? new URL(process.env["NEXT_PUBLIC_SITE_URL"]).hostname
+      : null;
+    const isLocalHost =
+      parsedUrl.hostname === "localhost" || parsedUrl.hostname === "127.0.0.1";
+    const isConfiguredHost =
+      configuredHost !== null && parsedUrl.hostname === configuredHost;
+
+    if ((isLocalHost || isConfiguredHost) && pathname.startsWith("uploads/")) {
+      const localPathname = pathname.slice("uploads/".length);
+      return localPathname.length > 0 ? localPathname : null;
+    }
+
+    return null;
+  } catch {
+    // Malformed URL or invalid configured host
+    return null;
+  }
 }
 
 export type UploadAvatarResult = Result<
@@ -92,15 +125,15 @@ export async function uploadAvatarAction(
     const blob = await uploadToBlob(file, pathname);
     uploadedBlobPathname = blob.pathname;
 
-    // 5. Get the old avatar URL before updating
-    const currentProfile = await db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, user.id),
-      columns: { avatarUrl: true },
-    });
-    const oldAvatarUrl = currentProfile?.avatarUrl;
-
-    // 6. Update profile with new avatar URL
+    // 5-6. Read current avatar and update profile
+    let oldAvatarUrl: string | null = null;
     try {
+      const currentProfile = await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, user.id),
+        columns: { avatarUrl: true },
+      });
+      oldAvatarUrl = currentProfile?.avatarUrl ?? null;
+
       await db
         .update(userProfiles)
         .set({
@@ -123,18 +156,10 @@ export async function uploadAvatarAction(
     }
 
     // 7. Delete old avatar blob if it's ours (not an OAuth URL)
-    if (oldAvatarUrl && isOurBlobUrl(oldAvatarUrl)) {
-      try {
-        const url = new URL(oldAvatarUrl);
-        const pathname = url.pathname.startsWith("/")
-          ? url.pathname.slice(1)
-          : url.pathname;
-        if (pathname) {
-          await deleteFromBlob(pathname);
-        }
-      } catch {
-        // If the URL is malformed, skip blob deletion
-      }
+    const oldAvatarPathname =
+      oldAvatarUrl !== null ? getManagedAvatarPathname(oldAvatarUrl) : null;
+    if (oldAvatarPathname) {
+      await deleteFromBlob(oldAvatarPathname);
     }
 
     // 8. Revalidate layout so avatar updates everywhere
@@ -142,6 +167,11 @@ export async function uploadAvatarAction(
 
     return ok({ url: blob.url });
   } catch (caughtErr) {
+    // Safety net: if anything failed after upload, clean up the new blob.
+    if (uploadedBlobPathname) {
+      await deleteFromBlob(uploadedBlobPathname);
+    }
+
     log.error(
       {
         error:
@@ -181,16 +211,15 @@ export async function deleteAvatarAction(): Promise<DeleteAvatarResult> {
     return err("AUTH", "You must be logged in to delete your avatar.");
   }
 
-  // 2. Get current avatar URL
-  const currentProfile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-    columns: { avatarUrl: true },
-  });
-
-  const oldAvatarUrl = currentProfile?.avatarUrl;
-
-  // 3. Set avatarUrl to null
   try {
+    // 2. Get current avatar URL
+    const currentProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { avatarUrl: true },
+    });
+    const oldAvatarUrl = currentProfile?.avatarUrl ?? null;
+
+    // 3. Set avatarUrl to null
     await db
       .update(userProfiles)
       .set({
@@ -198,6 +227,18 @@ export async function deleteAvatarAction(): Promise<DeleteAvatarResult> {
         updatedAt: new Date(),
       })
       .where(eq(userProfiles.id, user.id));
+
+    // 4. Delete blob if it's ours
+    const oldAvatarPathname =
+      oldAvatarUrl !== null ? getManagedAvatarPathname(oldAvatarUrl) : null;
+    if (oldAvatarPathname) {
+      await deleteFromBlob(oldAvatarPathname);
+    }
+
+    // 5. Revalidate layout
+    revalidatePath("/", "layout");
+
+    return ok({ success: true });
   } catch (dbErr) {
     log.error(
       {
@@ -207,24 +248,4 @@ export async function deleteAvatarAction(): Promise<DeleteAvatarResult> {
     );
     return err("DATABASE", "Failed to remove avatar.");
   }
-
-  // 4. Delete blob if it's ours
-  if (oldAvatarUrl && isOurBlobUrl(oldAvatarUrl)) {
-    try {
-      const url = new URL(oldAvatarUrl);
-      const pathname = url.pathname.startsWith("/")
-        ? url.pathname.slice(1)
-        : url.pathname;
-      if (pathname) {
-        await deleteFromBlob(pathname);
-      }
-    } catch {
-      // If the URL is malformed, skip blob deletion
-    }
-  }
-
-  // 5. Revalidate layout
-  revalidatePath("/", "layout");
-
-  return ok({ success: true });
 }

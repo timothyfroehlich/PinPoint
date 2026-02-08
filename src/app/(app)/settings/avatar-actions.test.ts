@@ -216,6 +216,22 @@ describe("uploadAvatarAction", () => {
     );
   });
 
+  it("should delete old local mock upload path when replacing existing avatar", async () => {
+    authenticateUser();
+    passRateLimit();
+    mockBlobUpload();
+    mockProfileLookup(
+      "http://localhost:3100/uploads/avatars/test-user/old-avatar.jpg"
+    );
+
+    const result = await uploadAvatarAction(makeAvatarFormData(validFile()));
+
+    expect(result.ok).toBe(true);
+    expect(blobClient.deleteFromBlob).toHaveBeenCalledWith(
+      "avatars/test-user/old-avatar.jpg"
+    );
+  });
+
   it("should not delete old blob for OAuth avatar URLs", async () => {
     authenticateUser();
     passRateLimit();
@@ -226,6 +242,35 @@ describe("uploadAvatarAction", () => {
 
     expect(result.ok).toBe(true);
     expect(blobClient.deleteFromBlob).not.toHaveBeenCalled();
+  });
+
+  it("should not delete old blob for external URLs that only contain /uploads/", async () => {
+    authenticateUser();
+    passRateLimit();
+    mockBlobUpload();
+    mockProfileLookup("https://evil.example.com/uploads/fake-avatar.jpg");
+
+    const result = await uploadAvatarAction(makeAvatarFormData(validFile()));
+
+    expect(result.ok).toBe(true);
+    expect(blobClient.deleteFromBlob).not.toHaveBeenCalled();
+  });
+
+  it("should clean up uploaded blob if profile lookup fails", async () => {
+    authenticateUser();
+    passRateLimit();
+    mockBlobUpload();
+    mockFindFirst.mockRejectedValueOnce(new Error("Profile lookup failed"));
+
+    const result = await uploadAvatarAction(makeAvatarFormData(validFile()));
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("DATABASE");
+    }
+    expect(blobClient.deleteFromBlob).toHaveBeenCalledWith(
+      "avatars/test-user/123-test.jpg"
+    );
   });
 
   it("should clean up uploaded blob if DB update fails", async () => {
@@ -304,5 +349,17 @@ describe("deleteAvatarAction", () => {
 
     expect(result.ok).toBe(true);
     expect(blobClient.deleteFromBlob).not.toHaveBeenCalled();
+  });
+
+  it("should return DATABASE when profile lookup fails", async () => {
+    authenticateUser();
+    mockFindFirst.mockRejectedValueOnce(new Error("Profile read failed"));
+
+    const result = await deleteAvatarAction();
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("DATABASE");
+    }
   });
 });
