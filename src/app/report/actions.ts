@@ -100,12 +100,9 @@ export async function submitPublicIssueAction(
       if (activeUser) {
         log.info(
           { action: "publicIssueReport", email },
-          "Blocked attempt to report for confirmed account"
+          "Silently rejected report for confirmed account (anti-enumeration)"
         );
-        return {
-          error:
-            "Unable to submit this report. Please try again or contact support.",
-        };
+        redirect("/report/success");
       }
       reporterEmail = email;
     }
