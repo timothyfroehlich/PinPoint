@@ -18,7 +18,7 @@ import {
   getClientIp,
   formatResetTime,
 } from "~/lib/rate-limit";
-import { getSiteUrl, getSafeRedirect } from "~/lib/url";
+import { getSafeRedirect, requireSiteUrl } from "~/lib/url";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
@@ -454,36 +454,9 @@ export async function forgotPasswordAction(
 
     const supabase = await createClient();
 
-    const siteUrl = getSiteUrl();
+    const siteUrl = requireSiteUrl("forgot-password");
 
-    // Validate origin against allowlist to prevent host header injection
-    // We allow:
-    // 1. The configured site URL (production)
-    // 2. The configured local port (development)
-    // 3. Default localhost:3000 (development fallback)
-    const localPort = process.env["PORT"] ?? "3000";
-
-    const origin = siteUrl; // No fallback, fail if not configured
-    const allowedOrigins = [
-      siteUrl,
-      `http://localhost:${localPort}`,
-      // Also allow 127.0.0.1 for local dev consistency
-      `http://127.0.0.1:${localPort}`,
-    ].filter((url): url is string => typeof url === "string" && url.length > 0);
-
-    if (!allowedOrigins.some((allowed) => origin.startsWith(allowed))) {
-      log.warn(
-        { origin, action: "forgot-password" },
-        "Invalid origin detected for password reset"
-      );
-      return err("SERVER", "Invalid origin for password reset");
-    }
-
-    log.info(
-      { action: "forgot-password", origin },
-      "Resolved password reset redirect origin"
-    );
-    const callbackUrl = new URL("/auth/callback", origin);
+    const callbackUrl = new URL("/auth/callback", siteUrl);
     callbackUrl.searchParams.set("next", "/reset-password");
     const redirectTo = callbackUrl.toString();
 
