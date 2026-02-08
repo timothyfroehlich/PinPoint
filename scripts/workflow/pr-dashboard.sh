@@ -1,14 +1,12 @@
 #!/bin/bash
-# scripts/pr-dashboard.sh
+# scripts/workflow/pr-dashboard.sh
 # Shows all open PRs with CI status, Copilot comment count, and readiness.
 #
 # Usage:
-#   ./scripts/pr-dashboard.sh          # All open PRs
-#   ./scripts/pr-dashboard.sh 918 920  # Specific PRs only
+#   ./scripts/workflow/pr-dashboard.sh          # All open PRs
+#   ./scripts/workflow/pr-dashboard.sh 918 920  # Specific PRs only
 
 set -euo pipefail
-
-REPO="timothyfroehlich/PinPoint"
 
 # Get PR list
 if [ $# -gt 0 ]; then
@@ -48,8 +46,31 @@ for pr in $PRS; do
         ci_status="All passed"
     fi
 
-    # Copilot comments
-    copilot_count=$(gh api "repos/${REPO}/pulls/${pr}/comments" --jq '[.[] | select(.user.login == "Copilot")] | length' 2>/dev/null) || copilot_count="?"
+    # Copilot comments (unresolved threads only)
+    copilot_count=$(gh api graphql -f query="
+      {
+        repository(owner: \"timothyfroehlich\", name: \"PinPoint\") {
+          pullRequest(number: $pr) {
+            reviewThreads(first: 100) {
+              nodes {
+                isResolved
+                comments(first: 1) {
+                  nodes { author { login } }
+                }
+              }
+            }
+          }
+        }
+      }" --jq '
+      [.data.repository.pullRequest.reviewThreads.nodes[]
+       | select(.isResolved == false)
+       | select(.comments.nodes | length > 0)
+       | .comments.nodes[0] as $comment
+       | select(
+           $comment.author.login == "copilot-pull-request-reviewer"
+           or $comment.author.login == "copilot-pull-request-reviewer[bot]"
+         )]
+       | length' 2>/dev/null) || copilot_count="?"
 
     # Draft status
     draft_str=""

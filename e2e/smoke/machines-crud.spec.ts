@@ -160,22 +160,23 @@ test.describe("Machines CRUD", () => {
       page.getByRole("heading", { name: "Machine Information" })
     ).toBeVisible();
 
-    // As a member (default login), owner should be displayed but read-only
+    // As a member (default login), owner should be displayed in the static info display
     const ownerDisplay = page.getByTestId("owner-display");
     await expect(ownerDisplay).toBeVisible();
 
     // Verify owner label is present
-    await expect(page.getByText("Machine Owner")).toBeVisible();
+    await expect(ownerDisplay.getByText("Machine Owner")).toBeVisible();
 
     // Verify owner name is shown (Admin User owns all seeded machines)
-    await expect(page.getByText("Admin User")).toBeVisible();
+    await expect(ownerDisplay.getByText("Admin User")).toBeVisible();
 
-    // Verify the help text is shown
+    // Non-owner member should see a disabled edit button with tooltip
     await expect(
-      page.getByText(
-        "The owner receives notifications for new issues on this machine."
-      )
+      page.getByTestId("edit-machine-button-disabled")
     ).toBeVisible();
+
+    // Active edit button should NOT be visible (member is not the owner)
+    await expect(page.getByTestId("edit-machine-button")).not.toBeVisible();
   });
 
   // Empty state test (requires creation) moved to integration/full suite

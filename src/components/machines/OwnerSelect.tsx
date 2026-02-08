@@ -21,6 +21,7 @@ interface OwnerSelectProps {
   defaultValue?: string | null;
   disabled?: boolean;
   onUsersChange?: (users: UnifiedUser[]) => void;
+  onValueChange?: (id: string) => void;
 }
 
 export function OwnerSelect({
@@ -28,6 +29,7 @@ export function OwnerSelect({
   defaultValue,
   disabled,
   onUsersChange,
+  onValueChange,
 }: OwnerSelectProps): React.JSX.Element {
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [selectedId, setSelectedId] = useState(defaultValue ?? "");
@@ -42,10 +44,11 @@ export function OwnerSelect({
       // Check if the pending ID now exists in the users list
       if (users.some((u) => u.id === pendingId)) {
         setSelectedId(pendingId);
+        onValueChange?.(pendingId);
         pendingSelectionRef.current = null;
       }
     }
-  }, [users]);
+  }, [users, onValueChange]);
 
   // Re-sort users after client-side mutations (e.g., inviting a new user)
   // to maintain consistent ordering: confirmed first, by machine count desc, then by last name
@@ -76,7 +79,10 @@ export function OwnerSelect({
       <Select
         name="ownerId"
         value={selectedId}
-        onValueChange={setSelectedId}
+        onValueChange={(value) => {
+          setSelectedId(value);
+          onValueChange?.(value);
+        }}
         disabled={!!disabled}
       >
         <SelectTrigger
