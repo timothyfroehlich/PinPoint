@@ -31,13 +31,22 @@ fi
 
 PR=$1
 PATH_LINE=$2
-MESSAGE=$3
+MESSAGE="${*:3}"
+
+if [[ "$PATH_LINE" != *:* ]]; then
+    echo "Error: path:line must include ':' (received '$PATH_LINE')."
+    exit 1
+fi
 
 # Parse path and line
 TARGET_PATH="${PATH_LINE%%:*}"
 TARGET_LINE="${PATH_LINE##*:}"
 if [ "$TARGET_LINE" = "N/A" ] || [ "$TARGET_LINE" = "null" ]; then
     TARGET_LINE="null"
+fi
+if [ "$TARGET_LINE" != "null" ] && ! [[ "$TARGET_LINE" =~ ^[0-9]+$ ]]; then
+    echo "Error: line must be a number or N/A (received '$TARGET_LINE')."
+    exit 1
 fi
 
 # Find the matching unresolved Copilot thread
@@ -69,19 +78,29 @@ if [ "$TARGET_LINE" = "null" ]; then
     match=$(echo "$thread_data" | jq -r --arg path "$TARGET_PATH" '
       [.data.repository.pullRequest.reviewThreads.nodes[]
       | select(.isResolved == false)
-      | select(.comments.nodes[0].author.login | test("copilot-pull-request-reviewer"))
-      | select(.comments.nodes[0].path == $path)
-      | select(.comments.nodes[0].line == null)
-      | {threadId: .id, commentDbId: .comments.nodes[0].databaseId, body: (.comments.nodes[0].body | split("\n")[0] | .[0:60])}]
+      | select(.comments.nodes | length > 0)
+      | .comments.nodes[0] as $comment
+      | select(
+          $comment.author.login == "copilot-pull-request-reviewer"
+          or $comment.author.login == "copilot-pull-request-reviewer[bot]"
+        )
+      | select($comment.path == $path)
+      | select($comment.line == null)
+      | {threadId: .id, commentDbId: $comment.databaseId, body: ($comment.body | split("\n")[0] | .[0:60])}]
       | first // empty')
 else
     match=$(echo "$thread_data" | jq -r --arg path "$TARGET_PATH" --argjson line "$TARGET_LINE" '
       [.data.repository.pullRequest.reviewThreads.nodes[]
       | select(.isResolved == false)
-      | select(.comments.nodes[0].author.login | test("copilot-pull-request-reviewer"))
-      | select(.comments.nodes[0].path == $path)
-      | select(.comments.nodes[0].line == $line)
-      | {threadId: .id, commentDbId: .comments.nodes[0].databaseId, body: (.comments.nodes[0].body | split("\n")[0] | .[0:60])}]
+      | select(.comments.nodes | length > 0)
+      | .comments.nodes[0] as $comment
+      | select(
+          $comment.author.login == "copilot-pull-request-reviewer"
+          or $comment.author.login == "copilot-pull-request-reviewer[bot]"
+        )
+      | select($comment.path == $path)
+      | select($comment.line == $line)
+      | {threadId: .id, commentDbId: $comment.databaseId, body: ($comment.body | split("\n")[0] | .[0:60])}]
       | first // empty')
 fi
 
@@ -93,14 +112,17 @@ fi
 THREAD_ID=$(echo "$match" | jq -r '.threadId')
 COMMENT_DB_ID=$(echo "$match" | jq -r '.commentDbId')
 BODY_PREVIEW=$(echo "$match" | jq -r '.body')
+DISPLAY_LINE=$TARGET_LINE
+if [ "$DISPLAY_LINE" = "null" ]; then
+    DISPLAY_LINE="N/A"
+fi
 
-echo "Thread: ${TARGET_PATH}:${TARGET_LINE}"
+echo "Thread: ${TARGET_PATH}:${DISPLAY_LINE}"
 echo "Comment: ${BODY_PREVIEW}..."
 
-# Reply via REST (no review ID needed)
-gh api "repos/${OWNER}/${REPO}/pulls/${PR}/comments" \
-    -f body="${MESSAGE}" \
-    -F in_reply_to="$COMMENT_DB_ID" --silent || { echo "FAILED to reply"; exit 1; }
+# Reply via REST using the dedicated replies endpoint
+gh api "repos/${OWNER}/${REPO}/pulls/${PR}/comments/${COMMENT_DB_ID}/replies" \
+    -f body="${MESSAGE}" --silent || { echo "FAILED to reply"; exit 1; }
 
 echo "Replied: ${MESSAGE}"
 

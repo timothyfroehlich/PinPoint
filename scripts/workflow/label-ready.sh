@@ -11,8 +11,6 @@
 
 set -euo pipefail
 
-REPO="timothyfroehlich/PinPoint"
-
 if [ $# -lt 1 ]; then
     echo "Usage: $0 <PR_NUMBER> [--cleanup] [--force] [--dry-run]"
     exit 1
@@ -30,12 +28,14 @@ for arg in "$@"; do
         --cleanup) CLEANUP=true ;;
         --force) FORCE=true ;;
         --dry-run) DRY_RUN=true ;;
+        *) echo "Error: unknown option '$arg'."; echo "Usage: $0 <PR_NUMBER> [--cleanup] [--force] [--dry-run]"; exit 1 ;;
     esac
 done
 
-# Get branch name
-branch=$(gh pr view "$PR" --json headRefName --jq '.headRefName')
-is_draft=$(gh pr view "$PR" --json isDraft --jq '.isDraft')
+# Get branch and draft status
+pr_data=$(gh pr view "$PR" --json headRefName,isDraft 2>/dev/null) || { echo "FAIL: Could not fetch PR #${PR}."; exit 1; }
+branch=$(echo "$pr_data" | jq -r '.headRefName')
+is_draft=$(echo "$pr_data" | jq -r '.isDraft')
 
 echo "PR #${PR} — branch: ${branch}"
 
@@ -47,8 +47,14 @@ fi
 
 # Check CI
 checks=$(gh pr checks "$PR" --json name,state 2>/dev/null) || checks="[]"
+total=$(echo "$checks" | jq 'length')
 failed=$(echo "$checks" | jq '[.[] | select(.state == "FAILURE" and (.name | startswith("codecov/") | not))] | length')
 pending=$(echo "$checks" | jq '[.[] | select(.state == "IN_PROGRESS" or .state == "QUEUED" or .state == "PENDING")] | length')
+
+if [ "$total" -eq 0 ]; then
+    echo "WAIT: No CI checks reported yet."
+    exit 1
+fi
 
 if [ "$pending" -gt 0 ]; then
     echo "WAIT: ${pending} checks still running."
@@ -81,7 +87,12 @@ copilot_count=$(gh api graphql -f query="
   }" --jq '
   [.data.repository.pullRequest.reviewThreads.nodes[]
    | select(.isResolved == false)
-   | select(.comments.nodes[0].author.login | test("copilot-pull-request-reviewer"))]
+   | select(.comments.nodes | length > 0)
+   | .comments.nodes[0] as $comment
+   | select(
+       $comment.author.login == "copilot-pull-request-reviewer"
+       or $comment.author.login == "copilot-pull-request-reviewer[bot]"
+     )]
    | length' 2>/dev/null) || { echo "FAIL: Could not fetch Copilot threads (API error). Use --force to skip."; exit 1; }
 
 if [ "$copilot_count" -gt 0 ] && [ "$FORCE" = "false" ]; then
@@ -99,7 +110,7 @@ fi
 if [ "$DRY_RUN" = "true" ]; then
     echo "DRY RUN: Would label PR #${PR} as ready-for-review"
 else
-    gh pr edit "$PR" --add-label "ready-for-review" 2>/dev/null || true
+    gh pr edit "$PR" --add-label "ready-for-review" >/dev/null 2>&1 || { echo "FAIL: Could not add ready-for-review label."; exit 1; }
     echo "Labeled PR #${PR} as ready-for-review."
 fi
 
@@ -111,9 +122,13 @@ if [ "$CLEANUP" = "true" ]; then
             echo "DRY RUN: Would remove worktree at ${worktree_path}"
         else
             echo "Removing worktree: ${worktree_path}"
-            ./pinpoint-wt.py remove "$branch" 2>/dev/null || \
-                git worktree remove "$worktree_path" --force 2>/dev/null || \
-                echo "WARN: Could not remove worktree. Clean up manually."
+            if [ -x "./pinpoint-wt.py" ]; then
+                ./pinpoint-wt.py remove "$branch" || echo "WARN: pinpoint-wt.py remove failed."
+            fi
+            if [ -d "$worktree_path" ]; then
+                git worktree remove "$worktree_path" 2>/dev/null || \
+                    echo "WARN: Could not remove worktree (it may contain uncommitted changes). Clean up manually."
+            fi
         fi
     else
         echo "No worktree found at ${worktree_path}."

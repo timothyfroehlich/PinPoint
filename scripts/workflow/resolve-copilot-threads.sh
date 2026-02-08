@@ -56,13 +56,18 @@ threads_json=$(gh api graphql -f query="
 unresolved=$(echo "$threads_json" | jq -r '
   [.data.repository.pullRequest.reviewThreads.nodes[]
    | select(.isResolved == false)
-   | select(.comments.nodes[0].author.login | test("copilot-pull-request-reviewer"))
+   | select(.comments.nodes | length > 0)
+   | .comments.nodes[0] as $comment
+   | select(
+       $comment.author.login == "copilot-pull-request-reviewer"
+       or $comment.author.login == "copilot-pull-request-reviewer[bot]"
+     )
    | {
        id: .id,
-       path: .comments.nodes[0].path,
-       line: .comments.nodes[0].line,
-       body: (.comments.nodes[0].body | split("\n")[0] | .[0:80]),
-       createdAt: .comments.nodes[0].createdAt
+       path: $comment.path,
+       line: $comment.line,
+       body: ($comment.body | split("\n")[0] | .[0:80]),
+       createdAt: $comment.createdAt
      }]')
 
 count=$(echo "$unresolved" | jq 'length')

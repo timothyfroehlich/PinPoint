@@ -24,6 +24,16 @@ fi
 PR=$1
 MODE="${2:-}"
 
+case "$MODE" in
+    ""|"--raw"|"--all") ;;
+    *) echo "Error: unknown mode '$MODE'."; echo "Usage: $0 <PR_NUMBER> [--raw|--all]"; exit 1 ;;
+esac
+
+INCLUDE_RESOLVED=false
+if [ "$MODE" = "--all" ]; then
+    INCLUDE_RESOLVED=true
+fi
+
 # Fetch all review threads via GraphQL
 threads_json=$(gh api graphql -f query="
 {
@@ -46,24 +56,22 @@ threads_json=$(gh api graphql -f query="
   }
 }")
 
-# Build jq filter based on mode
-if [ "$MODE" = "--all" ]; then
-    resolved_filter=""
-else
-    resolved_filter='| select(.isResolved == false)'
-fi
-
 # Extract Copilot comments
-comments=$(echo "$threads_json" | jq -r "
+comments=$(echo "$threads_json" | jq --argjson includeResolved "$INCLUDE_RESOLVED" '
   [.data.repository.pullRequest.reviewThreads.nodes[]
-   $resolved_filter
-   | select(.comments.nodes[0].author.login | test(\"copilot-pull-request-reviewer\"))
+   | select($includeResolved or (.isResolved == false))
+   | select(.comments.nodes | length > 0)
+   | .comments.nodes[0] as $comment
+   | select(
+       $comment.author.login == "copilot-pull-request-reviewer"
+       or $comment.author.login == "copilot-pull-request-reviewer[bot]"
+     )
    | {
-       path: .comments.nodes[0].path,
-       line: .comments.nodes[0].line,
-       body: .comments.nodes[0].body,
+       path: $comment.path,
+       line: $comment.line,
+       body: $comment.body,
        resolved: .isResolved
-     }]")
+     }]')
 
 count=$(echo "$comments" | jq 'length')
 

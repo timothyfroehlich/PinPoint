@@ -4,7 +4,7 @@ Bash scripts for managing GitHub PR lifecycle: CI monitoring, Copilot review thr
 
 ## Architecture
 
-All scripts use the **GitHub GraphQL API** for review thread operations (the REST API doesn't expose thread resolution state). They filter Copilot threads by matching the author login with `test("copilot-pull-request-reviewer")` — a substring match because GraphQL returns the login without the `[bot]` suffix that REST includes.
+All scripts use the **GitHub GraphQL API** for review thread operations (the REST API doesn't expose thread resolution state). They filter Copilot threads using an explicit author allowlist: `copilot-pull-request-reviewer` and `copilot-pull-request-reviewer[bot]`.
 
 Scripts are designed for the **PinPoint orchestrator workflow** where multiple subagents work in parallel worktrees. The orchestrator (or a human) uses these from the main repo to monitor and manage PRs created by agents.
 
@@ -34,9 +34,10 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 ## Key Design Decisions
 
 - **GraphQL for thread state**: REST `/pulls/{n}/comments` returns all comments regardless of resolution. Only GraphQL `reviewThreads` exposes `isResolved`.
-- **Substring author match**: GraphQL returns `copilot-pull-request-reviewer`, REST returns `copilot-pull-request-reviewer[bot]`. Using `test()` handles both.
+- **Exact bot-only author match**: Scripts only accept `copilot-pull-request-reviewer` (GraphQL login) and `copilot-pull-request-reviewer[bot]` (REST style), preventing non-Copilot comments from being included.
 - **Per-thread timestamp filtering** (resolve script): Each thread's `createdAt` is compared against the last commit date individually, preventing accidental resolution of threads from a newer review round.
 - **Fail closed** (label-ready): If the Copilot API call fails, the script exits non-zero rather than defaulting to 0 threads. Use `--force` to override.
+- **Reply endpoint** (respond script): Replies are posted via REST `POST /pulls/{pr}/comments/{id}/replies`, then thread resolution is done via GraphQL `resolveReviewThread`.
 - **First-match for respond script**: When multiple threads match the same `path:line`, the script resolves the first one. Call it multiple times to resolve them sequentially.
 
 ## Dependencies

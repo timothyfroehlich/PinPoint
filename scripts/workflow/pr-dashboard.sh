@@ -8,8 +8,6 @@
 
 set -euo pipefail
 
-REPO="timothyfroehlich/PinPoint"
-
 # Get PR list
 if [ $# -gt 0 ]; then
     PRS="$*"
@@ -66,7 +64,12 @@ for pr in $PRS; do
       }" --jq '
       [.data.repository.pullRequest.reviewThreads.nodes[]
        | select(.isResolved == false)
-       | select(.comments.nodes[0].author.login | test("copilot-pull-request-reviewer"))]
+       | select(.comments.nodes | length > 0)
+       | .comments.nodes[0] as $comment
+       | select(
+           $comment.author.login == "copilot-pull-request-reviewer"
+           or $comment.author.login == "copilot-pull-request-reviewer[bot]"
+         )]
        | length' 2>/dev/null) || copilot_count="?"
 
     # Draft status
