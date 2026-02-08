@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
 import { loginAs, openSidebarIfMobile } from "../support/actions";
-import { TEST_USERS, seededIssues } from "../support/constants";
+import { cleanupTestEntities, extractIdFromUrl } from "../support/cleanup";
+import { TEST_USERS, seededIssues, seededMachines } from "../support/constants";
+import { fillReportForm } from "../support/page-helpers";
 
 test.describe("Issue List Features", () => {
   test.beforeEach(async ({ page }, testInfo) => {
@@ -60,74 +62,74 @@ test.describe("Issue List Features", () => {
     await clearButton.click();
   });
 
-  test.skip("should inline-edit issues (Flaky Env)", async ({ page }) => {
-    const title1 = seededIssues.TAF[0].title;
+  test("should inline-edit issues", async ({ page, request }) => {
+    // Create a unique test issue to avoid parallel worker conflicts
+    const issueTitle = `Inline Edit Test ${Date.now()}`;
+    const machineInitials = seededMachines.addamsFamily.initials;
+
+    await page.goto(`/report?machine=${machineInitials}`);
+    await fillReportForm(page, { title: issueTitle, priority: "low" });
+    await page.getByRole("button", { name: "Submit Issue Report" }).click();
+    await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
+
+    // Track for cleanup
+    const issueId = extractIdFromUrl(page.url());
+
+    // Navigate to issues list and search for our unique issue
     await page.goto("/issues");
-
-    // 4. Test Inline Editing & Stable Sorting
-    // Isolate TAF-01
-    await page.getByPlaceholder("Search issues...").fill("TAF-01"); // Search by ID
+    await page.getByPlaceholder("Search issues...").fill(issueTitle);
     await page.keyboard.press("Enter");
+    await page.waitForURL((url) => url.searchParams.has("q"));
+    await expect(page.getByText("Showing 1 of 1 issues")).toBeVisible();
 
-    // Change Priority from... whatever it is to something else.
-    // TAF-01 doesn't have explicit priority seeded, defaults to Low usually?
-    // Actually schema defaults to 'low'.
-    // Let's assume it has some priority. Use the button in the priority column.
+    const row = page.getByRole("row", { name: issueTitle });
+    await expect(row).toBeVisible();
 
-    // Find the priority cell. The 4th column is priority.
-    // Simpler: find the badge inside the row.
-    const row = page.getByRole("row", { name: title1 });
-
-    // We don't know the exact current priority, so lets just pick the priority dropdown trigger
-    // It will have a chevron-down or similar, but accessible roles are tricky.
-    // The cell itself is a button.
-    // Let's rely on test-ids if we added them?
-    // We didn't add test-ids to the cells in this change, relying on role="row" and position might be safer.
-    // Or we can query by the priority text. Default is likely 'Low' or null.
-
-    // Let's inspect the seed: it doesn't specify priority, so default 'low'.
-    // Wait, let's just create a clearer test case by interacting with the cell that has "Low" text.
-    // If it's not Low, we fail, which is fine as it documents assumption.
+    // 1. Test Priority Inline Edit (Low -> High)
     const priorityTrigger = row
       .getByRole("button")
       .filter({ hasText: /Low|Medium|High/ })
       .first();
     await expect(priorityTrigger).toBeVisible();
-
-    // Click and change
     await priorityTrigger.click();
     await page.getByRole("menuitem", { name: "High" }).click();
 
-    // Toast check - wait for it to ensure server processed it
-    // await expect(page.getByText("Issue updated")).toBeVisible({ timeout: 10000 });
-
-    // Verify change persisted UI (Optimistic)
+    // Verify optimistic update
     await expect(
       row.getByRole("button").filter({ hasText: "High" })
     ).toBeVisible();
 
     // Verify persistence after reload
     await page.reload();
+    await page.getByPlaceholder("Search issues...").fill(issueTitle);
+    await page.keyboard.press("Enter");
+    await page.waitForURL((url) => url.searchParams.has("q"));
+
+    const rowAfterReload = page.getByRole("row", { name: issueTitle });
     await expect(
-      page
-        .getByRole("row", { name: title1 })
-        .getByRole("button")
-        .filter({ hasText: "High" })
+      rowAfterReload.getByRole("button").filter({ hasText: "High" })
     ).toBeVisible();
 
-    // 5. Test Assignee Inline Edit
-    // TAF-01 doesn't have assignee in seed (reportedBy is member, but assignedTo is null)
-    const assigneeCell = row
+    // 2. Test Assignee Inline Edit (Unassigned -> Admin)
+    const assigneeCell = rowAfterReload
       .getByRole("button")
       .filter({ hasText: /Unassigned/i });
+    await expect(assigneeCell).toBeVisible();
     await assigneeCell.click();
     await page.getByRole("menuitem", { name: TEST_USERS.admin.name }).click();
 
-    // Verify Update
+    // Verify assignee update
     await expect(page.getByText("Issue assigned")).toBeVisible();
     await expect(
-      row.getByRole("button").filter({ hasText: TEST_USERS.admin.name })
+      rowAfterReload
+        .getByRole("button")
+        .filter({ hasText: TEST_USERS.admin.name })
     ).toBeVisible();
+
+    // Cleanup test-created issue
+    if (issueId) {
+      await cleanupTestEntities(request, { issueIds: [issueId] });
+    }
   });
 
   test("should handle status group toggling in filters", async ({ page }) => {
