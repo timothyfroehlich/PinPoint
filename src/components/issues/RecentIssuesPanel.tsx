@@ -102,7 +102,7 @@ export async function RecentIssuesPanel({
         {issues.length > 0 && (
           <Link
             href={`/m/${machineInitials}/i`}
-            className="text-xs text-primary hover:underline font-medium"
+            className="text-xs text-link font-medium"
           >
             View all →
           </Link>

@@ -298,10 +298,7 @@ export function PrivacyContent(): React.JSX.Element {
         <p className="text-muted-foreground">
           Tim Froehlich
           <br />
-          <a
-            href="mailto:timothyfroehlich@gmail.com"
-            className="text-primary hover:underline"
-          >
+          <a href="mailto:timothyfroehlich@gmail.com" className="text-link">
             timothyfroehlich@gmail.com
           </a>
         </p>
@@ -310,7 +307,7 @@ export function PrivacyContent(): React.JSX.Element {
       <section className="space-y-4 mt-6">
         <p className="text-muted-foreground">
           See also our{" "}
-          <Link href="/terms" className="text-primary hover:underline">
+          <Link href="/terms" className="text-link">
             Terms of Service
           </Link>
           .
