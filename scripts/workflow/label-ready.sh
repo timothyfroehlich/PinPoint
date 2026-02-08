@@ -17,6 +17,10 @@ if [ $# -lt 1 ]; then
 fi
 
 PR=$1
+if ! [[ "$PR" =~ ^[0-9]+$ ]]; then
+    echo "Error: PR number must be numeric (e.g. '945'); received '$PR'."
+    exit 1
+fi
 shift
 
 CLEANUP=false
@@ -46,9 +50,9 @@ if [ "$is_draft" = "true" ]; then
 fi
 
 # Check CI
-checks=$(gh pr checks "$PR" --json name,state 2>/dev/null) || checks="[]"
+checks=$(gh pr checks "$PR" --json name,state 2>&1) || { echo "FAIL: Could not fetch CI checks for PR #${PR}."; exit 1; }
 total=$(echo "$checks" | jq 'length')
-failed=$(echo "$checks" | jq '[.[] | select(.state == "FAILURE" and (.name | startswith("codecov/") | not))] | length')
+failed=$(echo "$checks" | jq '[.[] | select((.state != "SUCCESS") and (.state != "IN_PROGRESS") and (.state != "QUEUED") and (.state != "PENDING") and (.name | startswith("codecov/") | not))] | length')
 pending=$(echo "$checks" | jq '[.[] | select(.state == "IN_PROGRESS" or .state == "QUEUED" or .state == "PENDING")] | length')
 
 if [ "$total" -eq 0 ]; then
@@ -62,7 +66,7 @@ if [ "$pending" -gt 0 ]; then
 fi
 
 if [ "$failed" -gt 0 ]; then
-    failed_names=$(echo "$checks" | jq -r '.[] | select(.state == "FAILURE" and (.name | startswith("codecov/") | not)) | .name' | paste -sd ", ")
+    failed_names=$(echo "$checks" | jq -r '.[] | select((.state != "SUCCESS") and (.state != "IN_PROGRESS") and (.state != "QUEUED") and (.state != "PENDING") and (.name | startswith("codecov/") | not)) | "\(.name) (\(.state))"' | paste -sd ", ")
     echo "FAIL: ${failed} checks failed: ${failed_names}"
     exit 1
 fi
