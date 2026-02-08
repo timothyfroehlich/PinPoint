@@ -38,8 +38,14 @@ async function createTestIssue(
 ): Promise<string> {
   const machineInitials = seededMachines.medievalMadness.initials;
 
-  // Navigate to report page
+  // Navigate to report page and wait for full load (Firefox can be slow under parallel load)
   await page.goto(`/report?machine=${machineInitials}`);
+  await page.waitForLoadState("networkidle");
+
+  // Wait for form to be interactive before filling
+  await expect(page.getByLabel("Issue Title *")).toBeVisible({
+    timeout: 15000,
+  });
 
   // Fill out form
   await fillReportForm(page, {
@@ -56,17 +62,25 @@ async function createTestIssue(
     timeout: 30000,
   });
 
+  // Wait for issue detail page to fully hydrate
+  await page.waitForLoadState("networkidle");
+
   rememberIssueId(page);
   return page.url();
 }
 
 async function addComment(page: Page, content: string): Promise<void> {
-  // The textarea has aria-label="Comment" per AddCommentForm.tsx
+  // Wait for comment form to be interactive (Firefox may need extra time under parallel load)
   const commentTextarea = page.getByRole("textbox", { name: "Comment" });
+  await expect(commentTextarea).toBeVisible({ timeout: 10000 });
   await commentTextarea.fill(content);
-  await page.getByRole("button", { name: "Add Comment" }).click();
+
+  const addButton = page.getByRole("button", { name: "Add Comment" });
+  await expect(addButton).toBeEnabled({ timeout: 5000 });
+  await addButton.click();
+
   await page.waitForLoadState("networkidle");
-  // Wait for comment to appear
+  // Wait for comment to appear in the timeline
   await expect(page.getByText(content)).toBeVisible({ timeout: 10000 });
 }
 
@@ -121,16 +135,22 @@ test.describe.serial("Comment Edit and Delete", () => {
       // Add a new comment
       await addComment(page, testCommentText);
 
+      // Wait for the comment card to fully render before interacting with actions
+      const commentCard = getCommentCard(page, testCommentText);
+      await expect(commentCard).toBeVisible({ timeout: 10000 });
+
       // Click the actions menu
       const actionsButton = getCommentActionsButton(page, testCommentText);
-      await expect(actionsButton).toBeVisible();
+      await expect(actionsButton).toBeVisible({ timeout: 10000 });
       await actionsButton.click();
 
       // Verify both Edit and Delete options are visible
-      await expect(page.getByRole("menuitem", { name: "Edit" })).toBeVisible();
-      await expect(
-        page.getByRole("menuitem", { name: "Delete" })
-      ).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "Edit" })).toBeVisible({
+        timeout: 5000,
+      });
+      await expect(page.getByRole("menuitem", { name: "Delete" })).toBeVisible({
+        timeout: 5000,
+      });
 
       // Close menu by pressing Escape
       await page.keyboard.press("Escape");
@@ -141,8 +161,12 @@ test.describe.serial("Comment Edit and Delete", () => {
       await page.goto(issueUrl);
       await page.waitForLoadState("networkidle");
 
-      // Find the comment we created
+      // Find the comment we created and wait for it to be visible
+      await expect(getCommentCard(page, testCommentText)).toBeVisible({
+        timeout: 10000,
+      });
       const actionsButton = getCommentActionsButton(page, testCommentText);
+      await expect(actionsButton).toBeVisible({ timeout: 5000 });
       await actionsButton.click();
 
       // Click Edit
@@ -176,8 +200,12 @@ test.describe.serial("Comment Edit and Delete", () => {
       await page.goto(issueUrl);
       await page.waitForLoadState("networkidle");
 
-      // Find the edited comment
+      // Find the edited comment and wait for it to be visible
+      await expect(getCommentCard(page, editedCommentText)).toBeVisible({
+        timeout: 10000,
+      });
       const actionsButton = getCommentActionsButton(page, editedCommentText);
+      await expect(actionsButton).toBeVisible({ timeout: 5000 });
       await actionsButton.click();
 
       // Click Delete
@@ -242,9 +270,12 @@ test.describe.serial("Comment Edit and Delete", () => {
       await page.goto(issueUrl);
       await page.waitForLoadState("networkidle");
 
-      // Find the member's comment
+      // Find the member's comment and wait for it to be visible
+      await expect(getCommentCard(page, memberComment)).toBeVisible({
+        timeout: 10000,
+      });
       const actionsButton = getCommentActionsButton(page, memberComment);
-      await expect(actionsButton).toBeVisible();
+      await expect(actionsButton).toBeVisible({ timeout: 5000 });
       await actionsButton.click();
 
       // Admin should see Delete but NOT Edit (since it's not their comment)
@@ -271,8 +302,12 @@ test.describe.serial("Comment Edit and Delete", () => {
       await page.goto(issueUrl);
       await page.waitForLoadState("networkidle");
 
-      // Find the member's comment
+      // Find the member's comment and wait for it to be visible
+      await expect(getCommentCard(page, memberComment)).toBeVisible({
+        timeout: 10000,
+      });
       const actionsButton = getCommentActionsButton(page, memberComment);
+      await expect(actionsButton).toBeVisible({ timeout: 5000 });
       await actionsButton.click();
 
       // Click Delete
@@ -353,7 +388,11 @@ test.describe.serial("Comment Edit and Delete", () => {
       await page.goto(issueUrl);
       await page.waitForLoadState("networkidle");
 
+      await expect(getCommentCard(page, adminComment)).toBeVisible({
+        timeout: 10000,
+      });
       const adminActionsButton = getCommentActionsButton(page, adminComment);
+      await expect(adminActionsButton).toBeVisible({ timeout: 5000 });
       await adminActionsButton.click();
       await page.getByRole("menuitem", { name: "Delete" }).click();
       await page
