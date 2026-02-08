@@ -1,4 +1,5 @@
 import { sendEmail } from "./client";
+import { escapeHtml } from "~/lib/markdown";
 
 interface InviteEmailParams {
   to: string;
@@ -46,9 +47,9 @@ export function renderInviteEmailHtml({
       <body>
         <div class="container">
           <h2>You've been invited to PinPoint!</h2>
-          <p>Hi ${firstName},</p>
+          <p>Hi ${escapeHtml(firstName)},</p>
           <p>
-            ${inviterName} has added you as an owner of pinball machines in PinPoint, the
+            ${escapeHtml(inviterName)} has added you as an owner of pinball machines in PinPoint, the
             issue tracking system for Austin Pinball Collective.
           </p>
           <p><strong>Create your account to get started:</strong></p>
