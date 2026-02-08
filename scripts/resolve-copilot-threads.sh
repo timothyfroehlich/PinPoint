@@ -23,6 +23,11 @@ fi
 PR=$1
 MODE="${2:-}"
 
+case "$MODE" in
+    ""|"--dry-run"|"--all") ;;
+    *) echo "Error: unknown mode '$MODE'."; echo "Usage: $0 <PR_NUMBER> [--dry-run|--all]"; exit 1 ;;
+esac
+
 # Get unresolved Copilot review threads
 threads_json=$(gh api graphql -f query="
 {
@@ -110,7 +115,7 @@ echo "$unresolved" | jq -c '.[]' | while read -r thread; do
           resolveReviewThread(input: {threadId: \"$thread_id\"}) {
             thread { isResolved }
           }
-        }" --silent 2>/dev/null
+        }" --silent || { echo "    → FAILED to resolve"; continue; }
         echo "    → Resolved ✓"
     fi
 done

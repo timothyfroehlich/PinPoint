@@ -85,14 +85,14 @@ copilot_count=$(gh api graphql -f query="
    | length' 2>/dev/null) || { echo "FAIL: Could not fetch Copilot threads (API error). Use --force to skip."; exit 1; }
 
 if [ "$copilot_count" -gt 0 ] && [ "$FORCE" = "false" ]; then
-    echo "BLOCK: ${copilot_count} Copilot comments. Use --force to label anyway."
+    echo "BLOCK: ${copilot_count} unresolved Copilot thread(s). Use --force to label anyway."
     exit 1
 fi
 
 if [ "$copilot_count" -gt 0 ]; then
-    echo "WARN: ${copilot_count} Copilot comments (--force used)."
+    echo "WARN: ${copilot_count} unresolved Copilot thread(s) (--force used)."
 else
-    echo "Copilot: 0 comments."
+    echo "Copilot: 0 unresolved threads."
 fi
 
 # Label

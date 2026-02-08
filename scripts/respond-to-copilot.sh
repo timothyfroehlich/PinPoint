@@ -100,7 +100,7 @@ echo "Comment: ${BODY_PREVIEW}..."
 # Reply via REST (no review ID needed)
 gh api "repos/${OWNER}/${REPO}/pulls/${PR}/comments" \
     -f body="${MESSAGE}" \
-    -F in_reply_to="$COMMENT_DB_ID" --silent 2>/dev/null
+    -F in_reply_to="$COMMENT_DB_ID" --silent || { echo "FAILED to reply"; exit 1; }
 
 echo "Replied: ${MESSAGE}"
 
@@ -110,6 +110,6 @@ mutation {
   resolveReviewThread(input: {threadId: \"$THREAD_ID\"}) {
     thread { isResolved }
   }
-}" --silent 2>/dev/null
+}" --silent || { echo "FAILED to resolve thread"; exit 1; }
 
 echo "Resolved ✓"
