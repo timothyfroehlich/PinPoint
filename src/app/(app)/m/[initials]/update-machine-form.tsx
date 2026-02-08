@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useActionState } from "react";
+import { useActionState, useState, useRef, useEffect } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -11,10 +11,32 @@ import {
 } from "~/app/(app)/m/actions";
 import { cn } from "~/lib/utils";
 import { OwnerSelect } from "~/components/machines/OwnerSelect";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "~/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "~/components/ui/alert-dialog";
+import { Pencil } from "lucide-react";
 
 import type { UnifiedUser } from "~/lib/types";
 
-interface UpdateMachineFormProps {
+// --- Edit Machine Dialog ---
+
+interface EditMachineDialogProps {
   machine: {
     id: string;
     name: string;
@@ -25,135 +47,254 @@ interface UpdateMachineFormProps {
       id: string;
       name: string;
       avatarUrl?: string | null;
-      email?: string;
     } | null;
     invitedOwner?: {
       id: string;
       name: string;
-      email?: string;
     } | null;
   };
   allUsers: UnifiedUser[];
   isAdmin: boolean;
+  isOwner: boolean;
 }
 
-export function UpdateMachineForm({
+export function EditMachineDialog({
   machine,
   allUsers,
   isAdmin,
-}: UpdateMachineFormProps): React.JSX.Element {
+  isOwner,
+}: EditMachineDialogProps): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  const [showTransferConfirm, setShowTransferConfirm] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const transferConfirmedRef = useRef(false);
+  const [selectedOwnerId, setSelectedOwnerId] = useState(
+    machine.ownerId ?? machine.invitedOwnerId ?? ""
+  );
+  const currentOwnerId = machine.ownerId ?? machine.invitedOwnerId ?? "";
+
   const [state, formAction, isPending] = useActionState<
     UpdateMachineResult | undefined,
     FormData
   >(updateMachineAction, undefined);
 
+  // Close dialog on successful update
+  useEffect(() => {
+    if (state?.ok) {
+      setOpen(false);
+    }
+  }, [state]);
+
+  // Reset selectedOwnerId when dialog reopens to avoid stale selection
+  useEffect(() => {
+    if (open) {
+      setSelectedOwnerId(currentOwnerId);
+      transferConfirmedRef.current = false;
+    }
+  }, [open, currentOwnerId]);
+
+  // Find the selected owner's name for the confirmation dialog
+  const selectedOwnerName =
+    allUsers.find((u) => u.id === selectedOwnerId)?.name ?? "the selected user";
+
+  // Only intercept submission for ownership-transfer confirmation (non-admin owners)
+  const needsTransferConfirm =
+    !isAdmin && isOwner && selectedOwnerId !== currentOwnerId;
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
+    // If transfer was already confirmed via the dialog, skip the guard
+    if (transferConfirmedRef.current) {
+      transferConfirmedRef.current = false;
+      return;
+    }
+    // Only prevent default when we need to show the transfer confirmation dialog
+    if (needsTransferConfirm) {
+      e.preventDefault();
+      setShowTransferConfirm(true);
+      return;
+    }
+    // Otherwise, let the form submit naturally via the action attribute
+  };
+
+  const handleConfirmTransfer = (): void => {
+    setShowTransferConfirm(false);
+    transferConfirmedRef.current = true;
+    // Use requestSubmit to trigger the form's action attribute
+    formRef.current?.requestSubmit();
+  };
+
   return (
-    <form action={formAction} className="space-y-6">
-      <input type="hidden" name="id" value={machine.id} />
-      {/* Flash message */}
-      {state && !state.ok && (
-        <div
-          className={cn(
-            "mb-6 rounded-md border p-4",
-            "border-destructive/20 bg-destructive/10 text-destructive"
-          )}
-        >
-          <p className="text-sm font-medium">{state.message}</p>
-        </div>
-      )}
-      {state && state.ok && (
-        <div
-          className={cn(
-            "mb-6 rounded-md border p-4",
-            "border-green-900/50 bg-green-900/20 text-green-300"
-          )}
-        >
-          <p className="text-sm font-medium">Machine updated successfully!</p>
-        </div>
-      )}
+    <>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full border-outline text-on-surface hover:bg-surface-variant"
+            data-testid="edit-machine-button"
+          >
+            <Pencil className="mr-2 size-4" />
+            Edit Machine
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Machine</DialogTitle>
+            <DialogDescription>
+              Update the details for {machine.name}.
+            </DialogDescription>
+          </DialogHeader>
 
-      {/* Machine Initials (Read Only) */}
-      <div className="space-y-2">
-        <Label htmlFor="initials" className="text-on-surface">
-          Initials
-        </Label>
-        <Input
-          id="initials"
-          value={machine.initials}
-          disabled
-          className="border-outline bg-surface-variant text-on-surface-variant"
-        />
-        <p className="text-xs text-on-surface-variant">
-          Machine initials cannot be changed
-        </p>
-      </div>
+          <form
+            ref={formRef}
+            action={formAction}
+            onSubmit={handleSubmit}
+            className="space-y-6"
+          >
+            <input type="hidden" name="id" value={machine.id} />
 
-      {/* Machine Name */}
-      <div className="space-y-2">
-        <Label htmlFor="name" className="text-on-surface">
-          Machine Name *
-        </Label>
-        <Input
-          id="name"
-          name="name"
-          type="text"
-          required
-          defaultValue={machine.name}
-          placeholder="e.g., Medieval Madness"
-          className="border-outline bg-surface text-on-surface placeholder:text-on-surface-variant"
-          autoFocus
-        />
-        <p className="text-xs text-on-surface-variant">
-          Enter the full name of the pinball machine
-        </p>
-      </div>
-
-      {/* Machine Owner */}
-      {isAdmin ? (
-        <OwnerSelect
-          users={allUsers}
-          defaultValue={machine.ownerId ?? machine.invitedOwnerId ?? null}
-        />
-      ) : (
-        <div className="space-y-2" data-testid="owner-display">
-          <span className="text-sm font-semibold text-on-surface">
-            Machine Owner
-          </span>
-          <div className="rounded-md border border-outline bg-surface px-3 py-2">
-            {machine.owner || machine.invitedOwner ? (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-on-surface">
-                  {machine.owner?.name ?? machine.invitedOwner?.name}
-                </span>
-                {/* Show invited badge only for truly invited owners (not yet accepted) */}
-                {machine.invitedOwner && !machine.owner && (
-                  <span className="text-[10px] font-medium uppercase tracking-wider text-on-surface-variant/70">
-                    (Invited)
-                  </span>
+            {/* Flash message */}
+            {state && !state.ok && (
+              <div
+                className={cn(
+                  "rounded-md border p-4",
+                  "border-destructive/20 bg-destructive/10 text-destructive"
                 )}
+              >
+                <p className="text-sm font-medium">{state.message}</p>
               </div>
-            ) : (
-              <span className="text-sm text-on-surface-variant">
-                No owner assigned
-              </span>
             )}
-          </div>
-          <p className="text-xs text-on-surface-variant">
-            The owner receives notifications for new issues on this machine.
-          </p>
-        </div>
-      )}
 
-      {/* Actions */}
-      <div className="flex gap-3 pt-4">
-        <Button
-          type="submit"
-          className="flex-1 bg-primary text-on-primary hover:bg-primary/90"
-          loading={isPending}
-        >
-          Update Machine
-        </Button>
-      </div>
-    </form>
+            {/* Machine Initials (Read Only) */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-initials" className="text-on-surface">
+                Initials
+              </Label>
+              <Input
+                id="edit-initials"
+                value={machine.initials}
+                disabled
+                className="border-outline bg-surface-variant text-on-surface-variant"
+              />
+              <p className="text-xs text-on-surface-variant">
+                Machine initials cannot be changed
+              </p>
+            </div>
+
+            {/* Machine Name */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-name" className="text-on-surface">
+                Machine Name *
+              </Label>
+              <Input
+                id="edit-name"
+                name="name"
+                type="text"
+                required
+                defaultValue={machine.name}
+                placeholder="e.g., Medieval Madness"
+                className="border-outline bg-surface text-on-surface placeholder:text-on-surface-variant"
+              />
+              <p className="text-xs text-on-surface-variant">
+                Enter the full name of the pinball machine
+              </p>
+            </div>
+
+            {/* Machine Owner - show for admin AND machine owner */}
+            {isAdmin || isOwner ? (
+              <OwnerSelectWithTracking
+                users={allUsers}
+                defaultValue={currentOwnerId}
+                onOwnerChange={setSelectedOwnerId}
+              />
+            ) : (
+              <div className="space-y-2" data-testid="owner-display">
+                <span className="text-sm font-semibold text-on-surface">
+                  Machine Owner
+                </span>
+                <div className="rounded-md border border-outline bg-surface px-3 py-2">
+                  {machine.owner || machine.invitedOwner ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-on-surface">
+                        {machine.owner?.name ?? machine.invitedOwner?.name}
+                      </span>
+                      {machine.invitedOwner && !machine.owner && (
+                        <span className="text-[10px] font-medium uppercase tracking-wider text-on-surface-variant/70">
+                          (Invited)
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-sm text-on-surface-variant">
+                      No owner assigned
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-on-surface-variant">
+                  The owner receives notifications for new issues on this
+                  machine.
+                </p>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button
+                type="submit"
+                className="bg-primary text-on-primary hover:bg-primary/90"
+                loading={isPending}
+              >
+                Update Machine
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ownership transfer confirmation (non-admin owners only) */}
+      <AlertDialog
+        open={showTransferConfirm}
+        onOpenChange={setShowTransferConfirm}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Transfer Ownership</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are transferring ownership of {machine.name} to{" "}
+              {selectedOwnerName}. You will lose the ability to edit this
+              machine. Only an admin can reverse this.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={handleConfirmTransfer}
+            >
+              Transfer Ownership
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+// --- Helper: OwnerSelect with change tracking ---
+
+function OwnerSelectWithTracking({
+  users,
+  defaultValue,
+  onOwnerChange,
+}: {
+  users: UnifiedUser[];
+  defaultValue: string | null;
+  onOwnerChange: (id: string) => void;
+}): React.JSX.Element {
+  return (
+    <OwnerSelect
+      users={users}
+      defaultValue={defaultValue}
+      onValueChange={onOwnerChange}
+    />
   );
 }
