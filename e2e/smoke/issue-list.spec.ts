@@ -134,7 +134,7 @@ test.describe("Issue List Features", () => {
     await page.getByRole("menuitem", { name: TEST_USERS.admin.name }).click();
 
     // Verify assignee update
-    await expect(page.getByText("Issue assigned")).toBeVisible();
+    await expect(page.getByText("Assignee updated")).toBeVisible();
     await expect(
       rowAfterReload
         .getByRole("button")
