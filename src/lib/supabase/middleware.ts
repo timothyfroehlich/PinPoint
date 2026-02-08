@@ -115,7 +115,8 @@ export async function updateSession(
     path.startsWith("/report") ||
     path.startsWith("/m/") ||
     path.startsWith("/dashboard") ||
-    path.startsWith("/api");
+    path.startsWith("/api") ||
+    path.startsWith("/about");
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
