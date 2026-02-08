@@ -40,6 +40,13 @@ export function EditableIssueTitle({
     }
   }, [isEditing]);
 
+  // Re-sync editValue when title prop changes (e.g., from server revalidation)
+  useEffect(() => {
+    if (!isEditing) {
+      setEditValue(title);
+    }
+  }, [title, isEditing]);
+
   // Handle action result
   useEffect(() => {
     if (state?.ok) {
@@ -125,7 +132,7 @@ export function EditableIssueTitle({
       <Button
         variant="ghost"
         size="icon-sm"
-        className="opacity-0 group-hover/title:opacity-100 transition-opacity flex-shrink-0"
+        className="opacity-0 group-hover/title:opacity-100 focus-visible:opacity-100 transition-opacity flex-shrink-0"
         onClick={() => setIsEditing(true)}
         aria-label="Edit title"
       >
