@@ -149,6 +149,7 @@ describe("Issue Service Functions (Integration)", () => {
     await updateIssueSeverity({
       issueId: testIssue.id,
       severity: newSeverity,
+      userId: testUser.id,
     });
 
     const updated = await db.query.issues.findFirst({
@@ -173,6 +174,7 @@ describe("Issue Service Functions (Integration)", () => {
     await updateIssuePriority({
       issueId: testIssue.id,
       priority: newPriority,
+      userId: testUser.id,
     });
 
     const updated = await db.query.issues.findFirst({
@@ -197,6 +199,7 @@ describe("Issue Service Functions (Integration)", () => {
     await updateIssueFrequency({
       issueId: testIssue.id,
       frequency: newFrequency,
+      userId: testUser.id,
     });
 
     const updated = await db.query.issues.findFirst({

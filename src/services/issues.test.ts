@@ -5,9 +5,13 @@ import {
   createIssue,
   addIssueComment,
   updateIssueStatus,
+  updateIssueSeverity,
+  updateIssuePriority,
+  updateIssueFrequency,
 } from "./issues";
 import { db } from "~/server/db";
 import { createNotification } from "~/lib/notifications";
+import { createTimelineEvent } from "~/lib/timeline/events";
 
 vi.mock("~/server/db", () => ({
   db: mockDeep(),
@@ -224,6 +228,127 @@ describe("Issue Service", () => {
 
       // Verify closedAt was set - using mockDeep patterns
       expect(mockDb.update).toHaveBeenCalledWith(expect.anything());
+    });
+
+    it("skips update when status has not changed (no-op)", async () => {
+      mockDb.query.issues.findFirst.mockResolvedValue({
+        id: "issue-1",
+        status: "in_progress",
+        machineInitials: "MM",
+        issueNumber: 1,
+        title: "Issue Title",
+        machine: { name: "Machine Name" },
+        assignedTo: null,
+        reportedBy: null,
+      } as any);
+
+      const result = await updateIssueStatus({
+        issueId: "issue-1",
+        status: "in_progress",
+        userId: "user-1",
+      });
+
+      expect(result).toEqual({
+        issueId: "issue-1",
+        oldStatus: "in_progress",
+        newStatus: "in_progress",
+      });
+      expect(createTimelineEvent).not.toHaveBeenCalled();
+      expect(createNotification).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("updateIssueSeverity", () => {
+    it("skips update when severity has not changed (no-op)", async () => {
+      mockDb.query.issues.findFirst.mockResolvedValue({
+        severity: "minor",
+        machineInitials: "MM",
+      } as any);
+
+      const result = await updateIssueSeverity({
+        issueId: "issue-1",
+        severity: "minor",
+        userId: "user-1",
+      });
+
+      expect(result).toEqual({
+        issueId: "issue-1",
+        oldSeverity: "minor",
+        newSeverity: "minor",
+      });
+      expect(mockDb.update).not.toHaveBeenCalled();
+      expect(createTimelineEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("updateIssuePriority", () => {
+    it("skips update when priority has not changed (no-op)", async () => {
+      mockDb.query.issues.findFirst.mockResolvedValue({
+        priority: "high",
+        machineInitials: "MM",
+      } as any);
+
+      const result = await updateIssuePriority({
+        issueId: "issue-1",
+        priority: "high",
+        userId: "user-1",
+      });
+
+      expect(result).toEqual({
+        issueId: "issue-1",
+        oldPriority: "high",
+        newPriority: "high",
+      });
+      expect(mockDb.update).not.toHaveBeenCalled();
+      expect(createTimelineEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("updateIssueFrequency", () => {
+    it("skips update when frequency has not changed (no-op)", async () => {
+      mockDb.query.issues.findFirst.mockResolvedValue({
+        frequency: "intermittent",
+        machineInitials: "MM",
+      } as any);
+
+      const result = await updateIssueFrequency({
+        issueId: "issue-1",
+        frequency: "intermittent",
+        userId: "user-1",
+      });
+
+      expect(result).toEqual({
+        issueId: "issue-1",
+        oldFrequency: "intermittent",
+        newFrequency: "intermittent",
+      });
+      expect(mockDb.update).not.toHaveBeenCalled();
+      expect(createTimelineEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("assignIssue", () => {
+    it("skips update when assignment has not changed (no-op)", async () => {
+      mockDb.query.issues.findFirst.mockResolvedValue({
+        machineInitials: "MM",
+        issueNumber: 1,
+        title: "Test Issue",
+        reportedBy: null,
+        assignedTo: "user-456",
+        machine: { name: "Test Machine" },
+        assignedToUser: { name: "Current User" },
+      } as any);
+
+      await assignIssue({
+        issueId: "issue-1",
+        assignedTo: "user-456",
+        actorId: "admin-1",
+      });
+
+      // Should not update DB or create timeline event
+      expect(mockDb.update).not.toHaveBeenCalled();
+      expect(createTimelineEvent).not.toHaveBeenCalled();
+      expect(createNotification).not.toHaveBeenCalled();
     });
   });
 });
