@@ -12,23 +12,23 @@ Scripts are designed for the **PinPoint orchestrator workflow** where multiple s
 
 ### PR Monitoring
 
-| Script | Purpose |
-|--------|---------|
-| `pr-dashboard.sh [PR...]` | Status table: CI checks, unresolved Copilot thread count, draft state. All open PRs if no args. |
-| `monitor-gh-actions.sh` | Watch all active CI runs in parallel, report failures. Writes signal files for async monitoring. |
+| Script                    | Purpose                                                                                          |
+| ------------------------- | ------------------------------------------------------------------------------------------------ |
+| `pr-dashboard.sh [PR...]` | Status table: CI checks, unresolved Copilot thread count, draft state. All open PRs if no args.  |
+| `monitor-gh-actions.sh`   | Watch all active CI runs in parallel, report failures. Writes signal files for async monitoring. |
 
 ### Copilot Thread Management
 
-| Script | Purpose |
-|--------|---------|
-| `copilot-comments.sh <PR>` | Show unresolved Copilot comments formatted for agent prompts. `--all` includes resolved. `--raw` for JSON. |
-| `respond-to-copilot.sh <PR> <path:line> <msg>` | Reply to and resolve a single thread. Match by file path + line number. Use `N/A` for file-level comments. |
-| `resolve-copilot-threads.sh <PR>` | Bulk-resolve threads older than the last commit (per-thread timestamp check). `--dry-run` to preview. `--all` to resolve regardless. |
+| Script                                         | Purpose                                                                                                                              |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `copilot-comments.sh <PR>`                     | Show unresolved Copilot comments formatted for agent prompts. `--all` includes resolved. `--raw` for JSON.                           |
+| `respond-to-copilot.sh <PR> <path:line> <msg>` | Reply to and resolve a single thread. Match by file path + line number. Use `N/A` for file-level comments.                           |
+| `resolve-copilot-threads.sh <PR>`              | Bulk-resolve threads older than the last commit (per-thread timestamp check). `--dry-run` to preview. `--all` to resolve regardless. |
 
 ### Readiness
 
-| Script | Purpose |
-|--------|---------|
+| Script                | Purpose                                                                                                                                                                                 |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `label-ready.sh <PR>` | Label `ready-for-review` if: all CI passed, 0 unresolved Copilot threads, not draft. `--cleanup` removes associated worktree. `--force` skips Copilot gate. Fails closed on API errors. |
 
 ## Key Design Decisions
