@@ -1,17 +1,29 @@
 import { test, expect } from "@playwright/test";
 import { loginAs, openSidebarIfMobile } from "../support/actions";
-import { cleanupTestEntities, extractIdFromUrl } from "../support/cleanup";
+import { cleanupTestEntities } from "../support/cleanup";
 import { TEST_USERS, seededIssues, seededMachines } from "../support/constants";
 import { fillReportForm } from "../support/page-helpers";
 
 test.describe("Issue List Features", () => {
+  // Track issue title prefix for cleanup across tests that create issues
+  let createdIssueTitlePrefix: string | undefined;
+
   test.beforeEach(async ({ page }, testInfo) => {
     test.setTimeout(60000);
+    createdIssueTitlePrefix = undefined;
     // Use Admin to ensure permissions for all inline edits
     await loginAs(page, testInfo, {
       email: TEST_USERS.admin.email,
       password: TEST_USERS.admin.password,
     });
+  });
+
+  test.afterEach(async ({ request }) => {
+    if (createdIssueTitlePrefix) {
+      await cleanupTestEntities(request, {
+        issueTitlePrefix: createdIssueTitlePrefix,
+      });
+    }
   });
 
   test("should filter and search issues", async ({ page }) => {
@@ -62,18 +74,16 @@ test.describe("Issue List Features", () => {
     await clearButton.click();
   });
 
-  test("should inline-edit issues", async ({ page, request }) => {
+  test("should inline-edit issues", async ({ page }) => {
     // Create a unique test issue to avoid parallel worker conflicts
     const issueTitle = `Inline Edit Test ${Date.now()}`;
+    createdIssueTitlePrefix = "Inline Edit Test";
     const machineInitials = seededMachines.addamsFamily.initials;
 
     await page.goto(`/report?machine=${machineInitials}`);
     await fillReportForm(page, { title: issueTitle, priority: "low" });
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
     await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
-
-    // Track for cleanup
-    const issueId = extractIdFromUrl(page.url());
 
     // Navigate to issues list and search for our unique issue
     await page.goto("/issues");
@@ -125,11 +135,6 @@ test.describe("Issue List Features", () => {
         .getByRole("button")
         .filter({ hasText: TEST_USERS.admin.name })
     ).toBeVisible();
-
-    // Cleanup test-created issue
-    if (issueId) {
-      await cleanupTestEntities(request, { issueIds: [issueId] });
-    }
   });
 
   test("should handle status group toggling in filters", async ({ page }) => {
