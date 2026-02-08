@@ -44,7 +44,9 @@ function failClosedResult(): RateLimitResult {
   };
 }
 
-function isProduction(): boolean {
+function isProductionEnv(): boolean {
+  const vercelEnv = process.env["VERCEL_ENV"];
+  if (vercelEnv) return vercelEnv === "production";
   return process.env.NODE_ENV === "production";
 }
 
@@ -230,18 +232,19 @@ export async function getClientIp(): Promise<string> {
  */
 export async function checkLoginIpLimit(ip: string): Promise<RateLimitResult> {
   if (ip === "unknown") {
-    if (isProduction()) {
-      log.error(
+    if (isProductionEnv()) {
+      log.warn(
         { action: "rate-limit" },
-        "Client IP unavailable in production - blocking request"
+        "Client IP unavailable - using shared fallback key"
       );
-      return failClosedResult();
+      ip = "unknown-ip-fallback";
+    } else {
+      log.warn(
+        { action: "rate-limit" },
+        "Client IP unavailable - skipping rate limit in development"
+      );
+      return { success: true, limit: 0, remaining: 0, reset: 0 };
     }
-    log.warn(
-      { action: "rate-limit" },
-      "Client IP unavailable - rate limiting disabled in development"
-    );
-    return { success: true, limit: 0, remaining: 0, reset: 0 };
   }
 
   if (loginIpLimiter === undefined) {
@@ -249,7 +252,7 @@ export async function checkLoginIpLimit(ip: string): Promise<RateLimitResult> {
   }
 
   if (!loginIpLimiter) {
-    if (isProduction()) {
+    if (isProductionEnv()) {
       log.error(
         { action: "rate-limit" },
         "Rate limiting unavailable in production - blocking request"
@@ -276,7 +279,7 @@ export async function checkLoginIpLimit(ip: string): Promise<RateLimitResult> {
       { error: error instanceof Error ? error.message : "Unknown", ip },
       "Login IP rate limit check failed"
     );
-    if (isProduction()) {
+    if (isProductionEnv()) {
       return failClosedResult();
     }
     return { success: true, limit: 0, remaining: 0, reset: 0 };
@@ -293,18 +296,19 @@ export async function checkPublicIssueLimit(
   ip: string
 ): Promise<RateLimitResult> {
   if (ip === "unknown") {
-    if (isProduction()) {
-      log.error(
+    if (isProductionEnv()) {
+      log.warn(
         { action: "rate-limit" },
-        "Client IP unavailable in production - blocking request"
+        "Client IP unavailable - using shared fallback key"
       );
-      return failClosedResult();
+      ip = "unknown-ip-fallback";
+    } else {
+      log.warn(
+        { action: "rate-limit" },
+        "Client IP unavailable - skipping rate limit in development"
+      );
+      return { success: true, limit: 0, remaining: 0, reset: 0 };
     }
-    log.warn(
-      { action: "rate-limit" },
-      "Client IP unavailable - rate limiting disabled in development"
-    );
-    return { success: true, limit: 0, remaining: 0, reset: 0 };
   }
 
   if (publicIssueLimiter === undefined) {
@@ -312,7 +316,7 @@ export async function checkPublicIssueLimit(
   }
 
   if (!publicIssueLimiter) {
-    if (isProduction()) {
+    if (isProductionEnv()) {
       log.error(
         { action: "rate-limit" },
         "Rate limiting unavailable in production - blocking request"
@@ -339,7 +343,7 @@ export async function checkPublicIssueLimit(
       { error: error instanceof Error ? error.message : "Unknown", ip },
       "Public issue rate limit check failed"
     );
-    if (isProduction()) {
+    if (isProductionEnv()) {
       return failClosedResult();
     }
     return { success: true, limit: 0, remaining: 0, reset: 0 };
@@ -356,18 +360,19 @@ export async function checkImageUploadLimit(
   ip: string
 ): Promise<RateLimitResult> {
   if (ip === "unknown") {
-    if (isProduction()) {
-      log.error(
+    if (isProductionEnv()) {
+      log.warn(
         { action: "rate-limit" },
-        "Client IP unavailable in production - blocking request"
+        "Client IP unavailable - using shared fallback key"
       );
-      return failClosedResult();
+      ip = "unknown-ip-fallback";
+    } else {
+      log.warn(
+        { action: "rate-limit" },
+        "Client IP unavailable - skipping rate limit in development"
+      );
+      return { success: true, limit: 0, remaining: 0, reset: 0 };
     }
-    log.warn(
-      { action: "rate-limit" },
-      "Client IP unavailable - rate limiting disabled in development"
-    );
-    return { success: true, limit: 0, remaining: 0, reset: 0 };
   }
 
   if (imageUploadLimiter === undefined) {
@@ -375,7 +380,7 @@ export async function checkImageUploadLimit(
   }
 
   if (!imageUploadLimiter) {
-    if (isProduction()) {
+    if (isProductionEnv()) {
       log.error(
         { action: "rate-limit" },
         "Rate limiting unavailable in production - blocking request"
@@ -402,7 +407,7 @@ export async function checkImageUploadLimit(
       { error: error instanceof Error ? error.message : "Unknown", ip },
       "Image upload rate limit check failed"
     );
-    if (isProduction()) {
+    if (isProductionEnv()) {
       return failClosedResult();
     }
     return { success: true, limit: 0, remaining: 0, reset: 0 };
@@ -423,7 +428,7 @@ export async function checkLoginAccountLimit(
   }
 
   if (!loginAccountLimiter) {
-    if (isProduction()) {
+    if (isProductionEnv()) {
       log.error(
         { action: "rate-limit" },
         "Rate limiting unavailable in production - blocking request"
@@ -454,7 +459,7 @@ export async function checkLoginAccountLimit(
       },
       "Login account rate limit check failed"
     );
-    if (isProduction()) {
+    if (isProductionEnv()) {
       return failClosedResult();
     }
     return { success: true, limit: 0, remaining: 0, reset: 0 };
@@ -469,18 +474,19 @@ export async function checkLoginAccountLimit(
  */
 export async function checkSignupLimit(ip: string): Promise<RateLimitResult> {
   if (ip === "unknown") {
-    if (isProduction()) {
-      log.error(
+    if (isProductionEnv()) {
+      log.warn(
         { action: "rate-limit" },
-        "Client IP unavailable in production - blocking request"
+        "Client IP unavailable - using shared fallback key"
       );
-      return failClosedResult();
+      ip = "unknown-ip-fallback";
+    } else {
+      log.warn(
+        { action: "rate-limit" },
+        "Client IP unavailable - skipping rate limit in development"
+      );
+      return { success: true, limit: 0, remaining: 0, reset: 0 };
     }
-    log.warn(
-      { action: "rate-limit" },
-      "Client IP unavailable - rate limiting disabled in development"
-    );
-    return { success: true, limit: 0, remaining: 0, reset: 0 };
   }
 
   if (signupLimiter === undefined) {
@@ -488,7 +494,7 @@ export async function checkSignupLimit(ip: string): Promise<RateLimitResult> {
   }
 
   if (!signupLimiter) {
-    if (isProduction()) {
+    if (isProductionEnv()) {
       log.error(
         { action: "rate-limit" },
         "Rate limiting unavailable in production - blocking request"
@@ -515,7 +521,7 @@ export async function checkSignupLimit(ip: string): Promise<RateLimitResult> {
       { error: error instanceof Error ? error.message : "Unknown", ip },
       "Signup rate limit check failed"
     );
-    if (isProduction()) {
+    if (isProductionEnv()) {
       return failClosedResult();
     }
     return { success: true, limit: 0, remaining: 0, reset: 0 };
@@ -536,7 +542,7 @@ export async function checkForgotPasswordLimit(
   }
 
   if (!forgotPasswordLimiter) {
-    if (isProduction()) {
+    if (isProductionEnv()) {
       log.error(
         { action: "rate-limit" },
         "Rate limiting unavailable in production - blocking request"
@@ -567,7 +573,7 @@ export async function checkForgotPasswordLimit(
       },
       "Forgot password rate limit check failed"
     );
-    if (isProduction()) {
+    if (isProductionEnv()) {
       return failClosedResult();
     }
     return { success: true, limit: 0, remaining: 0, reset: 0 };
