@@ -9,6 +9,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from pinpoint_wt_lib import (
+    LOCAL_SUPABASE_PUBLISHABLE_KEY,
+    LOCAL_SUPABASE_SERVICE_ROLE_KEY,
     MANAGED_ENV_KEYS,
     USER_PROVIDED_KEYS,
     PortConfig,
@@ -89,19 +91,22 @@ class TestMergeEnvLocal:
             project_id="pinpoint-test",
         )
 
-    def test_preserves_supabase_keys(self, tmp_path: Path, port_config: PortConfig) -> None:
-        """Test that Supabase keys are preserved on sync."""
+    def test_overwrites_supabase_keys_with_static_values(
+        self, tmp_path: Path, port_config: PortConfig
+    ) -> None:
+        """Test that Supabase keys are overwritten with static local dev values on sync."""
         env_file = tmp_path / ".env.local"
         env_file.write_text(
             "NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321\n"
-            "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=my-secret-key-123\n"
-            "SUPABASE_SERVICE_ROLE_KEY=my-service-role-key-456\n"
+            "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=old-key\n"
+            "SUPABASE_SERVICE_ROLE_KEY=old-role-key\n"
         )
 
         result = merge_env_local(tmp_path, port_config)
 
-        assert "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=my-secret-key-123" in result
-        assert "SUPABASE_SERVICE_ROLE_KEY=my-service-role-key-456" in result
+        # Should be overwritten with the static local dev values
+        assert f"NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY={LOCAL_SUPABASE_PUBLISHABLE_KEY}" in result
+        assert f"SUPABASE_SERVICE_ROLE_KEY={LOCAL_SUPABASE_SERVICE_ROLE_KEY}" in result
 
     def test_updates_port_dependent_keys(self, tmp_path: Path, port_config: PortConfig) -> None:
         """Test that port-dependent keys are updated."""
@@ -135,18 +140,18 @@ class TestMergeEnvLocal:
         assert "MY_CUSTOM_VAR=custom_value" in result
         assert "ANOTHER_CUSTOM=another_value" in result
 
-    def test_fresh_file_has_empty_supabase_keys(
+    def test_fresh_file_has_static_supabase_keys(
         self, tmp_path: Path, port_config: PortConfig
     ) -> None:
-        """Test that a fresh .env.local has empty placeholders for Supabase keys."""
+        """Test that a fresh .env.local has the static local Supabase keys."""
         # No existing .env.local file
 
         result = merge_env_local(tmp_path, port_config)
 
-        # Should have empty values (key= with nothing after)
-        assert "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=" in result
-        assert "SUPABASE_SERVICE_ROLE_KEY=" in result
-        # But managed values should be set
+        # Should have the static local dev keys auto-populated
+        assert f"NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY={LOCAL_SUPABASE_PUBLISHABLE_KEY}" in result
+        assert f"SUPABASE_SERVICE_ROLE_KEY={LOCAL_SUPABASE_SERVICE_ROLE_KEY}" in result
+        # And managed values should be set
         assert "http://localhost:58321" in result
 
     def test_includes_header_comment(self, tmp_path: Path, port_config: PortConfig) -> None:
@@ -183,8 +188,8 @@ class TestMergeEnvLocal:
 class TestManagedAndUserKeys:
     """Test the key categorization constants."""
 
-    def test_managed_keys_are_port_dependent_or_defaults(self) -> None:
-        """Test that managed keys are the expected port-dependent ones."""
+    def test_managed_keys_include_supabase_keys(self) -> None:
+        """Test that managed keys include static Supabase keys."""
         expected_managed = {
             "NEXT_PUBLIC_SUPABASE_URL",
             "DATABASE_URL",
@@ -198,16 +203,14 @@ class TestManagedAndUserKeys:
             "DEV_AUTOLOGIN_ENABLED",
             "DEV_AUTOLOGIN_EMAIL",
             "DEV_AUTOLOGIN_PASSWORD",
-        }
-        assert MANAGED_ENV_KEYS == expected_managed
-
-    def test_user_provided_keys_are_supabase_secrets(self) -> None:
-        """Test that user-provided keys are Supabase secrets."""
-        expected_user = {
             "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
             "SUPABASE_SERVICE_ROLE_KEY",
         }
-        assert USER_PROVIDED_KEYS == expected_user
+        assert MANAGED_ENV_KEYS == expected_managed
+
+    def test_user_provided_keys_is_empty(self) -> None:
+        """Test that user-provided keys set is empty (all keys are now managed)."""
+        assert USER_PROVIDED_KEYS == set()
 
     def test_no_overlap_between_managed_and_user(self) -> None:
         """Test that managed and user keys don't overlap."""

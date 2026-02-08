@@ -23,6 +23,14 @@ BASE_PORT_INBUCKET = 54324
 BASE_PORT_SMTP = 54325
 BASE_PORT_POP3 = 54326
 
+# Local Supabase uses static demo keys (same across all instances)
+LOCAL_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH"
+LOCAL_SUPABASE_SERVICE_ROLE_KEY = (
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+    "eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0."
+    "EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU"
+)
+
 # Keys that pinpoint-wt.py manages (port-dependent and local dev defaults)
 MANAGED_ENV_KEYS = {
     # Port-dependent
@@ -39,13 +47,13 @@ MANAGED_ENV_KEYS = {
     "DEV_AUTOLOGIN_ENABLED",
     "DEV_AUTOLOGIN_EMAIL",
     "DEV_AUTOLOGIN_PASSWORD",
-}
-
-# Keys that should exist but are user-provided (not overwritten)
-USER_PROVIDED_KEYS = {
+    # Static Supabase keys (same for all local instances)
     "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
     "SUPABASE_SERVICE_ROLE_KEY",
 }
+
+# No more USER_PROVIDED_KEYS — Supabase keys are static for local dev
+USER_PROVIDED_KEYS: set[str] = set()
 
 ENV_HEADER = """\
 # ⚠️ PORTS MANAGED BY pinpoint-wt.py - Other keys preserved ⚠️
@@ -153,10 +161,9 @@ def format_env_file(
         f"DEV_AUTOLOGIN_EMAIL={managed_values['DEV_AUTOLOGIN_EMAIL']}",
         f"DEV_AUTOLOGIN_PASSWORD={managed_values['DEV_AUTOLOGIN_PASSWORD']}",
         "",
-        "# === User-provided keys (preserved on sync) ===",
-        "# Fill these from 'supabase start' output",
-        f"NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY={user_values.get('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', '')}",
-        f"SUPABASE_SERVICE_ROLE_KEY={user_values.get('SUPABASE_SERVICE_ROLE_KEY', '')}",
+        "# Supabase keys (static for local dev)",
+        f"NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY={managed_values['NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY']}",
+        f"SUPABASE_SERVICE_ROLE_KEY={managed_values['SUPABASE_SERVICE_ROLE_KEY']}",
     ]
 
     # Add any custom user keys that aren't in managed or user-provided sets
@@ -198,6 +205,8 @@ def merge_env_local(worktree_path: Path, port_config: PortConfig) -> str:
         "DEV_AUTOLOGIN_ENABLED": "true",
         "DEV_AUTOLOGIN_EMAIL": "admin@test.com",
         "DEV_AUTOLOGIN_PASSWORD": "TestPassword123",
+        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": LOCAL_SUPABASE_PUBLISHABLE_KEY,
+        "SUPABASE_SERVICE_ROLE_KEY": LOCAL_SUPABASE_SERVICE_ROLE_KEY,
     }
 
     # Parse existing file to preserve user values
