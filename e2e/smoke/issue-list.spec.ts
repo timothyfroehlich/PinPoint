@@ -82,7 +82,7 @@ test.describe("Issue List Features", () => {
 
     // Create a unique test issue to avoid parallel worker conflicts
     const issueTitle = `Inline Edit Test ${Date.now()}`;
-    createdIssueTitlePrefix = "Inline Edit Test";
+    createdIssueTitlePrefix = issueTitle;
     const machineInitials = seededMachines.addamsFamily.initials;
 
     await page.goto(`/report?machine=${machineInitials}`);
