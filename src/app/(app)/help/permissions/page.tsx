@@ -128,7 +128,7 @@ export default function PermissionsPage(): React.JSX.Element {
     <PageShell size="default">
       <header className="space-y-2 mb-8">
         <p className="text-sm text-muted-foreground">
-          <Link href="/help" className="text-primary hover:underline">
+          <Link href="/help" className="text-link">
             Help
           </Link>{" "}
           / Roles &amp; Permissions
