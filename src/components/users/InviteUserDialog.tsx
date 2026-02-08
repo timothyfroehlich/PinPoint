@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { type z } from "zod";
-import type { UnifiedUser } from "~/lib/types";
+import type { OwnerSelectUser } from "~/components/machines/OwnerSelect";
 
 import {
   Dialog,
@@ -43,7 +43,7 @@ type InviteUserFormValues = z.infer<typeof inviteUserSchema>;
 interface InviteUserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess?: (userId: string, user: UnifiedUser) => void;
+  onSuccess?: (userId: string, user: OwnerSelectUser) => void;
 }
 
 export function InviteUserDialog({
@@ -79,16 +79,13 @@ export function InviteUserDialog({
         if (result.ok) {
           toast.success("User invited successfully");
           form.reset();
-          // Build the new user object to pass to the callback
-          const newUser: UnifiedUser = {
+          // Build minimal user object for the callback (CORE-SEC-006)
+          const newUser: OwnerSelectUser = {
             id: result.userId,
             name: `${values.firstName} ${values.lastName}`,
             lastName: values.lastName,
-            email: values.email,
-            role: values.role,
             status: "invited",
-            avatarUrl: null,
-            machineCount: 0, // New user has no machines yet
+            machineCount: 0,
           };
           // Call onSuccess with both the ID and full user object, then close dialog
           // Note: router.refresh() removed - parent manages users state directly

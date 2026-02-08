@@ -8,12 +8,27 @@ import {
   updateNotificationPreferencesAction,
   type UpdatePreferencesResult,
 } from "./actions";
-import { type notificationPreferences } from "~/server/db/schema";
 import { cn } from "~/lib/utils";
 import React from "react";
 
+/** Minimal preference shape for client rendering (CORE-SEC-006) */
+interface NotificationPreferencesData {
+  emailEnabled: boolean;
+  inAppEnabled: boolean;
+  emailNotifyOnAssigned: boolean;
+  inAppNotifyOnAssigned: boolean;
+  emailNotifyOnStatusChange: boolean;
+  inAppNotifyOnStatusChange: boolean;
+  emailNotifyOnNewComment: boolean;
+  inAppNotifyOnNewComment: boolean;
+  emailNotifyOnNewIssue: boolean;
+  inAppNotifyOnNewIssue: boolean;
+  emailWatchNewIssuesGlobal: boolean;
+  inAppWatchNewIssuesGlobal: boolean;
+}
+
 interface NotificationPreferencesFormProps {
-  preferences: typeof notificationPreferences.$inferSelect;
+  preferences: NotificationPreferencesData;
 }
 
 export function NotificationPreferencesForm({

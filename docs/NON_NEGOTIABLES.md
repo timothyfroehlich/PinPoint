@@ -27,10 +27,11 @@ trigger: always_on
 7. Use `~/` path aliases, avoid deep relative imports
 8. Never use `any`, non‑null `!`, or unsafe `as`; write proper type guards
 9. Default to Server Components, minimal Client Components
-10. Forms work without JavaScript (progressive enhancement)
-11. Use Drizzle migrations for schema changes (no ad-hoc `push` to production/preview)
-12. Keep auth host consistent: use `localhost` everywhere (Supabase site_url, Next dev, Playwright baseURL) to prevent cookie host mismatches
-13. E2E interaction coverage: if you add a clickable element, click it in a test
+10. Map data to minimal shapes before passing to Client Components (CORE-SEC-006)
+11. Forms work without JavaScript (progressive enhancement)
+12. Use Drizzle migrations for schema changes (no ad-hoc `push` to production/preview)
+13. Keep auth host consistent: use `localhost` everywhere (Supabase site_url, Next dev, Playwright baseURL) to prevent cookie host mismatches
+14. E2E interaction coverage: if you add a clickable element, click it in a test
 
 ---
 
@@ -172,6 +173,13 @@ trigger: always_on
 - **Why:** Prevents environment mismatches and "whack-a-mole" configuration bugs
 - **Do:** Use `NEXT_PUBLIC_SITE_URL` and `PORT` environment variables
 - **Don't:** Hardcode `localhost:3000` or specific domains in source code or tests
+
+**CORE-SEC-006:** Minimal data at Server→Client boundary
+
+- **Severity:** Critical
+- **Why:** RSC payload is visible in page source; full domain objects leak sensitive fields (emails, roles, internal IDs) even on authenticated pages
+- **Do:** Map data to a minimal shape before passing to Client Components — only include fields the component actually uses
+- **Don't:** Pass full ORM/domain objects (UnifiedUser, full profile records, etc.) as props to "use client" components
 
 ---
 
@@ -340,6 +348,7 @@ trigger: always_on
 - **Flash messages**: Don't use `setFlash()`/`readFlash()` for form feedback (use `useActionState` instead)
 - **Playwright arbitrary waits**: No `page.waitForTimeout()` in tests; assert on real UI state (add `data-testid` hooks if needed)
 - **Direct auth.users queries**: Never query Supabase's internal `auth.users` table in application code (use `user_profiles` instead)
+- **Over-serialization to client**: Don't pass full domain objects to Client Components; map to minimal shapes at the server→client boundary (especially user/account data)
 
 ---
 
@@ -371,7 +380,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 
 - CORE‑TS‑001..006: Type system
 - CORE‑SSR‑001..006: Supabase SSR and auth
-- CORE‑SEC‑001..004: Security
+- CORE‑SEC‑001..006: Security
 - CORE‑PERF‑001..002: Performance
 - CORE‑TEST‑001..005: Testing
 - CORE‑ARCH‑001..007: Architecture

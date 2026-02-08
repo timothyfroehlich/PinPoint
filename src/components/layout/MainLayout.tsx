@@ -40,14 +40,13 @@ export async function MainLayout({
     data: { user },
   } = await supabase.auth.getUser();
 
-  let userNotifications: (typeof notifications.$inferSelect)[] = [];
   let enrichedNotifications: EnrichedNotification[] = [];
   let userProfile:
     | { name: string; role: "guest" | "member" | "admin" }
     | undefined;
 
   if (user) {
-    userNotifications = await db.query.notifications.findMany({
+    const userNotifications = await db.query.notifications.findMany({
       where: eq(notifications.userId, user.id),
       orderBy: [desc(notifications.createdAt)],
       limit: 20,
@@ -77,6 +76,7 @@ export async function MainLayout({
           })
         : [];
 
+    // CORE-SEC-006: Map to minimal shape before passing to client component
     enrichedNotifications = userNotifications.map((n) => {
       let link = "/dashboard";
       let machineInitials: string | undefined;
@@ -94,8 +94,14 @@ export async function MainLayout({
         const machine = machinesData.find((m) => m.id === n.resourceId);
         if (machine) link = `/m/${machine.initials}`;
       }
-      // Ensure all properties of EnrichedNotification are present
-      return { ...n, link, machineInitials, issueNumber };
+      return {
+        id: n.id,
+        type: n.type,
+        createdAt: n.createdAt,
+        link,
+        machineInitials,
+        issueNumber,
+      };
     });
 
     userProfile = await db.query.userProfiles.findFirst({

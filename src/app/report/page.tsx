@@ -74,10 +74,11 @@ export default async function PublicReportPage({
   return (
     <MainLayout>
       <div className="container mx-auto max-w-5xl py-8 px-4">
+        {/* CORE-SEC-006: Pass minimal user shape, not full Supabase user */}
         <UnifiedReportForm
           machinesList={machinesList}
           defaultMachineId={defaultMachineId}
-          user={user}
+          user={user ? (user.email ? { email: user.email } : {}) : null}
           accessLevel={accessLevel}
           assignees={assignees}
           initialError={errorMessage}

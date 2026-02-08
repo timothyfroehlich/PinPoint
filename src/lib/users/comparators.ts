@@ -1,11 +1,22 @@
-import type { UnifiedUser } from "~/lib/types";
+/** Minimal fields required for user sorting (CORE-SEC-006) */
+interface ComparableUser {
+  id: string;
+  name: string;
+  lastName: string;
+  machineCount: number;
+  status: "active" | "invited";
+}
 
 /**
  * Comparator for sorting unified users.
  * Order: confirmed users first, then by machine count desc, then by last name, name, and id.
  * Extracted to a separate module so client components can import it without pulling in DB dependencies.
+ * Accepts any object with the required fields (CORE-SEC-006: minimal data at boundary).
  */
-export function compareUnifiedUsers(a: UnifiedUser, b: UnifiedUser): number {
+export function compareUnifiedUsers(
+  a: ComparableUser,
+  b: ComparableUser
+): number {
   // 1. Confirmed (active) users before unconfirmed (invited)
   if (a.status !== b.status) {
     return a.status === "active" ? -1 : 1;

@@ -12,7 +12,6 @@ import { eq } from "drizzle-orm";
 import { Forbidden } from "~/components/errors/Forbidden";
 
 import { getUnifiedUsers } from "~/lib/users/queries";
-import type { UnifiedUser } from "~/lib/types";
 
 /**
  * Create Machine Page (Protected Route)
@@ -43,9 +42,15 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
     return <Forbidden role={currentUserProfile?.role ?? null} backUrl="/m" />;
   }
 
-  const allUsers: UnifiedUser[] = await getUnifiedUsers({
-    includeEmails: false,
-  });
+  // CORE-SEC-006: Map to minimal shape before passing to client components
+  const allUsersRaw = await getUnifiedUsers({ includeEmails: false });
+  const allUsers = allUsersRaw.map((u) => ({
+    id: u.id,
+    name: u.name,
+    lastName: u.lastName,
+    machineCount: u.machineCount,
+    status: u.status,
+  }));
 
   return (
     <main className="min-h-screen bg-surface">
