@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useTransition } from "react";
+import { useActionState } from "react";
 import {
   assignIssueAction,
   type AssignIssueResult,
@@ -19,11 +19,14 @@ export function AssignIssueForm({
   assignedToId,
   users,
 }: AssignIssueFormProps): React.JSX.Element {
-  const [isPending, startTransition] = useTransition();
-  const [state, setState] = useState<AssignIssueResult | undefined>(undefined);
+  const [state, formAction, isPending] = useActionState<
+    AssignIssueResult | undefined,
+    FormData
+  >(assignIssueAction, undefined);
 
   return (
-    <div>
+    <form action={formAction}>
+      <input type="hidden" name="issueId" value={issueId} />
       <AssigneePicker
         assignedToId={assignedToId}
         users={users}
@@ -32,15 +35,12 @@ export function AssignIssueForm({
           const formData = new FormData();
           formData.append("issueId", issueId);
           formData.append("assignedTo", userId ?? "");
-          startTransition(async () => {
-            const result = await assignIssueAction(undefined, formData);
-            setState(result);
-          });
+          formAction(formData);
         }}
       />
       {state && !state.ok && (
         <p className="text-sm text-destructive">{state.message}</p>
       )}
-    </div>
+    </form>
   );
 }
