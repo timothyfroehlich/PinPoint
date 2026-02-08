@@ -70,16 +70,19 @@ export interface AssignIssueParams {
 export interface UpdateIssueSeverityParams {
   issueId: string;
   severity: IssueSeverity;
+  userId: string;
 }
 
 export interface UpdateIssuePriorityParams {
   issueId: string;
   priority: IssuePriority;
+  userId: string;
 }
 
 export interface UpdateIssueFrequencyParams {
   issueId: string;
   frequency: IssueFrequency;
+  userId: string;
 }
 
 export interface UpdateIssueCommentParams {
@@ -248,6 +251,11 @@ export async function updateIssueStatus({
 
     const oldStatus = currentIssue.status;
 
+    // No-op: skip if status hasn't changed
+    if (oldStatus === status) {
+      return { issueId, oldStatus, newStatus: status };
+    }
+
     // 1. Update Status
     const isClosed = (CLOSED_STATUSES as readonly string[]).includes(status);
     await tx
@@ -265,7 +273,8 @@ export async function updateIssueStatus({
     await createTimelineEvent(
       issueId,
       `Status changed from ${oldLabel} to ${newLabel}`,
-      tx
+      tx,
+      userId
     );
 
     log.info(
@@ -443,7 +452,8 @@ export async function assignIssue({
         issueNumber: true,
         title: true,
         reportedBy: true,
-      }, // Changed from machineId
+        assignedTo: true,
+      },
       with: {
         machine: true,
         assignedToUser: {
@@ -454,6 +464,11 @@ export async function assignIssue({
 
     if (!currentIssue) {
       throw new Error("Issue not found");
+    }
+
+    // No-op: skip if assignment hasn't changed
+    if (currentIssue.assignedTo === assignedTo) {
+      return;
     }
 
     // Get new assignee name if assigning to someone
@@ -487,7 +502,7 @@ export async function assignIssue({
     const eventMessage = assignedTo
       ? `Assigned to ${assigneeName}`
       : "Unassigned";
-    await createTimelineEvent(issueId, eventMessage, tx);
+    await createTimelineEvent(issueId, eventMessage, tx, actorId);
 
     log.info(
       { issueId, assignedTo, assigneeName, action: "assignIssue" },
@@ -504,6 +519,8 @@ export async function assignIssue({
             resourceId: issueId,
             resourceType: "issue",
             actorId,
+            includeActor: false,
+            additionalRecipientIds: [assignedTo],
             issueTitle: currentIssue.title,
             machineName: currentIssue.machine.name,
             formattedIssueId: formatIssueId(
@@ -529,6 +546,7 @@ export async function assignIssue({
 export async function updateIssueSeverity({
   issueId,
   severity,
+  userId,
 }: UpdateIssueSeverityParams): Promise<{
   issueId: string;
   oldSeverity: string;
@@ -537,7 +555,7 @@ export async function updateIssueSeverity({
   // Get current issue to check old severity
   const currentIssue = await db.query.issues.findFirst({
     where: eq(issues.id, issueId),
-    columns: { severity: true, machineInitials: true }, // Changed from machineId
+    columns: { severity: true, machineInitials: true },
   });
 
   if (!currentIssue) {
@@ -545,6 +563,11 @@ export async function updateIssueSeverity({
   }
 
   const oldSeverity = currentIssue.severity;
+
+  // No-op: skip if severity hasn't changed
+  if (oldSeverity === severity) {
+    return { issueId, oldSeverity, newSeverity: severity };
+  }
 
   // Update severity
   await db
@@ -560,7 +583,9 @@ export async function updateIssueSeverity({
   const newLabel = getIssueSeverityLabel(severity);
   await createTimelineEvent(
     issueId,
-    `Severity changed from ${oldLabel} to ${newLabel}`
+    `Severity changed from ${oldLabel} to ${newLabel}`,
+    db,
+    userId
   );
 
   log.info(
@@ -582,6 +607,7 @@ export async function updateIssueSeverity({
 export async function updateIssuePriority({
   issueId,
   priority,
+  userId,
 }: UpdateIssuePriorityParams): Promise<{
   issueId: string;
   oldPriority: string;
@@ -590,7 +616,7 @@ export async function updateIssuePriority({
   // Get current issue to check old priority
   const currentIssue = await db.query.issues.findFirst({
     where: eq(issues.id, issueId),
-    columns: { priority: true, machineInitials: true }, // Changed from machineId
+    columns: { priority: true, machineInitials: true },
   });
 
   if (!currentIssue) {
@@ -598,6 +624,11 @@ export async function updateIssuePriority({
   }
 
   const oldPriority = currentIssue.priority;
+
+  // No-op: skip if priority hasn't changed
+  if (oldPriority === priority) {
+    return { issueId, oldPriority, newPriority: priority };
+  }
 
   // Update priority
   await db
@@ -613,7 +644,9 @@ export async function updateIssuePriority({
   const newLabel = getIssuePriorityLabel(priority);
   await createTimelineEvent(
     issueId,
-    `Priority changed from ${oldLabel} to ${newLabel}`
+    `Priority changed from ${oldLabel} to ${newLabel}`,
+    db,
+    userId
   );
 
   log.info(
@@ -635,6 +668,7 @@ export async function updateIssuePriority({
 export async function updateIssueFrequency({
   issueId,
   frequency,
+  userId,
 }: UpdateIssueFrequencyParams): Promise<{
   issueId: string;
   oldFrequency: string;
@@ -652,6 +686,11 @@ export async function updateIssueFrequency({
 
   const oldFrequency = currentIssue.frequency;
 
+  // No-op: skip if frequency hasn't changed
+  if (oldFrequency === frequency) {
+    return { issueId, oldFrequency, newFrequency: frequency };
+  }
+
   // Update frequency
   await db
     .update(issues)
@@ -666,7 +705,9 @@ export async function updateIssueFrequency({
   const newLabel = getIssueFrequencyLabel(frequency);
   await createTimelineEvent(
     issueId,
-    `Frequency changed from ${oldLabel} to ${newLabel}`
+    `Frequency changed from ${oldLabel} to ${newLabel}`,
+    db,
+    userId
   );
 
   log.info(

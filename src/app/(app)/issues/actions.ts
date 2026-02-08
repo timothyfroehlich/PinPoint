@@ -283,6 +283,7 @@ export async function updateIssueSeverityAction(
     await updateIssueSeverity({
       issueId,
       severity,
+      userId: user.id,
     });
 
     const issuePath = `/m/${currentIssue.machineInitials}/i/${currentIssue.issueNumber}`;
@@ -374,6 +375,7 @@ export async function updateIssueFrequencyAction(
     await updateIssueFrequency({
       issueId,
       frequency,
+      userId: user.id,
     });
 
     revalidatePath(
@@ -473,6 +475,7 @@ export async function updateIssuePriorityAction(
     await updateIssuePriority({
       issueId,
       priority,
+      userId: user.id,
     });
 
     const issuePath = `/m/${currentIssue.machineInitials}/i/${currentIssue.issueNumber}`;

@@ -320,6 +320,113 @@ describe("createNotification (Integration)", () => {
     );
   });
 
+  it("issue_assigned should only notify the assignee, not all watchers", async () => {
+    const db = await getTestDb();
+
+    const [actor] = await db
+      .insert(userProfiles)
+      .values(createTestUser())
+      .returning();
+    const [assignee] = await db
+      .insert(userProfiles)
+      .values(createTestUser())
+      .returning();
+    const [watcher] = await db
+      .insert(userProfiles)
+      .values(createTestUser())
+      .returning();
+    const [machine] = await db
+      .insert(machines)
+      .values(createTestMachine({ initials: "ASN" }))
+      .returning();
+    const [issue] = await db
+      .insert(issues)
+      .values(createTestIssue(machine.initials, { issueNumber: 1 }))
+      .returning();
+
+    // Both assignee and watcher are watching this issue
+    await db.insert(issueWatchers).values([
+      { issueId: issue.id, userId: assignee.id },
+      { issueId: issue.id, userId: watcher.id },
+    ]);
+
+    // Mock auth.users emails
+    await db.execute(
+      sql`INSERT INTO auth.users (id, email) VALUES (${assignee.id}, 'assignee@test.com'), (${watcher.id}, 'watcher@test.com')`
+    );
+
+    await createNotification(
+      {
+        type: "issue_assigned",
+        resourceId: issue.id,
+        resourceType: "issue",
+        actorId: actor.id,
+        includeActor: false,
+        additionalRecipientIds: [assignee.id],
+        issueTitle: "Test Issue",
+        machineName: machine.name,
+      },
+      db
+    );
+
+    // Only the assignee should be notified, not the watcher
+    const allNotifications = await db.query.notifications.findMany();
+    expect(allNotifications).toHaveLength(1);
+    expect(allNotifications[0].userId).toBe(assignee.id);
+
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    expect(sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "assignee@test.com" })
+    );
+  });
+
+  it("self-assignment should not send any email (actor excluded)", async () => {
+    const db = await getTestDb();
+
+    const [actor] = await db
+      .insert(userProfiles)
+      .values(createTestUser())
+      .returning();
+    const [machine] = await db
+      .insert(machines)
+      .values(createTestMachine({ initials: "SLF" }))
+      .returning();
+    const [issue] = await db
+      .insert(issues)
+      .values(createTestIssue(machine.initials, { issueNumber: 1 }))
+      .returning();
+
+    // Actor watches the issue
+    await db.insert(issueWatchers).values({
+      issueId: issue.id,
+      userId: actor.id,
+    });
+
+    await db.execute(
+      sql`INSERT INTO auth.users (id, email) VALUES (${actor.id}, 'self@test.com')`
+    );
+
+    // Self-assignment: actor assigns to themselves
+    await createNotification(
+      {
+        type: "issue_assigned",
+        resourceId: issue.id,
+        resourceType: "issue",
+        actorId: actor.id,
+        includeActor: false,
+        additionalRecipientIds: [actor.id],
+        issueTitle: "Test Issue",
+        machineName: machine.name,
+      },
+      db
+    );
+
+    // No notifications — actor is the only recipient and is excluded
+    const allNotifications = await db.query.notifications.findMany();
+    expect(allNotifications).toHaveLength(0);
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
   it("should notify machine watchers on new issue", async () => {
     const db = await getTestDb();
 
