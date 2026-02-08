@@ -1,10 +1,12 @@
+import type { UserStatus } from "~/lib/types";
+
 /** Minimal fields required for user sorting (CORE-SEC-006) */
 interface ComparableUser {
   id: string;
   name: string;
   lastName: string;
   machineCount: number;
-  status: "active" | "invited";
+  status: UserStatus;
 }
 
 /**

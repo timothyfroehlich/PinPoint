@@ -87,7 +87,7 @@ export function InviteUserDialog({
             status: "invited",
             machineCount: 0,
           };
-          // Call onSuccess with both the ID and full user object, then close dialog
+          // Call onSuccess with both the ID and minimal OwnerSelectUser, then close dialog
           // Note: router.refresh() removed - parent manages users state directly
           onSuccess?.(result.userId, newUser);
           onOpenChange(false);

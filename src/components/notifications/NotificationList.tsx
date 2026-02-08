@@ -18,11 +18,12 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
+import type { NotificationType } from "~/lib/notifications";
 
 /** Minimal notification shape for client rendering (CORE-SEC-006) */
 export interface EnrichedNotification {
   id: string;
-  type: string;
+  type: NotificationType;
   createdAt: Date;
   link: string;
   machineInitials?: string | undefined;

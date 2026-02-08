@@ -12,7 +12,7 @@ import { cn } from "~/lib/utils";
 import React from "react";
 
 /** Minimal preference shape for client rendering (CORE-SEC-006) */
-interface NotificationPreferencesData {
+export interface NotificationPreferencesData {
   emailEnabled: boolean;
   inAppEnabled: boolean;
   emailNotifyOnAssigned: boolean;
