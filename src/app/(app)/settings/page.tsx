@@ -71,7 +71,23 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
           <h2 className="text-xl font-semibold mb-4">
             Notification Preferences
           </h2>
-          <NotificationPreferencesForm preferences={preferences} />
+          {/* CORE-SEC-006: Map to minimal shape, strip userId */}
+          <NotificationPreferencesForm
+            preferences={{
+              emailEnabled: preferences.emailEnabled,
+              inAppEnabled: preferences.inAppEnabled,
+              emailNotifyOnAssigned: preferences.emailNotifyOnAssigned,
+              inAppNotifyOnAssigned: preferences.inAppNotifyOnAssigned,
+              emailNotifyOnStatusChange: preferences.emailNotifyOnStatusChange,
+              inAppNotifyOnStatusChange: preferences.inAppNotifyOnStatusChange,
+              emailNotifyOnNewComment: preferences.emailNotifyOnNewComment,
+              inAppNotifyOnNewComment: preferences.inAppNotifyOnNewComment,
+              emailNotifyOnNewIssue: preferences.emailNotifyOnNewIssue,
+              inAppNotifyOnNewIssue: preferences.inAppNotifyOnNewIssue,
+              emailWatchNewIssuesGlobal: preferences.emailWatchNewIssuesGlobal,
+              inAppWatchNewIssuesGlobal: preferences.inAppWatchNewIssuesGlobal,
+            }}
+          />
         </div>
       </div>
     </div>

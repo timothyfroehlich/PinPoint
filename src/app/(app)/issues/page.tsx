@@ -123,6 +123,19 @@ export default async function IssuesPage({
 
   const issuesList = issuesListRaw as IssueListItem[];
 
+  // CORE-SEC-006: Map to minimal shapes before passing to client components
+  const filterUsers = allUsers.map((u) => ({
+    id: u.id,
+    name: u.name,
+    machineCount: u.machineCount,
+    status: u.status,
+  }));
+
+  const assigneeUsers = allUsers.map((u) => ({
+    id: u.id,
+    name: u.name,
+  }));
+
   return (
     <div className="container mx-auto max-w-7xl py-8 px-4 sm:px-6">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -140,7 +153,7 @@ export default async function IssuesPage({
       <div className="space-y-6">
         {/* Filters */}
         <IssueFilters
-          users={allUsers}
+          users={filterUsers}
           machines={allMachines}
           filters={filters}
         />
@@ -152,7 +165,7 @@ export default async function IssuesPage({
           sort={filters.sort ?? "updated_desc"}
           page={page}
           pageSize={pageSize}
-          allUsers={allUsers}
+          allUsers={assigneeUsers}
         />
       </div>
     </div>

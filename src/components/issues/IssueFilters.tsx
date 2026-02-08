@@ -25,7 +25,7 @@ import type {
   IssueFrequency,
 } from "~/lib/types";
 import type { LucideIcon } from "lucide-react";
-import type { UnifiedUser } from "~/lib/types";
+import type { UserStatus } from "~/lib/types";
 import {
   Tooltip,
   TooltipContent,
@@ -38,9 +38,17 @@ interface MachineOption {
   name: string;
 }
 
+/** Minimal user shape for filter dropdowns (CORE-SEC-006) */
+export interface IssueFilterUser {
+  id: string;
+  name: string;
+  machineCount: number;
+  status: UserStatus;
+}
+
 interface IssueFiltersProps {
   machines: MachineOption[];
-  users: UnifiedUser[];
+  users: IssueFilterUser[];
   filters: FilterState;
 }
 
