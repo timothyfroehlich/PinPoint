@@ -30,6 +30,10 @@ if [ $# -lt 3 ]; then
 fi
 
 PR=$1
+if ! [[ "$PR" =~ ^[0-9]+$ ]]; then
+    echo "Error: PR number must be numeric (e.g. '945'); received '$PR'."
+    exit 1
+fi
 PATH_LINE=$2
 MESSAGE="${*:3}"
 
@@ -106,7 +110,7 @@ fi
 
 if [ -z "$match" ] || [ "$match" = "" ]; then
     echo "No unresolved Copilot thread found at ${PATH_LINE}. It may already be resolved."
-    exit 0
+    exit 1
 fi
 
 THREAD_ID=$(echo "$match" | jq -r '.threadId')

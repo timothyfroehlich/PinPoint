@@ -25,6 +25,11 @@ printf "%-6s %-40s %-12s %-10s %-8s %s\n" "PR" "Title" "CI" "Copilot" "Draft" "B
 printf "%-6s %-40s %-12s %-10s %-8s %s\n" "------" "----------------------------------------" "------------" "----------" "--------" "-------------------"
 
 for pr in $PRS; do
+    if ! [[ "$pr" =~ ^[0-9]+$ ]]; then
+        echo "Error: PR number must be numeric (e.g. '945'); received '$pr'."
+        exit 1
+    fi
+
     # Get PR metadata
     pr_data=$(gh pr view "$pr" --json title,headRefName,isDraft 2>/dev/null) || continue
     title=$(echo "$pr_data" | jq -r '.title' | cut -c1-40)
