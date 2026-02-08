@@ -169,7 +169,12 @@ export function SignupForm({
           className="text-sm text-on-surface-variant leading-relaxed cursor-pointer"
         >
           I agree to the{" "}
-          <Link href="/terms" target="_blank" className="text-link">
+          <Link
+            href="/terms"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-link"
+          >
             Terms of Service
           </Link>
         </Label>
