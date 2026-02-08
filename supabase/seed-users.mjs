@@ -462,7 +462,7 @@ async function seedUsersAndData() {
       `;
 
       // Add "Issue reported by..." system comment to match service logic
-      let reporterDesc = issue.reporterName ?? issue.reporterEmail ?? "Guest";
+      let reporterDesc = issue.reporterName ?? "Anonymous";
 
       if (issue.reportedBy) {
         // In real app, we fetch the user name. Here we can check the user map.
