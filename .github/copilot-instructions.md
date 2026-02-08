@@ -37,8 +37,8 @@
 ## Quality Gates
 
 ```bash
-pnpm run check       # Fast: types + lint + format + unit tests
-pnpm run preflight   # Full: check + build + integration (run before commit)
+pnpm run check       # Fast: types + lint + format:fix + unit tests (may modify files)
+pnpm run preflight   # Full: check + build + DB reset + integration + smoke/e2e (pre-commit)
 ```
 
 Conventional commit messages required.
