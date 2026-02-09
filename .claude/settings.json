@@ -221,11 +221,7 @@
       "mcp__supabase__search_docs",
       "mcp__github__add_issue_comment",
       "WebFetch(domain:www.npmjs.com)",
-      "WebFetch(domain:vercel.com)",
-      "Read(//home/froeht/Code/pinpoint-worktrees/**)",
-      "Glob(//home/froeht/Code/pinpoint-worktrees/**)",
-      "Edit(//home/froeht/Code/pinpoint-worktrees/**)",
-      "Write(//home/froeht/Code/pinpoint-worktrees/**)"
+      "WebFetch(domain:vercel.com)"
     ],
     "deny": [
       "Bash(find:*)",
