@@ -85,6 +85,13 @@
       "when": 1770347271712,
       "tag": "0011_hot_crusher_hogan",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1738972800000,
+      "tag": "0012_fix_rls_user_metadata",
+      "breakpoints": true
     }
   ]
 }
