@@ -21,6 +21,7 @@
 9. **Preflight**: Must run `pnpm run preflight` before commit.
 10. **Code Cleanliness**: Follow Rule of Three. DRY up code only after 3rd duplication.
 11. **E2E Interaction Coverage**: If you add a clickable UI element, you must click it in an E2E test.
+12. **Email Privacy**: User email addresses must NEVER be displayed outside of admin views and the user's own settings page. Use names, "Anonymous", or role labels instead. This applies to UI, seed data, timeline events, and any client-facing serialization.
 
 ## 3. Agent Skills (Progressive Disclosure)
 
