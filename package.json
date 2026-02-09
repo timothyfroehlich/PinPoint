@@ -29,7 +29,7 @@
     "db:studio": "drizzle-kit studio",
     "db:_restart": "supabase stop && supabase start",
     "db:_drop_tables": "node --env-file=.env.local scripts/force-db-reset.mjs",
-    "db:_push": "drizzle-kit push",
+    "db:_push": "node -e \"console.error('drizzle-kit push is disabled in this repo. Use: pnpm run db:generate && pnpm run db:migrate'); process.exit(1)\"",
     "db:migrate": "drizzle-kit migrate",
     "db:generate": "drizzle-kit generate",
     "db:_seed": "node --env-file=.env.local -e 'require(\"child_process\").execFileSync(\"psql\", [process.env.POSTGRES_URL, \"-f\", \"supabase/seed.sql\"], {stdio: \"inherit\"})'",

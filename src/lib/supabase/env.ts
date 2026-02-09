@@ -8,8 +8,8 @@ export function getSupabaseEnv(): SupabaseEnv {
   const url =
     process.env["NEXT_PUBLIC_SUPABASE_URL"] ?? process.env["SUPABASE_URL"];
 
-  // Key naming changed in Supabase docs (anon_key -> publishable_key), but the Vercel
-  // integration still commonly provides anon_key variants. Support both.
+  // Supabase docs often refer to "publishable" keys, while some integrations still use
+  // "anon" naming. Support both.
   const publishableKey =
     process.env["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"] ??
     process.env["NEXT_PUBLIC_SUPABASE_ANON_KEY"] ??
