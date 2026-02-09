@@ -75,7 +75,7 @@
     "@react-email/components": "^1.0.6",
     "@sentry/nextjs": "^10.36.0",
     "@supabase/ssr": "^0.8.0",
-    "@supabase/supabase-js": "^2.92.0",
+    "@supabase/supabase-js": "^2.93.1",
     "@types/nodemailer": "^7.0.9",
     "@types/zxcvbn": "^4.4.5",
     "@upstash/ratelimit": "^2.0.8",
