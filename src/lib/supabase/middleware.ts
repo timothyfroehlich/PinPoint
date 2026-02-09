@@ -38,7 +38,7 @@ export async function updateSession(
   if (!supabaseUrl || !supabaseKey) {
     // Fail fast with a clear error during development/misconfiguration
     throw new Error(
-      "Missing Supabase env vars: set NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL) and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (or SUPABASE_PUBLISHABLE_KEY)."
+      "Missing Supabase env vars: set NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL) and one of NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, SUPABASE_PUBLISHABLE_KEY, or SUPABASE_ANON_KEY."
     );
   }
 
