@@ -25,8 +25,12 @@ import { cookies } from "next/headers";
 export async function createClient(): Promise<SupabaseClient> {
   const cookieStore = await cookies();
 
-  const supabaseUrl = process.env["NEXT_PUBLIC_SUPABASE_URL"];
-  const supabaseKey = process.env["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"];
+  // Fall back to Supabase Vercel integration env var names for preview deployments
+  const supabaseUrl =
+    process.env["NEXT_PUBLIC_SUPABASE_URL"] ?? process.env["SUPABASE_URL"];
+  const supabaseKey =
+    process.env["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"] ??
+    process.env["SUPABASE_ANON_KEY"];
 
   if (!supabaseUrl || !supabaseKey) {
     throw new Error(

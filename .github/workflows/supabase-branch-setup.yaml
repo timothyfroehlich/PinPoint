@@ -1,0 +1,88 @@
+# Supabase Branch Setup for Preview Deployments
+#
+# When Supabase creates a preview branch database for a PR, this workflow:
+# 1. Waits for the branch to be healthy
+# 2. Runs Drizzle ORM migrations (creates all tables)
+# 3. Runs seed.sql (FK constraints, triggers, schema grants)
+# 4. Runs seed-users.mjs (creates Auth users + seed data)
+#
+# Required GitHub Secrets:
+#   SUPABASE_ACCESS_TOKEN - from supabase.com/dashboard/account/tokens
+#   SUPABASE_PROJECT_ID   - production project ref (udhesuizjsgxfeotqybn)
+
+name: Supabase Branch Setup
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches: [main]
+
+# Only one setup per PR at a time
+concurrency:
+  group: supabase-branch-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  wait-for-branch:
+    name: Wait for Supabase Preview
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.check.outputs.conclusion }}
+    steps:
+      - uses: fountainhead/action-wait-for-check@v1.2.0
+        id: check
+        with:
+          checkName: Supabase Preview
+          ref: ${{ github.event.pull_request.head.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          timeoutSeconds: 300
+
+  setup-branch:
+    name: Migrate & Seed Branch DB
+    needs: wait-for-branch
+    if: needs.wait-for-branch.outputs.status == 'success'
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Get branch credentials
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
+        run: |
+          supabase --experimental branches get \
+            "$BRANCH_NAME" \
+            -o env >> "$GITHUB_ENV"
+
+      - name: Run Drizzle migrations
+        run: |
+          DRIZZLE_FORCE_PRODUCTION=1 \
+          DATABASE_URL="$POSTGRES_URL_NON_POOLING" \
+            pnpm exec drizzle-kit migrate
+
+      - name: Run seed SQL (triggers + grants)
+        run: psql "$POSTGRES_URL_NON_POOLING" -f supabase/seed.sql
+
+      - name: Seed users and data
+        run: |
+          NEXT_PUBLIC_SUPABASE_URL="$SUPABASE_URL" \
+          SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY" \
+          DATABASE_URL="$POSTGRES_URL_NON_POOLING" \
+            node supabase/seed-users.mjs

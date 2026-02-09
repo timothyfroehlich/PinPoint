@@ -18,7 +18,9 @@ if (!databaseUrl) {
 
 // Use DIRECT_URL for migrations (bypasses connection pooler)
 // Connection poolers don't support all PostgreSQL commands needed for migrations
-const directUrl = process.env.DIRECT_URL || databaseUrl;
+// POSTGRES_URL_NON_POOLING is set by the Supabase Vercel integration on preview deployments
+const directUrl =
+  process.env.DIRECT_URL || process.env.POSTGRES_URL_NON_POOLING || databaseUrl;
 
 // Safety: prevent drizzle-kit from accidentally running against production
 const isProductionUrl = /supabase\.com|neon\.tech|rds\.amazonaws\.com/.test(

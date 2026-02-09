@@ -18,14 +18,19 @@ export async function updateSession(
   });
 
   const {
-    NEXT_PUBLIC_SUPABASE_URL: supabaseUrl,
-    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: supabaseKey,
     VERCEL_ENV,
     NODE_ENV,
     DEV_AUTOLOGIN_ENABLED,
     DEV_AUTOLOGIN_EMAIL,
     DEV_AUTOLOGIN_PASSWORD,
   } = process.env;
+
+  // Fall back to Supabase Vercel integration env var names for preview deployments
+  const supabaseUrl =
+    process.env["NEXT_PUBLIC_SUPABASE_URL"] ?? process.env["SUPABASE_URL"];
+  const supabaseKey =
+    process.env["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"] ??
+    process.env["SUPABASE_ANON_KEY"];
 
   if (!supabaseUrl || !supabaseKey) {
     // Fail fast with a clear error during development/misconfiguration
