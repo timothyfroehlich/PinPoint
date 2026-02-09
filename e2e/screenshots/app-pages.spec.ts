@@ -10,12 +10,12 @@ import { createTestUser, updateUserRole } from "../support/supabase-admin.js";
  * report. The report is deployed to GitHub Pages per PR.
  */
 
-// Shared admin credentials, set up once for all projects
+// Admin credentials, created per-project (each project runs in its own worker process)
 let adminEmail: string;
 
 test.beforeAll(async () => {
   const timestamp = Date.now();
-  adminEmail = `screenshots_admin_${timestamp}@example.com`;
+  adminEmail = `screenshots_admin_${process.pid}_${timestamp}@example.com`;
   const adminUser = await createTestUser(adminEmail);
   await updateUserRole(adminUser.id, "admin");
 });

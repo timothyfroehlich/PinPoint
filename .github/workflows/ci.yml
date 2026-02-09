@@ -883,17 +883,17 @@ jobs:
         run: pnpm run screenshots || true
 
       - name: Deploy report to GitHub Pages
-        if: always()
+        if: always() && github.event.pull_request.head.repo.fork == false
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./playwright-report
           destination_dir: >-
             pr-${{ github.event.pull_request.number }}
-          keep_files: false
+          keep_files: true
 
       - name: Comment on PR with report link
-        if: always()
+        if: always() && github.event.pull_request.head.repo.fork == false
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}

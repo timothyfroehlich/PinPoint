@@ -9,7 +9,7 @@ import baseConfig from "./playwright.config";
  *
  * This config is intentionally lenient:
  *  - workers: 1 (deterministic ordering)
- *  - retries: 0 (informational, never fail the build)
+ *  - retries: 0 (informational; CI wraps the command with `|| true`)
  *  - reporter: HTML only (consumed by gh-pages deploy step)
  */
 export default {
@@ -29,10 +29,10 @@ export default {
     {
       name: "Mobile iPhone 13 Mini",
       use: {
-        browserName: "webkit" as const,
+        // iPhone 12 descriptor for correct Safari emulation, viewport overridden
+        // to iPhone 13 Mini (375x812).
+        ...devices["iPhone 12"],
         viewport: { width: 375, height: 812 },
-        isMobile: true,
-        hasTouch: true,
       },
     },
     {

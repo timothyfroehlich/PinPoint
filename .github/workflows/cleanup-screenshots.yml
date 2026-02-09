@@ -17,13 +17,28 @@ jobs:
     name: Remove PR Screenshots
     runs-on: ubuntu-latest
     steps:
+      - name: Check if gh-pages branch exists
+        id: check-branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          if gh api "repos/${REPO}/branches/gh-pages" --silent 2>/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "gh-pages branch does not exist, skipping cleanup."
+          fi
+
       - name: Checkout gh-pages
+        if: steps.check-branch.outputs.exists == 'true'
         uses: actions/checkout@v6
         with:
           ref: gh-pages
           fetch-depth: 1
 
       - name: Remove PR directory
+        if: steps.check-branch.outputs.exists == 'true'
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |

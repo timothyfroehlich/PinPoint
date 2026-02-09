@@ -169,12 +169,11 @@ export default defineConfig({
           {
             name: "Mobile Safari",
             use: {
-              // iPhone 13 Mini (375x812) — smallest modern iPhone viewport.
-              // Tests against this to catch layout issues on compact screens.
+              // Start from iPhone 12 descriptor for correct Mobile Safari emulation
+              // (userAgent, deviceScaleFactor, screen) and override viewport to
+              // iPhone 13 Mini (375x812) — the smallest modern iPhone.
+              ...devices["iPhone 12"],
               viewport: { width: 375, height: 812 },
-              isMobile: true,
-              hasTouch: true,
-              defaultBrowserType: "webkit" as const,
             },
             // Increase retries for WebKit due to known flakiness
             retries: process.env["CI"] ? 3 : 1,
