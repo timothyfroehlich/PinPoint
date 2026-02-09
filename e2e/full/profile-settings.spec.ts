@@ -1,7 +1,12 @@
 import { test, expect } from "@playwright/test";
 import { Buffer } from "node:buffer";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { loginAs } from "../support/actions";
 import { TEST_USERS } from "../support/constants";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 import {
   createTestUser,
   deleteTestUser,
@@ -61,13 +66,59 @@ test.describe("Profile Settings", () => {
     ).toBeVisible();
   });
 
-  test("should upload and remove avatar from settings", async ({
+  test("should upload valid avatar image successfully", async ({
     page,
   }, testInfo) => {
     const sanitizedProjectName = testInfo.project.name
       .toLowerCase()
       .replace(/[^a-z0-9]/g, "-");
-    const email = `avatar-${sanitizedProjectName}-${Date.now()}@example.com`;
+    const email = `avatar-upload-${sanitizedProjectName}-${Date.now()}@example.com`;
+    const password = "TestPassword123";
+    const user = await createTestUser(email, password);
+
+    try {
+      await loginAs(page, testInfo, { email, password });
+      await page.goto("/settings");
+
+      const uploadButton = page.getByRole("button", { name: "Upload Photo" });
+      await expect(uploadButton).toBeVisible();
+
+      // No avatar image should be present initially
+      const avatarImage = page.locator('[data-slot="avatar-image"]');
+      await expect(avatarImage).toHaveCount(0);
+
+      // Upload a valid test image
+      const testImagePath = join(__dirname, "..", "fixtures", "test-image.png");
+      const [fileChooser] = await Promise.all([
+        page.waitForEvent("filechooser"),
+        uploadButton.click(),
+      ]);
+      await fileChooser.setFiles(testImagePath);
+
+      // Verify success toast
+      await expect(page.getByText("Avatar updated successfully.")).toBeVisible({
+        timeout: 15000,
+      });
+
+      // After router refresh, the avatar image should now be rendered
+      await expect(avatarImage).toBeVisible({ timeout: 10000 });
+      await expect(avatarImage).toHaveAttribute("src", /blob/);
+
+      // The Remove button should now be visible
+      const removeButton = page.getByRole("button", { name: "Remove" });
+      await expect(removeButton).toBeVisible();
+    } finally {
+      await deleteTestUser(user.id).catch(() => undefined);
+    }
+  });
+
+  test("should reject invalid file type and remove avatar", async ({
+    page,
+  }, testInfo) => {
+    const sanitizedProjectName = testInfo.project.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "-");
+    const email = `avatar-invalid-${sanitizedProjectName}-${Date.now()}@example.com`;
     const password = "TestPassword123";
     const user = await createTestUser(email, password);
 

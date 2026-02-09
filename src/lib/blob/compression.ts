@@ -15,7 +15,10 @@ export async function compressImage(
         : mode === "full"
           ? BLOB_CONFIG.COMPRESSION.FULL_IMAGE_MAX_MB
           : BLOB_CONFIG.COMPRESSION.CROPPED_IMAGE_MAX_MB,
-    maxWidthOrHeight: BLOB_CONFIG.MAX_DIMENSIONS,
+    maxWidthOrHeight:
+      mode === "avatar"
+        ? BLOB_CONFIG.AVATAR.MAX_DIMENSIONS
+        : BLOB_CONFIG.MAX_DIMENSIONS,
     useWebWorker: true,
     initialQuality:
       mode === "avatar"

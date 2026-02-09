@@ -30,6 +30,7 @@ export const BLOB_CONFIG = {
   // Avatar upload settings
   AVATAR: {
     MAX_FILE_SIZE_BYTES: 2 * 1024 * 1024, // 2MB
+    MAX_DIMENSIONS: 256, // Avatars are small; no need for large images
     COMPRESSION_MAX_MB: 1,
     COMPRESSION_QUALITY: 0.9,
   },
