@@ -14,6 +14,7 @@ import {
   ChevronRight,
   AlertTriangle,
   HelpCircle,
+  Info,
   Map as MapIcon,
 } from "lucide-react";
 import { cn } from "~/lib/utils";
@@ -231,6 +232,13 @@ export function Sidebar({
                 title: "Roadmap",
                 href: "/roadmap",
                 icon: MapIcon,
+              }}
+            />
+            <NavItem
+              item={{
+                title: "About",
+                href: "/about",
+                icon: Info,
               }}
             />
           </div>
