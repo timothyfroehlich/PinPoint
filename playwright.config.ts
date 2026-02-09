@@ -169,10 +169,12 @@ export default defineConfig({
           {
             name: "Mobile Safari",
             use: {
-              ...devices["iPhone 12"],
-              // WebKit-specific configuration for known issues
-              // Safari has slower Server Action redirect processing (Next.js Issue #48309)
-              // WebKit tests can be 2x slower than Chromium
+              // iPhone 13 Mini (375x812) — smallest modern iPhone viewport.
+              // Tests against this to catch layout issues on compact screens.
+              viewport: { width: 375, height: 812 },
+              isMobile: true,
+              hasTouch: true,
+              defaultBrowserType: "webkit" as const,
             },
             // Increase retries for WebKit due to known flakiness
             retries: process.env["CI"] ? 3 : 1,

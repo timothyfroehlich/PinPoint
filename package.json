@@ -25,6 +25,8 @@
     "e2e:full": "playwright test --config=playwright.config.full.ts --quiet",
     "e2e:full:headed": "playwright test --config=playwright.config.full.ts --headed",
     "e2e:mobile": "playwright test --project='Mobile Chrome'",
+    "screenshots": "playwright test --config=playwright.config.screenshots.ts",
+    "screenshots:headed": "playwright test --config=playwright.config.screenshots.ts --headed",
     "db:reset": "npm-run-all db:_restart db:_drop_tables db:migrate test:_generate-schema db:_seed db:_seed-users",
     "db:studio": "drizzle-kit studio",
     "db:_restart": "supabase stop && supabase start",
