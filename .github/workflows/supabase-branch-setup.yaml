@@ -75,16 +75,21 @@ jobs:
 
       - name: Run Drizzle migrations
         run: |
+          # Use pooled connection (IPv4, port 6543) because GitHub Actions
+          # runners cannot reach the direct connection (IPv6, port 5432).
+          # Override POSTGRES_URL_NON_POOLING too since drizzle.config.ts
+          # prefers it for directUrl.
           DRIZZLE_FORCE_PRODUCTION=1 \
-          DATABASE_URL="$POSTGRES_URL_NON_POOLING" \
+          DATABASE_URL="$POSTGRES_URL" \
+          POSTGRES_URL_NON_POOLING="$POSTGRES_URL" \
             pnpm exec drizzle-kit migrate
 
       - name: Run seed SQL (triggers + grants)
-        run: psql "$POSTGRES_URL_NON_POOLING" -f supabase/seed.sql
+        run: psql "$POSTGRES_URL" -f supabase/seed.sql
 
       - name: Seed users and data
         run: |
           NEXT_PUBLIC_SUPABASE_URL="$SUPABASE_URL" \
           SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY" \
-          DATABASE_URL="$POSTGRES_URL_NON_POOLING" \
+          DATABASE_URL="$POSTGRES_URL" \
             node supabase/seed-users.mjs
