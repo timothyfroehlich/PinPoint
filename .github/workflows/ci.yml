@@ -339,8 +339,8 @@ jobs:
       - name: Export Supabase environment
         run: |
           eval "$(supabase status -o env | sed 's/=/=\"/;s/$/\"/')"
-          echo "DATABASE_URL=${DB_URL}" >> $GITHUB_ENV
-          echo "DIRECT_URL=${DB_URL}" >> $GITHUB_ENV
+          echo "POSTGRES_URL=${DB_URL}" >> $GITHUB_ENV
+          echo "POSTGRES_URL_NON_POOLING=${DB_URL}" >> $GITHUB_ENV
 
       - name: Apply migrations to fresh database
         run: pnpm run db:migrate

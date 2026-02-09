@@ -61,7 +61,7 @@ describe("Configuration Validation", () => {
     const requiredVars = [
       "NEXT_PUBLIC_SUPABASE_URL",
       "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
-      "DATABASE_URL",
+      "POSTGRES_URL",
       "PORT",
       "MAILPIT_PORT",
     ];

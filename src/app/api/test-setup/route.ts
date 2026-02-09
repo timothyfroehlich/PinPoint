@@ -7,7 +7,7 @@ export async function GET(): Promise<Response> {
     return new Response(null, { status: 404 });
   }
 
-  // Minimal connectivity check to the configured DATABASE_URL
+  // Minimal connectivity check to the configured POSTGRES_URL
   // Does not leak any data – just ensures the connection is valid
   try {
     // Lazy import to avoid loading db module during build

@@ -23,10 +23,10 @@ interface MigrationJournal {
  * applied before the auto-migration system was in place.
  *
  * Usage:
- *   DATABASE_URL=<url> tsx scripts/mark-migration-applied.ts <migration-number>
+ *   POSTGRES_URL=<url> tsx scripts/mark-migration-applied.ts <migration-number>
  *
  * Example:
- *   DATABASE_URL=postgres://... tsx scripts/mark-migration-applied.ts 0001
+ *   POSTGRES_URL=postgres://... tsx scripts/mark-migration-applied.ts 0001
  */
 
 const migrationNumber = process.argv[2];
@@ -40,13 +40,11 @@ if (!migrationNumber) {
 }
 
 const connectionString =
-  process.env["DATABASE_URL"] ??
-  process.env["DIRECT_URL"] ??
-  process.env["POSTGRES_URL"];
+  process.env["POSTGRES_URL_NON_POOLING"] ?? process.env["POSTGRES_URL"];
 
 if (!connectionString) {
   console.error(
-    "❌ No database connection string found (checked DATABASE_URL, DIRECT_URL, POSTGRES_URL)"
+    "❌ No database connection string found (checked POSTGRES_URL_NON_POOLING, POSTGRES_URL)"
   );
   process.exit(1);
 }

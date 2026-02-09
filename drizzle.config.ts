@@ -4,23 +4,44 @@ import { defineConfig } from "drizzle-kit";
 // Load Next.js environment variables (respects .env.local priority)
 loadEnvConfig(process.cwd());
 
-// Prefer Supabase Vercel integration names, fall back to legacy PinPoint names
-const databaseUrl =
-  process.env.POSTGRES_URL ||
-  process.env.DATABASE_URL ||
-  process.env.POSTGRES_URL_NON_POOLING ||
-  process.env.DIRECT_URL;
+const databaseUrl = process.env.POSTGRES_URL;
 
 if (!databaseUrl) {
   throw new Error(
-    "Database URL environment variable (DATABASE_URL, POSTGRES_URL_NON_POOLING, etc.) is required for Drizzle config."
+    "POSTGRES_URL environment variable is required for Drizzle config."
   );
 }
 
-// Use non-pooled connection for migrations (poolers don't support DDL commands)
-// POSTGRES_URL_NON_POOLING is the standard Supabase Vercel integration name
+function isLikelyPooledPostgresUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname;
+    const port = parsed.port;
+
+    return (
+      port === "6543" ||
+      host.includes(".pooler.") ||
+      host.includes("pooler.") ||
+      parsed.searchParams.get("pgbouncer") === "true"
+    );
+  } catch {
+    // If it's not parseable, don't assume pooled; keep behavior conservative.
+    return false;
+  }
+}
+
+// Use a non-pooled connection for migrations (poolers often don't support DDL commands).
+// If POSTGRES_URL appears to be pooled, require POSTGRES_URL_NON_POOLING explicitly.
 const directUrl =
-  process.env.POSTGRES_URL_NON_POOLING || process.env.DIRECT_URL || databaseUrl;
+  process.env.POSTGRES_URL_NON_POOLING ??
+  (isLikelyPooledPostgresUrl(databaseUrl) ? undefined : databaseUrl);
+
+if (!directUrl) {
+  throw new Error(
+    "POSTGRES_URL_NON_POOLING is required for drizzle-kit migrations when POSTGRES_URL points to a pooled connection. " +
+      "Set POSTGRES_URL_NON_POOLING to a direct (non-pooled) PostgreSQL URL (typically port 5432)."
+  );
+}
 
 // Safety: prevent drizzle-kit from accidentally running against production
 const isProductionUrl = /supabase\.com|neon\.tech|rds\.amazonaws\.com/.test(
@@ -28,10 +49,10 @@ const isProductionUrl = /supabase\.com|neon\.tech|rds\.amazonaws\.com/.test(
 );
 if (isProductionUrl && !process.env.DRIZZLE_FORCE_PRODUCTION) {
   throw new Error(
-    `🚨 SAFETY: drizzle-kit would run against a production database!\n` +
+    `SAFETY: drizzle-kit would run against a production database!\n` +
       `   URL: ${directUrl.replace(/:[^:@]+@/, ":***@")}\n` +
       `   To proceed intentionally, set DRIZZLE_FORCE_PRODUCTION=1\n` +
-      `   For local dev, ensure DIRECT_URL is set in .env.local`
+      `   For local dev, ensure POSTGRES_URL_NON_POOLING is set in .env.local`
   );
 }
 

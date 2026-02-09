@@ -22,13 +22,13 @@ import usersData from "../src/test/data/users.json" with { type: "json" };
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
-const DATABASE_URL = process.env.DATABASE_URL;
+const POSTGRES_URL = process.env.POSTGRES_URL;
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !DATABASE_URL) {
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !POSTGRES_URL) {
   console.error("❌ Missing required environment variables:");
   console.error("  - NEXT_PUBLIC_SUPABASE_URL");
   console.error("  - SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY)");
-  console.error("  - DATABASE_URL");
+  console.error("  - POSTGRES_URL");
   process.exit(1);
 }
 
@@ -41,7 +41,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 });
 
 // Create direct database connection for role updates and data seeding
-const sql = postgres(DATABASE_URL);
+const sql = postgres(POSTGRES_URL);
 
 const TEST_USERS = Object.values(usersData);
 

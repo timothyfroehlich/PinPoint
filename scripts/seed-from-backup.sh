@@ -52,27 +52,27 @@ if [ ! -f "$ENV_FILE" ]; then
     exit 1
 fi
 
-# Extract DATABASE_URL line and strip key + optional surrounding quotes
-DATABASE_URL_LINE=$(grep -m1 "^DATABASE_URL=" "$ENV_FILE" || echo "")
-DATABASE_URL=${DATABASE_URL_LINE#DATABASE_URL=}
+# Extract POSTGRES_URL line and strip key + optional surrounding quotes
+POSTGRES_URL_LINE=$(grep -m1 "^POSTGRES_URL=" "$ENV_FILE" || echo "")
+POSTGRES_URL=${POSTGRES_URL_LINE#POSTGRES_URL=}
 # Remove surrounding double quotes if present
-DATABASE_URL=${DATABASE_URL#\"}
-DATABASE_URL=${DATABASE_URL%\"}
+POSTGRES_URL=${POSTGRES_URL#\"}
+POSTGRES_URL=${POSTGRES_URL%\"}
 
-if [ -z "$DATABASE_URL" ]; then
-    echo -e "${RED}❌ DATABASE_URL not found in $ENV_FILE${NC}"
+if [ -z "$POSTGRES_URL" ]; then
+    echo -e "${RED}❌ POSTGRES_URL not found in $ENV_FILE${NC}"
     exit 1
 fi
 
 # Safety check: Ensure we're connecting to localhost
-if [[ ! "$DATABASE_URL" =~ (localhost|127\.0\.0\.1) ]]; then
-    echo -e "${RED}❌ DATABASE_URL does not point to localhost or 127.0.0.1${NC}"
-    echo -e "${RED}   Refusing to reset non-local database: $DATABASE_URL${NC}"
+if [[ ! "$POSTGRES_URL" =~ (localhost|127\.0\.0\.1) ]]; then
+    echo -e "${RED}❌ POSTGRES_URL does not point to localhost or 127.0.0.1${NC}"
+    echo -e "${RED}   Refusing to reset non-local database: $POSTGRES_URL${NC}"
     echo -e "${YELLOW}⚠️  This script should ONLY be used with local development databases.${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}✓ Verified DATABASE_URL points to local database${NC}"
+echo -e "${GREEN}✓ Verified POSTGRES_URL points to local database${NC}"
 
 echo -e "${BLUE}🧹 Resetting local database schema...${NC}"
 # Use the project's existing reset logic (minus seeding)
@@ -81,7 +81,7 @@ pnpm run db:migrate
 
 echo -e "${BLUE}🌱 Seeding local database from production dump...${NC}"
 # Use psql to apply the dump. We use --quiet and --set ON_ERROR_STOP=1
-if psql "$DATABASE_URL" --quiet -f "$BACKUP_FILE" --set ON_ERROR_STOP=1; then
+if psql "$POSTGRES_URL" --quiet -f "$BACKUP_FILE" --set ON_ERROR_STOP=1; then
     echo -e "${GREEN}✅ Local database seeded successfully!${NC}"
 else
     echo -e "${RED}❌ Seeding failed!${NC}"
