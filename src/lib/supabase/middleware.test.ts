@@ -204,6 +204,7 @@ describe("updateSession public route access", () => {
     "/dashboard",
     "/about",
     "/help",
+    "/help/permissions",
     "/privacy",
     "/terms",
     "/api/health",
@@ -219,6 +220,9 @@ describe("updateSession public route access", () => {
     expect(response.headers.get("location")).toBeNull();
   });
 
+  // Note: /m/new is protected at the page level (server component redirect),
+  // not at middleware level, since /m/* is broadly public in middleware.
+  // Its protection is verified in the E2E suite (public-routes-audit.spec.ts).
   const protectedRoutes = [
     "/settings",
     "/admin/users",

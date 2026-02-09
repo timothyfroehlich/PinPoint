@@ -1,8 +1,9 @@
 /**
  * Smoke Test: Public Routes Audit
  *
- * Comprehensive test that verifies ALL intended public routes are accessible
- * to unauthenticated users without redirecting to /login.
+ * Verifies key user-facing public routes are accessible to unauthenticated
+ * users without redirecting to /login. API endpoints and auth callbacks are
+ * covered by unit tests in middleware.test.ts rather than E2E.
  *
  * This is the definitive test for the public access audit (PinPoint-kh6).
  * Individual route behavior is tested in other spec files; this file
@@ -146,11 +147,13 @@ test.describe("Public Routes Audit", () => {
   });
 
   test.describe("Cross-page navigation without login", () => {
-    test("privacy page links to help without login wall", async ({ page }) => {
+    test("navigating from privacy to help works without login wall", async ({
+      page,
+    }) => {
       await page.goto("/privacy");
       await expect(page).toHaveURL("/privacy");
 
-      // Navigate to help via any available link
+      // Navigate directly to help (verifying route is public)
       await page.goto("/help");
       await expect(page).toHaveURL("/help");
       await expect(page.getByRole("heading", { name: "Help" })).toBeVisible();
