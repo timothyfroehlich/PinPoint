@@ -67,9 +67,11 @@ jobs:
         env:
           BRANCH_NAME: ${{ github.head_ref }}
         run: |
+          # supabase branches get -o env outputs KEY="value" (shell format)
+          # but $GITHUB_ENV expects KEY=value (no quotes around values)
           supabase --experimental branches get \
             "$BRANCH_NAME" \
-            -o env >> "$GITHUB_ENV"
+            -o env | sed 's/="\(.*\)"/=\1/' >> "$GITHUB_ENV"
 
       - name: Run Drizzle migrations
         run: |
