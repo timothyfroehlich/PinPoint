@@ -1,6 +1,5 @@
 import type React from "react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { machines as machinesTable, userProfiles } from "~/server/db/schema";
@@ -27,39 +26,41 @@ import {
   sortMachines,
 } from "~/lib/machines/filters-queries";
 import { MachineFilters } from "~/components/machines/MachineFilters";
+import { getAccessLevel } from "~/lib/permissions/helpers";
 
 interface MachinesPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 /**
- * Machines List Page (Protected Route)
+ * Machines List Page (Public Route)
  *
  * Shows all machines with their derived status based on open issues.
  * Status hierarchy: unplayable > needs_service > operational
+ *
+ * Accessible to all users (unauthenticated, guest, member, admin).
+ * The "Add Machine" button is only shown to admins.
  */
 export default async function MachinesPage({
   searchParams,
 }: MachinesPageProps): Promise<React.JSX.Element> {
-  // Auth guard - check if user is authenticated (CORE-SSR-002)
+  // Get current user if authenticated (CORE-SSR-002)
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login?next=%2Fm");
+  // Determine user's access level
+  let accessLevel = getAccessLevel(null); // default to "unauthenticated"
+  if (user) {
+    const userProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: {
+        role: true,
+      },
+    });
+    accessLevel = getAccessLevel(userProfile?.role);
   }
-
-  // Check admin status
-  const userProfile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-    columns: {
-      role: true,
-    },
-  });
-
-  const isAdmin = userProfile?.role === "admin";
 
   // Parse filters from search params
   const rawParams = await searchParams;
@@ -109,7 +110,13 @@ export default async function MachinesPage({
   });
 
   // Fetch all users for the owner filter (smart sorted: confirmed first, by machine count)
-  const allUsers = await getUnifiedUsers();
+  // Map to minimal shape — only send what MachineFilters needs to the client
+  const allUsers = (await getUnifiedUsers()).map((u) => ({
+    id: u.id,
+    name: u.name,
+    machineCount: u.machineCount,
+    status: u.status,
+  }));
 
   // Derive status and prepare for filtering
   const machinesWithStatus = allMachines.map((machine) => {
@@ -150,7 +157,7 @@ export default async function MachinesPage({
                   Manage pinball machines and view their status
                 </p>
               </div>
-              {isAdmin && (
+              {accessLevel === "admin" && (
                 <Button
                   asChild
                   className="bg-primary text-on-primary hover:bg-primary/90 rounded-full h-11 px-6"
@@ -196,11 +203,11 @@ export default async function MachinesPage({
                       No machines yet
                     </p>
                     <p className="text-on-surface-variant mb-4">
-                      {isAdmin
+                      {accessLevel === "admin"
                         ? "Get started by adding your first machine to the collection."
                         : "No machines have been added to the collection yet."}
                     </p>
-                    {isAdmin && (
+                    {accessLevel === "admin" && (
                       <Link href="/m/new">
                         <Button className="bg-primary text-on-primary hover:bg-primary/90 rounded-full h-11 px-6">
                           <Plus className="mr-2 size-4" />

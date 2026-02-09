@@ -86,7 +86,7 @@ export function TermsContent(): React.JSX.Element {
           reports and comments you create are visible to other users. We
           don&apos;t sell your personal information to third parties. For full
           details on how we handle your data, please see our{" "}
-          <Link href="/privacy" className="text-primary hover:underline">
+          <Link href="/privacy" className="text-link">
             Privacy Policy
           </Link>
           .

@@ -105,18 +105,21 @@ export async function updateSession(
 
   // Protected routes logic
   const path = request.nextUrl.pathname;
+
   const isPublic =
     path === "/" ||
+    path === "/m" ||
+    path.startsWith("/m/") ||
     path.startsWith("/login") ||
     path.startsWith("/signup") ||
     path.startsWith("/forgot-password") ||
     path.startsWith("/reset-password") ||
     path.startsWith("/auth") ||
     path.startsWith("/report") ||
-    path.startsWith("/m/") ||
     path.startsWith("/dashboard") ||
-    path.startsWith("/api") ||
-    path.startsWith("/about");
+    path.startsWith("/about") ||
+    path.startsWith("/help") ||
+    path.startsWith("/api");
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();

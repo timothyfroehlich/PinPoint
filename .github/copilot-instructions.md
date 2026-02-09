@@ -1,125 +1,67 @@
-# PinPoint v2 – GitHub Copilot Repository Instructions
+# PinPoint -- GitHub Copilot Repository Instructions
 
-> Source of truth lives in: `docs/NON_NEGOTIABLES.md`, `docs/UI_GUIDE.md`, `docs/PATTERNS.md`, `docs/TYPESCRIPT_STRICTEST_PATTERNS.md`, `docs/PRODUCT_SPEC.md`, `docs/TECH_SPEC.md`, `docs/TESTING_PLAN.md`, plus root `AGENTS.md` and active tasks in `TASKS.md`. Do NOT duplicate full lists of forbidden patterns here—reference them.
+> Detailed patterns live in `AGENTS.md`, skill files under `.agent/skills/`, and `docs/`. Reference those for deep dives.
 
-## Phase & Context
+## Status & Context
 
-- Phase: Greenfield rewrite (v2) – single-tenant (Austin Pinball Collective) – pre-beta
-- Users: 0 production users (high refactor tolerance, emphasize velocity + clarity)
-- Core Value: Enable logging issues for pinball machines, tracking work, resolving them.
-- Single-Tenant Impact: No organization scoping, no RLS, no multi-tenant isolation layers. Keep architecture lean.
+- **Phase**: Soft-launched (Beta) -- MVP+ Polish
+- **Users**: Active users at Austin Pinball Collective. This is a live app with real data.
+- **Core Value**: Log issues for pinball machines, track repair work, resolve them.
+- **Tenant Model**: Single-tenant (Austin Pinball Collective). No org scoping, no RLS, no multi-tenant isolation.
+- **Safety**: Destructive operations (migrations, deletions, data changes) require extra care. Real users depend on this data.
 
 ## Architectural Pillars
 
-1. Server-First: Prefer React Server Components. Client islands only for real interactivity (events, browser APIs, dynamic state).
-2. Direct Data Access: Use Drizzle directly from Server Components & Server Actions. Avoid DAL/service abstractions until Rule of Three is met.
-3. Progressive Enhancement: Forms must submit without JavaScript; enhance with client code optionally.
-4. Strict TypeScript: Follow strictest patterns (no `any`, non-null `!`, unsafe `as`). Use narrow types + guards.
-5. Schema Lock: Modify schema files directly (no migration files this phase). Never alter schema solely to appease TS errors.
-6. Memory Safety: Worker-scoped PGlite for integration tests; NEVER per-test DB instantiation.
-7. Consistent Domain Rules: Every issue belongs to exactly one machine (CHECK constraint). Severity uses `minor | playable | unplayable`.
-8. UI Constraints: shadcn/ui + Tailwind CSS v4 + Material Design 3 color tokens in `globals.css`.
+1. **Server-First**: Prefer React Server Components. `"use client"` only for interactivity (events, browser APIs, dynamic state).
+2. **Direct Data Access**: Drizzle ORM directly from Server Components & Server Actions. No DAL/service abstractions until Rule of Three.
+3. **Progressive Enhancement**: Forms must work without JavaScript: `<form action={serverAction}>`.
+4. **Strict TypeScript**: ts-strictest -- no `any`, no non-null `!`, no unsafe `as`. Narrow types + guards.
+5. **Drizzle Migrations**: Use `db:generate` + `db:migrate`. Never `drizzle-kit push`. Never Supabase migrations.
+6. **Memory Safety**: Worker-scoped PGlite for integration tests. Never per-test DB instances.
+7. **Domain Rules**: Every issue belongs to exactly one machine. Severity: `minor | playable | unplayable`.
+8. **UI Stack**: shadcn/ui + Tailwind CSS v4 + Material Design 3 color tokens. Never MUI.
 
-## What Changed From Archived (v1)
+## Auth
 
-- Dropped multi-tenant & RLS concerns (remove orgId scoping logic from generation / reviews).
-- Removed tRPC layer; now direct Drizzle + Server Actions.
-- Simplified auth: Supabase SSR only; no RLS policies or pgTAP tests.
-- Domain focus narrowed to machines + issues + comments (later navigation, auth pages, etc per `TASKS.md`).
-
-## Forward-Looking (PR Sequence Guidance)
-
-Referencing `TASKS.md` PR order:
-
-- PR1 Foundation: Bootstrapping configs (TS, lint, format, CI). Copilot suggestions should not introduce app logic prematurely.
-- PR2 Schema: Favor clear Drizzle definitions + relations; no premature indexes unless justified.
-- PR3 Auth: Generate SSR Supabase helpers (`createClient` with immediate `auth.getUser()`). Avoid client-side auth hacks.
-- PR4 UI + Landing: Server Component landing page; minimal client code.
-- PR5 Testing: Ensure test helpers follow memory safety guideline.
-  Subsequent PRs extend domain logic—keep suggestions incremental, referencing existing patterns.
-
-## Critical Patterns (Summaries – Full Detail in Docs)
-
-- Forbidden Patterns: See `docs/NON_NEGOTIABLES.md` (includes memory safety, schema mutation via migrations, unsafe TS escapes, non-progressive forms, introducing MUI, etc.).
-- Type Boundaries: Keep snake_case in database layer; convert at boundary if/when needed—do not over-engineer conversions early.
-- Server Actions: Use explicit return types; integrate validation (Zod) with smallest viable schemas.
-- Testing Distribution: Aim eventually for pyramid described in `TESTING_PLAN.md`; early phase can start with minimal unit + one integration seed.
-
-## Copilot Review Priorities
-
-1. **GitHub Staging Files**: Any files in `.github-staging/` directory MUST be manually reviewed before moving to `.github/`. Never automatically move or activate these files. See `.github-staging/README.md` for review process.
-2. **NEVER Merge Without Explicit Approval**: Do NOT merge PRs, enable auto-merge, or call any merge-related tools without explicit user approval. Always ask first, even if all CI checks pass.
-3. **Code Regressions**: Actively check for regressions, especially from recently merged PRs. Review recent commit history and merged PRs to identify patterns that should not be reintroduced. Flag any code that undoes recent fixes or reverts established patterns without explicit justification.
-4. Security & Data Integrity: Input validation, single-tenant assumptions honored, issue-machine relationship enforced.
-5. Server-First Compliance: Avoid unnecessary `"use client"`.
-6. Type Safety: No forbidden escapes; proper narrowing.
-7. Progressive Enhancement: `<form action={serverAction}>` patterns validated.
-8. Memory Safety & Test Patterns: Worker-scoped DB setup; no per-test instances.
-9. Domain Consistency: Issue severity vocabulary and one-machine rule.
-10. **E2E Test Quality**: Follow `docs/E2E_BEST_PRACTICES.md` - semantic selectors (role + name), no hard-coded delays, independent tests, descriptive names, reusable actions extracted. Validate critical user journeys only, avoid testing implementation details or edge cases.
-
-## Preferred Implementation Examples
-
-> **Source of Truth**: See `docs/PATTERNS.md` (and `docs/patterns/*.md`) for detailed coding patterns and examples.
-
-Refer to `docs/PATTERNS.md` index for:
-
-- Minimal Server Component examples
-- Server Actions with Zod validation
-- Integration Test memory safety patterns
-
-(See pattern-specific instruction files in `.github/instructions/` for scoped detail.)
-
-## Auth Essentials
-
-- SSR only: `src/lib/supabase/server.ts` wrapper creates client and immediately calls `auth.getUser()`.
+- SSR only via `src/lib/supabase/server.ts`: `createClient()` then immediately `auth.getUser()`.
 - Middleware handles token refresh; do not mutate the response object.
 - Auth pages use Server Components + forms posting to Server Actions.
 
-## UI & Styling
+## Testing
 
-- **Authority**: `docs/UI_GUIDE.md` - Follow this guide for all UI development.
-- Tailwind CSS v4 using `@import "tailwindcss"` & `@config` in `globals.css`.
-- Material Design 3 colors stored as CSS variables; prefer semantic tokens (`--color-primary-container`).
-- Use shadcn/ui primitives; never introduce MUI.
+- **Unit**: Pure logic (status derivation, validation).
+- **Integration**: Drizzle queries + Server Actions with worker-scoped PGlite.
+- **E2E**: Playwright for full user flows. Follow `docs/E2E_BEST_PRACTICES.md` for selectors, organization, anti-patterns.
+- If you add a clickable UI element, it must be exercised in an E2E test.
 
-## Testing Guidance (Condensed)
-
-- Unit: Pure logic (status derivation, validation).
-- Integration: Drizzle queries + Server Actions using worker-scoped PGlite.
-- E2E: Playwright for full flows (landing load, auth, machine creation) after foundational PRs.
-  - **Authority**: `docs/E2E_BEST_PRACTICES.md` - Follow selector strategy, test organization, and anti-patterns guide
-- Avoid testing Server Components directly—validate via E2E.
-
-## Commit & Quality Gates
-
-Run (or ensure CI runs) before pushing:
+## Quality Gates
 
 ```bash
-pnpm run typecheck
-pnpm run lint
-pnpm run test
-pnpm run format
+pnpm run check       # Fast: types + lint + format:fix + unit tests (may modify files)
+pnpm run preflight   # Full: check + build + DB reset + integration + smoke/e2e (pre-commit)
 ```
 
-(Use eventual `preflight` script when added.) Conventional commit messages.
+Conventional commit messages required.
 
-## Copilot Should Avoid Generating
+## Copilot Review Priorities
 
-- Organization scoping logic (obsolete in v2 single-tenant).
-- tRPC routers / multi-tenant context wrappers.
-- RLS policy tests / pgTAP usage.
-- DAL/service abstraction layers prematurely.
-- Client components where static server rendering suffices.
+1. **Never merge without explicit approval** -- even if CI is green.
+2. **Regression checks**: Review recent commits for patterns that should not be reintroduced.
+3. **Security & data integrity**: Input validation, single-tenant assumptions, issue-machine relationship.
+4. **Server-first compliance**: No unnecessary `"use client"`.
+5. **Type safety**: No forbidden escapes; proper narrowing.
+6. **Progressive enhancement**: `<form action={serverAction}>` patterns.
+7. **Memory safety**: Worker-scoped DB setup in tests.
+8. **E2E quality**: Semantic selectors, no hard-coded delays, independent tests.
 
-## Escalation / Uncertainty Handling
+## Do Not Generate
 
-If Copilot cannot infer a pattern: reference the canonical docs first; prefer asking for clarification only when a direct pattern is absent and Rule of Three not met.
-
-## Evolution Notes
-
-As features stabilize (Machines CRUD, Issues workflow, Comments), patterns that repeat (≥2 implementations) MUST be documented in `docs/patterns/` before introducing abstractions.
+- Organization/multi-tenant scoping logic.
+- tRPC routers or multi-tenant context wrappers.
+- RLS policies or pgTAP tests.
+- DAL/service abstractions prematurely (Rule of Three).
+- Client components where server rendering suffices.
 
 ---
 
-Last Updated: 2026-01-26 (Added explicit regression checks from recently merged PRs)
+Last Updated: 2026-02-07 (Updated for post-launch beta status)

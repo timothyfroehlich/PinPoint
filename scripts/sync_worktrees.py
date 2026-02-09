@@ -421,6 +421,7 @@ class Worktree:
         expected = {
             "NEXT_PUBLIC_SUPABASE_URL": f"http://localhost:{self.port_config.api_port}",
             "DATABASE_URL": f"postgresql://postgres:postgres@localhost:{self.port_config.db_port}/postgres",
+            "DIRECT_URL": f"postgresql://postgres:postgres@localhost:{self.port_config.db_port}/postgres",
             "PORT": str(self.port_config.nextjs_port),
             "NEXT_PUBLIC_SITE_URL": self.port_config.site_url,
             "EMAIL_TRANSPORT": "smtp",
@@ -466,6 +467,7 @@ class Worktree:
 # Local Supabase + Next.js defaults for {self.name}
 NEXT_PUBLIC_SUPABASE_URL=http://localhost:{self.port_config.api_port}
 DATABASE_URL=postgresql://postgres:postgres@localhost:{self.port_config.db_port}/postgres
+DIRECT_URL=postgresql://postgres:postgres@localhost:{self.port_config.db_port}/postgres
 PORT={self.port_config.nextjs_port}
 NEXT_PUBLIC_SITE_URL={self.port_config.site_url}
 

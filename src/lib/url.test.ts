@@ -68,7 +68,7 @@ describe("isInternalUrl", () => {
     const { isInternalUrl } = await import("./url");
     expect(isInternalUrl("/")).toBe(true);
     expect(isInternalUrl("/dashboard")).toBe(true);
-    expect(isInternalUrl("/machines/123")).toBe(true);
+    expect(isInternalUrl("/m/ABC")).toBe(true);
     expect(isInternalUrl("/settings?param=value")).toBe(true);
   });
 

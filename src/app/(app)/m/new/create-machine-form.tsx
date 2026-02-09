@@ -12,12 +12,13 @@ import {
   type CreateMachineResult,
 } from "~/app/(app)/m/actions";
 import { cn } from "~/lib/utils";
-import { OwnerSelect } from "~/components/machines/OwnerSelect";
-
-import type { UnifiedUser } from "~/lib/types";
+import {
+  OwnerSelect,
+  type OwnerSelectUser,
+} from "~/components/machines/OwnerSelect";
 
 interface CreateMachineFormProps {
-  allUsers: UnifiedUser[];
+  allUsers: OwnerSelectUser[];
   isAdmin: boolean;
 }
 
@@ -31,7 +32,7 @@ export function CreateMachineForm({
   >(createMachineAction, undefined);
 
   // Lift users state to client so we can append new users without full refresh
-  const [users, setUsers] = useState<UnifiedUser[]>(allUsers);
+  const [users, setUsers] = useState<OwnerSelectUser[]>(allUsers);
 
   return (
     <>

@@ -32,6 +32,25 @@ export interface RateLimitResult {
 }
 
 /**
+ * Returns a fail-closed rate limit result (5-minute cooldown).
+ * Used in production when Redis is unavailable to block requests by default.
+ */
+function failClosedResult(): RateLimitResult {
+  return {
+    success: false,
+    limit: 0,
+    remaining: 0,
+    reset: Date.now() + 300_000,
+  };
+}
+
+function isProductionEnv(): boolean {
+  const vercelEnv = process.env["VERCEL_ENV"];
+  if (vercelEnv) return vercelEnv === "production";
+  return process.env.NODE_ENV === "production";
+}
+
+/**
  * Check if Redis is configured via environment variables.
  * Supports both standard Upstash names and Vercel KV names.
  */
@@ -213,11 +232,19 @@ export async function getClientIp(): Promise<string> {
  */
 export async function checkLoginIpLimit(ip: string): Promise<RateLimitResult> {
   if (ip === "unknown") {
-    log.warn(
-      { action: "rate-limit" },
-      "Client IP unavailable - skipping login IP rate limit (fail open)"
-    );
-    return { success: true, limit: 0, remaining: 0, reset: 0 };
+    if (isProductionEnv()) {
+      log.warn(
+        { action: "rate-limit" },
+        "Client IP unavailable - using shared fallback key"
+      );
+      ip = "unknown-ip-fallback";
+    } else {
+      log.warn(
+        { action: "rate-limit" },
+        "Client IP unavailable - skipping rate limit in development"
+      );
+      return { success: true, limit: 0, remaining: 0, reset: 0 };
+    }
   }
 
   if (loginIpLimiter === undefined) {
@@ -225,9 +252,16 @@ export async function checkLoginIpLimit(ip: string): Promise<RateLimitResult> {
   }
 
   if (!loginIpLimiter) {
+    if (isProductionEnv()) {
+      log.error(
+        { action: "rate-limit" },
+        "Rate limiting unavailable in production - blocking request"
+      );
+      return failClosedResult();
+    }
     log.warn(
       { action: "rate-limit" },
-      "Upstash Redis not configured - login IP rate limiting disabled"
+      "Redis not configured - rate limiting disabled in development"
     );
     return { success: true, limit: 0, remaining: 0, reset: 0 };
   }
@@ -245,7 +279,9 @@ export async function checkLoginIpLimit(ip: string): Promise<RateLimitResult> {
       { error: error instanceof Error ? error.message : "Unknown", ip },
       "Login IP rate limit check failed"
     );
-    // Fail open - allow request if Redis is down
+    if (isProductionEnv()) {
+      return failClosedResult();
+    }
     return { success: true, limit: 0, remaining: 0, reset: 0 };
   }
 }
@@ -260,11 +296,19 @@ export async function checkPublicIssueLimit(
   ip: string
 ): Promise<RateLimitResult> {
   if (ip === "unknown") {
-    log.warn(
-      { action: "rate-limit" },
-      "Client IP unavailable - skipping public issue rate limit (fail open)"
-    );
-    return { success: true, limit: 0, remaining: 0, reset: 0 };
+    if (isProductionEnv()) {
+      log.warn(
+        { action: "rate-limit" },
+        "Client IP unavailable - using shared fallback key"
+      );
+      ip = "unknown-ip-fallback";
+    } else {
+      log.warn(
+        { action: "rate-limit" },
+        "Client IP unavailable - skipping rate limit in development"
+      );
+      return { success: true, limit: 0, remaining: 0, reset: 0 };
+    }
   }
 
   if (publicIssueLimiter === undefined) {
@@ -272,9 +316,16 @@ export async function checkPublicIssueLimit(
   }
 
   if (!publicIssueLimiter) {
+    if (isProductionEnv()) {
+      log.error(
+        { action: "rate-limit" },
+        "Rate limiting unavailable in production - blocking request"
+      );
+      return failClosedResult();
+    }
     log.warn(
       { action: "rate-limit" },
-      "Upstash Redis not configured - public issue rate limiting disabled"
+      "Redis not configured - rate limiting disabled in development"
     );
     return { success: true, limit: 0, remaining: 0, reset: 0 };
   }
@@ -292,7 +343,9 @@ export async function checkPublicIssueLimit(
       { error: error instanceof Error ? error.message : "Unknown", ip },
       "Public issue rate limit check failed"
     );
-    // Fail open - allow request if Redis is down
+    if (isProductionEnv()) {
+      return failClosedResult();
+    }
     return { success: true, limit: 0, remaining: 0, reset: 0 };
   }
 }
@@ -307,11 +360,19 @@ export async function checkImageUploadLimit(
   ip: string
 ): Promise<RateLimitResult> {
   if (ip === "unknown") {
-    log.warn(
-      { action: "rate-limit" },
-      "Client IP unavailable - skipping image upload rate limit (fail open)"
-    );
-    return { success: true, limit: 0, remaining: 0, reset: 0 };
+    if (isProductionEnv()) {
+      log.warn(
+        { action: "rate-limit" },
+        "Client IP unavailable - using shared fallback key"
+      );
+      ip = "unknown-ip-fallback";
+    } else {
+      log.warn(
+        { action: "rate-limit" },
+        "Client IP unavailable - skipping rate limit in development"
+      );
+      return { success: true, limit: 0, remaining: 0, reset: 0 };
+    }
   }
 
   if (imageUploadLimiter === undefined) {
@@ -319,9 +380,16 @@ export async function checkImageUploadLimit(
   }
 
   if (!imageUploadLimiter) {
+    if (isProductionEnv()) {
+      log.error(
+        { action: "rate-limit" },
+        "Rate limiting unavailable in production - blocking request"
+      );
+      return failClosedResult();
+    }
     log.warn(
       { action: "rate-limit" },
-      "Upstash Redis not configured - image upload rate limiting disabled"
+      "Redis not configured - rate limiting disabled in development"
     );
     return { success: true, limit: 0, remaining: 0, reset: 0 };
   }
@@ -339,7 +407,9 @@ export async function checkImageUploadLimit(
       { error: error instanceof Error ? error.message : "Unknown", ip },
       "Image upload rate limit check failed"
     );
-    // Fail open - allow request if Redis is down
+    if (isProductionEnv()) {
+      return failClosedResult();
+    }
     return { success: true, limit: 0, remaining: 0, reset: 0 };
   }
 }
@@ -358,9 +428,16 @@ export async function checkLoginAccountLimit(
   }
 
   if (!loginAccountLimiter) {
+    if (isProductionEnv()) {
+      log.error(
+        { action: "rate-limit" },
+        "Rate limiting unavailable in production - blocking request"
+      );
+      return failClosedResult();
+    }
     log.warn(
       { action: "rate-limit" },
-      "Upstash Redis not configured - login account rate limiting disabled"
+      "Redis not configured - rate limiting disabled in development"
     );
     return { success: true, limit: 0, remaining: 0, reset: 0 };
   }
@@ -382,7 +459,9 @@ export async function checkLoginAccountLimit(
       },
       "Login account rate limit check failed"
     );
-    // Fail open - allow request if Redis is down
+    if (isProductionEnv()) {
+      return failClosedResult();
+    }
     return { success: true, limit: 0, remaining: 0, reset: 0 };
   }
 }
@@ -395,11 +474,19 @@ export async function checkLoginAccountLimit(
  */
 export async function checkSignupLimit(ip: string): Promise<RateLimitResult> {
   if (ip === "unknown") {
-    log.warn(
-      { action: "rate-limit" },
-      "Client IP unavailable - skipping signup rate limit (fail open)"
-    );
-    return { success: true, limit: 0, remaining: 0, reset: 0 };
+    if (isProductionEnv()) {
+      log.warn(
+        { action: "rate-limit" },
+        "Client IP unavailable - using shared fallback key"
+      );
+      ip = "unknown-ip-fallback";
+    } else {
+      log.warn(
+        { action: "rate-limit" },
+        "Client IP unavailable - skipping rate limit in development"
+      );
+      return { success: true, limit: 0, remaining: 0, reset: 0 };
+    }
   }
 
   if (signupLimiter === undefined) {
@@ -407,9 +494,16 @@ export async function checkSignupLimit(ip: string): Promise<RateLimitResult> {
   }
 
   if (!signupLimiter) {
+    if (isProductionEnv()) {
+      log.error(
+        { action: "rate-limit" },
+        "Rate limiting unavailable in production - blocking request"
+      );
+      return failClosedResult();
+    }
     log.warn(
       { action: "rate-limit" },
-      "Upstash Redis not configured - signup rate limiting disabled"
+      "Redis not configured - rate limiting disabled in development"
     );
     return { success: true, limit: 0, remaining: 0, reset: 0 };
   }
@@ -427,7 +521,9 @@ export async function checkSignupLimit(ip: string): Promise<RateLimitResult> {
       { error: error instanceof Error ? error.message : "Unknown", ip },
       "Signup rate limit check failed"
     );
-    // Fail open - allow request if Redis is down
+    if (isProductionEnv()) {
+      return failClosedResult();
+    }
     return { success: true, limit: 0, remaining: 0, reset: 0 };
   }
 }
@@ -446,9 +542,16 @@ export async function checkForgotPasswordLimit(
   }
 
   if (!forgotPasswordLimiter) {
+    if (isProductionEnv()) {
+      log.error(
+        { action: "rate-limit" },
+        "Rate limiting unavailable in production - blocking request"
+      );
+      return failClosedResult();
+    }
     log.warn(
       { action: "rate-limit" },
-      "Upstash Redis not configured - forgot password rate limiting disabled"
+      "Redis not configured - rate limiting disabled in development"
     );
     return { success: true, limit: 0, remaining: 0, reset: 0 };
   }
@@ -470,7 +573,9 @@ export async function checkForgotPasswordLimit(
       },
       "Forgot password rate limit check failed"
     );
-    // Fail open - allow request if Redis is down
+    if (isProductionEnv()) {
+      return failClosedResult();
+    }
     return { success: true, limit: 0, remaining: 0, reset: 0 };
   }
 }

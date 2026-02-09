@@ -127,3 +127,15 @@ export const editCommentSchema = z.object({
 export const deleteCommentSchema = z.object({
   commentId: uuidish,
 });
+
+/**
+ * Schema for updating issue title
+ */
+export const updateIssueTitleSchema = z.object({
+  issueId: uuidish,
+  title: z
+    .string()
+    .trim()
+    .min(1, "Title cannot be empty")
+    .max(100, "Title must be 100 characters or less"),
+});

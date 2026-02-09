@@ -15,6 +15,8 @@ import { ImageGallery } from "~/components/images/ImageGallery";
 import type { Issue, IssueWithAllRelations } from "~/lib/types";
 import { BackToIssuesLink } from "~/components/issues/BackToIssuesLink";
 import { getLastIssuesPath } from "~/lib/cookies/preferences";
+import { canEditIssueTitle } from "~/lib/permissions";
+import { EditableIssueTitle } from "./editable-issue-title";
 
 /**
  * Issue Detail Page (Protected Route)
@@ -161,6 +163,12 @@ export default async function IssueDetailPage({
   const issueWithRelations = issue as unknown as IssueWithAllRelations;
   const ownerName = getMachineOwnerName(issueWithRelations);
 
+  // Compute title edit permission
+  const userCanEditTitle = canEditIssueTitle(
+    { id: user.id, role: currentUserProfile?.role ?? "guest" },
+    { reportedBy: issue.reportedBy, assignedTo: issue.assignedTo }
+  );
+
   return (
     <PageShell className="space-y-8" size="wide">
       {/* Back button */}
@@ -197,14 +205,11 @@ export default async function IssueDetailPage({
           )}
         </div>
         <div className="space-y-3">
-          <h1
-            className="text-3xl lg:text-4xl font-extrabold tracking-tight"
-            title={issue.title.length > 60 ? issue.title : undefined}
-          >
-            {issue.title.length > 60
-              ? `${issue.title.slice(0, 60)}...`
-              : issue.title}
-          </h1>
+          <EditableIssueTitle
+            issueId={issue.id}
+            title={issue.title}
+            canEdit={userCanEditTitle}
+          />
           <div className="flex flex-wrap items-center gap-2">
             <IssueBadgeGrid
               issue={

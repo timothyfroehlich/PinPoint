@@ -23,6 +23,7 @@ import {
   addCommentSchema,
   editCommentSchema,
   deleteCommentSchema,
+  updateIssueTitleSchema,
   imagesMetadataArraySchema,
 } from "./schemas";
 import { type Result, ok, err } from "~/lib/result";
@@ -35,7 +36,7 @@ import {
   updateIssueFrequency,
   updateIssueComment,
 } from "~/services/issues";
-import { canUpdateIssue } from "~/lib/permissions";
+import { canUpdateIssue, canEditIssueTitle } from "~/lib/permissions";
 import { userProfiles, issueComments, issueImages } from "~/server/db/schema";
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
@@ -91,6 +92,11 @@ export type EditCommentResult = Result<
 
 export type DeleteCommentResult = Result<
   { commentId: string },
+  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+>;
+
+export type UpdateIssueTitleResult = Result<
+  { issueId: string },
   "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
 >;
 
@@ -277,6 +283,7 @@ export async function updateIssueSeverityAction(
     await updateIssueSeverity({
       issueId,
       severity,
+      userId: user.id,
     });
 
     const issuePath = `/m/${currentIssue.machineInitials}/i/${currentIssue.issueNumber}`;
@@ -368,6 +375,7 @@ export async function updateIssueFrequencyAction(
     await updateIssueFrequency({
       issueId,
       frequency,
+      userId: user.id,
     });
 
     revalidatePath(
@@ -467,6 +475,7 @@ export async function updateIssuePriorityAction(
     await updateIssuePriority({
       issueId,
       priority,
+      userId: user.id,
     });
 
     const issuePath = `/m/${currentIssue.machineInitials}/i/${currentIssue.issueNumber}`;
@@ -857,5 +866,95 @@ export async function deleteCommentAction(
       "Failed to delete issue comment"
     );
     return err("SERVER", "Failed to delete comment");
+  }
+}
+
+/**
+ * Update Issue Title Action
+ *
+ * Updates the title of an issue with permission checks.
+ * Members and admins can edit any title. Guests can only edit their own.
+ */
+export async function updateIssueTitleAction(
+  _prevState: UpdateIssueTitleResult | undefined,
+  formData: FormData
+): Promise<UpdateIssueTitleResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return err("UNAUTHORIZED", "Unauthorized");
+  }
+
+  const rawData = {
+    issueId: toOptionalString(formData.get("issueId")),
+    title: toOptionalString(formData.get("title")),
+  };
+
+  const validation = updateIssueTitleSchema.safeParse(rawData);
+  if (!validation.success) {
+    const firstError = validation.error.issues[0];
+    return err("VALIDATION", firstError?.message ?? "Invalid input");
+  }
+
+  const { issueId, title } = validation.data;
+
+  try {
+    const currentIssue = await db.query.issues.findFirst({
+      where: eq(issues.id, issueId),
+      columns: {
+        machineInitials: true,
+        issueNumber: true,
+        reportedBy: true,
+        assignedTo: true,
+      },
+    });
+
+    if (!currentIssue) {
+      return err("NOT_FOUND", "Issue not found");
+    }
+
+    // Permission check
+    const userProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true },
+    });
+
+    if (
+      !canEditIssueTitle(
+        { id: user.id, role: userProfile?.role ?? "guest" },
+        currentIssue
+      )
+    ) {
+      return err(
+        "UNAUTHORIZED",
+        "You do not have permission to edit this issue title"
+      );
+    }
+
+    await db
+      .update(issues)
+      .set({ title, updatedAt: new Date() })
+      .where(eq(issues.id, issueId));
+
+    const issuePath = `/m/${currentIssue.machineInitials}/i/${currentIssue.issueNumber}`;
+    revalidatePath(issuePath);
+    revalidatePath(`/m/${currentIssue.machineInitials}`);
+
+    return ok({ issueId });
+  } catch (error) {
+    if (isNextRedirectError(error)) {
+      throw error;
+    }
+    log.error(
+      {
+        error: error instanceof Error ? error.message : "Unknown",
+        action: "updateIssueTitle",
+      },
+      "Update issue title error"
+    );
+    return err("SERVER", "Failed to update title");
   }
 }

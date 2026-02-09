@@ -2,6 +2,41 @@
 
 This document contains strict rules that must always be followed in the PinPoint codebase to prevent bugs and maintain consistency.
 
+## Privacy: Email Address Visibility
+
+**Rule:** User email addresses must NEVER be displayed outside of admin views and the user's own settings page.
+
+**Why:** Email addresses are PII. Displaying them to non-admin users violates user privacy expectations. Anonymous reporters who provide an email for follow-up do not consent to public display.
+
+**Applies to:**
+
+- Issue timeline events and comments
+- Reporter display names (sidebar, cards, lists)
+- Notification content
+- Seed data and test fixtures
+- Any client-serialized data
+
+**Use instead:**
+
+- User's display name (from `userProfiles.name`)
+- Invited user's name (from `invitedUsers.name`)
+- `reporterName` field (guest-provided name)
+- `"Anonymous"` as final fallback
+
+**Examples:**
+
+```typescript
+// ✅ Correct - uses name hierarchy with Anonymous fallback
+const name =
+  issue.reportedByUser?.name ??
+  issue.invitedReporter?.name ??
+  issue.reporterName ??
+  "Anonymous";
+
+// ❌ Wrong - leaks email to non-admin UI
+const name = issue.reporterName ?? issue.reporterEmail ?? "Guest";
+```
+
 ## Network: localhost Domain Standard
 
 **Rule:** Always use `localhost` (not `127.0.0.1`) for local development URLs.

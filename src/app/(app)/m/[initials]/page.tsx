@@ -148,9 +148,17 @@ export default async function MachineDetailPage({
     (user.id === machine.ownerId || user.id === machine.invitedOwnerId);
 
   // Only fetch allUsers when user can edit (needs OwnerSelect data)
-  const allUsers = canEdit
+  // CORE-SEC-006: Map to minimal shape before passing to client components
+  const allUsersRaw = canEdit
     ? await getUnifiedUsers({ includeEmails: false })
     : [];
+  const allUsers = allUsersRaw.map((u) => ({
+    id: u.id,
+    name: u.name,
+    lastName: u.lastName,
+    machineCount: u.machineCount,
+    status: u.status,
+  }));
 
   const totalIssuesCount = totalIssuesCountResult[0]?.count ?? 0;
   // machine.issues now contains only open issues due to the filter in the query

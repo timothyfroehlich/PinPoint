@@ -1,0 +1,21 @@
+# Gitleaks configuration — suppress false positives for local dev keys
+#
+# The Supabase demo JWT (service_role) is a well-known static key used by
+# all local Supabase instances. It is NOT a real secret.
+# See: https://supabase.com/docs/guides/local-development
+
+[[allowlists]]
+description = "Local Supabase demo keys in worktree env management"
+paths = [
+  '''scripts/pinpoint_wt_lib\.py''',
+  '''\.env\.local''',
+  '''\.env\.ci''',
+  '''\.env\.example''',
+]
+
+[[allowlists]]
+description = "Supabase config templates with demo keys"
+paths = [
+  '''supabase/config\.toml''',
+  '''supabase/config\.toml\.template''',
+]

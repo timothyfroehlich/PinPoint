@@ -140,6 +140,7 @@ describe("Issue Service Functions (Integration)", () => {
     expect(statusEvent).toBeDefined();
     expect(statusEvent?.content).toContain("from New to In Progress");
     expect(statusEvent?.isSystem).toBe(true);
+    expect(statusEvent?.authorId).toBe(testUser.id);
   });
 
   it("should update severity and create timeline event", async () => {
@@ -149,6 +150,7 @@ describe("Issue Service Functions (Integration)", () => {
     await updateIssueSeverity({
       issueId: testIssue.id,
       severity: newSeverity,
+      userId: testUser.id,
     });
 
     const updated = await db.query.issues.findFirst({
@@ -164,6 +166,7 @@ describe("Issue Service Functions (Integration)", () => {
 
     expect(event?.content).toContain("Severity changed");
     expect(event?.content).toContain("from Minor to Unplayable");
+    expect(event?.authorId).toBe(testUser.id);
   });
 
   it("should update priority and create timeline event", async () => {
@@ -173,6 +176,7 @@ describe("Issue Service Functions (Integration)", () => {
     await updateIssuePriority({
       issueId: testIssue.id,
       priority: newPriority,
+      userId: testUser.id,
     });
 
     const updated = await db.query.issues.findFirst({
@@ -188,6 +192,7 @@ describe("Issue Service Functions (Integration)", () => {
 
     expect(event?.content).toContain("Priority changed");
     expect(event?.content).toContain("from Low to High");
+    expect(event?.authorId).toBe(testUser.id);
   });
 
   it("should update frequency and create timeline event", async () => {
@@ -197,6 +202,7 @@ describe("Issue Service Functions (Integration)", () => {
     await updateIssueFrequency({
       issueId: testIssue.id,
       frequency: newFrequency,
+      userId: testUser.id,
     });
 
     const updated = await db.query.issues.findFirst({
@@ -212,6 +218,7 @@ describe("Issue Service Functions (Integration)", () => {
 
     expect(event?.content).toContain("Frequency changed");
     expect(event?.content).toContain("from Intermittent to Constant");
+    expect(event?.authorId).toBe(testUser.id);
   });
 
   describe("createIssue with reporter variations", () => {

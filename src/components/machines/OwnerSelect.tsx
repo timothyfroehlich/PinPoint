@@ -11,16 +11,25 @@ import { Label } from "~/components/ui/label";
 import { Button } from "~/components/ui/button";
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import type { UnifiedUser } from "~/lib/types";
+import type { UserStatus } from "~/lib/types";
 import { InviteUserDialog } from "~/components/users/InviteUserDialog";
 import { Plus } from "lucide-react";
 import { compareUnifiedUsers } from "~/lib/users/comparators";
 
+/** Minimal user shape for owner selection (CORE-SEC-006) */
+export interface OwnerSelectUser {
+  id: string;
+  name: string;
+  lastName: string;
+  machineCount: number;
+  status: UserStatus;
+}
+
 interface OwnerSelectProps {
-  users: UnifiedUser[];
+  users: OwnerSelectUser[];
   defaultValue?: string | null;
   disabled?: boolean;
-  onUsersChange?: (users: UnifiedUser[]) => void;
+  onUsersChange?: (users: OwnerSelectUser[]) => void;
   onValueChange?: (id: string) => void;
 }
 
