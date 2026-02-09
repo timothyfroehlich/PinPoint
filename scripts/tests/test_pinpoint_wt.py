@@ -53,11 +53,16 @@ class TestParseEnvFile:
     def test_handles_values_with_equals(self, tmp_path: Path) -> None:
         """Test values containing = are preserved."""
         env_file = tmp_path / ".env.local"
-        env_file.write_text("POSTGRES_URL=postgresql://user:pass@host:5432/db?sslmode=require\n")
+        env_file.write_text(
+            "POSTGRES_URL=postgresql://user:pass@host:5432/db?sslmode=require\n"
+        )
 
         result = parse_env_file(env_file)
 
-        assert result["POSTGRES_URL"] == "postgresql://user:pass@host:5432/db?sslmode=require"
+        assert (
+            result["POSTGRES_URL"]
+            == "postgresql://user:pass@host:5432/db?sslmode=require"
+        )
 
     def test_strips_whitespace(self, tmp_path: Path) -> None:
         """Test that whitespace is stripped from keys and values."""
@@ -105,10 +110,15 @@ class TestMergeEnvLocal:
         result = merge_env_local(tmp_path, port_config)
 
         # Should be overwritten with the static local dev values
-        assert f"NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY={LOCAL_SUPABASE_PUBLISHABLE_KEY}" in result
+        assert (
+            f"NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY={LOCAL_SUPABASE_PUBLISHABLE_KEY}"
+            in result
+        )
         assert f"SUPABASE_SERVICE_ROLE_KEY={LOCAL_SUPABASE_SERVICE_ROLE_KEY}" in result
 
-    def test_updates_port_dependent_keys(self, tmp_path: Path, port_config: PortConfig) -> None:
+    def test_updates_port_dependent_keys(
+        self, tmp_path: Path, port_config: PortConfig
+    ) -> None:
         """Test that port-dependent keys are updated."""
         env_file = tmp_path / ".env.local"
         env_file.write_text(
@@ -124,10 +134,18 @@ class TestMergeEnvLocal:
         # New Next.js port = 3000 + 400 = 3400
         assert "PORT=3400" in result
         # New DB port = 54322 + 4000 = 58322
-        assert "POSTGRES_URL=postgresql://postgres:postgres@localhost:58322/postgres" in result
-        assert "POSTGRES_URL_NON_POOLING=postgresql://postgres:postgres@localhost:58322/postgres" in result
+        assert (
+            "POSTGRES_URL=postgresql://postgres:postgres@localhost:58322/postgres"
+            in result
+        )
+        assert (
+            "POSTGRES_URL_NON_POOLING=postgresql://postgres:postgres@localhost:58322/postgres"
+            in result
+        )
 
-    def test_preserves_custom_variables(self, tmp_path: Path, port_config: PortConfig) -> None:
+    def test_preserves_custom_variables(
+        self, tmp_path: Path, port_config: PortConfig
+    ) -> None:
         """Test that user-added custom variables are preserved."""
         env_file = tmp_path / ".env.local"
         env_file.write_text(
@@ -150,12 +168,17 @@ class TestMergeEnvLocal:
         result = merge_env_local(tmp_path, port_config)
 
         # Should have the static local dev keys auto-populated
-        assert f"NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY={LOCAL_SUPABASE_PUBLISHABLE_KEY}" in result
+        assert (
+            f"NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY={LOCAL_SUPABASE_PUBLISHABLE_KEY}"
+            in result
+        )
         assert f"SUPABASE_SERVICE_ROLE_KEY={LOCAL_SUPABASE_SERVICE_ROLE_KEY}" in result
         # And managed values should be set
         assert "http://localhost:58321" in result
 
-    def test_includes_header_comment(self, tmp_path: Path, port_config: PortConfig) -> None:
+    def test_includes_header_comment(
+        self, tmp_path: Path, port_config: PortConfig
+    ) -> None:
         """Test that the output includes the header explaining management."""
         result = merge_env_local(tmp_path, port_config)
 
@@ -217,7 +240,9 @@ class TestManagedAndUserKeys:
     def test_no_overlap_between_managed_and_user(self) -> None:
         """Test that managed and user keys don't overlap."""
         overlap = MANAGED_ENV_KEYS & USER_PROVIDED_KEYS
-        assert overlap == set(), f"Keys should not be both managed and user-provided: {overlap}"
+        assert overlap == set(), (
+            f"Keys should not be both managed and user-provided: {overlap}"
+        )
 
 
 class TestPortConfig:
@@ -258,7 +283,10 @@ class TestBranchToProjectId:
     def test_special_characters_replaced(self) -> None:
         """Test special characters are replaced with hyphens."""
         # Trailing special chars become hyphens, then get stripped
-        assert branch_to_project_id("feat/add_new@feature!") == "pinpoint-feat-add-new-feature"
+        assert (
+            branch_to_project_id("feat/add_new@feature!")
+            == "pinpoint-feat-add-new-feature"
+        )
 
     def test_no_double_hyphens(self) -> None:
         """Test that double hyphens are collapsed (Copilot bug fix)."""
@@ -269,7 +297,10 @@ class TestBranchToProjectId:
 
     def test_multiple_consecutive_special_chars(self) -> None:
         """Test multiple consecutive special characters become single hyphen."""
-        assert branch_to_project_id("feat///multiple___chars") == "pinpoint-feat-multiple-chars"
+        assert (
+            branch_to_project_id("feat///multiple___chars")
+            == "pinpoint-feat-multiple-chars"
+        )
 
     def test_long_branch_name_truncated(self) -> None:
         """Test very long branch names are truncated to 50 chars."""

@@ -170,3 +170,79 @@ describe("updateSession autologin", () => {
     expect(response.headers.get("location")).toBeNull();
   });
 });
+
+describe("updateSession public route access", () => {
+  const envBackup = { ...process.env };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env = {
+      ...envBackup,
+      ...DEFAULT_ENV,
+      // Disable autologin so we test true unauthenticated behavior
+      DEV_AUTOLOGIN_ENABLED: "false",
+    };
+  });
+
+  afterEach(() => {
+    process.env = envBackup;
+  });
+
+  const publicRoutes = [
+    "/",
+    "/m",
+    "/m/TAF",
+    "/m/TAF/i/1",
+    "/m/AFM/i/42",
+    "/login",
+    "/signup",
+    "/forgot-password",
+    "/reset-password",
+    "/auth/callback",
+    "/auth/confirm",
+    "/report",
+    "/dashboard",
+    "/about",
+    "/help",
+    "/help/permissions",
+    "/privacy",
+    "/terms",
+    "/api/health",
+  ];
+
+  it.each(publicRoutes)("allows unauthenticated access to %s", async (path) => {
+    const supabase = createSupabaseAuthMocks(null, null);
+    createServerClientMock.mockReturnValue(supabase);
+
+    const request = makeRequest(`http://localhost${path}`);
+    const response = await updateSession(request);
+
+    expect(response.headers.get("location")).toBeNull();
+  });
+
+  // Note: /m/new is protected at the page level (server component redirect),
+  // not at middleware level, since /m/* is broadly public in middleware.
+  // Its protection is verified in the E2E suite (public-routes-audit.spec.ts).
+  const protectedRoutes = [
+    "/settings",
+    "/admin/users",
+    "/issues",
+    "/notifications",
+    "/debug/badges",
+  ];
+
+  it.each(protectedRoutes)(
+    "redirects unauthenticated users from %s to /login",
+    async (path) => {
+      const supabase = createSupabaseAuthMocks(null, null);
+      createServerClientMock.mockReturnValue(supabase);
+
+      const request = makeRequest(`http://localhost${path}`);
+      const response = await updateSession(request);
+
+      const location = response.headers.get("location");
+      expect(location).not.toBeNull();
+      expect(location).toContain("/login");
+    }
+  );
+});
