@@ -53,7 +53,8 @@ fi
 # User requested specific host: aws-0-us-east-2.pooler.supabase.com:6543
 POSTGRES_URL="postgresql://postgres.gjmpvmelowpgsveupbcy:${DB_PASSWORD}@aws-0-us-east-2.pooler.supabase.com:6543/postgres"
 
-# Also update POSTGRES_URL_NON_POOLING to match, just in case
+# Preview branches only expose the session pooler (no direct connection available),
+# so POSTGRES_URL_NON_POOLING intentionally uses the same pooler URL here.
 export POSTGRES_URL
 export POSTGRES_URL_NON_POOLING="$POSTGRES_URL"
 
