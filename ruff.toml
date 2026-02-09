@@ -1,0 +1,19 @@
+# Ruff configuration for Python scripts
+# https://docs.astral.sh/ruff/configuration/
+
+target-version = "py312"
+
+[lint]
+select = [
+  "E4",  # pycodestyle import errors
+  "E7",  # pycodestyle statement errors
+  "E9",  # pycodestyle runtime errors
+  "F",   # pyflakes
+  "I",   # isort
+  "W",   # pycodestyle warnings
+]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"

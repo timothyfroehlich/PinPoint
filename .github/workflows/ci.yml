@@ -158,10 +158,26 @@ jobs:
       - name: Run yamllint
         run: yamllint .github/workflows/
 
+  ruff:
+    name: Ruff (Python Lint + Format)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Ruff
+        uses: astral-sh/setup-ruff@v1
+
+      - name: Run ruff check
+        run: ruff check scripts/ pinpoint-wt.py
+
+      - name: Run ruff format check
+        run: ruff format --check scripts/ pinpoint-wt.py
+
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [setup, typecheck, lint, format, yamllint, test-unit, test-integration]
+    needs: [setup, typecheck, lint, format, yamllint, ruff, test-unit, test-integration]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
