@@ -7,7 +7,8 @@
 import "@testing-library/jest-dom/vitest";
 
 // Ensure POSTGRES_URL is set for tests to avoid db/index.ts throwing error
-process.env.POSTGRES_URL ??= "postgres://postgres:postgres@localhost:5432/test";
+// eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- Must catch empty string from vitest.config.ts env spreading
+process.env.POSTGRES_URL ||= "postgres://postgres:postgres@localhost:5432/test";
 
 // Mock ResizeObserver
 if (typeof window !== "undefined") {

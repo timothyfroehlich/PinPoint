@@ -50,8 +50,8 @@ if [ -z "$DB_PASSWORD" ]; then
 fi
 
 # Construct new Session Pool URL
-# User requested specific host: aws-0-us-east-2.pooler.supabase.com:5432
-POSTGRES_URL="postgresql://postgres.gjmpvmelowpgsveupbcy:${DB_PASSWORD}@aws-0-us-east-2.pooler.supabase.com:5432/postgres"
+# User requested specific host: aws-0-us-east-2.pooler.supabase.com:6543
+POSTGRES_URL="postgresql://postgres.gjmpvmelowpgsveupbcy:${DB_PASSWORD}@aws-0-us-east-2.pooler.supabase.com:6543/postgres"
 
 # Also update POSTGRES_URL_NON_POOLING to match, just in case
 export POSTGRES_URL
@@ -75,7 +75,7 @@ fi
 
 echo ""
 echo "1️⃣  Dropping and recreating schema..."
-# Use Session Mode pooler (already IPv4-compatible)
+# Use session pooler URL (already IPv4-compatible)
 psql "$POSTGRES_URL" -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres; GRANT ALL ON SCHEMA public TO public;" 2>&1 | grep -v "^NOTICE:" | grep -v "^DETAIL:" || true
 
 # Verify schema is empty
@@ -103,7 +103,7 @@ psql "$POSTGRES_URL" -c "DELETE FROM drizzle.__drizzle_migrations;" 2>&1 | grep 
 
 echo ""
 echo "2️⃣  Applying schema with drizzle-kit migrations..."
-# Uses POSTGRES_URL_NON_POOLING from env (Session Mode pooler, IPv4-compatible)
+# Uses POSTGRES_URL_NON_POOLING from env (direct/non-pooled connection for DDL)
 pnpm exec drizzle-kit migrate
 
 # Verify tables were created

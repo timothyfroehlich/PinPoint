@@ -32,7 +32,7 @@
     "db:_push": "drizzle-kit push",
     "db:migrate": "drizzle-kit migrate",
     "db:generate": "drizzle-kit generate",
-    "db:_seed": "node --env-file=.env.local -e 'require(\"child_process\").execSync(\"psql \" + process.env.POSTGRES_URL + \" -f supabase/seed.sql\", {stdio: \"inherit\"})'",
+    "db:_seed": "node --env-file=.env.local -e 'require(\"child_process\").execFileSync(\"psql\", [process.env.POSTGRES_URL, \"-f\", \"supabase/seed.sql\"], {stdio: \"inherit\"})'",
     "db:_seed-users": "node --env-file=.env.local supabase/seed-users.mjs",
     "db:fast-reset": "node --env-file=.env.local scripts/db-fast-reset.mjs > /dev/null",
     "check:config": "python3 scripts/check-config-drift.py > /dev/null",
