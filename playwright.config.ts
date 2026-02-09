@@ -202,7 +202,7 @@ export default defineConfig({
     env: {
       PORT: String(port),
       // Default to mock blob storage for local/CI Playwright stability.
-      // Can still be overridden by exporting MOCK_BLOB_STORAGE=false.
+      // Set MOCK_BLOB_STORAGE=false AND provide BLOB_READ_WRITE_TOKEN to use real storage.
       MOCK_BLOB_STORAGE: process.env["MOCK_BLOB_STORAGE"] ?? "true",
     },
   },

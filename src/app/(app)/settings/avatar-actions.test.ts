@@ -45,6 +45,10 @@ vi.mock("~/server/db/schema", () => ({
   userProfiles: { id: "id", avatarUrl: "avatar_url" },
 }));
 
+vi.mock("drizzle-orm", () => ({
+  eq: vi.fn((field: unknown, value: unknown) => ({ field, value })),
+}));
+
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));

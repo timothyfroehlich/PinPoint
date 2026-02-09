@@ -189,10 +189,7 @@ export async function uploadAvatarAction(
       },
       "Avatar upload action failed"
     );
-    return err(
-      "BLOB",
-      caughtErr instanceof Error ? caughtErr.message : "Upload failed."
-    );
+    return err("BLOB", "Avatar upload failed.");
   }
 }
 
