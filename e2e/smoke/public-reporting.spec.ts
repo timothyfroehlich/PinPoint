@@ -261,7 +261,7 @@ test.describe("Public Issue Reporting", () => {
     await expect(page).toHaveURL(/\/m\/[A-Z0-9]+\/i\/\d+/);
 
     // 6. Verify status badge shows 'New' on the detail page
-    const statusBadge = page.getByTestId("issue-status-badge");
+    const statusBadge = page.getByTestId("issue-status-badge").first();
     await expect(statusBadge).toHaveText(/New/i);
   });
 });
