@@ -4,6 +4,6 @@ export default {
   ...baseConfig,
   testDir: "./e2e/smoke",
   fullyParallel: false, // Respect .serial() within files
-  workers: 3, // 3 test files in parallel
+  workers: 1, // Avoid cross-file auth/session flakiness with local Supabase
   retries: process.env["CI"] ? 2 : 0,
 };
