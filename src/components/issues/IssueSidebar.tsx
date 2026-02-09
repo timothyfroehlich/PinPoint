@@ -7,6 +7,8 @@ import { OwnerBadge } from "~/components/issues/OwnerBadge";
 import { isUserMachineOwner } from "~/lib/issues/owner";
 import { type IssueWithAllRelations } from "~/lib/types";
 import { resolveIssueReporter } from "~/lib/issues/utils";
+import { type OwnershipContext } from "~/lib/permissions/helpers";
+import { type AccessLevel } from "~/lib/permissions/matrix";
 
 interface SidebarUser {
   id: string;
@@ -16,15 +18,21 @@ interface SidebarUser {
 interface IssueSidebarProps {
   issue: IssueWithAllRelations;
   allUsers: SidebarUser[];
-  currentUserId: string;
+  currentUserId: string | null;
+  accessLevel: AccessLevel;
+  ownershipContext: OwnershipContext;
 }
 
 export function IssueSidebar({
   issue,
   allUsers,
   currentUserId,
+  accessLevel,
+  ownershipContext,
 }: IssueSidebarProps): React.JSX.Element {
-  const isWatching = issue.watchers.some((w) => w.userId === currentUserId);
+  const isWatching = currentUserId
+    ? issue.watchers.some((w) => w.userId === currentUserId)
+    : false;
   const reporter = resolveIssueReporter(issue);
 
   return (
@@ -36,8 +44,18 @@ export function IssueSidebar({
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
-              <SidebarActions issue={issue} allUsers={allUsers} />
-              <WatchButton issueId={issue.id} initialIsWatching={isWatching} />
+              <SidebarActions
+                issue={issue}
+                allUsers={allUsers}
+                accessLevel={accessLevel}
+                ownershipContext={ownershipContext}
+              />
+              {accessLevel !== "unauthenticated" && (
+                <WatchButton
+                  issueId={issue.id}
+                  initialIsWatching={isWatching}
+                />
+              )}
             </div>
 
             {/* Watchers Count */}

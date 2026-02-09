@@ -39,6 +39,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
+import { type AccessLevel } from "~/lib/permissions/matrix";
 
 // ----------------------------------------------------------------------
 // Types
@@ -63,8 +64,8 @@ interface TimelineEvent {
 }
 
 interface UserContext {
-  currentUserId: string;
-  currentUserRole: string;
+  currentUserId: string | null;
+  currentUserRole: AccessLevel;
   currentUserInitials: string;
 }
 
@@ -348,8 +349,8 @@ function TimelineItem({
 
 interface IssueTimelineProps {
   issue: IssueWithAllRelations;
-  currentUserId: string;
-  currentUserRole: string;
+  currentUserId: string | null;
+  currentUserRole: AccessLevel;
   currentUserInitials: string;
 }
 
@@ -451,7 +452,16 @@ export function IssueTimeline({
             </Avatar>
           </div>
           <div className="flex-1 rounded-lg border bg-card p-6 shadow-sm">
-            <AddCommentForm issueId={issue.id} />
+            {currentUserRole === "unauthenticated" ? (
+              <div
+                className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/20 px-4 py-3 text-sm text-muted-foreground"
+                data-testid="login-to-comment"
+              >
+                Log in to comment
+              </div>
+            ) : (
+              <AddCommentForm issueId={issue.id} />
+            )}
           </div>
         </div>
       </div>
