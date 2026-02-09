@@ -19,16 +19,13 @@ interface MigrationJournal {
   entries: MigrationEntry[];
 }
 
-// Prefer non-pooled connections for DDL (Supabase Vercel integration standard names first)
+// Prefer non-pooled connections for DDL
 const connectionString =
-  process.env["POSTGRES_URL_NON_POOLING"] ??
-  process.env["DATABASE_URL"] ??
-  process.env["DIRECT_URL"] ??
-  process.env["POSTGRES_URL"];
+  process.env["POSTGRES_URL_NON_POOLING"] ?? process.env["POSTGRES_URL"];
 
 if (!connectionString) {
   console.error(
-    "❌ No database connection string found (checked POSTGRES_URL_NON_POOLING, DATABASE_URL, DIRECT_URL, POSTGRES_URL)"
+    "❌ No database connection string found (checked POSTGRES_URL_NON_POOLING, POSTGRES_URL)"
   );
   process.exit(1);
 }
@@ -112,7 +109,7 @@ async function main() {
           "   1. Identify which migration failed (check error above)"
         );
         console.error(
-          "   2. Run: DATABASE_URL=<url> tsx scripts/mark-migration-applied.ts <number>"
+          "   2. Run: POSTGRES_URL=<url> tsx scripts/mark-migration-applied.ts <number>"
         );
         console.error("   3. Redeploy to retry migrations");
         console.error(

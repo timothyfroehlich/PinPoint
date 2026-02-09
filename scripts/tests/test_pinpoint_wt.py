@@ -53,11 +53,11 @@ class TestParseEnvFile:
     def test_handles_values_with_equals(self, tmp_path: Path) -> None:
         """Test values containing = are preserved."""
         env_file = tmp_path / ".env.local"
-        env_file.write_text("DATABASE_URL=postgresql://user:pass@host:5432/db?sslmode=require\n")
+        env_file.write_text("POSTGRES_URL=postgresql://user:pass@host:5432/db?sslmode=require\n")
 
         result = parse_env_file(env_file)
 
-        assert result["DATABASE_URL"] == "postgresql://user:pass@host:5432/db?sslmode=require"
+        assert result["POSTGRES_URL"] == "postgresql://user:pass@host:5432/db?sslmode=require"
 
     def test_strips_whitespace(self, tmp_path: Path) -> None:
         """Test that whitespace is stripped from keys and values."""
@@ -114,7 +114,7 @@ class TestMergeEnvLocal:
         env_file.write_text(
             "NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321\n"
             "PORT=3000\n"
-            "DATABASE_URL=postgresql://postgres:postgres@localhost:54322/postgres\n"
+            "POSTGRES_URL=postgresql://postgres:postgres@localhost:54322/postgres\n"
         )
 
         result = merge_env_local(tmp_path, port_config)
@@ -124,8 +124,8 @@ class TestMergeEnvLocal:
         # New Next.js port = 3000 + 400 = 3400
         assert "PORT=3400" in result
         # New DB port = 54322 + 4000 = 58322
-        assert "DATABASE_URL=postgresql://postgres:postgres@localhost:58322/postgres" in result
-        assert "DIRECT_URL=postgresql://postgres:postgres@localhost:58322/postgres" in result
+        assert "POSTGRES_URL=postgresql://postgres:postgres@localhost:58322/postgres" in result
+        assert "POSTGRES_URL_NON_POOLING=postgresql://postgres:postgres@localhost:58322/postgres" in result
 
     def test_preserves_custom_variables(self, tmp_path: Path, port_config: PortConfig) -> None:
         """Test that user-added custom variables are preserved."""
@@ -193,8 +193,8 @@ class TestManagedAndUserKeys:
         """Test that managed keys include static Supabase keys."""
         expected_managed = {
             "NEXT_PUBLIC_SUPABASE_URL",
-            "DATABASE_URL",
-            "DIRECT_URL",
+            "POSTGRES_URL",
+            "POSTGRES_URL_NON_POOLING",
             "PORT",
             "NEXT_PUBLIC_SITE_URL",
             "EMAIL_TRANSPORT",

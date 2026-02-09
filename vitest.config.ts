@@ -15,8 +15,8 @@ export default defineConfig(({ mode }) => {
       setupFiles: ["./src/test/setup.ts"],
       env: {
         ...env,
-        // Ensure DATABASE_URL is available for integration tests
-        DATABASE_URL: env.DATABASE_URL || process.env.DATABASE_URL || "",
+        // Ensure POSTGRES_URL is available for integration tests
+        POSTGRES_URL: env.POSTGRES_URL || process.env.POSTGRES_URL || "",
       },
       coverage: {
         provider: "v8",

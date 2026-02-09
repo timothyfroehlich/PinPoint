@@ -41,7 +41,7 @@ schema_paths = []
 
 [db.seed]
 # Disabled - we use Drizzle for schema, so Supabase CLI can't manage seeds
-# We seed via npm script: `npm run db:seed` (uses psql + DIRECT_URL)
+# We seed via npm script: `npm run db:seed` (uses psql + POSTGRES_URL_NON_POOLING)
 enabled = false
 sql_paths = ["./seed.sql"]
 

@@ -123,7 +123,7 @@ conflicts across worktrees and force-push requirements on open PRs.
 ### Deployment Infrastructure
 
 - **Vercel Migrations**: Automatically runs `pnpm run migrate:production` on build.
-  - _Fix Stuck Migration_: `DATABASE_URL=<prod_url> tsx scripts/mark-migration-applied.ts <migration_number>`
+  - _Fix Stuck Migration_: `POSTGRES_URL=<prod_url> tsx scripts/mark-migration-applied.ts <migration_number>`
 - **Supabase Projects**:
   - `pinpoint-prod` (Live, Pro plan) - **Real user data. STRICT SAFETY.** Daily backups with 7-day retention.
   - Preview branches are auto-created per PR via Supabase GitHub integration.
@@ -137,7 +137,7 @@ conflicts across worktrees and force-push requirements on open PRs.
   - Local: `db:reset` allowed.
   - Prod: **NEVER** `db:reset`. ONLY `db:migrate`.
 - **Connection Requirements**:
-  - **Session Pooler (IPv4)**: Use `DATABASE_URL` (port `:6543`) for external connections. The `DIRECT_URL` (port `:5432`) uses IPv6 which may be unreachable from some environments.
+  - **Session Pooler (IPv4)**: Use `POSTGRES_URL` (port `:6543`) for external connections. The `POSTGRES_URL_NON_POOLING` (port `:5432`) uses IPv6 which may be unreachable from some environments.
   - Format: `postgresql://postgres.[project-ref]:password@aws-0-us-east-2.pooler.supabase.com:6543/postgres`
 
 ### Migration Conflict Resolution

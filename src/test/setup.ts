@@ -6,8 +6,8 @@
 
 import "@testing-library/jest-dom/vitest";
 
-// Ensure DATABASE_URL is set for tests to avoid db/index.ts throwing error
-process.env.DATABASE_URL ??= "postgres://postgres:postgres@localhost:5432/test";
+// Ensure POSTGRES_URL is set for tests to avoid db/index.ts throwing error
+process.env.POSTGRES_URL ??= "postgres://postgres:postgres@localhost:5432/test";
 
 // Mock ResizeObserver
 if (typeof window !== "undefined") {
