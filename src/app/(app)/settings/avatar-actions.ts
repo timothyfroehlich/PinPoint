@@ -142,13 +142,25 @@ export async function uploadAvatarAction(
       });
       oldAvatarUrl = currentProfile?.avatarUrl ?? null;
 
-      await db
+      const updated = await db
         .update(userProfiles)
         .set({
           avatarUrl: blob.url,
           updatedAt: new Date(),
         })
-        .where(eq(userProfiles.id, user.id));
+        .where(eq(userProfiles.id, user.id))
+        .returning({ id: userProfiles.id });
+
+      if (updated.length === 0) {
+        log.error(
+          { userId: user.id, blobPathname: uploadedBlobPathname },
+          "Avatar update matched 0 rows — profile missing, cleaning up blob"
+        );
+        if (uploadedBlobPathname) {
+          await deleteFromBlob(uploadedBlobPathname);
+        }
+        return err("DATABASE", "User profile not found.");
+      }
     } catch (dbErr) {
       log.error(
         {

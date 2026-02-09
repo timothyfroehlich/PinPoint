@@ -26,7 +26,8 @@ vi.mock("~/lib/rate-limit", () => ({
 }));
 
 const mockFindFirst = vi.fn();
-const mockDbUpdateWhere = vi.fn(() => Promise.resolve());
+const mockDbReturning = vi.fn(() => Promise.resolve([{ id: "test-user" }]));
+const mockDbUpdateWhere = vi.fn(() => ({ returning: mockDbReturning }));
 const mockDbUpdateSet = vi.fn(() => ({ where: mockDbUpdateWhere }));
 const mockDbUpdate = vi.fn(() => ({ set: mockDbUpdateSet }));
 
@@ -291,13 +292,34 @@ describe("uploadAvatarAction", () => {
     );
   });
 
+  it("should clean up blob and return DATABASE if profile row is missing", async () => {
+    authenticateUser();
+    passRateLimit();
+    mockBlobUpload();
+    mockProfileLookup(null);
+    mockDbReturning.mockResolvedValueOnce([]);
+
+    const result = await uploadAvatarAction(makeAvatarFormData(validFile()));
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("DATABASE");
+      expect(result.message).toContain("not found");
+    }
+    expect(blobClient.deleteFromBlob).toHaveBeenCalledWith(
+      "avatars/test-user/123-test.jpg"
+    );
+  });
+
   it("should clean up uploaded blob if DB update fails", async () => {
     authenticateUser();
     passRateLimit();
     mockBlobUpload();
     mockProfileLookup(null);
     mockDbUpdateSet.mockImplementationOnce(() => ({
-      where: vi.fn().mockRejectedValue(new Error("DB Error")),
+      where: vi.fn(() => ({
+        returning: vi.fn().mockRejectedValue(new Error("DB Error")),
+      })),
     }));
 
     const result = await uploadAvatarAction(makeAvatarFormData(validFile()));
