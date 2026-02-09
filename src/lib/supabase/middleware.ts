@@ -18,8 +18,6 @@ export async function updateSession(
   });
 
   const {
-    NEXT_PUBLIC_SUPABASE_URL: supabaseUrl,
-    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: supabaseKey,
     VERCEL_ENV,
     NODE_ENV,
     DEV_AUTOLOGIN_ENABLED,
@@ -27,10 +25,20 @@ export async function updateSession(
     DEV_AUTOLOGIN_PASSWORD,
   } = process.env;
 
+  // NEXT_PUBLIC_SUPABASE_URL is set by both local dev and the Vercel integration
+  // SUPABASE_URL is the server-side variant (also set by the integration)
+  const supabaseUrl =
+    process.env["NEXT_PUBLIC_SUPABASE_URL"] ?? process.env["SUPABASE_URL"];
+  // Supabase renamed anon_key → publishable_key; support both for compatibility
+  const supabaseKey =
+    process.env["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"] ??
+    process.env["SUPABASE_PUBLISHABLE_KEY"] ??
+    process.env["SUPABASE_ANON_KEY"];
+
   if (!supabaseUrl || !supabaseKey) {
     // Fail fast with a clear error during development/misconfiguration
     throw new Error(
-      "Missing Supabase env vars: ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY are set."
+      "Missing Supabase env vars: set NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL) and one of NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, SUPABASE_PUBLISHABLE_KEY, or SUPABASE_ANON_KEY."
     );
   }
 
