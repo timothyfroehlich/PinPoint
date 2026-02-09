@@ -5,7 +5,7 @@ import fs from "fs/promises";
 import { log } from "~/lib/logger";
 
 function shouldUseMockBlobStorage(): boolean {
-  if (shouldUseMockBlobStorage()) {
+  if (process.env["MOCK_BLOB_STORAGE"] === "true") {
     return true;
   }
 
