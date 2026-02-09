@@ -118,7 +118,10 @@ export async function updateSession(
     path.startsWith("/report") ||
     path.startsWith("/dashboard") ||
     path.startsWith("/help") ||
-    path.startsWith("/api");
+    path.startsWith("/api") ||
+    path === "/privacy" ||
+    path === "/terms" ||
+    path === "/roadmap";
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();

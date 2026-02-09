@@ -19,9 +19,11 @@ import { canEditIssueTitle } from "~/lib/permissions";
 import { EditableIssueTitle } from "./editable-issue-title";
 
 /**
- * Issue Detail Page (Protected Route)
+ * Issue Detail Page (Public Route)
  *
  * Displays issue details, timeline, and update actions.
+ * Unauthenticated users can view issue details in read-only mode.
+ * Authenticated users see the full timeline and sidebar controls.
  */
 export default async function IssueDetailPage({
   params,
@@ -34,16 +36,12 @@ export default async function IssueDetailPage({
   // Read user preferences from cookies
   const issuesPath = await getLastIssuesPath();
 
-  // Auth guard
+  // Auth check - user may be null (public route)
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    const next = encodeURIComponent(`/m/${initials}/i/${issueNumber}`);
-    redirect(`/login?next=${next}`);
-  }
   const issueNum = parseInt(issueNumber, 10);
 
   if (isNaN(issueNum) || issueNum < 1) {
@@ -139,20 +137,24 @@ export default async function IssueDetailPage({
         invitedReportedBy: true,
       },
     }),
-    // Fetch all members/admins for assignment dropdown (Restrict to actual users)
-    db
-      .select({
-        id: userProfiles.id,
-        name: userProfiles.name,
-      })
-      .from(userProfiles)
-      .where(notInArray(userProfiles.role, ["guest"]))
-      .orderBy(asc(userProfiles.name)),
-    // Fetch current user's profile for timeline permissions
-    db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, user.id),
-      columns: { name: true, role: true },
-    }),
+    // Fetch all members/admins for assignment dropdown (only when authenticated)
+    user
+      ? db
+          .select({
+            id: userProfiles.id,
+            name: userProfiles.name,
+          })
+          .from(userProfiles)
+          .where(notInArray(userProfiles.role, ["guest"]))
+          .orderBy(asc(userProfiles.name))
+      : Promise.resolve([]),
+    // Fetch current user's profile for timeline permissions (only when authenticated)
+    user
+      ? db.query.userProfiles.findFirst({
+          where: eq(userProfiles.id, user.id),
+          columns: { name: true, role: true },
+        })
+      : Promise.resolve(undefined),
   ]);
 
   if (!issue) {
@@ -163,11 +165,13 @@ export default async function IssueDetailPage({
   const issueWithRelations = issue as unknown as IssueWithAllRelations;
   const ownerName = getMachineOwnerName(issueWithRelations);
 
-  // Compute title edit permission
-  const userCanEditTitle = canEditIssueTitle(
-    { id: user.id, role: currentUserProfile?.role ?? "guest" },
-    { reportedBy: issue.reportedBy, assignedTo: issue.assignedTo }
-  );
+  // Compute title edit permission (unauthenticated users cannot edit)
+  const userCanEditTitle = user
+    ? canEditIssueTitle(
+        { id: user.id, role: currentUserProfile?.role ?? "guest" },
+        { reportedBy: issue.reportedBy, assignedTo: issue.assignedTo }
+      )
+    : false;
 
   return (
     <PageShell className="space-y-8" size="wide">
@@ -245,21 +249,30 @@ export default async function IssueDetailPage({
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
             Activity
           </h2>
-          <IssueTimeline
-            issue={issueWithRelations}
-            currentUserId={user.id}
-            currentUserRole={currentUserProfile?.role ?? "guest"}
-            currentUserInitials={
-              currentUserProfile?.name.slice(0, 2).toUpperCase() ?? "ME"
-            }
-          />
+          {user ? (
+            <IssueTimeline
+              issue={issueWithRelations}
+              currentUserId={user.id}
+              currentUserRole={currentUserProfile?.role ?? "guest"}
+              currentUserInitials={
+                currentUserProfile?.name.slice(0, 2).toUpperCase() ?? "ME"
+              }
+            />
+          ) : (
+            <IssueTimeline
+              issue={issueWithRelations}
+              currentUserId=""
+              currentUserRole="unauthenticated"
+              currentUserInitials=""
+            />
+          )}
         </section>
 
         {/* Sticky Sidebar */}
         <IssueSidebar
           issue={issueWithRelations}
           allUsers={allUsers}
-          currentUserId={user.id}
+          currentUserId={user?.id ?? ""}
         />
       </div>
     </PageShell>
