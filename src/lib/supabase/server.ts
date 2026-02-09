@@ -25,16 +25,18 @@ import { cookies } from "next/headers";
 export async function createClient(): Promise<SupabaseClient> {
   const cookieStore = await cookies();
 
-  // Fall back to Supabase Vercel integration env var names for preview deployments
+  // Use standard Supabase env var names (set by Vercel integration on preview deployments)
+  // Fall back to legacy PinPoint names for local dev until env var rename is complete
   const supabaseUrl =
     process.env["NEXT_PUBLIC_SUPABASE_URL"] ?? process.env["SUPABASE_URL"];
   const supabaseKey =
-    process.env["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"] ??
-    process.env["SUPABASE_ANON_KEY"];
+    process.env["NEXT_PUBLIC_SUPABASE_ANON_KEY"] ??
+    process.env["SUPABASE_ANON_KEY"] ??
+    process.env["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"];
 
   if (!supabaseUrl || !supabaseKey) {
     throw new Error(
-      "Missing Supabase env vars: ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY are set."
+      "Missing Supabase env vars: ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set."
     );
   }
 

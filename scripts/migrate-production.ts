@@ -19,17 +19,16 @@ interface MigrationJournal {
   entries: MigrationEntry[];
 }
 
-// Vercel uses POSTGRES_URL or DATABASE_URL, Supabase uses DIRECT_URL
-// Supabase Vercel integration also sets POSTGRES_URL_NON_POOLING (non-pooled, needed for DDL)
+// Prefer non-pooled connections for DDL (Supabase Vercel integration standard names first)
 const connectionString =
+  process.env["POSTGRES_URL_NON_POOLING"] ??
   process.env["DATABASE_URL"] ??
   process.env["DIRECT_URL"] ??
-  process.env["POSTGRES_URL_NON_POOLING"] ??
   process.env["POSTGRES_URL"];
 
 if (!connectionString) {
   console.error(
-    "❌ No database connection string found (checked DATABASE_URL, DIRECT_URL, POSTGRES_URL_NON_POOLING, POSTGRES_URL)"
+    "❌ No database connection string found (checked POSTGRES_URL_NON_POOLING, DATABASE_URL, DIRECT_URL, POSTGRES_URL)"
   );
   process.exit(1);
 }
