@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock @vercel/blob
 const mockList = vi.fn();
@@ -21,6 +21,13 @@ vi.mock("~/lib/logger", () => ({
   log: {
     info: vi.fn(),
     error: vi.fn(),
+  },
+}));
+
+// Mock blob config
+vi.mock("~/lib/blob/config", () => ({
+  BLOB_CONFIG: {
+    SOFT_DELETE_RETENTION_HOURS: 24,
   },
 }));
 
@@ -54,6 +61,10 @@ describe("cleanupOrphanedBlobs", () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2025-06-15T12:00:00Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("returns zero counts when storage is empty", async () => {

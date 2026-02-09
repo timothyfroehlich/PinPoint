@@ -3,9 +3,11 @@ import { db } from "~/server/db";
 import { userProfiles, issueImages } from "~/server/db/schema";
 import { sql } from "drizzle-orm";
 import { log } from "~/lib/logger";
+import { BLOB_CONFIG } from "~/lib/blob/config";
 
 /** Blobs older than this threshold are eligible for cleanup. */
-const GRACE_PERIOD_MS = 24 * 60 * 60 * 1000; // 24 hours
+const GRACE_PERIOD_MS =
+  BLOB_CONFIG.SOFT_DELETE_RETENTION_HOURS * 60 * 60 * 1000;
 
 export interface CleanupResult {
   /** Total blobs found in storage */
