@@ -65,8 +65,8 @@ export default withSentryConfig(nextConfig, {
   org: "pinpoint-nc",
   project: "pinpoint",
 
-  // Only print logs for uploading source maps in CI
-  silent: !process.env["CI"],
+  // Source maps still upload to Sentry; silent only suppresses verbose CLI output
+  silent: true,
 
   // Upload a larger set of source maps for prettier stack traces (increases build time)
   widenClientFileUpload: true,

@@ -24,20 +24,18 @@ applyTo: "**/*auth*.ts,**/middleware.ts,src/lib/supabase/**/*.ts,src/app/(auth)/
 // src/lib/supabase/server.ts
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { getSupabaseEnv } from "~/lib/supabase/env";
 
 export async function createClient() {
   const cookieStore = cookies();
-  const client = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    {
-      cookies: {
-        getAll: () => cookieStore.getAll(),
-        setAll: (pairs) =>
-          pairs.forEach((p) => cookieStore.set(p.name, p.value, p.options)),
-      },
-    }
-  );
+  const { url, publishableKey } = getSupabaseEnv();
+  const client = createServerClient(url, publishableKey, {
+    cookies: {
+      getAll: () => cookieStore.getAll(),
+      setAll: (pairs) =>
+        pairs.forEach((p) => cookieStore.set(p.name, p.value, p.options)),
+    },
+  });
   await client.auth.getUser(); // REQUIRED immediate call
   return client;
 }

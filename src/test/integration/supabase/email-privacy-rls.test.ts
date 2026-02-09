@@ -14,12 +14,14 @@ import { withUserContext } from "~/server/db/utils/rls";
  * 3. Anonymous users cannot see any emails.
  */
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey || !serviceRoleKey) {
-  throw new Error("Missing Supabase env vars for RLS tests");
+  throw new Error(
+    "Missing Supabase env vars for RLS tests: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, SUPABASE_SERVICE_ROLE_KEY."
+  );
 }
 
 const adminClient = createClient(supabaseUrl, serviceRoleKey);
@@ -43,7 +45,10 @@ describe("Email Privacy RLS Integration", () => {
         role: "admin", // CRITICAL: Used by get_my_role()
       },
     });
-    adminUser = { id: adminData.user!.id, email: adminEmail };
+    if (!adminData.user) {
+      throw new Error("Expected admin user to be created");
+    }
+    adminUser = { id: adminData.user.id, email: adminEmail };
 
     // Also sync to user_profiles table for foreign keys and view consistency
     await adminClient
@@ -63,7 +68,10 @@ describe("Email Privacy RLS Integration", () => {
         role: "member", // CRITICAL: Used by get_my_role()
       },
     });
-    memberUser = { id: memberData.user!.id, email: memberEmail };
+    if (!memberData.user) {
+      throw new Error("Expected member user to be created");
+    }
+    memberUser = { id: memberData.user.id, email: memberEmail };
 
     // 3. Create a client authenticated as the member
     memberClient = createClient(supabaseUrl, supabaseAnonKey);
@@ -187,7 +195,10 @@ describe("Email Privacy RLS Integration", () => {
           role: "admin", // JWT claims admin...
         },
       });
-      spoofedUser = { id: data.user!.id, email: spoofedEmail };
+      if (!data.user) {
+        throw new Error("Expected spoofed user to be created");
+      }
+      spoofedUser = { id: data.user.id, email: spoofedEmail };
 
       // Force user_profiles.role to 'member' — this is the source of truth
       await adminClient
@@ -245,10 +256,9 @@ describe("Email Privacy RLS Integration", () => {
         }
       );
 
-      // Admin should see all emails
-      const profilesWithEmails = profiles.filter((p: any) => p.email !== null);
-      expect(profilesWithEmails.length).toBe(profiles.length);
-      expect(profilesWithEmails.length).toBeGreaterThan(0);
+      // Admin should see emails on all profiles.
+      expect(profiles.length).toBeGreaterThan(0);
+      expect(profiles.every((p) => p.email.length > 0)).toBe(true);
     });
 
     it("should show only own email with member context", async () => {
@@ -263,7 +273,7 @@ describe("Email Privacy RLS Integration", () => {
       // Member should see all profiles but only their own email
       expect(profiles.length).toBeGreaterThan(1);
 
-      const ownProfile = profiles.find((p: any) => p.id === memberUser.id);
+      const ownProfile = profiles.find((p) => p.id === memberUser.id);
       expect(ownProfile?.email).toBe(memberUser.email);
 
       // Note: RLS on SELECT * from a table doesn't mask columns - it filters ROWS.
@@ -279,7 +289,10 @@ describe("Email Privacy RLS Integration", () => {
         { id: adminUser.id, role: "admin" },
         async (tx: Tx) => {
           const setting = await tx.execute(
-            sql`SELECT current_setting('request.user_id', true) as user_id,
+            sql<{
+              user_id: string | null;
+              user_role: string | null;
+            }>`SELECT current_setting('request.user_id', true) as user_id,
                        current_setting('request.user_role', true) as user_role`
           );
           return setting;
@@ -292,7 +305,10 @@ describe("Email Privacy RLS Integration", () => {
         { id: memberUser.id, role: "member" },
         async (tx: Tx) => {
           const setting = await tx.execute(
-            sql`SELECT current_setting('request.user_id', true) as user_id,
+            sql<{
+              user_id: string | null;
+              user_role: string | null;
+            }>`SELECT current_setting('request.user_id', true) as user_id,
                        current_setting('request.user_role', true) as user_role`
           );
           return setting;
@@ -302,20 +318,16 @@ describe("Email Privacy RLS Integration", () => {
       // Verify each transaction has its own isolated context
       expect(result1).toBeDefined();
       expect(result2).toBeDefined();
-      // Result from execute() in Drizzle with postgres.js is an array of rows
-      const row1 = result1 as unknown as {
-        user_id: string;
-        user_role: string;
-      }[];
-      const row2 = result2 as unknown as {
-        user_id: string;
-        user_role: string;
-      }[];
 
-      expect(row1[0]?.user_id).toBe(adminUser.id);
-      expect(row1[0]?.user_role).toBe("admin");
-      expect(row2[0]?.user_id).toBe(memberUser.id);
-      expect(row2[0]?.user_role).toBe("member");
+      expect(result1.length).toBeGreaterThan(0);
+      expect(result2.length).toBeGreaterThan(0);
+
+      const row1 = result1[0];
+      const row2 = result2[0];
+      expect(row1.user_id).toBe(adminUser.id);
+      expect(row1.user_role).toBe("admin");
+      expect(row2.user_id).toBe(memberUser.id);
+      expect(row2.user_role).toBe("member");
     });
 
     it("should mask emails in public_profiles_view for non-admins", async () => {
@@ -323,23 +335,23 @@ describe("Email Privacy RLS Integration", () => {
         db,
         { id: memberUser.id, role: "member" },
         async (tx: Tx) => {
-          return tx.execute(sql`SELECT id, email FROM public_profiles_view`);
+          return tx.execute(
+            sql<{
+              id: string;
+              email: string | null;
+            }>`SELECT id, email FROM public_profiles_view`
+          );
         }
       );
 
-      const rows = profiles as unknown as {
-        id: string;
-        email: string | null;
-      }[];
-
       // Should see own email
-      const ownProfile = rows.find((p) => p.id === memberUser.id);
+      const ownProfile = profiles.find((p) => p.id === memberUser.id);
       expect(ownProfile?.email).toBe(memberUser.email);
 
       // Should NOT see other emails (except possibly other members/admins if they are also the same user, but they aren't here)
-      const otherProfiles = rows.filter((p: any) => p.id !== memberUser.id);
+      const otherProfiles = profiles.filter((p) => p.id !== memberUser.id);
       expect(otherProfiles.length).toBeGreaterThan(0);
-      otherProfiles.forEach((profile: any) => {
+      otherProfiles.forEach((profile) => {
         expect(profile.email).toBeNull();
       });
     });
@@ -349,20 +361,20 @@ describe("Email Privacy RLS Integration", () => {
         db,
         { id: adminUser.id, role: "admin" },
         async (tx: Tx) => {
-          return tx.execute(sql`SELECT id, email FROM public_profiles_view`);
+          return tx.execute(
+            sql<{
+              id: string;
+              email: string | null;
+            }>`SELECT id, email FROM public_profiles_view`
+          );
         }
       );
 
-      const rows = profiles as unknown as {
-        id: string;
-        email: string | null;
-      }[];
-
       // Admin should see emails for our test users (other users in DB may not have emails)
-      const testUsers = rows.filter(
+      const testUsers = profiles.filter(
         (r) => r.id === adminUser.id || r.id === memberUser.id
       );
-      testUsers.forEach((u: any) => expect(u.email).not.toBeNull());
+      testUsers.forEach((u) => expect(u.email).not.toBeNull());
     });
   });
 });

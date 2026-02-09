@@ -9,6 +9,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import { type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
+import { getSupabaseEnv } from "~/lib/supabase/env";
 import { getSiteUrl, isInternalUrl } from "~/lib/url";
 
 export function resolveRedirectPath(nextParam: string | null): string {
@@ -146,14 +147,7 @@ function createSupabaseClient(request: NextRequest): {
   supabase: ReturnType<typeof createServerClient>;
   pendingCookies: { name: string; value: string; options?: CookieOptions }[];
 } {
-  const supabaseUrl = process.env["NEXT_PUBLIC_SUPABASE_URL"];
-  const supabaseKey = process.env["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"];
-
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error(
-      "Missing Supabase env vars: ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY are set."
-    );
-  }
+  const { url: supabaseUrl, publishableKey: supabaseKey } = getSupabaseEnv();
 
   const pendingCookies: {
     name: string;

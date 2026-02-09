@@ -34,7 +34,7 @@ Use this template when dispatching subagents to work in worktrees.
 
 ### Environment Setup
 
-If tests fail with `DATABASE_URL is not set`:
+If tests fail with `POSTGRES_URL is not set`:
 - The worktree is missing `.env.local` (orchestrator setup issue, not your problem)
 - Verify your changes pass typecheck and lint: `pnpm exec tsc --noEmit && pnpm exec eslint .`
 - CI will have proper env vars - proceed with commit if typecheck/lint pass

@@ -80,7 +80,7 @@ jobs:
           # Override POSTGRES_URL_NON_POOLING too since drizzle.config.ts
           # prefers it for directUrl.
           DRIZZLE_FORCE_PRODUCTION=1 \
-          DATABASE_URL="$POSTGRES_URL" \
+          POSTGRES_URL="$POSTGRES_URL" \
           POSTGRES_URL_NON_POOLING="$POSTGRES_URL" \
             pnpm exec drizzle-kit migrate
 
@@ -91,5 +91,5 @@ jobs:
         run: |
           NEXT_PUBLIC_SUPABASE_URL="$SUPABASE_URL" \
           SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY" \
-          DATABASE_URL="$POSTGRES_URL" \
+          POSTGRES_URL="$POSTGRES_URL" \
             node supabase/seed-users.mjs

@@ -1,10 +1,10 @@
 import postgres from "postgres";
 
-// Use DATABASE_URL (session pooler with IPv4 support) instead of DIRECT_URL (IPv6)
-const databaseUrl = process.env.DATABASE_URL;
+// Use POSTGRES_URL (session pooler with IPv4 support) instead of POSTGRES_URL_NON_POOLING (IPv6)
+const databaseUrl = process.env.POSTGRES_URL;
 
 if (!databaseUrl) {
-  console.error("❌ DATABASE_URL is not defined");
+  console.error("❌ POSTGRES_URL is not defined");
   process.exit(1);
 }
 

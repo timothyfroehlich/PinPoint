@@ -36,31 +36,32 @@ set -a
 source "$ENV_FILE"
 set +a
 
-if [ -z "$DATABASE_URL" ]; then
-  echo "Error: DATABASE_URL not found in $ENV_FILE"
+if [ -z "$POSTGRES_URL" ]; then
+  echo "Error: POSTGRES_URL not found in $ENV_FILE"
   exit 1
 fi
 
-# Extract password from DATABASE_URL using Node.js for safety
-DB_PASSWORD=$(node -e 'try { console.log(new URL(process.env.DATABASE_URL).password) } catch (e) { console.error(e); process.exit(1) }')
+# Extract password from POSTGRES_URL using Node.js for safety
+DB_PASSWORD=$(node -e 'try { console.log(new URL(process.env.POSTGRES_URL).password) } catch (e) { console.error(e); process.exit(1) }')
 
 if [ -z "$DB_PASSWORD" ]; then
-  echo "Error: Could not extract password from DATABASE_URL"
+  echo "Error: Could not extract password from POSTGRES_URL"
   exit 1
 fi
 
 # Construct new Session Pool URL
-# User requested specific host: aws-0-us-east-2.pooler.supabase.com:5432
-DATABASE_URL="postgresql://postgres.gjmpvmelowpgsveupbcy:${DB_PASSWORD}@aws-0-us-east-2.pooler.supabase.com:5432/postgres"
+# User requested specific host: aws-0-us-east-2.pooler.supabase.com:6543
+POSTGRES_URL="postgresql://postgres.gjmpvmelowpgsveupbcy:${DB_PASSWORD}@aws-0-us-east-2.pooler.supabase.com:6543/postgres"
 
-# Also update DIRECT_URL to match, just in case
-export DATABASE_URL
-export DIRECT_URL="$DATABASE_URL"
+# Preview branches only expose the session pooler (no direct connection available),
+# so POSTGRES_URL_NON_POOLING intentionally uses the same pooler URL here.
+export POSTGRES_URL
+export POSTGRES_URL_NON_POOLING="$POSTGRES_URL"
 
 # Confirm before proceeding
 if [ "$SKIP_CONFIRM" = false ]; then
   echo "⚠️  WARNING: This will DESTROY all data in the database!"
-  echo "Database: $(echo $DATABASE_URL | sed -E 's/(:\/\/[^:]+:)[^@]+(@)/\1***\2/')"
+  echo "Database: $(echo $POSTGRES_URL | sed -E 's/(:\/\/[^:]+:)[^@]+(@)/\1***\2/')"
   echo ""
   read -p "Are you sure? (yes/no): " confirm
 
@@ -70,20 +71,20 @@ if [ "$SKIP_CONFIRM" = false ]; then
   fi
 else
   echo "⚠️  Skipping confirmation (--yes flag provided)"
-  echo "Database: $(echo $DATABASE_URL | sed -E 's/(:\/\/[^:]+:)[^@]+(@)/\1***\2/')"
+  echo "Database: $(echo $POSTGRES_URL | sed -E 's/(:\/\/[^:]+:)[^@]+(@)/\1***\2/')"
 fi
 
 echo ""
 echo "1️⃣  Dropping and recreating schema..."
-# Use Session Mode pooler (already IPv4-compatible)
-psql "$DATABASE_URL" -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres; GRANT ALL ON SCHEMA public TO public;" 2>&1 | grep -v "^NOTICE:" | grep -v "^DETAIL:" || true
+# Use session pooler URL (already IPv4-compatible)
+psql "$POSTGRES_URL" -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres; GRANT ALL ON SCHEMA public TO public;" 2>&1 | grep -v "^NOTICE:" | grep -v "^DETAIL:" || true
 
 # Verify schema is empty
 echo "   Verifying schema is empty..."
-TABLE_COUNT=$(psql "$DATABASE_URL" -t -c "SELECT COUNT(*) FROM pg_tables WHERE schemaname = 'public';" | tr -d ' ')
+TABLE_COUNT=$(psql "$POSTGRES_URL" -t -c "SELECT COUNT(*) FROM pg_tables WHERE schemaname = 'public';" | tr -d ' ')
 if [ "$TABLE_COUNT" -ne 0 ]; then
   echo "   ⚠️  Warning: Found $TABLE_COUNT tables after schema drop. Attempting to drop them individually..."
-  psql "$DATABASE_URL" -c "
+  psql "$POSTGRES_URL" -c "
     DO \$\$
     DECLARE
       r RECORD;
@@ -99,16 +100,16 @@ echo "✅ Schema reset"
 
 # Clear drizzle migration tracking (survives schema drop since it's in drizzle schema)
 echo "   Clearing drizzle migration tracking..."
-psql "$DATABASE_URL" -c "DELETE FROM drizzle.__drizzle_migrations;" 2>&1 | grep -v "^NOTICE:" | grep -v "^DETAIL:" || true
+psql "$POSTGRES_URL" -c "DELETE FROM drizzle.__drizzle_migrations;" 2>&1 | grep -v "^NOTICE:" | grep -v "^DETAIL:" || true
 
 echo ""
 echo "2️⃣  Applying schema with drizzle-kit migrations..."
-# Uses DIRECT_URL from env (Session Mode pooler, IPv4-compatible)
+# Uses POSTGRES_URL_NON_POOLING from env (direct/non-pooled connection for DDL)
 pnpm exec drizzle-kit migrate
 
 # Verify tables were created
 echo "   Verifying tables were created..."
-TABLE_COUNT=$(psql "$DATABASE_URL" -t -c "SELECT COUNT(*) FROM pg_tables WHERE schemaname = 'public';" | tr -d ' ')
+TABLE_COUNT=$(psql "$POSTGRES_URL" -t -c "SELECT COUNT(*) FROM pg_tables WHERE schemaname = 'public';" | tr -d ' ')
 echo "   Found $TABLE_COUNT tables in public schema"
 if [ "$TABLE_COUNT" -eq 0 ]; then
   echo "   ❌ Error: No tables created by drizzle-kit migrate!"
@@ -118,7 +119,7 @@ echo "✅ Schema pushed"
 
 echo ""
 echo "3️⃣  Running SQL seed..."
-psql "$DATABASE_URL" -f supabase/seed.sql 2>&1 | grep -v "^NOTICE:" | grep -v "^DETAIL:" || true
+psql "$POSTGRES_URL" -f supabase/seed.sql 2>&1 | grep -v "^NOTICE:" | grep -v "^DETAIL:" || true
 echo "✅ SQL seed complete"
 
 echo ""

@@ -54,13 +54,13 @@ class TestParseEnvFile:
         """Test values containing = are preserved."""
         env_file = tmp_path / ".env.local"
         env_file.write_text(
-            "DATABASE_URL=postgresql://user:pass@host:5432/db?sslmode=require\n"
+            "POSTGRES_URL=postgresql://user:pass@host:5432/db?sslmode=require\n"
         )
 
         result = parse_env_file(env_file)
 
         assert (
-            result["DATABASE_URL"]
+            result["POSTGRES_URL"]
             == "postgresql://user:pass@host:5432/db?sslmode=require"
         )
 
@@ -124,7 +124,7 @@ class TestMergeEnvLocal:
         env_file.write_text(
             "NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321\n"
             "PORT=3000\n"
-            "DATABASE_URL=postgresql://postgres:postgres@localhost:54322/postgres\n"
+            "POSTGRES_URL=postgresql://postgres:postgres@localhost:54322/postgres\n"
         )
 
         result = merge_env_local(tmp_path, port_config)
@@ -135,11 +135,11 @@ class TestMergeEnvLocal:
         assert "PORT=3400" in result
         # New DB port = 54322 + 4000 = 58322
         assert (
-            "DATABASE_URL=postgresql://postgres:postgres@localhost:58322/postgres"
+            "POSTGRES_URL=postgresql://postgres:postgres@localhost:58322/postgres"
             in result
         )
         assert (
-            "DIRECT_URL=postgresql://postgres:postgres@localhost:58322/postgres"
+            "POSTGRES_URL_NON_POOLING=postgresql://postgres:postgres@localhost:58322/postgres"
             in result
         )
 
@@ -216,8 +216,8 @@ class TestManagedAndUserKeys:
         """Test that managed keys include static Supabase keys."""
         expected_managed = {
             "NEXT_PUBLIC_SUPABASE_URL",
-            "DATABASE_URL",
-            "DIRECT_URL",
+            "POSTGRES_URL",
+            "POSTGRES_URL_NON_POOLING",
             "PORT",
             "NEXT_PUBLIC_SITE_URL",
             "EMAIL_TRANSPORT",

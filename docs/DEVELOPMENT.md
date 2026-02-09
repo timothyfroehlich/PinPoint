@@ -152,7 +152,7 @@ For preview and production, we use **Automated Migrations** via Vercel build hoo
 2. **Automated Deployment**:
    - When you push to Vercel (Preview or Production), the build pipeline automatically runs `pnpm run migrate:production` via the `vercel-build` script.
    - This applies pending migrations _before_ the new code is built and deployed.
-   - Requires `DATABASE_URL` (or `DIRECT_URL` / `POSTGRES_URL`) to be set in the Vercel environment.
+   - Requires `POSTGRES_URL` (or `POSTGRES_URL_NON_POOLING`) to be set in the Vercel environment.
 
 3. **Migration State Mismatch (Troubleshooting)**:
 
@@ -163,7 +163,7 @@ For preview and production, we use **Automated Migrations** via Vercel build hoo
    ```bash
    # 1. Identify the failed migration number from Vercel build logs
    # 2. Mark it as applied (replace 0001 with actual migration number):
-   DATABASE_URL=<production-url> tsx scripts/mark-migration-applied.ts 0001
+   POSTGRES_URL=<production-url> tsx scripts/mark-migration-applied.ts 0001
 
    # 3. Trigger a redeployment (push a trivial change or use Vercel UI)
    ```
