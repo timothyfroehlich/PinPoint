@@ -18,7 +18,7 @@ describe("Mailpit Integration", () => {
 
   beforeAll(() => {
     // Ensure we're testing against local Mailpit (static: 54xxx-57xxx, ephemeral: 58xxx-63xxx)
-    expect(mailpitPort).toMatch(/[5-6]\d{4}/);
+    expect(mailpitPort).toMatch(/^(5[4-9]\d{3}|6[0-3]\d{3})$/);
   });
 
   it("should be accessible on configured port", async () => {

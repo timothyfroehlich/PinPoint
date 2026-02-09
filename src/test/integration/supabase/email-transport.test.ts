@@ -43,7 +43,7 @@ describe("Email Transport Integration", () => {
       mailpitApiUrl = `http://127.0.0.1:${mailpitApiPort}/api/v1`;
 
       // Static worktrees: 54xxx-57xxx, ephemeral worktrees: 58xxx-63xxx
-      expect(mailpitApiPort).toMatch(/[5-6]\d{4}/);
+      expect(mailpitApiPort).toMatch(/^(5[4-9]\d{3}|6[0-3]\d{3})$/);
     })();
   });
 
