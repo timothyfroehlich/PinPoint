@@ -166,8 +166,10 @@ test.describe("Issues System", () => {
       await expect(sidebar.getByText("Created", { exact: true })).toBeVisible();
 
       // Should show status and severity badges
-      await expect(page.getByTestId("issue-status-badge")).toHaveText(/New/i);
-      await expect(page.getByTestId("issue-severity-badge")).toHaveText(
+      await expect(page.getByTestId("issue-status-badge").first()).toHaveText(
+        /New/i
+      );
+      await expect(page.getByTestId("issue-severity-badge").first()).toHaveText(
         /Minor/i
       );
 
@@ -210,7 +212,10 @@ test.describe("Issues System", () => {
       ).toBeVisible();
 
       // Find the assignee picker - initially shows "Unassigned"
-      const assigneePicker = page.getByTestId("assignee-picker-trigger");
+      const assigneePicker = page
+        .getByTestId("issue-sidebar")
+        .getByTestId("assignee-picker-trigger")
+        .first();
       await expect(assigneePicker).toBeVisible();
       await expect(assigneePicker).toContainText("Unassigned");
 
@@ -223,9 +228,12 @@ test.describe("Issues System", () => {
 
       // Reload page to verify persistence
       await page.reload();
-      await expect(page.getByTestId("assignee-picker-trigger")).toContainText(
-        "Member User"
-      );
+      await expect(
+        page
+          .getByTestId("issue-sidebar")
+          .getByTestId("assignee-picker-trigger")
+          .first()
+      ).toContainText("Member User");
     });
   });
 });

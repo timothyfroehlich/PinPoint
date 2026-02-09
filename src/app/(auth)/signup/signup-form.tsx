@@ -172,7 +172,8 @@ export function SignupForm({
           <Link
             href="/terms"
             target="_blank"
-            className="text-link hover:underline"
+            rel="noopener noreferrer"
+            className="text-link"
           >
             Terms of Service
           </Link>

@@ -21,6 +21,10 @@ if [ $# -lt 1 ]; then
 fi
 
 PR=$1
+if ! [[ "$PR" =~ ^[0-9]+$ ]]; then
+    echo "Error: PR number must be numeric (e.g. '945'); received '$PR'."
+    exit 1
+fi
 MODE="${2:-}"
 
 case "$MODE" in
@@ -110,7 +114,12 @@ echo "$unresolved" | jq -c '.[]' | while read -r thread; do
     line=$(echo "$thread" | jq -r '.line')
     body=$(echo "$thread" | jq -r '.body')
 
-    echo "  ${path}:${line} — ${body}..."
+    display_line="${line}"
+    if [ "$display_line" = "null" ]; then
+        display_line="N/A"
+    fi
+
+    echo "  ${path}:${display_line} — ${body}..."
 
     if [ "$MODE" = "--dry-run" ]; then
         echo "    → Would resolve (dry-run)"

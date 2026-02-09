@@ -21,6 +21,7 @@
 9. **Preflight**: Must run `pnpm run preflight` before commit.
 10. **Code Cleanliness**: Follow Rule of Three. DRY up code only after 3rd duplication.
 11. **E2E Interaction Coverage**: If you add a clickable UI element, you must click it in an E2E test.
+12. **Email Privacy**: User email addresses must NEVER be displayed outside of admin views and the user's own settings page. Use names, "Anonymous", or role labels instead. This applies to UI, seed data, timeline events, and any client-facing serialization.
 
 ## 3. Agent Skills (Progressive Disclosure)
 
@@ -124,8 +125,14 @@ conflicts across worktrees and force-push requirements on open PRs.
 - **Vercel Migrations**: Automatically runs `pnpm run migrate:production` on build.
   - _Fix Stuck Migration_: `DATABASE_URL=<prod_url> tsx scripts/mark-migration-applied.ts <migration_number>`
 - **Supabase Projects**:
-  - `pinpoint-preview` (Dev/Staging) - Disposable data.
-  - `pinpoint-prod` (Live) - **Real user data. STRICT SAFETY.**
+  - `pinpoint-prod` (Live, Pro plan) - **Real user data. STRICT SAFETY.** Daily backups with 7-day retention.
+  - Preview branches are auto-created per PR via Supabase GitHub integration.
+- **Preview Deployments (Supabase Branching)**:
+  - Every PR gets an isolated Supabase branch database (auto-created, auto-deleted on PR close).
+  - The `Supabase Branch Setup` GHA workflow runs Drizzle migrations + seeding on each branch.
+  - Vercel preview deployments connect to branch DBs via the Supabase Vercel integration.
+  - Env var fallbacks in `server.ts`/`middleware.ts` handle both PinPoint and integration naming conventions.
+  - Cost: ~$0.32/day per open PR (Micro instance at $0.01344/hr).
 - **Database Safety**:
   - Local: `db:reset` allowed.
   - Prod: **NEVER** `db:reset`. ONLY `db:migrate`.

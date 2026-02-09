@@ -1,6 +1,6 @@
 import sanitizeHtml from "sanitize-html";
 
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -22,7 +22,7 @@ function parseInline(text: string): string {
   // Handle links [text](url)
   parsed = parsed.replace(
     /\[([^\]]+)\]\(([^)]+)\)/g,
-    '<a href="$2" class="text-primary hover:underline underline-offset-4" target="_blank" rel="noopener noreferrer">$1</a>'
+    '<a href="$2" class="text-link" target="_blank" rel="noopener noreferrer">$1</a>'
   );
 
   return parsed;
@@ -123,7 +123,7 @@ export function renderMarkdownToHtml(markdown: string): string {
       a: ["href", "class", "target", "rel"],
     },
     allowedClasses: {
-      a: ["text-primary", "hover:underline", "underline-offset-4"],
+      a: ["text-link"],
     },
   });
 }

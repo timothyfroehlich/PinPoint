@@ -22,6 +22,10 @@ if [ $# -lt 1 ]; then
 fi
 
 PR=$1
+if ! [[ "$PR" =~ ^[0-9]+$ ]]; then
+    echo "Error: PR number must be numeric (e.g. '945'); received '$PR'."
+    exit 1
+fi
 MODE="${2:-}"
 
 case "$MODE" in

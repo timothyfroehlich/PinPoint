@@ -32,7 +32,7 @@ import {
 } from "~/components/ui/alert-dialog";
 import { Pencil } from "lucide-react";
 
-import type { UnifiedUser } from "~/lib/types";
+import type { OwnerSelectUser } from "~/components/machines/OwnerSelect";
 
 // --- Edit Machine Dialog ---
 
@@ -53,7 +53,7 @@ interface EditMachineDialogProps {
       name: string;
     } | null;
   };
-  allUsers: UnifiedUser[];
+  allUsers: OwnerSelectUser[];
   isAdmin: boolean;
   isOwner: boolean;
 }
@@ -286,7 +286,7 @@ function OwnerSelectWithTracking({
   defaultValue,
   onOwnerChange,
 }: {
-  users: UnifiedUser[];
+  users: OwnerSelectUser[];
   defaultValue: string | null;
   onOwnerChange: (id: string) => void;
 }): React.JSX.Element {

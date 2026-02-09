@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { loginAs, selectOption } from "../support/actions";
 import { cleanupTestEntities } from "../support/cleanup";
-import { seededMachines } from "../support/constants";
+import { seededMachines, TEST_USERS } from "../support/constants";
 import { fillReportForm } from "../support/page-helpers";
 
 test.describe("Status Overhaul E2E", () => {
@@ -33,12 +33,16 @@ test.describe("Status Overhaul E2E", () => {
     // 2. Verify redirect and badges
     await expect(page).toHaveURL(/\/m\/TAF\/i\/[0-9]+/);
 
-    await expect(page.getByTestId("issue-status-badge")).toHaveText(/New/i);
-    await expect(page.getByTestId("issue-severity-badge")).toHaveText(
+    await expect(page.getByTestId("issue-status-badge").first()).toHaveText(
+      /New/i
+    );
+    await expect(page.getByTestId("issue-severity-badge").first()).toHaveText(
       /Unplayable/i
     );
-    await expect(page.getByTestId("issue-priority-badge")).toHaveText(/High/i);
-    await expect(page.getByTestId("issue-frequency-badge")).toHaveText(
+    await expect(page.getByTestId("issue-priority-badge").first()).toHaveText(
+      /High/i
+    );
+    await expect(page.getByTestId("issue-frequency-badge").first()).toHaveText(
       /Frequent/i
     );
 
@@ -46,11 +50,19 @@ test.describe("Status Overhaul E2E", () => {
     await selectOption(page, "issue-status-select", "in_progress");
 
     // 4. Verify status change in badge and timeline
-    await expect(page.getByTestId("issue-status-badge")).toHaveText(
+    await expect(page.getByTestId("issue-status-badge").first()).toHaveText(
       /In Progress/i
     );
-    await expect(
-      page.getByText("Status changed from New to In Progress")
-    ).toBeVisible();
+    // 5. Verify actor attribution on the system timeline event
+    const statusEvent = page.getByText(
+      "Status changed from New to In Progress"
+    );
+    await expect(statusEvent).toBeVisible();
+
+    // The system event should show who made the change
+    const systemEventRow = statusEvent.locator("..");
+    await expect(systemEventRow.getByTestId("system-event-actor")).toHaveText(
+      TEST_USERS.member.name
+    );
   });
 });

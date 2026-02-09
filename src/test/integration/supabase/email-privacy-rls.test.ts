@@ -159,6 +159,82 @@ describe("Email Privacy RLS Integration", () => {
     expect(anonView).toHaveLength(0);
   });
 
+  describe("user_metadata role escalation regression (CORE-SEC)", () => {
+    /**
+     * Regression test for RLS user_metadata exploit.
+     *
+     * Before the fix (migration 0012), RLS policies fell back to
+     * `auth.jwt() -> 'user_metadata' ->> 'role'` which users can
+     * self-edit via the Supabase Auth API. After the fix, policies
+     * fall back to `(select role from user_profiles ...)` which is
+     * database-controlled and not user-editable.
+     *
+     * This test creates a user with user_metadata.role='admin' but
+     * user_profiles.role='member' to verify the metadata is ignored.
+     */
+    let spoofedUser: { id: string; email: string };
+    let spoofedClient: SupabaseClient;
+
+    beforeAll(async () => {
+      const spoofedEmail = `rls-spoof-${Date.now()}@test.com`;
+      const { data } = await adminClient.auth.admin.createUser({
+        email: spoofedEmail,
+        password: "TestPassword123",
+        email_confirm: true,
+        user_metadata: {
+          first_name: "Spoofed",
+          last_name: "Admin",
+          role: "admin", // JWT claims admin...
+        },
+      });
+      spoofedUser = { id: data.user!.id, email: spoofedEmail };
+
+      // Force user_profiles.role to 'member' — this is the source of truth
+      await adminClient
+        .from("user_profiles")
+        .update({ role: "member" })
+        .eq("id", spoofedUser.id);
+
+      spoofedClient = createClient(supabaseUrl, supabaseAnonKey);
+      await spoofedClient.auth.signInWithPassword({
+        email: spoofedEmail,
+        password: "TestPassword123",
+      });
+    });
+
+    afterAll(async () => {
+      await adminClient.auth.admin.deleteUser(spoofedUser.id);
+    });
+
+    it("user with user_metadata.role='admin' but user_profiles.role='member' cannot view invited_users", async () => {
+      const { data, error } = await spoofedClient
+        .from("invited_users")
+        .select("id");
+
+      expect(error).toBeNull();
+      expect(data).toHaveLength(0);
+    });
+
+    it("user with user_metadata.role='admin' but user_profiles.role='member' cannot see other emails", async () => {
+      const { data, error } = await spoofedClient
+        .from("public_profiles_view")
+        .select("id, email");
+
+      expect(error).toBeNull();
+
+      // Should see own email
+      const ownProfile = data?.find((r) => r.id === spoofedUser.id);
+      expect(ownProfile?.email).toBe(spoofedUser.email);
+
+      // Should NOT see other users' emails (metadata 'admin' is ignored)
+      const otherProfiles = data?.filter((r) => r.id !== spoofedUser.id) ?? [];
+      expect(otherProfiles.length).toBeGreaterThan(0);
+      otherProfiles.forEach((profile) => {
+        expect(profile.email).toBeNull();
+      });
+    });
+  });
+
   describe("Direct Drizzle Queries with Session Context", () => {
     it("should show all emails with admin context", async () => {
       const profiles = await withUserContext(

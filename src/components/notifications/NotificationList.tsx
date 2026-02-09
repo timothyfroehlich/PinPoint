@@ -17,14 +17,14 @@ import {
 } from "~/app/(app)/notifications/actions";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type notifications } from "~/server/db/schema"; // Import notifications schema
 import { formatDistanceToNow } from "date-fns";
+import type { NotificationType } from "~/lib/notifications";
 
-// Define the base notification type from the Drizzle schema
-type BaseNotification = typeof notifications.$inferSelect;
-
-// Extend it for the enriched notifications used in the UI
-export interface EnrichedNotification extends BaseNotification {
+/** Minimal notification shape for client rendering (CORE-SEC-006) */
+export interface EnrichedNotification {
+  id: string;
+  type: NotificationType;
+  createdAt: Date;
   link: string;
   machineInitials?: string | undefined;
   issueNumber?: number | undefined;

@@ -14,6 +14,8 @@ interface AssigneePickerProps {
   users: PickerUser[];
   isPending: boolean;
   onAssign: (userId: string | null) => void;
+  disabled?: boolean;
+  disabledReason?: string | null;
 }
 
 export function AssigneePicker({
@@ -21,6 +23,8 @@ export function AssigneePicker({
   users,
   isPending,
   onAssign,
+  disabled = false,
+  disabledReason = null,
 }: AssigneePickerProps): React.JSX.Element {
   const [isOpen, setIsOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -91,7 +95,8 @@ export function AssigneePicker({
         onClick={() => setIsOpen((prev) => !prev)}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        disabled={isPending}
+        disabled={isPending || disabled}
+        title={disabledReason ?? undefined}
         data-testid="assignee-picker-trigger"
       >
         <div className="flex items-center gap-2">

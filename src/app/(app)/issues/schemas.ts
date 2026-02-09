@@ -78,9 +78,12 @@ export const imageMetadataSchema = z.object({
         const isVercelBlob = parsedUrl.hostname.endsWith(
           ".public.blob.vercel-storage.com"
         );
+        const allowLocalhostBlob =
+          process.env["MOCK_BLOB_STORAGE"] === "true" ||
+          (process.env.NODE_ENV !== "production" &&
+            !process.env["BLOB_READ_WRITE_TOKEN"]);
         const isLocalhost =
-          process.env["MOCK_BLOB_STORAGE"] === "true" &&
-          parsedUrl.hostname === "localhost";
+          allowLocalhostBlob && parsedUrl.hostname === "localhost";
         return isVercelBlob || isLocalhost;
       },
       {
@@ -126,4 +129,16 @@ export const editCommentSchema = z.object({
  */
 export const deleteCommentSchema = z.object({
   commentId: uuidish,
+});
+
+/**
+ * Schema for updating issue title
+ */
+export const updateIssueTitleSchema = z.object({
+  issueId: uuidish,
+  title: z
+    .string()
+    .trim()
+    .min(1, "Title cannot be empty")
+    .max(100, "Title must be 100 characters or less"),
 });

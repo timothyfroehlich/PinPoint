@@ -4,6 +4,19 @@ import path from "path";
 import fs from "fs/promises";
 import { log } from "~/lib/logger";
 
+function shouldUseMockBlobStorage(): boolean {
+  if (process.env["MOCK_BLOB_STORAGE"] === "true") {
+    return true;
+  }
+
+  // Local/dev fallback: if no blob token is configured, use mock storage.
+  // Production should fail loudly when blob credentials are missing.
+  return (
+    process.env.NODE_ENV !== "production" &&
+    !process.env["BLOB_READ_WRITE_TOKEN"]
+  );
+}
+
 /**
  * Uploads a file to Vercel Blob storage.
  * @param file The file to upload
@@ -14,7 +27,7 @@ export async function uploadToBlob(
   pathname: string
 ): Promise<PutBlobResult> {
   // Mock implementation for local testing without Vercel credentials
-  if (process.env["MOCK_BLOB_STORAGE"] === "true") {
+  if (shouldUseMockBlobStorage()) {
     // Determine local path in public/uploads and sanitize to prevent path traversal
     const publicDir = path.join(process.cwd(), "public", "uploads");
     // Remove any leading slashes or ../ segments to keep it within publicDir
@@ -70,7 +83,7 @@ export async function uploadToBlob(
  */
 export async function deleteFromBlob(pathname: string): Promise<void> {
   // Mock implementation for local testing
-  if (process.env["MOCK_BLOB_STORAGE"] === "true") {
+  if (shouldUseMockBlobStorage()) {
     try {
       const publicDir = path.join(process.cwd(), "public", "uploads");
       const safePathname = pathname

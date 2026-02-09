@@ -466,7 +466,7 @@ export function UnifiedReportForm({
                             ? `/report?machine=${selectedMachine.initials}`
                             : "/report"
                         )}`}
-                        className="text-primary hover:underline"
+                        className="text-link"
                       >
                         Log in
                       </Link>
