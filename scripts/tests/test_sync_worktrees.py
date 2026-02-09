@@ -89,10 +89,7 @@ class TestPortConfig:
         for name, config in PORT_MAPPINGS.items():
             # Project ID should be lowercase version of name with hyphens
             expected_id = name.lower()
-            assert (
-                config.project_id == expected_id
-                or config.project_id == name.lower().replace("-", "-")
-            )
+            assert config.project_id == expected_id
 
 
 class TestWorktreeState:

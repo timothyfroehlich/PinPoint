@@ -165,14 +165,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Setup Ruff
-        uses: astral-sh/setup-ruff@v1
-
       - name: Run ruff check
-        run: ruff check scripts/ pinpoint-wt.py
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: "check scripts/ pinpoint-wt.py"
 
       - name: Run ruff format check
-        run: ruff format --check scripts/ pinpoint-wt.py
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: "format --check scripts/ pinpoint-wt.py"
 
   build:
     name: Build
