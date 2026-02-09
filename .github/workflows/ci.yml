@@ -158,10 +158,26 @@ jobs:
       - name: Run yamllint
         run: yamllint .github/workflows/
 
+  ruff:
+    name: Ruff (Python Lint + Format)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install Ruff
+        run: pipx install ruff
+
+      - name: Run ruff check
+        run: ruff check scripts/ pinpoint-wt.py .agent/skills/*/scripts/*.py
+
+      - name: Run ruff format check
+        run: ruff format --check scripts/ pinpoint-wt.py .agent/skills/*/scripts/*.py
+
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [setup, typecheck, lint, format, yamllint, test-unit, test-integration]
+    needs: [setup, typecheck, lint, format, yamllint, ruff, test-unit, test-integration]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -323,8 +339,8 @@ jobs:
       - name: Export Supabase environment
         run: |
           eval "$(supabase status -o env | sed 's/=/=\"/;s/$/\"/')"
-          echo "DATABASE_URL=${DB_URL}" >> $GITHUB_ENV
-          echo "DIRECT_URL=${DB_URL}" >> $GITHUB_ENV
+          echo "POSTGRES_URL=${DB_URL}" >> $GITHUB_ENV
+          echo "POSTGRES_URL_NON_POOLING=${DB_URL}" >> $GITHUB_ENV
 
       - name: Apply migrations to fresh database
         run: pnpm run db:migrate

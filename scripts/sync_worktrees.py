@@ -29,6 +29,7 @@ from typing import Optional
 
 class StatusLevel(Enum):
     """Status level for tracking overall worktree state"""
+
     SUCCESS = "success"
     WARNING = "warning"
     ERROR = "error"
@@ -36,6 +37,7 @@ class StatusLevel(Enum):
 
 class MergeStatus(Enum):
     """Merge operation status"""
+
     MERGED = "merged"
     UP_TO_DATE = "up-to-date"
     CONFLICTS = "conflicts"
@@ -48,6 +50,7 @@ class MergeStatus(Enum):
 @dataclass
 class PortConfig:
     """Port configuration for a worktree"""
+
     name: str
     nextjs_offset: int
     supabase_offset: int
@@ -103,15 +106,20 @@ class PortConfig:
 # Port allocation mappings (from AGENTS.md)
 PORT_MAPPINGS = {
     "PinPoint": PortConfig("PinPoint", 0, 0, "pinpoint"),
-    "PinPoint-Secondary": PortConfig("PinPoint-Secondary", 100, 1000, "pinpoint-secondary"),
+    "PinPoint-Secondary": PortConfig(
+        "PinPoint-Secondary", 100, 1000, "pinpoint-secondary"
+    ),
     "PinPoint-review": PortConfig("PinPoint-review", 200, 2000, "pinpoint-review"),
-    "PinPoint-AntiGravity": PortConfig("PinPoint-AntiGravity", 300, 3000, "pinpoint-antigravity"),
+    "PinPoint-AntiGravity": PortConfig(
+        "PinPoint-AntiGravity", 300, 3000, "pinpoint-antigravity"
+    ),
 }
 
 
 @dataclass
 class WorktreeState:
     """State for a single worktree during sync"""
+
     path: Path
     name: str
     port_config: PortConfig
@@ -155,7 +163,9 @@ class WorktreeState:
             # Get branch info
             branch = subprocess.run(
                 ["git", "-C", str(self.path), "rev-parse", "--abbrev-ref", "HEAD"],
-                capture_output=True, text=True, check=True
+                capture_output=True,
+                text=True,
+                check=True,
             ).stdout.strip()
 
             # Get upstream status
@@ -164,13 +174,32 @@ class WorktreeState:
             else:
                 try:
                     subprocess.run(
-                        ["git", "-C", str(self.path), "rev-parse", "--abbrev-ref", "@{u}"],
-                        capture_output=True, text=True, check=True
+                        [
+                            "git",
+                            "-C",
+                            str(self.path),
+                            "rev-parse",
+                            "--abbrev-ref",
+                            "@{u}",
+                        ],
+                        capture_output=True,
+                        text=True,
+                        check=True,
                     )
                     # Get ahead/behind counts
                     result = subprocess.run(
-                        ["git", "-C", str(self.path), "rev-list", "--left-right", "--count", "HEAD...@{u}"],
-                        capture_output=True, text=True, check=True
+                        [
+                            "git",
+                            "-C",
+                            str(self.path),
+                            "rev-list",
+                            "--left-right",
+                            "--count",
+                            "HEAD...@{u}",
+                        ],
+                        capture_output=True,
+                        text=True,
+                        check=True,
                     )
                     ahead, behind = result.stdout.strip().split()
                     upstream_status = f"ahead {ahead}, behind {behind}"
@@ -179,15 +208,28 @@ class WorktreeState:
 
             # Get pending files count
             result = subprocess.run(
-                ["git", "-C", str(self.path), "status", "--porcelain", "--ignore-submodules"],
-                capture_output=True, text=True, check=True
+                [
+                    "git",
+                    "-C",
+                    str(self.path),
+                    "status",
+                    "--porcelain",
+                    "--ignore-submodules",
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
             )
-            pending_files = len(result.stdout.strip().split('\n')) if result.stdout.strip() else 0
+            pending_files = (
+                len(result.stdout.strip().split("\n")) if result.stdout.strip() else 0
+            )
 
             # Get diff stats
             result = subprocess.run(
                 ["git", "-C", str(self.path), "diff", "--shortstat"],
-                capture_output=True, text=True, check=True
+                capture_output=True,
+                text=True,
+                check=True,
             )
             shortstat = result.stdout.strip()
 
@@ -196,11 +238,11 @@ class WorktreeState:
             if shortstat:
                 # Parse insertions and deletions
                 if "insertion" in shortstat:
-                    match = re.search(r'(\d+) insertion', shortstat)
+                    match = re.search(r"(\d+) insertion", shortstat)
                     if match:
                         insertions = int(match.group(1))
                 if "deletion" in shortstat:
-                    match = re.search(r'(\d+) deletion', shortstat)
+                    match = re.search(r"(\d+) deletion", shortstat)
                     if match:
                         deletions = int(match.group(1))
 
@@ -222,7 +264,9 @@ class Worktree:
 
         # Get port config
         if self.name not in PORT_MAPPINGS:
-            raise ValueError(f"Unknown worktree: {self.name}. Expected one of: {list(PORT_MAPPINGS.keys())}")
+            raise ValueError(
+                f"Unknown worktree: {self.name}. Expected one of: {list(PORT_MAPPINGS.keys())}"
+            )
 
         self.port_config = PORT_MAPPINGS[self.name]
         self.state = WorktreeState(self.path, self.name, self.port_config)
@@ -231,7 +275,9 @@ class Worktree:
         """Get the current branch name"""
         result = subprocess.run(
             ["git", "-C", str(self.path), "rev-parse", "--abbrev-ref", "HEAD"],
-            capture_output=True, text=True, check=True
+            capture_output=True,
+            text=True,
+            check=True,
         )
         return result.stdout.strip()
 
@@ -239,7 +285,7 @@ class Worktree:
         """Check if there are uncommitted changes"""
         result = subprocess.run(
             ["git", "-C", str(self.path), "diff-index", "--quiet", "HEAD", "--"],
-            capture_output=True
+            capture_output=True,
         )
         return result.returncode != 0
 
@@ -290,15 +336,45 @@ class Worktree:
         if config_file.exists():
             current_content = config_file.read_text()
             current = {}
-            current["project_id"] = self._extract_value(current_content, r'^project_id = "([^"]+)"')
-            current["api_port"] = self._extract_port(current_content, r'^\[api\].*?^port = (\d+)', re.MULTILINE | re.DOTALL)
-            current["db_port"] = self._extract_port(current_content, r'^\[db\].*?^port = (\d+)', re.MULTILINE | re.DOTALL)
-            current["shadow_port"] = self._extract_port(current_content, r'^\[db\].*?^shadow_port = (\d+)', re.MULTILINE | re.DOTALL)
-            current["pooler_port"] = self._extract_port(current_content, r'^\[db\.pooler\].*?^port = (\d+)', re.MULTILINE | re.DOTALL)
-            current["inbucket_port"] = self._extract_port(current_content, r'^\[inbucket\].*?^port = (\d+)', re.MULTILINE | re.DOTALL)
-            current["smtp_port"] = self._extract_port(current_content, r'^\[inbucket\].*?^smtp_port = (\d+)', re.MULTILINE | re.DOTALL)
-            current["pop3_port"] = self._extract_port(current_content, r'^\[inbucket\].*?^pop3_port = (\d+)', re.MULTILINE | re.DOTALL)
-            current["refresh_token_reuse_interval"] = self._extract_port(current_content, r'^\[auth\].*?^refresh_token_reuse_interval = (\d+)', re.MULTILINE | re.DOTALL)
+            current["project_id"] = self._extract_value(
+                current_content, r'^project_id = "([^"]+)"'
+            )
+            current["api_port"] = self._extract_port(
+                current_content, r"^\[api\].*?^port = (\d+)", re.MULTILINE | re.DOTALL
+            )
+            current["db_port"] = self._extract_port(
+                current_content, r"^\[db\].*?^port = (\d+)", re.MULTILINE | re.DOTALL
+            )
+            current["shadow_port"] = self._extract_port(
+                current_content,
+                r"^\[db\].*?^shadow_port = (\d+)",
+                re.MULTILINE | re.DOTALL,
+            )
+            current["pooler_port"] = self._extract_port(
+                current_content,
+                r"^\[db\.pooler\].*?^port = (\d+)",
+                re.MULTILINE | re.DOTALL,
+            )
+            current["inbucket_port"] = self._extract_port(
+                current_content,
+                r"^\[inbucket\].*?^port = (\d+)",
+                re.MULTILINE | re.DOTALL,
+            )
+            current["smtp_port"] = self._extract_port(
+                current_content,
+                r"^\[inbucket\].*?^smtp_port = (\d+)",
+                re.MULTILINE | re.DOTALL,
+            )
+            current["pop3_port"] = self._extract_port(
+                current_content,
+                r"^\[inbucket\].*?^pop3_port = (\d+)",
+                re.MULTILINE | re.DOTALL,
+            )
+            current["refresh_token_reuse_interval"] = self._extract_port(
+                current_content,
+                r"^\[auth\].*?^refresh_token_reuse_interval = (\d+)",
+                re.MULTILINE | re.DOTALL,
+            )
 
             # Check if all values match
             if current == expected:
@@ -309,19 +385,40 @@ class Worktree:
         if self.dry_run:
             print(f"[DRY-RUN] Would generate config.toml from template in {self.name}")
             print(f"[DRY-RUN]   project_id: {expected['project_id']}")
-            print(f"[DRY-RUN]   ports: API={expected['api_port']}, DB={expected['db_port']}, etc.")
+            print(
+                f"[DRY-RUN]   ports: API={expected['api_port']}, DB={expected['db_port']}, etc."
+            )
         else:
             # Apply replacements to template
             content = template_content
             content = self._replace_project_id(content, expected["project_id"])
-            content = self._replace_port_in_section(content, "api", expected["api_port"])
-            content = self._replace_port_in_section(content, "db", expected["db_port"], "port")
-            content = self._replace_port_in_section(content, "db", expected["shadow_port"], "shadow_port")
-            content = self._replace_port_in_section(content, "db.pooler", expected["pooler_port"])
-            content = self._replace_port_in_section(content, "inbucket", expected["inbucket_port"])
-            content = self._ensure_inbucket_port(content, "smtp_port", expected["smtp_port"])
-            content = self._ensure_inbucket_port(content, "pop3_port", expected["pop3_port"])
-            content = self._replace_port_in_section(content, "auth", expected["refresh_token_reuse_interval"], "refresh_token_reuse_interval")
+            content = self._replace_port_in_section(
+                content, "api", expected["api_port"]
+            )
+            content = self._replace_port_in_section(
+                content, "db", expected["db_port"], "port"
+            )
+            content = self._replace_port_in_section(
+                content, "db", expected["shadow_port"], "shadow_port"
+            )
+            content = self._replace_port_in_section(
+                content, "db.pooler", expected["pooler_port"]
+            )
+            content = self._replace_port_in_section(
+                content, "inbucket", expected["inbucket_port"]
+            )
+            content = self._ensure_inbucket_port(
+                content, "smtp_port", expected["smtp_port"]
+            )
+            content = self._ensure_inbucket_port(
+                content, "pop3_port", expected["pop3_port"]
+            )
+            content = self._replace_port_in_section(
+                content,
+                "auth",
+                expected["refresh_token_reuse_interval"],
+                "refresh_token_reuse_interval",
+            )
 
             # Write generated config
             config_file.write_text(content)
@@ -335,7 +432,9 @@ class Worktree:
         match = re.search(pattern, content, re.MULTILINE)
         return match.group(1) if match else None
 
-    def _extract_port(self, content: str, pattern: str, flags: int = 0) -> Optional[int]:
+    def _extract_port(
+        self, content: str, pattern: str, flags: int = 0
+    ) -> Optional[int]:
         """Extract a port number from config"""
         match = re.search(pattern, content, flags)
         return int(match.group(1)) if match else None
@@ -346,60 +445,65 @@ class Worktree:
             r'^project_id = ".*"',
             f'project_id = "{project_id}"',
             content,
-            flags=re.MULTILINE
+            flags=re.MULTILINE,
         )
 
-    def _replace_port_in_section(self, content: str, section: str, port: int, key: str = "port") -> str:
+    def _replace_port_in_section(
+        self, content: str, section: str, port: int, key: str = "port"
+    ) -> str:
         """Replace a port value in a specific TOML section"""
         # Find the section and replace the port
-        section_pattern = rf'^\[{re.escape(section)}\](.*?)(?=^\[|\Z)'
+        section_pattern = rf"^\[{re.escape(section)}\](.*?)(?=^\[|\Z)"
 
         def replacer(match):
             section_content = match.group(1)
             # Replace the specific key in this section
             section_content = re.sub(
-                rf'^{key} = \d+',
-                f'{key} = {port}',
-                section_content,
-                flags=re.MULTILINE
+                rf"^{key} = \d+", f"{key} = {port}", section_content, flags=re.MULTILINE
             )
-            return f'[{section}]{section_content}'
+            return f"[{section}]{section_content}"
 
-        return re.sub(section_pattern, replacer, content, flags=re.MULTILINE | re.DOTALL)
+        return re.sub(
+            section_pattern, replacer, content, flags=re.MULTILINE | re.DOTALL
+        )
 
     def _ensure_inbucket_port(self, content: str, key: str, port: int) -> str:
         """Ensure an inbucket port exists, adding it if missing"""
         # Check if it already exists
-        if re.search(rf'^\[inbucket\].*?^{key} = ', content, re.MULTILINE | re.DOTALL):
+        if re.search(rf"^\[inbucket\].*?^{key} = ", content, re.MULTILINE | re.DOTALL):
             # Update existing
-            section_pattern = r'^\[inbucket\](.*?)(?=^\[|\Z)'
+            section_pattern = r"^\[inbucket\](.*?)(?=^\[|\Z)"
 
             def replacer(match):
                 section_content = match.group(1)
                 section_content = re.sub(
-                    rf'^{key} = \d+',
-                    f'{key} = {port}',
+                    rf"^{key} = \d+",
+                    f"{key} = {port}",
                     section_content,
-                    flags=re.MULTILINE
+                    flags=re.MULTILINE,
                 )
-                return f'[inbucket]{section_content}'
+                return f"[inbucket]{section_content}"
 
-            return re.sub(section_pattern, replacer, content, flags=re.MULTILINE | re.DOTALL)
+            return re.sub(
+                section_pattern, replacer, content, flags=re.MULTILINE | re.DOTALL
+            )
         else:
             # Add after port line in inbucket section
             def replacer(match):
                 section_content = match.group(1)
                 # Find the port line and add after it
                 section_content = re.sub(
-                    r'^(port = \d+)$',
-                    rf'\1\n{key} = {port}',
+                    r"^(port = \d+)$",
+                    rf"\1\n{key} = {port}",
                     section_content,
-                    flags=re.MULTILINE
+                    flags=re.MULTILINE,
                 )
-                return f'[inbucket]{section_content}'
+                return f"[inbucket]{section_content}"
 
-            section_pattern = r'^\[inbucket\](.*?)(?=^\[|\Z)'
-            return re.sub(section_pattern, replacer, content, flags=re.MULTILINE | re.DOTALL)
+            section_pattern = r"^\[inbucket\](.*?)(?=^\[|\Z)"
+            return re.sub(
+                section_pattern, replacer, content, flags=re.MULTILINE | re.DOTALL
+            )
 
     def _fix_env_local(self) -> None:
         """Fix .env.local with correct ports and URLs"""
@@ -420,8 +524,8 @@ class Worktree:
         # Expected values
         expected = {
             "NEXT_PUBLIC_SUPABASE_URL": f"http://localhost:{self.port_config.api_port}",
-            "DATABASE_URL": f"postgresql://postgres:postgres@localhost:{self.port_config.db_port}/postgres",
-            "DIRECT_URL": f"postgresql://postgres:postgres@localhost:{self.port_config.db_port}/postgres",
+            "POSTGRES_URL": f"postgresql://postgres:postgres@localhost:{self.port_config.db_port}/postgres",
+            "POSTGRES_URL_NON_POOLING": f"postgresql://postgres:postgres@localhost:{self.port_config.db_port}/postgres",
             "PORT": str(self.port_config.nextjs_port),
             "NEXT_PUBLIC_SITE_URL": self.port_config.site_url,
             "EMAIL_TRANSPORT": "smtp",
@@ -453,8 +557,11 @@ class Worktree:
                 content = self._set_env_value(content, key, value)
 
             # Ensure required keys exist (even if empty)
-            for key in ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SERVICE_ROLE_KEY"]:
-                if not re.search(rf'^{key}=', content, re.MULTILINE):
+            for key in [
+                "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+                "SUPABASE_SERVICE_ROLE_KEY",
+            ]:
+                if not re.search(rf"^{key}=", content, re.MULTILINE):
                     content += f"\n{key}=\n"
 
             env_file.write_text(content)
@@ -466,8 +573,8 @@ class Worktree:
         return f"""# Generated by scripts/sync_worktrees.py
 # Local Supabase + Next.js defaults for {self.name}
 NEXT_PUBLIC_SUPABASE_URL=http://localhost:{self.port_config.api_port}
-DATABASE_URL=postgresql://postgres:postgres@localhost:{self.port_config.db_port}/postgres
-DIRECT_URL=postgresql://postgres:postgres@localhost:{self.port_config.db_port}/postgres
+POSTGRES_URL=postgresql://postgres:postgres@localhost:{self.port_config.db_port}/postgres
+POSTGRES_URL_NON_POOLING=postgresql://postgres:postgres@localhost:{self.port_config.db_port}/postgres
 PORT={self.port_config.nextjs_port}
 NEXT_PUBLIC_SITE_URL={self.port_config.site_url}
 
@@ -485,23 +592,17 @@ SUPABASE_SERVICE_ROLE_KEY=
 
     def _extract_env_value(self, content: str, key: str) -> Optional[str]:
         """Extract value from .env file"""
-        match = re.search(rf'^{key}=(.*)$', content, re.MULTILINE)
+        match = re.search(rf"^{key}=(.*)$", content, re.MULTILINE)
         return match.group(1) if match else None
 
     def _set_env_value(self, content: str, key: str, value: str) -> str:
         """Set or add an environment variable in .env content"""
-        if re.search(rf'^{key}=', content, re.MULTILINE):
+        if re.search(rf"^{key}=", content, re.MULTILINE):
             # Update existing
-            return re.sub(
-                rf'^{key}=.*$',
-                f'{key}={value}',
-                content,
-                flags=re.MULTILINE
-            )
+            return re.sub(rf"^{key}=.*$", f"{key}={value}", content, flags=re.MULTILINE)
         else:
             # Add new
             return content + f"\n{key}={value}\n"
-
 
     def fetch(self) -> None:
         """Fetch from origin"""
@@ -510,7 +611,8 @@ SUPABASE_SERVICE_ROLE_KEY=
         else:
             subprocess.run(
                 ["git", "-C", str(self.path), "fetch", "origin"],
-                capture_output=True, check=True
+                capture_output=True,
+                check=True,
             )
 
     def checkout_detached_main(self) -> None:
@@ -520,7 +622,8 @@ SUPABASE_SERVICE_ROLE_KEY=
         else:
             subprocess.run(
                 ["git", "-C", str(self.path), "checkout", "--detach", "origin/main"],
-                capture_output=True, check=True
+                capture_output=True,
+                check=True,
             )
 
     def stash_changes(self, branch: str) -> bool:
@@ -528,14 +631,17 @@ SUPABASE_SERVICE_ROLE_KEY=
         if not self.has_uncommitted_changes():
             return False
 
-        stash_name = f"sync-worktrees-auto-{branch}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        stash_name = (
+            f"sync-worktrees-auto-{branch}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        )
 
         if self.dry_run:
             print(f"[DRY-RUN] Would stash: {stash_name}")
         else:
             subprocess.run(
                 ["git", "-C", str(self.path), "stash", "push", "-u", "-m", stash_name],
-                capture_output=True, check=True
+                capture_output=True,
+                check=True,
             )
             self.state.stash_ref = "stash@{0}"
 
@@ -555,15 +661,26 @@ SUPABASE_SERVICE_ROLE_KEY=
 
             # Switch to origin/main detached
             if self.dry_run:
-                print("[DRY-RUN] Would run: git fetch origin && git checkout --detach origin/main")
+                print(
+                    "[DRY-RUN] Would run: git fetch origin && git checkout --detach origin/main"
+                )
             else:
                 subprocess.run(
                     ["git", "-C", str(self.path), "fetch", "origin"],
-                    capture_output=True, check=True
+                    capture_output=True,
+                    check=True,
                 )
                 subprocess.run(
-                    ["git", "-C", str(self.path), "checkout", "--detach", "origin/main"],
-                    capture_output=True, check=True
+                    [
+                        "git",
+                        "-C",
+                        str(self.path),
+                        "checkout",
+                        "--detach",
+                        "origin/main",
+                    ],
+                    capture_output=True,
+                    check=True,
                 )
 
             self.state.merge_status = MergeStatus.DETACHED
@@ -574,7 +691,9 @@ SUPABASE_SERVICE_ROLE_KEY=
         if branch == "main":
             if has_changes:
                 self.state.merge_status = MergeStatus.SKIPPED
-                self.state.merge_message = "On main with outstanding changes - should be working on a branch"
+                self.state.merge_message = (
+                    "On main with outstanding changes - should be working on a branch"
+                )
                 self.state.update_status(StatusLevel.WARNING)
                 return MergeStatus.SKIPPED
 
@@ -584,7 +703,9 @@ SUPABASE_SERVICE_ROLE_KEY=
             else:
                 result = subprocess.run(
                     ["git", "-C", str(self.path), "pull"],
-                    capture_output=True, text=True, check=True
+                    capture_output=True,
+                    text=True,
+                    check=True,
                 )
                 if "Already up to date" in result.stdout:
                     self.state.merge_status = MergeStatus.UP_TO_DATE
@@ -601,14 +722,18 @@ SUPABASE_SERVICE_ROLE_KEY=
             # Would prompt user in interactive mode
             # For now, skip the detached HEAD option
             self.state.merge_status = MergeStatus.DECLINED
-            self.state.merge_message = f"Merged PR #{pr_number} found (manual checkout recommended)"
+            self.state.merge_message = (
+                f"Merged PR #{pr_number} found (manual checkout recommended)"
+            )
             self.state.update_status(StatusLevel.WARNING)
             return MergeStatus.DECLINED
 
         # Save pre-merge SHA for recovery
         result = subprocess.run(
             ["git", "-C", str(self.path), "rev-parse", "HEAD"],
-            capture_output=True, text=True, check=True
+            capture_output=True,
+            text=True,
+            check=True,
         )
         self.state.pre_merge_sha = result.stdout.strip()
 
@@ -621,7 +746,8 @@ SUPABASE_SERVICE_ROLE_KEY=
 
         result = subprocess.run(
             ["git", "-C", str(self.path), "merge", "main"],
-            capture_output=True, text=True
+            capture_output=True,
+            text=True,
         )
 
         if result.returncode == 0:
@@ -641,11 +767,15 @@ SUPABASE_SERVICE_ROLE_KEY=
 
             # Distinguish config.toml from other conflicts
             config_conflict = "supabase/config.toml" in conflicted_files
-            other_conflicts = [f for f in conflicted_files if f != "supabase/config.toml"]
+            other_conflicts = [
+                f for f in conflicted_files if f != "supabase/config.toml"
+            ]
 
             if config_conflict and not other_conflicts:
                 # Only config.toml has conflicts - can auto-resolve
-                self.state.merge_message = "Merge conflicts in config.toml (auto-resolvable)"
+                self.state.merge_message = (
+                    "Merge conflicts in config.toml (auto-resolvable)"
+                )
                 recovery = f"""cd {self.path}
 
 # Option 3: Accept all main's changes
@@ -666,9 +796,24 @@ python3 scripts/sync_worktrees.py  # Restore ports
 
         try:
             result = subprocess.run(
-                ["gh", "pr", "list", "--repo", "timothyfroehlich/PinPoint",
-                 "--head", branch, "--state", "merged", "--json", "number,title,mergedAt", "--limit", "1"],
-                capture_output=True, text=True, check=True
+                [
+                    "gh",
+                    "pr",
+                    "list",
+                    "--repo",
+                    "timothyfroehlich/PinPoint",
+                    "--head",
+                    branch,
+                    "--state",
+                    "merged",
+                    "--json",
+                    "number,title,mergedAt",
+                    "--limit",
+                    "1",
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
             )
 
             if result.stdout.strip() in ("[]", ""):
@@ -687,9 +832,11 @@ python3 scripts/sync_worktrees.py  # Restore ports
         try:
             result = subprocess.run(
                 ["git", "-C", str(self.path), "diff", "--name-only", "--diff-filter=U"],
-                capture_output=True, text=True, check=True
+                capture_output=True,
+                text=True,
+                check=True,
             )
-            return [f.strip() for f in result.stdout.strip().split('\n') if f.strip()]
+            return [f.strip() for f in result.stdout.strip().split("\n") if f.strip()]
         except subprocess.CalledProcessError:
             return []
 
@@ -704,7 +851,8 @@ python3 scripts/sync_worktrees.py  # Restore ports
 
         result = subprocess.run(
             ["git", "-C", str(self.path), "stash", "pop"],
-            capture_output=True, text=True
+            capture_output=True,
+            text=True,
         )
 
         if result.returncode != 0:
@@ -738,7 +886,9 @@ git reset --hard HEAD"""
             pass
 
         if self.dry_run:
-            print(f"[DRY-RUN] Would run: pnpm install --frozen-lockfile --silent in {self.name}")
+            print(
+                f"[DRY-RUN] Would run: pnpm install --frozen-lockfile --silent in {self.name}"
+            )
         else:
             try:
                 subprocess.run(
@@ -746,7 +896,7 @@ git reset --hard HEAD"""
                     cwd=self.path,
                     capture_output=True,
                     check=True,
-                    timeout=300  # 5 minute timeout
+                    timeout=300,  # 5 minute timeout
                 )
             except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
                 # Non-fatal, just report
@@ -766,10 +916,7 @@ git reset --hard HEAD"""
 
         try:
             subprocess.run(
-                ["supabase", "stop"],
-                cwd=self.path,
-                capture_output=True,
-                timeout=60
+                ["supabase", "stop"], cwd=self.path, capture_output=True, timeout=60
             )
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
             pass
@@ -791,7 +938,8 @@ git reset --hard HEAD"""
             try:
                 subprocess.run(
                     [sys.executable, "-m", "venv", str(venv_path)],
-                    check=True, capture_output=True
+                    check=True,
+                    capture_output=True,
                 )
             except subprocess.CalledProcessError as e:
                 print(f"  ⚠️  Failed to create venv: {e}")
@@ -803,7 +951,8 @@ git reset --hard HEAD"""
             try:
                 subprocess.run(
                     [str(pip_path), "install", "-r", str(req_path), "--quiet"],
-                    check=True, capture_output=True
+                    check=True,
+                    capture_output=True,
                 )
             except subprocess.CalledProcessError as e:
                 print(f"  ⚠️  Failed to install requirements: {e}")
@@ -822,11 +971,7 @@ git reset --hard HEAD"""
         else:
             try:
                 # Stop Supabase
-                subprocess.run(
-                    ["supabase", "stop"],
-                    cwd=self.path,
-                    capture_output=True
-                )
+                subprocess.run(["supabase", "stop"], cwd=self.path, capture_output=True)
 
                 # Start Supabase
                 subprocess.run(
@@ -834,7 +979,7 @@ git reset --hard HEAD"""
                     cwd=self.path,
                     capture_output=True,
                     check=True,
-                    timeout=120
+                    timeout=120,
                 )
 
                 # Reset database
@@ -842,7 +987,7 @@ git reset --hard HEAD"""
                     ["pnpm", "run", "db:reset", "--silent"],
                     cwd=self.path,
                     capture_output=True,
-                    timeout=60
+                    timeout=60,
                 )
 
                 self.state.supabase_restarted = True
@@ -862,7 +1007,7 @@ git reset --hard HEAD"""
                     ["pnpm", "run", "test:_generate-schema"],
                     cwd=self.path,
                     capture_output=True,
-                    timeout=60
+                    timeout=60,
                 )
             except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
                 pass
@@ -889,7 +1034,7 @@ git reset --hard HEAD"""
                 cwd=self.path,
                 capture_output=True,
                 check=True,
-                timeout=120
+                timeout=120,
             )
 
             print("  ✅ Validation passed")
@@ -903,7 +1048,13 @@ git reset --hard HEAD"""
 class SyncManager:
     """Manages the sync process across multiple worktrees"""
 
-    def __init__(self, dry_run: bool = False, non_interactive: bool = False, validate: bool = False, reset: bool = False):
+    def __init__(
+        self,
+        dry_run: bool = False,
+        non_interactive: bool = False,
+        validate: bool = False,
+        reset: bool = False,
+    ):
         self.dry_run = dry_run
         self.non_interactive = non_interactive
         self.validate = validate
@@ -925,13 +1076,22 @@ class SyncManager:
         print()
         return True
 
-
     def _check_legacy_volumes(self) -> None:
         """Check for legacy Docker volumes (warning only)"""
         try:
             result = subprocess.run(
-                ["docker", "volume", "ls", "--filter", "label=com.supabase.cli.project=pinpoint-v2", "--format", "{{.Name}}"],
-                capture_output=True, text=True, check=True
+                [
+                    "docker",
+                    "volume",
+                    "ls",
+                    "--filter",
+                    "label=com.supabase.cli.project=pinpoint-v2",
+                    "--format",
+                    "{{.Name}}",
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
             )
 
             legacy_volumes = result.stdout.strip()
@@ -941,7 +1101,9 @@ class SyncManager:
                 print("The following legacy volumes exist:")
                 print(legacy_volumes)
                 print()
-                print("These should be removed to avoid conflicts with 'pinpoint' project.")
+                print(
+                    "These should be removed to avoid conflicts with 'pinpoint' project."
+                )
                 print()
                 print("To fix:")
                 print(f"  docker volume rm {legacy_volumes}")
@@ -956,11 +1118,10 @@ class SyncManager:
         # Get main worktree path
         try:
             result = subprocess.run(
-                ["git", "worktree", "list"],
-                capture_output=True, text=True, check=True
+                ["git", "worktree", "list"], capture_output=True, text=True, check=True
             )
 
-            for line in result.stdout.strip().split('\n'):
+            for line in result.stdout.strip().split("\n"):
                 if "[main]" in line:
                     self.main_worktree_path = Path(line.split()[0])
                     break
@@ -978,18 +1139,30 @@ class SyncManager:
             # Fetch origin
             subprocess.run(
                 ["git", "-C", str(self.main_worktree_path), "fetch", "origin"],
-                capture_output=True, check=True
+                capture_output=True,
+                check=True,
             )
 
             # Check behind count
             result = subprocess.run(
-                ["git", "-C", str(self.main_worktree_path), "rev-list", "--count", "HEAD..origin/main"],
-                capture_output=True, text=True, check=True
+                [
+                    "git",
+                    "-C",
+                    str(self.main_worktree_path),
+                    "rev-list",
+                    "--count",
+                    "HEAD..origin/main",
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
             )
 
             behind = int(result.stdout.strip() or "0")
             if behind > 0:
-                print_status("error", f"Main worktree is {behind} commits behind origin/main!")
+                print_status(
+                    "error", f"Main worktree is {behind} commits behind origin/main!"
+                )
                 print()
                 print("Main must be up-to-date before syncing other worktrees.")
                 print()
@@ -1024,10 +1197,6 @@ class SyncManager:
         print(f"Processing: {worktree.name}")
         print(f"Path: {worktree.path}")
         print("=" * 68)
-
-        # Determine if this is the main worktree
-        is_main = (self.main_worktree_path and
-                   worktree.path.resolve() == self.main_worktree_path.resolve())
 
         # Phase 0: Ensure clean state
         worktree.stop_supabase()
@@ -1115,9 +1284,15 @@ class SyncManager:
         print("📊 OVERALL SUMMARY")
         print("-" * 68)
 
-        success_count = sum(1 for w in self.worktrees if w.state.overall_status == StatusLevel.SUCCESS)
-        warning_count = sum(1 for w in self.worktrees if w.state.overall_status == StatusLevel.WARNING)
-        error_count = sum(1 for w in self.worktrees if w.state.overall_status == StatusLevel.ERROR)
+        success_count = sum(
+            1 for w in self.worktrees if w.state.overall_status == StatusLevel.SUCCESS
+        )
+        warning_count = sum(
+            1 for w in self.worktrees if w.state.overall_status == StatusLevel.WARNING
+        )
+        error_count = sum(
+            1 for w in self.worktrees if w.state.overall_status == StatusLevel.ERROR
+        )
 
         print()
         print(f"✅ Success:  {success_count} worktree(s)")
@@ -1134,13 +1309,17 @@ class SyncManager:
             status_icon = {
                 StatusLevel.SUCCESS: "✅",
                 StatusLevel.WARNING: "⚠️ ",
-                StatusLevel.ERROR: "❌"
+                StatusLevel.ERROR: "❌",
             }[worktree.state.overall_status]
 
             print()
-            print(f"{status_icon} {worktree.name} ({worktree.state.overall_status.value.upper()})")
+            print(
+                f"{status_icon} {worktree.name} ({worktree.state.overall_status.value.upper()})"
+            )
             print(f"   Path: {worktree.path}")
-            print(f"   Config: {' | '.join(worktree.state.config_messages) or 'Unknown'}")
+            print(
+                f"   Config: {' | '.join(worktree.state.config_messages) or 'Unknown'}"
+            )
             print(f"   Merge: {worktree.state.merge_message or 'Unknown'}")
             print(f"   Status: {worktree.state.get_status_summary()}")
 
@@ -1196,11 +1375,10 @@ def get_worktree_paths(args: argparse.Namespace) -> list[Path]:
     if args.all:
         # Process all worktrees
         result = subprocess.run(
-            ["git", "worktree", "list"],
-            capture_output=True, text=True, check=True
+            ["git", "worktree", "list"], capture_output=True, text=True, check=True
         )
         paths = []
-        for line in result.stdout.strip().split('\n'):
+        for line in result.stdout.strip().split("\n"):
             path = Path(line.split()[0])
             if path.exists():
                 paths.append(path)
@@ -1219,7 +1397,9 @@ def get_worktree_paths(args: argparse.Namespace) -> list[Path]:
         # Process current worktree
         result = subprocess.run(
             ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True, text=True, check=True
+            capture_output=True,
+            text=True,
+            check=True,
         )
         return [Path(result.stdout.strip())]
 
@@ -1233,45 +1413,40 @@ def main() -> None:
 Notes:
   - Without --all, the script processes exactly one worktree (current by default).
   - When both positional path and --path are provided, only --path is used.
-        """
+        """,
     )
 
     parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Show actions without making changes"
+        "--dry-run", action="store_true", help="Show actions without making changes"
     )
     parser.add_argument(
         "-y",
         dest="non_interactive",
         action="store_true",
-        help="Non-interactive (auto-confirm prompts)"
+        help="Non-interactive (auto-confirm prompts)",
     )
     parser.add_argument(
-        "-a", "--all",
-        action="store_true",
-        help="Process all worktrees"
+        "-a", "--all", action="store_true", help="Process all worktrees"
     )
     parser.add_argument(
-        "-p", "--path",
-        type=str,
-        help="Process a specific worktree (single path)"
+        "-p", "--path", type=str, help="Process a specific worktree (single path)"
     )
     parser.add_argument(
         "--validate",
         action="store_true",
-        help="Run post-merge validation (db:reset + integration tests)"
+        help="Run post-merge validation (db:reset + integration tests)",
     )
     parser.add_argument(
-        "-r", "--reset",
+        "-r",
+        "--reset",
         action="store_true",
-        help="Fetch and reset worktree to origin/main (detached) before syncing"
+        help="Fetch and reset worktree to origin/main (detached) before syncing",
     )
     parser.add_argument(
         "worktree_path",
         nargs="?",
         type=str,
-        help="Worktree path (alternative to --path)"
+        help="Worktree path (alternative to --path)",
     )
 
     args = parser.parse_args()
@@ -1315,7 +1490,7 @@ Notes:
         dry_run=args.dry_run,
         non_interactive=args.non_interactive,
         validate=args.validate,
-        reset=args.reset
+        reset=args.reset,
     )
 
     # Run pre-flight checks

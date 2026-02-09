@@ -2,10 +2,10 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { execSync } from "child_process";
 
-const databaseUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
+const databaseUrl = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
 
 if (!databaseUrl) {
-  console.error("❌ DATABASE_URL or DIRECT_URL is not defined");
+  console.error("❌ POSTGRES_URL or POSTGRES_URL_NON_POOLING is not defined");
   process.exit(1);
 }
 

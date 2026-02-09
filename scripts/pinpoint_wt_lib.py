@@ -35,8 +35,8 @@ LOCAL_SUPABASE_SERVICE_ROLE_KEY = (
 MANAGED_ENV_KEYS = {
     # Port-dependent
     "NEXT_PUBLIC_SUPABASE_URL",
-    "DATABASE_URL",
-    "DIRECT_URL",
+    "POSTGRES_URL",
+    "POSTGRES_URL_NON_POOLING",
     "PORT",
     "NEXT_PUBLIC_SITE_URL",
     "EMAIL_TRANSPORT",
@@ -146,8 +146,8 @@ def format_env_file(
         "",
         "# === Managed by pinpoint-wt.py (do not edit) ===",
         f"NEXT_PUBLIC_SUPABASE_URL={managed_values['NEXT_PUBLIC_SUPABASE_URL']}",
-        f"DATABASE_URL={managed_values['DATABASE_URL']}",
-        f"DIRECT_URL={managed_values['DIRECT_URL']}",
+        f"POSTGRES_URL={managed_values['POSTGRES_URL']}",
+        f"POSTGRES_URL_NON_POOLING={managed_values['POSTGRES_URL_NON_POOLING']}",
         f"PORT={managed_values['PORT']}",
         f"NEXT_PUBLIC_SITE_URL={managed_values['NEXT_PUBLIC_SITE_URL']}",
         "",
@@ -196,8 +196,8 @@ def merge_env_local(worktree_path: Path, port_config: PortConfig) -> str:
     # Build managed values from port config
     managed_values = {
         "NEXT_PUBLIC_SUPABASE_URL": f"http://localhost:{port_config.api_port}",
-        "DATABASE_URL": f"postgresql://postgres:postgres@localhost:{port_config.db_port}/postgres",
-        "DIRECT_URL": f"postgresql://postgres:postgres@localhost:{port_config.db_port}/postgres",
+        "POSTGRES_URL": f"postgresql://postgres:postgres@localhost:{port_config.db_port}/postgres",
+        "POSTGRES_URL_NON_POOLING": f"postgresql://postgres:postgres@localhost:{port_config.db_port}/postgres",
         "PORT": str(port_config.nextjs_port),
         "NEXT_PUBLIC_SITE_URL": port_config.site_url,
         "EMAIL_TRANSPORT": "smtp",
