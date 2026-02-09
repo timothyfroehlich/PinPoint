@@ -8,15 +8,21 @@ import { UpdateIssueStatusForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/
 import { UpdateIssueSeverityForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/update-issue-severity-form";
 import { UpdateIssuePriorityForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/update-issue-priority-form";
 import { UpdateIssueFrequencyForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/update-issue-frequency-form";
+import { type OwnershipContext } from "~/lib/permissions/helpers";
+import { type AccessLevel } from "~/lib/permissions/matrix";
 
 interface SidebarActionsProps {
   issue: IssueWithAllRelations;
   allUsers: { id: string; name: string }[];
+  accessLevel: AccessLevel;
+  ownershipContext: OwnershipContext;
 }
 
 export function SidebarActions({
   issue,
   allUsers,
+  accessLevel,
+  ownershipContext,
 }: SidebarActionsProps): React.JSX.Element {
   return (
     <div className="space-y-5">
@@ -28,6 +34,8 @@ export function SidebarActions({
             issueId={issue.id}
             assignedToId={issue.assignedTo ?? null}
             users={allUsers}
+            accessLevel={accessLevel}
+            ownershipContext={ownershipContext}
           />
         </div>
       </div>
@@ -39,6 +47,8 @@ export function SidebarActions({
           <UpdateIssueStatusForm
             issueId={issue.id}
             currentStatus={issue.status}
+            accessLevel={accessLevel}
+            ownershipContext={ownershipContext}
           />
         </div>
       </div>
@@ -50,6 +60,8 @@ export function SidebarActions({
           <UpdateIssueSeverityForm
             issueId={issue.id}
             currentSeverity={issue.severity}
+            accessLevel={accessLevel}
+            ownershipContext={ownershipContext}
           />
         </div>
       </div>
@@ -61,6 +73,8 @@ export function SidebarActions({
           <UpdateIssuePriorityForm
             issueId={issue.id}
             currentPriority={issue.priority}
+            accessLevel={accessLevel}
+            ownershipContext={ownershipContext}
           />
         </div>
       </div>
@@ -72,6 +86,8 @@ export function SidebarActions({
           <UpdateIssueFrequencyForm
             issueId={issue.id}
             currentFrequency={issue.frequency}
+            accessLevel={accessLevel}
+            ownershipContext={ownershipContext}
           />
         </div>
       </div>

@@ -9,15 +9,32 @@ import {
 } from "~/app/(app)/issues/actions";
 import { SeveritySelect } from "~/components/issues/fields/SeveritySelect";
 import { type IssueSeverity } from "~/lib/types";
+import { IssueBadge } from "~/components/issues/IssueBadge";
+import {
+  getPermissionDeniedReason,
+  getPermissionState,
+  type OwnershipContext,
+} from "~/lib/permissions/helpers";
+import { type AccessLevel } from "~/lib/permissions/matrix";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 
 interface UpdateIssueSeverityFormProps {
   issueId: string;
   currentSeverity: IssueSeverity;
+  accessLevel: AccessLevel;
+  ownershipContext: OwnershipContext;
 }
 
 export function UpdateIssueSeverityForm({
   issueId,
   currentSeverity,
+  accessLevel,
+  ownershipContext,
 }: UpdateIssueSeverityFormProps): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
   const [selectedSeverity, setSelectedSeverity] =
@@ -29,6 +46,18 @@ export function UpdateIssueSeverityForm({
     UpdateIssueSeverityResult | undefined,
     FormData
   >(updateIssueSeverityAction, undefined);
+  const permissionState = getPermissionState(
+    "issues.update.severity",
+    accessLevel,
+    ownershipContext
+  );
+  const deniedReason = permissionState.allowed
+    ? null
+    : getPermissionDeniedReason(
+        "issues.update.severity",
+        accessLevel,
+        ownershipContext
+      );
 
   // Auto-submit form when pending severity changes
   useEffect(() => {
@@ -43,6 +72,23 @@ export function UpdateIssueSeverityForm({
     setPendingSeverity(newSeverity);
   };
 
+  if (
+    !permissionState.allowed &&
+    permissionState.reason === "unauthenticated"
+  ) {
+    return (
+      <IssueBadge type="severity" value={currentSeverity} showTooltip={false} />
+    );
+  }
+
+  const selectControl = (
+    <SeveritySelect
+      value={selectedSeverity}
+      onValueChange={handleValueChange}
+      disabled={isPending || !permissionState.allowed}
+    />
+  );
+
   return (
     <form
       ref={formRef}
@@ -52,12 +98,17 @@ export function UpdateIssueSeverityForm({
     >
       <input type="hidden" name="issueId" value={issueId} />
       <input type="hidden" name="severity" value={selectedSeverity} />
-      <div className="relative">
-        <SeveritySelect
-          value={selectedSeverity}
-          onValueChange={handleValueChange}
-          disabled={isPending}
-        />
+      <div className="relative" title={deniedReason ?? undefined}>
+        {permissionState.allowed ? (
+          selectControl
+        ) : (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>{selectControl}</TooltipTrigger>
+              <TooltipContent>{deniedReason}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
         {isPending && (
           <div className="absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none">
             <Loader2 className="size-4 animate-spin text-muted-foreground" />

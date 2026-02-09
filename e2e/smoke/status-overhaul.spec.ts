@@ -33,12 +33,16 @@ test.describe("Status Overhaul E2E", () => {
     // 2. Verify redirect and badges
     await expect(page).toHaveURL(/\/m\/TAF\/i\/[0-9]+/);
 
-    await expect(page.getByTestId("issue-status-badge")).toHaveText(/New/i);
-    await expect(page.getByTestId("issue-severity-badge")).toHaveText(
+    await expect(page.getByTestId("issue-status-badge").first()).toHaveText(
+      /New/i
+    );
+    await expect(page.getByTestId("issue-severity-badge").first()).toHaveText(
       /Unplayable/i
     );
-    await expect(page.getByTestId("issue-priority-badge")).toHaveText(/High/i);
-    await expect(page.getByTestId("issue-frequency-badge")).toHaveText(
+    await expect(page.getByTestId("issue-priority-badge").first()).toHaveText(
+      /High/i
+    );
+    await expect(page.getByTestId("issue-frequency-badge").first()).toHaveText(
       /Frequent/i
     );
 
@@ -46,7 +50,7 @@ test.describe("Status Overhaul E2E", () => {
     await selectOption(page, "issue-status-select", "in_progress");
 
     // 4. Verify status change in badge and timeline
-    await expect(page.getByTestId("issue-status-badge")).toHaveText(
+    await expect(page.getByTestId("issue-status-badge").first()).toHaveText(
       /In Progress/i
     );
     // 5. Verify actor attribution on the system timeline event

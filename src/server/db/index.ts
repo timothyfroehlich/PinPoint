@@ -2,14 +2,18 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
 
-if (!process.env["DATABASE_URL"]) {
+// Supabase Vercel integration sets POSTGRES_URL; local dev uses DATABASE_URL
+const rawDatabaseUrl =
+  process.env["POSTGRES_URL"] ?? process.env["DATABASE_URL"];
+
+if (!rawDatabaseUrl) {
   throw new Error(
-    "DATABASE_URL is not set. Please set it in your .env.local file."
+    "Database URL is not set. Set POSTGRES_URL (Supabase integration) or DATABASE_URL (.env.local)."
   );
 }
 
 // Strip surrounding quotes if present (handles both single and double quotes)
-const databaseUrl = process.env["DATABASE_URL"].replace(/^["']|["']$/g, "");
+const databaseUrl = rawDatabaseUrl.replace(/^["']|["']$/g, "");
 
 /**
  * Persist the database connection across hot reloads in development.

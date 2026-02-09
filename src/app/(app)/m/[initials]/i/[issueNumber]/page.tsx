@@ -9,7 +9,7 @@ import { PageShell } from "~/components/layout/PageShell";
 import { IssueTimeline } from "~/components/issues/IssueTimeline";
 import { IssueSidebar } from "~/components/issues/IssueSidebar";
 import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
-import { getMachineOwnerName } from "~/lib/issues/owner";
+import { getMachineOwnerId, getMachineOwnerName } from "~/lib/issues/owner";
 import { formatIssueId } from "~/lib/issues/utils";
 import { ImageGallery } from "~/components/images/ImageGallery";
 import type { Issue, IssueWithAllRelations } from "~/lib/types";
@@ -17,9 +17,13 @@ import { BackToIssuesLink } from "~/components/issues/BackToIssuesLink";
 import { getLastIssuesPath } from "~/lib/cookies/preferences";
 import { canEditIssueTitle } from "~/lib/permissions";
 import { EditableIssueTitle } from "./editable-issue-title";
+import {
+  type OwnershipContext,
+  getAccessLevel,
+} from "~/lib/permissions/helpers";
 
 /**
- * Issue Detail Page (Protected Route)
+ * Issue Detail Page
  *
  * Displays issue details, timeline, and update actions.
  */
@@ -34,16 +38,12 @@ export default async function IssueDetailPage({
   // Read user preferences from cookies
   const issuesPath = await getLastIssuesPath();
 
-  // Auth guard
+  // Load auth context for permission-aware rendering
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    const next = encodeURIComponent(`/m/${initials}/i/${issueNumber}`);
-    redirect(`/login?next=${next}`);
-  }
   const issueNum = parseInt(issueNumber, 10);
 
   if (isNaN(issueNum) || issueNum < 1) {
@@ -149,10 +149,12 @@ export default async function IssueDetailPage({
       .where(notInArray(userProfiles.role, ["guest"]))
       .orderBy(asc(userProfiles.name)),
     // Fetch current user's profile for timeline permissions
-    db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, user.id),
-      columns: { name: true, role: true },
-    }),
+    user?.id
+      ? db.query.userProfiles.findFirst({
+          where: eq(userProfiles.id, user.id),
+          columns: { name: true, role: true },
+        })
+      : Promise.resolve(null),
   ]);
 
   if (!issue) {
@@ -162,12 +164,20 @@ export default async function IssueDetailPage({
   // Cast issue to IssueWithAllRelations for type safety
   const issueWithRelations = issue as unknown as IssueWithAllRelations;
   const ownerName = getMachineOwnerName(issueWithRelations);
+  const accessLevel = getAccessLevel(currentUserProfile?.role);
+  const ownershipContext: OwnershipContext = {
+    userId: user?.id,
+    reporterId: issueWithRelations.reportedBy,
+    machineOwnerId: getMachineOwnerId(issueWithRelations),
+  };
 
   // Compute title edit permission
-  const userCanEditTitle = canEditIssueTitle(
-    { id: user.id, role: currentUserProfile?.role ?? "guest" },
-    { reportedBy: issue.reportedBy, assignedTo: issue.assignedTo }
-  );
+  const userCanEditTitle = user
+    ? canEditIssueTitle(
+        { id: user.id, role: currentUserProfile?.role ?? "guest" },
+        { reportedBy: issue.reportedBy, assignedTo: issue.assignedTo }
+      )
+    : false;
 
   return (
     <PageShell className="space-y-8" size="wide">
@@ -247,10 +257,10 @@ export default async function IssueDetailPage({
           </h2>
           <IssueTimeline
             issue={issueWithRelations}
-            currentUserId={user.id}
-            currentUserRole={currentUserProfile?.role ?? "guest"}
+            currentUserId={user?.id ?? null}
+            currentUserRole={accessLevel}
             currentUserInitials={
-              currentUserProfile?.name.slice(0, 2).toUpperCase() ?? "ME"
+              currentUserProfile?.name.slice(0, 2).toUpperCase() ?? "??"
             }
           />
         </section>
@@ -259,7 +269,9 @@ export default async function IssueDetailPage({
         <IssueSidebar
           issue={issueWithRelations}
           allUsers={allUsers}
-          currentUserId={user.id}
+          currentUserId={user?.id ?? null}
+          accessLevel={accessLevel}
+          ownershipContext={ownershipContext}
         />
       </div>
     </PageShell>

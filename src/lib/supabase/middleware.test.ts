@@ -159,4 +159,14 @@ describe("updateSession autologin", () => {
 
     expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled();
   });
+
+  it("allows unauthenticated access to issue detail pages", async () => {
+    const supabase = createSupabaseAuthMocks(null, null);
+    createServerClientMock.mockReturnValue(supabase);
+
+    const request = makeRequest("http://localhost/m/AFM/i/1");
+    const response = await updateSession(request);
+
+    expect(response.headers.get("location")).toBeNull();
+  });
 });
