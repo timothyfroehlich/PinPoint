@@ -35,7 +35,6 @@ from pinpoint_wt_lib import (
     merge_env_local,
 )
 
-
 # =============================================================================
 # Configuration
 # =============================================================================
@@ -43,16 +42,30 @@ from pinpoint_wt_lib import (
 # Static worktree mappings (preserved from sync_worktrees.py)
 STATIC_WORKTREES = {
     "PinPoint": {"nextjs_offset": 0, "supabase_offset": 0, "project_id": "pinpoint"},
-    "PinPoint-Secondary": {"nextjs_offset": 100, "supabase_offset": 1000, "project_id": "pinpoint-secondary"},
-    "PinPoint-review": {"nextjs_offset": 200, "supabase_offset": 2000, "project_id": "pinpoint-review"},
-    "PinPoint-AntiGravity": {"nextjs_offset": 300, "supabase_offset": 3000, "project_id": "pinpoint-antigravity"},
+    "PinPoint-Secondary": {
+        "nextjs_offset": 100,
+        "supabase_offset": 1000,
+        "project_id": "pinpoint-secondary",
+    },
+    "PinPoint-review": {
+        "nextjs_offset": 200,
+        "supabase_offset": 2000,
+        "project_id": "pinpoint-review",
+    },
+    "PinPoint-AntiGravity": {
+        "nextjs_offset": 300,
+        "supabase_offset": 3000,
+        "project_id": "pinpoint-antigravity",
+    },
 }
 
 # Ephemeral worktree configuration
 EPHEMERAL_OFFSET_MIN = 4000
 EPHEMERAL_OFFSET_MAX = 9900
 EPHEMERAL_OFFSET_STEP = 100
-EPHEMERAL_SLOTS = (EPHEMERAL_OFFSET_MAX - EPHEMERAL_OFFSET_MIN) // EPHEMERAL_OFFSET_STEP + 1  # 60 slots
+EPHEMERAL_SLOTS = (
+    EPHEMERAL_OFFSET_MAX - EPHEMERAL_OFFSET_MIN
+) // EPHEMERAL_OFFSET_STEP + 1  # 60 slots
 
 # Worktree directories
 EPHEMERAL_WORKTREE_BASE = Path("../pinpoint-worktrees")
@@ -61,6 +74,7 @@ EPHEMERAL_WORKTREE_BASE = Path("../pinpoint-worktrees")
 # =============================================================================
 # Port Allocation
 # =============================================================================
+
 
 def compute_base_offset(branch_name: str) -> int:
     """
@@ -84,7 +98,7 @@ def get_offset_from_env(worktree_path: Path) -> Optional[int]:
     try:
         content = env_file.read_text()
         # Look for NEXT_PUBLIC_SUPABASE_URL=http://localhost:XXXXX
-        match = re.search(r'NEXT_PUBLIC_SUPABASE_URL=http://localhost:(\d+)', content)
+        match = re.search(r"NEXT_PUBLIC_SUPABASE_URL=http://localhost:(\d+)", content)
         if match:
             api_port = int(match.group(1))
             return api_port - BASE_PORT_API
@@ -101,11 +115,13 @@ def get_all_worktree_paths() -> list[Path]:
     try:
         result = subprocess.run(
             ["git", "worktree", "list", "--porcelain"],
-            capture_output=True, text=True, check=True
+            capture_output=True,
+            text=True,
+            check=True,
         )
 
         paths = []
-        for line in result.stdout.strip().split('\n'):
+        for line in result.stdout.strip().split("\n"):
             if line.startswith("worktree "):
                 paths.append(Path(line[9:]))
         return paths
@@ -140,7 +156,10 @@ def find_free_offset(branch_name: str) -> int:
 
     # Linear probing: try base, then base+100, base+200, etc.
     for i in range(EPHEMERAL_SLOTS):
-        candidate = EPHEMERAL_OFFSET_MIN + ((base - EPHEMERAL_OFFSET_MIN + i * EPHEMERAL_OFFSET_STEP) % (EPHEMERAL_SLOTS * EPHEMERAL_OFFSET_STEP))
+        candidate = EPHEMERAL_OFFSET_MIN + (
+            (base - EPHEMERAL_OFFSET_MIN + i * EPHEMERAL_OFFSET_STEP)
+            % (EPHEMERAL_SLOTS * EPHEMERAL_OFFSET_STEP)
+        )
         if candidate not in used:
             return candidate
 
@@ -172,13 +191,13 @@ def generate_config_toml(worktree_path: Path, port_config: PortConfig) -> str:
         r'^project_id = ".*"',
         f'project_id = "{port_config.project_id}"',
         content,
-        flags=re.MULTILINE
+        flags=re.MULTILINE,
     )
 
     # Replace ports in sections using section-aware replacement
     def replace_in_section(content: str, section: str, key: str, value: int) -> str:
-        pattern = rf'(\[{re.escape(section)}\].*?)^({key} = )\d+'
-        replacement = rf'\g<1>\g<2>{value}'
+        pattern = rf"(\[{re.escape(section)}\].*?)^({key} = )\d+"
+        replacement = rf"\g<1>\g<2>{value}"
         return re.sub(pattern, replacement, content, flags=re.MULTILINE | re.DOTALL)
 
     content = replace_in_section(content, "api", "port", port_config.api_port)
@@ -186,15 +205,19 @@ def generate_config_toml(worktree_path: Path, port_config: PortConfig) -> str:
     content = replace_in_section(content, "db", "shadow_port", port_config.shadow_port)
     content = replace_in_section(content, "db.pooler", "port", port_config.pooler_port)
     content = replace_in_section(content, "inbucket", "port", port_config.inbucket_port)
-    content = replace_in_section(content, "inbucket", "smtp_port", port_config.smtp_port)
-    content = replace_in_section(content, "inbucket", "pop3_port", port_config.pop3_port)
+    content = replace_in_section(
+        content, "inbucket", "smtp_port", port_config.smtp_port
+    )
+    content = replace_in_section(
+        content, "inbucket", "pop3_port", port_config.pop3_port
+    )
 
     # Update site_url in auth section
     content = re.sub(
         r'^(site_url = )"[^"]*"',
         rf'\1"{port_config.site_url}"',
         content,
-        flags=re.MULTILINE
+        flags=re.MULTILINE,
     )
 
     return CONFIG_HEADER + content
@@ -216,6 +239,7 @@ def write_protected_file(path: Path, content: str) -> None:
 # Commands
 # =============================================================================
 
+
 def cmd_create(args: argparse.Namespace) -> int:
     """Create a new ephemeral worktree."""
     branch = args.branch
@@ -230,17 +254,23 @@ def cmd_create(args: argparse.Namespace) -> int:
         return 1
 
     # Check if branch already exists (local or remote)
-    branch_exists_locally = subprocess.run(
-        ["git", "rev-parse", "--verify", f"refs/heads/{branch}"],
-        capture_output=True
-    ).returncode == 0
+    branch_exists_locally = (
+        subprocess.run(
+            ["git", "rev-parse", "--verify", f"refs/heads/{branch}"],
+            capture_output=True,
+        ).returncode
+        == 0
+    )
 
     branch_exists_remote = False
     if not branch_exists_locally:
-        branch_exists_remote = subprocess.run(
-            ["git", "rev-parse", "--verify", f"refs/remotes/origin/{branch}"],
-            capture_output=True
-        ).returncode == 0
+        branch_exists_remote = (
+            subprocess.run(
+                ["git", "rev-parse", "--verify", f"refs/remotes/origin/{branch}"],
+                capture_output=True,
+            ).returncode
+            == 0
+        )
 
     # Fetch latest from origin
     print("  📥 Fetching from origin...")
@@ -270,10 +300,12 @@ def cmd_create(args: argparse.Namespace) -> int:
         nextjs_offset=nextjs_offset,
         supabase_offset=supabase_offset,
         project_id=project_id,
-        is_static=False
+        is_static=False,
     )
 
-    print(f"  🔌 Allocated ports: Next.js={port_config.nextjs_port}, API={port_config.api_port}, DB={port_config.db_port}")
+    print(
+        f"  🔌 Allocated ports: Next.js={port_config.nextjs_port}, API={port_config.api_port}, DB={port_config.db_port}"
+    )
 
     # Create parent directories
     worktree_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -283,20 +315,25 @@ def cmd_create(args: argparse.Namespace) -> int:
         print(f"  📂 Creating worktree for existing local branch: {branch}")
         result = subprocess.run(
             ["git", "worktree", "add", str(worktree_dir), branch],
-            capture_output=True, text=True
+            capture_output=True,
+            text=True,
         )
     elif branch_exists_remote:
         print(f"  📂 Creating worktree for existing remote branch: {branch}")
         result = subprocess.run(
             ["git", "worktree", "add", str(worktree_dir), branch],
-            capture_output=True, text=True
+            capture_output=True,
+            text=True,
         )
     else:
         base_ref = args.base
-        print(f"  📂 Creating worktree with new branch at {worktree_dir} (from {base_ref})...")
+        print(
+            f"  📂 Creating worktree with new branch at {worktree_dir} (from {base_ref})..."
+        )
         result = subprocess.run(
             ["git", "worktree", "add", "-b", branch, str(worktree_dir), base_ref],
-            capture_output=True, text=True
+            capture_output=True,
+            text=True,
         )
 
     if result.returncode != 0:
@@ -320,7 +357,8 @@ def cmd_create(args: argparse.Namespace) -> int:
     result = subprocess.run(
         ["pnpm", "install", "--frozen-lockfile"],
         cwd=worktree_dir,
-        capture_output=True, text=True
+        capture_output=True,
+        text=True,
     )
     if result.returncode != 0:
         print(f"  ⚠️  Warning: pnpm install failed: {result.stderr[:200]}")
@@ -358,7 +396,9 @@ def cmd_list(args: argparse.Namespace) -> int:
         try:
             result = subprocess.run(
                 ["git", "-C", str(path), "rev-parse", "--abbrev-ref", "HEAD"],
-                capture_output=True, text=True, check=True
+                capture_output=True,
+                text=True,
+                check=True,
             )
             branch = result.stdout.strip()
         except subprocess.CalledProcessError:
@@ -399,26 +439,27 @@ def cmd_remove(args: argparse.Namespace) -> int:
 
     # Stop Supabase if running
     print("  🛑 Stopping Supabase...")
-    subprocess.run(
-        ["supabase", "stop"],
-        cwd=worktree_dir,
-        capture_output=True
-    )
+    subprocess.run(["supabase", "stop"], cwd=worktree_dir, capture_output=True)
 
     # Remove Docker volumes
     print(f"  🐳 Removing Docker volumes for project: {project_id}...")
     result = subprocess.run(
-        ["docker", "volume", "ls", "--filter", f"label=com.supabase.cli.project={project_id}", "-q"],
-        capture_output=True, text=True
+        [
+            "docker",
+            "volume",
+            "ls",
+            "--filter",
+            f"label=com.supabase.cli.project={project_id}",
+            "-q",
+        ],
+        capture_output=True,
+        text=True,
     )
-    volumes = result.stdout.strip().split('\n')
+    volumes = result.stdout.strip().split("\n")
     volumes = [v for v in volumes if v]  # Filter empty strings
 
     if volumes:
-        subprocess.run(
-            ["docker", "volume", "rm"] + volumes,
-            capture_output=True
-        )
+        subprocess.run(["docker", "volume", "rm"] + volumes, capture_output=True)
         print(f"     Removed {len(volumes)} volume(s)")
     else:
         print("     No volumes found")
@@ -427,7 +468,8 @@ def cmd_remove(args: argparse.Namespace) -> int:
     print("  📂 Removing worktree...")
     result = subprocess.run(
         ["git", "worktree", "remove", "--force", str(worktree_dir)],
-        capture_output=True, text=True
+        capture_output=True,
+        text=True,
     )
     if result.returncode != 0:
         print(f"  ⚠️  Warning: {result.stderr}")
@@ -437,7 +479,9 @@ def cmd_remove(args: argparse.Namespace) -> int:
 
     print()
     print("✅ Worktree removed successfully!")
-    print(f"   Branch '{branch}' preserved (delete manually with: git branch -d -- '{branch}' (or: git branch -D -- '{branch}' to force))")
+    print(
+        f"   Branch '{branch}' preserved (delete manually with: git branch -d -- '{branch}' (or: git branch -D -- '{branch}' to force))"
+    )
     print()
 
     return 0
@@ -464,7 +508,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
                 nextjs_offset=config["nextjs_offset"],
                 supabase_offset=config["supabase_offset"],
                 project_id=config["project_id"],
-                is_static=True
+                is_static=True,
             )
         else:
             # Extract offset from existing .env.local or compute new
@@ -474,7 +518,9 @@ def cmd_sync(args: argparse.Namespace) -> int:
                 try:
                     result = subprocess.run(
                         ["git", "-C", str(path), "rev-parse", "--abbrev-ref", "HEAD"],
-                        capture_output=True, text=True, check=True
+                        capture_output=True,
+                        text=True,
+                        check=True,
                     )
                     branch = result.stdout.strip()
                     offset = find_free_offset(branch)
@@ -486,7 +532,9 @@ def cmd_sync(args: argparse.Namespace) -> int:
             try:
                 result = subprocess.run(
                     ["git", "-C", str(path), "rev-parse", "--abbrev-ref", "HEAD"],
-                    capture_output=True, text=True, check=True
+                    capture_output=True,
+                    text=True,
+                    check=True,
                 )
                 branch = result.stdout.strip()
             except subprocess.CalledProcessError:
@@ -497,7 +545,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
                 nextjs_offset=offset // 10,
                 supabase_offset=offset,
                 project_id=branch_to_project_id(branch),
-                is_static=False
+                is_static=False,
             )
 
         # Check if template exists
@@ -520,7 +568,9 @@ def cmd_sync(args: argparse.Namespace) -> int:
             env_content = merge_env_local(path, port_config)
             env_path = path / ".env.local"
             write_protected_file(env_path, env_content)
-            print(f"    ✅ .env.local (Port={port_config.nextjs_port}, user keys preserved)")
+            print(
+                f"    ✅ .env.local (Port={port_config.nextjs_port}, user keys preserved)"
+            )
         except Exception as e:
             print(f"    ❌ .env.local: {e}")
 
@@ -535,6 +585,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
 # Main
 # =============================================================================
 
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="PinPoint Worktree Manager - Manage ephemeral worktrees with auto port allocation",
@@ -547,7 +598,7 @@ Examples:
   ./pinpoint-wt.py sync                                 Regenerate config for current worktree
   ./pinpoint-wt.py sync --all                           Regenerate config for all worktrees
   ./pinpoint-wt.py remove feat/new-feature              Remove worktree and cleanup
-        """
+        """,
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -555,8 +606,12 @@ Examples:
     # create
     create_parser = subparsers.add_parser("create", help="Create ephemeral worktree")
     create_parser.add_argument("branch", help="Branch name (e.g., feat/new-feature)")
-    create_parser.add_argument("--base", "-b", default="origin/main",
-                               help="Base revision/branch to create from (default: origin/main)")
+    create_parser.add_argument(
+        "--base",
+        "-b",
+        default="origin/main",
+        help="Base revision/branch to create from (default: origin/main)",
+    )
 
     # list
     subparsers.add_parser("list", help="List all worktrees with port assignments")
