@@ -165,15 +165,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Install Ruff
+        run: pipx install ruff
+
       - name: Run ruff check
-        uses: astral-sh/ruff-action@v3
-        with:
-          args: "check scripts/ pinpoint-wt.py"
+        run: ruff check scripts/ pinpoint-wt.py .agent/skills/*/scripts/*.py
 
       - name: Run ruff format check
-        uses: astral-sh/ruff-action@v3
-        with:
-          args: "format --check scripts/ pinpoint-wt.py"
+        run: ruff format --check scripts/ pinpoint-wt.py .agent/skills/*/scripts/*.py
 
   build:
     name: Build
