@@ -83,14 +83,11 @@ test.describe("Profile Settings", () => {
       const uploadButton = page.getByRole("button", { name: "Upload Photo" });
       await expect(uploadButton).toBeVisible();
 
-      // Scope avatar checks to the settings avatar section (not the header user menu)
-      const settingsAvatar = page
-        .locator("div")
-        .filter({ has: uploadButton })
-        .locator('[data-slot="avatar-image"]');
+      // Track avatar images on the page (settings section + header user menu)
+      const avatarImages = page.locator('[data-slot="avatar-image"]');
 
-      // No avatar image should be present initially in the settings section
-      await expect(settingsAvatar).toHaveCount(0);
+      // No avatar images should be present initially (new user, no avatar)
+      await expect(avatarImages).toHaveCount(0);
 
       // Upload a valid test image
       const testImagePath = join(__dirname, "..", "fixtures", "test-image.png");
@@ -105,10 +102,13 @@ test.describe("Profile Settings", () => {
         timeout: 15000,
       });
 
-      // After router refresh, the avatar image should now be rendered
+      // After router refresh, avatar images appear in settings + header (2 total)
+      await expect(avatarImages).toHaveCount(2, { timeout: 10000 });
       // Mock blob storage serves from /uploads/, real storage from blob URLs
-      await expect(settingsAvatar).toBeVisible({ timeout: 10000 });
-      await expect(settingsAvatar).toHaveAttribute("src", /uploads\/|blob/);
+      await expect(avatarImages.first()).toHaveAttribute(
+        "src",
+        /uploads\/|blob/
+      );
 
       // The Remove button should now be visible
       const removeButton = page.getByRole("button", { name: "Remove" });
