@@ -3,7 +3,7 @@ import { db, type DbTransaction } from "~/server/db";
 import {
   notifications,
   notificationPreferences,
-  authUsers,
+  userProfiles,
   issues,
   issueWatchers,
   machines,
@@ -175,9 +175,9 @@ export async function createNotification(
 
   // 3. Fetch Emails for all recipients (to avoid N+1 in loop)
   const users = await tx
-    .select({ id: authUsers.id, email: authUsers.email })
-    .from(authUsers)
-    .where(inArray(authUsers.id, [...recipientIds]));
+    .select({ id: userProfiles.id, email: userProfiles.email })
+    .from(userProfiles)
+    .where(inArray(userProfiles.id, [...recipientIds]));
 
   const emailMap = new Map(users.map((u) => [u.id, u.email]));
 

@@ -2,7 +2,7 @@
 
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { userProfiles, invitedUsers, authUsers } from "~/server/db/schema";
+import { userProfiles, invitedUsers } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { sendInviteEmail } from "~/lib/email/invite";
@@ -116,8 +116,8 @@ export async function inviteUser(
     const validated = inviteUserSchema.parse(rawData);
 
     // Check if user already exists
-    const existingUser = await db.query.authUsers.findFirst({
-      where: eq(authUsers.email, validated.email),
+    const existingUser = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.email, validated.email),
     });
 
     if (existingUser) {

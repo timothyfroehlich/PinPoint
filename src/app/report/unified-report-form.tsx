@@ -37,10 +37,6 @@ interface Machine {
   initials: string;
 }
 
-interface User {
-  email?: string;
-}
-
 export interface ActionState {
   error?: string;
   success?: boolean;
@@ -54,7 +50,7 @@ interface Assignee {
 interface UnifiedReportFormProps {
   machinesList: Machine[];
   defaultMachineId?: string | undefined;
-  user: User | null; // Supabase User
+  userAuthenticated: boolean;
   accessLevel: AccessLevel;
   assignees?: Assignee[];
   initialError?: string | undefined;
@@ -65,7 +61,7 @@ interface UnifiedReportFormProps {
 export function UnifiedReportForm({
   machinesList,
   defaultMachineId,
-  user,
+  userAuthenticated,
   accessLevel,
   assignees = [],
   initialError,
@@ -376,7 +372,7 @@ export function UnifiedReportForm({
                       <ImageUploadButton
                         issueId="new"
                         currentCount={uploadedImages.length}
-                        maxCount={user ? 4 : 2}
+                        maxCount={userAuthenticated ? 4 : 2}
                         onUploadComplete={(img) =>
                           setUploadedImages((prev) => [...prev, img])
                         }
@@ -404,7 +400,7 @@ export function UnifiedReportForm({
                 </div>
 
                 {/* Reporter Info (Only if NOT logged in) */}
-                {!user ? (
+                {!userAuthenticated ? (
                   <div className="space-y-3 pt-2">
                     <div className="space-y-1">
                       <h3 className="text-sm font-semibold text-on-surface">

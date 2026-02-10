@@ -19,7 +19,6 @@ interface IssueRowProps {
     | "createdAt"
     | "machineInitials"
     | "reporterName"
-    | "reporterEmail"
   > & {
     machine: {
       name: string;

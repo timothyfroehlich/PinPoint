@@ -63,6 +63,20 @@ export const getIssues = cache(
     return (await db.query.issues.findMany({
       where: conditions.length > 0 ? and(...conditions) : undefined,
       orderBy: desc(issues.createdAt),
+      columns: {
+        id: true,
+        issueNumber: true,
+        title: true,
+        status: true,
+        severity: true,
+        priority: true,
+        frequency: true,
+        createdAt: true,
+        updatedAt: true,
+        machineInitials: true,
+        reporterName: true,
+        assignedTo: true,
+      },
       with: {
         machine: {
           columns: {

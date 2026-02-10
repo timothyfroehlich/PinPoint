@@ -43,6 +43,29 @@ describe("getIssues", () => {
     );
   });
 
+  it("should request minimal issue columns without reporter emails", async () => {
+    await getIssues({});
+
+    const columns = (db.query.issues.findMany as unknown as vi.Mock).mock
+      .calls[0]?.[0]?.columns;
+
+    expect(columns).toMatchObject({
+      id: true,
+      issueNumber: true,
+      title: true,
+      status: true,
+      severity: true,
+      priority: true,
+      frequency: true,
+      createdAt: true,
+      updatedAt: true,
+      machineInitials: true,
+      reporterName: true,
+      assignedTo: true,
+    });
+    expect(columns?.reporterEmail).toBeUndefined();
+  });
+
   it("should filter by machineInitials", async () => {
     const machineInitials = "MM";
     await getIssues({ machineInitials });
