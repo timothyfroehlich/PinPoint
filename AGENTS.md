@@ -59,6 +59,8 @@ We use git worktrees for parallel environments. There are two types:
 
 Created with `./pinpoint-wt.py` for quick PR reviews or parallel development. Ports are hash-allocated to avoid conflicts.
 
+**Worktree Path Resolution**: Branch names with slashes (e.g., `feat/my-feature`) create nested directories. **Always use `git worktree list`** to find the actual path — never guess it. Example: branch `feat/f3r-rename-env-vars` lives at `/home/froeht/Code/pinpoint-worktrees/feat/f3r-rename-env-vars`, NOT `.../f3r-rename-env-vars`.
+
 **Commands**:
 
 ```bash
