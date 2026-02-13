@@ -10,6 +10,7 @@ import { z } from "zod";
 const updatePreferencesSchema = z.object({
   emailEnabled: z.boolean(),
   inAppEnabled: z.boolean(),
+  suppressOwnActions: z.boolean(),
 
   // Granular Preferences
   emailNotifyOnAssigned: z.boolean(),
@@ -46,6 +47,7 @@ export async function updateNotificationPreferencesAction(
   const rawData = {
     emailEnabled: formData.get("emailEnabled") === "on",
     inAppEnabled: formData.get("inAppEnabled") === "on",
+    suppressOwnActions: formData.get("suppressOwnActions") === "on",
 
     // Granular Preferences
     emailNotifyOnAssigned: formData.get("emailNotifyOnAssigned") === "on",

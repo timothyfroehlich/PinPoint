@@ -191,19 +191,25 @@ export async function createNotification(
       userId,
       emailEnabled: true,
       inAppEnabled: true,
+      suppressOwnActions: false,
       emailNotifyOnAssigned: true,
       inAppNotifyOnAssigned: true,
-      emailNotifyOnStatusChange: true,
-      inAppNotifyOnStatusChange: true,
-      emailNotifyOnNewComment: true,
-      inAppNotifyOnNewComment: true,
+      emailNotifyOnStatusChange: false,
+      inAppNotifyOnStatusChange: false,
+      emailNotifyOnNewComment: false,
+      inAppNotifyOnNewComment: false,
       emailNotifyOnNewIssue: true,
-      inAppNotifyOnNewIssue: true,
+      inAppNotifyOnNewIssue: false,
       emailWatchNewIssuesGlobal: false,
       inAppWatchNewIssuesGlobal: false,
-      emailNotifyOnMachineOwnershipChange: true,
-      inAppNotifyOnMachineOwnershipChange: true,
+      emailNotifyOnMachineOwnershipChange: false,
+      inAppNotifyOnMachineOwnershipChange: false,
     };
+
+    // Skip this recipient entirely if they triggered the action and have suppressOwnActions enabled
+    if (actorId && userId === actorId && prefs.suppressOwnActions) {
+      continue;
+    }
 
     // Check specific toggle
     let emailNotify = false;
@@ -267,7 +273,8 @@ export async function createNotification(
             resolvedMachineName,
             resolvedFormattedIssueId,
             commentContent,
-            newStatus
+            newStatus,
+            userId
           ),
         });
       }

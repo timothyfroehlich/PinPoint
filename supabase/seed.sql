@@ -42,10 +42,12 @@ BEGIN
   );
 
   -- Create default notification preferences
+  -- New user defaults: only assigned + new issue on owned machines (email) are ON
   INSERT INTO public.notification_preferences (
     user_id,
     email_enabled,
     in_app_enabled,
+    suppress_own_actions,
     email_notify_on_assigned,
     in_app_notify_on_assigned,
     email_notify_on_status_change,
@@ -62,12 +64,13 @@ BEGIN
   VALUES (
     NEW.id,
     true, true, -- Master switches
+    false,      -- Suppress own actions (off by default)
     true, true, -- Assigned
-    true, true, -- Status change
-    true, true, -- New comment
-    true, true, -- New issue (owned)
+    false, false, -- Status change
+    false, false, -- New comment
+    true, false,  -- New issue on owned machines (email only)
     false, false, -- Global watch
-    true, true -- Machine ownership change
+    false, false  -- Machine ownership change
   );
 
   -- Transfer guest issues to newly created account

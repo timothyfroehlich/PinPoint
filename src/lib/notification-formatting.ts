@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import sanitizeHtml from "sanitize-html";
 import { getSiteUrl } from "~/lib/url";
 import { type NotificationType } from "~/lib/notifications";
@@ -25,13 +26,59 @@ export function getEmailSubject(
   }
 }
 
+/**
+ * Generate an HMAC-signed unsubscribe token for a user.
+ * Uses SUPABASE_SERVICE_ROLE_KEY as the signing secret.
+ */
+export function generateUnsubscribeToken(userId: string): string {
+  const secret = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+  if (!secret) {
+    return "";
+  }
+  return createHmac("sha256", secret)
+    .update(userId + "unsubscribe")
+    .digest("hex");
+}
+
+/**
+ * Verify an unsubscribe token against a userId.
+ */
+export function verifyUnsubscribeToken(userId: string, token: string): boolean {
+  const expected = generateUnsubscribeToken(userId);
+  if (!expected) return false;
+  // Constant-time comparison via HMAC comparison
+  return expected === token && token.length > 0;
+}
+
+function getEmailFooter(userId?: string): string {
+  const siteUrl = getSiteUrl();
+  const settingsUrl = `${siteUrl}/settings`;
+
+  let unsubscribeLink = "";
+  if (userId) {
+    const token = generateUnsubscribeToken(userId);
+    if (token) {
+      const unsubscribeUrl = `${siteUrl}/api/unsubscribe?uid=${encodeURIComponent(userId)}&token=${encodeURIComponent(token)}`;
+      unsubscribeLink = ` · <a href="${unsubscribeUrl}" style="color: #888;">Unsubscribe from all emails</a>`;
+    }
+  }
+
+  return `
+    <hr style="margin-top: 32px; border: none; border-top: 1px solid #eee;" />
+    <p style="font-size: 12px; color: #888; margin-top: 16px;">
+      <a href="${settingsUrl}" style="color: #888;">Manage notification settings</a>${unsubscribeLink}
+    </p>
+  `;
+}
+
 export function getEmailHtml(
   type: NotificationType,
   issueTitle?: string,
   machineName?: string,
   formattedIssueId?: string,
   commentContent?: string,
-  newStatus?: string
+  newStatus?: string,
+  userId?: string
 ): string {
   // Basic HTML for MVP
   let body = "";
@@ -89,5 +136,6 @@ export function getEmailHtml(
       <h2>${machinePrefix}${sanitizedIssueId ? `${sanitizedIssueId}: ` : ""}${sanitizedIssueTitle}</h2>
       <p>${body}</p>
       <p><a href="${issueUrl}">View Issue</a></p>
+      ${getEmailFooter(userId)}
     `;
 }

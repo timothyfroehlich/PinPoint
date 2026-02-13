@@ -100,6 +100,13 @@ describe("createNotification (Integration)", () => {
       userId: actor.id,
     });
 
+    // Explicitly enable notifications for this event type
+    await db.insert(notificationPreferences).values({
+      userId: actor.id,
+      inAppEnabled: true,
+      inAppNotifyOnNewComment: true,
+    });
+
     // Mock auth.users email for actor
     await db.execute(
       sql`INSERT INTO auth.users (id, email) VALUES (${actor.id}, 'actor@test.com')`
@@ -427,6 +434,116 @@ describe("createNotification (Integration)", () => {
     expect(sendEmail).not.toHaveBeenCalled();
   });
 
+  it("should skip actor when suppressOwnActions is enabled", async () => {
+    const db = await getTestDb();
+
+    const [actor] = await db
+      .insert(userProfiles)
+      .values(createTestUser())
+      .returning();
+    const [machine] = await db
+      .insert(machines)
+      .values(createTestMachine({ initials: "SUP" }))
+      .returning();
+    const [issue] = await db
+      .insert(issues)
+      .values(createTestIssue(machine.initials, { issueNumber: 1 }))
+      .returning();
+
+    // Actor watches the issue
+    await db.insert(issueWatchers).values({
+      issueId: issue.id,
+      userId: actor.id,
+    });
+
+    // Set suppressOwnActions = true
+    await db.insert(notificationPreferences).values({
+      userId: actor.id,
+      emailEnabled: true,
+      inAppEnabled: true,
+      suppressOwnActions: true,
+      emailNotifyOnNewComment: true,
+      inAppNotifyOnNewComment: true,
+    });
+
+    await db.execute(
+      sql`INSERT INTO auth.users (id, email) VALUES (${actor.id}, 'suppress@test.com')`
+    );
+
+    // Actor comments on issue they're watching — with includeActor: true (default)
+    await createNotification(
+      {
+        type: "new_comment",
+        resourceId: issue.id,
+        resourceType: "issue",
+        actorId: actor.id,
+        includeActor: true,
+        commentContent: "Test comment",
+      },
+      db
+    );
+
+    // No notifications should be created — actor is suppressed
+    const result = await db.query.notifications.findMany();
+    expect(result).toHaveLength(0);
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("should NOT skip actor when suppressOwnActions is disabled", async () => {
+    const db = await getTestDb();
+
+    const [actor] = await db
+      .insert(userProfiles)
+      .values(createTestUser())
+      .returning();
+    const [machine] = await db
+      .insert(machines)
+      .values(createTestMachine({ initials: "NOSUP" }))
+      .returning();
+    const [issue] = await db
+      .insert(issues)
+      .values(createTestIssue(machine.initials, { issueNumber: 1 }))
+      .returning();
+
+    await db.insert(issueWatchers).values({
+      issueId: issue.id,
+      userId: actor.id,
+    });
+
+    // suppressOwnActions = false (default)
+    await db.insert(notificationPreferences).values({
+      userId: actor.id,
+      emailEnabled: true,
+      inAppEnabled: true,
+      suppressOwnActions: false,
+      emailNotifyOnNewComment: true,
+      inAppNotifyOnNewComment: true,
+    });
+
+    await db.execute(
+      sql`INSERT INTO auth.users (id, email) VALUES (${actor.id}, 'nosuppress@test.com')`
+    );
+
+    await createNotification(
+      {
+        type: "new_comment",
+        resourceId: issue.id,
+        resourceType: "issue",
+        actorId: actor.id,
+        includeActor: true,
+        commentContent: "Test comment",
+      },
+      db
+    );
+
+    // Actor should receive notification since suppressOwnActions is false
+    const result = await db.query.notifications.findMany({
+      where: eq(notifications.userId, actor.id),
+    });
+    expect(result).toHaveLength(1);
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+
   it("should notify machine watchers on new issue", async () => {
     const db = await getTestDb();
 
@@ -444,6 +561,15 @@ describe("createNotification (Integration)", () => {
       machineId: machine.id,
       userId: recipient.id,
       watchMode: "notify",
+    });
+
+    // Explicitly enable notifications for new issue events
+    await db.insert(notificationPreferences).values({
+      userId: recipient.id,
+      emailEnabled: true,
+      inAppEnabled: true,
+      emailNotifyOnNewIssue: true,
+      inAppNotifyOnNewIssue: true,
     });
 
     // Mock auth.users email

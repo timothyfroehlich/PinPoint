@@ -382,6 +382,11 @@ export const notificationPreferences = pgTable(
     emailEnabled: boolean("email_enabled").notNull().default(true),
     inAppEnabled: boolean("in_app_enabled").notNull().default(true),
 
+    // Suppress notifications for own actions (global toggle)
+    suppressOwnActions: boolean("suppress_own_actions")
+      .notNull()
+      .default(false),
+
     // Assignment
     emailNotifyOnAssigned: boolean("email_notify_on_assigned")
       .notNull()
@@ -393,18 +398,18 @@ export const notificationPreferences = pgTable(
     // Status Changes
     emailNotifyOnStatusChange: boolean("email_notify_on_status_change")
       .notNull()
-      .default(true),
+      .default(false),
     inAppNotifyOnStatusChange: boolean("in_app_notify_on_status_change")
       .notNull()
-      .default(true),
+      .default(false),
 
     // New Comments
     emailNotifyOnNewComment: boolean("email_notify_on_new_comment")
       .notNull()
-      .default(true),
+      .default(false),
     inAppNotifyOnNewComment: boolean("in_app_notify_on_new_comment")
       .notNull()
-      .default(true),
+      .default(false),
 
     // New Issues (Owned Machines)
     emailNotifyOnNewIssue: boolean("email_notify_on_new_issue")
@@ -412,7 +417,7 @@ export const notificationPreferences = pgTable(
       .default(true),
     inAppNotifyOnNewIssue: boolean("in_app_notify_on_new_issue")
       .notNull()
-      .default(true),
+      .default(false),
 
     // Global New Issues (Watch All)
     emailWatchNewIssuesGlobal: boolean("email_watch_new_issues_global")
@@ -427,12 +432,12 @@ export const notificationPreferences = pgTable(
       "email_notify_on_machine_ownership_change"
     )
       .notNull()
-      .default(true),
+      .default(false),
     inAppNotifyOnMachineOwnershipChange: boolean(
       "in_app_notify_on_machine_ownership_change"
     )
       .notNull()
-      .default(true),
+      .default(false),
   },
   (t) => ({
     globalWatchEmailIdx: index("idx_notif_prefs_global_watch_email").on(
