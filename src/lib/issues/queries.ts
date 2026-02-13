@@ -10,6 +10,22 @@ import { db } from "~/server/db";
 import { issues } from "~/server/db/schema";
 import { eq, and, desc, isNull, inArray, type SQL } from "drizzle-orm";
 
+/** Column selection shared between getIssues() and the issues page query. */
+export const ISSUE_LIST_COLUMNS = {
+  id: true,
+  issueNumber: true,
+  title: true,
+  status: true,
+  severity: true,
+  priority: true,
+  frequency: true,
+  createdAt: true,
+  updatedAt: true,
+  machineInitials: true,
+  reporterName: true,
+  assignedTo: true,
+} as const;
+
 export interface IssueFilters {
   machineInitials?: string | undefined;
   status?: string | string[] | undefined;
@@ -63,20 +79,7 @@ export const getIssues = cache(
     return (await db.query.issues.findMany({
       where: conditions.length > 0 ? and(...conditions) : undefined,
       orderBy: desc(issues.createdAt),
-      columns: {
-        id: true,
-        issueNumber: true,
-        title: true,
-        status: true,
-        severity: true,
-        priority: true,
-        frequency: true,
-        createdAt: true,
-        updatedAt: true,
-        machineInitials: true,
-        reporterName: true,
-        assignedTo: true,
-      },
+      columns: ISSUE_LIST_COLUMNS,
       with: {
         machine: {
           columns: {
