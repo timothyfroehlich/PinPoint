@@ -163,7 +163,7 @@ export async function updateUserRole(
 export async function updateUserAvatar(
   userId: string,
   avatarUrl: string | null
-) {
+): Promise<void> {
   const { error } = await supabaseAdmin
     .from("user_profiles")
     .update({ avatar_url: avatarUrl })

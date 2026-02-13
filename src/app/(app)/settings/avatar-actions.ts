@@ -6,7 +6,7 @@ import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { uploadToBlob, deleteFromBlob } from "~/lib/blob/client";
-import { validateImageFile } from "~/lib/blob/validation";
+import { validateImageFile, getImageDimensions } from "~/lib/blob/validation";
 import { BLOB_CONFIG } from "~/lib/blob/config";
 import { type Result, ok, err } from "~/lib/result";
 import {
@@ -124,6 +124,22 @@ export async function uploadAvatarAction(
     const validation = validateImageFile(file);
     if (!validation.valid) {
       return err("VALIDATION", validation.error ?? "Invalid image file.");
+    }
+
+    // 3b. Validate image dimensions server-side (defense against bypassed client compression)
+    if (typeof file.arrayBuffer === "function") {
+      const imageBytes = new Uint8Array(await file.arrayBuffer());
+      const dimensions = getImageDimensions(imageBytes);
+      if (
+        dimensions !== null &&
+        (dimensions.width > BLOB_CONFIG.AVATAR.MAX_DIMENSIONS ||
+          dimensions.height > BLOB_CONFIG.AVATAR.MAX_DIMENSIONS)
+      ) {
+        return err(
+          "VALIDATION",
+          `Image dimensions ${dimensions.width}x${dimensions.height} exceed maximum ${BLOB_CONFIG.AVATAR.MAX_DIMENSIONS}x${BLOB_CONFIG.AVATAR.MAX_DIMENSIONS}px.`
+        );
+      }
     }
 
     // 4. Upload to Blob

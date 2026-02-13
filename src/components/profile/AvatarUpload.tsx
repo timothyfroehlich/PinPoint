@@ -55,7 +55,7 @@ export function AvatarUpload({
       return;
     }
 
-    // General image validation (type, dimensions, etc.)
+    // Client-side validation (MIME type and file size only; dimensions checked server-side)
     const validation = validateImageFile(file);
     if (!validation.valid) {
       toast.error(validation.error ?? "Selected file is not a valid image.");
