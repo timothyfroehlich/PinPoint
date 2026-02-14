@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   getEmailHtml,
+  getEmailSubject,
   generateUnsubscribeToken,
   verifyUnsubscribeToken,
 } from "~/lib/notification-formatting";
@@ -123,6 +124,62 @@ describe("Notification Formatting", () => {
     it("should fall back to issues page for invalid initials", () => {
       const html = getEmailHtml("new_issue", "Title", "Machine", "A+B-42");
       expect(html).toContain('href="http://test.com/issues"');
+    });
+  });
+
+  describe("Machine Ownership Changed Email", () => {
+    it("should render added-as-owner body", () => {
+      const html = getEmailHtml(
+        "machine_ownership_changed",
+        undefined,
+        "Medieval Madness",
+        undefined,
+        undefined,
+        "added"
+      );
+      expect(html).toContain("<strong>added</strong>");
+      expect(html).toContain("Medieval Madness");
+      expect(html).toContain("receive notifications for new issues");
+    });
+
+    it("should render removed-as-owner body", () => {
+      const html = getEmailHtml(
+        "machine_ownership_changed",
+        undefined,
+        "Twilight Zone",
+        undefined,
+        undefined,
+        "removed"
+      );
+      expect(html).toContain("<strong>removed</strong>");
+      expect(html).toContain("Twilight Zone");
+      expect(html).toContain("no longer receive notifications");
+    });
+
+    it("should generate correct subject for added owner", () => {
+      const subject = getEmailSubject(
+        "machine_ownership_changed",
+        undefined,
+        "Medieval Madness",
+        undefined,
+        "added"
+      );
+      expect(subject).toBe(
+        "[Medieval Madness] Ownership Update: You have been added as an owner"
+      );
+    });
+
+    it("should generate correct subject for removed owner", () => {
+      const subject = getEmailSubject(
+        "machine_ownership_changed",
+        undefined,
+        "Twilight Zone",
+        undefined,
+        "removed"
+      );
+      expect(subject).toBe(
+        "[Twilight Zone] Ownership Update: You have been removed as an owner"
+      );
     });
   });
 

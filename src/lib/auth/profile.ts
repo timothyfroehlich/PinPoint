@@ -68,23 +68,10 @@ export async function ensureUserProfile(user: User): Promise<void> {
     });
 
     if (!prefs) {
+      // Only userId is required — schema defaults handle all preference values.
+      // This keeps a single source of truth for defaults in the schema.
       await db.insert(notificationPreferences).values({
         userId: user.id,
-        emailEnabled: true,
-        inAppEnabled: true,
-        suppressOwnActions: false,
-        emailNotifyOnAssigned: true,
-        inAppNotifyOnAssigned: true,
-        emailNotifyOnStatusChange: false,
-        inAppNotifyOnStatusChange: false,
-        emailNotifyOnNewComment: false,
-        inAppNotifyOnNewComment: false,
-        emailNotifyOnNewIssue: true,
-        inAppNotifyOnNewIssue: false,
-        emailWatchNewIssuesGlobal: false,
-        inAppWatchNewIssuesGlobal: false,
-        emailNotifyOnMachineOwnershipChange: false,
-        inAppNotifyOnMachineOwnershipChange: false,
       });
     }
 

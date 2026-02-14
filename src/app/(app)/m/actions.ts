@@ -339,7 +339,7 @@ export async function updateMachineAction(
           resourceType: "machine",
           actorId: user.id,
           machineName: machine.name,
-          issueTitle: "removed", // Passes context to email template
+          newStatus: "removed",
           additionalRecipientIds: [oldOwnerId],
         });
       }
@@ -366,7 +366,7 @@ export async function updateMachineAction(
           resourceType: "machine",
           actorId: user.id,
           machineName: machine.name,
-          issueTitle: "added", // Passes context to email template
+          newStatus: "added",
           additionalRecipientIds: [finalOwnerId],
         });
       }

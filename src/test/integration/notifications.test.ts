@@ -573,4 +573,57 @@ describe("createNotification (Integration)", () => {
       })
     );
   });
+
+  it("should always notify for machine_ownership_changed even with granular toggles off", async () => {
+    const db = await getTestDb();
+
+    const [actor] = await db
+      .insert(userProfiles)
+      .values(createTestUser())
+      .returning();
+    const [recipient] = await db
+      .insert(userProfiles)
+      .values(createTestUser({ email: "new-owner@test.com" }))
+      .returning();
+    const [machine] = await db
+      .insert(machines)
+      .values(createTestMachine({ initials: "OWN" }))
+      .returning();
+
+    // Granular ownership toggle OFF, but main switches ON
+    await db.insert(notificationPreferences).values({
+      userId: recipient.id,
+      emailEnabled: true,
+      inAppEnabled: true,
+      emailNotifyOnMachineOwnershipChange: false,
+      inAppNotifyOnMachineOwnershipChange: false,
+    });
+
+    await createNotification(
+      {
+        type: "machine_ownership_changed",
+        resourceId: machine.id,
+        resourceType: "machine",
+        actorId: actor.id,
+        machineName: machine.name,
+        newStatus: "added",
+        additionalRecipientIds: [recipient.id],
+      },
+      db
+    );
+
+    // Should still notify because ownership changes bypass granular toggles
+    const result = await db.query.notifications.findMany({
+      where: eq(notifications.userId, recipient.id),
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].type).toBe("machine_ownership_changed");
+
+    expect(sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "new-owner@test.com",
+        subject: expect.stringContaining("Ownership Update"),
+      })
+    );
+  });
 });

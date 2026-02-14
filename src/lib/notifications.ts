@@ -239,8 +239,10 @@ export async function createNotification(
         break;
       }
       case "machine_ownership_changed":
-        emailNotify = prefs.emailNotifyOnMachineOwnershipChange;
-        inAppNotify = prefs.inAppNotifyOnMachineOwnershipChange;
+        // Always notify for ownership changes — this is critical information
+        // for both old and new owners. Only main switches can suppress.
+        emailNotify = true;
+        inAppNotify = true;
         break;
     }
 
@@ -265,7 +267,8 @@ export async function createNotification(
             type,
             resolvedIssueTitle,
             resolvedMachineName,
-            resolvedFormattedIssueId
+            resolvedFormattedIssueId,
+            newStatus
           ),
           html: getEmailHtml(
             type,

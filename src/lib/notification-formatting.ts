@@ -8,7 +8,8 @@ export function getEmailSubject(
   type: NotificationType,
   issueTitle?: string,
   machineName?: string,
-  formattedIssueId?: string
+  formattedIssueId?: string,
+  newStatus?: string
 ): string {
   const prefix = machineName ? `[${machineName}] ` : "";
   switch (type) {
@@ -21,7 +22,9 @@ export function getEmailSubject(
     case "new_comment":
       return `${prefix}New Comment on ${formattedIssueId ? `(${formattedIssueId})` : ""}: ${issueTitle}`;
     case "machine_ownership_changed":
-      return `${prefix}Ownership Update: You have been ${issueTitle?.includes("removed") ? "removed as" : "added as"} an owner`;
+      return newStatus === "removed"
+        ? `${prefix}Ownership Update: You have been removed as an owner`
+        : `${prefix}Ownership Update: You have been added as an owner`;
     default:
       return "PinPoint Notification";
   }
@@ -37,7 +40,7 @@ export function generateUnsubscribeToken(userId: string): string {
     return "";
   }
   return createHmac("sha256", secret)
-    .update(userId + "unsubscribe")
+    .update(userId + ":unsubscribe")
     .digest("hex");
 }
 
@@ -103,6 +106,11 @@ export function getEmailHtml(
       body = `New comment:<br/><blockquote>${sanitizedComment}</blockquote>`;
       break;
     }
+    case "machine_ownership_changed":
+      body = newStatus?.includes("removed")
+        ? `You have been <strong>removed</strong> as an owner of <strong>${machineName ? sanitizeHtml(machineName) : "a machine"}</strong>. You will no longer receive notifications for new issues on this machine.`
+        : `You have been <strong>added</strong> as an owner of <strong>${machineName ? sanitizeHtml(machineName) : "a machine"}</strong>. You will receive notifications for new issues reported on this machine.`;
+      break;
   }
 
   const siteUrl = getSiteUrl();
