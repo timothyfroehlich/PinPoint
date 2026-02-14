@@ -187,7 +187,10 @@ export function SignupForm({
       </div>
 
       <input type="hidden" name="captchaToken" value={turnstileToken} />
-      <TurnstileWidget onVerify={handleTurnstileVerify} />
+      <TurnstileWidget
+        onVerify={handleTurnstileVerify}
+        onExpire={() => setTurnstileToken("")}
+      />
 
       <Button
         type="submit"

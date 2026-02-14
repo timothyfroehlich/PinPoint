@@ -32,7 +32,13 @@ export async function verifyTurnstileToken(
   }
 
   if (!token) {
-    log.warn({ action: "turnstile" }, "Empty Turnstile token provided");
+    const hasSiteKey = Boolean(process.env["NEXT_PUBLIC_TURNSTILE_SITE_KEY"]);
+    log.warn(
+      { action: "turnstile", hasSiteKey },
+      hasSiteKey
+        ? "Empty Turnstile token — widget may not have loaded"
+        : "Empty Turnstile token — NEXT_PUBLIC_TURNSTILE_SITE_KEY not set, widget did not render"
+    );
     return false;
   }
 

@@ -110,7 +110,10 @@ export function LoginForm({
         </div>
 
         <input type="hidden" name="captchaToken" value={turnstileToken} />
-        <TurnstileWidget onVerify={handleTurnstileVerify} />
+        <TurnstileWidget
+          onVerify={handleTurnstileVerify}
+          onExpire={() => setTurnstileToken("")}
+        />
 
         {/* Submit button */}
         <Button

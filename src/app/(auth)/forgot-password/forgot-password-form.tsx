@@ -54,7 +54,10 @@ export function ForgotPasswordForm(): React.JSX.Element {
       </div>
 
       <input type="hidden" name="captchaToken" value={turnstileToken} />
-      <TurnstileWidget onVerify={handleTurnstileVerify} />
+      <TurnstileWidget
+        onVerify={handleTurnstileVerify}
+        onExpire={() => setTurnstileToken("")}
+      />
 
       <Button
         type="submit"

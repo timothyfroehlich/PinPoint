@@ -487,7 +487,10 @@ export function UnifiedReportForm({
                   name="cf-turnstile-response"
                   value={turnstileToken}
                 />
-                <TurnstileWidget onVerify={handleTurnstileVerify} />
+                <TurnstileWidget
+                  onVerify={handleTurnstileVerify}
+                  onExpire={() => setTurnstileToken("")}
+                />
 
                 <Button
                   type="submit"
