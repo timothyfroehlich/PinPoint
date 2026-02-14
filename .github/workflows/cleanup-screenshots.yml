@@ -1,0 +1,55 @@
+name: Cleanup PR Screenshots
+
+on:
+  pull_request:
+    types:
+      - closed
+
+concurrency:
+  group: gh-pages
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    name: Remove PR Screenshots
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if gh-pages branch exists
+        id: check-branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          if gh api "repos/${REPO}/branches/gh-pages" --silent 2>/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "gh-pages branch does not exist, skipping cleanup."
+          fi
+
+      - name: Checkout gh-pages
+        if: steps.check-branch.outputs.exists == 'true'
+        uses: actions/checkout@v6
+        with:
+          ref: gh-pages
+          fetch-depth: 1
+
+      - name: Remove PR directory
+        if: steps.check-branch.outputs.exists == 'true'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          PR_DIR="pr-${PR_NUMBER}"
+          if [ -d "$PR_DIR" ]; then
+            rm -rf "$PR_DIR"
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "Clean up screenshots for PR #${PR_NUMBER}" || true
+            git push
+          else
+            echo "No directory found for PR #${PR_NUMBER}, skipping."
+          fi
