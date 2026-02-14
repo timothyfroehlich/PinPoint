@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { uploadAvatarAction, deleteAvatarAction } from "./avatar-actions";
 import * as blobClient from "~/lib/blob/client";
+import * as blobValidation from "~/lib/blob/validation";
 import * as rateLimit from "~/lib/rate-limit";
 import { BLOB_CONFIG } from "~/lib/blob/config";
 
@@ -48,6 +49,11 @@ vi.mock("~/server/db/schema", () => ({
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((field: unknown, value: unknown) => ({ field, value })),
+}));
+
+vi.mock("~/lib/blob/validation", () => ({
+  validateImageFile: vi.fn(() => ({ valid: true })),
+  getImageDimensions: vi.fn(() => ({ width: 200, height: 200 })),
 }));
 
 vi.mock("next/cache", () => ({
@@ -162,6 +168,10 @@ describe("uploadAvatarAction", () => {
   it("should fail with VALIDATION for invalid file type", async () => {
     authenticateUser();
     passRateLimit();
+    vi.mocked(blobValidation.validateImageFile).mockReturnValueOnce({
+      valid: false,
+      error: "Invalid file type: text/plain",
+    });
 
     const file = createMockFile("test.txt", "text/plain", 2048);
     const result = await uploadAvatarAction(makeAvatarFormData(file));

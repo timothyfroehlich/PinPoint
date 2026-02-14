@@ -103,6 +103,7 @@ describe("Issue detail permission-aware UI", () => {
         currentUserId={null}
         currentUserRole="unauthenticated"
         currentUserInitials="??"
+        currentUserAvatarUrl={null}
       />
     );
 
