@@ -8,7 +8,7 @@
 
 import { createClient } from "~/lib/supabase/server";
 import { createAdminClient } from "~/lib/supabase/admin";
-import { db } from "~/server/db";
+import { db as globalDb, type Db } from "~/server/db";
 import {
   userProfiles,
   machines,
@@ -73,7 +73,7 @@ export async function updateProfileAction(
   const { firstName, lastName } = validation.data;
 
   try {
-    await db
+    await globalDb
       .update(userProfiles)
       .set({
         firstName,
@@ -151,74 +151,8 @@ export async function deleteAccountAction(
   const userId = user.id;
 
   try {
-    // Fetch profile and run anonymization in a single transaction to avoid
-    // race conditions (e.g., role change between fetch and admin check)
-    const avatarUrl = await db.transaction(async (tx) => {
-      const profile = await tx.query.userProfiles.findFirst({
-        where: eq(userProfiles.id, userId),
-      });
-
-      if (!profile) {
-        throw new Error("Profile not found");
-      }
-
-      // Admin check: if this user is an admin, ensure they're not the only one
-      if (profile.role === "admin") {
-        const [adminCount] = await tx
-          .select({ count: count() })
-          .from(userProfiles)
-          .where(
-            and(eq(userProfiles.role, "admin"), ne(userProfiles.id, userId))
-          );
-
-        if (!adminCount || adminCount.count === 0) {
-          throw new SoleAdminError();
-        }
-      }
-
-      // Reassign or unassign owned machines
-      if (reassignTo) {
-        await tx
-          .update(machines)
-          .set({ ownerId: reassignTo, updatedAt: new Date() })
-          .where(eq(machines.ownerId, userId));
-      } else {
-        await tx
-          .update(machines)
-          .set({ ownerId: null, updatedAt: new Date() })
-          .where(eq(machines.ownerId, userId));
-      }
-
-      // Anonymize issue references
-      await tx
-        .update(issues)
-        .set({ assignedTo: null, updatedAt: new Date() })
-        .where(eq(issues.assignedTo, userId));
-
-      await tx
-        .update(issues)
-        .set({ reportedBy: null, updatedAt: new Date() })
-        .where(eq(issues.reportedBy, userId));
-
-      // Anonymize comment authorship
-      await tx
-        .update(issueComments)
-        .set({ authorId: null, updatedAt: new Date() })
-        .where(eq(issueComments.authorId, userId));
-
-      // Anonymize image references
-      await tx
-        .update(issueImages)
-        .set({ uploadedBy: null, updatedAt: new Date() })
-        .where(eq(issueImages.uploadedBy, userId));
-
-      await tx
-        .update(issueImages)
-        .set({ deletedBy: null, updatedAt: new Date() })
-        .where(eq(issueImages.deletedBy, userId));
-
-      return profile.avatarUrl;
-    });
+    // Fetch profile and run anonymization in a single transaction
+    const avatarUrl = await anonymizeUserReferences(userId, reassignTo);
 
     // Best-effort avatar cleanup (outside transaction)
     if (avatarUrl) {
@@ -260,6 +194,93 @@ export async function deleteAccountAction(
   }
 
   redirect("/");
+}
+
+/**
+ * Anonymize user references in the database.
+ *
+ * This function performs the following operations in a transaction:
+ * 1. Checks if the user is the sole admin (throws SoleAdminError if true)
+ * 2. Reassigns machines to the new owner (if provided) or unassigns them
+ * 3. Sets reportedBy and assignedTo to null for issues
+ * 4. Sets authorId to null for comments
+ * 5. Sets uploadedBy/deletedBy to null for images
+ *
+ * @param userId - The ID of the user to anonymize
+ * @param reassignTo - The ID of the user to reassign machines to (optional)
+ * @returns The user's avatar URL (if any) for subsequent deletion
+ */
+export async function anonymizeUserReferences(
+  userId: string,
+  reassignTo: string | null,
+  db: Db = globalDb
+): Promise<string | null> {
+  return await db.transaction(async (tx) => {
+    const profile = await tx.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, userId),
+    });
+
+    if (!profile) {
+      throw new Error("Profile not found");
+    }
+
+    // Admin check: if this user is an admin, ensure they're not the only one
+    if (profile.role === "admin") {
+      const [adminCount] = await tx
+        .select({ count: count() })
+        .from(userProfiles)
+        .where(
+          and(eq(userProfiles.role, "admin"), ne(userProfiles.id, userId))
+        );
+
+      if (!adminCount || adminCount.count === 0) {
+        throw new SoleAdminError();
+      }
+    }
+
+    // Reassign or unassign owned machines
+    if (reassignTo) {
+      await tx
+        .update(machines)
+        .set({ ownerId: reassignTo, updatedAt: new Date() })
+        .where(eq(machines.ownerId, userId));
+    } else {
+      await tx
+        .update(machines)
+        .set({ ownerId: null, updatedAt: new Date() })
+        .where(eq(machines.ownerId, userId));
+    }
+
+    // Anonymize issue references
+    await tx
+      .update(issues)
+      .set({ assignedTo: null, updatedAt: new Date() })
+      .where(eq(issues.assignedTo, userId));
+
+    await tx
+      .update(issues)
+      .set({ reportedBy: null, updatedAt: new Date() })
+      .where(eq(issues.reportedBy, userId));
+
+    // Anonymize comment authorship
+    await tx
+      .update(issueComments)
+      .set({ authorId: null, updatedAt: new Date() })
+      .where(eq(issueComments.authorId, userId));
+
+    // Anonymize image references
+    await tx
+      .update(issueImages)
+      .set({ uploadedBy: null, updatedAt: new Date() })
+      .where(eq(issueImages.uploadedBy, userId));
+
+    await tx
+      .update(issueImages)
+      .set({ deletedBy: null, updatedAt: new Date() })
+      .where(eq(issueImages.deletedBy, userId));
+
+    return profile.avatarUrl;
+  });
 }
 
 class SoleAdminError extends Error {
