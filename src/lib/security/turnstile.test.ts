@@ -22,6 +22,7 @@ describe("verifyTurnstileToken", () => {
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     process.env = originalEnv;
   });
 
