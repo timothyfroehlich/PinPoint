@@ -51,6 +51,9 @@ MANAGED_ENV_KEYS = {
     # Static Supabase keys (same for all local instances)
     "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
     "SUPABASE_SERVICE_ROLE_KEY",
+    # Cloudflare Turnstile test keys (always pass for local dev)
+    "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
+    "TURNSTILE_SECRET_KEY",
 }
 
 # No more USER_PROVIDED_KEYS — Supabase keys are static for local dev
@@ -166,6 +169,10 @@ def format_env_file(
         "# Supabase keys (static for local dev)",
         f"NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY={managed_values['NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY']}",
         f"SUPABASE_SERVICE_ROLE_KEY={managed_values['SUPABASE_SERVICE_ROLE_KEY']}",
+        "",
+        "# Cloudflare Turnstile test keys (always pass for local dev)",
+        f"NEXT_PUBLIC_TURNSTILE_SITE_KEY={managed_values['NEXT_PUBLIC_TURNSTILE_SITE_KEY']}",
+        f"TURNSTILE_SECRET_KEY={managed_values['TURNSTILE_SECRET_KEY']}",
     ]
 
     # Add any custom user keys that aren't in managed or user-provided sets
@@ -210,6 +217,9 @@ def merge_env_local(worktree_path: Path, port_config: PortConfig) -> str:
         "DEV_AUTOLOGIN_PASSWORD": "TestPassword123",
         "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": LOCAL_SUPABASE_PUBLISHABLE_KEY,
         "SUPABASE_SERVICE_ROLE_KEY": LOCAL_SUPABASE_SERVICE_ROLE_KEY,
+        # Cloudflare Turnstile test keys (always pass) for local dev
+        "NEXT_PUBLIC_TURNSTILE_SITE_KEY": "1x00000000000000000000AA",
+        "TURNSTILE_SECRET_KEY": "1x0000000000000000000000000000000AA",
     }
 
     # Parse existing file to preserve user values
