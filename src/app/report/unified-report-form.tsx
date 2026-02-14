@@ -5,6 +5,7 @@ import React, {
   useActionState,
   useEffect,
   useRef,
+  useCallback,
 } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -30,6 +31,7 @@ import { ImageUploadButton } from "~/components/images/ImageUploadButton";
 import { ImageGallery } from "~/components/images/ImageGallery";
 import { type ImageMetadata } from "~/types/images";
 import type { AccessLevel } from "~/lib/permissions/matrix";
+import { TurnstileWidget } from "~/components/security/TurnstileWidget";
 
 interface Machine {
   id: string;
@@ -83,6 +85,11 @@ export function UnifiedReportForm({
   const [assignedTo, setAssignedTo] = useState("");
 
   const [uploadedImages, setUploadedImages] = useState<ImageMetadata[]>([]);
+  const [turnstileToken, setTurnstileToken] = useState("");
+
+  const handleTurnstileVerify = useCallback((token: string) => {
+    setTurnstileToken(token);
+  }, []);
 
   const [state, formAction, isPending] = useActionState(
     submitPublicIssueAction,
@@ -474,6 +481,16 @@ export function UnifiedReportForm({
                     <span>Logged in</span>
                   </div>
                 )}
+
+                <input
+                  type="hidden"
+                  name="cf-turnstile-response"
+                  value={turnstileToken}
+                />
+                <TurnstileWidget
+                  onVerify={handleTurnstileVerify}
+                  onExpire={() => setTurnstileToken("")}
+                />
 
                 <Button
                   type="submit"

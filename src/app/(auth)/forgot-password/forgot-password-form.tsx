@@ -1,16 +1,22 @@
 "use client";
 
-import React, { useActionState } from "react";
+import React, { useActionState, useState, useCallback } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { forgotPasswordAction } from "~/app/(auth)/actions";
+import { TurnstileWidget } from "~/components/security/TurnstileWidget";
 
 export function ForgotPasswordForm(): React.JSX.Element {
   const [state, formAction, isPending] = useActionState(
     forgotPasswordAction,
     undefined
   );
+  const [turnstileToken, setTurnstileToken] = useState("");
+
+  const handleTurnstileVerify = useCallback((token: string) => {
+    setTurnstileToken(token);
+  }, []);
 
   return (
     <form action={formAction} className="space-y-4">
@@ -46,6 +52,12 @@ export function ForgotPasswordForm(): React.JSX.Element {
           className="bg-surface-variant"
         />
       </div>
+
+      <input type="hidden" name="captchaToken" value={turnstileToken} />
+      <TurnstileWidget
+        onVerify={handleTurnstileVerify}
+        onExpire={() => setTurnstileToken("")}
+      />
 
       <Button
         type="submit"

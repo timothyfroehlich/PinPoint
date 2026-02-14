@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useActionState } from "react";
+import React, { useState, useActionState, useCallback } from "react";
 import Link from "next/link";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -8,6 +8,7 @@ import { Label } from "~/components/ui/label";
 import { Checkbox } from "~/components/ui/checkbox";
 import { PasswordStrength } from "~/components/password-strength";
 import { signupAction, type SignupResult } from "~/app/(auth)/actions";
+import { TurnstileWidget } from "~/components/security/TurnstileWidget";
 
 interface SignupFormProps {
   initialData?:
@@ -27,6 +28,11 @@ export function SignupForm({
     FormData
   >(signupAction, undefined);
   const [password, setPassword] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+
+  const handleTurnstileVerify = useCallback((token: string) => {
+    setTurnstileToken(token);
+  }, []);
 
   if (state && !state.ok && state.code === "CONFIRMATION_REQUIRED") {
     return (
@@ -179,6 +185,12 @@ export function SignupForm({
           </Link>
         </Label>
       </div>
+
+      <input type="hidden" name="captchaToken" value={turnstileToken} />
+      <TurnstileWidget
+        onVerify={handleTurnstileVerify}
+        onExpire={() => setTurnstileToken("")}
+      />
 
       <Button
         type="submit"
