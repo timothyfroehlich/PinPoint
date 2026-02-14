@@ -38,9 +38,10 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   // Production: strict-dynamic (nonce-only, blocks host allowlists)
   // Preview: explicit allowlist (allows vercel.live scripts)
+  // Cloudflare Turnstile requires challenges.cloudflare.com for CAPTCHA widget
   const scriptSrc = isProduction
     ? `'self' 'nonce-${nonce}' 'strict-dynamic'`
-    : `'self' 'nonce-${nonce}' https://vercel.live`;
+    : `'self' 'nonce-${nonce}' https://vercel.live https://challenges.cloudflare.com`;
 
   const styleSrc = isProduction
     ? "'self' 'unsafe-inline'"
@@ -55,10 +56,12 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     : "'self' data: https://vercel.live https://assets.vercel.com https://fonts.gstatic.com";
 
   const connectSrc = isProduction
-    ? `'self' ${supabaseUrl ?? ""} ${supabaseWsUrl ?? ""} http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:*`
-    : `'self' ${supabaseUrl ?? ""} ${supabaseWsUrl ?? ""} http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:* https://vercel.live wss://ws-us3.pusher.com`;
+    ? `'self' ${supabaseUrl ?? ""} ${supabaseWsUrl ?? ""} http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:* https://challenges.cloudflare.com`
+    : `'self' ${supabaseUrl ?? ""} ${supabaseWsUrl ?? ""} http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:* https://vercel.live wss://ws-us3.pusher.com https://challenges.cloudflare.com`;
 
-  const frameSrc = isProduction ? "'none'" : "'self' https://vercel.live";
+  const frameSrc = isProduction
+    ? "https://challenges.cloudflare.com"
+    : "'self' https://vercel.live https://challenges.cloudflare.com";
   const frameAncestors = isProduction ? "'none'" : "'self' https://vercel.live";
 
   // 5. Construct CSP header with nonce-based script execution

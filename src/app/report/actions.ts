@@ -11,6 +11,7 @@ import {
   getClientIp,
 } from "~/lib/rate-limit";
 import { parsePublicIssueForm } from "./validation";
+import { verifyTurnstileToken } from "~/lib/security/turnstile";
 import { BLOB_CONFIG } from "~/lib/blob/config";
 import { db } from "~/server/db";
 import { machines, userProfiles, issueImages } from "~/server/db/schema";
@@ -51,6 +52,21 @@ export async function submitPublicIssueAction(
     const resetTime = formatResetTime(reset);
     return {
       error: `Too many submissions. Please try again in ${resetTime}.`,
+    };
+  }
+
+  // 3. Verify Turnstile CAPTCHA
+  const turnstileToken = formData.get("cf-turnstile-response");
+  const tokenStr = typeof turnstileToken === "string" ? turnstileToken : "";
+  const captchaValid = await verifyTurnstileToken(tokenStr, ip);
+
+  if (!captchaValid) {
+    log.warn(
+      { action: "publicIssueReport", ip },
+      "Turnstile CAPTCHA verification failed"
+    );
+    return {
+      error: "CAPTCHA verification failed. Please try again.",
     };
   }
 

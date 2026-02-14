@@ -123,12 +123,18 @@ export async function loginAction(
 
     const supabase = await createClient();
 
+    // Extract Turnstile CAPTCHA token for Supabase built-in verification
+    const captchaTokenEntry = formData.get("captchaToken");
+    const captchaToken =
+      typeof captchaTokenEntry === "string" ? captchaTokenEntry : undefined;
+
     // Sign in with Supabase Auth
     // Note: Remember Me is for UX only - SSR sessions persist via cookies
     // The rememberMe value could be used to adjust cookie expiry if needed
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
+      ...(captchaToken ? { options: { captchaToken } } : {}),
     });
 
     // Defensive check - Supabase types guarantee user exists if no error,
@@ -244,6 +250,11 @@ export async function signupAction(
 
     const supabase = await createClient();
 
+    // Extract Turnstile CAPTCHA token for Supabase built-in verification
+    const captchaTokenEntry = formData.get("captchaToken");
+    const captchaToken =
+      typeof captchaTokenEntry === "string" ? captchaTokenEntry : undefined;
+
     // Create user with Supabase Auth
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -253,6 +264,7 @@ export async function signupAction(
           first_name: firstName,
           last_name: lastName,
         },
+        ...(captchaToken ? { captchaToken } : {}),
       },
     });
 
@@ -454,6 +466,11 @@ export async function forgotPasswordAction(
 
     const supabase = await createClient();
 
+    // Extract Turnstile CAPTCHA token for Supabase built-in verification
+    const captchaTokenEntry = formData.get("captchaToken");
+    const captchaToken =
+      typeof captchaTokenEntry === "string" ? captchaTokenEntry : undefined;
+
     const siteUrl = requireSiteUrl("forgot-password");
 
     const callbackUrl = new URL("/auth/callback", siteUrl);
@@ -462,6 +479,7 @@ export async function forgotPasswordAction(
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo,
+      ...(captchaToken ? { captchaToken } : {}),
     });
 
     if (error) {

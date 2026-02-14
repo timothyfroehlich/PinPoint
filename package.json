@@ -62,6 +62,7 @@
   "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
+    "@marsidev/react-turnstile": "^1.4.2",
     "@next/env": "^16.1.6",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-avatar": "^1.1.11",

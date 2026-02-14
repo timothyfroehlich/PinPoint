@@ -2,13 +2,14 @@
 
 import type React from "react";
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { loginAction, type LoginResult } from "~/app/(auth)/actions";
 import { cn } from "~/lib/utils";
+import { TurnstileWidget } from "~/components/security/TurnstileWidget";
 
 // Lazily load TestAdminButton to prevent including test credentials in the production bundle
 const TestAdminButton = dynamic(() =>
@@ -28,6 +29,11 @@ export function LoginForm({
     LoginResult | undefined,
     FormData
   >(loginAction, undefined);
+  const [turnstileToken, setTurnstileToken] = useState("");
+
+  const handleTurnstileVerify = useCallback((token: string) => {
+    setTurnstileToken(token);
+  }, []);
 
   return (
     <>
@@ -102,6 +108,9 @@ export function LoginForm({
             Remember me for 60 days
           </Label>
         </div>
+
+        <input type="hidden" name="captchaToken" value={turnstileToken} />
+        <TurnstileWidget onVerify={handleTurnstileVerify} />
 
         {/* Submit button */}
         <Button
