@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { verifyTurnstileToken } from "./turnstile";
 
+// Mock server-only (no-op in test environment)
+vi.mock("server-only", () => ({}));
+
 // Mock logger
 vi.mock("~/lib/logger", () => ({
   log: {
@@ -22,10 +25,18 @@ describe("verifyTurnstileToken", () => {
     process.env = originalEnv;
   });
 
-  it("returns true when TURNSTILE_SECRET_KEY is not set (graceful skip)", async () => {
+  it("returns true when TURNSTILE_SECRET_KEY is not set in development (graceful skip)", async () => {
     delete process.env.TURNSTILE_SECRET_KEY;
+    process.env.NODE_ENV = "test";
     const result = await verifyTurnstileToken("some-token");
     expect(result).toBe(true);
+  });
+
+  it("returns false when TURNSTILE_SECRET_KEY is not set in production", async () => {
+    delete process.env.TURNSTILE_SECRET_KEY;
+    process.env.NODE_ENV = "production";
+    const result = await verifyTurnstileToken("some-token");
+    expect(result).toBe(false);
   });
 
   it("returns false when token is empty", async () => {

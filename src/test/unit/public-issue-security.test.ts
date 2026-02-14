@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { submitPublicIssueAction } from "~/app/report/actions";
 
+// Mock server-only (no-op in test environment)
+vi.mock("server-only", () => ({}));
+
+// Mock server-only (no-op in test environment)
+vi.mock("server-only", () => ({}));
+
 // Mock Next.js server modules
 vi.mock("next/headers", () => ({
   headers: vi.fn(),

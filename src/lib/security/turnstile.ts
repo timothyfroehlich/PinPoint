@@ -1,3 +1,5 @@
+import "server-only";
+
 import { log } from "~/lib/logger";
 
 interface TurnstileVerifyResponse {
@@ -24,6 +26,13 @@ export async function verifyTurnstileToken(
   const secretKey = process.env["TURNSTILE_SECRET_KEY"];
 
   if (!secretKey) {
+    if (process.env.NODE_ENV === "production") {
+      log.error(
+        { action: "turnstile" },
+        "TURNSTILE_SECRET_KEY not set in production — CAPTCHA verification will fail"
+      );
+      return false;
+    }
     log.warn(
       { action: "turnstile" },
       "TURNSTILE_SECRET_KEY not set — skipping CAPTCHA verification"
