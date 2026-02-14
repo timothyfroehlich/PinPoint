@@ -103,6 +103,61 @@ test.describe("Notifications", () => {
     await publicContext.close();
   });
 
+  test("should suppress own-action notifications when enabled in settings", async ({
+    page,
+  }, testInfo) => {
+    const timestamp = Date.now();
+    const ownerEmail = getTestEmail(`self-suppress-${timestamp}@test.com`);
+    const owner = await createTestUser(ownerEmail);
+    cleanupUserIds.push(owner.id);
+    const machine = await createTestMachine(owner.id);
+    cleanupMachineIds.push(machine.id);
+
+    await ensureLoggedIn(page, testInfo, {
+      email: ownerEmail,
+      password: "TestPassword123",
+    });
+
+    // Click new settings controls via UI (E2E interaction coverage)
+    await page.goto("/settings");
+
+    const inAppNewIssueSwitch = page.locator("#inAppNotifyOnNewIssue");
+    await expect(inAppNewIssueSwitch).toHaveAttribute("aria-checked", "false");
+    await inAppNewIssueSwitch.click();
+    await expect(inAppNewIssueSwitch).toHaveAttribute("aria-checked", "true");
+
+    const suppressOwnActionsSwitch = page.locator("#suppressOwnActions");
+    await expect(suppressOwnActionsSwitch).toHaveAttribute(
+      "aria-checked",
+      "false"
+    );
+    await suppressOwnActionsSwitch.click();
+    await expect(suppressOwnActionsSwitch).toHaveAttribute(
+      "aria-checked",
+      "true"
+    );
+
+    await page.getByRole("button", { name: "Save Preferences" }).click();
+    await expect(page.getByRole("button", { name: "Saved!" })).toBeVisible();
+
+    // Report issue as this same user; with suppression on, no notification should appear
+    await page.goto(`/report?machine=${machine.initials}`);
+    const issueTitle = getTestIssueTitle("Own Action Suppressed");
+    await fillReportForm(page, {
+      title: issueTitle,
+      includePriority: false,
+    });
+    await page.getByRole("button", { name: "Submit Issue Report" }).click();
+    await expect(page).toHaveURL(
+      /(\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+)|(\/report\/success)/
+    );
+
+    await page.goto("/dashboard");
+    const bell = page.getByRole("button", { name: /notifications/i });
+    await bell.click();
+    await expect(page.getByText("No new notifications")).toBeVisible();
+  });
+
   // Skip this test in Safari due to Next.js Issue #48309
   // Safari fails to process Server Action redirects to dynamic pages
   // This test creates an issue (Server Action + redirect) which fails in Safari

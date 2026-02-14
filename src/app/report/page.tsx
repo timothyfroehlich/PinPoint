@@ -78,7 +78,7 @@ export default async function PublicReportPage({
         <UnifiedReportForm
           machinesList={machinesList}
           defaultMachineId={defaultMachineId}
-          user={user ? (user.email ? { email: user.email } : {}) : null}
+          userAuthenticated={Boolean(user)}
           accessLevel={accessLevel}
           assignees={assignees}
           initialError={errorMessage}

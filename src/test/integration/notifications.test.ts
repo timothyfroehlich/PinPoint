@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { createNotification } from "~/lib/notifications";
 import { sendEmail } from "~/lib/email/client";
 import { getTestDb, setupTestDb } from "~/test/setup/pglite";
@@ -106,12 +106,6 @@ describe("createNotification (Integration)", () => {
       inAppEnabled: true,
       inAppNotifyOnNewComment: true,
     });
-
-    // Mock auth.users email for actor
-    await db.execute(
-      sql`INSERT INTO auth.users (id, email) VALUES (${actor.id}, 'actor@test.com')`
-    );
-
     // Don't specify includeActor - should default to true
     await createNotification(
       {
@@ -141,7 +135,7 @@ describe("createNotification (Integration)", () => {
       .returning();
     const [recipient] = await db
       .insert(userProfiles)
-      .values(createTestUser())
+      .values(createTestUser({ email: "user2@test.com" }))
       .returning();
     const [machine] = await db
       .insert(machines)
@@ -202,7 +196,7 @@ describe("createNotification (Integration)", () => {
       .returning();
     const [recipient] = await db
       .insert(userProfiles)
-      .values(createTestUser())
+      .values(createTestUser({ email: "watcher@test.com" }))
       .returning();
     const [machine] = await db
       .insert(machines)
@@ -262,7 +256,7 @@ describe("createNotification (Integration)", () => {
       .returning();
     const [recipient] = await db
       .insert(userProfiles)
-      .values(createTestUser())
+      .values(createTestUser({ email: "user2@test.com" }))
       .returning();
     const [machine] = await db
       .insert(machines)
@@ -295,11 +289,6 @@ describe("createNotification (Integration)", () => {
           inAppEnabled: true,
         },
       });
-
-    // Mock auth.users email
-    await db.execute(
-      `INSERT INTO auth.users (id, email) VALUES ('${recipient.id}', 'user2@test.com')`
-    );
 
     await createNotification(
       {
@@ -336,11 +325,11 @@ describe("createNotification (Integration)", () => {
       .returning();
     const [assignee] = await db
       .insert(userProfiles)
-      .values(createTestUser())
+      .values(createTestUser({ email: "assignee@test.com" }))
       .returning();
     const [watcher] = await db
       .insert(userProfiles)
-      .values(createTestUser())
+      .values(createTestUser({ email: "watcher@test.com" }))
       .returning();
     const [machine] = await db
       .insert(machines)
@@ -356,11 +345,6 @@ describe("createNotification (Integration)", () => {
       { issueId: issue.id, userId: assignee.id },
       { issueId: issue.id, userId: watcher.id },
     ]);
-
-    // Mock auth.users emails
-    await db.execute(
-      sql`INSERT INTO auth.users (id, email) VALUES (${assignee.id}, 'assignee@test.com'), (${watcher.id}, 'watcher@test.com')`
-    );
 
     await createNotification(
       {
@@ -408,10 +392,6 @@ describe("createNotification (Integration)", () => {
       issueId: issue.id,
       userId: actor.id,
     });
-
-    await db.execute(
-      sql`INSERT INTO auth.users (id, email) VALUES (${actor.id}, 'self@test.com')`
-    );
 
     // Self-assignment: actor assigns to themselves
     await createNotification(
@@ -466,10 +446,6 @@ describe("createNotification (Integration)", () => {
       inAppNotifyOnNewComment: true,
     });
 
-    await db.execute(
-      sql`INSERT INTO auth.users (id, email) VALUES (${actor.id}, 'suppress@test.com')`
-    );
-
     // Actor comments on issue they're watching — with includeActor: true (default)
     await createNotification(
       {
@@ -520,10 +496,6 @@ describe("createNotification (Integration)", () => {
       inAppNotifyOnNewComment: true,
     });
 
-    await db.execute(
-      sql`INSERT INTO auth.users (id, email) VALUES (${actor.id}, 'nosuppress@test.com')`
-    );
-
     await createNotification(
       {
         type: "new_comment",
@@ -549,7 +521,7 @@ describe("createNotification (Integration)", () => {
 
     const [recipient] = await db
       .insert(userProfiles)
-      .values(createTestUser())
+      .values(createTestUser({ email: "watcher@test.com" }))
       .returning();
     const [machine] = await db
       .insert(machines)
@@ -571,12 +543,6 @@ describe("createNotification (Integration)", () => {
       emailNotifyOnNewIssue: true,
       inAppNotifyOnNewIssue: true,
     });
-
-    // Mock auth.users email
-    await db.execute(
-      `INSERT INTO auth.users (id, email) VALUES ('${recipient.id}', 'watcher@test.com')`
-    );
-
     const [issue] = await db
       .insert(issues)
       .values(createTestIssue(machine.initials, { issueNumber: 1 }))

@@ -115,12 +115,21 @@ export async function inviteUser(
 
     const validated = inviteUserSchema.parse(rawData);
 
-    // Check if user already exists
-    const existingUser = await db.query.authUsers.findFirst({
+    // Check both auth.users and user_profiles — a user could exist in
+    // auth.users without a profile row if the handle_new_user trigger failed.
+    const existingAuthUser = await db.query.authUsers.findFirst({
       where: eq(authUsers.email, validated.email),
     });
 
-    if (existingUser) {
+    if (existingAuthUser) {
+      throw new Error("A user with this email already exists and is active.");
+    }
+
+    const existingProfile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.email, validated.email),
+    });
+
+    if (existingProfile) {
       throw new Error("A user with this email already exists and is active.");
     }
 

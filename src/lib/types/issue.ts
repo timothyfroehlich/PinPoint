@@ -14,7 +14,21 @@ export type IssueCommentWithAuthor = Pick<
   images: IssueImage[];
 };
 
-export type IssueListItem = Issue & {
+export type IssueListItem = Pick<
+  Issue,
+  | "id"
+  | "issueNumber"
+  | "title"
+  | "status"
+  | "severity"
+  | "priority"
+  | "frequency"
+  | "createdAt"
+  | "updatedAt"
+  | "machineInitials"
+  | "reporterName"
+  | "assignedTo"
+> & {
   machine: Pick<Machine, "id" | "name">;
   reportedByUser?: Pick<UserProfile, "id" | "name"> | null;
   invitedReporter?: Pick<UserProfile, "id" | "name"> | null;
