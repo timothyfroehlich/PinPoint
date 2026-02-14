@@ -12,6 +12,7 @@ import {
   createTestUser,
   createTestMachine,
   updateUserRole,
+  updateNotificationPreferences,
 } from "e2e/support/supabase-admin.js";
 import {
   getTestIssueTitle,
@@ -49,6 +50,11 @@ test.describe.serial("Email Notifications", () => {
     const machine = await createTestMachine(user.id, initials);
     testMachineInitials = machine.initials;
     cleanupMachineIds.push(machine.id);
+
+    // Enable email notifications for status changes (default is OFF after overhaul)
+    await updateNotificationPreferences(user.id, {
+      emailNotifyOnStatusChange: true,
+    });
   });
 
   test.afterAll(async () => {

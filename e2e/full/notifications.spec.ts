@@ -8,6 +8,7 @@ import {
   deleteTestUser,
   deleteTestMachine,
   updateUserRole,
+  updateNotificationPreferences,
 } from "../support/supabase-admin.js";
 import { getTestIssueTitle, getTestEmail } from "../support/test-isolation.js";
 
@@ -35,22 +36,21 @@ test.describe("Notifications", () => {
     const machine = await createTestMachine(owner.id);
     cleanupMachineIds.push(machine.id);
 
-    // Login as owner to setup preferences
+    // Enable in-app notifications for new issues on owned machines
+    // (default is OFF after notification overhaul)
+    await updateNotificationPreferences(owner.id, {
+      inAppNotifyOnNewIssue: true,
+    });
+
+    // Login as owner
     const ownerContext = await browser.newContext();
     const ownerPage = await ownerContext.newPage();
 
-    // Initial login to ensure profile creation and prefs
     await ownerPage.goto("/login");
     await ownerPage.getByLabel("Email").fill(ownerEmail);
     await ownerPage.getByLabel("Password").fill("TestPassword123");
     await ownerPage.getByRole("button", { name: "Sign In" }).click();
     await expect(ownerPage).toHaveURL("/dashboard");
-
-    // Ensure "Auto-Watch Owned Machines" is ON (default)
-    // We can verify by checking settings
-    await ownerPage.goto("/settings");
-    const newIssueToggle = ownerPage.locator("#inAppNotifyOnNewIssue");
-    await expect(newIssueToggle).toBeChecked();
 
     // 2. Action: Anonymous user reports issue on THIS machine
     const publicContext = await browser.newContext();

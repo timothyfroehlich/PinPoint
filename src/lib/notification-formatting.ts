@@ -1,4 +1,5 @@
-import { createHmac } from "node:crypto";
+import { Buffer } from "node:buffer";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import sanitizeHtml from "sanitize-html";
 import { getSiteUrl } from "~/lib/url";
 import { type NotificationType } from "~/lib/notifications";
@@ -45,9 +46,11 @@ export function generateUnsubscribeToken(userId: string): string {
  */
 export function verifyUnsubscribeToken(userId: string, token: string): boolean {
   const expected = generateUnsubscribeToken(userId);
-  if (!expected) return false;
-  // Constant-time comparison via HMAC comparison
-  return expected === token && token.length > 0;
+  if (!expected || token.length === 0) return false;
+  const expectedBuf = Buffer.from(expected, "utf-8");
+  const tokenBuf = Buffer.from(token, "utf-8");
+  if (expectedBuf.length !== tokenBuf.length) return false;
+  return timingSafeEqual(expectedBuf, tokenBuf);
 }
 
 function getEmailFooter(userId?: string): string {

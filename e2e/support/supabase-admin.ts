@@ -194,6 +194,28 @@ export async function deleteTestIssueByNumber(
 }
 
 /**
+ * Update notification preferences for a test user directly in the database.
+ * Useful for setting up preconditions in E2E tests without UI interaction.
+ */
+export async function updateNotificationPreferences(
+  userId: string,
+  prefs: Record<string, boolean>
+) {
+  // Convert camelCase keys to snake_case for the database
+  const snakePrefs: Record<string, boolean> = {};
+  for (const [key, value] of Object.entries(prefs)) {
+    const snakeKey = key.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
+    snakePrefs[snakeKey] = value;
+  }
+
+  const { error } = await supabaseAdmin
+    .from("notification_preferences")
+    .update(snakePrefs)
+    .eq("user_id", userId);
+  if (error) throw error;
+}
+
+/**
  * Delete a test machine by ID
  */
 export async function deleteTestMachine(machineId: string) {
