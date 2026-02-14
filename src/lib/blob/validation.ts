@@ -72,13 +72,26 @@ export function getImageDimensions(
   if (bytes.length < 30) return null;
   const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 
-  // PNG: 8-byte signature then IHDR chunk with width (4 bytes) + height (4 bytes)
+  // PNG: full 8-byte signature (89 50 4E 47 0D 0A 1A 0A) then IHDR chunk
   if (
     bytes[0] === 0x89 &&
     bytes[1] === 0x50 &&
     bytes[2] === 0x4e &&
-    bytes[3] === 0x47
+    bytes[3] === 0x47 &&
+    bytes[4] === 0x0d &&
+    bytes[5] === 0x0a &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0x0a
   ) {
+    // Verify first chunk is IHDR (bytes 12-15 = "IHDR")
+    if (
+      bytes[12] !== 0x49 ||
+      bytes[13] !== 0x48 ||
+      bytes[14] !== 0x44 ||
+      bytes[15] !== 0x52
+    ) {
+      return null;
+    }
     const width = readU32BE(dv, 16);
     const height = readU32BE(dv, 20);
     if (width === null || height === null) return null;

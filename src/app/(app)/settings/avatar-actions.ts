@@ -130,10 +130,15 @@ export async function uploadAvatarAction(
     if (typeof file.arrayBuffer === "function") {
       const imageBytes = new Uint8Array(await file.arrayBuffer());
       const dimensions = getImageDimensions(imageBytes);
+      if (dimensions === null) {
+        return err(
+          "VALIDATION",
+          "Could not read image dimensions. The file may be malformed."
+        );
+      }
       if (
-        dimensions !== null &&
-        (dimensions.width > BLOB_CONFIG.AVATAR.MAX_DIMENSIONS ||
-          dimensions.height > BLOB_CONFIG.AVATAR.MAX_DIMENSIONS)
+        dimensions.width > BLOB_CONFIG.AVATAR.MAX_DIMENSIONS ||
+        dimensions.height > BLOB_CONFIG.AVATAR.MAX_DIMENSIONS
       ) {
         return err(
           "VALIDATION",

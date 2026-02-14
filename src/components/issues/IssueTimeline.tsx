@@ -68,7 +68,7 @@ interface UserContext {
   currentUserId: string | null;
   currentUserRole: AccessLevel;
   currentUserInitials: string;
-  currentUserAvatarUrl?: string | null | undefined;
+  currentUserAvatarUrl: string | null;
 }
 
 // Components
@@ -360,7 +360,7 @@ interface IssueTimelineProps {
   currentUserId: string | null;
   currentUserRole: AccessLevel;
   currentUserInitials: string;
-  currentUserAvatarUrl?: string | null | undefined;
+  currentUserAvatarUrl: string | null;
 }
 
 export function IssueTimeline({
