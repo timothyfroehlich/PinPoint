@@ -7,7 +7,7 @@ import {
   notificationPreferences,
   machines,
 } from "~/server/db/schema";
-import { eq, ne, sql } from "drizzle-orm";
+import { eq, ne, count } from "drizzle-orm";
 import { ProfileForm } from "./profile-form";
 import { NotificationPreferencesForm } from "./notifications/notification-preferences-form";
 import { DeleteAccountSection } from "./delete-account-section";
@@ -53,7 +53,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
   // Fetch owned machines count and potential reassignment targets
   const [ownedMachinesResult, membersResult] = await Promise.all([
     db
-      .select({ count: sql<number>`count(*)::int` })
+      .select({ count: count() })
       .from(machines)
       .where(eq(machines.ownerId, user.id)),
     db

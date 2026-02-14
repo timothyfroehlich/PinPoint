@@ -98,6 +98,11 @@ describe("deleteAccountAction", () => {
     // By default, the transaction just executes the callback with a mock tx
     mockTransaction.mockImplementation((cb: (tx: unknown) => unknown) => {
       const mockTx = {
+        query: {
+          userProfiles: {
+            findFirst: mockFindFirst,
+          },
+        },
         select: vi.fn(() => ({
           from: vi.fn(() => ({
             where: vi.fn(() => Promise.resolve([{ count: 2 }])),
@@ -142,6 +147,11 @@ describe("deleteAccountAction", () => {
     // Override transaction to simulate the sole admin check
     mockTransaction.mockImplementation((cb: (tx: unknown) => unknown) => {
       const mockTx = {
+        query: {
+          userProfiles: {
+            findFirst: mockFindFirst,
+          },
+        },
         select: vi.fn(() => ({
           from: vi.fn(() => ({
             where: vi.fn(() => Promise.resolve([{ count: 0 }])),
@@ -176,16 +186,17 @@ describe("deleteAccountAction", () => {
     expect(redirect).toHaveBeenCalledWith("/");
   });
 
-  it("returns SERVER error when auth deletion fails", async () => {
+  it("still redirects when auth deletion fails (best-effort)", async () => {
+    const { redirect } = await import("next/navigation");
     mockDeleteUser.mockResolvedValue({
       error: { message: "Auth service error" },
     });
 
-    const result = await deleteAccountAction(undefined, makeFormData("DELETE"));
+    await expect(
+      deleteAccountAction(undefined, makeFormData("DELETE"))
+    ).rejects.toThrow("NEXT_REDIRECT");
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.code).toBe("SERVER");
-    }
+    expect(mockSignOut).toHaveBeenCalled();
+    expect(redirect).toHaveBeenCalledWith("/");
   });
 });

@@ -16,7 +16,7 @@ import {
   issueComments,
   issueImages,
 } from "~/server/db/schema";
-import { eq, and, ne, sql } from "drizzle-orm";
+import { eq, and, ne, count } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -151,21 +151,21 @@ export async function deleteAccountAction(
   const userId = user.id;
 
   try {
-    // Fetch profile for avatar cleanup
-    const profile = await db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, userId),
-    });
+    // Fetch profile and run anonymization in a single transaction to avoid
+    // race conditions (e.g., role change between fetch and admin check)
+    const avatarUrl = await db.transaction(async (tx) => {
+      const profile = await tx.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, userId),
+      });
 
-    if (!profile) {
-      return err("SERVER", "Profile not found.");
-    }
+      if (!profile) {
+        throw new Error("Profile not found");
+      }
 
-    // Run anonymization in a transaction
-    await db.transaction(async (tx) => {
       // Admin check: if this user is an admin, ensure they're not the only one
       if (profile.role === "admin") {
         const [adminCount] = await tx
-          .select({ count: sql<number>`count(*)::int` })
+          .select({ count: count() })
           .from(userProfiles)
           .where(
             and(eq(userProfiles.role, "admin"), ne(userProfiles.id, userId))
@@ -216,34 +216,38 @@ export async function deleteAccountAction(
         .update(issueImages)
         .set({ deletedBy: null, updatedAt: new Date() })
         .where(eq(issueImages.deletedBy, userId));
+
+      return profile.avatarUrl;
     });
 
     // Best-effort avatar cleanup (outside transaction)
-    if (profile.avatarUrl) {
+    if (avatarUrl) {
       try {
-        await deleteFromBlob(profile.avatarUrl);
+        await deleteFromBlob(avatarUrl);
       } catch {
-        log.warn({ userId: userId.slice(0, 8) }, "Avatar blob cleanup failed");
+        log.warn({ userId }, "Avatar blob cleanup failed");
       }
     }
 
-    // Delete auth user (cascades to user_profiles, watchers, notifications)
+    // Delete auth user (cascades to user_profiles, watchers, notifications).
+    // This is best-effort: if it fails after anonymization committed, we log
+    // the error for manual cleanup but still sign out the user. The data is
+    // already anonymized, so the user's information is protected.
     const adminClient = createAdminClient();
     const { error: deleteError } =
       await adminClient.auth.admin.deleteUser(userId);
 
     if (deleteError) {
       log.error(
-        { userId: userId.slice(0, 8), error: deleteError.message },
-        "Failed to delete auth user"
+        { userId, error: deleteError.message },
+        "Failed to delete auth user after anonymization — requires manual cleanup"
       );
-      return err("SERVER", "Failed to delete account. Please try again.");
     }
 
     // Sign out the current session
     await supabase.auth.signOut();
 
-    log.info({ userId: userId.slice(0, 8) }, "Account deleted successfully");
+    log.info({ userId }, "Account deleted successfully");
   } catch (error) {
     if (error instanceof SoleAdminError) {
       return err(

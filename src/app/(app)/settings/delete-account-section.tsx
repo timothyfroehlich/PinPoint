@@ -97,6 +97,7 @@ export function DeleteAccountSection({
         </AlertDialogTrigger>
         <AlertDialogContent>
           <form action={formAction}>
+            {/* __unassigned__ → "" → server parses empty string as null for Zod UUID validation */}
             <input
               type="hidden"
               name="reassignTo"
