@@ -11,6 +11,7 @@ import { redirect } from "next/navigation";
 import type { IssueListItem } from "~/lib/types";
 
 import { parseIssueFilters } from "~/lib/issues/filters";
+import { ISSUE_LIST_COLUMNS } from "~/lib/issues/queries";
 import {
   buildWhereConditions,
   buildOrderBy,
@@ -101,6 +102,7 @@ export default async function IssuesPage({
         },
       },
     },
+    columns: ISSUE_LIST_COLUMNS,
     limit: pageSize,
     offset: (page - 1) * pageSize,
   });
