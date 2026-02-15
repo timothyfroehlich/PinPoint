@@ -76,6 +76,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
             preferences={{
               emailEnabled: preferences.emailEnabled,
               inAppEnabled: preferences.inAppEnabled,
+              suppressOwnActions: preferences.suppressOwnActions,
               emailNotifyOnAssigned: preferences.emailNotifyOnAssigned,
               inAppNotifyOnAssigned: preferences.inAppNotifyOnAssigned,
               emailNotifyOnStatusChange: preferences.emailNotifyOnStatusChange,

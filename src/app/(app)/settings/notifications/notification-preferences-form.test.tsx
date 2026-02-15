@@ -16,6 +16,7 @@ describe("NotificationPreferencesForm", () => {
     userId: "test-user-id",
     emailEnabled: true,
     inAppEnabled: true,
+    suppressOwnActions: false,
     emailNotifyOnNewIssue: false,
     inAppNotifyOnNewIssue: false,
     emailWatchNewIssuesGlobal: false,

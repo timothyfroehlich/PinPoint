@@ -100,6 +100,12 @@ describe("createNotification (Integration)", () => {
       userId: actor.id,
     });
 
+    // Explicitly enable notifications for this event type
+    await db.insert(notificationPreferences).values({
+      userId: actor.id,
+      inAppEnabled: true,
+      inAppNotifyOnNewComment: true,
+    });
     // Don't specify includeActor - should default to true
     await createNotification(
       {
@@ -408,6 +414,108 @@ describe("createNotification (Integration)", () => {
     expect(sendEmail).not.toHaveBeenCalled();
   });
 
+  it("should skip actor when suppressOwnActions is enabled", async () => {
+    const db = await getTestDb();
+
+    const [actor] = await db
+      .insert(userProfiles)
+      .values(createTestUser())
+      .returning();
+    const [machine] = await db
+      .insert(machines)
+      .values(createTestMachine({ initials: "SUP" }))
+      .returning();
+    const [issue] = await db
+      .insert(issues)
+      .values(createTestIssue(machine.initials, { issueNumber: 1 }))
+      .returning();
+
+    // Actor watches the issue
+    await db.insert(issueWatchers).values({
+      issueId: issue.id,
+      userId: actor.id,
+    });
+
+    // Set suppressOwnActions = true
+    await db.insert(notificationPreferences).values({
+      userId: actor.id,
+      emailEnabled: true,
+      inAppEnabled: true,
+      suppressOwnActions: true,
+      emailNotifyOnNewComment: true,
+      inAppNotifyOnNewComment: true,
+    });
+
+    // Actor comments on issue they're watching — with includeActor: true (default)
+    await createNotification(
+      {
+        type: "new_comment",
+        resourceId: issue.id,
+        resourceType: "issue",
+        actorId: actor.id,
+        includeActor: true,
+        commentContent: "Test comment",
+      },
+      db
+    );
+
+    // No notifications should be created — actor is suppressed
+    const result = await db.query.notifications.findMany();
+    expect(result).toHaveLength(0);
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("should NOT skip actor when suppressOwnActions is disabled", async () => {
+    const db = await getTestDb();
+
+    const [actor] = await db
+      .insert(userProfiles)
+      .values(createTestUser())
+      .returning();
+    const [machine] = await db
+      .insert(machines)
+      .values(createTestMachine({ initials: "NOSUP" }))
+      .returning();
+    const [issue] = await db
+      .insert(issues)
+      .values(createTestIssue(machine.initials, { issueNumber: 1 }))
+      .returning();
+
+    await db.insert(issueWatchers).values({
+      issueId: issue.id,
+      userId: actor.id,
+    });
+
+    // suppressOwnActions = false (default)
+    await db.insert(notificationPreferences).values({
+      userId: actor.id,
+      emailEnabled: true,
+      inAppEnabled: true,
+      suppressOwnActions: false,
+      emailNotifyOnNewComment: true,
+      inAppNotifyOnNewComment: true,
+    });
+
+    await createNotification(
+      {
+        type: "new_comment",
+        resourceId: issue.id,
+        resourceType: "issue",
+        actorId: actor.id,
+        includeActor: true,
+        commentContent: "Test comment",
+      },
+      db
+    );
+
+    // Actor should receive notification since suppressOwnActions is false
+    const result = await db.query.notifications.findMany({
+      where: eq(notifications.userId, actor.id),
+    });
+    expect(result).toHaveLength(1);
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+
   it("should notify machine watchers on new issue", async () => {
     const db = await getTestDb();
 
@@ -427,6 +535,14 @@ describe("createNotification (Integration)", () => {
       watchMode: "notify",
     });
 
+    // Explicitly enable notifications for new issue events
+    await db.insert(notificationPreferences).values({
+      userId: recipient.id,
+      emailEnabled: true,
+      inAppEnabled: true,
+      emailNotifyOnNewIssue: true,
+      inAppNotifyOnNewIssue: true,
+    });
     const [issue] = await db
       .insert(issues)
       .values(createTestIssue(machine.initials, { issueNumber: 1 }))
@@ -456,5 +572,105 @@ describe("createNotification (Integration)", () => {
         to: "watcher@test.com",
       })
     );
+  });
+
+  it("should always notify for machine_ownership_changed even with granular toggles off", async () => {
+    const db = await getTestDb();
+
+    const [actor] = await db
+      .insert(userProfiles)
+      .values(createTestUser())
+      .returning();
+    const [recipient] = await db
+      .insert(userProfiles)
+      .values(createTestUser({ email: "new-owner@test.com" }))
+      .returning();
+    const [machine] = await db
+      .insert(machines)
+      .values(createTestMachine({ initials: "OWN" }))
+      .returning();
+
+    // Granular ownership toggle OFF, but main switches ON
+    await db.insert(notificationPreferences).values({
+      userId: recipient.id,
+      emailEnabled: true,
+      inAppEnabled: true,
+      emailNotifyOnMachineOwnershipChange: false,
+      inAppNotifyOnMachineOwnershipChange: false,
+    });
+
+    await createNotification(
+      {
+        type: "machine_ownership_changed",
+        resourceId: machine.id,
+        resourceType: "machine",
+        actorId: actor.id,
+        machineName: machine.name,
+        newStatus: "added",
+        additionalRecipientIds: [recipient.id],
+      },
+      db
+    );
+
+    // Should still notify because ownership changes bypass granular toggles
+    const result = await db.query.notifications.findMany({
+      where: eq(notifications.userId, recipient.id),
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].type).toBe("machine_ownership_changed");
+
+    expect(sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "new-owner@test.com",
+        subject: expect.stringContaining("Ownership Update"),
+      })
+    );
+  });
+
+  it("machine_ownership_changed with includeActor: false should not notify the admin who made the change", async () => {
+    const db = await getTestDb();
+
+    const [admin] = await db
+      .insert(userProfiles)
+      .values(createTestUser({ email: "admin-owner@test.com" }))
+      .returning();
+    const [newOwner] = await db
+      .insert(userProfiles)
+      .values(createTestUser({ email: "new-owner-excl@test.com" }))
+      .returning();
+    const [machine] = await db
+      .insert(machines)
+      .values(createTestMachine({ initials: "EX" }))
+      .returning();
+
+    await db.insert(notificationPreferences).values({
+      userId: admin.id,
+      emailEnabled: true,
+      inAppEnabled: true,
+    });
+    await db.insert(notificationPreferences).values({
+      userId: newOwner.id,
+      emailEnabled: true,
+      inAppEnabled: true,
+    });
+
+    await createNotification(
+      {
+        type: "machine_ownership_changed",
+        resourceId: machine.id,
+        resourceType: "machine",
+        actorId: admin.id,
+        includeActor: false,
+        machineName: machine.name,
+        newStatus: "added",
+        additionalRecipientIds: [newOwner.id],
+      },
+      db
+    );
+
+    // Only the new owner should be notified, not the admin
+    const result = await db.query.notifications.findMany();
+    expect(result).toHaveLength(1);
+    expect(result[0].userId).toBe(newOwner.id);
   });
 });
