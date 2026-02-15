@@ -626,4 +626,51 @@ describe("createNotification (Integration)", () => {
       })
     );
   });
+
+  it("machine_ownership_changed with includeActor: false should not notify the admin who made the change", async () => {
+    const db = await getTestDb();
+
+    const [admin] = await db
+      .insert(userProfiles)
+      .values(createTestUser({ email: "admin-owner@test.com" }))
+      .returning();
+    const [newOwner] = await db
+      .insert(userProfiles)
+      .values(createTestUser({ email: "new-owner-excl@test.com" }))
+      .returning();
+    const [machine] = await db
+      .insert(machines)
+      .values(createTestMachine({ initials: "EX" }))
+      .returning();
+
+    await db.insert(notificationPreferences).values({
+      userId: admin.id,
+      emailEnabled: true,
+      inAppEnabled: true,
+    });
+    await db.insert(notificationPreferences).values({
+      userId: newOwner.id,
+      emailEnabled: true,
+      inAppEnabled: true,
+    });
+
+    await createNotification(
+      {
+        type: "machine_ownership_changed",
+        resourceId: machine.id,
+        resourceType: "machine",
+        actorId: admin.id,
+        includeActor: false,
+        machineName: machine.name,
+        newStatus: "added",
+        additionalRecipientIds: [newOwner.id],
+      },
+      db
+    );
+
+    // Only the new owner should be notified, not the admin
+    const result = await db.query.notifications.findMany();
+    expect(result).toHaveLength(1);
+    expect(result[0].userId).toBe(newOwner.id);
+  });
 });

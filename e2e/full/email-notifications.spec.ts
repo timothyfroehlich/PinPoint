@@ -13,6 +13,8 @@ import {
   createTestMachine,
   updateUserRole,
   updateNotificationPreferences,
+  generateUnsubscribeTokenForTest,
+  getNotificationPreferences,
 } from "e2e/support/supabase-admin.js";
 import {
   getTestIssueTitle,
@@ -36,12 +38,14 @@ test.describe.serial("Email Notifications", () => {
   const cleanupUserIds: string[] = [];
   const cleanupMachineIds: string[] = [];
   let testAdminEmail: string;
+  let testAdminUserId: string;
   let testMachineInitials: string;
 
   test.beforeAll(async () => {
     // Create a unique admin user for this worker
     testAdminEmail = getTestEmail("worker-admin@test.com");
     const user = await createTestUser(testAdminEmail);
+    testAdminUserId = user.id;
     await updateUserRole(user.id, "admin");
     cleanupUserIds.push(user.id);
 
@@ -218,5 +222,45 @@ test.describe.serial("Email Notifications", () => {
     expect(emailAfterStatusChange).not.toBeNull();
     expect(emailAfterStatusChange?.subject).toContain("Status Changed");
     expect(emailAfterStatusChange?.subject).toContain(issueTitle);
+  });
+
+  test("should unsubscribe via confirmation page", async ({ page }) => {
+    // Generate a valid unsubscribe token for the test admin
+    const token = generateUnsubscribeTokenForTest(testAdminUserId);
+
+    // Navigate to the unsubscribe confirmation page (GET — non-mutating)
+    await page.goto(
+      `/api/unsubscribe?uid=${encodeURIComponent(testAdminUserId)}&token=${encodeURIComponent(token)}`
+    );
+
+    // Verify confirmation page renders
+    await expect(
+      page.getByText("Unsubscribe from PinPoint emails?")
+    ).toBeVisible();
+    await expect(
+      page.getByText("This will turn off all email notifications")
+    ).toBeVisible();
+
+    // Click the confirm button
+    await page.getByRole("button", { name: "Confirm unsubscribe" }).click();
+
+    // Verify success message
+    await expect(page.getByText("You have been unsubscribed")).toBeVisible();
+
+    // Verify all email preferences are now disabled in the database
+    const prefs = await getNotificationPreferences(testAdminUserId);
+    expect(prefs.email_enabled).toBe(false);
+    expect(prefs.email_notify_on_assigned).toBe(false);
+    expect(prefs.email_notify_on_status_change).toBe(false);
+    expect(prefs.email_notify_on_new_comment).toBe(false);
+    expect(prefs.email_notify_on_new_issue).toBe(false);
+    expect(prefs.email_watch_new_issues_global).toBe(false);
+    expect(prefs.email_notify_on_machine_ownership_change).toBe(false);
+
+    // Restore email prefs so cleanup/other tests aren't affected
+    await updateNotificationPreferences(testAdminUserId, {
+      emailEnabled: true,
+      emailNotifyOnStatusChange: true,
+    });
   });
 });

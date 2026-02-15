@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 /**
@@ -224,4 +225,27 @@ export async function deleteTestMachine(machineId: string) {
     .delete()
     .eq("id", machineId);
   if (error) throw error;
+}
+
+/**
+ * Generate an unsubscribe token for E2E tests.
+ * Uses the same HMAC-SHA256 algorithm as src/lib/notification-formatting.ts.
+ */
+export function generateUnsubscribeTokenForTest(userId: string): string {
+  return createHmac("sha256", SUPABASE_SERVICE_ROLE_KEY)
+    .update(userId + ":unsubscribe")
+    .digest("hex");
+}
+
+/**
+ * Fetch notification preferences for a test user.
+ */
+export async function getNotificationPreferences(userId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("notification_preferences")
+    .select("*")
+    .eq("user_id", userId)
+    .single();
+  if (error) throw error;
+  return data;
 }

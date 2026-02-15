@@ -28,6 +28,18 @@ export interface CreateNotificationProps {
   resourceId: string;
   resourceType: ResourceType;
   actorId?: string; // User who triggered the notification (optional for anonymous)
+  /**
+   * Whether to include the actor in the recipient set (default: true).
+   *
+   * Two separate layers control actor self-notification:
+   * - `includeActor: false` — Business rule override. The actor is structurally
+   *   excluded from the recipient set regardless of user preferences. Use for
+   *   notifications where the actor is not a valid recipient (e.g., assigner
+   *   in issue_assigned, admin performing machine ownership changes).
+   * - `suppressOwnActions` (user pref) — The actor can globally opt out of
+   *   receiving notifications for their own actions. Only evaluated when
+   *   includeActor is true (default).
+   */
   includeActor?: boolean;
   // Context data for emails
   issueTitle?: string | undefined;

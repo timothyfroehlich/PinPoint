@@ -99,6 +99,13 @@
       "when": 1771001338518,
       "tag": "0013_mute_korg",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1771087738518,
+      "tag": "0014_sync_trigger_defaults",
+      "breakpoints": true
     }
   ]
 }
