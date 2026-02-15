@@ -86,7 +86,15 @@ export async function deleteFromBlob(pathname: string): Promise<void> {
   if (shouldUseMockBlobStorage()) {
     try {
       const publicDir = path.join(process.cwd(), "public", "uploads");
-      const safePathname = pathname
+      // Extract pathname from full URLs (production stores URLs, not pathnames)
+      let resolved = pathname;
+      try {
+        const url = new URL(pathname);
+        resolved = url.pathname.replace(/^\/uploads\//, "");
+      } catch {
+        // Not a URL — use as-is
+      }
+      const safePathname = resolved
         .replace(/^(\.\.[/\\])+/, "")
         .replace(/^[/\\]/, "");
       const filePath = path.join(publicDir, safePathname);

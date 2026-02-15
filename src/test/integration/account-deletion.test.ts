@@ -21,7 +21,7 @@ import {
   createTestIssue,
 } from "~/test/helpers/factories";
 import { anonymizeUserReferences } from "~/app/(app)/settings/actions";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "node:crypto";
 
 describe("Account Deletion Anonymization (PGlite)", () => {
   setupTestDb();
@@ -30,8 +30,8 @@ describe("Account Deletion Anonymization (PGlite)", () => {
     const db = await getTestDb();
 
     // 1. Setup Users
-    const userToDeleteId = uuidv4();
-    const otherUserId = uuidv4();
+    const userToDeleteId = randomUUID();
+    const otherUserId = randomUUID();
 
     await db
       .insert(userProfiles)
@@ -112,8 +112,8 @@ describe("Account Deletion Anonymization (PGlite)", () => {
     const db = await getTestDb();
 
     // 1. Setup Users
-    const userToDeleteId = uuidv4();
-    const newOwnerId = uuidv4();
+    const userToDeleteId = randomUUID();
+    const newOwnerId = randomUUID();
 
     await db
       .insert(userProfiles)
@@ -140,7 +140,7 @@ describe("Account Deletion Anonymization (PGlite)", () => {
     const db = await getTestDb();
 
     // 1. Setup Sole Admin
-    const adminId = uuidv4();
+    const adminId = randomUUID();
     await db
       .insert(userProfiles)
       .values(createTestUser({ id: adminId, role: "admin" }));
@@ -155,8 +155,8 @@ describe("Account Deletion Anonymization (PGlite)", () => {
     const db = await getTestDb();
 
     // 1. Setup Two Admins
-    const adminToDeleteId = uuidv4();
-    const otherAdminId = uuidv4();
+    const adminToDeleteId = randomUUID();
+    const otherAdminId = randomUUID();
 
     await db.insert(userProfiles).values([
       createTestUser({
