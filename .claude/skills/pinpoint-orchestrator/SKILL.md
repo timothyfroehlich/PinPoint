@@ -191,13 +191,14 @@ gh run rerun <run-id> --failed
 
 ### 4.4 Label Ready PRs
 
-When a PR passes CI and has 0 Copilot comments:
+**PROACTIVE**: Label PRs as soon as CI goes green and Copilot comments are resolved. Do NOT wait for the user to ask — this is part of the orchestrator's job.
 
 ```bash
+bash scripts/workflow/label-ready.sh <PR>               # Label (keeps worktree)
 bash scripts/workflow/label-ready.sh <PR> --cleanup     # Label + remove worktree
 ```
 
-The script checks: all CI passed, 0 Copilot comments, not draft. `--cleanup` frees the branch for the review tool (git won't allow two worktrees on the same branch).
+The script checks: all CI passed (cancelled/skipped runs are ignored), 0 Copilot comments, not draft. Use `--cleanup` only when explicitly asked — worktrees may be needed for follow-up work.
 
 ### 4.5 Review Feedback Loop
 
