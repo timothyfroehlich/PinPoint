@@ -42,11 +42,7 @@ export async function MainLayout({
 
   let enrichedNotifications: EnrichedNotification[] = [];
   let userProfile:
-    | {
-        name: string;
-        role: "guest" | "member" | "admin";
-        avatarUrl: string | null;
-      }
+    | { name: string; role: "guest" | "member" | "admin" }
     | undefined;
 
   if (user) {
@@ -110,7 +106,7 @@ export async function MainLayout({
 
     userProfile = await db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, user.id),
-      columns: { name: true, role: true, avatarUrl: true },
+      columns: { name: true, role: true },
     });
 
     if (!userProfile) {
@@ -120,7 +116,7 @@ export async function MainLayout({
       // Refetch profile after healing
       userProfile = await db.query.userProfiles.findFirst({
         where: eq(userProfiles.id, user.id),
-        columns: { name: true, role: true, avatarUrl: true },
+        columns: { name: true, role: true },
       });
     }
   }
@@ -161,10 +157,7 @@ export async function MainLayout({
             {user ? (
               <div className="flex items-center gap-4">
                 <NotificationList notifications={enrichedNotifications} />
-                <UserMenu
-                  userName={userProfile?.name ?? "User"}
-                  avatarUrl={userProfile?.avatarUrl ?? null}
-                />
+                <UserMenu userName={userProfile?.name ?? "User"} />
               </div>
             ) : (
               <div className="flex items-center gap-4">

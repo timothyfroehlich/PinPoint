@@ -84,7 +84,6 @@ export default async function IssueDetailPage({
           columns: {
             id: true,
             name: true,
-            avatarUrl: true,
           },
         },
         invitedReporter: {
@@ -108,7 +107,6 @@ export default async function IssueDetailPage({
               columns: {
                 id: true,
                 name: true,
-                avatarUrl: true,
               },
             },
             images: {
@@ -154,7 +152,7 @@ export default async function IssueDetailPage({
     user?.id
       ? db.query.userProfiles.findFirst({
           where: eq(userProfiles.id, user.id),
-          columns: { name: true, role: true, avatarUrl: true },
+          columns: { name: true, role: true },
         })
       : Promise.resolve(null),
   ]);
@@ -264,7 +262,6 @@ export default async function IssueDetailPage({
             currentUserInitials={
               currentUserProfile?.name.slice(0, 2).toUpperCase() ?? "??"
             }
-            currentUserAvatarUrl={currentUserProfile?.avatarUrl ?? null}
           />
         </section>
 

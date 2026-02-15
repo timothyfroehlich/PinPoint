@@ -2,7 +2,7 @@
 
 import React, { useTransition } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { AddCommentForm } from "~/components/issues/AddCommentForm";
 import { OwnerBadge } from "~/components/issues/OwnerBadge";
 import { isUserMachineOwner } from "~/lib/issues/owner";
@@ -55,7 +55,6 @@ interface TimelineEvent {
     id?: string | null;
     name: string;
     avatarFallback: string;
-    avatarUrl?: string | null;
   };
   createdAt: Date;
   updatedAt: Date;
@@ -68,7 +67,6 @@ interface UserContext {
   currentUserId: string | null;
   currentUserRole: AccessLevel;
   currentUserInitials: string;
-  currentUserAvatarUrl: string | null;
 }
 
 // Components
@@ -211,12 +209,6 @@ function TimelineItem({
           </div>
         ) : (
           <Avatar className="relative z-10 size-10 border border-border/60 ring-4 ring-background">
-            {event.author.avatarUrl ? (
-              <AvatarImage
-                src={event.author.avatarUrl}
-                alt={event.author.name}
-              />
-            ) : null}
             <AvatarFallback className="bg-muted text-xs font-medium text-muted-foreground">
               {event.author.avatarFallback}
             </AvatarFallback>
@@ -360,7 +352,6 @@ interface IssueTimelineProps {
   currentUserId: string | null;
   currentUserRole: AccessLevel;
   currentUserInitials: string;
-  currentUserAvatarUrl: string | null;
 }
 
 export function IssueTimeline({
@@ -368,13 +359,11 @@ export function IssueTimeline({
   currentUserId,
   currentUserRole,
   currentUserInitials,
-  currentUserAvatarUrl,
 }: IssueTimelineProps): React.JSX.Element {
   const userContext: UserContext = {
     currentUserId,
     currentUserRole,
     currentUserInitials,
-    currentUserAvatarUrl,
   };
 
   // 1. Normalize Issue as the first event
@@ -387,7 +376,6 @@ export function IssueTimeline({
       id: reporter.id ?? null,
       name: reporter.name,
       avatarFallback: reporter.initial,
-      avatarUrl: issue.reportedByUser?.avatarUrl ?? null,
     },
     createdAt: new Date(issue.createdAt),
     updatedAt: new Date(issue.updatedAt),
@@ -406,7 +394,6 @@ export function IssueTimeline({
         id: c.author?.id ?? null,
         name: authorName,
         avatarFallback: authorName.slice(0, 2).toUpperCase(),
-        avatarUrl: c.author?.avatarUrl ?? null,
       },
       createdAt: new Date(c.createdAt),
       updatedAt: new Date(c.updatedAt),
@@ -459,9 +446,6 @@ export function IssueTimeline({
         <div className="relative mt-8 flex gap-4 pt-2">
           <div className="flex w-16 flex-none flex-col items-center">
             <Avatar className="relative z-10 size-10 border border-border/60 ring-4 ring-background">
-              {userContext.currentUserAvatarUrl ? (
-                <AvatarImage src={userContext.currentUserAvatarUrl} alt="You" />
-              ) : null}
               <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
                 {currentUserInitials}
               </AvatarFallback>
