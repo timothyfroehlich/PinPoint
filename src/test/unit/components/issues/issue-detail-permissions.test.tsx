@@ -52,7 +52,7 @@ function createIssue(
       owner: { id: "owner-1", name: "Owner One" },
       invitedOwner: null,
     },
-    reportedByUser: { id: "reporter-1", name: "Reporter One" },
+    reportedByUser: { id: "reporter-1", name: "Reporter One", avatarUrl: null },
     invitedReporter: null,
     assignedToUser: { id: "assignee-1", name: "Assignee One" },
     comments: [],
@@ -103,6 +103,7 @@ describe("Issue detail permission-aware UI", () => {
         currentUserId={null}
         currentUserRole="unauthenticated"
         currentUserInitials="??"
+        currentUserAvatarUrl={null}
       />
     );
 

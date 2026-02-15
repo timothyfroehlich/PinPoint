@@ -6,19 +6,26 @@ import { BLOB_CONFIG } from "./config";
  */
 export async function compressImage(
   file: File,
-  mode: "full" | "cropped" = "full"
+  mode: "full" | "cropped" | "avatar" = "full"
 ): Promise<File> {
   const options = {
     maxSizeMB:
-      mode === "full"
-        ? BLOB_CONFIG.COMPRESSION.FULL_IMAGE_MAX_MB
-        : BLOB_CONFIG.COMPRESSION.CROPPED_IMAGE_MAX_MB,
-    maxWidthOrHeight: BLOB_CONFIG.MAX_DIMENSIONS,
+      mode === "avatar"
+        ? BLOB_CONFIG.AVATAR.COMPRESSION_MAX_MB
+        : mode === "full"
+          ? BLOB_CONFIG.COMPRESSION.FULL_IMAGE_MAX_MB
+          : BLOB_CONFIG.COMPRESSION.CROPPED_IMAGE_MAX_MB,
+    maxWidthOrHeight:
+      mode === "avatar"
+        ? BLOB_CONFIG.AVATAR.MAX_DIMENSIONS
+        : BLOB_CONFIG.MAX_DIMENSIONS,
     useWebWorker: true,
     initialQuality:
-      mode === "full"
-        ? BLOB_CONFIG.COMPRESSION.FULL_IMAGE_QUALITY
-        : BLOB_CONFIG.COMPRESSION.CROPPED_IMAGE_QUALITY,
+      mode === "avatar"
+        ? BLOB_CONFIG.AVATAR.COMPRESSION_QUALITY
+        : mode === "full"
+          ? BLOB_CONFIG.COMPRESSION.FULL_IMAGE_QUALITY
+          : BLOB_CONFIG.COMPRESSION.CROPPED_IMAGE_QUALITY,
   };
 
   try {

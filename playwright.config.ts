@@ -202,8 +202,9 @@ export default defineConfig({
     ignoreHTTPSErrors: true,
     env: {
       PORT: String(port),
-      // Explicitly forward mock storage flag if present
-      MOCK_BLOB_STORAGE: process.env["MOCK_BLOB_STORAGE"] ?? "",
+      // Default to mock blob storage for local/CI Playwright stability.
+      // Set MOCK_BLOB_STORAGE=false AND provide BLOB_READ_WRITE_TOKEN to use real storage.
+      MOCK_BLOB_STORAGE: process.env["MOCK_BLOB_STORAGE"] ?? "true",
     },
   },
 });

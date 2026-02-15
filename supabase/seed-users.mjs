@@ -100,14 +100,16 @@ async function seedUsersAndData() {
       // Update user profile role
       // Ensure user profile exists and has correct role (Upsert)
       // This handles cases where auth.users exists but public.user_profiles was wiped
+      // Avatar is null — seeded users rely on initials fallback in the UI
       await sql`
-        INSERT INTO user_profiles (id, email, first_name, last_name, role)
-        VALUES (${userId}, ${user.email}, ${user.firstName}, ${user.lastName}, ${user.role})
+        INSERT INTO user_profiles (id, email, first_name, last_name, role, avatar_url)
+        VALUES (${userId}, ${user.email}, ${user.firstName}, ${user.lastName}, ${user.role}, ${null})
         ON CONFLICT (id) DO UPDATE SET
           email = ${user.email},
           role = ${user.role},
           first_name = ${user.firstName},
           last_name = ${user.lastName},
+          avatar_url = ${null},
           updated_at = NOW()
       `;
       console.log(`   └─ Role set to: ${user.role}`);
