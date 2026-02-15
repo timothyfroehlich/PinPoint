@@ -14,7 +14,6 @@ import {
 } from "~/components/ui/select";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -33,11 +32,13 @@ interface MemberOption {
 interface DeleteAccountSectionProps {
   ownedMachineCount: number;
   members: MemberOption[];
+  isSoleAdmin: boolean;
 }
 
 export function DeleteAccountSection({
   ownedMachineCount,
   members,
+  isSoleAdmin,
 }: DeleteAccountSectionProps): React.JSX.Element {
   const [state, formAction, isPending] = useActionState<
     DeleteAccountResult | undefined,
@@ -46,6 +47,7 @@ export function DeleteAccountSection({
 
   const [confirmText, setConfirmText] = useState("");
   const [reassignTo, setReassignTo] = useState<string>("__unassigned__");
+  const [isOpen, setIsOpen] = useState(false);
 
   const isConfirmed = confirmText === "DELETE";
 
@@ -57,98 +59,139 @@ export function DeleteAccountSection({
         </div>
       )}
 
-      {ownedMachineCount > 0 && (
-        <div className="rounded-md border border-amber-500/20 bg-amber-50 p-4 dark:bg-amber-950/20">
-          <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-            You own {ownedMachineCount}{" "}
-            {ownedMachineCount === 1 ? "machine" : "machines"}. Choose what
-            happens to them:
+      {isSoleAdmin && (
+        <div className="rounded-md border border-destructive/20 bg-destructive/10 p-4 text-destructive">
+          <p className="text-sm font-medium">
+            You are the only admin. Promote another user to admin before
+            deleting your account.
           </p>
-          <div className="mt-3 max-w-[280px]">
-            <Label htmlFor="reassignTo" className="text-sm">
-              Reassign machines to
-            </Label>
-            <Select
-              value={reassignTo}
-              onValueChange={setReassignTo}
-              name="reassignToSelect"
-            >
-              <SelectTrigger id="reassignTo" className="mt-1">
-                <SelectValue placeholder="Select a member..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__unassigned__">Leave unassigned</SelectItem>
-                {members.map((member) => (
-                  <SelectItem key={member.id} value={member.id}>
-                    {member.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
         </div>
       )}
 
-      <AlertDialog>
+      <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
         <AlertDialogTrigger asChild>
-          <Button variant="destructive" data-testid="delete-account-trigger">
+          <Button
+            variant="destructive"
+            data-testid="delete-account-trigger"
+            disabled={isSoleAdmin}
+          >
             Delete My Account
           </Button>
         </AlertDialogTrigger>
-        <AlertDialogContent>
-          <form action={formAction}>
-            {/* __unassigned__ → "" → server parses empty string as null for Zod UUID validation */}
-            <input
-              type="hidden"
-              name="reassignTo"
-              value={reassignTo === "__unassigned__" ? "" : reassignTo}
-            />
+        <AlertDialogContent className="sm:max-w-[500px]">
+          <form action={formAction} className="space-y-6">
             <AlertDialogHeader>
               <AlertDialogTitle>Delete your account?</AlertDialogTitle>
               <AlertDialogDescription asChild>
-                <div className="space-y-2">
-                  <p>
-                    This action is{" "}
-                    <strong>permanent and cannot be undone</strong>. Your
-                    profile, notification preferences, and watch lists will be
-                    deleted. Your issues, comments, and images will be
-                    anonymized (author information removed) to preserve the
-                    maintenance history.
-                  </p>
-                  <p>
-                    Type <strong>DELETE</strong> below to confirm.
-                  </p>
+                <div className="space-y-4 text-foreground">
+                  {isSoleAdmin && (
+                    <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-destructive">
+                      <p className="text-sm font-semibold">
+                        Critical Error: Sole Admin Constraint
+                      </p>
+                      <p className="text-xs">
+                        You are the only administrator. System security requires
+                        at least one active admin. Please promote another user
+                        before proceeding.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <p>
+                      This action is{" "}
+                      <strong className="text-destructive underline">
+                        permanent and cannot be undone
+                      </strong>
+                      . Your profile and preferences will be deleted.
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Contributions (issues, comments) will be anonymized to
+                      preserve history while removing your identity.
+                    </p>
+                  </div>
+
+                  {ownedMachineCount > 0 && (
+                    <div className="space-y-3 rounded-lg border border-amber-500/20 bg-amber-50/50 p-4 dark:bg-amber-950/20">
+                      <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
+                        Machine Reassignment Needed
+                      </p>
+                      <p className="text-xs text-amber-700 dark:text-amber-300">
+                        You own {ownedMachineCount}{" "}
+                        {ownedMachineCount === 1 ? "machine" : "machines"}.
+                        Choose a new owner:
+                      </p>
+                      <Select
+                        value={reassignTo}
+                        onValueChange={setReassignTo}
+                        name="reassignToSelect"
+                      >
+                        <SelectTrigger className="bg-background">
+                          <SelectValue placeholder="Select a member..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__unassigned__">
+                            Leave unassigned
+                          </SelectItem>
+                          {members.map((member) => (
+                            <SelectItem key={member.id} value={member.id}>
+                              {member.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <input
+                        type="hidden"
+                        name="reassignTo"
+                        value={
+                          reassignTo === "__unassigned__" ? "" : reassignTo
+                        }
+                      />
+                    </div>
+                  )}
+
+                  <div className="space-y-2 pt-2">
+                    <Label
+                      htmlFor="confirmation"
+                      className="text-sm font-semibold"
+                    >
+                      To confirm, type{" "}
+                      <span className="select-all">DELETE</span> in the box
+                      below
+                    </Label>
+                    <Input
+                      id="confirmation"
+                      name="confirmation"
+                      placeholder='Type "DELETE"'
+                      value={confirmText}
+                      onChange={(e) => setConfirmText(e.target.value)}
+                      autoComplete="off"
+                      className="uppercase"
+                      data-testid="delete-confirmation-input"
+                    />
+                  </div>
                 </div>
               </AlertDialogDescription>
             </AlertDialogHeader>
 
-            <div className="my-4">
-              <Label htmlFor="confirmation" className="sr-only">
-                Type DELETE to confirm
-              </Label>
-              <Input
-                id="confirmation"
-                name="confirmation"
-                placeholder='Type "DELETE" to confirm'
-                value={confirmText}
-                onChange={(e) => setConfirmText(e.target.value)}
-                autoComplete="off"
-                data-testid="delete-confirmation-input"
-              />
-            </div>
-
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setConfirmText("")}>
-                Cancel
+            <AlertDialogFooter className="gap-2 sm:gap-0">
+              <AlertDialogCancel
+                onClick={() => {
+                  setConfirmText("");
+                  setIsOpen(false);
+                }}
+              >
+                Keep Account
               </AlertDialogCancel>
-              <AlertDialogAction
+              <Button
                 type="submit"
                 variant="destructive"
-                disabled={!isConfirmed || isPending}
+                disabled={!isConfirmed || isPending || isSoleAdmin}
+                className="w-full sm:w-auto"
                 data-testid="delete-account-confirm"
               >
-                {isPending ? "Deleting..." : "Delete My Account"}
-              </AlertDialogAction>
+                {isPending ? "Deleting..." : "Permanently Delete Account"}
+              </Button>
             </AlertDialogFooter>
           </form>
         </AlertDialogContent>

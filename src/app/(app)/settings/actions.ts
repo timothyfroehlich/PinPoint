@@ -151,8 +151,10 @@ export async function deleteAccountAction(
   const userId = user.id;
 
   try {
+    log.info({ userId }, "Starting account deletion process");
     // Fetch profile and run anonymization in a single transaction
     const avatarUrl = await anonymizeUserReferences(userId, reassignTo);
+    log.info({ userId, hasAvatar: !!avatarUrl }, "Anonymization complete");
 
     // Best-effort avatar cleanup (outside transaction)
     if (avatarUrl) {

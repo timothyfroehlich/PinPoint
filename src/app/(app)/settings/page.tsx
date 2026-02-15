@@ -7,7 +7,7 @@ import {
   notificationPreferences,
   machines,
 } from "~/server/db/schema";
-import { eq, ne, count } from "drizzle-orm";
+import { eq, and, ne, count } from "drizzle-orm";
 import { ProfileForm } from "./profile-form";
 import { NotificationPreferencesForm } from "./notifications/notification-preferences-form";
 import { DeleteAccountSection } from "./delete-account-section";
@@ -63,6 +63,18 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
   ]);
 
   const ownedMachineCount = ownedMachinesResult[0]?.count ?? 0;
+
+  // Check if user is the sole admin
+  const isSoleAdmin =
+    profile.role === "admin" &&
+    (
+      await db
+        .select({ count: count() })
+        .from(userProfiles)
+        .where(
+          and(eq(userProfiles.role, "admin"), ne(userProfiles.id, user.id))
+        )
+    )[0]?.count === 0;
 
   return (
     <div className="container max-w-3xl py-6 space-y-6">
@@ -121,6 +133,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
           <DeleteAccountSection
             ownedMachineCount={ownedMachineCount}
             members={membersResult}
+            isSoleAdmin={isSoleAdmin}
           />
         </div>
       </div>
