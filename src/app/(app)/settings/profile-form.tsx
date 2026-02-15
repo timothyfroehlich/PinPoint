@@ -13,6 +13,7 @@ interface ProfileFormProps {
   lastName: string;
   email: string;
   role: string;
+  isInternalAccount?: boolean;
 }
 
 export function ProfileForm({
@@ -20,6 +21,7 @@ export function ProfileForm({
   lastName,
   email,
   role,
+  isInternalAccount,
 }: ProfileFormProps): React.JSX.Element {
   const [state, formAction, isPending] = useActionState<
     UpdateProfileResult | undefined,
@@ -82,13 +84,19 @@ export function ProfileForm({
         </div>
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            name="email"
-            value={email}
-            disabled
-            className="max-w-[240px] bg-muted"
-          />
+          {isInternalAccount ? (
+            <p className="text-sm text-muted-foreground py-2">
+              Username account — no email on file
+            </p>
+          ) : (
+            <Input
+              id="email"
+              name="email"
+              value={email}
+              disabled
+              className="max-w-[240px] bg-muted"
+            />
+          )}
         </div>
         <div className="space-y-2">
           <Label htmlFor="role">Role</Label>

@@ -4,6 +4,7 @@ import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { userProfiles, notificationPreferences } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
+import { isInternalAccount } from "~/lib/auth/internal-accounts";
 import { ProfileForm } from "./profile-form";
 import { NotificationPreferencesForm } from "./notifications/notification-preferences-form";
 import { Separator } from "~/components/ui/separator";
@@ -62,6 +63,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
             lastName={profile.lastName}
             email={profile.email}
             role={profile.role}
+            isInternalAccount={isInternalAccount(profile.email)}
           />
         </div>
 
@@ -71,23 +73,33 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
           <h2 className="text-xl font-semibold mb-4">
             Notification Preferences
           </h2>
-          {/* CORE-SEC-006: Map to minimal shape, strip userId */}
-          <NotificationPreferencesForm
-            preferences={{
-              emailEnabled: preferences.emailEnabled,
-              inAppEnabled: preferences.inAppEnabled,
-              emailNotifyOnAssigned: preferences.emailNotifyOnAssigned,
-              inAppNotifyOnAssigned: preferences.inAppNotifyOnAssigned,
-              emailNotifyOnStatusChange: preferences.emailNotifyOnStatusChange,
-              inAppNotifyOnStatusChange: preferences.inAppNotifyOnStatusChange,
-              emailNotifyOnNewComment: preferences.emailNotifyOnNewComment,
-              inAppNotifyOnNewComment: preferences.inAppNotifyOnNewComment,
-              emailNotifyOnNewIssue: preferences.emailNotifyOnNewIssue,
-              inAppNotifyOnNewIssue: preferences.inAppNotifyOnNewIssue,
-              emailWatchNewIssuesGlobal: preferences.emailWatchNewIssuesGlobal,
-              inAppWatchNewIssuesGlobal: preferences.inAppWatchNewIssuesGlobal,
-            }}
-          />
+          {isInternalAccount(profile.email) ? (
+            <p className="text-sm text-muted-foreground">
+              Email notifications are not available for username accounts.
+            </p>
+          ) : (
+            /* CORE-SEC-006: Map to minimal shape, strip userId */
+            <NotificationPreferencesForm
+              preferences={{
+                emailEnabled: preferences.emailEnabled,
+                inAppEnabled: preferences.inAppEnabled,
+                emailNotifyOnAssigned: preferences.emailNotifyOnAssigned,
+                inAppNotifyOnAssigned: preferences.inAppNotifyOnAssigned,
+                emailNotifyOnStatusChange:
+                  preferences.emailNotifyOnStatusChange,
+                inAppNotifyOnStatusChange:
+                  preferences.inAppNotifyOnStatusChange,
+                emailNotifyOnNewComment: preferences.emailNotifyOnNewComment,
+                inAppNotifyOnNewComment: preferences.inAppNotifyOnNewComment,
+                emailNotifyOnNewIssue: preferences.emailNotifyOnNewIssue,
+                inAppNotifyOnNewIssue: preferences.inAppNotifyOnNewIssue,
+                emailWatchNewIssuesGlobal:
+                  preferences.emailWatchNewIssuesGlobal,
+                inAppWatchNewIssuesGlobal:
+                  preferences.inAppWatchNewIssuesGlobal,
+              }}
+            />
+          )}
         </div>
       </div>
     </div>
