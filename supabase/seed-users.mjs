@@ -43,7 +43,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 // Create direct database connection for role updates and data seeding
 const sql = postgres(POSTGRES_URL);
 
-const TEST_USERS = Object.values(usersData);
+const TEST_USERS = Object.entries(usersData);
 
 async function seedUsersAndData() {
   console.log("🌱 Seeding test users and data...\n");
@@ -51,7 +51,7 @@ async function seedUsersAndData() {
   const userIds = {};
 
   // 1. Create Users
-  for (const user of TEST_USERS) {
+  for (const [key, user] of TEST_USERS) {
     try {
       // Create user using Supabase Admin API
       const { data, error } = await supabase.auth.admin.createUser({
@@ -95,7 +95,7 @@ async function seedUsersAndData() {
         console.log(`✅ Created ${user.email} (ID: ${userId})`);
       }
 
-      userIds[user.role] = userId;
+      userIds[key] = userId;
 
       // Update user profile role
       // Ensure user profile exists and has correct role (Upsert)
@@ -757,6 +757,8 @@ async function seedUsersAndData() {
   console.log("  admin@test.com (Admin role)");
   console.log("  member@test.com (Member role)");
   console.log("  guest@test.com (Guest role)");
+  console.log("  testuser@pinpoint.internal (Username account, Member role)");
+  console.log("    └─ Login with username: testuser");
   console.log(`  Password: ${usersData.admin.password}`);
 
   await sql.end();
