@@ -19,6 +19,7 @@ import {
   formatResetTime,
 } from "~/lib/rate-limit";
 import { getSafeRedirect, requireSiteUrl } from "~/lib/url";
+import { usernameToInternalEmail } from "~/lib/auth/internal-accounts";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
@@ -82,6 +83,10 @@ export async function loginAction(
   }
 
   const { email, password } = parsed.data;
+  // If input has no @, treat it as a username and convert to internal email
+  const authEmail = email.includes("@")
+    ? email
+    : usernameToInternalEmail(email);
   // Note: rememberMe is validated but not used currently
   // SSR sessions persist via cookies regardless of this setting
 
@@ -103,7 +108,7 @@ export async function loginAction(
     }
 
     // Rate limiting: Check account-based limit
-    const accountLimit = await checkLoginAccountLimit(email);
+    const accountLimit = await checkLoginAccountLimit(authEmail);
 
     if (!accountLimit.success) {
       log.warn(
@@ -132,7 +137,7 @@ export async function loginAction(
     // Note: Remember Me is for UX only - SSR sessions persist via cookies
     // The rememberMe value could be used to adjust cookie expiry if needed
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+      email: authEmail,
       password,
       ...(captchaToken ? { options: { captchaToken } } : {}),
     });
