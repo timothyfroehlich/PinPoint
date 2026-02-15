@@ -12,6 +12,7 @@ import {
 import type { IssueWatcher } from "~/lib/types/database";
 import { sendEmail } from "~/lib/email/client";
 import { log } from "~/lib/logger";
+import { isInternalAccount } from "~/lib/auth/internal-accounts";
 import { getEmailHtml, getEmailSubject } from "~/lib/notification-formatting";
 
 export type NotificationType =
@@ -248,11 +249,11 @@ export async function createNotification(
       });
     }
 
-    // Email
+    // Email (skip internal accounts — they have no real email)
     if (prefs.emailEnabled && emailNotify) {
       const email = emailMap.get(userId);
 
-      if (email) {
+      if (email && !isInternalAccount(email)) {
         emailsToSend.push({
           to: email,
           subject: getEmailSubject(
