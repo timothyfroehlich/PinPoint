@@ -27,14 +27,6 @@ export const BLOB_CONFIG = {
     PER_HOUR: 10,
   },
 
-  // Avatar upload settings
-  AVATAR: {
-    MAX_FILE_SIZE_BYTES: 2 * 1024 * 1024, // 2MB
-    MAX_DIMENSIONS: 256, // Avatars are small; no need for large images
-    COMPRESSION_MAX_MB: 1,
-    COMPRESSION_QUALITY: 0.9,
-  },
-
   // Cleanup
   // TODO: Implement cron/cleanup job to delete blobs in "pending" folder older than 24h
   // TODO: Implement cron/cleanup job to enforce SOFT_DELETE_RETENTION_HOURS

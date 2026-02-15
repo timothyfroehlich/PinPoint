@@ -2,7 +2,7 @@
 
 import React from "react";
 import { User, Settings, LogOut, ChevronDown } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,7 +14,6 @@ import { logoutAction } from "~/app/(auth)/actions";
 
 interface UserMenuProps {
   userName: string;
-  avatarUrl: string | null;
 }
 
 /**
@@ -25,10 +24,7 @@ interface UserMenuProps {
  * - Settings (future)
  * - Sign Out
  */
-export function UserMenu({
-  userName,
-  avatarUrl,
-}: UserMenuProps): React.JSX.Element {
+export function UserMenu({ userName }: UserMenuProps): React.JSX.Element {
   // Get user initials for avatar fallback
   const initials = userName
     .split(" ")
@@ -55,7 +51,6 @@ export function UserMenu({
             </p>
           </div>
           <Avatar className="size-7 bg-primary text-on-primary">
-            {avatarUrl ? <AvatarImage src={avatarUrl} alt={userName} /> : null}
             <AvatarFallback className="bg-primary text-on-primary font-semibold text-[10px]">
               {initials}
             </AvatarFallback>

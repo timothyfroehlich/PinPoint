@@ -158,20 +158,6 @@ export async function updateUserRole(
 }
 
 /**
- * Update a user's avatar URL directly in the database
- */
-export async function updateUserAvatar(
-  userId: string,
-  avatarUrl: string | null
-): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from("user_profiles")
-    .update({ avatar_url: avatarUrl })
-    .eq("id", userId);
-  if (error) throw error;
-}
-
-/**
  * Delete a test user by ID (admin only)
  */
 export async function deleteTestUser(userId: string) {
