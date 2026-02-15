@@ -2,10 +2,15 @@ import type React from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { userProfiles, notificationPreferences } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
+import {
+  userProfiles,
+  notificationPreferences,
+  machines,
+} from "~/server/db/schema";
+import { eq, and, ne, count } from "drizzle-orm";
 import { ProfileForm } from "./profile-form";
 import { NotificationPreferencesForm } from "./notifications/notification-preferences-form";
+import { DeleteAccountSection } from "./delete-account-section";
 import { Separator } from "~/components/ui/separator";
 
 export default async function SettingsPage(): Promise<React.JSX.Element> {
@@ -44,6 +49,32 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
   if (!preferences) {
     throw new Error("Failed to create notification preferences");
   }
+
+  // Fetch owned machines count and potential reassignment targets
+  const [ownedMachinesResult, membersResult] = await Promise.all([
+    db
+      .select({ count: count() })
+      .from(machines)
+      .where(eq(machines.ownerId, user.id)),
+    db
+      .select({ id: userProfiles.id, name: userProfiles.name })
+      .from(userProfiles)
+      .where(ne(userProfiles.id, user.id)),
+  ]);
+
+  const ownedMachineCount = ownedMachinesResult[0]?.count ?? 0;
+
+  // Check if user is the sole admin
+  const isSoleAdmin =
+    profile.role === "admin" &&
+    (
+      await db
+        .select({ count: count() })
+        .from(userProfiles)
+        .where(
+          and(eq(userProfiles.role, "admin"), ne(userProfiles.id, user.id))
+        )
+    )[0]?.count === 0;
 
   return (
     <div className="container max-w-3xl py-6 space-y-6">
@@ -88,6 +119,22 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
               emailWatchNewIssuesGlobal: preferences.emailWatchNewIssuesGlobal,
               inAppWatchNewIssuesGlobal: preferences.inAppWatchNewIssuesGlobal,
             }}
+          />
+        </div>
+
+        <Separator />
+
+        <div>
+          <h2 className="text-xl font-semibold mb-2 text-destructive">
+            Danger Zone
+          </h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Permanently delete your account and anonymize your contributions.
+          </p>
+          <DeleteAccountSection
+            ownedMachineCount={ownedMachineCount}
+            members={membersResult}
+            isSoleAdmin={isSoleAdmin}
           />
         </div>
       </div>
