@@ -208,6 +208,7 @@ describe("updateSession public route access", () => {
     "/privacy",
     "/terms",
     "/api/health",
+    "/issues",
   ];
 
   it.each(publicRoutes)("allows unauthenticated access to %s", async (path) => {
@@ -226,7 +227,6 @@ describe("updateSession public route access", () => {
   const protectedRoutes = [
     "/settings",
     "/admin/users",
-    "/issues",
     "/notifications",
     "/debug/badges",
   ];
