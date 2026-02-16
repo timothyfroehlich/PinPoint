@@ -19,8 +19,7 @@ import Link from "next/link";
 import { Button } from "~/components/ui/button";
 import { MobileNav } from "./MobileNav";
 import { FeedbackWidget } from "~/components/feedback/FeedbackWidget";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import changelogMeta from "@content/changelog-meta.json";
 import {
   getLastIssuesPath,
   getSidebarCollapsed,
@@ -40,11 +39,10 @@ export async function MainLayout({
   ]);
 
   // Compute unread changelog count from metadata file
-  const metaPath = join(process.cwd(), "content", "changelog-meta.json");
-  const meta = JSON.parse(readFileSync(metaPath, "utf-8")) as {
-    totalEntries: number;
-  };
-  const newChangelogCount = Math.max(0, meta.totalEntries - changelogSeen);
+  const newChangelogCount = Math.max(
+    0,
+    changelogMeta.totalEntries - changelogSeen
+  );
 
   const supabase = await createClient();
   const {

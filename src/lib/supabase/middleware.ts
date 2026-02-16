@@ -114,6 +114,7 @@ export async function updateSession(
     path.startsWith("/dashboard") ||
     path.startsWith("/about") ||
     path.startsWith("/help") ||
+    path.startsWith("/whats-new") ||
     path.startsWith("/privacy") ||
     path.startsWith("/terms") ||
     path.startsWith("/api");

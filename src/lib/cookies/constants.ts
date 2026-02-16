@@ -8,5 +8,7 @@ export const SIDEBAR_COLLAPSED_KEY = "sidebarCollapsed";
 export const CHANGELOG_SEEN_KEY = "changelogSeen";
 export const DEFAULT_ISSUES_PATH = "/issues";
 
+export const COOKIE_CONSENT_KEY = "cookieConsent";
+
 /** Cookie lifetime: 1 year in seconds */
 export const PREFERENCE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  COOKIE_CONSENT_KEY,
   LAST_ISSUES_PATH_KEY,
   SIDEBAR_COLLAPSED_KEY,
   CHANGELOG_SEEN_KEY,
@@ -47,4 +48,17 @@ export function storeChangelogSeen(count: number): void {
     count.toString(),
     PREFERENCE_MAX_AGE_SECONDS
   );
+}
+
+/** Stores cookie consent acknowledgment (client-side). */
+export function storeCookieConsent(): void {
+  setClientCookie(COOKIE_CONSENT_KEY, "true", PREFERENCE_MAX_AGE_SECONDS);
+}
+
+/** Checks if user has already acknowledged cookie consent. */
+export function hasCookieConsent(): boolean {
+  if (typeof document === "undefined") return false;
+  return document.cookie
+    .split("; ")
+    .some((c) => c.startsWith(`${COOKIE_CONSENT_KEY}=`));
 }
