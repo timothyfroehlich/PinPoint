@@ -33,11 +33,16 @@ test.describe("Cookie Consent Banner", () => {
     const learnMore = banner.getByRole("link", { name: /learn more/i });
     await expect(learnMore).toHaveAttribute("href", "/privacy");
 
-    // Click "Got it" to dismiss.
-    // force: true bypasses the Next.js dev overlay (<nextjs-portal>) which
-    // intercepts pointer events on mobile viewports in CI (runs next dev).
+    // Remove Next.js dev overlay that intercepts pointer events on mobile
+    // viewports. CI runs against `next dev`, so the <nextjs-portal> overlay
+    // blocks clicks on fixed-position elements on small screens.
+    await page.evaluate(() => {
+      document.querySelectorAll("nextjs-portal").forEach((el) => el.remove());
+    });
+
+    // Click "Got it" to dismiss
     const gotItButton = banner.getByRole("button", { name: /got it/i });
-    await gotItButton.click({ force: true });
+    await gotItButton.click();
 
     // Banner should disappear
     await expect(banner).not.toBeVisible();
