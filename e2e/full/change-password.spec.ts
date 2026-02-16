@@ -23,7 +23,7 @@ test.describe("Change Password", () => {
     // Fill in change password form
     const form = page.getByTestId("change-password-form");
     await form.getByLabel("Current Password").fill(originalPassword);
-    await form.getByLabel("New Password").fill(newPassword);
+    await form.getByLabel("New Password", { exact: true }).fill(newPassword);
     await form.getByLabel("Confirm New Password").fill(newPassword);
 
     // Submit
@@ -48,7 +48,9 @@ test.describe("Change Password", () => {
     await page.goto("/settings");
     const formAgain = page.getByTestId("change-password-form");
     await formAgain.getByLabel("Current Password").fill(newPassword);
-    await formAgain.getByLabel("New Password").fill(originalPassword);
+    await formAgain
+      .getByLabel("New Password", { exact: true })
+      .fill(originalPassword);
     await formAgain.getByLabel("Confirm New Password").fill(originalPassword);
     await formAgain.getByRole("button", { name: "Change Password" }).click();
     await expect(
@@ -63,7 +65,9 @@ test.describe("Change Password", () => {
 
     const form = page.getByTestId("change-password-form");
     await form.getByLabel("Current Password").fill("WrongPassword");
-    await form.getByLabel("New Password").fill("NewPassword123");
+    await form
+      .getByLabel("New Password", { exact: true })
+      .fill("NewPassword123");
     await form.getByLabel("Confirm New Password").fill("NewPassword123");
     await form.getByRole("button", { name: "Change Password" }).click();
 
