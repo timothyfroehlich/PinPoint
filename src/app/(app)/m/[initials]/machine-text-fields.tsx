@@ -1,13 +1,29 @@
 "use client";
 
 import type React from "react";
-import { InlineEditableField } from "~/components/inline-editable-field";
+import {
+  InlineEditableField,
+  type InlineEditSaveResult,
+} from "~/components/inline-editable-field";
 import {
   updateMachineDescription,
   updateMachineTournamentNotes,
   updateMachineOwnerRequirements,
   updateMachineOwnerNotes,
+  type UpdateMachineFieldResult,
 } from "~/app/(app)/m/actions";
+
+/** Adapt the Result<T, C> discriminated union to the simpler { ok, message } shape */
+function adaptResult(result: UpdateMachineFieldResult): InlineEditSaveResult {
+  if (result.ok) return { ok: true };
+  return { ok: false, message: result.message };
+}
+
+function wrapAction(
+  action: (id: string, value: string) => Promise<UpdateMachineFieldResult>
+): (id: string, value: string) => Promise<InlineEditSaveResult> {
+  return async (id, value) => adaptResult(await action(id, value));
+}
 
 interface MachineTextFieldsProps {
   machineId: string;
@@ -37,7 +53,7 @@ export function MachineTextFields({
       <InlineEditableField
         label="Description"
         value={description}
-        onSave={updateMachineDescription}
+        onSave={wrapAction(updateMachineDescription)}
         machineId={machineId}
         canEdit={canEditGeneral}
         placeholder="Add a description for this machine..."
@@ -47,7 +63,7 @@ export function MachineTextFields({
       <InlineEditableField
         label="Tournament Notes"
         value={tournamentNotes}
-        onSave={updateMachineTournamentNotes}
+        onSave={wrapAction(updateMachineTournamentNotes)}
         machineId={machineId}
         canEdit={canEditGeneral}
         placeholder="Add tournament notes..."
@@ -58,7 +74,7 @@ export function MachineTextFields({
         <InlineEditableField
           label="Owner's Requirements"
           value={ownerRequirements}
-          onSave={updateMachineOwnerRequirements}
+          onSave={wrapAction(updateMachineOwnerRequirements)}
           machineId={machineId}
           canEdit={canEditGeneral}
           placeholder="Add owner's requirements..."
@@ -70,7 +86,7 @@ export function MachineTextFields({
         <InlineEditableField
           label="Owner's Notes"
           value={ownerNotes}
-          onSave={updateMachineOwnerNotes}
+          onSave={wrapAction(updateMachineOwnerNotes)}
           machineId={machineId}
           canEdit={canEditOwnerNotes}
           placeholder="Add private notes (only visible to you)..."

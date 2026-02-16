@@ -7,16 +7,18 @@ import { Textarea } from "~/components/ui/textarea";
 import { Pencil } from "lucide-react";
 import { cn } from "~/lib/utils";
 
+export interface InlineEditSaveResult {
+  ok: boolean;
+  message?: string;
+}
+
 interface InlineEditableFieldProps {
   /** The field label displayed above the content */
   label: string;
   /** Current value (null/undefined/empty treated as empty) */
   value: string | null | undefined;
   /** Server action to save the updated value */
-  onSave: (
-    machineId: string,
-    value: string
-  ) => Promise<{ ok: boolean; message?: string }>;
+  onSave: (machineId: string, value: string) => Promise<InlineEditSaveResult>;
   /** Machine ID to pass to the save action */
   machineId: string;
   /** Whether the current user can edit this field */
