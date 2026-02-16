@@ -613,6 +613,40 @@ export function IssueList({
           )}
         </div>
       )}
+
+      {issues.length > 0 && (
+        <div className="flex items-center justify-center gap-3 pt-2">
+          <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground">
+            <span>
+              {start}-{end} of {totalCount}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 hover:bg-muted"
+                onClick={() => setPage(page - 1)}
+                disabled={isFirstPage}
+                aria-label="Previous page"
+                data-testid="bottom-prev-page"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 hover:bg-muted"
+                onClick={() => setPage(page + 1)}
+                disabled={isLastPage}
+                aria-label="Next page"
+                data-testid="bottom-next-page"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
