@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { forgotPasswordSchema, resetPasswordSchema } from "./schemas";
+import {
+  loginSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+} from "./schemas";
 
 /**
  * Authentication Schema Validation Tests
@@ -11,6 +15,63 @@ import { forgotPasswordSchema, resetPasswordSchema } from "./schemas";
  * These schemas are user-facing, so error messages are validated
  * to ensure they provide clear guidance to users.
  */
+
+describe("loginSchema", () => {
+  it("should accept valid email with password", () => {
+    const result = loginSchema.safeParse({
+      email: "user@example.com",
+      password: "TestPassword123",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept plain username (no @) with password", () => {
+    const result = loginSchema.safeParse({
+      email: "jdoe",
+      password: "TestPassword123",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept alphanumeric username with underscores", () => {
+    const result = loginSchema.safeParse({
+      email: "john_doe_42",
+      password: "TestPassword123",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("should reject empty email/username", () => {
+    const result = loginSchema.safeParse({
+      email: "",
+      password: "TestPassword123",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("should reject single-character username", () => {
+    const result = loginSchema.safeParse({
+      email: "x",
+      password: "TestPassword123",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("should accept two-character username", () => {
+    const result = loginSchema.safeParse({
+      email: "ab",
+      password: "TestPassword123",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("should reject password-only (no email)", () => {
+    const result = loginSchema.safeParse({
+      password: "TestPassword123",
+    });
+    expect(result.success).toBe(false);
+  });
+});
 
 describe("forgotPasswordSchema", () => {
   it("should accept valid standard email", () => {

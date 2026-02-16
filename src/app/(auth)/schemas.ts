@@ -11,8 +11,15 @@ import { z } from "zod";
 export const loginSchema = z.object({
   email: z
     .string()
-    .email("Please enter a valid email address")
-    .max(254, "Email is too long"),
+    .min(1, "Email or username is required")
+    .max(254, "Input is too long")
+    .refine(
+      (val) =>
+        val.includes("@")
+          ? z.string().email().safeParse(val).success
+          : /^[a-zA-Z0-9_]{2,}$/.test(val),
+      "Please enter a valid email address or username"
+    ),
   password: z
     .string()
     .min(1, "Password is required")

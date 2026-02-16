@@ -1,12 +1,30 @@
 import type React from "react";
 import Link from "next/link";
+import { createClient } from "~/lib/supabase/server";
+import { db } from "~/server/db";
+import { userProfiles } from "~/server/db/schema";
+import { eq } from "drizzle-orm";
 import { PageShell } from "~/components/layout/PageShell";
 
 export const metadata = {
   title: "Help | PinPoint",
 };
 
-export default function HelpPage(): React.JSX.Element {
+export default async function HelpPage(): Promise<React.JSX.Element> {
+  let isAdmin = false;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user) {
+    const profile = await db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, user.id),
+      columns: { role: true },
+    });
+    isAdmin = profile?.role === "admin";
+  }
+
   return (
     <PageShell size="narrow">
       <header className="space-y-2 mb-8">
@@ -212,6 +230,17 @@ export default function HelpPage(): React.JSX.Element {
           merge/close issues, or adjust severities as needed.
         </p>
       </section>
+
+      {isAdmin && (
+        <section className="mt-8 pt-6 border-t">
+          <Link
+            href="/help/admin"
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            Admin Help
+          </Link>
+        </section>
+      )}
     </PageShell>
   );
 }

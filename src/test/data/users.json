@@ -22,5 +22,13 @@
     "name": "Guest User",
     "firstName": "Guest",
     "lastName": "User"
+  },
+  "usernameAccount": {
+    "email": "testuser@pinpoint.internal",
+    "password": "TestPassword123",
+    "role": "member",
+    "name": "Test Username Account",
+    "firstName": "Test",
+    "lastName": "Username"
   }
 }

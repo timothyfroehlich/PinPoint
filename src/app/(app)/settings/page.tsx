@@ -8,6 +8,7 @@ import {
   machines,
 } from "~/server/db/schema";
 import { eq, and, ne, count } from "drizzle-orm";
+import { isInternalAccount } from "~/lib/auth/internal-accounts";
 import { ProfileForm } from "./profile-form";
 import { NotificationPreferencesForm } from "./notifications/notification-preferences-form";
 import { DeleteAccountSection } from "./delete-account-section";
@@ -93,6 +94,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
             lastName={profile.lastName}
             email={profile.email}
             role={profile.role}
+            isInternalAccount={isInternalAccount(profile.email)}
           />
         </div>
 
@@ -119,6 +121,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
               emailWatchNewIssuesGlobal: preferences.emailWatchNewIssuesGlobal,
               inAppWatchNewIssuesGlobal: preferences.inAppWatchNewIssuesGlobal,
             }}
+            isInternalAccount={isInternalAccount(profile.email)}
           />
         </div>
 
