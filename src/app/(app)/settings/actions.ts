@@ -306,6 +306,7 @@ const changePasswordSchema = z
       .max(128, "Password must be less than 128 characters"),
     confirmNewPassword: z
       .string()
+      .min(1, "Please confirm your new password")
       .max(128, "Password must be less than 128 characters"),
   })
   .refine((data) => data.newPassword === data.confirmNewPassword, {
@@ -357,8 +358,16 @@ export async function changePasswordAction(
 
   try {
     // Verify current password by attempting sign-in
+    if (!user.email) {
+      log.error(
+        { userId: user.id, action: "change-password" },
+        "User has no email — cannot verify password"
+      );
+      return err("SERVER", "Unable to verify your identity.");
+    }
+
     const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: user.email ?? "",
+      email: user.email,
       password: currentPassword,
     });
 
@@ -392,6 +401,7 @@ export async function changePasswordAction(
   } catch (error) {
     log.error(
       {
+        userId: user.id,
         error: error instanceof Error ? error.message : "Unknown",
         action: "change-password",
       },
