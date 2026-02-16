@@ -66,9 +66,10 @@ export async function cleanupTestDb() {
 
   // Delete in order to respect foreign key constraints
   await testDb.delete(schema.issueWatchers);
-  await testDb.delete(schema.issueImages); // Added
+  await testDb.delete(schema.issueImages);
   await testDb.delete(schema.issueComments);
   await testDb.delete(schema.issues);
+  await testDb.delete(schema.machineWatchers);
   await testDb.delete(schema.machines);
   await testDb.delete(schema.userProfiles);
   await testDb.delete(schema.invitedUsers);
