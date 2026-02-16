@@ -377,8 +377,8 @@ export async function changePasswordAction(
     }
 
     // Supabase has no "verify password" API, so we use signInWithPassword.
-    // Since we're signing in as the same authenticated user, this only
-    // refreshes the existing session tokens — no side effects.
+    // This verifies the password by signing in again, which refreshes the
+    // session but doesn't create additional side effects.
     const { error: signInError } = await supabase.auth.signInWithPassword({
       email: user.email,
       password: currentPassword,

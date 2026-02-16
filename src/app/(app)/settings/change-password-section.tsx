@@ -76,6 +76,7 @@ export function ChangePasswordSection(): React.JSX.Element {
             type="password"
             autoComplete="new-password"
             required
+            minLength={8}
             maxLength={128}
           />
         </div>
