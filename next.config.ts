@@ -1,7 +1,9 @@
 import { withSentryConfig } from "@sentry/nextjs";
+import createMDX from "@next/mdx";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  pageExtensions: ["ts", "tsx", "md", "mdx"],
   reactStrictMode: true,
   experimental: {
     serverActions: {
@@ -66,7 +68,9 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withSentryConfig(nextConfig, {
+const withMDX = createMDX();
+
+export default withSentryConfig(withMDX(nextConfig), {
   // For all available options, see:
   // https://www.npmjs.com/package/@sentry/webpack-plugin#options
 

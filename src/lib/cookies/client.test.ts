@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { storeLastIssuesPath, storeSidebarCollapsed } from "./client";
+import {
+  hasCookieConsent,
+  storeCookieConsent,
+  storeLastIssuesPath,
+  storeSidebarCollapsed,
+} from "./client";
 
 describe("client cookie utilities", () => {
   let cookieSetter: ReturnType<typeof vi.fn>;
@@ -89,6 +94,61 @@ describe("client cookie utilities", () => {
 
       const cookieString = cookieSetter.mock.calls[0][0] as string;
       expect(cookieString).toContain("sidebarCollapsed=false");
+    });
+  });
+
+  describe("storeCookieConsent", () => {
+    it("sets cookie with correct name and value", () => {
+      storeCookieConsent();
+
+      expect(cookieSetter).toHaveBeenCalledTimes(1);
+      const cookieString = cookieSetter.mock.calls[0][0] as string;
+      expect(cookieString).toContain("cookieConsent=true");
+    });
+
+    it("sets cookie with 1 year max-age", () => {
+      storeCookieConsent();
+
+      const cookieString = cookieSetter.mock.calls[0][0] as string;
+      expect(cookieString).toContain("max-age=31536000");
+    });
+  });
+
+  describe("hasCookieConsent", () => {
+    it("returns false when no consent cookie exists", () => {
+      // Default mock returns empty string for document.cookie
+      expect(hasCookieConsent()).toBe(false);
+    });
+
+    it("returns true when consent cookie exists", () => {
+      Object.defineProperty(document, "cookie", {
+        set: cookieSetter,
+        get: () => "cookieConsent=true",
+        configurable: true,
+      });
+
+      expect(hasCookieConsent()).toBe(true);
+    });
+
+    it("returns true when consent cookie exists among other cookies", () => {
+      Object.defineProperty(document, "cookie", {
+        set: cookieSetter,
+        get: () =>
+          "sidebarCollapsed=false; cookieConsent=true; lastIssuesPath=%2Fissues",
+        configurable: true,
+      });
+
+      expect(hasCookieConsent()).toBe(true);
+    });
+
+    it("returns false when a similarly named cookie exists", () => {
+      Object.defineProperty(document, "cookie", {
+        set: cookieSetter,
+        get: () => "notCookieConsent=true",
+        configurable: true,
+      });
+
+      expect(hasCookieConsent()).toBe(false);
     });
   });
 });

@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "sonner";
 import { ClientLogger } from "~/components/dev/client-logger";
 
+import { CookieConsentBanner } from "~/components/CookieConsentBanner";
 import { SentryInitializer } from "~/components/SentryInitializer";
 
 export const metadata: Metadata = {
@@ -30,6 +31,7 @@ export default function RootLayout({
         {isDevelopment && <ClientLogger />}
         <div className="flex-1 overflow-hidden">{children}</div>
         <Toaster />
+        <CookieConsentBanner />
       </body>
     </html>
   );

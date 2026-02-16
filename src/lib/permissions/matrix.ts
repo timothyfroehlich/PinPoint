@@ -320,6 +320,29 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         },
       },
       {
+        id: "machines.view.ownerRequirements",
+        label: "View owner requirements",
+        description: "View the machine owner's requirements and preferences",
+        access: {
+          unauthenticated: false,
+          guest: true,
+          member: true,
+          admin: true,
+        },
+      },
+      {
+        id: "machines.view.ownerNotes",
+        label: "View owner notes",
+        description:
+          "View private owner notes on a machine (owner only, not even admins)",
+        access: {
+          unauthenticated: false,
+          guest: false,
+          member: "owner",
+          admin: "owner",
+        },
+      },
+      {
         id: "machines.watch",
         label: "Watch machines",
         description: "Subscribe to notifications for a machine",
@@ -344,7 +367,8 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
       {
         id: "machines.edit",
         label: "Edit machines",
-        description: "Modify machine name and details",
+        description:
+          "Modify machine name, description, tournament notes, and owner requirements",
         access: {
           unauthenticated: false,
           guest: false,
@@ -357,28 +381,6 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         label: "Edit owner notes",
         description:
           "Edit private owner notes on a machine (owner only, not even admins)",
-        access: {
-          unauthenticated: false,
-          guest: false,
-          member: "owner",
-          admin: "owner",
-        },
-      },
-      {
-        id: "machines.view.ownerRequirements",
-        label: "View owner requirements",
-        description: "View owner's requirements on machines",
-        access: {
-          unauthenticated: false,
-          guest: true,
-          member: true,
-          admin: true,
-        },
-      },
-      {
-        id: "machines.view.ownerNotes",
-        label: "View owner notes",
-        description: "View private owner notes on a machine (owner only)",
         access: {
           unauthenticated: false,
           guest: false,

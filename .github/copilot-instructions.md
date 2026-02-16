@@ -53,6 +53,11 @@ Conventional commit messages required.
 6. **Progressive enhancement**: `<form action={serverAction}>` patterns.
 7. **Memory safety**: Worker-scoped DB setup in tests.
 8. **E2E quality**: Semantic selectors, no hard-coded delays, independent tests.
+9. **Help page accuracy**: If a PR changes roles, statuses, permissions, UI flows, or user-facing terminology, read through `src/app/(app)/help/` pages and flag any content that becomes outdated or inaccurate. Help pages must reflect the current state of the app. Key things to check:
+   - Role names must match the access levels in `src/lib/permissions/matrix.ts` (Guest, Member, Admin — no "Technician")
+   - Status names must use display labels from `STATUS_CONFIG` in `src/lib/issues/status.ts`, not raw database values
+   - Descriptions of features, workflows, and form fields should match the actual implementation
+   - No references to removed features (e.g., roadmap)
 
 ## Do Not Generate
 
@@ -64,4 +69,4 @@ Conventional commit messages required.
 
 ---
 
-Last Updated: 2026-02-07 (Updated for post-launch beta status)
+Last Updated: 2026-02-16 (Added help page accuracy review priority)

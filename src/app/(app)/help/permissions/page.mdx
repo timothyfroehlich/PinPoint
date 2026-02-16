@@ -1,0 +1,24 @@
+import { HelpPage } from "~/components/help/HelpPage";
+import {
+  RoleTiers,
+  PermissionsLegend,
+  PermissionsTables,
+} from "~/components/help/PermissionsTable";
+
+export const metadata = {
+  title: "Roles & Permissions | PinPoint",
+};
+
+<HelpPage breadcrumb="Roles & Permissions" title="Roles & Permissions" description="What each role can do in PinPoint. Permissions are checked on every action — the tables below reflect the current system rules." size="default">
+
+## Role Tiers
+
+<RoleTiers />
+
+## Legend
+
+<PermissionsLegend />
+
+<PermissionsTables />
+
+</HelpPage>

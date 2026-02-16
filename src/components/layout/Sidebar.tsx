@@ -15,7 +15,6 @@ import {
   AlertTriangle,
   HelpCircle,
   Info,
-  Map as MapIcon,
 } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
@@ -225,13 +224,6 @@ export function Sidebar({
                 title: "Help",
                 href: "/help",
                 icon: HelpCircle,
-              }}
-            />
-            <NavItem
-              item={{
-                title: "Roadmap",
-                href: "/roadmap",
-                icon: MapIcon,
               }}
             />
             <NavItem

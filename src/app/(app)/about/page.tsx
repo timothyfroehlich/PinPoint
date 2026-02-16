@@ -34,7 +34,7 @@ export default function AboutPage(): React.JSX.Element {
             Austin Pinball Collective
           </a>
           . It helps players report problems they encounter on machines and
-          gives technicians a clear view of what needs attention.
+          gives the team a clear view of what needs attention.
         </p>
         <p className="text-sm text-muted-foreground">
           Whether a flipper is stuck, a bumper is misfiring, or a game will not
@@ -48,8 +48,8 @@ export default function AboutPage(): React.JSX.Element {
         <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
           <li>Players report issues from any device, no account required.</li>
           <li>
-            Operators and technicians triage, assign, and resolve issues on an
-            internal dashboard.
+            Members and admins triage, assign, and resolve issues on an internal
+            dashboard.
           </li>
           <li>
             Machine health updates automatically as issues are opened and
