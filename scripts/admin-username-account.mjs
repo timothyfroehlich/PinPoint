@@ -55,9 +55,9 @@ if (!values.username) {
 }
 
 // Validate username format
-if (!/^[a-zA-Z0-9_]+$/.test(values.username)) {
+if (!/^[a-zA-Z0-9_]{2,32}$/.test(values.username)) {
   console.error(
-    "Error: Username must contain only letters, numbers, and underscores"
+    "Error: Username must be 2-32 characters, containing only letters, numbers, and underscores"
   );
   process.exit(1);
 }

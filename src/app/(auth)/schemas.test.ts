@@ -49,6 +49,22 @@ describe("loginSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("should reject single-character username", () => {
+    const result = loginSchema.safeParse({
+      email: "x",
+      password: "TestPassword123",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("should accept two-character username", () => {
+    const result = loginSchema.safeParse({
+      email: "ab",
+      password: "TestPassword123",
+    });
+    expect(result.success).toBe(true);
+  });
+
   it("should reject password-only (no email)", () => {
     const result = loginSchema.safeParse({
       password: "TestPassword123",

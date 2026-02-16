@@ -29,10 +29,12 @@ export interface NotificationPreferencesData {
 
 interface NotificationPreferencesFormProps {
   preferences: NotificationPreferencesData;
+  isInternalAccount?: boolean;
 }
 
 export function NotificationPreferencesForm({
   preferences,
+  isInternalAccount,
 }: NotificationPreferencesFormProps): React.JSX.Element {
   const [state, formAction, isPending] = useActionState<
     UpdatePreferencesResult | undefined,
@@ -88,14 +90,21 @@ export function NotificationPreferencesForm({
         <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
           Channels
         </h3>
+        {isInternalAccount && (
+          <p className="text-sm text-muted-foreground">
+            Email notifications are not available for username accounts.
+          </p>
+        )}
         <div className="grid gap-4 sm:grid-cols-2">
-          <MainSwitchItem
-            id="emailEnabled"
-            label="Email Notifications"
-            description="Main switch for all email notifications"
-            checked={emailMainEnabled}
-            onCheckedChange={setEmailMainEnabled}
-          />
+          {!isInternalAccount && (
+            <MainSwitchItem
+              id="emailEnabled"
+              label="Email Notifications"
+              description="Main switch for all email notifications"
+              checked={emailMainEnabled}
+              onCheckedChange={setEmailMainEnabled}
+            />
+          )}
           <MainSwitchItem
             id="inAppEnabled"
             label="In-App Notifications"
@@ -112,9 +121,18 @@ export function NotificationPreferencesForm({
           New Issue Notifications
         </h3>
         <div className="rounded-lg border border-outline-variant/50 bg-surface/50 overflow-hidden">
-          <div className="grid grid-cols-[1fr_auto_auto] gap-4 border-b border-outline-variant/50 bg-surface-variant/30 p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <div
+            className={cn(
+              "gap-4 border-b border-outline-variant/50 bg-surface-variant/30 p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider",
+              isInternalAccount
+                ? "grid grid-cols-[1fr_auto]"
+                : "grid grid-cols-[1fr_auto_auto]"
+            )}
+          >
             <div>Scope</div>
-            <div className="text-center w-16">Email</div>
+            {!isInternalAccount && (
+              <div className="text-center w-16">Email</div>
+            )}
             <div className="text-center w-16">In-App</div>
           </div>
           <div className="divide-y divide-outline-variant/50">
@@ -127,6 +145,7 @@ export function NotificationPreferencesForm({
               inAppDefault={preferences.inAppNotifyOnNewIssue}
               emailDisabled={!emailMainEnabled}
               inAppDisabled={!inAppMainEnabled}
+              hideEmail={isInternalAccount}
             />
             <PreferenceRow
               label="All Machines"
@@ -137,6 +156,7 @@ export function NotificationPreferencesForm({
               inAppDefault={preferences.inAppWatchNewIssuesGlobal}
               emailDisabled={!emailMainEnabled}
               inAppDisabled={!inAppMainEnabled}
+              hideEmail={isInternalAccount}
             />
           </div>
         </div>
@@ -149,9 +169,18 @@ export function NotificationPreferencesForm({
         </h3>
         <div className="rounded-lg border border-outline-variant/50 bg-surface/50 overflow-hidden">
           {/* Header Row */}
-          <div className="grid grid-cols-[1fr_auto_auto] gap-4 border-b border-outline-variant/50 bg-surface-variant/30 p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <div
+            className={cn(
+              "gap-4 border-b border-outline-variant/50 bg-surface-variant/30 p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider",
+              isInternalAccount
+                ? "grid grid-cols-[1fr_auto]"
+                : "grid grid-cols-[1fr_auto_auto]"
+            )}
+          >
             <div>Event Type</div>
-            <div className="text-center w-16">Email</div>
+            {!isInternalAccount && (
+              <div className="text-center w-16">Email</div>
+            )}
             <div className="text-center w-16">In-App</div>
           </div>
 
@@ -166,6 +195,7 @@ export function NotificationPreferencesForm({
               inAppDefault={preferences.inAppNotifyOnAssigned}
               emailDisabled={!emailMainEnabled}
               inAppDisabled={!inAppMainEnabled}
+              hideEmail={isInternalAccount}
             />
             <PreferenceRow
               label="Status Changes"
@@ -176,6 +206,7 @@ export function NotificationPreferencesForm({
               inAppDefault={preferences.inAppNotifyOnStatusChange}
               emailDisabled={!emailMainEnabled}
               inAppDisabled={!inAppMainEnabled}
+              hideEmail={isInternalAccount}
             />
             <PreferenceRow
               label="New Comments"
@@ -186,6 +217,7 @@ export function NotificationPreferencesForm({
               inAppDefault={preferences.inAppNotifyOnNewComment}
               emailDisabled={!emailMainEnabled}
               inAppDisabled={!inAppMainEnabled}
+              hideEmail={isInternalAccount}
             />
           </div>
         </div>
@@ -250,6 +282,7 @@ interface PreferenceRowProps {
   inAppDefault: boolean;
   emailDisabled: boolean;
   inAppDisabled: boolean;
+  hideEmail?: boolean | undefined;
 }
 
 function PreferenceRow({
@@ -261,21 +294,31 @@ function PreferenceRow({
   inAppDefault,
   emailDisabled,
   inAppDisabled,
+  hideEmail,
 }: PreferenceRowProps): React.JSX.Element {
   return (
-    <div className="grid grid-cols-[1fr_auto_auto] gap-4 p-3 items-center hover:bg-surface-variant/30 transition-colors">
+    <div
+      className={cn(
+        "gap-4 p-3 items-center hover:bg-surface-variant/30 transition-colors",
+        hideEmail
+          ? "grid grid-cols-[1fr_auto]"
+          : "grid grid-cols-[1fr_auto_auto]"
+      )}
+    >
       <div className="space-y-0.5">
         <p className="text-sm font-medium">{label}</p>
         <p className="text-xs text-muted-foreground">{description}</p>
       </div>
-      <div className="flex justify-center w-16">
-        <Switch
-          id={emailId}
-          name={emailId}
-          defaultChecked={emailDefault}
-          disabled={emailDisabled}
-        />
-      </div>
+      {!hideEmail && (
+        <div className="flex justify-center w-16">
+          <Switch
+            id={emailId}
+            name={emailId}
+            defaultChecked={emailDefault}
+            disabled={emailDisabled}
+          />
+        </div>
+      )}
       <div className="flex justify-center w-16">
         <Switch
           id={inAppId}

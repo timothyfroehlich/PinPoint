@@ -63,7 +63,7 @@ export function LoginForm({
             name="email"
             type="text"
             placeholder="you@example.com"
-            autoComplete="email"
+            autoComplete="username"
             required
             defaultValue={
               !state?.ok && state?.meta?.submittedEmail

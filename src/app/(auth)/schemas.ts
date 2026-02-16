@@ -17,7 +17,7 @@ export const loginSchema = z.object({
       (val) =>
         val.includes("@")
           ? z.string().email().safeParse(val).success
-          : /^[a-zA-Z0-9_]+$/.test(val),
+          : /^[a-zA-Z0-9_]{2,}$/.test(val),
       "Please enter a valid email address or username"
     ),
   password: z

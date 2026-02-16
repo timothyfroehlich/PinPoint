@@ -22,7 +22,7 @@ test.describe("Username Account Settings", () => {
     await expect(profileForm.getByText("Username account")).toBeVisible();
   });
 
-  test("notification preferences section shows email unavailable message", async ({
+  test("notification form hides email toggles but keeps in-app controls", async ({
     page,
   }, testInfo) => {
     await loginAs(page, testInfo, {
@@ -32,9 +32,20 @@ test.describe("Username Account Settings", () => {
 
     await page.goto("/settings");
 
-    // Should show the "not available" message instead of the full notification form
+    // The notification form should still be visible (for in-app controls)
+    await expect(
+      page.getByTestId("notification-preferences-form")
+    ).toBeVisible();
+
+    // Should show the "email not available" message
     await expect(
       page.getByText("Email notifications are not available")
     ).toBeVisible();
+
+    // Email main switch should NOT be visible
+    await expect(page.getByLabel("Email Notifications")).not.toBeVisible();
+
+    // In-App main switch SHOULD be visible
+    await expect(page.getByLabel("In-App Notifications")).toBeVisible();
   });
 });
