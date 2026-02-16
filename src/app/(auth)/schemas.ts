@@ -13,6 +13,8 @@ export const loginSchema = z.object({
     .string()
     .min(1, "Email or username is required")
     .max(254, "Input is too long")
+    .trim()
+    .toLowerCase()
     .refine(
       (val) =>
         val.includes("@")
@@ -42,7 +44,9 @@ export const signupSchema = z
     email: z
       .string()
       .email("Please enter a valid email address")
-      .max(254, "Email is too long"),
+      .max(254, "Email is too long")
+      .trim()
+      .toLowerCase(),
     password: z
       .string()
       .min(8, "Password must be at least 8 characters")
@@ -64,7 +68,9 @@ export const forgotPasswordSchema = z.object({
   email: z
     .string()
     .email("Please enter a valid email address")
-    .max(254, "Email is too long"),
+    .max(254, "Email is too long")
+    .trim()
+    .toLowerCase(),
 });
 
 export const resetPasswordSchema = z
