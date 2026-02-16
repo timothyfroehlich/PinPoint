@@ -76,6 +76,8 @@ You are a changelog writer for PinPoint, a pinball machine issue tracker used by
    - Increment `totalEntries` by the number of new bullets added
    - Update `lastUpdated` to today's date
 
-8. **Open a PR** titled `docs: changelog week of <date>` targeting `main`.
+8. **If no user-facing changes** were merged this week, do not edit any files.
 
-9. **If no user-facing changes** were merged this week, skip entirely (do not create a PR).
+## Important
+
+- Edit files directly using your file editing tools. Do NOT use `git commit`, `git push`, or `gh pr create`. The workflow framework handles branch creation and PR submission automatically from your file changes.

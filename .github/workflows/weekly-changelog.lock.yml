@@ -24,7 +24,7 @@
 # Scan merged PRs from the past week, generate user-facing changelog entries,
 # and open a PR targeting main.
 #
-# frontmatter-hash: 6558a2daf679d12f5e8c3c798296916de86319bf47254e942b75a500cb916940
+# frontmatter-hash: 72fd52c31f36b0aac190b708c39601dd3f106e6b010b3a093250e0b0ed39b0c9
 
 name: "Weekly Changelog Agent"
 "on":
