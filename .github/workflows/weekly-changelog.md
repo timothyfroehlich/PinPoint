@@ -1,8 +1,22 @@
 ---
-name: Weekly Changelog
-description: Scan merged PRs from the past week, generate user-facing changelog entries, and open a PR.
-schedule: "0 14 * * 1" # Every Monday at 14:00 UTC (08:00 CST / 09:00 CDT in Austin)
+description: |
+  Scan merged PRs from the past week, generate user-facing changelog entries,
+  and open a PR targeting main.
+
+on:
+  schedule: weekly on monday
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
 engine: copilot
+
+safe-outputs:
+  create-pull-request:
+    title-prefix: "docs: changelog week of "
+    base-branch: main
 ---
 
 # Weekly Changelog Agent
@@ -40,7 +54,7 @@ You are a changelog writer for PinPoint, a pinball machine issue tracker used by
 6. **Prepend** a new week section to `content/changelog.mdx`:
 
    ```markdown
-   ## <Monday date, e.g. "February 16, 2026">
+   ## <Monday date, e.g. "February 17, 2026">
 
    ### New Features
 
