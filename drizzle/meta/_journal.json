@@ -106,6 +106,13 @@
       "when": 1771087738518,
       "tag": "0014_sync_trigger_defaults",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1771207610903,
+      "tag": "0015_military_hex",
+      "breakpoints": true
     }
   ]
 }

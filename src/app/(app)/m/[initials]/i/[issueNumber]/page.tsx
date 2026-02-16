@@ -21,6 +21,7 @@ import {
   type OwnershipContext,
   getAccessLevel,
 } from "~/lib/permissions/helpers";
+import { OwnerRequirementsCallout } from "~/components/machines/OwnerRequirementsCallout";
 
 /**
  * Issue Detail Page
@@ -64,6 +65,7 @@ export default async function IssueDetailPage({
             id: true,
             name: true,
             initials: true,
+            ownerRequirements: true,
           },
           with: {
             owner: {
@@ -234,6 +236,14 @@ export default async function IssueDetailPage({
           </div>
         </div>
       </div>
+
+      {/* Owner's Requirements Callout - only for authenticated users */}
+      {user && issue.machine.ownerRequirements && (
+        <OwnerRequirementsCallout
+          ownerRequirements={issue.machine.ownerRequirements}
+          machineName={issue.machine.name}
+        />
+      )}
 
       <div className="grid gap-10 md:grid-cols-[minmax(0,1fr)_320px]">
         <section className="space-y-5 lg:pr-4">
