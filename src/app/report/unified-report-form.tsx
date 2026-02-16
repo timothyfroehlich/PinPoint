@@ -32,6 +32,7 @@ import { ImageGallery } from "~/components/images/ImageGallery";
 import { type ImageMetadata } from "~/types/images";
 import type { AccessLevel } from "~/lib/permissions/matrix";
 import { TurnstileWidget } from "~/components/security/TurnstileWidget";
+import { getLoginUrl } from "~/lib/url";
 
 interface Machine {
   id: string;
@@ -464,11 +465,11 @@ export function UnifiedReportForm({
                     <p className="text-sm text-on-surface-variant">
                       Already have an account?{" "}
                       <Link
-                        href={`/login?redirect=${encodeURIComponent(
+                        href={getLoginUrl(
                           selectedMachine
                             ? `/report?machine=${selectedMachine.initials}`
                             : "/report"
-                        )}`}
+                        )}
                         className="text-link"
                       >
                         Log in

@@ -95,3 +95,11 @@ export function getSafeRedirect(
   }
   return fallback;
 }
+
+/**
+ * Builds a login URL that redirects back to the given path after authentication.
+ * Centralizes the login redirect pattern to prevent parameter name drift.
+ */
+export function getLoginUrl(returnTo: string): string {
+  return `/login?next=${encodeURIComponent(returnTo)}`;
+}
