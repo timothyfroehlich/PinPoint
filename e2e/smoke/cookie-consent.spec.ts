@@ -33,10 +33,11 @@ test.describe("Cookie Consent Banner", () => {
     const learnMore = banner.getByRole("link", { name: /learn more/i });
     await expect(learnMore).toHaveAttribute("href", "/privacy");
 
-    // Click "Got it" to dismiss — use the button locator and ensure it's ready
+    // Click "Got it" to dismiss.
+    // force: true bypasses the Next.js dev overlay (<nextjs-portal>) which
+    // intercepts pointer events on mobile viewports in CI (runs next dev).
     const gotItButton = banner.getByRole("button", { name: /got it/i });
-    await gotItButton.scrollIntoViewIfNeeded();
-    await gotItButton.click();
+    await gotItButton.click({ force: true });
 
     // Banner should disappear
     await expect(banner).not.toBeVisible();
