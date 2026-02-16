@@ -1,0 +1,44 @@
+import { HelpPage } from "~/components/help/HelpPage";
+
+export const metadata = {
+  title: "Issue Lifecycle | PinPoint",
+};
+
+<HelpPage breadcrumb="Issue Lifecycle" title="Issue Lifecycle" description="How issues move from first report to resolution, what each status means, and how assignment and watching work.">
+
+## How an Issue Progresses
+
+When you report an issue, it starts as **New**. An operator confirms it's a real problem, someone picks it up and works on the repair, and eventually it's marked as **Fixed** (or closed for another reason).
+
+Not every issue follows this exact path. Some may be closed as **Won't Fix** or **Duplicate**, and others may pause at **Need Parts** or **Need Help** before moving forward again.
+
+## Status Definitions
+
+**Open Statuses**
+
+- **New** — Just reported, needs triage
+- **Confirmed** — Verified by an operator as an actual issue
+- **In Progress** — Someone is actively working on the repair
+- **Need Parts** — The repair is paused while waiting for new parts
+- **Need Help** — The issue has been escalated to an expert for assistance
+- **Pending Owner** — Pending a decision or action from the machine owner
+
+**Closed Statuses**
+
+- **Fixed** — The issue has been successfully resolved
+- **As Intended** — Working as intended; the reported behavior is normal
+- **Won't Fix** — The issue cannot or will not be fixed
+- **No Repro** — The issue could not be reproduced
+- **Duplicate** — This issue was already reported elsewhere
+
+## How Assignment Works
+
+Members can self-assign issues they want to work on, or an admin can assign issues to a specific person. When someone is working on your issue, you'll see their name on the issue detail page. Assignment helps the team avoid duplicating effort and makes it clear who's responsible for each repair.
+
+## Watching Issues & Machines
+
+You can "watch" an issue or a machine to receive notifications when things change. Watching an issue means you'll be notified of status changes and new comments. Watching a machine means you'll hear about new issues filed against it and status updates on its existing issues.
+
+You automatically watch issues you create. To watch a machine, visit its page and use the watch button. You can manage your watched items from your [settings](/settings).
+
+</HelpPage>

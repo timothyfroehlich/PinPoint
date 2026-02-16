@@ -49,13 +49,14 @@ const FAQ_ITEMS = [
     question: "I can't edit an issue I reported",
     answer: (
       <>
-        If you reported as a guest (without signing in), you can only edit your
-        own issues. Members can edit any issue they reported. See the full
-        permissions breakdown on the{" "}
+        If you reported without signing in, you won&apos;t be able to edit it
+        afterward. Sign up for an account to track and update your reports.
+        Guests can edit some fields on issues they reported, and members can
+        update any issue. See the{" "}
         <Link href="/help/permissions" className="text-primary underline">
           Roles &amp; Permissions
         </Link>{" "}
-        page.
+        page for the full breakdown.
       </>
     ),
   },
@@ -64,9 +65,9 @@ const FAQ_ITEMS = [
     question: "How do I become a member?",
     answer: (
       <>
-        Members are invited by an admin. If you&rsquo;re a regular at Austin
-        Pinball Collective and want member access, talk to an organizer at the
-        venue.
+        Roles are assigned by admins. If you&rsquo;re a regular at Austin
+        Pinball Collective and want member access, send a message to the
+        PinPoint channel on the APC Discord.
       </>
     ),
   },
@@ -76,8 +77,8 @@ const FAQ_ITEMS = [
     answer: (
       <>
         Unplayable means the machine should be considered out of service — for
-        example, a ball is stuck, flippers are dead, or the game won&rsquo;t
-        start. See the full severity guide on the{" "}
+        example, a loose part, flippers are dead, or the game won&rsquo;t start.
+        See the full severity guide on the{" "}
         <Link href="/help/reporting" className="text-primary underline">
           Reporting Issues
         </Link>{" "}
