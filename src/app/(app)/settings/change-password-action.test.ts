@@ -27,6 +27,12 @@ vi.mock("~/lib/logger", () => ({
   },
 }));
 
+vi.mock("~/lib/rate-limit", () => ({
+  checkLoginAccountLimit: vi
+    .fn()
+    .mockResolvedValue({ success: true, limit: 5, remaining: 4, reset: 0 }),
+}));
+
 // --- Helpers ---
 
 function makeFormData(
@@ -88,6 +94,26 @@ describe("changePasswordAction", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe("VALIDATION");
+    }
+  });
+
+  it("returns SERVER when rate limited", async () => {
+    const { checkLoginAccountLimit } = await import("~/lib/rate-limit");
+    vi.mocked(checkLoginAccountLimit).mockResolvedValueOnce({
+      success: false,
+      limit: 5,
+      remaining: 0,
+      reset: Date.now() + 900_000,
+    });
+
+    const result = await changePasswordAction(
+      undefined,
+      makeFormData("oldPass1!", "newPass12", "newPass12")
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.message).toMatch(/too many attempts/i);
     }
   });
 

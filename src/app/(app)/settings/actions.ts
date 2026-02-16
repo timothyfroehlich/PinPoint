@@ -23,6 +23,7 @@ import { z } from "zod";
 import { type Result, ok, err } from "~/lib/result";
 import { deleteFromBlob } from "~/lib/blob/client";
 import { log } from "~/lib/logger";
+import { checkLoginAccountLimit } from "~/lib/rate-limit";
 
 const updateProfileSchema = z.object({
   firstName: z.string().trim().max(50).optional(),
@@ -356,8 +357,17 @@ export async function changePasswordAction(
 
   const { currentPassword, newPassword } = validation.data;
 
+  // Rate-limit password change attempts per account (reuses login account limiter)
+  const accountLimit = await checkLoginAccountLimit(user.email ?? user.id);
+  if (!accountLimit.success) {
+    log.warn(
+      { userId: user.id, action: "change-password" },
+      "Change password rate limit exceeded"
+    );
+    return err("SERVER", "Too many attempts. Please try again later.");
+  }
+
   try {
-    // Verify current password by attempting sign-in
     if (!user.email) {
       log.error(
         { userId: user.id, action: "change-password" },
@@ -366,12 +376,19 @@ export async function changePasswordAction(
       return err("SERVER", "Unable to verify your identity.");
     }
 
+    // Supabase has no "verify password" API, so we use signInWithPassword.
+    // Since we're signing in as the same authenticated user, this only
+    // refreshes the existing session tokens — no side effects.
     const { error: signInError } = await supabase.auth.signInWithPassword({
       email: user.email,
       password: currentPassword,
     });
 
     if (signInError) {
+      log.warn(
+        { userId: user.id, action: "change-password" },
+        "Current password verification failed"
+      );
       return err("WRONG_PASSWORD", "Current password is incorrect.");
     }
 
