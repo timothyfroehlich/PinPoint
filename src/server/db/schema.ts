@@ -12,6 +12,7 @@ import {
   check,
   unique,
 } from "drizzle-orm/pg-core";
+import { citext } from "~/server/db/citext";
 import { ISSUE_STATUS_VALUES, type IssueStatus } from "~/lib/issues/status";
 
 /**
@@ -42,7 +43,7 @@ export const authUsers = authSchema.table("users", {
  */
 export const userProfiles = pgTable("user_profiles", {
   id: uuid("id").primaryKey(),
-  email: text("email").notNull().unique(),
+  email: citext("email").notNull().unique(),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   name: text("name")
@@ -74,7 +75,7 @@ export const invitedUsers = pgTable("invited_users", {
   name: text("name")
     .generatedAlwaysAs(sql`first_name || ' ' || last_name`)
     .notNull(),
-  email: text("email").notNull().unique(),
+  email: citext("email").notNull().unique(),
   role: text("role", { enum: ["guest", "member", "admin"] })
     .notNull()
     .default("member"), // Default for invited users (trusted)
@@ -164,7 +165,7 @@ export const issues = pgTable(
       () => invitedUsers.id
     ),
     reporterName: text("reporter_name"),
-    reporterEmail: text("reporter_email"),
+    reporterEmail: citext("reporter_email"),
     assignedTo: uuid("assigned_to").references(() => userProfiles.id),
     closedAt: timestamp("closed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
