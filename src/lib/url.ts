@@ -96,10 +96,7 @@ export function getSafeRedirect(
   return fallback;
 }
 
-/**
- * Builds a login URL that redirects back to the given path after authentication.
- * Centralizes the login redirect pattern to prevent parameter name drift.
- */
-export function getLoginUrl(returnTo: string): string {
-  return `/login?next=${encodeURIComponent(returnTo)}`;
-}
+// Re-export for server-side consumers (settings/page.tsx, m/new/page.tsx).
+// Client components must import directly from ~/lib/login-url to avoid
+// pulling in the logger (which uses Node.js 'fs').
+export { getLoginUrl } from "./login-url";

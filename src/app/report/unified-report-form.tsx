@@ -32,7 +32,7 @@ import { ImageGallery } from "~/components/images/ImageGallery";
 import { type ImageMetadata } from "~/types/images";
 import type { AccessLevel } from "~/lib/permissions/matrix";
 import { TurnstileWidget } from "~/components/security/TurnstileWidget";
-import { getLoginUrl } from "~/lib/url";
+import { getLoginUrl } from "~/lib/login-url";
 
 interface Machine {
   id: string;
