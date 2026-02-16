@@ -236,4 +236,49 @@ test.describe("Issues System", () => {
       ).toContainText("Member User");
     });
   });
+
+  test.describe("Issues List Pagination", () => {
+    test("should have bottom pagination buttons that work", async ({
+      page,
+    }) => {
+      // Navigate to issues list page
+      await page.goto("/issues");
+
+      // Wait for issues to load
+      await expect(
+        page.getByRole("heading", { name: "All Issues" })
+      ).toBeVisible();
+
+      // Check if bottom pagination buttons exist
+      const bottomPrevButton = page.getByTestId("bottom-prev-page");
+      const bottomNextButton = page.getByTestId("bottom-next-page");
+
+      await expect(bottomPrevButton).toBeVisible();
+      await expect(bottomNextButton).toBeVisible();
+
+      // If there are multiple pages, test navigation
+      const nextButton = page.getByTestId("bottom-next-page");
+      const isNextDisabled = await nextButton.isDisabled();
+
+      if (!isNextDisabled) {
+        // Click next page
+        await nextButton.click();
+
+        // Wait for URL to change
+        await page.waitForURL(/page=2/);
+
+        // Previous button should now be enabled
+        await expect(bottomPrevButton).toBeEnabled();
+
+        // Click previous page
+        await bottomPrevButton.click();
+
+        // Should be back on page 1
+        await page.waitForURL(/\/issues(?:\?.*)?$/);
+      } else {
+        // If only one page, previous should be disabled
+        await expect(bottomPrevButton).toBeDisabled();
+      }
+    });
+  });
 });
