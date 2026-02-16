@@ -615,7 +615,7 @@ export function IssueList({
       )}
 
       {issues.length > 0 && (
-        <div className="flex items-center justify-center gap-3 pt-2">
+        <div className="flex items-center justify-end gap-3 pt-2">
           <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground">
             <span>
               {start}-{end} of {totalCount}
