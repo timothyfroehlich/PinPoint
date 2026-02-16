@@ -86,16 +86,24 @@ const email = usernameToEmail(values.username);
 
 if (values["reset-password"]) {
   // ── Reset Password Mode ──
-  // Look up user by email
-  const { data: userList, error: listError } =
-    await supabase.auth.admin.listUsers();
+  // Look up user by email, paginating through all users
+  let user = null;
+  let page = 1;
+  const perPage = 50;
+  while (!user) {
+    const { data: userList, error: listError } =
+      await supabase.auth.admin.listUsers({ page, perPage });
 
-  if (listError) {
-    console.error("Error listing users:", listError.message);
-    process.exit(1);
+    if (listError) {
+      console.error("Error listing users:", listError.message);
+      process.exit(1);
+    }
+
+    user = userList.users.find((u) => u.email === email) ?? null;
+    if (!user && userList.users.length < perPage) break;
+    page++;
   }
 
-  const user = userList.users.find((u) => u.email === email);
   if (!user) {
     console.error(`Error: No account found for username "${values.username}"`);
     process.exit(1);

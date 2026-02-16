@@ -83,19 +83,24 @@ export function ProfileForm({
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
           {isInternalAccount ? (
-            <p className="text-sm text-muted-foreground py-2">
-              Username account — no email on file
-            </p>
+            <>
+              <Label>Email</Label>
+              <p className="text-sm text-muted-foreground py-2">
+                Username account — no email on file
+              </p>
+            </>
           ) : (
-            <Input
-              id="email"
-              name="email"
-              value={email}
-              disabled
-              className="max-w-[240px] bg-muted"
-            />
+            <>
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                name="email"
+                value={email}
+                disabled
+                className="max-w-[240px] bg-muted"
+              />
+            </>
           )}
         </div>
         <div className="space-y-2">

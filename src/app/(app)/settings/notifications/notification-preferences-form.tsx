@@ -86,6 +86,42 @@ export function NotificationPreferencesForm({
         </div>
       )}
 
+      {/* Preserve email preference values for internal accounts (no email UI rendered) */}
+      {isInternalAccount && (
+        <>
+          <input
+            type="hidden"
+            name="emailEnabled"
+            value={preferences.emailEnabled ? "on" : ""}
+          />
+          <input
+            type="hidden"
+            name="emailNotifyOnAssigned"
+            value={preferences.emailNotifyOnAssigned ? "on" : ""}
+          />
+          <input
+            type="hidden"
+            name="emailNotifyOnStatusChange"
+            value={preferences.emailNotifyOnStatusChange ? "on" : ""}
+          />
+          <input
+            type="hidden"
+            name="emailNotifyOnNewComment"
+            value={preferences.emailNotifyOnNewComment ? "on" : ""}
+          />
+          <input
+            type="hidden"
+            name="emailNotifyOnNewIssue"
+            value={preferences.emailNotifyOnNewIssue ? "on" : ""}
+          />
+          <input
+            type="hidden"
+            name="emailWatchNewIssuesGlobal"
+            value={preferences.emailWatchNewIssuesGlobal ? "on" : ""}
+          />
+        </>
+      )}
+
       {/* Main Switches */}
       <div className="space-y-3">
         <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
