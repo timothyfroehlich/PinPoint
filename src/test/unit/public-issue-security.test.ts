@@ -4,9 +4,6 @@ import { submitPublicIssueAction } from "~/app/report/actions";
 // Mock server-only (no-op in test environment)
 vi.mock("server-only", () => ({}));
 
-// Mock server-only (no-op in test environment)
-vi.mock("server-only", () => ({}));
-
 // Mock Next.js server modules
 vi.mock("next/headers", () => ({
   headers: vi.fn(),
@@ -24,6 +21,11 @@ vi.mock("~/lib/logger", () => ({
     warn: vi.fn(),
     error: vi.fn(),
   },
+}));
+
+// Mock Turnstile CAPTCHA — always pass so tests exercise the logic beyond CAPTCHA
+vi.mock("~/lib/security/turnstile", () => ({
+  verifyTurnstileToken: vi.fn().mockResolvedValue(true),
 }));
 
 // Mock rate limiting
