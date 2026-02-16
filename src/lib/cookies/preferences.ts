@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import {
   LAST_ISSUES_PATH_KEY,
   SIDEBAR_COLLAPSED_KEY,
+  CHANGELOG_SEEN_KEY,
   DEFAULT_ISSUES_PATH,
   PREFERENCE_MAX_AGE_SECONDS,
 } from "./constants";
@@ -58,4 +59,15 @@ export async function setSidebarCollapsedCookie(
     collapsed.toString(),
     PREFERENCE_COOKIE_OPTIONS
   );
+}
+
+/**
+ * Reads the number of changelog entries the user has seen (server-side).
+ * Returns 0 if never visited (all entries are "new").
+ */
+export async function getChangelogSeen(): Promise<number> {
+  const cookieStore = await cookies();
+  const stored = cookieStore.get(CHANGELOG_SEEN_KEY);
+  const parsed = Number(stored?.value);
+  return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
 }

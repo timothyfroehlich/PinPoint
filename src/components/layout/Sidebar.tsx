@@ -15,7 +15,9 @@ import {
   AlertTriangle,
   HelpCircle,
   Info,
+  Sparkles,
 } from "lucide-react";
+import { Badge } from "~/components/ui/badge";
 import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import {
@@ -49,6 +51,7 @@ export function Sidebar({
   isMobile = false,
   issuesPath,
   initialCollapsed = false,
+  newChangelogCount = 0,
 }: {
   role?: "guest" | "member" | "admin" | undefined;
   onNavigate?: () => void;
@@ -57,6 +60,8 @@ export function Sidebar({
   issuesPath?: string | undefined;
   /** Initial collapsed state, read from cookie on the server */
   initialCollapsed?: boolean;
+  /** Number of unread changelog entries, computed in MainLayout */
+  newChangelogCount?: number;
 }): React.JSX.Element {
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const pathname = usePathname();
@@ -78,12 +83,15 @@ export function Sidebar({
       href: string;
       icon: React.ElementType;
       variant?: string;
+      badge?: number;
     };
   }): React.JSX.Element => {
     const href = item.href === "/issues" ? resolvedIssuesPath : item.href;
     const hrefPath = href.split("?")[0];
     const isActive = pathname === hrefPath;
     const isReport = item.variant === "accent";
+    const badgeCount = item.badge ?? 0;
+    const badgeLabel = badgeCount > 20 ? "20+" : badgeCount.toString();
 
     const content = (
       <Link
@@ -108,6 +116,17 @@ export function Sidebar({
           )}
         />
         <span className={cn(collapsed && "sr-only")}>{item.title}</span>
+        {badgeCount > 0 && !collapsed && (
+          <Badge
+            variant="default"
+            className="ml-auto text-[10px] px-1.5 py-0 min-w-[20px] h-5"
+          >
+            {badgeLabel}
+          </Badge>
+        )}
+        {badgeCount > 0 && collapsed && (
+          <span className="absolute top-1 right-1 size-2 rounded-full bg-primary" />
+        )}
       </Link>
     );
 
@@ -219,6 +238,14 @@ export function Sidebar({
         {/* Help + Collapse (bottom) */}
         <div className="border-t border-border px-2 pt-3 pb-2 space-y-2">
           <div className="space-y-1">
+            <NavItem
+              item={{
+                title: "What's New",
+                href: "/whats-new",
+                icon: Sparkles,
+                badge: newChangelogCount,
+              }}
+            />
             <NavItem
               item={{
                 title: "Help",
