@@ -64,6 +64,7 @@ export default async function IssueDetailPage({
             id: true,
             name: true,
             initials: true,
+            ownerRequirements: true,
           },
           with: {
             owner: {
@@ -262,6 +263,10 @@ export default async function IssueDetailPage({
             currentUserInitials={
               currentUserProfile?.name.slice(0, 2).toUpperCase() ?? "??"
             }
+            ownerRequirements={
+              user ? (issue.machine.ownerRequirements ?? undefined) : undefined
+            }
+            machineName={issue.machine.name}
           />
         </section>
 

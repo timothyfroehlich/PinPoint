@@ -47,7 +47,7 @@ export async function ensureUserProfile(user: User): Promise<void> {
     let role: "member" | "admin" | "guest" = "guest";
     if (user.email) {
       const invitedUser = await db.query.invitedUsers.findFirst({
-        where: eq(invitedUsers.email, user.email),
+        where: eq(invitedUsers.email, user.email.toLowerCase()),
         columns: { role: true },
       });
       if (invitedUser) {
@@ -90,7 +90,7 @@ export async function ensureUserProfile(user: User): Promise<void> {
         })
         .where(
           and(
-            eq(issues.reporterEmail, user.email),
+            eq(issues.reporterEmail, user.email.toLowerCase()),
             isNull(issues.reportedBy),
             isNull(issues.invitedReportedBy)
           )
@@ -100,7 +100,7 @@ export async function ensureUserProfile(user: User): Promise<void> {
     // Handle invited users transfer
     if (user.email) {
       const invitedUser = await db.query.invitedUsers.findFirst({
-        where: eq(invitedUsers.email, user.email),
+        where: eq(invitedUsers.email, user.email.toLowerCase()),
       });
 
       if (invitedUser) {

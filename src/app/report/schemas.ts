@@ -31,6 +31,8 @@ export const publicIssueSchema = z.object({
     .string()
     .email("Invalid email")
     .max(254, "Email is too long")
+    .trim()
+    .toLowerCase()
     .optional()
     .or(z.literal("")),
   assignedTo: z.string().uuid("Invalid assignee").optional().or(z.literal("")),

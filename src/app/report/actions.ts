@@ -109,7 +109,7 @@ export async function submitPublicIssueAction(
     if (email) {
       // Check active user profiles directly to prevent spoofing
       const activeUser = await db.query.userProfiles.findFirst({
-        where: eq(userProfiles.email, email),
+        where: eq(userProfiles.email, email.toLowerCase()),
         columns: { id: true },
       });
 

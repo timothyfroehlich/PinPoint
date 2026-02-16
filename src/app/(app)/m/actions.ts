@@ -18,6 +18,7 @@ import {
 } from "~/server/db/schema";
 import { createMachineSchema, updateMachineSchema } from "./schemas";
 import { type Result, ok, err } from "~/lib/result";
+import { z } from "zod";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { log } from "~/lib/logger";
@@ -434,5 +435,167 @@ export async function deleteMachineAction(
       "deleteMachineAction failed"
     );
     return err("SERVER", "Failed to delete machine. Please try again.");
+  }
+}
+
+// --- Machine Text Field Update Actions ---
+
+/**
+ * Schema for updating a machine text field
+ */
+const updateMachineTextFieldSchema = z.object({
+  machineId: z.string().uuid("Invalid machine ID"),
+  value: z
+    .string()
+    .max(5000, "Text must be less than 5000 characters")
+    .transform((v) => (v.trim() === "" ? null : v.trim())),
+});
+
+export type UpdateMachineFieldResult = Result<
+  { machineId: string },
+  "VALIDATION" | "UNAUTHORIZED" | "NOT_FOUND" | "SERVER"
+>;
+
+/**
+ * Update Machine Description
+ *
+ * Editable by machine owner and admins.
+ */
+export async function updateMachineDescription(
+  machineId: string,
+  value: string
+): Promise<UpdateMachineFieldResult> {
+  return updateMachineTextField(machineId, value, "description");
+}
+
+/**
+ * Update Machine Tournament Notes
+ *
+ * Editable by machine owner and admins.
+ */
+export async function updateMachineTournamentNotes(
+  machineId: string,
+  value: string
+): Promise<UpdateMachineFieldResult> {
+  return updateMachineTextField(machineId, value, "tournamentNotes");
+}
+
+/**
+ * Update Machine Owner Requirements
+ *
+ * Editable by machine owner and admins.
+ */
+export async function updateMachineOwnerRequirements(
+  machineId: string,
+  value: string
+): Promise<UpdateMachineFieldResult> {
+  return updateMachineTextField(machineId, value, "ownerRequirements");
+}
+
+/**
+ * Update Machine Owner Notes
+ *
+ * Editable by machine owner ONLY (not even admins).
+ */
+export async function updateMachineOwnerNotes(
+  machineId: string,
+  value: string
+): Promise<UpdateMachineFieldResult> {
+  return updateMachineTextField(machineId, value, "ownerNotes");
+}
+
+/**
+ * Internal helper for updating a machine text field.
+ *
+ * Permission logic:
+ * - description, tournamentNotes, ownerRequirements: owner + admins
+ * - ownerNotes: owner only
+ */
+async function updateMachineTextField(
+  machineId: string,
+  value: string,
+  field: "description" | "tournamentNotes" | "ownerRequirements" | "ownerNotes"
+): Promise<UpdateMachineFieldResult> {
+  // Auth check (CORE-SEC-001)
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return err("UNAUTHORIZED", "Unauthorized. Please log in.");
+  }
+
+  // Validate input (CORE-SEC-002)
+  const validation = updateMachineTextFieldSchema.safeParse({
+    machineId,
+    value,
+  });
+  if (!validation.success) {
+    const firstError = validation.error.issues[0];
+    return err("VALIDATION", firstError?.message ?? "Invalid input");
+  }
+
+  try {
+    // Fetch user profile and machine in parallel
+    const [profile, machine] = await Promise.all([
+      db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, user.id),
+        columns: { role: true },
+      }),
+      db.query.machines.findFirst({
+        where: eq(machines.id, validation.data.machineId),
+        columns: { id: true, ownerId: true, initials: true },
+      }),
+    ]);
+
+    if (!profile) {
+      return err("UNAUTHORIZED", "User profile not found.");
+    }
+
+    if (!machine) {
+      return err("NOT_FOUND", "Machine not found.");
+    }
+
+    // Permission check
+    const isOwner = user.id === machine.ownerId;
+    const isAdmin = profile.role === "admin";
+
+    if (field === "ownerNotes") {
+      // Owner notes: owner only (not even admins)
+      if (!isOwner) {
+        return err(
+          "UNAUTHORIZED",
+          "Only the machine owner can edit owner notes."
+        );
+      }
+    } else {
+      // description, tournamentNotes, ownerRequirements: owner + admins
+      if (!isOwner && !isAdmin) {
+        return err(
+          "UNAUTHORIZED",
+          "Only the machine owner or admins can edit this field."
+        );
+      }
+    }
+
+    // Update the field
+    await db
+      .update(machines)
+      .set({ [field]: validation.data.value })
+      .where(eq(machines.id, machine.id));
+
+    revalidatePath(`/m/${machine.initials}`);
+
+    return ok({ machineId: machine.id });
+  } catch (error: unknown) {
+    if (isNextRedirectError(error)) {
+      throw error;
+    }
+    log.error(
+      { error, action: "updateMachineTextField", field },
+      `updateMachineTextField (${field}) failed`
+    );
+    return err("SERVER", "Failed to update field. Please try again.");
   }
 }

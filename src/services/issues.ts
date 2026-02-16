@@ -268,7 +268,7 @@ export async function updateIssueStatus({
       .where(eq(issues.id, issueId));
 
     // 2. Create Timeline Event
-    const oldLabel = getIssueStatusLabel(oldStatus as IssueStatus);
+    const oldLabel = getIssueStatusLabel(oldStatus);
     const newLabel = getIssueStatusLabel(status);
     await createTimelineEvent(
       issueId,

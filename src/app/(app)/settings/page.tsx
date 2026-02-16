@@ -11,6 +11,7 @@ import { eq, and, ne, count } from "drizzle-orm";
 import { isInternalAccount } from "~/lib/auth/internal-accounts";
 import { ProfileForm } from "./profile-form";
 import { NotificationPreferencesForm } from "./notifications/notification-preferences-form";
+import { ChangePasswordSection } from "./change-password-section";
 import { DeleteAccountSection } from "./delete-account-section";
 import { Separator } from "~/components/ui/separator";
 
@@ -123,6 +124,16 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
             }}
             isInternalAccount={isInternalAccount(profile.email)}
           />
+        </div>
+
+        <Separator />
+
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Security</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Change your account password.
+          </p>
+          <ChangePasswordSection />
         </div>
 
         <Separator />

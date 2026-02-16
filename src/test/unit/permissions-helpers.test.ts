@@ -305,6 +305,89 @@ describe("Integration: Comment ownership flow", () => {
   });
 });
 
+describe("Integration: Machine text field permissions", () => {
+  const ownerId = "owner-123";
+  const otherId = "other-456";
+
+  it("should allow owner to edit ownerNotes", () => {
+    const context: OwnershipContext = {
+      userId: ownerId,
+      machineOwnerId: ownerId,
+    };
+    expect(checkPermission("machines.edit.ownerNotes", "member", context)).toBe(
+      true
+    );
+  });
+
+  it("should deny non-owner member from editing ownerNotes", () => {
+    const context: OwnershipContext = {
+      userId: otherId,
+      machineOwnerId: ownerId,
+    };
+    expect(checkPermission("machines.edit.ownerNotes", "member", context)).toBe(
+      false
+    );
+  });
+
+  it("should deny admin from editing ownerNotes if not owner", () => {
+    const context: OwnershipContext = {
+      userId: otherId,
+      machineOwnerId: ownerId,
+    };
+    expect(checkPermission("machines.edit.ownerNotes", "admin", context)).toBe(
+      false
+    );
+  });
+
+  it("should allow admin to edit ownerNotes if also owner", () => {
+    const context: OwnershipContext = {
+      userId: ownerId,
+      machineOwnerId: ownerId,
+    };
+    expect(checkPermission("machines.edit.ownerNotes", "admin", context)).toBe(
+      true
+    );
+  });
+
+  it("should allow owner to view ownerNotes", () => {
+    const context: OwnershipContext = {
+      userId: ownerId,
+      machineOwnerId: ownerId,
+    };
+    expect(checkPermission("machines.view.ownerNotes", "member", context)).toBe(
+      true
+    );
+  });
+
+  it("should deny non-owner from viewing ownerNotes", () => {
+    const context: OwnershipContext = {
+      userId: otherId,
+      machineOwnerId: ownerId,
+    };
+    expect(checkPermission("machines.view.ownerNotes", "member", context)).toBe(
+      false
+    );
+  });
+
+  it("should allow any authenticated user to view ownerRequirements", () => {
+    expect(checkPermission("machines.view.ownerRequirements", "guest")).toBe(
+      true
+    );
+    expect(checkPermission("machines.view.ownerRequirements", "member")).toBe(
+      true
+    );
+    expect(checkPermission("machines.view.ownerRequirements", "admin")).toBe(
+      true
+    );
+  });
+
+  it("should deny unauthenticated users from viewing ownerRequirements", () => {
+    expect(
+      checkPermission("machines.view.ownerRequirements", "unauthenticated")
+    ).toBe(false);
+  });
+});
+
 describe("Integration: Guest issue update flow", () => {
   const guestId = "guest-user";
   const memberId = "member-user";

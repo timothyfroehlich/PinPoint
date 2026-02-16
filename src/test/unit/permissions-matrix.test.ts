@@ -171,9 +171,17 @@ describe("requiresOwnershipCheck", () => {
 });
 
 describe("Permission hierarchy", () => {
-  it("should grant admin all permissions that member has", () => {
+  // Owner-only permissions (not subject to admin escalation)
+  const ownerOnlyPermissions = new Set([
+    "machines.edit.ownerNotes",
+    "machines.view.ownerNotes",
+  ]);
+
+  it("should grant admin all permissions that member has (except owner-only)", () => {
     for (const category of PERMISSIONS_MATRIX) {
       for (const permission of category.permissions) {
+        if (ownerOnlyPermissions.has(permission.id)) continue;
+
         const memberValue = permission.access.member;
         const adminValue = permission.access.admin;
 
@@ -316,6 +324,40 @@ describe("Specific permission rules from design", () => {
     it("should require authentication to watch machines", () => {
       expect(getPermission("machines.watch", "unauthenticated")).toBe(false);
       expect(getPermission("machines.watch", "guest")).toBe(true);
+    });
+
+    it("should allow owner-only access for ownerNotes editing", () => {
+      expect(getPermission("machines.edit.ownerNotes", "unauthenticated")).toBe(
+        false
+      );
+      expect(getPermission("machines.edit.ownerNotes", "guest")).toBe(false);
+      expect(getPermission("machines.edit.ownerNotes", "member")).toBe("owner");
+      // Even admins need to be the owner to edit owner notes
+      expect(getPermission("machines.edit.ownerNotes", "admin")).toBe("owner");
+    });
+
+    it("should allow owner-only access for viewing ownerNotes", () => {
+      expect(getPermission("machines.view.ownerNotes", "unauthenticated")).toBe(
+        false
+      );
+      expect(getPermission("machines.view.ownerNotes", "guest")).toBe(false);
+      expect(getPermission("machines.view.ownerNotes", "member")).toBe("owner");
+      expect(getPermission("machines.view.ownerNotes", "admin")).toBe("owner");
+    });
+
+    it("should allow authenticated users to view ownerRequirements", () => {
+      expect(
+        getPermission("machines.view.ownerRequirements", "unauthenticated")
+      ).toBe(false);
+      expect(getPermission("machines.view.ownerRequirements", "guest")).toBe(
+        true
+      );
+      expect(getPermission("machines.view.ownerRequirements", "member")).toBe(
+        true
+      );
+      expect(getPermission("machines.view.ownerRequirements", "admin")).toBe(
+        true
+      );
     });
   });
 
