@@ -9,23 +9,25 @@ import { formatIssueId, resolveIssueReporter } from "~/lib/issues/utils";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
 import type { Issue } from "~/lib/types";
 
+export type IssueCardIssue = Pick<
+  Issue,
+  | "id"
+  | "title"
+  | "status"
+  | "severity"
+  | "priority"
+  | "frequency"
+  | "machineInitials"
+  | "issueNumber"
+  | "createdAt"
+  | "reporterName"
+> & {
+  reportedByUser?: { name: string } | null;
+  invitedReporter?: { name: string } | null;
+};
+
 interface IssueCardProps {
-  issue: Pick<
-    Issue,
-    | "id"
-    | "title"
-    | "status"
-    | "severity"
-    | "priority"
-    | "frequency"
-    | "machineInitials"
-    | "issueNumber"
-    | "createdAt"
-    | "reporterName"
-  > & {
-    reportedByUser?: { name: string } | null;
-    invitedReporter?: { name: string } | null;
-  };
+  issue: IssueCardIssue;
   machine: { name: string };
   variant?: "normal" | "compact";
   className?: string;
