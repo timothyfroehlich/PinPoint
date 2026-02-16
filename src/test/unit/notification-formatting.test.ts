@@ -1,5 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
-import { getEmailHtml } from "~/lib/notification-formatting";
+import {
+  getEmailHtml,
+  getEmailSubject,
+  generateUnsubscribeToken,
+  verifyUnsubscribeToken,
+} from "~/lib/notification-formatting";
 
 vi.mock("~/lib/url", () => ({
   getSiteUrl: () => "http://test.com",
@@ -119,6 +124,154 @@ describe("Notification Formatting", () => {
     it("should fall back to issues page for invalid initials", () => {
       const html = getEmailHtml("new_issue", "Title", "Machine", "A+B-42");
       expect(html).toContain('href="http://test.com/issues"');
+    });
+  });
+
+  describe("Machine Ownership Changed Email", () => {
+    it("should render added-as-owner body", () => {
+      const html = getEmailHtml(
+        "machine_ownership_changed",
+        undefined,
+        "Medieval Madness",
+        undefined,
+        undefined,
+        "added"
+      );
+      expect(html).toContain("<strong>added</strong>");
+      expect(html).toContain("Medieval Madness");
+      expect(html).toContain("receive notifications for new issues");
+    });
+
+    it("should render removed-as-owner body", () => {
+      const html = getEmailHtml(
+        "machine_ownership_changed",
+        undefined,
+        "Twilight Zone",
+        undefined,
+        undefined,
+        "removed"
+      );
+      expect(html).toContain("<strong>removed</strong>");
+      expect(html).toContain("Twilight Zone");
+      expect(html).toContain("no longer receive notifications");
+    });
+
+    it("should generate correct subject for added owner", () => {
+      const subject = getEmailSubject(
+        "machine_ownership_changed",
+        undefined,
+        "Medieval Madness",
+        undefined,
+        "added"
+      );
+      expect(subject).toBe(
+        "[Medieval Madness] Ownership Update: You have been added as an owner"
+      );
+    });
+
+    it("should generate correct subject for removed owner", () => {
+      const subject = getEmailSubject(
+        "machine_ownership_changed",
+        undefined,
+        "Twilight Zone",
+        undefined,
+        "removed"
+      );
+      expect(subject).toBe(
+        "[Twilight Zone] Ownership Update: You have been removed as an owner"
+      );
+    });
+  });
+
+  describe("Email Footer", () => {
+    it("should include settings link in email footer", () => {
+      const html = getEmailHtml("new_issue", "Title", "Machine", "TZ-01");
+      expect(html).toContain("Manage notification settings");
+      expect(html).toContain('href="http://test.com/settings"');
+    });
+
+    it("should include unsubscribe link when userId and secret are provided", () => {
+      vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-secret-key");
+
+      const html = getEmailHtml(
+        "new_issue",
+        "Title",
+        "Machine",
+        "TZ-01",
+        undefined,
+        undefined,
+        "user-123"
+      );
+      expect(html).toContain("Unsubscribe from all emails");
+      expect(html).toContain("/api/unsubscribe?uid=user-123&token=");
+
+      vi.unstubAllEnvs();
+    });
+
+    it("should not include unsubscribe link when no userId is provided", () => {
+      const html = getEmailHtml("new_issue", "Title", "Machine", "TZ-01");
+      expect(html).not.toContain("Unsubscribe from all emails");
+    });
+  });
+
+  describe("Unsubscribe Token", () => {
+    it("should generate a consistent HMAC token", () => {
+      vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-secret");
+
+      const token1 = generateUnsubscribeToken("user-abc");
+      const token2 = generateUnsubscribeToken("user-abc");
+      expect(token1).toBe(token2);
+      expect(token1.length).toBe(64); // SHA-256 hex digest
+
+      vi.unstubAllEnvs();
+    });
+
+    it("should generate different tokens for different users", () => {
+      vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-secret");
+
+      const token1 = generateUnsubscribeToken("user-1");
+      const token2 = generateUnsubscribeToken("user-2");
+      expect(token1).not.toBe(token2);
+
+      vi.unstubAllEnvs();
+    });
+
+    it("should return empty string when no secret is configured", () => {
+      vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
+      // Need to delete the env var since empty string is falsy
+      // eslint-disable-next-line @typescript-eslint/dot-notation -- dynamic key deletion
+      delete process.env["SUPABASE_SERVICE_ROLE_KEY"];
+
+      const token = generateUnsubscribeToken("user-abc");
+      expect(token).toBe("");
+
+      vi.unstubAllEnvs();
+    });
+
+    it("should verify a valid token", () => {
+      vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-secret");
+
+      const token = generateUnsubscribeToken("user-abc");
+      expect(verifyUnsubscribeToken("user-abc", token)).toBe(true);
+
+      vi.unstubAllEnvs();
+    });
+
+    it("should reject an invalid token", () => {
+      vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-secret");
+
+      expect(verifyUnsubscribeToken("user-abc", "invalid-token")).toBe(false);
+
+      vi.unstubAllEnvs();
+    });
+
+    it("should reject a token for the wrong user", () => {
+      vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-secret");
+
+      const token = generateUnsubscribeToken("user-1");
+      expect(verifyUnsubscribeToken("user-2", token)).toBe(false);
+
+      vi.unstubAllEnvs();
     });
   });
 });

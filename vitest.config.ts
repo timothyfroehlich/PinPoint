@@ -72,6 +72,12 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         "~": path.resolve(__dirname, "./src"),
+        // server-only is a Next.js convention that errors in client bundles.
+        // In Vitest (Node.js), we resolve it to an empty module.
+        "server-only": path.resolve(
+          __dirname,
+          "./src/test/mocks/server-only.ts"
+        ),
       },
     },
   };

@@ -15,7 +15,10 @@ import { log } from "~/lib/logger";
  * If the profile is missing (e.g. after a database reset), it recreates it
  * using metadata from the Supabase Auth user object.
  *
- * This replicates the logic from the `handle_new_user` SQL trigger.
+ * This replicates the logic from the `handle_new_user` SQL trigger
+ * (drizzle/0007, updated by drizzle/0014). Notification preference defaults
+ * come from the Drizzle schema, keeping a single source of truth.
+ * If you change schema defaults, also update the SQL trigger to match.
  */
 export async function ensureUserProfile(user: User): Promise<void> {
   try {
@@ -68,22 +71,10 @@ export async function ensureUserProfile(user: User): Promise<void> {
     });
 
     if (!prefs) {
+      // Only userId is required — schema defaults handle all preference values.
+      // This keeps a single source of truth for defaults in the schema.
       await db.insert(notificationPreferences).values({
         userId: user.id,
-        emailEnabled: true,
-        inAppEnabled: true,
-        emailNotifyOnAssigned: true,
-        inAppNotifyOnAssigned: true,
-        emailNotifyOnStatusChange: true,
-        inAppNotifyOnStatusChange: true,
-        emailNotifyOnNewComment: true,
-        inAppNotifyOnNewComment: true,
-        emailNotifyOnNewIssue: true,
-        inAppNotifyOnNewIssue: true,
-        emailWatchNewIssuesGlobal: false,
-        inAppWatchNewIssuesGlobal: false,
-        emailNotifyOnMachineOwnershipChange: true,
-        inAppNotifyOnMachineOwnershipChange: true,
       });
     }
 

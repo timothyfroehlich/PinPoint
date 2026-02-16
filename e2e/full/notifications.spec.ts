@@ -8,6 +8,7 @@ import {
   deleteTestUser,
   deleteTestMachine,
   updateUserRole,
+  updateNotificationPreferences,
 } from "../support/supabase-admin.js";
 import { getTestIssueTitle, getTestEmail } from "../support/test-isolation.js";
 
@@ -35,22 +36,21 @@ test.describe("Notifications", () => {
     const machine = await createTestMachine(owner.id);
     cleanupMachineIds.push(machine.id);
 
-    // Login as owner to setup preferences
+    // Enable in-app notifications for new issues on owned machines
+    // (default is OFF after notification overhaul)
+    await updateNotificationPreferences(owner.id, {
+      inAppNotifyOnNewIssue: true,
+    });
+
+    // Login as owner
     const ownerContext = await browser.newContext();
     const ownerPage = await ownerContext.newPage();
 
-    // Initial login to ensure profile creation and prefs
     await ownerPage.goto("/login");
     await ownerPage.getByLabel("Email").fill(ownerEmail);
     await ownerPage.getByLabel("Password").fill("TestPassword123");
     await ownerPage.getByRole("button", { name: "Sign In" }).click();
     await expect(ownerPage).toHaveURL("/dashboard");
-
-    // Ensure "Auto-Watch Owned Machines" is ON (default)
-    // We can verify by checking settings
-    await ownerPage.goto("/settings");
-    const newIssueToggle = ownerPage.locator("#inAppNotifyOnNewIssue");
-    await expect(newIssueToggle).toBeChecked();
 
     // 2. Action: Anonymous user reports issue on THIS machine
     const publicContext = await browser.newContext();
@@ -101,6 +101,61 @@ test.describe("Notifications", () => {
 
     await ownerContext.close();
     await publicContext.close();
+  });
+
+  test("should suppress own-action notifications when enabled in settings", async ({
+    page,
+  }, testInfo) => {
+    const timestamp = Date.now();
+    const ownerEmail = getTestEmail(`self-suppress-${timestamp}@test.com`);
+    const owner = await createTestUser(ownerEmail);
+    cleanupUserIds.push(owner.id);
+    const machine = await createTestMachine(owner.id);
+    cleanupMachineIds.push(machine.id);
+
+    await ensureLoggedIn(page, testInfo, {
+      email: ownerEmail,
+      password: "TestPassword123",
+    });
+
+    // Click new settings controls via UI (E2E interaction coverage)
+    await page.goto("/settings");
+
+    const inAppNewIssueSwitch = page.locator("#inAppNotifyOnNewIssue");
+    await expect(inAppNewIssueSwitch).toHaveAttribute("aria-checked", "false");
+    await inAppNewIssueSwitch.click();
+    await expect(inAppNewIssueSwitch).toHaveAttribute("aria-checked", "true");
+
+    const suppressOwnActionsSwitch = page.locator("#suppressOwnActions");
+    await expect(suppressOwnActionsSwitch).toHaveAttribute(
+      "aria-checked",
+      "false"
+    );
+    await suppressOwnActionsSwitch.click();
+    await expect(suppressOwnActionsSwitch).toHaveAttribute(
+      "aria-checked",
+      "true"
+    );
+
+    await page.getByRole("button", { name: "Save Preferences" }).click();
+    await expect(page.getByRole("button", { name: "Saved!" })).toBeVisible();
+
+    // Report issue as this same user; with suppression on, no notification should appear
+    await page.goto(`/report?machine=${machine.initials}`);
+    const issueTitle = getTestIssueTitle("Own Action Suppressed");
+    await fillReportForm(page, {
+      title: issueTitle,
+      includePriority: false,
+    });
+    await page.getByRole("button", { name: "Submit Issue Report" }).click();
+    await expect(page).toHaveURL(
+      /(\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+)|(\/report\/success)/
+    );
+
+    await page.goto("/dashboard");
+    const bell = page.getByRole("button", { name: /notifications/i });
+    await bell.click();
+    await expect(page.getByText("No new notifications")).toBeVisible();
   });
 
   // Skip this test in Safari due to Next.js Issue #48309

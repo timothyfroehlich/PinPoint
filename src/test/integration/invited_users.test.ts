@@ -561,7 +561,7 @@ describe("Invited Users Integration", () => {
     expect(deletedInvited).toBeUndefined();
   });
 
-  it("should initialize correct default notification preferences including machine ownership", async () => {
+  it("should initialize notification preferences with current defaults", async () => {
     const db = await getTestDb();
     const userId = randomUUID();
 
@@ -586,8 +586,16 @@ describe("Invited Users Integration", () => {
     });
 
     expect(prefs).toBeDefined();
-    // THIS SHOULD FAIL until implemented (currently not setting these fields in ensureUserProfile defaults)
-    expect(prefs?.emailNotifyOnMachineOwnershipChange).toBe(true);
-    expect(prefs?.inAppNotifyOnMachineOwnershipChange).toBe(true);
+    expect(prefs?.suppressOwnActions).toBe(false);
+    expect(prefs?.emailNotifyOnAssigned).toBe(true);
+    expect(prefs?.inAppNotifyOnAssigned).toBe(true);
+    expect(prefs?.emailNotifyOnStatusChange).toBe(false);
+    expect(prefs?.inAppNotifyOnStatusChange).toBe(false);
+    expect(prefs?.emailNotifyOnNewComment).toBe(false);
+    expect(prefs?.inAppNotifyOnNewComment).toBe(false);
+    expect(prefs?.emailNotifyOnNewIssue).toBe(true);
+    expect(prefs?.inAppNotifyOnNewIssue).toBe(false);
+    expect(prefs?.emailNotifyOnMachineOwnershipChange).toBe(false);
+    expect(prefs?.inAppNotifyOnMachineOwnershipChange).toBe(false);
   });
 });

@@ -15,6 +15,7 @@ import React from "react";
 export interface NotificationPreferencesData {
   emailEnabled: boolean;
   inAppEnabled: boolean;
+  suppressOwnActions: boolean;
   emailNotifyOnAssigned: boolean;
   inAppNotifyOnAssigned: boolean;
   emailNotifyOnStatusChange: boolean;
@@ -111,6 +112,31 @@ export function NotificationPreferencesForm({
             description="Main switch for all in-app notifications"
             checked={inAppMainEnabled}
             onCheckedChange={setInAppMainEnabled}
+          />
+        </div>
+      </div>
+
+      {/* Suppress Own Actions */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+          Behavior
+        </h3>
+        <div className="flex items-center justify-between rounded-lg border border-outline-variant/50 bg-surface/50 p-3 shadow-sm transition-colors hover:bg-surface-variant/30">
+          <div className="space-y-0.5 pr-4">
+            <Label
+              htmlFor="suppressOwnActions"
+              className="text-sm font-medium cursor-pointer"
+            >
+              {"Don't notify me about my own actions"}
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Skip all notifications when you are the one performing the action
+            </p>
+          </div>
+          <Switch
+            id="suppressOwnActions"
+            name="suppressOwnActions"
+            defaultChecked={preferences.suppressOwnActions}
           />
         </div>
       </div>
