@@ -116,7 +116,9 @@ test.describe("Machines CRUD", () => {
 
   // Machine creation moved to integration/full suite
 
-  test("should display machine issues on detail page", async ({ page }) => {
+  test("should display machine issues on detail page via expando", async ({
+    page,
+  }) => {
     // Navigate to The Addams Family (has unplayable issue)
     await page.goto(`/m/${seededMachines.addamsFamily.initials}`);
 
@@ -125,15 +127,18 @@ test.describe("Machines CRUD", () => {
       page.getByRole("heading", { name: seededMachines.addamsFamily.name })
     ).toBeVisible();
 
-    // Verify status badge matches severity
-    const firstIssueCard = page.getByTestId("issue-card").first();
-    await expect(firstIssueCard).toBeVisible();
-
     // Verify open issues count section is visible
     await expect(page.getByTestId("detail-open-issues")).toBeVisible();
     await expect(page.getByTestId("detail-open-issues-count")).toBeVisible();
 
-    // Dynamic count verification: count visible issue cards and verify matches displayed count
+    // Issues expando should be visible (collapsed by default)
+    const expando = page.getByTestId("issues-expando");
+    await expect(expando).toBeVisible();
+
+    // Click the expando trigger to expand
+    await page.getByTestId("issues-expando-trigger").click();
+
+    // Now issue cards should be visible
     const issueCards = page.getByTestId("issue-card");
     const displayedCountText = await page
       .getByTestId("detail-open-issues-count")
@@ -147,6 +152,12 @@ test.describe("Machines CRUD", () => {
     // Verify specific seed issues are listed (using actual TAF seeded issues)
     await expect(page.getByText(seededIssues.TAF[0].title)).toBeVisible(); // "Thing flips the bird"
     await expect(page.getByText(seededIssues.TAF[1].title)).toBeVisible(); // "Bookcase not registering"
+
+    // Click trigger again to collapse
+    await page.getByTestId("issues-expando-trigger").click();
+
+    // Issue cards should no longer be visible
+    await expect(issueCards.first()).not.toBeVisible();
   });
 
   test("should display machine owner to all logged-in users", async ({

@@ -26,9 +26,9 @@ import { EditMachineDialog } from "./update-machine-form";
 import { QrCodeDialog } from "./qr-code-dialog";
 import { buildMachineReportUrl } from "~/lib/machines/report-url";
 import { generateQrPngDataUrl } from "~/lib/machines/qr";
-import { IssueCard } from "~/components/issues/IssueCard";
 import { WatchMachineButton } from "~/components/machines/WatchMachineButton";
-import { MachineEmptyState } from "~/components/machines/MachineEmptyState";
+import { MachineTextFields } from "./machine-text-fields";
+import { IssuesExpando } from "./issues-expando";
 import {
   getAccessLevel,
   checkPermission,
@@ -39,8 +39,11 @@ import {
 /**
  * Machine Detail Page (Public Route)
  *
- * Shows machine details and its associated issues.
- * Displays derived status based on open issues.
+ * Full-width details pane with internal two-column layout:
+ * - Left: machine metadata (initials, owner, status, dates, issue counts)
+ * - Right: text fields (description, tournament notes, owner's requirements, owner's notes)
+ *
+ * Collapsible issues section below.
  * Permission-aware: unauthenticated users can view but not edit.
  */
 export default async function MachineDetailPage({
@@ -70,7 +73,7 @@ export default async function MachineDetailPage({
 
   // Execute independent queries in parallel (CORE-PERF-001)
   const [machine, totalIssuesCountResult] = await Promise.all([
-    // Query 1: Machine with OPEN issues only
+    // Query 1: Machine with OPEN issues only + new text fields
     db.query.machines.findFirst({
       where: eq(machines.initials, initials),
       with: {
@@ -146,6 +149,22 @@ export default async function MachineDetailPage({
   const isOwner =
     !!user &&
     (user.id === machine.ownerId || user.id === machine.invitedOwnerId);
+
+  // Text field permissions
+  const canEditOwnerNotes = checkPermission(
+    "machines.edit.ownerNotes",
+    accessLevel,
+    ownershipContext
+  );
+  const canViewOwnerRequirements = checkPermission(
+    "machines.view.ownerRequirements",
+    accessLevel
+  );
+  const canViewOwnerNotes = checkPermission(
+    "machines.view.ownerNotes",
+    accessLevel,
+    ownershipContext
+  );
 
   // Only fetch allUsers when user can edit (needs OwnerSelect data)
   // CORE-SEC-006: Map to minimal shape before passing to client components
@@ -248,23 +267,24 @@ export default async function MachineDetailPage({
       </div>
 
       {/* Content */}
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Sidebar - Machine Info (4 cols) */}
-          <div className="lg:col-span-4 space-y-6">
-            <Card className="border-outline-variant bg-surface sticky top-24">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
-                <CardTitle className="text-xl text-on-surface">
-                  Machine Information
-                </CardTitle>
-                <QrCodeDialog
-                  machineName={machine.name}
-                  machineInitials={machine.initials}
-                  qrDataUrl={qrDataUrl}
-                  reportUrl={reportUrl}
-                />
-              </CardHeader>
-              <CardContent className="space-y-6">
+      <div className="container mx-auto space-y-6 px-4 py-8">
+        {/* Full-width Details Card */}
+        <Card className="border-outline-variant bg-surface">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
+            <CardTitle className="text-xl text-on-surface">
+              Machine Information
+            </CardTitle>
+            <QrCodeDialog
+              machineName={machine.name}
+              machineInitials={machine.initials}
+              qrDataUrl={qrDataUrl}
+              reportUrl={reportUrl}
+            />
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+              {/* Left Column: Machine Metadata */}
+              <div className="space-y-6">
                 {/* Static read-only display */}
                 <MachineInfoDisplay
                   machine={machine}
@@ -283,11 +303,11 @@ export default async function MachineDetailPage({
                   />
                 )}
 
-                <div className="pt-6 border-t border-outline-variant/50 space-y-4">
+                <div className="space-y-4 border-t border-outline-variant/50 pt-6">
                   {/* Status & Issues Count Row */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-[10px] font-bold text-on-surface-variant mb-1 uppercase tracking-wider">
+                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
                         Status
                       </p>
                       <Badge
@@ -301,7 +321,7 @@ export default async function MachineDetailPage({
                     </div>
 
                     <div data-testid="detail-open-issues">
-                      <p className="text-[10px] font-bold text-on-surface-variant mb-1 uppercase tracking-wider">
+                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
                         Open Issues
                       </p>
                       <p
@@ -316,7 +336,7 @@ export default async function MachineDetailPage({
                   {/* Date & Total Row */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-[10px] font-bold text-on-surface-variant mb-1 uppercase tracking-wider">
+                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
                         Added Date
                       </p>
                       <div className="flex items-center gap-1.5 text-on-surface-variant">
@@ -334,7 +354,7 @@ export default async function MachineDetailPage({
                     </div>
 
                     <div>
-                      <p className="text-[10px] font-bold text-on-surface-variant mb-1 uppercase tracking-wider">
+                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
                         Total Issues
                       </p>
                       <p className="text-xl font-bold text-on-surface">
@@ -343,59 +363,33 @@ export default async function MachineDetailPage({
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
 
-          {/* Main Content - Issues (8 cols) */}
-          <div className="lg:col-span-8">
-            <Card className="border-outline-variant bg-surface">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-2xl text-on-surface font-bold">
-                  Issues
-                </CardTitle>
-                <div className="flex gap-2">
-                  {totalIssuesCount > 5 && (
-                    <Button
-                      asChild
-                      variant="ghost"
-                      size="sm"
-                      className="text-primary hover:text-primary hover:bg-primary/5"
-                    >
-                      <Link href={`/m/${machine.initials}/i`}>
-                        View All ({totalIssuesCount})
-                      </Link>
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                {openIssues.length === 0 ? (
-                  <MachineEmptyState machineInitials={machine.initials} />
-                ) : (
-                  <div className="space-y-3">
-                    {openIssues.slice(0, 50).map((issue) => (
-                      <IssueCard
-                        key={issue.id}
-                        issue={issue as unknown as Issue}
-                        machine={{ name: machine.name }}
-                      />
-                    ))}
+              {/* Right Column: Text Fields */}
+              <div className="border-t border-outline-variant/50 pt-6 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
+                <MachineTextFields
+                  machineId={machine.id}
+                  description={machine.description}
+                  tournamentNotes={machine.tournamentNotes}
+                  ownerRequirements={machine.ownerRequirements}
+                  ownerNotes={machine.ownerNotes}
+                  canEditGeneral={canEdit}
+                  canEditOwnerNotes={canEditOwnerNotes}
+                  canViewOwnerRequirements={canViewOwnerRequirements}
+                  canViewOwnerNotes={canViewOwnerNotes}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-                    {openIssues.length > 5 && (
-                      <div className="pt-2 text-center">
-                        <p className="text-xs text-on-surface-variant italic">
-                          Showing top 5 issues. Use "View All" to see the full
-                          list.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+        {/* Collapsible Issues Section */}
+        <IssuesExpando
+          issues={openIssues as unknown as Issue[]}
+          machineName={machine.name}
+          machineInitials={machine.initials}
+          totalIssuesCount={totalIssuesCount}
+        />
       </div>
     </main>
   );
