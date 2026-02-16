@@ -95,3 +95,8 @@ export function getSafeRedirect(
   }
   return fallback;
 }
+
+// Re-export for server-side consumers (settings/page.tsx, m/new/page.tsx).
+// Client components must import directly from ~/lib/login-url to avoid
+// pulling in the logger (which uses Node.js 'fs').
+export { getLoginUrl } from "./login-url";

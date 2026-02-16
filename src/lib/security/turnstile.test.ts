@@ -40,6 +40,18 @@ describe("verifyTurnstileToken", () => {
     expect(result).toBe(false);
   });
 
+  it("returns true when using Cloudflare test secret key (skips verification)", async () => {
+    process.env.TURNSTILE_SECRET_KEY = "1x0000000000000000000000000000000AA";
+    const result = await verifyTurnstileToken("");
+    expect(result).toBe(true);
+  });
+
+  it("returns true when using Cloudflare test secret key even with a token", async () => {
+    process.env.TURNSTILE_SECRET_KEY = "1x0000000000000000000000000000000AA";
+    const result = await verifyTurnstileToken("some-token");
+    expect(result).toBe(true);
+  });
+
   it("returns false when token is empty", async () => {
     process.env.TURNSTILE_SECRET_KEY = "test-secret";
     const result = await verifyTurnstileToken("");

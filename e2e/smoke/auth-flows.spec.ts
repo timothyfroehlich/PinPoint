@@ -21,8 +21,8 @@ test.describe("Authentication Smoke", () => {
     await expect(signInLink).toBeVisible();
     await signInLink.click();
 
-    // Verify we're on the login page
-    await expect(page).toHaveURL("/login");
+    // Verify we're on the login page (may include ?next= from HeaderSignInButton)
+    await expect(page).toHaveURL(/\/login/);
     await expect(page.getByRole("heading", { name: "Sign In" })).toBeVisible();
 
     // Fill out login form

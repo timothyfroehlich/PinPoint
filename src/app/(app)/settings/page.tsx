@@ -1,6 +1,7 @@
 import type React from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
+import { getLoginUrl } from "~/lib/url";
 import { db } from "~/server/db";
 import {
   userProfiles,
@@ -22,7 +23,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login?next=%2Fsettings");
+    redirect(getLoginUrl("/settings"));
   }
 
   // Fetch user profile
