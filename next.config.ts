@@ -6,7 +6,8 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
       // Image uploads are sent through Server Actions as multipart FormData.
-      // Keep this above the 10MB app-level validation limit to avoid 413s at 1MB default.
+      // Set above 10MB app-level validation limit (BLOB_CONFIG.MAX_FILE_SIZE_BYTES)
+      // to account for multipart FormData overhead (~20% buffer) and avoid 413s at 1MB default.
       bodySizeLimit: "12mb",
     },
   },

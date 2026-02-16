@@ -8,7 +8,7 @@ describe("getUploadErrorMessage", () => {
     );
 
     expect(result).toBe(
-      "Image exceeds the upload size limit. Please use an image under 10MB."
+      "Upload size limit exceeded. Please try again with a smaller file."
     );
   });
 
