@@ -24,7 +24,7 @@
 # Scan merged PRs from the past week, generate user-facing changelog entries,
 # and open a PR targeting main.
 #
-# frontmatter-hash: 72fd52c31f36b0aac190b708c39601dd3f106e6b010b3a093250e0b0ed39b0c9
+# frontmatter-hash: 8fcbe183f6e8942e493365819da86be24f698a60b501a3883422fb31ad30f830
 
 name: "Weekly Changelog Agent"
 "on":
@@ -32,7 +32,7 @@ name: "Weekly Changelog Agent"
     branches:
     - feat/whats-new-page
     paths:
-    - .github/workflows/weekly-changelog.lock.yml
+    - .github/workflows/weekly-changelog.*
   schedule:
   - cron: "36 16 * * 1"
     # Friendly format: weekly on monday (scattered)

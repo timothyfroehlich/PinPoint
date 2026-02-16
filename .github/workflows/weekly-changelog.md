@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
   push:
     branches: [feat/whats-new-page]
-    paths: [".github/workflows/weekly-changelog.lock.yml"]
+    paths: [".github/workflows/weekly-changelog.*"]
 
 permissions:
   contents: read
