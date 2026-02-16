@@ -7,7 +7,6 @@ import { IssueFilters } from "~/components/issues/IssueFilters";
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { IssueList } from "~/components/issues/IssueList";
 import { createClient } from "~/lib/supabase/server";
-import { redirect } from "next/navigation";
 import type { IssueListItem } from "~/lib/types";
 
 import { parseIssueFilters } from "~/lib/issues/filters";
@@ -35,10 +34,6 @@ export default async function IssuesPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login?next=%2Fissues");
-  }
-
   // 1. Parse filters from searchParams
   const rawParams = await searchParams;
   // Convert Record to URLSearchParams (parseIssueFilters expects URLSearchParams)
@@ -53,16 +48,18 @@ export default async function IssuesPage({
 
   const filters = parseIssueFilters(urlParams);
 
-  // Fetch current user profile to check role for visibility
-  const currentUserProfile = await db.query.userProfiles.findFirst({
-    where: eq(userProfiles.id, user.id),
-    columns: { role: true },
-  });
+  // Fetch current user profile to check role for visibility (if authenticated)
+  const currentUserProfile = user
+    ? await db.query.userProfiles.findFirst({
+        where: eq(userProfiles.id, user.id),
+        columns: { role: true },
+      })
+    : undefined;
 
   const isAdmin = currentUserProfile?.role === "admin";
 
-  // Add currentUserId for watching filter
-  filters.currentUserId = user.id;
+  // Add currentUserId for watching filter (if authenticated)
+  filters.currentUserId = user?.id;
   const where = buildWhereConditions(filters, db, { isAdmin });
   const orderBy = buildOrderBy(filters.sort);
   const pageSize = filters.pageSize ?? 15;
