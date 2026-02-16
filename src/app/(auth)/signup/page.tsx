@@ -40,7 +40,7 @@ export default async function SignupPage({
 
   if (email) {
     const invited = await db.query.invitedUsers.findFirst({
-      where: eq(invitedUsers.email, email),
+      where: eq(invitedUsers.email, email.toLowerCase()),
     });
 
     if (invited) {

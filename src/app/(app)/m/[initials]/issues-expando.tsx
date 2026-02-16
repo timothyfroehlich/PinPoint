@@ -3,13 +3,12 @@
 import type React from "react";
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
-import { IssueCard } from "~/components/issues/IssueCard";
+import { IssueCard, type IssueCardIssue } from "~/components/issues/IssueCard";
 import { MachineEmptyState } from "~/components/machines/MachineEmptyState";
-import type { Issue } from "~/lib/types";
 import { cn } from "~/lib/utils";
 
 interface IssuesExpandoProps {
-  issues: Issue[];
+  issues: IssueCardIssue[];
   machineName: string;
   machineInitials: string;
   totalIssuesCount: number;

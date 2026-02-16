@@ -124,6 +124,16 @@ test.describe("Public Routes Audit", () => {
     });
   });
 
+  test.describe("Issues route (public read access)", () => {
+    test("/issues loads without login", async ({ page }) => {
+      await page.goto("/issues");
+      await expect(page).toHaveURL("/issues");
+      await expect(
+        page.getByRole("heading", { name: "All Issues" })
+      ).toBeVisible();
+    });
+  });
+
   test.describe("Protected routes redirect to login", () => {
     test("/settings redirects to login", async ({ page }) => {
       await page.goto("/settings");
@@ -137,11 +147,6 @@ test.describe("Public Routes Audit", () => {
 
     test("/m/new redirects to login", async ({ page }) => {
       await page.goto("/m/new");
-      await expect(page).toHaveURL(/\/login/);
-    });
-
-    test("/issues redirects to login", async ({ page }) => {
-      await page.goto("/issues");
       await expect(page).toHaveURL(/\/login/);
     });
   });

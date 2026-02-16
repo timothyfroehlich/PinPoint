@@ -27,14 +27,14 @@ BEGIN
   -- Find matching invited user by email
   SELECT id, role INTO v_invited_user_id, v_role
   FROM public.invited_users
-  WHERE email = NEW.email
+  WHERE lower(email) = lower(NEW.email)
   LIMIT 1;
 
   -- Create user profile
   INSERT INTO public.user_profiles (id, email, first_name, last_name, avatar_url, role)
   VALUES (
     NEW.id,
-    NEW.email,
+    lower(NEW.email),
     COALESCE(NEW.raw_user_meta_data->>'first_name', ''),
     COALESCE(NEW.raw_user_meta_data->>'last_name', ''),
     NEW.raw_user_meta_data->>'avatar_url',
@@ -80,7 +80,7 @@ BEGIN
     reported_by = NEW.id,
     reporter_name = NULL,
     reporter_email = NULL
-  WHERE reporter_email = NEW.email
+  WHERE lower(reporter_email) = lower(NEW.email)
     AND reported_by IS NULL
     AND invited_reported_by IS NULL;
 
