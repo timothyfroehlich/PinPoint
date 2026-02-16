@@ -15,9 +15,9 @@ const FAQ_ITEMS = [
     answer: (
       <>
         When you report an issue, it starts with a &ldquo;new&rdquo; status.
-        Operators review new issues and prioritize based on severity. Unplayable
-        issues get attention first, while cosmetic issues may take longer. Check
-        the issue page to see its current status.
+        Members and admins review new issues and prioritize based on severity.
+        Unplayable issues get attention first, while cosmetic issues may take
+        longer. Check the issue page to see its current status.
       </>
     ),
   },
