@@ -23,6 +23,7 @@ import { z } from "zod";
 import { type Result, ok, err } from "~/lib/result";
 import { deleteFromBlob } from "~/lib/blob/client";
 import { log } from "~/lib/logger";
+import { checkLoginAccountLimit } from "~/lib/rate-limit";
 
 const updateProfileSchema = z.object({
   firstName: z.string().trim().max(50).optional(),
@@ -289,5 +290,140 @@ class SoleAdminError extends Error {
   constructor() {
     super("Sole admin cannot delete their account");
     this.name = "SoleAdminError";
+  }
+}
+
+// --- Change Password ---
+
+const changePasswordSchema = z
+  .object({
+    currentPassword: z
+      .string()
+      .min(1, "Current password is required")
+      .max(1000, "Password is too long"),
+    newPassword: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .max(128, "Password must be less than 128 characters"),
+    confirmNewPassword: z
+      .string()
+      .min(1, "Please confirm your new password")
+      .max(128, "Password must be less than 128 characters"),
+  })
+  .refine((data) => data.newPassword === data.confirmNewPassword, {
+    message: "Passwords do not match",
+    path: ["confirmNewPassword"],
+  });
+
+export type ChangePasswordResult = Result<
+  { success: boolean },
+  "VALIDATION" | "UNAUTHORIZED" | "WRONG_PASSWORD" | "SERVER"
+>;
+
+/**
+ * Change Password Action
+ *
+ * Allows authenticated users to change their password.
+ * Verifies the current password before updating.
+ */
+export async function changePasswordAction(
+  _prevState: ChangePasswordResult | undefined,
+  formData: FormData
+): Promise<ChangePasswordResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return err(
+      "UNAUTHORIZED",
+      "You must be logged in to change your password."
+    );
+  }
+
+  const rawData = {
+    currentPassword: formData.get("currentPassword"),
+    newPassword: formData.get("newPassword"),
+    confirmNewPassword: formData.get("confirmNewPassword"),
+  };
+
+  const validation = changePasswordSchema.safeParse(rawData);
+
+  if (!validation.success) {
+    const firstError = validation.error.issues[0]?.message ?? "Invalid input";
+    return err("VALIDATION", firstError);
+  }
+
+  const { currentPassword, newPassword } = validation.data;
+
+  // Rate-limit password change attempts per account (reuses login account limiter)
+  const accountLimit = await checkLoginAccountLimit(user.email ?? user.id);
+  if (!accountLimit.success) {
+    log.warn(
+      { userId: user.id, action: "change-password" },
+      "Change password rate limit exceeded"
+    );
+    return err("SERVER", "Too many attempts. Please try again later.");
+  }
+
+  try {
+    if (!user.email) {
+      log.error(
+        { userId: user.id, action: "change-password" },
+        "User has no email — cannot verify password"
+      );
+      return err("SERVER", "Unable to verify your identity.");
+    }
+
+    // Supabase has no "verify password" API, so we use signInWithPassword.
+    // Since we're signing in as the same authenticated user, this only
+    // refreshes the existing session tokens — no side effects.
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: currentPassword,
+    });
+
+    if (signInError) {
+      log.warn(
+        { userId: user.id, action: "change-password" },
+        "Current password verification failed"
+      );
+      return err("WRONG_PASSWORD", "Current password is incorrect.");
+    }
+
+    // Update to new password
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (updateError) {
+      log.error(
+        {
+          userId: user.id,
+          action: "change-password",
+          error: updateError.message,
+        },
+        "Password update failed"
+      );
+      return err("SERVER", "Failed to update password. Please try again.");
+    }
+
+    log.info(
+      { userId: user.id, action: "change-password" },
+      "Password changed successfully"
+    );
+
+    return ok({ success: true });
+  } catch (error) {
+    log.error(
+      {
+        userId: user.id,
+        error: error instanceof Error ? error.message : "Unknown",
+        action: "change-password",
+      },
+      "Change password server error"
+    );
+    return err("SERVER", "An unexpected error occurred.");
   }
 }
