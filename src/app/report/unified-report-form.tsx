@@ -13,7 +13,6 @@ import { Label } from "~/components/ui/label";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { Button } from "~/components/ui/button";
-import { UserCheck } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "~/lib/utils";
 import { submitPublicIssueAction } from "./actions";
@@ -114,46 +113,50 @@ export function UnifiedReportForm({
     if (typeof window === "undefined" || hasRestored.current) return;
     hasRestored.current = true;
 
-    // If a specific machine is requested via URL, treat as a new report and clear any draft
-    if (defaultMachineId) {
-      window.localStorage.removeItem("report_form_state");
-      return;
-    }
+    const savedDraft = window.localStorage.getItem("report_form_state");
+    if (!savedDraft) return;
 
-    const saved = window.localStorage.getItem("report_form_state");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as Partial<{
-          machineId: string;
-          title: string;
-          description: string;
-          severity: IssueSeverity | "";
-          priority: IssuePriority | "";
-          frequency: IssueFrequency | "";
-        }>;
+    try {
+      const parsed = JSON.parse(savedDraft) as Partial<{
+        machineId: string;
+        title: string;
+        description: string;
+        severity: IssueSeverity | "";
+        priority: IssuePriority | "";
+        frequency: IssueFrequency | "";
+      }>;
 
-        // Only restore machineId if not provided via prop or URL already
-        // AND if we have a valid machineId in storage
-        if (parsed.machineId && !defaultMachineId) {
-          setSelectedMachineId(parsed.machineId);
-          // Sync to URL if we restored it from localStorage
-          const machine = machinesList.find((m) => m.id === parsed.machineId);
-          if (machine) {
-            const params = new URLSearchParams(searchParams.toString());
-            params.set("machine", machine.initials);
-            router.replace(`?${params.toString()}`, { scroll: false });
-          }
-        }
-
-        if (parsed.title) setTitle(parsed.title);
-        if (parsed.description) setDescription(parsed.description);
-        if (parsed.severity) setSeverity(parsed.severity);
-        if (parsed.priority) setPriority(parsed.priority);
-        if (parsed.frequency) setFrequency(parsed.frequency);
-      } catch {
-        // Clear corrupted localStorage
+      // If URL points to a different machine than the draft, treat this as a new report.
+      // If machine matches, keep restoring (this is the login redirect case).
+      if (
+        defaultMachineId &&
+        parsed.machineId &&
+        defaultMachineId !== parsed.machineId
+      ) {
         window.localStorage.removeItem("report_form_state");
+        return;
       }
+
+      if (parsed.machineId && !defaultMachineId) {
+        setSelectedMachineId(parsed.machineId);
+
+        // Sync URL with the restored machine when no machine param is present.
+        const machine = machinesList.find((m) => m.id === parsed.machineId);
+        if (machine) {
+          const params = new URLSearchParams(searchParams.toString());
+          params.set("machine", machine.initials);
+          router.replace(`?${params.toString()}`, { scroll: false });
+        }
+      }
+
+      if (parsed.title) setTitle(parsed.title);
+      if (parsed.description) setDescription(parsed.description);
+      if (parsed.severity) setSeverity(parsed.severity);
+      if (parsed.priority) setPriority(parsed.priority);
+      if (parsed.frequency) setFrequency(parsed.frequency);
+    } catch {
+      // Clear corrupted localStorage
+      window.localStorage.removeItem("report_form_state");
     }
   }, [defaultMachineId, machinesList, router, searchParams]);
 
@@ -408,7 +411,7 @@ export function UnifiedReportForm({
                 </div>
 
                 {/* Reporter Info (Only if NOT logged in) */}
-                {!userAuthenticated ? (
+                {!userAuthenticated && (
                   <div className="space-y-3 pt-2">
                     <div className="space-y-1">
                       <h3 className="text-sm font-semibold text-on-surface">
@@ -475,11 +478,6 @@ export function UnifiedReportForm({
                         Log in
                       </Link>
                     </p>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 rounded-lg bg-surface-container-high px-3 py-2 text-xs text-on-surface-variant mt-2">
-                    <UserCheck className="h-4 w-4 text-primary" />
-                    <span>Logged in</span>
                   </div>
                 )}
 

@@ -160,6 +160,84 @@ test.describe("Public Issue Reporting", () => {
     await expect(page).toHaveURL("/report");
   });
 
+  test("should preserve draft when logging in from inline report-form link", async ({
+    page,
+  }) => {
+    await page.goto("/report");
+    await page.getByTestId("machine-select").selectOption({ index: 1 });
+    await expect(page).toHaveURL(/machine=/);
+
+    const machineInitials = new URL(page.url()).searchParams.get("machine");
+    expect(machineInitials).toBeTruthy();
+    if (!machineInitials) {
+      throw new Error("Expected machine initials in report URL before login.");
+    }
+
+    const issueTitle = `${PUBLIC_PREFIX} Inline Login Draft ${Date.now()}`;
+    const issueDescription = "Draft should survive inline login.";
+    await fillReportForm(page, {
+      title: issueTitle,
+      description: issueDescription,
+      includePriority: false,
+    });
+
+    await page.getByRole("link", { name: "Log in" }).click();
+    await expect(page).toHaveURL(/\/login\?/);
+
+    const next = new URL(page.url()).searchParams.get("next");
+    expect(next).toBe(`/report?machine=${machineInitials}`);
+
+    await page.getByLabel("Email").fill(TEST_USERS.member.email);
+    await page.getByLabel("Password").fill(TEST_USERS.member.password);
+    await page.getByRole("button", { name: "Sign In" }).click();
+
+    await expect(page).toHaveURL(
+      new RegExp(`/report\\?machine=${machineInitials}`)
+    );
+    await expect(page.getByLabel("Issue Title")).toHaveValue(issueTitle);
+    await expect(page.getByLabel("Description")).toHaveValue(issueDescription);
+    await expect(page.getByLabel("First Name")).toHaveCount(0);
+  });
+
+  test("should preserve draft when logging in from header sign-in link", async ({
+    page,
+  }) => {
+    await page.goto("/report");
+    await page.getByTestId("machine-select").selectOption({ index: 1 });
+    await expect(page).toHaveURL(/machine=/);
+
+    const machineInitials = new URL(page.url()).searchParams.get("machine");
+    expect(machineInitials).toBeTruthy();
+    if (!machineInitials) {
+      throw new Error("Expected machine initials in report URL before login.");
+    }
+
+    const issueTitle = `${PUBLIC_PREFIX} Header Login Draft ${Date.now()}`;
+    const issueDescription = "Draft should survive header sign-in login.";
+    await fillReportForm(page, {
+      title: issueTitle,
+      description: issueDescription,
+      includePriority: false,
+    });
+
+    await page.getByTestId("nav-signin").click();
+    await expect(page).toHaveURL(/\/login\?/);
+
+    const next = new URL(page.url()).searchParams.get("next");
+    expect(next).toBe(`/report?machine=${machineInitials}`);
+
+    await page.getByLabel("Email").fill(TEST_USERS.member.email);
+    await page.getByLabel("Password").fill(TEST_USERS.member.password);
+    await page.getByRole("button", { name: "Sign In" }).click();
+
+    await expect(page).toHaveURL(
+      new RegExp(`/report\\?machine=${machineInitials}`)
+    );
+    await expect(page.getByLabel("Issue Title")).toHaveValue(issueTitle);
+    await expect(page.getByLabel("Description")).toHaveValue(issueDescription);
+    await expect(page.getByLabel("First Name")).toHaveCount(0);
+  });
+
   test("should clear form draft after successful submission", async ({
     page,
   }) => {
