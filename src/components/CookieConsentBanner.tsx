@@ -18,7 +18,11 @@ export function CookieConsentBanner(): React.JSX.Element | null {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background p-4">
+    <div
+      className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background p-4"
+      role="region"
+      aria-label="Cookie consent notice"
+    >
       <div className="mx-auto flex max-w-screen-xl flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
           PinPoint uses cookies for authentication and to remember your
