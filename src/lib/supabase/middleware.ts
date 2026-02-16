@@ -104,6 +104,7 @@ export async function updateSession(
     path === "/" ||
     path === "/m" ||
     path.startsWith("/m/") ||
+    path.startsWith("/issues") ||
     path.startsWith("/login") ||
     path.startsWith("/signup") ||
     path.startsWith("/forgot-password") ||
