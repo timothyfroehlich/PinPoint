@@ -100,9 +100,9 @@ describe("getLoginUrl", () => {
     );
   });
 
-  it("handles the root path", async () => {
+  it("omits ?next= for the root path (login default is better than landing page)", async () => {
     const { getLoginUrl } = await import("./url");
-    expect(getLoginUrl("/")).toBe("/login?next=%2F");
+    expect(getLoginUrl("/")).toBe("/login");
   });
 });
 

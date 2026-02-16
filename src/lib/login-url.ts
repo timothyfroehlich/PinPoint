@@ -6,5 +6,10 @@
  * the logger which uses Node.js 'fs' — making it unsafe for client components.
  */
 export function getLoginUrl(returnTo: string): string {
+  // Don't set ?next= for the landing page — after login the default
+  // fallback (/dashboard) is a better destination than the marketing page.
+  if (!returnTo || returnTo === "/") {
+    return "/login";
+  }
   return `/login?next=${encodeURIComponent(returnTo)}`;
 }
