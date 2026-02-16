@@ -291,3 +291,112 @@ class SoleAdminError extends Error {
     this.name = "SoleAdminError";
   }
 }
+
+// --- Change Password ---
+
+const changePasswordSchema = z
+  .object({
+    currentPassword: z
+      .string()
+      .min(1, "Current password is required")
+      .max(1000, "Password is too long"),
+    newPassword: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .max(128, "Password must be less than 128 characters"),
+    confirmNewPassword: z
+      .string()
+      .max(128, "Password must be less than 128 characters"),
+  })
+  .refine((data) => data.newPassword === data.confirmNewPassword, {
+    message: "Passwords do not match",
+    path: ["confirmNewPassword"],
+  });
+
+export type ChangePasswordResult = Result<
+  { success: boolean },
+  "VALIDATION" | "UNAUTHORIZED" | "WRONG_PASSWORD" | "SERVER"
+>;
+
+/**
+ * Change Password Action
+ *
+ * Allows authenticated users to change their password.
+ * Verifies the current password before updating.
+ */
+export async function changePasswordAction(
+  _prevState: ChangePasswordResult | undefined,
+  formData: FormData
+): Promise<ChangePasswordResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return err(
+      "UNAUTHORIZED",
+      "You must be logged in to change your password."
+    );
+  }
+
+  const rawData = {
+    currentPassword: formData.get("currentPassword"),
+    newPassword: formData.get("newPassword"),
+    confirmNewPassword: formData.get("confirmNewPassword"),
+  };
+
+  const validation = changePasswordSchema.safeParse(rawData);
+
+  if (!validation.success) {
+    const firstError = validation.error.issues[0]?.message ?? "Invalid input";
+    return err("VALIDATION", firstError);
+  }
+
+  const { currentPassword, newPassword } = validation.data;
+
+  try {
+    // Verify current password by attempting sign-in
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: user.email ?? "",
+      password: currentPassword,
+    });
+
+    if (signInError) {
+      return err("WRONG_PASSWORD", "Current password is incorrect.");
+    }
+
+    // Update to new password
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (updateError) {
+      log.error(
+        {
+          userId: user.id,
+          action: "change-password",
+          error: updateError.message,
+        },
+        "Password update failed"
+      );
+      return err("SERVER", "Failed to update password. Please try again.");
+    }
+
+    log.info(
+      { userId: user.id, action: "change-password" },
+      "Password changed successfully"
+    );
+
+    return ok({ success: true });
+  } catch (error) {
+    log.error(
+      {
+        error: error instanceof Error ? error.message : "Unknown",
+        action: "change-password",
+      },
+      "Change password server error"
+    );
+    return err("SERVER", "An unexpected error occurred.");
+  }
+}
