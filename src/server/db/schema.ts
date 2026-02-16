@@ -104,6 +104,10 @@ export const machines = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    description: text("description"),
+    tournamentNotes: text("tournament_notes"),
+    ownerRequirements: text("owner_requirements"),
+    ownerNotes: text("owner_notes"),
   },
   (t) => ({
     initialsCheck: check("initials_check", sql`initials ~ '^[A-Z0-9]{2,6}$'`),
