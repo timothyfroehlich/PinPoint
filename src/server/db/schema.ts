@@ -13,7 +13,7 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 import { citext } from "~/server/db/citext";
-import { ISSUE_STATUS_VALUES } from "~/lib/issues/status";
+import { ISSUE_STATUS_VALUES, type IssueStatus } from "~/lib/issues/status";
 
 /**
  * ⚠️ IMPORTANT: When adding new tables to this schema file,
@@ -143,7 +143,7 @@ export const issues = pgTable(
     // Status values imported from single source of truth
     // Based on _issue-status-redesign/README.md - Final design with 11 statuses
     status: text("status", {
-      enum: ISSUE_STATUS_VALUES as unknown as [string, ...string[]],
+      enum: ISSUE_STATUS_VALUES as unknown as [IssueStatus, ...IssueStatus[]],
     })
       .notNull()
       .default("new"),

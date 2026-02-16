@@ -11,10 +11,8 @@ import {
   deriveMachineStatus,
   getMachineStatusLabel,
   getMachineStatusStyles,
-  type IssueForStatus,
 } from "~/lib/machines/status";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
-import type { Issue } from "~/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
@@ -90,6 +88,7 @@ export default async function MachineDetailPage({
             frequency: true,
             machineInitials: true,
             createdAt: true,
+            reporterName: true,
           },
           orderBy: (issues, { desc }) => [desc(issues.createdAt)],
         },
@@ -184,7 +183,7 @@ export default async function MachineDetailPage({
   const openIssues = machine.issues;
 
   // Derive machine status
-  const machineStatus = deriveMachineStatus(openIssues as IssueForStatus[]);
+  const machineStatus = deriveMachineStatus(openIssues);
 
   // Generate QR data for modal using dynamic host resolution
   const headersList = await headers();
@@ -385,7 +384,7 @@ export default async function MachineDetailPage({
 
         {/* Collapsible Issues Section */}
         <IssuesExpando
-          issues={openIssues as unknown as Issue[]}
+          issues={openIssues}
           machineName={machine.name}
           machineInitials={machine.initials}
           totalIssuesCount={totalIssuesCount}
