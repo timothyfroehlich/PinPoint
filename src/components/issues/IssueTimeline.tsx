@@ -40,6 +40,7 @@ import {
   AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
 import { type AccessLevel } from "~/lib/permissions/matrix";
+import { OwnerRequirementsCallout } from "~/components/machines/OwnerRequirementsCallout";
 
 // ----------------------------------------------------------------------
 // Types
@@ -352,6 +353,10 @@ interface IssueTimelineProps {
   currentUserId: string | null;
   currentUserRole: AccessLevel;
   currentUserInitials: string;
+  /** Owner requirements to display after the initial report (authenticated users only) */
+  ownerRequirements?: string | undefined;
+  /** Machine name for the requirements callout title */
+  machineName?: string | undefined;
 }
 
 export function IssueTimeline({
@@ -359,6 +364,8 @@ export function IssueTimeline({
   currentUserId,
   currentUserRole,
   currentUserInitials,
+  ownerRequirements,
+  machineName,
 }: IssueTimelineProps): React.JSX.Element {
   const userContext: UserContext = {
     currentUserId,
@@ -417,13 +424,22 @@ export function IssueTimeline({
 
         {/* Events List */}
         <div className="relative flex flex-col space-y-6">
-          {allEvents.map((event) => (
-            <TimelineItem
-              key={event.id}
-              event={event}
-              issue={issue}
-              userContext={userContext}
-            />
+          {allEvents.map((event, index) => (
+            <React.Fragment key={event.id}>
+              <TimelineItem
+                event={event}
+                issue={issue}
+                userContext={userContext}
+              />
+              {index === 0 && ownerRequirements && machineName && (
+                <div className="ml-20">
+                  <OwnerRequirementsCallout
+                    ownerRequirements={ownerRequirements}
+                    machineName={machineName}
+                  />
+                </div>
+              )}
+            </React.Fragment>
           ))}
 
           {/* Delightful Empty State when no comments yet */}
