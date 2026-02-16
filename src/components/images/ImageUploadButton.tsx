@@ -10,6 +10,7 @@ import { validateImageFile } from "~/lib/blob/validation";
 import { uploadIssueImage } from "~/server/actions/images";
 import { toast } from "sonner";
 import { type ImageMetadata } from "~/types/images";
+import { getUploadErrorMessage } from "~/components/images/upload-error-message";
 
 interface ImageUploadButtonProps {
   issueId: string; // 'new' or UUID
@@ -64,7 +65,7 @@ export function ImageUploadButton({
       // Client-side component - use console.error as logger is server-side only
 
       console.error("Upload error:", error);
-      toast.error("An unexpected error occurred during upload");
+      toast.error(getUploadErrorMessage(error));
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {

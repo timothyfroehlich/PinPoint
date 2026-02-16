@@ -3,6 +3,13 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  experimental: {
+    serverActions: {
+      // Image uploads are sent through Server Actions as multipart FormData.
+      // Keep this above the 10MB app-level validation limit to avoid 413s at 1MB default.
+      bodySizeLimit: "12mb",
+    },
+  },
   typescript: {
     tsconfigPath: "./tsconfig.json",
   },
