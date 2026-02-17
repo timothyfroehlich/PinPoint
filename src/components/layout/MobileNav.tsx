@@ -16,9 +16,11 @@ import {
 export function MobileNav({
   role,
   issuesPath,
+  newChangelogCount = 0,
 }: {
   role?: "guest" | "member" | "admin" | undefined;
   issuesPath?: string;
+  newChangelogCount?: number;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
 
@@ -47,6 +49,7 @@ export function MobileNav({
           onNavigate={() => setOpen(false)}
           isMobile={true}
           issuesPath={issuesPath}
+          newChangelogCount={newChangelogCount}
         />
       </SheetContent>
     </Sheet>

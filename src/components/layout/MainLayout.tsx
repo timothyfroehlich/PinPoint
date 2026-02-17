@@ -19,10 +19,12 @@ import Link from "next/link";
 import { Button } from "~/components/ui/button";
 import { MobileNav } from "./MobileNav";
 import { FeedbackWidget } from "~/components/feedback/FeedbackWidget";
+import changelogMeta from "@content/changelog-meta.json";
 import { HeaderSignInButton } from "./header-sign-in-button";
 import {
   getLastIssuesPath,
   getSidebarCollapsed,
+  getChangelogSeen,
 } from "~/lib/cookies/preferences";
 
 export async function MainLayout({
@@ -31,10 +33,17 @@ export async function MainLayout({
   children: React.ReactNode;
 }): Promise<React.JSX.Element> {
   // Read user preferences from cookies (server-side)
-  const [issuesPath, sidebarCollapsed] = await Promise.all([
+  const [issuesPath, sidebarCollapsed, changelogSeen] = await Promise.all([
     getLastIssuesPath(),
     getSidebarCollapsed(),
+    getChangelogSeen(),
   ]);
+
+  // Compute unread changelog count from metadata file
+  const newChangelogCount = Math.max(
+    0,
+    changelogMeta.totalEntries - changelogSeen
+  );
 
   const supabase = await createClient();
   const {
@@ -130,6 +139,7 @@ export async function MainLayout({
           role={userProfile?.role}
           issuesPath={issuesPath}
           initialCollapsed={sidebarCollapsed}
+          newChangelogCount={newChangelogCount}
         />
       </aside>
 
@@ -140,7 +150,11 @@ export async function MainLayout({
           {/* Mobile Menu Trigger & Left Spacer */}
           <div className="flex-1 flex items-center">
             <div className="md:hidden mr-4">
-              <MobileNav role={userProfile?.role} issuesPath={issuesPath} />
+              <MobileNav
+                role={userProfile?.role}
+                issuesPath={issuesPath}
+                newChangelogCount={newChangelogCount}
+              />
             </div>
           </div>
 
