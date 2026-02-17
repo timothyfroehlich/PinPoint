@@ -10,6 +10,16 @@ interface TurnstileVerifyResponse {
 }
 
 /**
+ * Cloudflare's well-known "always passes" test secret key.
+ * When this key is configured, skip server-side verification entirely
+ * because the widget JS may not complete in headless test browsers
+ * (Playwright, etc.), leaving the token empty.
+ *
+ * @see https://developers.cloudflare.com/turnstile/troubleshooting/testing/
+ */
+const TURNSTILE_TEST_SECRET = "1x0000000000000000000000000000000AA";
+
+/**
  * Verify a Cloudflare Turnstile token server-side.
  *
  * If TURNSTILE_SECRET_KEY is not configured, returns true to allow
@@ -37,6 +47,12 @@ export async function verifyTurnstileToken(
       { action: "turnstile" },
       "TURNSTILE_SECRET_KEY not set — skipping CAPTCHA verification"
     );
+    return true;
+  }
+
+  // Cloudflare test keys: skip verification entirely. The widget JS may
+  // not complete in headless browsers (Playwright), producing no token.
+  if (secretKey === TURNSTILE_TEST_SECRET) {
     return true;
   }
 

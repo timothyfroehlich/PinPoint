@@ -2,6 +2,7 @@ import type React from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "~/lib/supabase/server";
+import { getLoginUrl } from "~/lib/url";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { ArrowLeft } from "lucide-react";
@@ -27,7 +28,7 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login?next=%2Fm%2Fnew");
+    redirect(getLoginUrl("/m/new"));
   }
 
   // Fetch all users for owner selection (Admin only)

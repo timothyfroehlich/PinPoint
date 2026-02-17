@@ -20,6 +20,7 @@ import { Button } from "~/components/ui/button";
 import { MobileNav } from "./MobileNav";
 import { FeedbackWidget } from "~/components/feedback/FeedbackWidget";
 import changelogMeta from "@content/changelog-meta.json";
+import { HeaderSignInButton } from "./header-sign-in-button";
 import {
   getLastIssuesPath,
   getSidebarCollapsed,
@@ -176,15 +177,7 @@ export async function MainLayout({
             ) : (
               <div className="flex items-center gap-4">
                 <div className="h-4 w-px bg-border mx-1 hidden lg:block" />
-                <Button
-                  asChild
-                  variant="ghost"
-                  size="sm"
-                  className="text-muted-foreground hover:text-foreground"
-                  data-testid="nav-signin"
-                >
-                  <Link href="/login">Sign In</Link>
-                </Button>
+                <HeaderSignInButton />
                 <Button asChild size="sm" data-testid="nav-signup">
                   <Link href="/signup">Sign Up</Link>
                 </Button>

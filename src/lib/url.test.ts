@@ -87,6 +87,25 @@ describe("isInternalUrl", () => {
   });
 });
 
+describe("getLoginUrl", () => {
+  it("builds login URL for a basic path", async () => {
+    const { getLoginUrl } = await import("./url");
+    expect(getLoginUrl("/settings")).toBe("/login?next=%2Fsettings");
+  });
+
+  it("encodes query params in the return path", async () => {
+    const { getLoginUrl } = await import("./url");
+    expect(getLoginUrl("/report?machine=TA")).toBe(
+      "/login?next=%2Freport%3Fmachine%3DTA"
+    );
+  });
+
+  it("omits ?next= for the root path (login default is better than landing page)", async () => {
+    const { getLoginUrl } = await import("./url");
+    expect(getLoginUrl("/")).toBe("/login");
+  });
+});
+
 describe("getSafeRedirect", () => {
   it("returns the URL if it is internal", async () => {
     const { getSafeRedirect } = await import("./url");

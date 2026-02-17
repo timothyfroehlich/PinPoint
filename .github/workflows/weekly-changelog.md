@@ -6,9 +6,6 @@ description: |
 on:
   schedule: weekly on monday
   workflow_dispatch:
-  push:
-    branches: [feat/whats-new-page]
-    paths: [".github/workflows/weekly-changelog.*"]
 
 permissions:
   contents: read
