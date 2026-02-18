@@ -85,7 +85,7 @@
     "@types/nodemailer": "^7.0.9",
     "@types/zxcvbn": "^4.4.5",
     "@upstash/ratelimit": "^2.0.8",
-    "@upstash/redis": "^1.36.1",
+    "@upstash/redis": "^1.36.2",
     "@vercel/blob": "^2.0.1",
     "browser-image-compression": "^2.0.2",
     "class-variance-authority": "^0.7.1",

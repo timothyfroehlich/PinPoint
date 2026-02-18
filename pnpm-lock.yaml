@@ -82,10 +82,10 @@ importers:
         version: 4.4.5
       '@upstash/ratelimit':
         specifier: ^2.0.8
-        version: 2.0.8(@upstash/redis@1.36.1)
+        version: 2.0.8(@upstash/redis@1.36.2)
       '@upstash/redis':
-        specifier: ^1.36.1
-        version: 1.36.1
+        specifier: ^1.36.2
+        version: 1.36.2
       '@vercel/blob':
         specifier: ^2.0.1
         version: 2.0.1
@@ -106,7 +106,7 @@ importers:
         version: 4.1.0
       drizzle-orm:
         specifier: ^0.45.1
-        version: 0.45.1(@electric-sql/pglite@0.3.15)(@opentelemetry/api@1.9.0)(@types/pg@8.15.6)(@upstash/redis@1.36.1)(postgres@3.4.8)
+        version: 0.45.1(@electric-sql/pglite@0.3.15)(@opentelemetry/api@1.9.0)(@types/pg@8.15.6)(@upstash/redis@1.36.2)(postgres@3.4.8)
       lucide-react:
         specifier: ^0.563.0
         version: 0.563.0(react@19.2.4)
@@ -2867,8 +2867,8 @@ packages:
     peerDependencies:
       '@upstash/redis': ^1.34.3
 
-  '@upstash/redis@1.36.1':
-    resolution: {integrity: sha512-N6SjDcgXdOcTAF+7uNoY69o7hCspe9BcA7YjQdxVu5d25avljTwyLaHBW3krWjrP0FfocgMk94qyVtQbeDp39A==}
+  '@upstash/redis@1.36.2':
+    resolution: {integrity: sha512-C0Yt8hc12vLaQYRG1fMci8iPrLtnTdbJG0HR5T8vKnvEP/1RdMMblsOJs5/jp0JXZJ1oSzMnQz4J9EVezNpI6A==}
 
   '@vercel/blob@2.0.1':
     resolution: {integrity: sha512-DeJmC/B5oH1ExazYh/UvjbN6Mg0q0wlDz29GPIPNhi4COjVzqYRkyPYjOcAZd+RgXVzWqGXholZWtGcLCPuL8A==}
@@ -8538,14 +8538,14 @@ snapshots:
 
   '@upstash/core-analytics@0.0.10':
     dependencies:
-      '@upstash/redis': 1.36.1
+      '@upstash/redis': 1.36.2
 
-  '@upstash/ratelimit@2.0.8(@upstash/redis@1.36.1)':
+  '@upstash/ratelimit@2.0.8(@upstash/redis@1.36.2)':
     dependencies:
       '@upstash/core-analytics': 0.0.10
-      '@upstash/redis': 1.36.1
+      '@upstash/redis': 1.36.2
 
-  '@upstash/redis@1.36.1':
+  '@upstash/redis@1.36.2':
     dependencies:
       uncrypto: 0.1.3
 
@@ -9206,12 +9206,12 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  drizzle-orm@0.45.1(@electric-sql/pglite@0.3.15)(@opentelemetry/api@1.9.0)(@types/pg@8.15.6)(@upstash/redis@1.36.1)(postgres@3.4.8):
+  drizzle-orm@0.45.1(@electric-sql/pglite@0.3.15)(@opentelemetry/api@1.9.0)(@types/pg@8.15.6)(@upstash/redis@1.36.2)(postgres@3.4.8):
     optionalDependencies:
       '@electric-sql/pglite': 0.3.15
       '@opentelemetry/api': 1.9.0
       '@types/pg': 8.15.6
-      '@upstash/redis': 1.36.1
+      '@upstash/redis': 1.36.2
       postgres: 3.4.8
 
   dunder-proto@1.0.1:
