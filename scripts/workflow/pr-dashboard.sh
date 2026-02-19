@@ -35,7 +35,6 @@ for pr in $PRS; do
     title=$(echo "$pr_data" | jq -r '.title' | cut -c1-40)
     branch=$(echo "$pr_data" | jq -r '.headRefName')
     is_draft=$(echo "$pr_data" | jq -r '.isDraft')
-    mergeable=$(echo "$pr_data" | jq -r '.mergeable')
     merge_state=$(echo "$pr_data" | jq -r '.mergeStateStatus')
 
     # CI status: count states
