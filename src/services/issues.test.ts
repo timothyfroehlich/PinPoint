@@ -120,7 +120,7 @@ describe("Issue Service", () => {
   });
 
   describe("createIssue", () => {
-    it("sends new issue notifications without auto-watch", async () => {
+    it("auto-watches reporter by default and sends notifications", async () => {
       const params = {
         title: "New Issue",
         machineInitials: "MM",
@@ -138,10 +138,13 @@ describe("Issue Service", () => {
       // Mock machine update returning next issue number
       mockDb.update.mockReturnValueOnce(mockUpdateReturning(mockMachineUpdate));
 
-      // Mock issue insert
+      // Mock issue insert (first call), then default to void for issueWatchers
       mockDb.insert.mockReturnValueOnce(mockInsertReturning(mockIssue));
 
       await createIssue(params);
+
+      // Verify two inserts were made: issue + issueWatchers (auto-watch for reporter)
+      expect(mockDb.insert).toHaveBeenCalledTimes(2);
 
       expect(createNotification).toHaveBeenCalledWith(
         {
@@ -178,6 +181,7 @@ describe("Issue Service", () => {
 
       await createIssue(params);
 
+      // Only the issue insert should have been called — no issueWatchers insert
       expect(mockDb.insert).toHaveBeenCalledTimes(1);
     });
   });
