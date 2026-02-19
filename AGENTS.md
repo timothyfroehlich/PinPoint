@@ -59,7 +59,7 @@ We use git worktrees for parallel environments. There are two types:
 
 Created with `./pinpoint-wt.py` for quick PR reviews or parallel development. Ports are hash-allocated to avoid conflicts.
 
-**Worktree Path Resolution**: Branch names with slashes (e.g., `feat/my-feature`) create nested directories. **Always use `git worktree list`** to find the actual path — never guess it. Example: branch `feat/f3r-rename-env-vars` lives at `/home/froeht/Code/pinpoint-worktrees/feat/f3r-rename-env-vars`, NOT `.../f3r-rename-env-vars`.
+**Worktree Path Resolution**: Branch slashes are replaced with dashes in directory names (flat naming). Branch `feat/my-feature` creates directory `pinpoint-worktrees/feat-my-feature`. Example: branch `feat/f3r-rename-env-vars` lives at `/home/froeht/Code/pinpoint-worktrees/feat-f3r-rename-env-vars`. The `remove` command has a fallback for old nested paths (`pinpoint-worktrees/feat/f3r-rename-env-vars`).
 
 **Commands**:
 
@@ -115,6 +115,7 @@ conflicts across worktrees and force-push requirements on open PRs.
 - `pnpm run db:backup`: Manual production data dump to `~/.pinpoint/db-backups` (verifies Supabase CLI link matches expected production project).
 - `pnpm run db:seed:from-prod`: Reset local DB and seed from the latest production backup.
 - `pnpm run e2e:full`: Full E2E suite (Don't run Safari locally on Linux).
+- `ruff check <file> && ruff format <file>`: Lint and format Python files (`pinpoint-wt.py`, scripts). Ruff is installed globally — no venv needed.
 
 ### Safe Command Patterns
 

@@ -21,8 +21,8 @@ if [ -z "$PRS" ]; then
 fi
 
 # Header
-printf "%-6s %-40s %-12s %-10s %-8s %s\n" "PR" "Title" "CI" "Copilot" "Draft" "Branch"
-printf "%-6s %-40s %-12s %-10s %-8s %s\n" "------" "----------------------------------------" "------------" "----------" "--------" "-------------------"
+printf "%-6s %-40s %-12s %-10s %-10s %-8s %s\n" "PR" "Title" "CI" "Copilot" "Merge" "Draft" "Branch"
+printf "%-6s %-40s %-12s %-10s %-10s %-8s %s\n" "------" "----------------------------------------" "------------" "----------" "----------" "--------" "-------------------"
 
 for pr in $PRS; do
     if ! [[ "$pr" =~ ^[0-9]+$ ]]; then
@@ -30,11 +30,12 @@ for pr in $PRS; do
         exit 1
     fi
 
-    # Get PR metadata
-    pr_data=$(gh pr view "$pr" --json title,headRefName,isDraft 2>/dev/null) || continue
+    # Get PR metadata (including merge status)
+    pr_data=$(gh pr view "$pr" --json title,headRefName,isDraft,mergeable,mergeStateStatus 2>/dev/null) || continue
     title=$(echo "$pr_data" | jq -r '.title' | cut -c1-40)
     branch=$(echo "$pr_data" | jq -r '.headRefName')
     is_draft=$(echo "$pr_data" | jq -r '.isDraft')
+    merge_state=$(echo "$pr_data" | jq -r '.mergeStateStatus')
 
     # CI status: count states
     checks=$(gh pr checks "$pr" --json name,state 2>/dev/null) || checks="[]"
@@ -78,11 +79,22 @@ for pr in $PRS; do
          )]
        | length' 2>/dev/null) || copilot_count="?"
 
+    # Merge status
+    case "$merge_state" in
+        CONFLICTING) merge_str="CONFLICT" ;;
+        CLEAN)       merge_str="CLEAN" ;;
+        BLOCKED)     merge_str="BLOCKED" ;;
+        UNSTABLE)    merge_str="UNSTABLE" ;;
+        BEHIND)      merge_str="BEHIND" ;;
+        UNKNOWN)     merge_str="UNKNOWN" ;;
+        *)           merge_str="${merge_state:-?}" ;;
+    esac
+
     # Draft status
     draft_str=""
     if [ "$is_draft" = "true" ]; then
         draft_str="draft"
     fi
 
-    printf "%-6s %-40s %-12s %-10s %-8s %s\n" "#${pr}" "$title" "$ci_status" "$copilot_count" "$draft_str" "$branch"
+    printf "%-6s %-40s %-12s %-10s %-10s %-8s %s\n" "#${pr}" "$title" "$ci_status" "$copilot_count" "$merge_str" "$draft_str" "$branch"
 done

@@ -66,7 +66,7 @@ Before completing:
 ```markdown
 ## Task: Fix machine dropdown default
 
-**Worktree**: /home/froeht/Code/pinpoint-worktrees/feat/machine-dropdown-fix
+**Worktree**: /home/froeht/Code/pinpoint-worktrees/feat-machine-dropdown-fix
 **Branch**: feat/machine-dropdown-fix
 **Beads Issue**: PinPoint-23v
 
@@ -76,12 +76,12 @@ The machine dropdown on the public report form currently defaults to the first m
 
 ### Critical Instructions
 
-1. **ALL file operations MUST use paths under**: `/home/froeht/Code/pinpoint-worktrees/feat/machine-dropdown-fix`
-   - Read files: `/home/froeht/Code/pinpoint-worktrees/feat/machine-dropdown-fix/src/...`
-   - Edit files: `/home/froeht/Code/pinpoint-worktrees/feat/machine-dropdown-fix/src/...`
-   - Run commands: `cd /home/froeht/Code/pinpoint-worktrees/feat/machine-dropdown-fix && ...`
+1. **ALL file operations MUST use paths under**: `/home/froeht/Code/pinpoint-worktrees/feat-machine-dropdown-fix`
+   - Read files: `/home/froeht/Code/pinpoint-worktrees/feat-machine-dropdown-fix/src/...`
+   - Edit files: `/home/froeht/Code/pinpoint-worktrees/feat-machine-dropdown-fix/src/...`
+   - Run commands: `cd /home/froeht/Code/pinpoint-worktrees/feat-machine-dropdown-fix && ...`
 
-2. **Read AGENTS.md first**: `/home/froeht/Code/pinpoint-worktrees/feat/machine-dropdown-fix/AGENTS.md`
+2. **Read AGENTS.md first**: `/home/froeht/Code/pinpoint-worktrees/feat-machine-dropdown-fix/AGENTS.md`
 
 3. **Follow project patterns** from the skills referenced in AGENTS.md
 
@@ -96,15 +96,15 @@ The machine dropdown on the public report form currently defaults to the first m
 
 Before completing:
 
-1. `cd /home/froeht/Code/pinpoint-worktrees/feat/machine-dropdown-fix && pnpm run check` - Must pass
-2. `cd /home/froeht/Code/pinpoint-worktrees/feat/machine-dropdown-fix && git status` - All changes staged
-3. `cd /home/froeht/Code/pinpoint-worktrees/feat/machine-dropdown-fix && git diff --cached` - Review changes
+1. `cd /home/froeht/Code/pinpoint-worktrees/feat-machine-dropdown-fix && pnpm run check` - Must pass
+2. `cd /home/froeht/Code/pinpoint-worktrees/feat-machine-dropdown-fix && git status` - All changes staged
+3. `cd /home/froeht/Code/pinpoint-worktrees/feat-machine-dropdown-fix && git diff --cached` - Review changes
 
 ### Completion
 
 1. Commit with conventional commit message
-2. Push: `cd /home/froeht/Code/pinpoint-worktrees/feat/machine-dropdown-fix && git push -u origin feat/machine-dropdown-fix`
-3. Create PR: `cd /home/froeht/Code/pinpoint-worktrees/feat/machine-dropdown-fix && gh pr create --title "fix(report): machine dropdown defaults to unselected" --body "..."`
+2. Push: `cd /home/froeht/Code/pinpoint-worktrees/feat-machine-dropdown-fix && git push -u origin feat/machine-dropdown-fix`
+3. Create PR: `cd /home/froeht/Code/pinpoint-worktrees/feat-machine-dropdown-fix && gh pr create --title "fix(report): machine dropdown defaults to unselected" --body "..."`
 
 ### Success Criteria
 

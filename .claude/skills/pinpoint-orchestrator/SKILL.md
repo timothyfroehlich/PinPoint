@@ -20,9 +20,14 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 All monitoring and readiness commands are handled by scripts. Use these instead of raw `gh` commands.
 
 ```bash
+# Orchestration startup (ONE call for full situational awareness)
+bash scripts/workflow/orchestration-status.sh               # PR dashboard + worktree health + beads + security alerts
+bash scripts/workflow/orchestration-status.sh --prs-only    # Just PR dashboard
+bash scripts/workflow/orchestration-status.sh --security-only  # Just Dependabot alerts
+
 # PR monitoring
-bash scripts/workflow/pr-dashboard.sh [PR numbers...]       # CI + Copilot status table (all open PRs if no args)
-bash scripts/workflow/copilot-comments.sh <PR>              # Copilot details formatted for agent prompts
+bash scripts/workflow/pr-dashboard.sh [PR numbers...]       # CI + Copilot + merge status table (all open PRs if no args)
+bash scripts/workflow/copilot-comments.sh <PR> [PR...]      # Copilot details (accepts multiple PRs)
 bash scripts/workflow/copilot-comments.sh <PR> --raw        # JSON output for parsing
 
 # Copilot thread management (see AGENTS.md "GitHub Copilot Reviews" for full protocol)
@@ -41,7 +46,11 @@ bash scripts/workflow/label-ready.sh <PR> --dry-run         # Preview without ac
 bash scripts/workflow/monitor-gh-actions.sh                 # Watch all active CI runs in parallel, report failures
 bash .agent/skills/pinpoint-commit/scripts/watch-ci.sh <PR> [timeout]  # Poll single PR CI (default 10min)
 
-# Worktree management
+# Worktree health
+bash scripts/workflow/stale-worktrees.sh                    # Report stale/active/dirty worktrees
+bash scripts/workflow/stale-worktrees.sh --clean            # Auto-remove stale worktrees
+
+# Worktree management (paths are now flat: feat/x → feat-x)
 python3 ./pinpoint-wt.py create <branch>           # Create worktree (new or existing branch)
 python3 ./pinpoint-wt.py list                      # Show all worktrees with port assignments
 python3 ./pinpoint-wt.py remove <branch>           # Clean teardown (Supabase + Docker + worktree)
@@ -108,11 +117,11 @@ Before proceeding, verify:
 python3 ./pinpoint-wt.py create <branch-name>   # Works for new or existing branches
 ```
 
-Track the mapping:
+Track the mapping (note: paths are flat — `feat/task-abc` → `feat-task-abc`):
 
 ```
-PinPoint-abc → /home/froeht/Code/pinpoint-worktrees/feat/task-abc
-PinPoint-def → /home/froeht/Code/pinpoint-worktrees/feat/task-def
+PinPoint-abc → /home/froeht/Code/pinpoint-worktrees/feat-task-abc
+PinPoint-def → /home/froeht/Code/pinpoint-worktrees/feat-task-def
 ```
 
 ---

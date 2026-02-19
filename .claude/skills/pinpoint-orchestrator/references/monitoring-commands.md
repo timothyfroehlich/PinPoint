@@ -114,6 +114,14 @@ cd /home/froeht/Code/pinpoint-worktrees/<branch> && git status
 cd /home/froeht/Code/pinpoint-worktrees/<branch> && git log --oneline -5
 ```
 
+## Orchestration Startup (Preferred)
+
+**Use this instead of individual commands for session startup:**
+
+```bash
+bash scripts/workflow/orchestration-status.sh    # Full picture: PRs + worktrees + beads + security
+```
+
 ## Batch Monitoring Script
 
 Check all open PRs from current user:
@@ -124,6 +132,14 @@ for pr in $(gh pr list --author @me --state open --json number --jq '.[].number'
   gh pr view $pr --json title,statusCheckRollup --jq '"\(.title)\nChecks: \([.statusCheckRollup[] | .conclusion // .status] | unique | join(", "))"'
   echo ""
 done
+```
+
+## Stale Worktree Detection
+
+```bash
+bash scripts/workflow/stale-worktrees.sh           # Report status of all ephemeral worktrees
+bash scripts/workflow/stale-worktrees.sh --clean    # Auto-remove stale + clean worktrees
+bash scripts/workflow/stale-worktrees.sh --json     # Machine-readable output
 ```
 
 ## Teams Monitoring (Interactive Mode)

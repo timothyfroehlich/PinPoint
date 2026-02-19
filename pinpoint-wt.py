@@ -73,6 +73,16 @@ EPHEMERAL_WORKTREE_BASE = Path("../pinpoint-worktrees")
 
 
 # =============================================================================
+# Path Helpers
+# =============================================================================
+
+
+def branch_to_dir_name(branch: str) -> str:
+    """Convert branch name to flat directory name (replace / with -)."""
+    return branch.replace("/", "-")
+
+
+# =============================================================================
 # Port Allocation
 # =============================================================================
 
@@ -249,7 +259,9 @@ def cmd_create(args: argparse.Namespace) -> int:
     print(f"🌿 Creating ephemeral worktree for branch: {branch}")
 
     # Validate worktree doesn't already exist at target path
-    worktree_dir = (repo_root / EPHEMERAL_WORKTREE_BASE / branch).resolve()
+    worktree_dir = (
+        repo_root / EPHEMERAL_WORKTREE_BASE / branch_to_dir_name(branch)
+    ).resolve()
     if worktree_dir.exists():
         print(f"❌ Error: Worktree already exists at {worktree_dir}")
         return 1
@@ -434,8 +446,13 @@ def cmd_remove(args: argparse.Namespace) -> int:
     branch = args.branch
     repo_root = Path.cwd()
 
-    # Find the worktree path
-    worktree_dir = (repo_root / EPHEMERAL_WORKTREE_BASE / branch).resolve()
+    # Find the worktree path (flat name first, fallback to old nested path)
+    worktree_dir = (
+        repo_root / EPHEMERAL_WORKTREE_BASE / branch_to_dir_name(branch)
+    ).resolve()
+    if not worktree_dir.exists():
+        # Fallback: try old nested path for backwards compatibility
+        worktree_dir = (repo_root / EPHEMERAL_WORKTREE_BASE / branch).resolve()
 
     if not worktree_dir.exists():
         print(f"❌ Error: Worktree not found at {worktree_dir}")

@@ -121,7 +121,12 @@ fi
 
 # Cleanup worktree
 if [ "$CLEANUP" = "true" ]; then
-    worktree_path="/home/froeht/Code/pinpoint-worktrees/${branch}"
+    branch_dir=$(echo "$branch" | tr '/' '-')
+    worktree_path="/home/froeht/Code/pinpoint-worktrees/${branch_dir}"
+    # Fallback to old nested path
+    if [ ! -d "$worktree_path" ]; then
+        worktree_path="/home/froeht/Code/pinpoint-worktrees/${branch}"
+    fi
     if [ -d "$worktree_path" ]; then
         if [ "$DRY_RUN" = "true" ]; then
             echo "DRY RUN: Would remove worktree at ${worktree_path}"
