@@ -37,6 +37,26 @@ describe("parseMachineFilters", () => {
     expect(filters.status).toEqual([]);
   });
 
+  it("parses comma-separated presence values", () => {
+    const params = new URLSearchParams("presence=on_the_floor,removed");
+    const filters = parseMachineFilters(params);
+    expect(filters.presence).toEqual(["on_the_floor", "removed"]);
+  });
+
+  it("filters out invalid presence values", () => {
+    const params = new URLSearchParams(
+      "presence=on_the_floor,invalid_presence,removed"
+    );
+    const filters = parseMachineFilters(params);
+    expect(filters.presence).toEqual(["on_the_floor", "removed"]);
+  });
+
+  it("handles presence=all", () => {
+    const params = new URLSearchParams("presence=all");
+    const filters = parseMachineFilters(params);
+    expect(filters.presence).toEqual([]);
+  });
+
   it("handles valid sort parameter", () => {
     const params = new URLSearchParams("sort=issues_desc");
     const filters = parseMachineFilters(params);
@@ -69,6 +89,11 @@ describe("hasActiveMachineFilters", () => {
 
   it("returns true when owner is present", () => {
     const params = new URLSearchParams("owner=user-1");
+    expect(hasActiveMachineFilters(params)).toBe(true);
+  });
+
+  it("returns true when presence is present", () => {
+    const params = new URLSearchParams("presence=removed");
     expect(hasActiveMachineFilters(params)).toBe(true);
   });
 

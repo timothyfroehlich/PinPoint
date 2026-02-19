@@ -282,6 +282,23 @@ export function buildWhereConditions(
     conditions.push(lte(issues.updatedAt, endOfDay));
   }
 
+  // Default: exclude issues from machines not currently "on the floor"
+  if (!filters.includeInactiveMachines) {
+    conditions.push(
+      exists(
+        db
+          .select()
+          .from(machines)
+          .where(
+            and(
+              eq(machines.initials, issues.machineInitials),
+              eq(machines.presenceStatus, "on_the_floor")
+            )
+          )
+      )
+    );
+  }
+
   return conditions;
 }
 

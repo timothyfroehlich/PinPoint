@@ -305,6 +305,57 @@ describe("updateMachineAction", () => {
     expect(db.update).not.toHaveBeenCalled();
   });
 
+  it("should validate presenceStatus input", async () => {
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      role: "member",
+    } as any);
+
+    const formData = new FormData();
+    formData.append("id", machineId);
+    formData.append("name", "Updated Name");
+    formData.append("presenceStatus", "invalid_presence");
+
+    const result = await updateMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("VALIDATION");
+    }
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it("should update machine presence status", async () => {
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      id: mockUser.id,
+      role: "member",
+    } as any);
+
+    const mockMachine = {
+      id: machineId,
+      initials: "MM",
+      name: "Updated Name",
+      ownerId: mockUser.id,
+      presenceStatus: "removed",
+    };
+    chain.returning.mockResolvedValue([mockMachine]);
+
+    const formData = new FormData();
+    formData.append("id", machineId);
+    formData.append("name", "Updated Name");
+    formData.append("presenceStatus", "removed");
+
+    const result = await updateMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(true);
+    expect(db.update).toHaveBeenCalled();
+    expect(chain.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "Updated Name",
+        presenceStatus: "removed",
+      })
+    );
+  });
+
   it("should allow member owner to transfer ownership", async () => {
     // Mock member profile (owner, not admin)
     vi.mocked(db.query.userProfiles.findFirst).mockImplementation(() => {

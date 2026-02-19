@@ -22,6 +22,10 @@ import type {
   MachineSort,
 } from "~/lib/machines/filters";
 import { getMachineStatusLabel } from "~/lib/machines/status";
+import {
+  getMachinePresenceLabel,
+  type MachinePresenceStatus,
+} from "~/lib/machines/presence";
 
 interface FilterUser {
   id: string;
@@ -50,6 +54,14 @@ const STATUS_OPTIONS = [
   { label: "Operational", value: "operational" },
   { label: "Needs Service", value: "needs_service" },
   { label: "Unplayable", value: "unplayable" },
+];
+
+const PRESENCE_OPTIONS = [
+  { label: "On the Floor", value: "on_the_floor" },
+  { label: "Off the Floor", value: "off_the_floor" },
+  { label: "On Loan", value: "on_loan" },
+  { label: "Pending Arrival", value: "pending_arrival" },
+  { label: "Removed", value: "removed" },
 ];
 
 export function MachineFilters({
@@ -120,13 +132,32 @@ export function MachineFilters({
       });
     });
 
+    // Presence badges (only show non-default values)
+    filters.presence?.forEach((presenceStatus) => {
+      if (presenceStatus !== "on_the_floor") {
+        items.push({
+          id: `presence-${presenceStatus}`,
+          label: getMachinePresenceLabel(presenceStatus),
+          clear: () =>
+            pushFilters({
+              presence: filters.presence?.filter((v) => v !== presenceStatus),
+            }),
+        });
+      }
+    });
+
     return items;
   }, [filters, users, pushFilters]);
 
   const hasAnyFilter =
-    search ||
+    search.length > 0 ||
     badges.length > 0 ||
-    (filters.sort && filters.sort !== "name_asc");
+    (filters.sort ?? "name_asc") !== "name_asc" ||
+    (filters.presence &&
+      filters.presence.length > 0 &&
+      !(
+        filters.presence.length === 1 && filters.presence[0] === "on_the_floor"
+      ));
 
   return (
     <div className="space-y-4">
@@ -215,6 +246,7 @@ export function MachineFilters({
                   q: undefined,
                   status: [],
                   owner: [],
+                  presence: undefined,
                   sort: "name_asc",
                 });
               }}
@@ -242,6 +274,16 @@ export function MachineFilters({
             value={filters.owner ?? []}
             onChange={(val) => pushFilters({ owner: val })}
             placeholder="Owner"
+          />
+        </div>
+        <div className="w-full sm:w-48">
+          <MultiSelect
+            options={PRESENCE_OPTIONS}
+            value={filters.presence ?? ["on_the_floor"]}
+            onChange={(val) =>
+              pushFilters({ presence: val as MachinePresenceStatus[] })
+            }
+            placeholder="Availability"
           />
         </div>
       </div>

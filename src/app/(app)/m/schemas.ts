@@ -6,6 +6,7 @@
  */
 
 import { z } from "zod";
+import { VALID_MACHINE_PRESENCE_STATUSES } from "~/lib/machines/presence";
 
 /**
  * Create Machine Schema
@@ -47,6 +48,7 @@ export const updateMachineSchema = z.object({
     .min(1, "Name is required")
     .max(100, "Machine name must be less than 100 characters"),
   ownerId: z.string().uuid().optional(),
+  presenceStatus: z.enum(VALID_MACHINE_PRESENCE_STATUSES).optional(),
 });
 
 export type UpdateMachineInput = z.infer<typeof updateMachineSchema>;

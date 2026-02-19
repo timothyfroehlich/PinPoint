@@ -6,11 +6,23 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import {
   updateMachineAction,
   type UpdateMachineResult,
 } from "~/app/(app)/m/actions";
 import { cn } from "~/lib/utils";
 import { OwnerSelect } from "~/components/machines/OwnerSelect";
+import {
+  VALID_MACHINE_PRESENCE_STATUSES,
+  getMachinePresenceLabel,
+  type MachinePresenceStatus,
+} from "~/lib/machines/presence";
 import {
   Dialog,
   DialogContent,
@@ -41,6 +53,7 @@ interface EditMachineDialogProps {
     id: string;
     name: string;
     initials: string;
+    presenceStatus: MachinePresenceStatus;
     ownerId: string | null;
     invitedOwnerId: string | null;
     owner?: {
@@ -197,6 +210,34 @@ export function EditMachineDialog({
               />
               <p className="text-xs text-on-surface-variant">
                 Enter the full name of the pinball machine
+              </p>
+            </div>
+
+            {/* Availability */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-presence" className="text-on-surface">
+                Availability
+              </Label>
+              <Select
+                name="presenceStatus"
+                defaultValue={machine.presenceStatus}
+              >
+                <SelectTrigger
+                  id="edit-presence"
+                  className="border-outline bg-surface text-on-surface"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {VALID_MACHINE_PRESENCE_STATUSES.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {getMachinePresenceLabel(status)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-on-surface-variant">
+                Whether this machine is currently available on the floor
               </p>
             </div>
 

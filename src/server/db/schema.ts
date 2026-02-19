@@ -109,6 +109,17 @@ export const machines = pgTable(
     tournamentNotes: text("tournament_notes"),
     ownerRequirements: text("owner_requirements"),
     ownerNotes: text("owner_notes"),
+    presenceStatus: text("presence_status", {
+      enum: [
+        "on_the_floor",
+        "off_the_floor",
+        "on_loan",
+        "pending_arrival",
+        "removed",
+      ],
+    })
+      .notNull()
+      .default("on_the_floor"),
   },
   (t) => ({
     initialsCheck: check("initials_check", sql`initials ~ '^[A-Z0-9]{2,6}$'`),

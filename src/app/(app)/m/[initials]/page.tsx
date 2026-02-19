@@ -12,6 +12,11 @@ import {
   getMachineStatusLabel,
   getMachineStatusStyles,
 } from "~/lib/machines/status";
+import {
+  getMachinePresenceLabel,
+  getMachinePresenceStyles,
+  isOnTheFloor,
+} from "~/lib/machines/presence";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
@@ -234,6 +239,16 @@ export default async function MachineDetailPage({
                   >
                     {getMachineStatusLabel(machineStatus)}
                   </Badge>
+                  {!isOnTheFloor(machine.presenceStatus) && (
+                    <Badge
+                      className={cn(
+                        getMachinePresenceStyles(machine.presenceStatus),
+                        "border px-3 py-1 text-sm font-semibold"
+                      )}
+                    >
+                      {getMachinePresenceLabel(machine.presenceStatus)}
+                    </Badge>
+                  )}
                 </div>
                 <p className="mt-1 text-sm text-on-surface-variant">
                   Machine details and issue tracking
@@ -267,6 +282,16 @@ export default async function MachineDetailPage({
 
       {/* Content */}
       <div className="container mx-auto space-y-6 px-4 py-8">
+        {!isOnTheFloor(machine.presenceStatus) && (
+          <div className="rounded-md border border-outline-variant bg-surface-container px-4 py-2 text-sm text-on-surface-variant">
+            This machine is currently{" "}
+            <strong>
+              {getMachinePresenceLabel(machine.presenceStatus).toLowerCase()}
+            </strong>
+            .
+          </div>
+        )}
+
         {/* Full-width Details Card */}
         <Card className="border-outline-variant bg-surface">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">

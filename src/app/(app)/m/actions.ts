@@ -245,6 +245,11 @@ export async function updateMachineAction(
       (formData.get("ownerId") as string).length > 0
         ? (formData.get("ownerId") as string)
         : undefined,
+    presenceStatus:
+      typeof formData.get("presenceStatus") === "string" &&
+      (formData.get("presenceStatus") as string).length > 0
+        ? (formData.get("presenceStatus") as string)
+        : undefined,
   };
 
   const validation = updateMachineSchema.safeParse(rawData);
@@ -253,7 +258,7 @@ export async function updateMachineAction(
     return err("VALIDATION", firstError?.message ?? "Invalid input");
   }
 
-  const { id, name, ownerId } = validation.data;
+  const { id, name, ownerId, presenceStatus } = validation.data;
 
   try {
     // Admins can update any machine, non-admins can only update their own machines
@@ -305,6 +310,7 @@ export async function updateMachineAction(
       .update(machines)
       .set({
         name,
+        ...(presenceStatus !== undefined && { presenceStatus }),
         ...(shouldUpdateOwner && {
           ownerId: finalOwnerId,
           invitedOwnerId: finalInvitedOwnerId,
