@@ -115,6 +115,7 @@ conflicts across worktrees and force-push requirements on open PRs.
 - `pnpm run db:backup`: Manual production data dump to `~/.pinpoint/db-backups` (verifies Supabase CLI link matches expected production project).
 - `pnpm run db:seed:from-prod`: Reset local DB and seed from the latest production backup.
 - `pnpm run e2e:full`: Full E2E suite (Don't run Safari locally on Linux).
+- `ruff check <file> && ruff format <file>`: Lint and format Python files (`pinpoint-wt.py`, scripts). Ruff is installed globally — no venv needed.
 
 ### Safe Command Patterns
 
