@@ -33,6 +33,7 @@ echo ""
 
 # Load all env vars from file (excluding comments and empty lines)
 set -a
+# shellcheck source=/dev/null
 source "$ENV_FILE"
 set +a
 
@@ -61,9 +62,9 @@ export POSTGRES_URL_NON_POOLING="$POSTGRES_URL"
 # Confirm before proceeding
 if [ "$SKIP_CONFIRM" = false ]; then
   echo "⚠️  WARNING: This will DESTROY all data in the database!"
-  echo "Database: $(echo $POSTGRES_URL | sed -E 's/(:\/\/[^:]+:)[^@]+(@)/\1***\2/')"
+  echo "Database: $(echo "$POSTGRES_URL" | sed -E 's/(:\/\/[^:]+:)[^@]+(@)/\1***\2/')"
   echo ""
-  read -p "Are you sure? (yes/no): " confirm
+  read -rp "Are you sure? (yes/no): " confirm
 
   if [ "$confirm" != "yes" ]; then
     echo "Aborted."
@@ -71,7 +72,7 @@ if [ "$SKIP_CONFIRM" = false ]; then
   fi
 else
   echo "⚠️  Skipping confirmation (--yes flag provided)"
-  echo "Database: $(echo $POSTGRES_URL | sed -E 's/(:\/\/[^:]+:)[^@]+(@)/\1***\2/')"
+  echo "Database: $(echo "$POSTGRES_URL" | sed -E 's/(:\/\/[^:]+:)[^@]+(@)/\1***\2/')"
 fi
 
 echo ""
