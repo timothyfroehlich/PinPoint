@@ -24,10 +24,15 @@
 # Weekly security and privacy review of merged changes.
 # Creates a GitHub Issue with findings.
 #
-# gh-aw-metadata: {"schema_version":"v1","frontmatter_hash":"333b7d9b590cfaf8db21d35d7812c5709dbaf8b68114faebc895837414d35295","compiler_version":"v0.46.1"}
+# gh-aw-metadata: {"schema_version":"v1","frontmatter_hash":"e92eb48fe10bbdf82145a9c0012bb64fda093e53ec50f7bac7c97897d50e8dbf","compiler_version":"v0.46.1"}
 
 name: "Weekly Security Review Agent"
 "on":
+  push:
+    branches:
+    - feat/weekly-security-review
+    paths:
+    - .github/workflows/weekly-security-review.*
   schedule:
   - cron: "25 13 * * 1"
     # Friendly format: weekly on monday (scattered)
@@ -36,12 +41,14 @@ name: "Weekly Security Review Agent"
 permissions: {}
 
 concurrency:
-  group: "gh-aw-${{ github.workflow }}"
+  group: "gh-aw-${{ github.workflow }}-${{ github.ref }}"
 
 run-name: "Weekly Security Review Agent"
 
 jobs:
   activation:
+    needs: pre_activation
+    if: needs.pre_activation.outputs.activated == 'true'
     runs-on: ubuntu-slim
     permissions:
       contents: read
@@ -232,8 +239,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
-    concurrency:
-      group: "gh-aw-copilot-${{ github.workflow }}"
     env:
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
       GH_AW_ASSETS_ALLOWED_EXTS: ""
@@ -907,8 +912,6 @@ jobs:
     if: needs.agent.outputs.output_types != '' || needs.agent.outputs.has_patch == 'true'
     runs-on: ubuntu-latest
     permissions: {}
-    concurrency:
-      group: "gh-aw-copilot-${{ github.workflow }}"
     timeout-minutes: 10
     outputs:
       success: ${{ steps.parse_results.outputs.success }}
@@ -1002,6 +1005,28 @@ jobs:
           name: threat-detection.log
           path: /tmp/gh-aw/threat-detection/detection.log
           if-no-files-found: ignore
+
+  pre_activation:
+    runs-on: ubuntu-slim
+    outputs:
+      activated: ${{ steps.check_membership.outputs.is_team_member == 'true' }}
+    steps:
+      - name: Setup Scripts
+        uses: github/gh-aw/actions/setup@874bdd8271bf8c21902b068fb1ca6a22d2dc4b7a # v0.46.1
+        with:
+          destination: /opt/gh-aw/actions
+      - name: Check team membership for workflow
+        id: check_membership
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          GH_AW_REQUIRED_ROLES: admin,maintainer,write
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
+            setupGlobals(core, github, context, exec, io);
+            const { main } = require('/opt/gh-aw/actions/check_membership.cjs');
+            await main();
 
   safe_outputs:
     needs:
