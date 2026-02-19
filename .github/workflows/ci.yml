@@ -877,7 +877,20 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run pnpm audit
-        run: pnpm audit --audit-level=high
+        run: |
+          registry_errors="ERR_PNPM_AUDIT_BAD_RESPONSE"
+          registry_errors+="|ERR_PNPM_AUDIT_REGISTRY"
+          registry_errors+="|ECONNREFUSED|EAI_AGAIN|ETIMEDOUT"
+          output=$(pnpm audit --audit-level=high 2>&1) || {
+            if echo "$output" | grep -qE "$registry_errors"; then
+              echo "::warning::pnpm audit skipped: registry error"
+              echo "$output"
+              exit 0
+            fi
+            echo "$output"
+            exit 1
+          }
+          echo "$output"
 
   ci-gate:
     name: CI Gate
