@@ -17,45 +17,37 @@ concurrency:
 
 jobs:
   # Detect which files changed to skip expensive jobs for docs-only changes.
-  # Uses a positive filter (listing code paths) so new directories default to
-  # "skip CI" — a safe failure mode that's easy to notice and fix.
+  # Uses predicate-quantifier: 'every' with a negative filter so that code=true
+  # unless EVERY changed file is docs-only. New/unknown directories default to
+  # running full CI — the safe failure mode.
   changes:
     name: Detect Changes
     runs-on: ubuntu-latest
     outputs:
-      code: ${{ steps.filter.outputs.code }}
+      code: ${{ steps.set-code.outputs.code }}
     steps:
       - uses: actions/checkout@v6
       - id: filter
         uses: dorny/paths-filter@v3
         with:
+          predicate-quantifier: "every"
           filters: |
-            code:
-              - 'src/**'
-              - 'e2e/**'
-              - 'drizzle/**'
-              - 'supabase/**'
-              - 'scripts/**'
-              - 'public/**'
-              - 'package.json'
-              - 'pnpm-lock.yaml'
-              - 'tsconfig*.json'
-              - 'next.config.*'
-              - 'postcss.config.*'
-              - 'tailwind.config.*'
-              - 'playwright.config.*'
-              - 'vitest.config.*'
-              - 'eslint.config.*'
-              - '.env.*'
-              - 'components.json'
-              - 'pinpoint-wt.py'
-              - '.github/workflows/**'
-              - 'content/**'
-              - 'drizzle.config.ts'
-              - 'mdx-components.tsx'
-              - 'middleware.ts'
-              - '.prettierrc*'
-              - '.prettierignore'
+            docs_only:
+              - 'docs/**'
+              - '**/*.md'
+              - '.beads/**'
+              - '.agent/**'
+              - '.claude/**'
+              - 'LICENSE'
+              - '.gitignore'
+      - name: Determine code changes
+        id: set-code
+        run: |
+          if [ "${{ steps.filter.outputs.docs_only }}" = "true" ]; then
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          fi
   # Setup job caches dependencies for reuse by other jobs
   setup:
     name: Setup Dependencies
@@ -199,16 +191,20 @@ jobs:
           sudo apt-get install -y yamllint shellcheck
 
       - name: Install Ruff
-        run: pipx install ruff
+        run: pipx install "ruff==0.15.1"
 
       - name: YAML lint
         run: yamllint .github/workflows/
 
       - name: Action lint
+        env:
+          ACTIONLINT_VERSION: "1.7.11"
         run: |
-          bash <(curl -sL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
-          # shellcheck disable=SC2046
-          ./actionlint $(find .github/workflows -name '*.yml' ! -name '*.lock.yml')
+          dl="https://raw.githubusercontent.com/rhysd/actionlint"
+          dl="${dl}/main/scripts/download-actionlint.bash"
+          bash <(curl -sL "$dl") "$ACTIONLINT_VERSION"
+          find .github/workflows -name '*.yml' ! -name '*.lock.yml' \
+            -print0 | xargs -0 ./actionlint
 
       - name: Ruff check
         run: ruff check scripts/ pinpoint-wt.py .agent/skills/*/scripts/*.py
