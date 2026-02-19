@@ -120,6 +120,13 @@
       "when": 1771294010903,
       "tag": "0016_citext_email_normalization",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1771473276535,
+      "tag": "0017_restore_public_profiles_view_grant",
+      "breakpoints": true
     }
   ]
 }
