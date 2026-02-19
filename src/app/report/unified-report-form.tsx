@@ -13,6 +13,7 @@ import { Label } from "~/components/ui/label";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { Button } from "~/components/ui/button";
+import { Checkbox } from "~/components/ui/checkbox";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "~/lib/utils";
 import { submitPublicIssueAction } from "./actions";
@@ -83,6 +84,7 @@ export function UnifiedReportForm({
   const [frequency, setFrequency] = useState<IssueFrequency | "">("constant");
   const [status, setStatus] = useState<IssueStatus>("new");
   const [assignedTo, setAssignedTo] = useState("");
+  const [watchIssue, setWatchIssue] = useState(true);
 
   const [uploadedImages, setUploadedImages] = useState<ImageMetadata[]>([]);
   const [turnstileToken, setTurnstileToken] = useState("");
@@ -124,6 +126,7 @@ export function UnifiedReportForm({
         severity: IssueSeverity | "";
         priority: IssuePriority | "";
         frequency: IssueFrequency | "";
+        watchIssue: boolean;
       }>;
 
       // If URL points to a different machine than the draft, treat this as a new report.
@@ -154,6 +157,8 @@ export function UnifiedReportForm({
       if (parsed.severity) setSeverity(parsed.severity);
       if (parsed.priority) setPriority(parsed.priority);
       if (parsed.frequency) setFrequency(parsed.frequency);
+      if (typeof parsed.watchIssue === "boolean")
+        setWatchIssue(parsed.watchIssue);
     } catch {
       // Clear corrupted localStorage
       window.localStorage.removeItem("report_form_state");
@@ -170,12 +175,21 @@ export function UnifiedReportForm({
       severity,
       priority,
       frequency,
+      watchIssue,
     };
     window.localStorage.setItem(
       "report_form_state",
       JSON.stringify(stateToSave)
     );
-  }, [selectedMachineId, title, description, severity, priority, frequency]);
+  }, [
+    selectedMachineId,
+    title,
+    description,
+    severity,
+    priority,
+    frequency,
+    watchIssue,
+  ]);
 
   // Cleanup: Clear storage on success (handled by redirect usually, but good for robust logic if no redirect)
   // Actually, review says: "cleanup effect will never execute because action redirects".
@@ -478,6 +492,37 @@ export function UnifiedReportForm({
                         Log in
                       </Link>
                     </p>
+                  </div>
+                )}
+
+                {userAuthenticated && (
+                  <div className="space-y-2 rounded-lg border border-outline-variant/30 bg-surface-container-low p-3">
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        id="watchIssue"
+                        checked={watchIssue}
+                        onCheckedChange={(checked) =>
+                          setWatchIssue(checked === true)
+                        }
+                        className="mt-0.5 border-outline-variant data-[state=checked]:border-primary"
+                      />
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor="watchIssue"
+                          className="text-sm font-medium text-on-surface"
+                        >
+                          Watch this issue
+                        </Label>
+                        <p className="text-xs text-on-surface-variant">
+                          Get updates when status or comments change.
+                        </p>
+                      </div>
+                    </div>
+                    <input
+                      type="hidden"
+                      name="watchIssue"
+                      value={watchIssue ? "true" : "false"}
+                    />
                   </div>
                 )}
 

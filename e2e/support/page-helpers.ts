@@ -67,6 +67,7 @@ export async function fillReportForm(
     frequency?: "intermittent" | "frequent" | "constant";
     /** Set to false for anonymous/public forms that don't have priority */
     includePriority?: boolean;
+    watchIssue?: boolean;
   }
 ): Promise<void> {
   const {
@@ -76,6 +77,7 @@ export async function fillReportForm(
     priority = "low",
     frequency = "intermittent",
     includePriority = true,
+    watchIssue = true,
   } = options;
 
   await page.getByLabel("Issue Title *").fill(title);
@@ -94,4 +96,9 @@ export async function fillReportForm(
   }
 
   await selectOption(page, "issue-frequency-select", frequency);
+
+  const watchToggle = page.getByLabel("Watch this issue");
+  if ((await watchToggle.count()) > 0) {
+    await watchToggle.setChecked(watchIssue);
+  }
 }

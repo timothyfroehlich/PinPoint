@@ -36,6 +36,7 @@ export const publicIssueSchema = z.object({
     .optional()
     .or(z.literal("")),
   assignedTo: z.string().uuid("Invalid assignee").optional().or(z.literal("")),
+  watchIssue: z.boolean().default(true),
 });
 
 export type PublicIssueInput = z.infer<typeof publicIssueSchema>;

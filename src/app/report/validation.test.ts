@@ -61,6 +61,25 @@ describe("Public Issue Form Validation", () => {
     const result = parsePublicIssueForm(formData);
 
     expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.watchIssue).toBe(true);
+    }
+  });
+
+  it("should respect watchIssue opt-out flag", () => {
+    const formData = new FormData();
+    formData.set("machineId", "00000000-0000-0000-0000-000000000000");
+    formData.set("title", "Valid Title");
+    formData.set("severity", "minor");
+    formData.set("frequency", "intermittent");
+    formData.set("watchIssue", "false");
+
+    const result = parsePublicIssueForm(formData);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.watchIssue).toBe(false);
+    }
   });
 
   // assignedTo field tests

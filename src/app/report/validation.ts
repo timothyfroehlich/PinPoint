@@ -19,6 +19,25 @@ const toOptionalString = (
 ): string | undefined => (typeof value === "string" ? value : undefined);
 
 /**
+ * Converts a FormData entry to a boolean, defaulting to `true` when the
+ * field is absent (`null`).
+ *
+ * This function is designed for use with a companion hidden `<input>` that
+ * always submits an explicit "true" or "false" string value, ensuring the
+ * field is never absent in practice. The `null -> true` default acts as a
+ * safe fallback so the opt-in behavior (e.g. "watch this issue") remains
+ * enabled even if the hidden input is accidentally omitted.
+ *
+ * @see unified-report-form.tsx — hidden input pattern for the watchIssue field
+ */
+const toBooleanFromForm = (value: FormDataEntryValue | null): boolean => {
+  if (value === null) return true;
+  if (typeof value !== "string") return false;
+  const normalized = value.toLowerCase();
+  return normalized === "true" || normalized === "on" || normalized === "1";
+};
+
+/**
  * Extracts and validates public issue form data.
  *
  * Keeps validation in a pure helper so it can be unit-tested without
@@ -39,6 +58,7 @@ export function parsePublicIssueForm(
     frequency: toOptionalString(formData.get("frequency")),
     status: toOptionalString(formData.get("status")),
     assignedTo: toOptionalString(formData.get("assignedTo")),
+    watchIssue: toBooleanFromForm(formData.get("watchIssue")),
   };
 
   const validation = publicIssueSchema.safeParse(rawData);
