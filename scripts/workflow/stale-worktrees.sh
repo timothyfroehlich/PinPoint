@@ -14,6 +14,9 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
 CLEAN=false
 JSON_OUTPUT=false
 
@@ -96,7 +99,15 @@ for wt_path in "${worktree_paths[@]}"; do
     fi
 
     if [ "$JSON_OUTPUT" = "true" ]; then
-        json_entries+=("{\"path\":\"$wt_path\",\"dir\":\"$dir_name\",\"branch\":\"$branch\",\"status\":\"$status\",\"has_pr\":$has_pr,\"has_changes\":$has_changes}")
+        json_entry=$(jq -n \
+            --arg path "$wt_path" \
+            --arg dir "$dir_name" \
+            --arg branch "$branch" \
+            --arg status "$status" \
+            --argjson has_pr "$has_pr" \
+            --argjson has_changes "$has_changes" \
+            '{path: $path, dir: $dir, branch: $branch, status: $status, has_pr: $has_pr, has_changes: $has_changes}')
+        json_entries+=("$json_entry")
     else
         printf "%-40s %-30s %-8s %s\n" "$dir_name" "$branch" "$status" "$details"
     fi
@@ -116,7 +127,7 @@ else
 fi
 
 # Clean stale worktrees if requested
-if [ "$CLEAN" = "true" ] && [ "$stale_count" -gt 0 ]; then
+if [ "$CLEAN" = "true" ] && [ "$stale_count" -gt 0 ] && [ "$JSON_OUTPUT" = "false" ]; then
     echo ""
     echo "Cleaning ${stale_count} stale worktree(s)..."
     for wt_path in "${worktree_paths[@]}"; do
@@ -131,7 +142,7 @@ if [ "$CLEAN" = "true" ] && [ "$stale_count" -gt 0 ]; then
 
         if [ "$has_pr" = "false" ] && [ -z "$changes" ]; then
             echo "  Removing: $branch"
-            python3 ./pinpoint-wt.py remove "$branch" 2>/dev/null || echo "    WARN: Failed to remove $branch"
+            python3 "$REPO_ROOT/pinpoint-wt.py" remove "$branch" 2>/dev/null || echo "    WARN: Failed to remove $branch"
         fi
     done
     echo "Done."
