@@ -157,12 +157,9 @@
   },
   "pnpm": {
     "overrides": {
-      "esbuild": ">=0.25.0"
-    },
-    "auditConfig": {
-      "ignoreCves": [
-        "CVE-2026-26996"
-      ]
+      "esbuild": ">=0.25.0",
+      "minimatch": ">=10.2.1",
+      "webpack": ">=5.104.1"
     }
   },
   "lint-staged": {
