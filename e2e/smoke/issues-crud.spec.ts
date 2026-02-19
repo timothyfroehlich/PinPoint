@@ -237,6 +237,48 @@ test.describe("Issues System", () => {
     });
   });
 
+  test.describe("Watch Issue Opt-in", () => {
+    test("should auto-watch issue by default", async ({ page }) => {
+      const machineInitials = seededMachines.addamsFamily.initials;
+      await page.goto(`/report?machine=${machineInitials}`);
+
+      // Watch checkbox should be visible and checked by default
+      const watchCheckbox = page.getByLabel("Watch this issue");
+      await expect(watchCheckbox).toBeVisible();
+      await expect(watchCheckbox).toBeChecked();
+
+      await fillReportForm(page, { title: "Auto-watched issue" });
+      await page.getByRole("button", { name: "Submit Issue Report" }).click();
+      await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
+      rememberIssueId(page);
+
+      // On detail page, watch button should show "Unwatch" (already watching)
+      await expect(
+        page.getByRole("button", { name: /Unwatch Issue/i })
+      ).toBeVisible();
+    });
+
+    test("should not auto-watch when checkbox is unchecked", async ({
+      page,
+    }) => {
+      const machineInitials = seededMachines.addamsFamily.initials;
+      await page.goto(`/report?machine=${machineInitials}`);
+
+      await fillReportForm(page, {
+        title: "Unwatched issue",
+        watchIssue: false,
+      });
+      await page.getByRole("button", { name: "Submit Issue Report" }).click();
+      await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/);
+      rememberIssueId(page);
+
+      // On detail page, watch button should show "Watch" (not watching)
+      await expect(
+        page.getByRole("button", { name: /^Watch Issue$/i })
+      ).toBeVisible();
+    });
+  });
+
   test.describe("Issues List Pagination", () => {
     test("should have bottom pagination buttons that work", async ({
       page,

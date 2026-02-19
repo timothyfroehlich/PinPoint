@@ -20,19 +20,9 @@ const toOptionalString = (
 
 const toBooleanFromForm = (value: FormDataEntryValue | null): boolean => {
   if (value === null) return true;
-  if (typeof value === "string") {
-    const normalized = value.toLowerCase();
-    if (normalized === "true" || normalized === "on" || normalized === "1") {
-      return true;
-    }
-    if (normalized === "false" || normalized === "off" || normalized === "0") {
-      return false;
-    }
-  }
-  if (typeof value === "boolean") {
-    return value;
-  }
-  return false;
+  if (typeof value !== "string") return false;
+  const normalized = value.toLowerCase();
+  return normalized === "true" || normalized === "on" || normalized === "1";
 };
 
 /**
