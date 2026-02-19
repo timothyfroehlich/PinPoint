@@ -276,9 +276,7 @@ test.describe("Machine Details Redesign", () => {
     // Tournament notes field should be visible with placeholder
     const tourney = page.getByTestId("machine-tournament-notes");
     await expect(tourney).toBeVisible();
-    await expect(tourney).toContainText(
-      /Add tournament notes|Extra ball settings: OFF/
-    );
+    await expect(tourney).toContainText("Add tournament notes");
 
     // Click to edit
     await page.getByTestId("machine-tournament-notes-display").click();
