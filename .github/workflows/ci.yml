@@ -50,6 +50,10 @@ jobs:
               - 'components.json'
               - 'pinpoint-wt.py'
               - '.github/workflows/**'
+              - 'content/**'
+              - 'drizzle.config.ts'
+              - 'mdx-components.tsx'
+              - 'middleware.ts'
               - '.prettierrc*'
               - '.prettierignore'
   # Setup job caches dependencies for reuse by other jobs
