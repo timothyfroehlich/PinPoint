@@ -4,9 +4,6 @@ description: |
   Creates a GitHub Issue with findings.
 
 on:
-  push:
-    branches: [feat/weekly-security-review]
-    paths: [".github/workflows/weekly-security-review.*"]
   schedule: weekly on monday
   workflow_dispatch:
 
