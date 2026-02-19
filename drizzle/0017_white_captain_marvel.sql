@@ -1,3 +1,0 @@
--- SUPERSEDED: This migration was replaced by 0019_flat_toad.sql after
--- merge conflict resolution with main. The journal does not reference
--- this file. It can be safely deleted.
