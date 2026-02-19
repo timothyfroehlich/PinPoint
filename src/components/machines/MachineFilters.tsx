@@ -283,7 +283,7 @@ export function MachineFilters({
             onChange={(val) =>
               pushFilters({ presence: val as MachinePresenceStatus[] })
             }
-            placeholder="Presence"
+            placeholder="Availability"
           />
         </div>
       </div>

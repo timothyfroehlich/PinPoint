@@ -75,7 +75,7 @@ test.describe("Machine Presence Status", () => {
     await page.getByTestId("edit-machine-button").click();
 
     const presenceSelect = page.getByRole("combobox", {
-      name: "Presence Status",
+      name: "Availability",
     });
     await expect(presenceSelect).toBeVisible();
     await presenceSelect.click();
@@ -109,7 +109,7 @@ test.describe("Machine Presence Status", () => {
 
     const presenceFilter = page
       .getByRole("combobox")
-      .filter({ hasText: "Presence" });
+      .filter({ hasText: "Availability" });
     await presenceFilter.click();
     await page.getByRole("option", { name: "On Loan" }).click();
     await page.keyboard.press("Escape");

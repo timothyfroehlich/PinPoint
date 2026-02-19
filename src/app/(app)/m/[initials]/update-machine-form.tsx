@@ -213,10 +213,10 @@ export function EditMachineDialog({
               </p>
             </div>
 
-            {/* Presence Status */}
+            {/* Availability */}
             <div className="space-y-2">
               <Label htmlFor="edit-presence" className="text-on-surface">
-                Presence Status
+                Availability
               </Label>
               <Select
                 name="presenceStatus"
