@@ -120,6 +120,20 @@
       "when": 1771294010903,
       "tag": "0016_citext_email_normalization",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1771463340682,
+      "tag": "0017_fix_rls_user_metadata_prod",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1771473600000,
+      "tag": "0018_restore_public_profiles_view_grant",
+      "breakpoints": true
     }
   ]
 }
