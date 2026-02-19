@@ -109,7 +109,7 @@ conflicts across worktrees and force-push requirements on open PRs.
 
 ### Key Commands
 
-- `pnpm run check` (**RUN OFTEN**): Fast check (types, lint, format, unit tests). ~5s.
+- `pnpm run check` (**RUN OFTEN**): Fast check (types, lint, format, unit tests, yamllint, actionlint, ruff, shellcheck). ~12s.
 - `pnpm run preflight`: Full suite (check + build + integration). **Run before commit.**
 - `pnpm run db:migrate`: Apply schema changes locally.
 - `pnpm run db:backup`: Manual production data dump to `~/.pinpoint/db-backups` (verifies Supabase CLI link matches expected production project).
