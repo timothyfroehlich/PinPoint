@@ -79,6 +79,15 @@ export function useSearchFilters<T extends GenericFilters>(
       if (merged.owner && merged.owner.length > 0)
         params.set("owner", merged.owner.join(","));
 
+      // Machine presence filter
+      if ("presence" in merged && Array.isArray(merged.presence)) {
+        if (merged.presence.length > 0) {
+          params.set("presence", merged.presence.join(","));
+        } else {
+          params.set("presence", "all");
+        }
+      }
+
       // 2. Issue-specific Filters
       if (
         "machine" in merged &&
@@ -120,6 +129,12 @@ export function useSearchFilters<T extends GenericFilters>(
       // Boolean filters
       if ("watching" in merged && merged.watching)
         params.set("watching", "true");
+      if (
+        "includeInactiveMachines" in merged &&
+        merged.includeInactiveMachines
+      ) {
+        params.set("include_inactive_machines", "true");
+      }
 
       // Date range filters
       if ("createdFrom" in merged && merged.createdFrom instanceof Date)

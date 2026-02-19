@@ -11,6 +11,11 @@ import {
   getMachineStatusStyles,
   type IssueForStatus,
 } from "~/lib/machines/status";
+import {
+  getMachinePresenceLabel,
+  getMachinePresenceStyles,
+  isOnTheFloor,
+} from "~/lib/machines/presence";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
@@ -103,6 +108,7 @@ export default async function MachinesPage({
       id: true,
       name: true,
       initials: true,
+      presenceStatus: true,
       createdAt: true,
       ownerId: true,
       invitedOwnerId: true,
@@ -130,12 +136,16 @@ export default async function MachinesPage({
       name: machine.name,
       initials: machine.initials,
       status,
+      presenceStatus: machine.presenceStatus,
       openIssuesCount,
       createdAt: machine.createdAt,
       ownerId: machine.ownerId,
       invitedOwnerId: machine.invitedOwnerId,
     };
   });
+
+  // Default: only show "on the floor" machines unless presence filter is explicitly set.
+  filters.presence ??= ["on_the_floor"];
 
   // Apply filters and sorting
   const filteredMachines = applyMachineFilters(machinesWithStatus, filters);
@@ -235,15 +245,27 @@ export default async function MachinesPage({
                       <CardTitle className="text-xl text-on-surface group-hover:text-primary transition-colors">
                         {machine.name}
                       </CardTitle>
-                      <Badge
-                        data-testid="machine-status-badge"
-                        className={cn(
-                          getMachineStatusStyles(machine.status),
-                          "border px-2.5 py-0.5 text-xs font-semibold rounded-full"
+                      <div className="flex flex-col items-end gap-1.5">
+                        <Badge
+                          data-testid="machine-status-badge"
+                          className={cn(
+                            getMachineStatusStyles(machine.status),
+                            "border px-2.5 py-0.5 text-xs font-semibold rounded-full"
+                          )}
+                        >
+                          {getMachineStatusLabel(machine.status)}
+                        </Badge>
+                        {!isOnTheFloor(machine.presenceStatus) && (
+                          <Badge
+                            className={cn(
+                              getMachinePresenceStyles(machine.presenceStatus),
+                              "border px-2.5 py-0.5 text-xs font-semibold rounded-full"
+                            )}
+                          >
+                            {getMachinePresenceLabel(machine.presenceStatus)}
+                          </Badge>
                         )}
-                      >
-                        {getMachineStatusLabel(machine.status)}
-                      </Badge>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>

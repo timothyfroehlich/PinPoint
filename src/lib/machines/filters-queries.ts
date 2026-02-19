@@ -1,10 +1,12 @@
 import type { MachineFilters, MachineSort, MachineStatus } from "./filters";
+import type { MachinePresenceStatus } from "~/lib/machines/presence";
 
 export interface MachineWithDerivedStatus {
   id: string;
   name: string;
   initials: string;
   status: MachineStatus;
+  presenceStatus: MachinePresenceStatus;
   openIssuesCount: number;
   createdAt: Date | string;
   ownerId?: string | null;
@@ -45,6 +47,11 @@ export function applyMachineFilters(
         (machine.invitedOwnerId != null &&
           filters.owner.includes(machine.invitedOwnerId));
       if (!matchesOwner) return false;
+    }
+
+    // 4. Presence filter
+    if (filters.presence && filters.presence.length > 0) {
+      if (!filters.presence.includes(machine.presenceStatus)) return false;
     }
 
     return true;

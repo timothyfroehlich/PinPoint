@@ -11,6 +11,7 @@ const MOCK_MACHINES: MachineWithDerivedStatus[] = [
     name: "Attack from Mars",
     initials: "AFM",
     status: "operational",
+    presenceStatus: "on_the_floor",
     openIssuesCount: 0,
     createdAt: "2026-01-01T00:00:00Z",
     ownerId: "user-1",
@@ -20,6 +21,7 @@ const MOCK_MACHINES: MachineWithDerivedStatus[] = [
     name: "Twilight Zone",
     initials: "TZ",
     status: "needs_service",
+    presenceStatus: "on_loan",
     openIssuesCount: 2,
     createdAt: "2026-01-10T00:00:00Z",
     ownerId: "user-2",
@@ -29,6 +31,7 @@ const MOCK_MACHINES: MachineWithDerivedStatus[] = [
     name: "Medieval Madness",
     initials: "MM",
     status: "unplayable",
+    presenceStatus: "removed",
     openIssuesCount: 5,
     createdAt: "2026-01-05T00:00:00Z",
     invitedOwnerId: "user-3",
@@ -78,6 +81,24 @@ describe("applyMachineFilters", () => {
   it("returns all when no filters applied", () => {
     const filtered = applyMachineFilters(MOCK_MACHINES, {});
     expect(filtered).toHaveLength(3);
+  });
+
+  it("filters by presence status", () => {
+    const filtered = applyMachineFilters(MOCK_MACHINES, {
+      presence: ["on_the_floor"],
+    });
+
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].initials).toBe("AFM");
+  });
+
+  it("filters by multiple presence statuses", () => {
+    const filtered = applyMachineFilters(MOCK_MACHINES, {
+      presence: ["on_loan", "removed"],
+    });
+
+    expect(filtered).toHaveLength(2);
+    expect(filtered.map((machine) => machine.initials)).toEqual(["TZ", "MM"]);
   });
 });
 

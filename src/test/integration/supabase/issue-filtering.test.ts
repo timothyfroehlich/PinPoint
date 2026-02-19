@@ -16,6 +16,7 @@ describe("Issue Filtering Integration", () => {
   const ISSUE_1_ID = "00000000-0000-0000-0000-0000000000e1";
   const ISSUE_2_ID = "00000000-0000-0000-0000-0000000000e2";
   const ISSUE_3_ID = "00000000-0000-0000-0000-0000000000e3";
+  const ISSUE_4_ID = "00000000-0000-0000-0000-0000000000e4";
 
   beforeEach(async () => {
     const db = await getTestDb();
@@ -54,6 +55,13 @@ describe("Issue Filtering Integration", () => {
         initials: "TZ",
         name: "Twilight Zone",
         ownerId: BOB_ID,
+      },
+      {
+        id: "00000000-0000-0000-0000-0000000000a3",
+        initials: "LON",
+        name: "Loaner Machine",
+        ownerId: ALICE_ID,
+        presenceStatus: "on_loan",
       },
     ]);
 
@@ -99,6 +107,20 @@ describe("Issue Filtering Integration", () => {
         assignedTo: CHARLIE_ID,
         createdAt: new Date("2026-01-03 10:00:00"),
         updatedAt: new Date("2026-01-03 10:00:00"),
+      },
+      {
+        id: ISSUE_4_ID,
+        machineInitials: "LON",
+        issueNumber: 4,
+        title: "Loaned machine note",
+        status: "fixed",
+        severity: "minor",
+        priority: "low",
+        frequency: "intermittent",
+        reportedBy: ALICE_ID,
+        assignedTo: null,
+        createdAt: new Date("2026-01-04 10:00:00"),
+        updatedAt: new Date("2026-01-04 10:00:00"),
       },
     ]);
   });
@@ -210,5 +232,26 @@ describe("Issue Filtering Integration", () => {
     expect(results.map((i) => i.id)).toContain(ISSUE_1_ID);
     expect(results.map((i) => i.id)).toContain(ISSUE_3_ID);
     expect(results.map((i) => i.id)).not.toContain(ISSUE_2_ID);
+  });
+
+  it("excludes issues from inactive machines by default", async () => {
+    const db = await getTestDb();
+    const where = buildWhereConditions({ status: [] }, db);
+    const results = await queryIssues(where);
+
+    expect(results.map((i) => i.id)).not.toContain(ISSUE_4_ID);
+    expect(results).toHaveLength(3);
+  });
+
+  it("includes inactive machine issues when includeInactiveMachines is true", async () => {
+    const db = await getTestDb();
+    const where = buildWhereConditions(
+      { status: [], includeInactiveMachines: true },
+      db
+    );
+    const results = await queryIssues(where);
+
+    expect(results.map((i) => i.id)).toContain(ISSUE_4_ID);
+    expect(results).toHaveLength(4);
   });
 });

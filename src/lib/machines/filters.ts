@@ -1,4 +1,8 @@
 import type { MachineStatus } from "~/lib/machines/status";
+import {
+  type MachinePresenceStatus,
+  VALID_MACHINE_PRESENCE_STATUSES,
+} from "~/lib/machines/presence";
 export type { MachineStatus };
 
 export const VALID_MACHINE_STATUSES: MachineStatus[] = [
@@ -24,6 +28,7 @@ export interface MachineFilters {
   q?: string | undefined;
   status?: MachineStatus[] | undefined;
   owner?: string[] | undefined;
+  presence?: MachinePresenceStatus[] | undefined;
   sort?: MachineSort | undefined;
   page?: number | undefined;
   pageSize?: number | undefined;
@@ -59,6 +64,14 @@ export function parseMachineFilters(params: URLSearchParams): MachineFilters {
   const owner = params.get("owner")?.split(",");
   if (owner) filters.owner = owner;
 
+  const presence = parseCommaList(
+    params.get("presence"),
+    VALID_MACHINE_PRESENCE_STATUSES
+  );
+  if (presence !== undefined) {
+    filters.presence = presence;
+  }
+
   const sort = (params.get("sort") as MachineSort | null) ?? "name_asc";
   filters.sort = VALID_MACHINE_SORTS.includes(sort) ? sort : "name_asc";
 
@@ -74,7 +87,7 @@ export function parseMachineFilters(params: URLSearchParams): MachineFilters {
  * Checks if any machine filters are active in the search params
  */
 export function hasActiveMachineFilters(params: URLSearchParams): boolean {
-  const filterKeys = ["q", "status", "owner"];
+  const filterKeys = ["q", "status", "owner", "presence"];
   return filterKeys.some((key) => {
     const val = params.get(key);
     return val !== null && val.length > 0;

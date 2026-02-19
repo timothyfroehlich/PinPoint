@@ -20,6 +20,7 @@ export interface IssueFilters {
   reporter?: string[] | undefined;
   frequency?: IssueFrequency[] | undefined;
   watching?: boolean | undefined;
+  includeInactiveMachines?: boolean | undefined;
   createdFrom?: Date | undefined;
   createdTo?: Date | undefined;
   updatedFrom?: Date | undefined;
@@ -125,6 +126,11 @@ export function parseIssueFilters(params: URLSearchParams): IssueFilters {
   const watching = params.get("watching");
   if (watching === "true") filters.watching = true;
 
+  const includeInactive = params.get("include_inactive_machines");
+  if (includeInactive === "true") {
+    filters.includeInactiveMachines = true;
+  }
+
   return filters;
 }
 
@@ -143,6 +149,7 @@ export function hasActiveIssueFilters(params: URLSearchParams): boolean {
     "reporter",
     "frequency",
     "watching",
+    "include_inactive_machines",
     "created_from",
     "created_to",
     "updated_from",

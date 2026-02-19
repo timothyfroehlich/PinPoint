@@ -74,6 +74,12 @@ describe("parseIssueFilters", () => {
     const filters = parseIssueFilters(params);
     expect(filters.sort).toBe("updated_desc");
   });
+
+  it("parses include_inactive_machines=true", () => {
+    const params = new URLSearchParams("include_inactive_machines=true");
+    const filters = parseIssueFilters(params);
+    expect(filters.includeInactiveMachines).toBe(true);
+  });
 });
 
 describe("hasActiveIssueFilters", () => {
@@ -94,6 +100,11 @@ describe("hasActiveIssueFilters", () => {
 
   it("returns true when watching filter is set", () => {
     const params = new URLSearchParams("watching=true");
+    expect(hasActiveIssueFilters(params)).toBe(true);
+  });
+
+  it("returns true when include_inactive_machines is set", () => {
+    const params = new URLSearchParams("include_inactive_machines=true");
     expect(hasActiveIssueFilters(params)).toBe(true);
   });
 
