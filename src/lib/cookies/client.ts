@@ -4,6 +4,7 @@ import {
   COOKIE_CONSENT_KEY,
   LAST_ISSUES_PATH_KEY,
   SIDEBAR_COLLAPSED_KEY,
+  CHANGELOG_SEEN_KEY,
   PREFERENCE_MAX_AGE_SECONDS,
 } from "./constants";
 
@@ -33,6 +34,18 @@ export function storeSidebarCollapsed(collapsed: boolean): void {
   setClientCookie(
     SIDEBAR_COLLAPSED_KEY,
     collapsed.toString(),
+    PREFERENCE_MAX_AGE_SECONDS
+  );
+}
+
+/**
+ * Stores the number of changelog entries the user has seen (client-side, synchronous).
+ * Called when the user visits the What's New page to clear the badge.
+ */
+export function storeChangelogSeen(count: number): void {
+  setClientCookie(
+    CHANGELOG_SEEN_KEY,
+    count.toString(),
     PREFERENCE_MAX_AGE_SECONDS
   );
 }

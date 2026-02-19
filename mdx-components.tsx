@@ -8,6 +8,9 @@ type MDXComponents = Record<
 
 export function useMDXComponents(components: MDXComponents): MDXComponents {
   return {
+    h1: ({ children }: React.PropsWithChildren) => (
+      <h1 className="text-xl font-semibold mt-10 first:mt-0">{children}</h1>
+    ),
     h2: ({ children }: React.PropsWithChildren) => (
       <h2 className="text-lg font-semibold mt-8 first:mt-0">{children}</h2>
     ),
@@ -27,6 +30,8 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
         {children}
       </ol>
     ),
+    li: ({ children }: React.PropsWithChildren) => <li>{children}</li>,
+    hr: () => <hr className="my-8 border-border" />,
     strong: ({ children }: React.PropsWithChildren) => (
       <strong className="font-semibold text-foreground">{children}</strong>
     ),

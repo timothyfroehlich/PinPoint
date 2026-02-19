@@ -22,6 +22,7 @@ const nextConfig: NextConfig = {
     resolveAlias: {
       "~/*": "./src/*",
       "@/*": "./src/*",
+      "@content/*": "./content/*",
     },
   },
   images: {

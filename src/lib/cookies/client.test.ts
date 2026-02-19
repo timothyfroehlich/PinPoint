@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   hasCookieConsent,
+  storeChangelogSeen,
   storeCookieConsent,
   storeLastIssuesPath,
   storeSidebarCollapsed,
@@ -149,6 +150,29 @@ describe("client cookie utilities", () => {
       });
 
       expect(hasCookieConsent()).toBe(false);
+    });
+  });
+
+  describe("storeChangelogSeen", () => {
+    it("sets cookie with correct name and numeric value", () => {
+      storeChangelogSeen(42);
+
+      const cookieString = cookieSetter.mock.calls[0][0] as string;
+      expect(cookieString).toContain("changelogSeen=42");
+    });
+
+    it("sets cookie with 1 year max-age", () => {
+      storeChangelogSeen(10);
+
+      const cookieString = cookieSetter.mock.calls[0][0] as string;
+      expect(cookieString).toContain("max-age=31536000");
+    });
+
+    it("sets SameSite=Lax", () => {
+      storeChangelogSeen(10);
+
+      const cookieString = cookieSetter.mock.calls[0][0] as string;
+      expect(cookieString).toContain("SameSite=Lax");
     });
   });
 });

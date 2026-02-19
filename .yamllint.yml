@@ -1,6 +1,10 @@
 # yamllint configuration for GitHub Actions workflows
 extends: default
 
+ignore:
+  # gh-aw compiled workflows are machine-generated and not yamllint-conformant
+  - '.github/workflows/*.lock.yml'
+
 rules:
   # GitHub Actions workflows often have long lines due to nested structure
   line-length:
