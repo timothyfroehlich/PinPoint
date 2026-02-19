@@ -86,7 +86,9 @@ export async function updateUserRole(
       },
       "Failed to update user role"
     );
-    throw new Error("An unexpected error occurred while updating user role");
+    throw new Error("An unexpected error occurred while updating user role", {
+      cause: error,
+    });
   }
 }
 
@@ -219,7 +221,9 @@ export async function inviteUser(
       },
       "Invite user failed"
     );
-    throw new Error("An unexpected error occurred while inviting the user");
+    throw new Error("An unexpected error occurred while inviting the user", {
+      cause: error,
+    });
   }
 }
 
@@ -298,6 +302,8 @@ export async function resendInvite(userId: string): Promise<{ ok: boolean }> {
       },
       "Resend invite failed"
     );
-    throw new Error("An unexpected error occurred while resending the invite");
+    throw new Error("An unexpected error occurred while resending the invite", {
+      cause: error,
+    });
   }
 }

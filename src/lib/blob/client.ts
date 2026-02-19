@@ -73,7 +73,7 @@ export async function uploadToBlob(
       pathname,
     };
     log.error(errorDetails, "Blob upload failed");
-    throw new Error("Failed to upload image to storage");
+    throw new Error("Failed to upload image to storage", { cause: err });
   }
 }
 
