@@ -16,10 +16,48 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Detect which files changed to skip expensive jobs for docs-only changes.
+  # Uses a positive filter (listing code paths) so new directories default to
+  # "skip CI" — a safe failure mode that's easy to notice and fix.
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            code:
+              - 'src/**'
+              - 'e2e/**'
+              - 'drizzle/**'
+              - 'supabase/**'
+              - 'scripts/**'
+              - 'public/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'tsconfig*.json'
+              - 'next.config.*'
+              - 'postcss.config.*'
+              - 'tailwind.config.*'
+              - 'playwright.config.*'
+              - 'vitest.config.*'
+              - 'eslint.config.*'
+              - '.env.*'
+              - 'components.json'
+              - 'pinpoint-wt.py'
+              - '.github/workflows/**'
+              - '.prettierrc*'
+              - '.prettierignore'
   # Setup job caches dependencies for reuse by other jobs
   setup:
     name: Setup Dependencies
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -143,41 +181,44 @@ jobs:
       - name: Check formatting
         run: pnpm run format
 
-  yamllint:
-    name: YAML Lint
+  # Fast linters that always run — cheap enough to never skip.
+  linters:
+    name: Fast Linters
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Install yamllint
+      - name: Install system linters
         run: |
           sudo apt-get update
-          sudo apt-get install -y yamllint
-
-      - name: Run yamllint
-        run: yamllint .github/workflows/
-
-  ruff:
-    name: Ruff (Python Lint + Format)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
+          sudo apt-get install -y yamllint shellcheck
 
       - name: Install Ruff
         run: pipx install ruff
 
-      - name: Run ruff check
+      - name: YAML lint
+        run: yamllint .github/workflows/
+
+      - name: Action lint
+        run: |
+          bash <(curl -sL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          # shellcheck disable=SC2046
+          ./actionlint $(find .github/workflows -name '*.yml' ! -name '*.lock.yml')
+
+      - name: Ruff check
         run: ruff check scripts/ pinpoint-wt.py .agent/skills/*/scripts/*.py
 
-      - name: Run ruff format check
+      - name: Ruff format check
         run: ruff format --check scripts/ pinpoint-wt.py .agent/skills/*/scripts/*.py
+
+      - name: ShellCheck
+        run: find scripts/ .agent/skills/ .devcontainer/ -name '*.sh' -print0 | xargs -0 shellcheck
 
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [setup, typecheck, lint, format, yamllint, ruff, test-unit, test-integration]
+    needs: [setup, typecheck, lint, format, linters, test-unit, test-integration]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -339,8 +380,8 @@ jobs:
       - name: Export Supabase environment
         run: |
           eval "$(supabase status -o env | sed 's/=/=\"/;s/$/\"/')"
-          echo "POSTGRES_URL=${DB_URL}" >> $GITHUB_ENV
-          echo "POSTGRES_URL_NON_POOLING=${DB_URL}" >> $GITHUB_ENV
+          echo "POSTGRES_URL=${DB_URL}" >> "$GITHUB_ENV"
+          echo "POSTGRES_URL_NON_POOLING=${DB_URL}" >> "$GITHUB_ENV"
 
       - name: Apply migrations to fresh database
         run: pnpm run db:migrate
@@ -356,7 +397,7 @@ jobs:
     name: Supabase Integration Tests
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' }}
-    needs: [setup, typecheck, lint, format, yamllint, test-unit, test-integration, test-migrations]
+    needs: [setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -406,7 +447,7 @@ jobs:
     name: E2E Smoke Tests (Chromium)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' }}
-    needs: [setup, typecheck, lint, format, yamllint, test-unit, test-integration, test-migrations]
+    needs: [setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -484,7 +525,7 @@ jobs:
     name: E2E Smoke Tests (Mobile Chrome)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' }}
-    needs: [setup, typecheck, lint, format, yamllint, test-unit, test-integration, test-migrations]
+    needs: [setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
     timeout-minutes: 15
     steps:
       - name: Checkout code
@@ -563,7 +604,7 @@ jobs:
     name: E2E Full Tests (Chromium)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' }}
-    needs: [setup, typecheck, lint, format, yamllint, test-unit, test-integration, test-migrations]
+    needs: [setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -641,7 +682,7 @@ jobs:
     name: E2E Full Tests (Mobile Chrome)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' }}
-    needs: [setup, typecheck, lint, format, yamllint, test-unit, test-integration, test-migrations]
+    needs: [setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -719,7 +760,7 @@ jobs:
     name: E2E Full Tests (Mobile Safari)
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'pull_request' }}
-    needs: [setup, typecheck, lint, format, yamllint, test-unit, test-integration, test-migrations]
+    needs: [setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -807,7 +848,7 @@ jobs:
       - typecheck
       - lint
       - format
-      - yamllint
+      - linters
       - test-unit
       - test-integration
       - test-migrations
