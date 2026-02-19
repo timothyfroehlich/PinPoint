@@ -3,7 +3,7 @@ import typescriptEslint from "@typescript-eslint/eslint-plugin";
 import typescriptParser from "@typescript-eslint/parser";
 import unusedImportsPlugin from "eslint-plugin-unused-imports";
 import promisePlugin from "eslint-plugin-promise";
-import eslintCommentsPlugin from "eslint-plugin-eslint-comments";
+import eslintCommentsPlugin from "@eslint-community/eslint-plugin-eslint-comments";
 
 export default [
   js.configs.recommended,
