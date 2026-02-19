@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/froeht/PinPoint/actions/workflows/ci.yml/badge.svg)](https://github.com/froeht/PinPoint/actions/workflows/ci.yml)
 
-PinPoint is an issue tracker built for the **Austin Pinball Collective**.
+PinPoint is an issue tracker built for the **Austin Pinball Collective**. <!-- CI path-filter test -->
 It helps keep games playable by making it easy to report problems, see what’s broken, and coordinate repairs.
 
 ---
