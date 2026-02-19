@@ -29,7 +29,13 @@ for arg in "$@"; do
 done
 
 # Get all open PR branch names in one API call
-open_branches=$(gh pr list --state open --json headRefName --jq '.[].headRefName' 2>/dev/null) || open_branches=""
+if ! open_branches=$(gh pr list --state open --json headRefName --jq '.[].headRefName' 2>/dev/null); then
+    if [ "$CLEAN" = "true" ]; then
+        echo "ERROR: Cannot fetch open PRs from GitHub. Aborting --clean to prevent accidental removal."
+        exit 1
+    fi
+    open_branches=""
+fi
 
 # Parse worktree list (porcelain format)
 worktree_paths=()
@@ -71,7 +77,7 @@ for wt_path in "${worktree_paths[@]}"; do
 
     # Check if branch has an open PR
     has_pr=false
-    if echo "$open_branches" | grep -qx "$branch" 2>/dev/null; then
+    if echo "$open_branches" | grep -Fqx "$branch" 2>/dev/null; then
         has_pr=true
     fi
 
@@ -134,7 +140,7 @@ if [ "$CLEAN" = "true" ] && [ "$stale_count" -gt 0 ] && [ "$JSON_OUTPUT" = "fals
         branch=$(git -C "$wt_path" rev-parse --abbrev-ref HEAD 2>/dev/null) || continue
 
         has_pr=false
-        if echo "$open_branches" | grep -qx "$branch" 2>/dev/null; then
+        if echo "$open_branches" | grep -Fqx "$branch" 2>/dev/null; then
             has_pr=true
         fi
 

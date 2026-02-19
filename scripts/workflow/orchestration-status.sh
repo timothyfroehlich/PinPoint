@@ -102,7 +102,7 @@ if [ "$SHOW_SECURITY" = "true" ]; then
     if [ -z "$REPO_SLUG" ]; then
         echo "  (could not detect repository)"
     else
-        alerts=$(gh api "repos/${REPO_SLUG}/dependabot/alerts" --jq '
+        if ! alerts=$(gh api "repos/${REPO_SLUG}/dependabot/alerts" --jq '
             [.[] | select(.state == "open")] |
             group_by(.security_vulnerability.severity) |
             map({
@@ -115,7 +115,10 @@ if [ "$SHOW_SECURITY" = "true" ]; then
                 elif .severity == "high" then 1
                 elif .severity == "medium" then 2
                 else 3 end
-            )' 2>/dev/null) || alerts="[]"
+            )' 2>/dev/null); then
+            echo "  WARNING: Could not fetch Dependabot alerts (check gh auth or API access)"
+            alerts="[]"
+        fi
 
         total=$(echo "$alerts" | jq '[.[].count] | add // 0')
 
