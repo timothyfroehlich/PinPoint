@@ -1,12 +1,27 @@
+/**
+ * E2E Tests: Machine Presence Status
+ *
+ * Tests the presence status feature: editing via modal, filtering on
+ * machine list, presence badge on detail page, and issue list filtering.
+ *
+ * Uses serial mode because tests build on shared state (machine created
+ * in first test, presence changed in second, verified in subsequent tests).
+ */
+
 import { test, expect } from "@playwright/test";
 import { ensureLoggedIn } from "../support/actions";
 import { cleanupTestEntities } from "../support/cleanup";
 import { fillReportForm } from "../support/page-helpers";
 import { TEST_USERS } from "../support/constants";
 
+const suffix = Math.random().toString(36).slice(2, 7).toUpperCase();
+const machineInitials = `P${suffix}`.slice(0, 6);
+const machineName = `Presence Test ${suffix}`;
+const issueTitlePrefix = `[presence-${suffix}]`;
+const issueTitle = `${issueTitlePrefix} hidden by inactive machine filter`;
+
 test.describe("Machine Presence Status", () => {
-  let machineInitials: string | undefined;
-  let issueTitlePrefix: string | undefined;
+  test.describe.configure({ mode: "serial" });
 
   test.beforeEach(async ({ page }, testInfo) => {
     await ensureLoggedIn(page, testInfo, {
@@ -15,30 +30,14 @@ test.describe("Machine Presence Status", () => {
     });
   });
 
-  test.afterEach(async ({ request }) => {
-    if (!machineInitials && !issueTitlePrefix) {
-      return;
-    }
-
+  test.afterAll(async ({ request }) => {
     await cleanupTestEntities(request, {
-      machineInitials: machineInitials ? [machineInitials] : [],
+      machineInitials: [machineInitials],
       issueTitlePrefix,
     });
-
-    machineInitials = undefined;
-    issueTitlePrefix = undefined;
   });
 
-  test("filters machines/issues by presence and supports editing presence", async ({
-    page,
-  }) => {
-    const suffix = Math.random().toString(36).slice(2, 7).toUpperCase();
-    machineInitials = `P${suffix}`.slice(0, 6);
-    const machineName = `Presence Test ${suffix}`;
-    issueTitlePrefix = `[presence-${suffix}]`;
-    const issueTitle = `${issueTitlePrefix} hidden by inactive machine filter`;
-
-    // Create a dedicated test machine.
+  test("create test machine and issue for presence tests", async ({ page }) => {
     await page.goto("/m/new");
     await page.getByLabel(/Initials/i).fill(machineInitials);
     await page.getByLabel(/Machine Name/i).fill(machineName);
@@ -48,7 +47,7 @@ test.describe("Machine Presence Status", () => {
       page.getByRole("heading", { name: machineName, exact: true })
     ).toBeVisible();
 
-    // Create an issue while machine is on the floor.
+    // Create an issue while machine is on the floor
     await page.getByTestId("machine-report-issue").click();
     await fillReportForm(page, {
       title: issueTitle,
@@ -57,15 +56,21 @@ test.describe("Machine Presence Status", () => {
     });
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
     await expect(page).toHaveURL(new RegExp(`/m/${machineInitials}/i/\\d+$`));
+  });
 
-    // Baseline: issue is visible in /issues while machine is on the floor.
+  test("issue is visible in issues list while machine is on the floor", async ({
+    page,
+  }) => {
     await page.goto("/issues");
     await page.getByPlaceholder("Search issues...").fill(issueTitle);
     await page.keyboard.press("Enter");
     await page.waitForURL((url) => url.searchParams.get("q") === issueTitle);
     await expect(page.getByRole("row", { name: issueTitle })).toBeVisible();
+  });
 
-    // Update machine presence to On Loan via edit modal.
+  test("edit modal shows presence dropdown and updates status", async ({
+    page,
+  }) => {
     await page.goto(`/m/${machineInitials}`);
     await page.getByTestId("edit-machine-button").click();
 
@@ -80,20 +85,28 @@ test.describe("Machine Presence Status", () => {
     await expect(
       page.getByRole("heading", { name: "Edit Machine" })
     ).toBeHidden();
+  });
 
-    // Machine detail shows presence status badge + inactive banner.
+  test("detail page shows presence badge and inactive banner", async ({
+    page,
+  }) => {
+    await page.goto(`/m/${machineInitials}`);
     await expect(page.getByText("On Loan").first()).toBeVisible();
     await expect(
       page.getByText("This machine is currently on loan.")
     ).toBeVisible();
+  });
 
-    // Machine list default hides non-floor machines.
+  test("machine list hides non-floor machines by default", async ({ page }) => {
     await page.goto("/m");
     await expect(
       page.getByRole("link", { name: new RegExp(machineName, "i") })
     ).not.toBeVisible();
+  });
 
-    // Presence filter reveals non-floor machine.
+  test("presence filter reveals non-floor machines", async ({ page }) => {
+    await page.goto("/m");
+
     const presenceFilter = page
       .getByRole("combobox")
       .filter({ hasText: "Presence" });
@@ -105,8 +118,11 @@ test.describe("Machine Presence Status", () => {
     await expect(
       page.getByRole("link", { name: new RegExp(machineName, "i") })
     ).toBeVisible();
+  });
 
-    // Issues list now excludes this issue by default (inactive machine).
+  test("issues list excludes issues from inactive machines", async ({
+    page,
+  }) => {
     await page.goto("/issues");
     await page.getByPlaceholder("Search issues...").fill(issueTitle);
     await page.keyboard.press("Enter");
