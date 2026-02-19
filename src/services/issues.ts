@@ -40,6 +40,7 @@ export interface CreateIssueParams {
   reporterName?: string | null;
   reporterEmail?: string | null;
   assignedTo?: string | null;
+  autoWatchReporter?: boolean | undefined;
 }
 
 export interface UpdateIssueStatusParams {
@@ -111,6 +112,7 @@ export async function createIssue({
   reporterName,
   reporterEmail,
   assignedTo,
+  autoWatchReporter = true,
 }: CreateIssueParams): Promise<Issue> {
   return await db.transaction(async (tx) => {
     // 1. Lock machine row and get next number (Atomic increment)
@@ -183,7 +185,7 @@ export async function createIssue({
 
     // 4. Auto-Watch Logic
     // Reporter
-    if (reportedBy) {
+    if (autoWatchReporter && reportedBy) {
       await tx
         .insert(issueWatchers)
         .values({ issueId: issue.id, userId: reportedBy })

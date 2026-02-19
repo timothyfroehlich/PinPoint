@@ -88,6 +88,7 @@ export async function submitPublicIssueAction(
     frequency,
     status,
     assignedTo,
+    watchIssue,
   } = parsedValue.data;
 
   // 3. Resolve reporter
@@ -191,6 +192,7 @@ export async function submitPublicIssueAction(
       reporterName,
       reporterEmail,
       assignedTo: finalAssignedTo ?? null,
+      autoWatchReporter: watchIssue,
     });
 
     // 5. Link uploaded images

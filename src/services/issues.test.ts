@@ -156,6 +156,30 @@ describe("Issue Service", () => {
         expect.anything()
       );
     });
+
+    it("skips reporter auto-watch when disabled", async () => {
+      const params = {
+        title: "New Issue",
+        machineInitials: "MM",
+        severity: "minor" as const,
+        reportedBy: "user-1",
+        autoWatchReporter: false,
+      };
+
+      const mockIssue = { id: "issue-new", ...params, issueNumber: 1 };
+      const mockMachineUpdate = {
+        nextIssueNumber: 2,
+        name: "Test Machine",
+        ownerId: "owner-1",
+      };
+
+      mockDb.update.mockReturnValueOnce(mockUpdateReturning(mockMachineUpdate));
+      mockDb.insert.mockReturnValueOnce(mockInsertReturning(mockIssue));
+
+      await createIssue(params);
+
+      expect(mockDb.insert).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("addIssueComment", () => {

@@ -5,6 +5,7 @@ import {
   invitedUsers,
   machines,
   issues,
+  issueWatchers,
 } from "~/server/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import type { User } from "@supabase/supabase-js";
@@ -80,8 +81,9 @@ export async function ensureUserProfile(user: User): Promise<void> {
 
     // Transfer guest issues (by email)
     // Matches SQL: WHERE reporter_email = NEW.email AND reported_by IS NULL AND invited_reported_by IS NULL
+    const issueIdsToWatch = new Set<string>();
     if (user.email) {
-      await db
+      const transferredGuestIssues = await db
         .update(issues)
         .set({
           reportedBy: user.id,
@@ -94,7 +96,9 @@ export async function ensureUserProfile(user: User): Promise<void> {
             isNull(issues.reportedBy),
             isNull(issues.invitedReportedBy)
           )
-        );
+        )
+        .returning({ id: issues.id });
+      transferredGuestIssues.forEach((issue) => issueIdsToWatch.add(issue.id));
     }
 
     // Handle invited users transfer
@@ -114,7 +118,7 @@ export async function ensureUserProfile(user: User): Promise<void> {
           .where(eq(machines.invitedOwnerId, invitedUser.id));
 
         // Transfer issues reported by invited user
-        await db
+        const transferredInvitedIssues = await db
           .update(issues)
           .set({
             reportedBy: user.id,
@@ -122,13 +126,30 @@ export async function ensureUserProfile(user: User): Promise<void> {
             reporterName: null,
             reporterEmail: null,
           })
-          .where(eq(issues.invitedReportedBy, invitedUser.id));
+          .where(eq(issues.invitedReportedBy, invitedUser.id))
+          .returning({ id: issues.id });
 
         // Delete the invited user record
         await db
           .delete(invitedUsers)
           .where(eq(invitedUsers.id, invitedUser.id));
+
+        transferredInvitedIssues.forEach((issue) =>
+          issueIdsToWatch.add(issue.id)
+        );
       }
+    }
+
+    if (issueIdsToWatch.size > 0) {
+      await db
+        .insert(issueWatchers)
+        .values(
+          [...issueIdsToWatch].map((issueId) => ({
+            issueId,
+            userId: user.id,
+          }))
+        )
+        .onConflictDoNothing();
     }
 
     log.info({ userId: user.id }, "User profile auto-healed successfully");

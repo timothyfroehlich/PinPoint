@@ -18,6 +18,23 @@ const toOptionalString = (
   value: FormDataEntryValue | null
 ): string | undefined => (typeof value === "string" ? value : undefined);
 
+const toBooleanFromForm = (value: FormDataEntryValue | null): boolean => {
+  if (value === null) return true;
+  if (typeof value === "string") {
+    const normalized = value.toLowerCase();
+    if (normalized === "true" || normalized === "on" || normalized === "1") {
+      return true;
+    }
+    if (normalized === "false" || normalized === "off" || normalized === "0") {
+      return false;
+    }
+  }
+  if (typeof value === "boolean") {
+    return value;
+  }
+  return false;
+};
+
 /**
  * Extracts and validates public issue form data.
  *
@@ -39,6 +56,7 @@ export function parsePublicIssueForm(
     frequency: toOptionalString(formData.get("frequency")),
     status: toOptionalString(formData.get("status")),
     assignedTo: toOptionalString(formData.get("assignedTo")),
+    watchIssue: toBooleanFromForm(formData.get("watchIssue")),
   };
 
   const validation = publicIssueSchema.safeParse(rawData);
