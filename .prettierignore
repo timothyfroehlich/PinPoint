@@ -33,3 +33,6 @@ coverage/
 
 # Claude
 .claude/
+
+# Beads (issue tracker database)
+.beads/

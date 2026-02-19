@@ -26,7 +26,7 @@ while true; do
     current_time=$(date +%s)
     elapsed=$((current_time - start_time))
 
-    if [ $elapsed -gt $TIMEOUT_SECONDS ]; then
+    if [ "$elapsed" -gt "$TIMEOUT_SECONDS" ]; then
         echo ""
         echo "⏱️  Timeout after ${elapsed}s"
         echo "Some checks may still be running."

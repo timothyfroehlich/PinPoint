@@ -53,6 +53,7 @@ for pr in $PRS; do
     fi
 
     # Copilot comments (unresolved threads only)
+    # shellcheck disable=SC2016
     copilot_count=$(gh api graphql -f query="
       {
         repository(owner: \"timothyfroehlich\", name: \"PinPoint\") {

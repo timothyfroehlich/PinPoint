@@ -88,7 +88,7 @@ export async function createNotification(
   let resolvedFormattedIssueId = formattedIssueId;
 
   if (type === "new_issue") {
-    let machineId: string | null = null;
+    let machineId: string | null;
 
     // Resolve machineId and metadata
     if (resourceType === "issue") {

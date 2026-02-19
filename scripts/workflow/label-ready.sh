@@ -74,6 +74,7 @@ fi
 echo "CI: All checks passed."
 
 # Check Copilot comments (unresolved threads only via GraphQL)
+# shellcheck disable=SC2016
 copilot_count=$(gh api graphql -f query="
   {
     repository(owner: \"timothyfroehlich\", name: \"PinPoint\") {

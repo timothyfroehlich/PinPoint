@@ -59,6 +59,7 @@ export async function uploadToBlob(
       pathname,
       contentType: file.type,
       contentDisposition: `inline; filename="${file.name}"`,
+      etag: "mock-etag",
     };
   }
 
@@ -73,7 +74,7 @@ export async function uploadToBlob(
       pathname,
     };
     log.error(errorDetails, "Blob upload failed");
-    throw new Error("Failed to upload image to storage");
+    throw new Error("Failed to upload image to storage", { cause: err });
   }
 }
 

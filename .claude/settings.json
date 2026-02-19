@@ -200,6 +200,8 @@
       "Bash(gh pr create:*)",
       "Bash(fd:*)",
       "Bash(jq:*)",
+      "Bash(actionlint:*)",
+      "Bash(shellcheck:*)",
       "Bash(yamllint:*)",
       "Bash(md5sum:*)",
       "Bash(node --version)",

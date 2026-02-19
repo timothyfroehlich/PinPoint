@@ -18,6 +18,7 @@ Port Allocation:
 
 import argparse
 import hashlib
+import os
 import re
 import stat
 import subprocess
@@ -375,6 +376,14 @@ def cmd_create(args: argparse.Namespace) -> int:
     if result.returncode != 0:
         print(f"  ⚠️  Warning: pnpm install failed: {result.stderr[:200]}")
 
+    # Set up beads redirect (so `bd` commands work from this worktree)
+    beads_dir = worktree_dir / ".beads"
+    beads_dir.mkdir(exist_ok=True)
+    main_beads = repo_root / ".beads"
+    rel_path = os.path.relpath(main_beads, worktree_dir)
+    (beads_dir / "redirect").write_text(rel_path + "\n")
+    print("  📋 Beads redirect configured")
+
     print()
     print("✅ Ephemeral worktree created successfully!")
     print()
@@ -590,6 +599,17 @@ def cmd_sync(args: argparse.Namespace) -> int:
             )
         except Exception as e:
             print(f"    ❌ .env.local: {e}")
+
+        # Ensure beads redirect exists for non-main worktrees
+        main_beads = Path.cwd() / ".beads"
+        wt_beads = path / ".beads"
+        if main_beads.is_dir() and not (wt_beads / "dolt").exists():
+            wt_beads.mkdir(exist_ok=True)
+            redirect_file = wt_beads / "redirect"
+            if not redirect_file.exists():
+                rel_path = os.path.relpath(main_beads, path)
+                redirect_file.write_text(rel_path + "\n")
+                print("    📋 Beads redirect configured")
 
     print()
     print("✅ Sync complete!")

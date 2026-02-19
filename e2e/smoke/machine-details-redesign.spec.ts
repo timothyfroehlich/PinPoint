@@ -273,17 +273,19 @@ test.describe("Machine Details Redesign", () => {
     // Member owns Slick Chick (SC)
     await page.goto(`/m/${seededMachines.slickChick.initials}`);
 
-    // Tournament notes field should be visible with placeholder
+    // Tournament notes field should be visible. Do not assert placeholder text:
+    // this suite runs Chromium and Mobile Chrome against the same DB and prior
+    // tests may have already populated notes.
     const tourney = page.getByTestId("machine-tournament-notes");
     await expect(tourney).toBeVisible();
-    await expect(tourney).toContainText("Add tournament notes");
 
     // Click to edit
     await page.getByTestId("machine-tournament-notes-display").click();
 
     // Fill in
     const textarea = page.getByTestId("machine-tournament-notes-textarea");
-    await textarea.fill("Extra ball settings: OFF");
+    const tournamentNotes = `Extra ball settings: OFF (${Date.now()})`;
+    await textarea.fill(tournamentNotes);
 
     // Save
     await page.getByTestId("machine-tournament-notes-save").click();
@@ -291,6 +293,6 @@ test.describe("Machine Details Redesign", () => {
     // Verify
     await expect(
       page.getByTestId("machine-tournament-notes-display")
-    ).toContainText("Extra ball settings: OFF");
+    ).toContainText(tournamentNotes);
   });
 });
