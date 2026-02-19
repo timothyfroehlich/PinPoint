@@ -20,7 +20,7 @@ import {
   createTestMachine,
   createTestIssue,
 } from "~/test/helpers/factories";
-import { anonymizeUserReferences } from "~/app/(app)/settings/actions";
+import { anonymizeUserReferences } from "~/app/(app)/settings/account-deletion";
 import { randomUUID } from "node:crypto";
 
 describe("Account Deletion Anonymization (PGlite)", () => {
