@@ -246,7 +246,7 @@ export function MachineFilters({
                   q: undefined,
                   status: [],
                   owner: [],
-                  presence: [],
+                  presence: undefined,
                   sort: "name_asc",
                 });
               }}

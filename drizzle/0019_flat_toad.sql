@@ -1,0 +1,1 @@
+ALTER TABLE "machines" ADD COLUMN "presence_status" text DEFAULT 'on_the_floor' NOT NULL;

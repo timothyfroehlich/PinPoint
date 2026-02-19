@@ -1,1 +1,3 @@
-ALTER TABLE "machines" ADD COLUMN "presence_status" text DEFAULT 'on_the_floor' NOT NULL;
+-- SUPERSEDED: This migration was replaced by 0019_flat_toad.sql after
+-- merge conflict resolution with main. The journal does not reference
+-- this file. It can be safely deleted.
