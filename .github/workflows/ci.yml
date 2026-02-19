@@ -882,3 +882,43 @@ jobs:
 
       - name: Run pnpm audit
         run: pnpm audit --audit-level=high
+
+  ci-gate:
+    name: CI Gate
+    if: always()
+    needs:
+      - linters
+      - gitleaks
+      - build
+      - lint
+      - format
+      - typecheck
+      - test-unit
+      - test-integration
+      - test-migrations
+      - test-integration-supabase
+      - test-e2e-smoke
+      - test-e2e-smoke-mobile-chrome
+      - test-e2e-full-chromium
+      - test-e2e-full-mobile-chrome
+      - test-e2e-full-mobile-safari
+      - pnpm-audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check required job results
+        run: |
+          results=("${{ needs.linters.result }}" "${{ needs.gitleaks.result }}" \
+                   "${{ needs.build.result }}" "${{ needs.lint.result }}" \
+                   "${{ needs.format.result }}" "${{ needs.typecheck.result }}" \
+                   "${{ needs.test-unit.result }}" "${{ needs.test-integration.result }}" \
+                   "${{ needs.test-migrations.result }}" "${{ needs.test-integration-supabase.result }}" \
+                   "${{ needs.test-e2e-smoke.result }}" "${{ needs.test-e2e-smoke-mobile-chrome.result }}" \
+                   "${{ needs.test-e2e-full-chromium.result }}" "${{ needs.test-e2e-full-mobile-chrome.result }}" \
+                   "${{ needs.test-e2e-full-mobile-safari.result }}" "${{ needs.pnpm-audit.result }}")
+          for r in "${results[@]}"; do
+            if [[ "$r" == "failure" || "$r" == "cancelled" ]]; then
+              echo "::error::One or more required jobs failed or were cancelled"
+              exit 1
+            fi
+          done
+          echo "All required jobs passed or were skipped"
