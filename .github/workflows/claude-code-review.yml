@@ -16,7 +16,9 @@ concurrency:
 jobs:
   claude-review:
     # Only run when the 'claude-review' label is present
-    if: contains(github.event.pull_request.labels.*.name, 'claude-review')
+    if: |
+      contains(github.event.pull_request.labels.*.name, 'claude-review') &&
+      github.event.pull_request.head.repo.fork == false
 
     runs-on: ubuntu-latest
     permissions:
