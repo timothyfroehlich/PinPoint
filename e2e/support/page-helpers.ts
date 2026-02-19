@@ -98,5 +98,7 @@ export async function fillReportForm(
   await selectOption(page, "issue-frequency-select", frequency);
 
   const watchToggle = page.getByLabel("Watch this issue");
-  await watchToggle.setChecked(watchIssue);
+  if ((await watchToggle.count()) > 0) {
+    await watchToggle.setChecked(watchIssue);
+  }
 }

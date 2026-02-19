@@ -495,34 +495,36 @@ export function UnifiedReportForm({
                   </div>
                 )}
 
-                <div className="space-y-2 rounded-lg border border-outline-variant/30 bg-surface-container-low p-3">
-                  <div className="flex items-start gap-3">
-                    <Checkbox
-                      id="watchIssue"
-                      checked={watchIssue}
-                      onCheckedChange={(checked) =>
-                        setWatchIssue(checked === true)
-                      }
-                      className="mt-0.5 border-outline-variant data-[state=checked]:border-primary"
-                    />
-                    <div className="space-y-1">
-                      <Label
-                        htmlFor="watchIssue"
-                        className="text-sm font-medium text-on-surface"
-                      >
-                        Watch this issue
-                      </Label>
-                      <p className="text-xs text-on-surface-variant">
-                        Get updates when status or comments change.
-                      </p>
+                {userAuthenticated && (
+                  <div className="space-y-2 rounded-lg border border-outline-variant/30 bg-surface-container-low p-3">
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        id="watchIssue"
+                        checked={watchIssue}
+                        onCheckedChange={(checked) =>
+                          setWatchIssue(checked === true)
+                        }
+                        className="mt-0.5 border-outline-variant data-[state=checked]:border-primary"
+                      />
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor="watchIssue"
+                          className="text-sm font-medium text-on-surface"
+                        >
+                          Watch this issue
+                        </Label>
+                        <p className="text-xs text-on-surface-variant">
+                          Get updates when status or comments change.
+                        </p>
+                      </div>
                     </div>
+                    <input
+                      type="hidden"
+                      name="watchIssue"
+                      value={watchIssue ? "true" : "false"}
+                    />
                   </div>
-                  <input
-                    type="hidden"
-                    name="watchIssue"
-                    value={watchIssue ? "true" : "false"}
-                  />
-                </div>
+                )}
 
                 <input
                   type="hidden"

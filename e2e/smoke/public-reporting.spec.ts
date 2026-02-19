@@ -40,7 +40,6 @@ test.describe("Public Issue Reporting", () => {
       title: issueTitle,
       description: "Playfield gets stuck during multiball.",
       includePriority: false,
-      watchIssue: false,
     });
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
