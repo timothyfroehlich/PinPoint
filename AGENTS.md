@@ -28,17 +28,19 @@
 **YOU MUST LOAD RELEVANT SKILLS FOR EVERY TASK.**
 If your tool does not support skills, read the file path directly.
 
-| Category       | Skill Name              | Path                                            | When to Use                                                              |
-| :------------- | :---------------------- | :---------------------------------------------- | :----------------------------------------------------------------------- |
-| **UI**         | `pinpoint-ui`           | `.agent/skills/pinpoint-ui/SKILL.md`            | Components, shadcn/ui, forms, responsive design.                         |
-| **TypeScript** | `pinpoint-typescript`   | `.agent/skills/pinpoint-typescript/SKILL.md`    | Type errors, generics, strict mode, Drizzle types.                       |
-| **Testing**    | `pinpoint-testing`      | `.agent/skills/pinpoint-testing/SKILL.md`       | Writing tests, PGlite setup, Playwright.                                 |
-| **Testing**    | `pinpoint-e2e`          | `.agent/skills/pinpoint-e2e/SKILL.md`           | E2E tests, worker isolation, stability patterns.                         |
-| **Security**   | `pinpoint-security`     | `.agent/skills/pinpoint-security/SKILL.md`      | Auth flows, CSP, Zod validation, Supabase SSR.                           |
-| **Patterns**   | `pinpoint-patterns`     | `.agent/skills/pinpoint-patterns/SKILL.md`      | Server Actions, architecture, data fetching.                             |
-| **Workflow**   | `pinpoint-commit`       | `.agent/skills/pinpoint-commit/SKILL.md`        | Intelligent commit-to-PR workflow and CI monitoring.                     |
-| **Workflow**   | `github-monitor`        | `.agent/skills/github-monitor/SKILL.md`         | Monitoring GitHub Actions and build status.                              |
-| **Workflow**   | `pinpoint-orchestrator` | `.claude/skills/pinpoint-orchestrator/SKILL.md` | Parallel subagent work in worktrees (background agents or Claude Teams). |
+| Category       | Skill Name                       | Path                                                     | When to Use                                                              |
+| :------------- | :------------------------------- | :------------------------------------------------------- | :----------------------------------------------------------------------- |
+| **UI**         | `pinpoint-ui`                    | `.agent/skills/pinpoint-ui/SKILL.md`                     | Components, shadcn/ui, forms, responsive design.                         |
+| **TypeScript** | `pinpoint-typescript`            | `.agent/skills/pinpoint-typescript/SKILL.md`             | Type errors, generics, strict mode, Drizzle types.                       |
+| **Testing**    | `pinpoint-testing`               | `.agent/skills/pinpoint-testing/SKILL.md`                | Writing tests, PGlite setup, Playwright.                                 |
+| **Testing**    | `pinpoint-e2e`                   | `.agent/skills/pinpoint-e2e/SKILL.md`                    | E2E tests, worker isolation, stability patterns.                         |
+| **Security**   | `pinpoint-security`              | `.agent/skills/pinpoint-security/SKILL.md`               | Auth flows, CSP, Zod validation, Supabase SSR.                           |
+| **Patterns**   | `pinpoint-patterns`              | `.agent/skills/pinpoint-patterns/SKILL.md`               | Server Actions, architecture, data fetching.                             |
+| **Workflow**   | `pinpoint-commit`                | `.agent/skills/pinpoint-commit/SKILL.md`                 | Intelligent commit-to-PR workflow and CI monitoring.                     |
+| **Workflow**   | `pinpoint-github-monitor`        | `.agent/skills/pinpoint-github-monitor/SKILL.md`         | Monitoring GitHub Actions and build status.                              |
+| **Workflow**   | `pinpoint-orchestrator`          | `.claude/skills/pinpoint-orchestrator/SKILL.md`          | Parallel subagent work in worktrees (background agents or Claude Teams). |
+| **Workflow**   | `pinpoint-dispatch-e2e-teammate` | `.claude/skills/pinpoint-dispatch-e2e-teammate/SKILL.md` | Dispatching a teammate end-to-end (worktree + contract + prompt).        |
+| **Workflow**   | `pinpoint-teammate-guide`        | `.claude/skills/pinpoint-teammate-guide/SKILL.md`        | For dispatched teammates: environment, contract, Copilot loop, CI.       |
 
 ## 4. Environment & Workflow
 
@@ -106,6 +108,15 @@ conflicts across worktrees and force-push requirements on open PRs.
 - **NEVER use `--no-verify`** without explicit user permission
 - This flag bypasses pre-commit hooks (lint, format, type checks)
 - Only use when user explicitly requests it
+- Never add `gh pr merge` or broad wildcard tool patterns without explicit user approval.
+
+### CI Workflow
+
+- When investigating CI failures, check for merge conflicts FIRST:
+  `gh pr view <PR> --json mergeable`. A dirty mergeable state blocks all CI.
+- Never push directly to protected branches (main). Always use a feature branch.
+- After code changes, run `pnpm run preflight` before considering work complete.
+  For trivial changes (comments, docs), `pnpm run check` is sufficient.
 
 ### Key Commands
 
@@ -116,6 +127,12 @@ conflicts across worktrees and force-push requirements on open PRs.
 - `pnpm run db:seed:from-prod`: Reset local DB and seed from the latest production backup.
 - `pnpm run e2e:full`: Full E2E suite (Don't run Safari locally on Linux).
 - `ruff check <file> && ruff format <file>`: Lint and format Python files (`pinpoint-wt.py`, scripts). Ruff is installed globally — no venv needed.
+
+### Testing After Refactors
+
+- After any refactor, verify that test mocks reflect the new code structure
+  (transaction wrappers, changed defaults, new parameters).
+- Update test fixtures and seed data proactively rather than waiting for CI to fail.
 
 ### Safe Command Patterns
 
@@ -211,35 +228,26 @@ bash scripts/workflow/respond-to-copilot.sh <PR> <path:line> <msg>  # Reply + re
 
 For multiple independent tasks (UI fixes, Copilot feedback, parallel features), use worktree-isolated subagents.
 
-**When to Use**:
+**Coordination**: Built-in **Agent Teams** is the primary mechanism. Use `TeamCreate`, spawn teammates with the `Task` tool (with `team_name`), and coordinate via `SendMessage`/`TaskUpdate`. Fall back to background subagents (`run_in_background: true`) if Agent Teams is unreliable.
 
-- 2+ independent beads issues ready to work
-- Copilot review feedback on multiple PRs
-- Parallel feature development
+**Quality Enforcement**: Automatic via Claude Code hooks:
 
-**Permission Requirements**:
-Worktree permissions must be in `.claude/settings.json`:
+- `TaskCompleted` hook → runs `pnpm run check` before allowing task completion
+- `TeammateIdle` hook → blocks idle if unpushed commits or uncommitted changes exist
 
-```json
-"Read(//home/froeht/Code/pinpoint-worktrees/**)",
-"Glob(//home/froeht/Code/pinpoint-worktrees/**)",
-"Edit(//home/froeht/Code/pinpoint-worktrees/**)",
-"Write(//home/froeht/Code/pinpoint-worktrees/**)"
-```
+**Worktree Creation**: Always use `pinpoint-wt.py` (not built-in `isolation: "worktree"`) — it handles port allocation and Supabase isolation.
 
 **Workflow**:
 
 1. Create worktrees: `./pinpoint-wt.py create <branch>` for each task
-2. Dispatch subagents with full worktree paths in prompts
-3. Monitor: `gh pr checks`, Copilot comments
+2. Dispatch subagents/teammates with full absolute worktree paths in prompts
+3. Monitor: `bash scripts/workflow/pr-dashboard.sh`, Copilot comments
 4. Clean up: `./pinpoint-wt.py remove <branch>`
-
-**Critical**: Agent prompts must include the full worktree path and instruct agents to work ONLY in that path. Agents inherit the parent session's cwd - they will NOT cd into worktrees on their own.
 
 **Anti-patterns**:
 
-- DON'T spawn agents from parent dir with `cd /path/to/worktree` instructions
-- DON'T assume agents will respect directory instructions without explicit paths
+- DON'T use built-in `isolation: "worktree"` — it doesn't set up ports or Supabase config
+- DON'T spawn agents without absolute worktree paths — they inherit parent cwd
 - DON'T forget to check Copilot comments before merging
 
 See `pinpoint-orchestrator` skill for the full workflow.
@@ -254,21 +262,21 @@ See `pinpoint-orchestrator` skill for the full workflow.
 
 **When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
 
+> **Note**: The `TeammateIdle` hook now enforces push-before-idle automatically for teammates.
+> The manual checklist below applies to the lead agent and solo sessions.
+
 **MANDATORY WORKFLOW:**
 
 1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
+2. **Update issue status** - Close finished work, update in-progress items
+3. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
    git pull --rebase
    bd sync
    git push
    git status  # MUST show "up to date with origin"
    ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
+4. **Hand off** - Provide context for next session
 
 **CRITICAL RULES:**
 

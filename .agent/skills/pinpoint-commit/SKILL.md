@@ -562,6 +562,28 @@ Some checks still running.
 View: gh pr checks <pr-number>
 ```
 
+### 6.2 Address Copilot Comments (if any)
+
+After CI completes, check for Copilot review comments:
+
+```bash
+bash scripts/workflow/copilot-comments.sh <PR>
+```
+
+If comments exist, address each one and resolve the thread:
+
+```bash
+bash scripts/workflow/respond-to-copilot.sh <PR> "<path>:<line>" "Fixed: <description>. —Claude"
+```
+
+### 6.3 Label Ready for Review
+
+Once CI is green and Copilot comments are resolved:
+
+```bash
+bash scripts/workflow/label-ready.sh <PR>
+```
+
 ---
 
 ## Final Summary

@@ -1,0 +1,25 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+set -e
+
+# Args: previous HEAD, new HEAD, branch flag (1=branch change, 0=file checkout)
+BRANCH_CHECKOUT=$3
+
+if [ "$BRANCH_CHECKOUT" = "1" ]; then
+  # Only sync if we're in a pinpoint worktree with a config template
+  if [ -f "supabase/config.toml.template" ]; then
+    # Find pinpoint-wt.py relative to repo root
+    REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || true)
+    WT_SCRIPT="$REPO_ROOT/pinpoint-wt.py"
+
+    # For worktrees, the script lives in the main repo
+    if [ ! -f "$WT_SCRIPT" ]; then
+      MAIN_WT=$(git worktree list --porcelain | head -1 | sed 's/^worktree //')
+      WT_SCRIPT="$MAIN_WT/pinpoint-wt.py"
+    fi
+
+    if [ -f "$WT_SCRIPT" ]; then
+      python3 "$WT_SCRIPT" sync 2>/dev/null || true
+    fi
+  fi
+fi

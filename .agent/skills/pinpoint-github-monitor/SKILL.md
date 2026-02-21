@@ -1,11 +1,22 @@
 ---
-name: github-monitor
+name: pinpoint-github-monitor
 description: Monitor GitHub Actions, watch builds, and automatically transition to debugging on failure. Use when user says "monitor github actions", "watch builds", or "check actions".
 ---
 
 # GitHub Actions Monitor Skill
 
 Use this skill whenever you are asked to "monitor the github actions" or "watch the builds".
+
+## 0. Pre-Check: Merge Conflicts
+
+Before investigating CI failures, ALWAYS check merge status first:
+
+```bash
+gh pr view <PR> --json mergeable --jq '.mergeable'
+```
+
+If the result is `CONFLICTING`, resolve merge conflicts before investigating other
+failures. A dirty merge state blocks all CI checks and wastes debugging time.
 
 ## 1. Environment Detection & Strategy
 
