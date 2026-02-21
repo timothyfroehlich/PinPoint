@@ -1,5 +1,5 @@
 ---
-name: pinpoint-ui
+name: tmf-ui
 description: shadcn/ui patterns, progressive enhancement, Server Components, Client Components, form handling, Tailwind CSS v4, accessibility. Use when building UI, forms, components, or when user mentions UI/styling/components/forms.
 ---
 

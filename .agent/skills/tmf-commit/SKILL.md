@@ -1,5 +1,5 @@
 ---
-name: pinpoint-commit
+name: tmf-commit
 description: Comprehensive commit-to-PR workflow with intelligent testing, branch management, and CI monitoring
 ---
 

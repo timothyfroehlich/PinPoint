@@ -1,5 +1,5 @@
 ---
-name: github-monitor
+name: tmf-github-monitor
 description: Monitor GitHub Actions, watch builds, and automatically transition to debugging on failure. Use when user says "monitor github actions", "watch builds", or "check actions".
 ---
 

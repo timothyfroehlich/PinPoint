@@ -1,5 +1,5 @@
 ---
-name: pinpoint-testing
+name: tmf-testing
 description: Testing strategy, test pyramid (70% unit/25% integration/5% E2E), PGlite patterns, Playwright best practices. Use when writing tests, debugging test failures, or when user mentions testing/test/spec/E2E.
 ---
 

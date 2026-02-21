@@ -1,5 +1,5 @@
 ---
-name: pinpoint-orchestrator
+name: tmf-orchestrator
 description: Orchestrate parallel subagent work in git worktrees using built-in Agent Teams (primary) or background agents (fallback).
 ---
 
@@ -43,7 +43,7 @@ bash scripts/workflow/label-ready.sh <PR> --dry-run         # Preview without ac
 
 # CI watching
 bash scripts/workflow/monitor-gh-actions.sh                 # Watch all active CI runs in parallel, report failures
-bash .agent/skills/pinpoint-commit/scripts/watch-ci.sh <PR> [timeout]  # Poll single PR CI (default 10min)
+bash .agent/skills/tmf-commit/scripts/watch-ci.sh <PR> [timeout]  # Poll single PR CI (default 10min)
 
 # Worktree health
 bash scripts/workflow/stale-worktrees.sh                    # Report stale/active/dirty worktrees
