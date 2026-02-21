@@ -10,6 +10,7 @@ import {
 import { eq, and, isNull } from "drizzle-orm";
 import type { User } from "@supabase/supabase-js";
 import { log } from "~/lib/logger";
+import type { UserRole } from "~/lib/types";
 
 /**
  * Ensures a user profile exists in the database.
@@ -45,7 +46,7 @@ export async function ensureUserProfile(user: User): Promise<void> {
 
     // Check for existing invited user to inherit role
     // Default to "guest" for non-invited signups (least-privilege)
-    let role: "member" | "admin" | "guest" = "guest";
+    let role: UserRole = "guest";
     if (user.email) {
       const invitedUser = await db.query.invitedUsers.findFirst({
         where: eq(invitedUsers.email, user.email.toLowerCase()),

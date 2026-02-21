@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const updateUserRoleSchema = z.object({
   userId: z.string().uuid(),
-  newRole: z.enum(["guest", "member", "admin"]),
+  newRole: z.enum(["guest", "member", "technician", "admin"]),
   userType: z.enum(["active", "invited"]),
 });
 
@@ -21,6 +21,6 @@ export const inviteUserSchema = z.object({
     .max(254, "Email is too long")
     .trim()
     .toLowerCase(),
-  role: z.enum(["guest", "member"]), // Explicitly exclude "admin"
+  role: z.enum(["guest", "member", "technician"]), // Explicitly exclude "admin"
   sendInvite: z.boolean().optional(),
 });

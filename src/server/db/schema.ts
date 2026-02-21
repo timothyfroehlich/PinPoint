@@ -41,26 +41,35 @@ export const authUsers = authSchema.table("users", {
  * Note: Drizzle doesn't support cross-schema references, so the FK constraint
  * is created manually in supabase/seed.sql (user_profiles.id -> auth.users.id).
  */
-export const userProfiles = pgTable("user_profiles", {
-  id: uuid("id").primaryKey(),
-  email: citext("email").notNull().unique(),
-  firstName: text("first_name").notNull(),
-  lastName: text("last_name").notNull(),
-  name: text("name")
-    .generatedAlwaysAs(sql`first_name || ' ' || last_name`)
-    .notNull(),
-  avatarUrl: text("avatar_url"),
-  role: text("role", { enum: ["guest", "member", "admin"] })
-    .notNull()
-    .default("guest"), // Default for new signups (no invitation)
-  termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const userProfiles = pgTable(
+  "user_profiles",
+  {
+    id: uuid("id").primaryKey(),
+    email: citext("email").notNull().unique(),
+    firstName: text("first_name").notNull(),
+    lastName: text("last_name").notNull(),
+    name: text("name")
+      .generatedAlwaysAs(sql`first_name || ' ' || last_name`)
+      .notNull(),
+    avatarUrl: text("avatar_url"),
+    role: text("role", { enum: ["guest", "member", "technician", "admin"] })
+      .notNull()
+      .default("guest"), // Default for new signups (no invitation)
+    termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (_t) => ({
+    roleCheck: check(
+      "user_profiles_role_check",
+      sql`role IN ('guest', 'member', 'technician', 'admin')`
+    ),
+  })
+);
 
 /**
  * Invited Users Table
@@ -68,22 +77,31 @@ export const userProfiles = pgTable("user_profiles", {
  * Tracks users who have been invited to join the platform but haven't signed up yet.
  * Linked to user_profiles automatically on signup via database trigger.
  */
-export const invitedUsers = pgTable("invited_users", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  firstName: text("first_name").notNull(),
-  lastName: text("last_name").notNull(),
-  name: text("name")
-    .generatedAlwaysAs(sql`first_name || ' ' || last_name`)
-    .notNull(),
-  email: citext("email").notNull().unique(),
-  role: text("role", { enum: ["guest", "member", "admin"] })
-    .notNull()
-    .default("member"), // Default for invited users (trusted)
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  inviteSentAt: timestamp("invite_sent_at", { withTimezone: true }),
-});
+export const invitedUsers = pgTable(
+  "invited_users",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    firstName: text("first_name").notNull(),
+    lastName: text("last_name").notNull(),
+    name: text("name")
+      .generatedAlwaysAs(sql`first_name || ' ' || last_name`)
+      .notNull(),
+    email: citext("email").notNull().unique(),
+    role: text("role", { enum: ["guest", "member", "technician", "admin"] })
+      .notNull()
+      .default("member"), // Default for invited users (trusted)
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    inviteSentAt: timestamp("invite_sent_at", { withTimezone: true }),
+  },
+  (_t) => ({
+    roleCheck: check(
+      "invited_users_role_check",
+      sql`role IN ('guest', 'member', 'technician', 'admin')`
+    ),
+  })
+);
 
 /**
  * Machines Table

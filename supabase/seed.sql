@@ -120,7 +120,7 @@ CREATE TRIGGER on_auth_user_created
 
 -- Add helpful comments
 COMMENT ON FUNCTION public.handle_new_user() IS
-  'Automatically creates a user_profile and notification_preferences when a new user signs up via Supabase Auth. Works for both email/password and OAuth (Google, GitHub). Also transfers guest issues (by reporter_email) and handles legacy invited_users cleanup by transferring their machines/issues and removing the invited_users record. Non-invited signups default to guest role.';
+  'Automatically creates a user_profile and notification_preferences when a new user signs up via Supabase Auth. Works for both email/password and OAuth (Google, GitHub). Also transfers guest issues (by reporter_email) and handles legacy invited_users cleanup by transferring their machines/issues and removing the invited_users record. Non-invited signups default to guest role. Invited users inherit their role (guest, member, technician, or admin).';
 
 COMMENT ON CONSTRAINT user_profiles_id_fkey ON public.user_profiles IS
   'Foreign key constraint to auth.users. Ensures user_profiles.id always references a valid auth.users.id. CASCADE delete removes profile when auth user is deleted.';

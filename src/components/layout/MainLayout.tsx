@@ -52,7 +52,7 @@ export async function MainLayout({
 
   let enrichedNotifications: EnrichedNotification[] = [];
   let userProfile:
-    | { name: string; role: "guest" | "member" | "admin" }
+    | { name: string; role: "guest" | "member" | "technician" | "admin" }
     | undefined;
 
   if (user) {

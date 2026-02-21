@@ -14,7 +14,7 @@ import { toast } from "sonner";
 interface UserRoleSelectProps {
   userId: string;
   userName: string;
-  currentRole: "guest" | "member" | "admin";
+  currentRole: "guest" | "member" | "technician" | "admin";
   currentUserId: string;
   userType?: "active" | "invited";
 }
@@ -28,7 +28,9 @@ export function UserRoleSelect({
 }: UserRoleSelectProps): React.JSX.Element {
   const [isPending, startTransition] = React.useTransition();
 
-  const handleRoleChange = (newRole: "guest" | "member" | "admin"): void => {
+  const handleRoleChange = (
+    newRole: "guest" | "member" | "technician" | "admin"
+  ): void => {
     if (
       userType === "active" &&
       userId === currentUserId &&
@@ -68,6 +70,7 @@ export function UserRoleSelect({
       <SelectContent>
         <SelectItem value="guest">Guest</SelectItem>
         <SelectItem value="member">Member</SelectItem>
+        <SelectItem value="technician">Technician</SelectItem>
         <SelectItem value="admin">Admin</SelectItem>
       </SelectContent>
     </Select>

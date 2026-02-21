@@ -26,6 +26,7 @@ describe("getAccessLevel", () => {
   it("should return the role for valid roles", () => {
     expect(getAccessLevel("guest")).toBe("guest");
     expect(getAccessLevel("member")).toBe("member");
+    expect(getAccessLevel("technician")).toBe("technician");
     expect(getAccessLevel("admin")).toBe("admin");
   });
 });
@@ -94,6 +95,43 @@ describe("checkPermission", () => {
       expect(checkPermission("issues.update.status", "guest", context)).toBe(
         false
       );
+    });
+  });
+
+  describe("technician role specific permissions", () => {
+    it("should allow technician to create machines", () => {
+      expect(checkPermission("machines.create", "technician")).toBe(true);
+    });
+
+    it("should allow technician to edit any machine without ownership", () => {
+      const context: OwnershipContext = {
+        userId,
+        machineOwnerId: otherUserId, // Owned by someone else
+      };
+      expect(checkPermission("machines.edit", "technician", context)).toBe(
+        true
+      );
+    });
+
+    it("should still restrict technician ownerNotes to owner-only", () => {
+      const ownerContext: OwnershipContext = {
+        userId,
+        machineOwnerId: userId,
+      };
+      const nonOwnerContext: OwnershipContext = {
+        userId,
+        machineOwnerId: otherUserId,
+      };
+      expect(
+        checkPermission("machines.edit.ownerNotes", "technician", ownerContext)
+      ).toBe(true);
+      expect(
+        checkPermission(
+          "machines.edit.ownerNotes",
+          "technician",
+          nonOwnerContext
+        )
+      ).toBe(false);
     });
   });
 
@@ -172,8 +210,13 @@ describe("getPermissionDeniedReason", () => {
     expect(reason).toContain("Members");
   });
 
-  it("should return admin message for member role denial", () => {
+  it("should return technician/admin message for member role denial", () => {
     const reason = getPermissionDeniedReason("machines.create", "member");
+    expect(reason).toContain("Technicians");
+  });
+
+  it("should return admin message for technician role denial", () => {
+    const reason = getPermissionDeniedReason("admin.access", "technician");
     expect(reason).toContain("admin");
   });
 
@@ -254,8 +297,8 @@ describe("Integration: Comment ownership flow", () => {
       userId,
       reporterId: userId, // reporterId maps to comment author for "own" checks
     };
-    expect(checkPermission("comments.edit.own", "guest", context)).toBe(true);
-    expect(checkPermission("comments.delete.own", "guest", context)).toBe(true);
+    expect(checkPermission("comments.edit", "guest", context)).toBe(true);
+    expect(checkPermission("comments.delete", "guest", context)).toBe(true);
   });
 
   it("should deny guest editing others comments", () => {
@@ -263,45 +306,28 @@ describe("Integration: Comment ownership flow", () => {
       userId,
       reporterId: otherUserId,
     };
-    expect(checkPermission("comments.edit.own", "guest", context)).toBe(false);
-    expect(checkPermission("comments.delete.own", "guest", context)).toBe(
-      false
-    );
+    expect(checkPermission("comments.edit", "guest", context)).toBe(false);
+    expect(checkPermission("comments.delete", "guest", context)).toBe(false);
   });
 
-  it("should allow member to edit own comment via ownership check", () => {
-    const context: OwnershipContext = {
-      userId,
-      reporterId: userId,
-    };
-    expect(checkPermission("comments.edit.own", "member", context)).toBe(true);
-    expect(checkPermission("comments.delete.own", "member", context)).toBe(
-      true
-    );
+  it("should allow member to edit any comment unconditionally", () => {
+    expect(checkPermission("comments.edit", "member")).toBe(true);
+    expect(checkPermission("comments.delete", "member")).toBe(true);
   });
 
-  it("should deny member editing others comments", () => {
-    const context: OwnershipContext = {
-      userId,
-      reporterId: otherUserId,
-    };
-    expect(checkPermission("comments.edit.own", "member", context)).toBe(false);
-    expect(checkPermission("comments.delete.own", "member", context)).toBe(
-      false
-    );
+  it("should allow technician to edit any comment unconditionally", () => {
+    expect(checkPermission("comments.edit", "technician")).toBe(true);
+    expect(checkPermission("comments.delete", "technician")).toBe(true);
   });
 
   it("should allow admin to edit any comment unconditionally", () => {
-    // Admin has true, not "own", so context doesn't matter
-    expect(checkPermission("comments.edit.own", "admin")).toBe(true);
-    expect(checkPermission("comments.delete.own", "admin")).toBe(true);
+    expect(checkPermission("comments.edit", "admin")).toBe(true);
+    expect(checkPermission("comments.delete", "admin")).toBe(true);
   });
 
   it("should deny unauthenticated from editing any comment", () => {
-    expect(checkPermission("comments.edit.own", "unauthenticated")).toBe(false);
-    expect(checkPermission("comments.delete.own", "unauthenticated")).toBe(
-      false
-    );
+    expect(checkPermission("comments.edit", "unauthenticated")).toBe(false);
+    expect(checkPermission("comments.delete", "unauthenticated")).toBe(false);
   });
 });
 

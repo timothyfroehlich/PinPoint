@@ -99,13 +99,16 @@ export async function createMachineAction(
     return err("UNAUTHORIZED", "User profile not found.");
   }
 
-  // Access control: only admins can create machines
-  if (profile.role !== "admin") {
+  // Access control: only admins or technicians can create machines
+  if (profile.role !== "admin" && profile.role !== "technician") {
     log.warn(
       { userId: user.id, action: "createMachineAction" },
-      "Non-admin user attempted to create a machine"
+      "Unauthorized user attempted to create a machine"
     );
-    return err("UNAUTHORIZED", "You must be an admin to create a machine.");
+    return err(
+      "UNAUTHORIZED",
+      "You must be an admin or technician to create a machine."
+    );
   }
 
   // Extract form data
@@ -261,11 +264,12 @@ export async function updateMachineAction(
   const { id, name, ownerId, presenceStatus } = validation.data;
 
   try {
-    // Admins can update any machine, non-admins can only update their own machines
-    const whereConditions =
-      profile.role === "admin"
-        ? eq(machines.id, id)
-        : and(eq(machines.id, id), eq(machines.ownerId, user.id));
+    // Admins and technicians can update any machine, non-privileged users can only update their own machines
+    const isPrivileged =
+      profile.role === "admin" || profile.role === "technician";
+    const whereConditions = isPrivileged
+      ? eq(machines.id, id)
+      : and(eq(machines.id, id), eq(machines.ownerId, user.id));
 
     // Get current machine state to check for owner change
     const currentMachine = await db.query.machines.findFirst({
@@ -284,8 +288,8 @@ export async function updateMachineAction(
 
     // Derive ownership from the actual machine record, not from form fields
     const isActualOwner = currentMachine.ownerId === user.id;
-    const isOwnerOrAdmin = profile.role === "admin" || isActualOwner;
-    if (isOwnerOrAdmin && ownerId) {
+    const isOwnerOrPrivileged = isPrivileged || isActualOwner;
+    if (isOwnerOrPrivileged && ownerId) {
       shouldUpdateOwner = true;
       const isActive = await db.query.userProfiles.findFirst({
         where: eq(userProfiles.id, ownerId),
@@ -565,7 +569,8 @@ async function updateMachineTextField(
 
     // Permission check
     const isOwner = user.id === machine.ownerId;
-    const isAdmin = profile.role === "admin";
+    const isPrivileged =
+      profile.role === "admin" || profile.role === "technician";
 
     if (field === "ownerNotes") {
       // Owner notes: owner only (not even admins)
@@ -576,11 +581,11 @@ async function updateMachineTextField(
         );
       }
     } else {
-      // description, tournamentNotes, ownerRequirements: owner + admins
-      if (!isOwner && !isAdmin) {
+      // description, tournamentNotes, ownerRequirements: owner + privileged roles
+      if (!isOwner && !isPrivileged) {
         return err(
           "UNAUTHORIZED",
-          "Only the machine owner or admins can edit this field."
+          "Only the machine owner, technicians, or admins can edit this field."
         );
       }
     }

@@ -202,7 +202,10 @@ export function UnifiedReportForm({
     }
   }, [defaultMachineId]);
 
-  const isAdminOrMember = accessLevel === "admin" || accessLevel === "member";
+  const canSetWorkflowFields =
+    accessLevel === "admin" ||
+    accessLevel === "technician" ||
+    accessLevel === "member";
 
   return (
     <div className="w-full max-w-5xl mx-auto">
@@ -344,7 +347,7 @@ export function UnifiedReportForm({
                     />
                   </div>
 
-                  {isAdminOrMember && (
+                  {canSetWorkflowFields && (
                     <div className="space-y-1.5">
                       <Label htmlFor="priority" className="text-on-surface">
                         Priority *
@@ -356,7 +359,7 @@ export function UnifiedReportForm({
                       />
                     </div>
                   )}
-                  {isAdminOrMember && (
+                  {canSetWorkflowFields && (
                     <div className="space-y-1.5">
                       <Label htmlFor="status" className="text-on-surface">
                         Status *
@@ -366,7 +369,7 @@ export function UnifiedReportForm({
                     </div>
                   )}
 
-                  {isAdminOrMember && assignees.length > 0 && (
+                  {canSetWorkflowFields && assignees.length > 0 && (
                     <div className="space-y-1.5 md:col-span-2">
                       <Label htmlFor="assignedTo" className="text-on-surface">
                         Assign To

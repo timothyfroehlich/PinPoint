@@ -19,12 +19,12 @@ import {
 
 interface CreateMachineFormProps {
   allUsers: OwnerSelectUser[];
-  isAdmin: boolean;
+  canSelectOwner: boolean;
 }
 
 export function CreateMachineForm({
   allUsers,
-  isAdmin,
+  canSelectOwner,
 }: CreateMachineFormProps): React.JSX.Element {
   const [state, formAction, isPending] = useActionState<
     CreateMachineResult | undefined,
@@ -93,8 +93,10 @@ export function CreateMachineForm({
           </p>
         </div>
 
-        {/* Owner Select (Admin Only) */}
-        {isAdmin && <OwnerSelect users={users} onUsersChange={setUsers} />}
+        {/* Owner Select (Admin/Technician Only) */}
+        {canSelectOwner && (
+          <OwnerSelect users={users} onUsersChange={setUsers} />
+        )}
 
         {/* Actions */}
         <div className="flex gap-3 pt-4">

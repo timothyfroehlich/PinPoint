@@ -29,7 +29,7 @@ export interface OwnershipContext {
  * Returns 'unauthenticated' if no user/role provided.
  */
 export function getAccessLevel(
-  role: "guest" | "member" | "admin" | undefined | null
+  role: "guest" | "member" | "technician" | "admin" | undefined | null
 ): AccessLevel {
   if (!role) return "unauthenticated";
   return role;
@@ -135,6 +135,9 @@ export function getPermissionDeniedReason(
         return "Members can perform this action";
       }
       if (accessLevel === "member") {
+        return "Technicians or admins can perform this action";
+      }
+      if (accessLevel === "technician") {
         return "Only admins can perform this action";
       }
       return "You don't have permission to perform this action";

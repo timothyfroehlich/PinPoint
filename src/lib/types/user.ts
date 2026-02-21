@@ -2,7 +2,7 @@
  * User context for RLS enforcement
  */
 
-export const USER_ROLES = ["admin", "member", "guest"] as const;
+export const USER_ROLES = ["admin", "technician", "member", "guest"] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
 export interface UserContext {

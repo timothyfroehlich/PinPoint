@@ -167,10 +167,11 @@ export default async function MachinesPage({
                   Manage pinball machines and view their status
                 </p>
               </div>
-              {accessLevel === "admin" && (
+              {(accessLevel === "admin" || accessLevel === "technician") && (
                 <Button
                   asChild
                   className="bg-primary text-on-primary hover:bg-primary/90 rounded-full h-11 px-6"
+                  data-testid="add-machine-button"
                 >
                   <Link href="/m/new">
                     <Plus className="mr-2 size-4" />
@@ -213,11 +214,12 @@ export default async function MachinesPage({
                       No machines yet
                     </p>
                     <p className="text-on-surface-variant mb-4">
-                      {accessLevel === "admin"
+                      {accessLevel === "admin" || accessLevel === "technician"
                         ? "Get started by adding your first machine to the collection."
                         : "No machines have been added to the collection yet."}
                     </p>
-                    {accessLevel === "admin" && (
+                    {(accessLevel === "admin" ||
+                      accessLevel === "technician") && (
                       <Link href="/m/new">
                         <Button className="bg-primary text-on-primary hover:bg-primary/90 rounded-full h-11 px-6">
                           <Plus className="mr-2 size-4" />

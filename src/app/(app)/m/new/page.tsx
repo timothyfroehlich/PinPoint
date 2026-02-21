@@ -37,9 +37,11 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
     columns: { role: true },
   });
 
-  const isAdmin = currentUserProfile?.role === "admin";
+  const canCreateMachine =
+    currentUserProfile?.role === "admin" ||
+    currentUserProfile?.role === "technician";
 
-  if (!isAdmin) {
+  if (!canCreateMachine) {
     return <Forbidden role={currentUserProfile?.role ?? null} backUrl="/m" />;
   }
 
@@ -90,7 +92,10 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <CreateMachineForm allUsers={allUsers} isAdmin={isAdmin} />
+            <CreateMachineForm
+              allUsers={allUsers}
+              canSelectOwner={canCreateMachine}
+            />
           </CardContent>
         </Card>
       </div>

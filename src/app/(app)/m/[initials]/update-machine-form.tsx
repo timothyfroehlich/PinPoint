@@ -67,14 +67,14 @@ interface EditMachineDialogProps {
     } | null;
   };
   allUsers: OwnerSelectUser[];
-  isAdmin: boolean;
+  canEditAnyMachine: boolean;
   isOwner: boolean;
 }
 
 export function EditMachineDialog({
   machine,
   allUsers,
-  isAdmin,
+  canEditAnyMachine,
   isOwner,
 }: EditMachineDialogProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
@@ -110,9 +110,9 @@ export function EditMachineDialog({
   const selectedOwnerName =
     allUsers.find((u) => u.id === selectedOwnerId)?.name ?? "the selected user";
 
-  // Only intercept submission for ownership-transfer confirmation (non-admin owners)
+  // Only intercept submission for ownership-transfer confirmation (non-privileged owners)
   const needsTransferConfirm =
-    !isAdmin && isOwner && selectedOwnerId !== currentOwnerId;
+    !canEditAnyMachine && isOwner && selectedOwnerId !== currentOwnerId;
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
     // If transfer was already confirmed via the dialog, skip the guard
@@ -241,8 +241,8 @@ export function EditMachineDialog({
               </p>
             </div>
 
-            {/* Machine Owner - show for admin AND machine owner */}
-            {isAdmin || isOwner ? (
+            {/* Machine Owner - show for admin/technician AND machine owner */}
+            {canEditAnyMachine || isOwner ? (
               <OwnerSelectWithTracking
                 users={allUsers}
                 defaultValue={currentOwnerId}

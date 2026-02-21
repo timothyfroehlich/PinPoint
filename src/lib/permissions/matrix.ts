@@ -10,13 +10,12 @@
  * - unauthenticated: Anonymous visitor, no account
  * - guest: New account holder (default for signup)
  * - member: Trusted contributor (default for invited users)
+ * - technician: Machine maintenance and full issue management
  * - admin: Full control
  *
  * Naming conventions:
  * - Permission IDs use "update" for modifying resources (issues.update.status)
  * - Comment permissions use "edit" / "delete" to match the UI actions
- *   TODO: Standardize to "update" for comments too (comments.update.own)
- *         when migrating existing comment action code.
  *
  * Migration notes:
  * - The legacy src/lib/permissions.ts (canUpdateIssue) predates this matrix
@@ -53,12 +52,18 @@ export type PermissionValue = boolean | "own" | "owner";
  * role stored in the database for authenticated users. Use getAccessLevel() from
  * helpers.ts to convert a UserRole (or null) into an AccessLevel.
  */
-export type AccessLevel = "unauthenticated" | "guest" | "member" | "admin";
+export type AccessLevel =
+  | "unauthenticated"
+  | "guest"
+  | "member"
+  | "technician"
+  | "admin";
 
 export const ACCESS_LEVELS = [
   "unauthenticated",
   "guest",
   "member",
+  "technician",
   "admin",
 ] as const;
 
@@ -69,6 +74,7 @@ export const ACCESS_LEVEL_LABELS: Record<AccessLevel, string> = {
   unauthenticated: "Not Logged In",
   guest: "Guest",
   member: "Member",
+  technician: "Technician",
   admin: "Admin",
 };
 
@@ -79,6 +85,7 @@ export const ACCESS_LEVEL_DESCRIPTIONS: Record<AccessLevel, string> = {
   unauthenticated: "Anonymous visitors who haven't signed in",
   guest: "Users who created an account (default role for new signups)",
   member: "Trusted contributors (default role for invited users)",
+  technician: "Machine maintenance and full issue management",
   admin: "Full system access including user management",
 };
 
@@ -121,6 +128,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: true,
           guest: true,
           member: true,
+          technician: true,
           admin: true,
         },
       },
@@ -134,6 +142,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: true,
           guest: true,
           member: true,
+          technician: true,
           admin: true,
         },
       },
@@ -150,6 +159,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: false,
           guest: false,
           member: true,
+          technician: true,
           admin: true,
         },
       },
@@ -161,6 +171,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: false,
           guest: false,
           member: true,
+          technician: true,
           admin: true,
         },
       },
@@ -172,6 +183,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: false,
           guest: false,
           member: true,
+          technician: true,
           admin: true,
         },
       },
@@ -183,6 +195,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: false,
           guest: "own",
           member: true,
+          technician: true,
           admin: true,
         },
       },
@@ -194,6 +207,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: false,
           guest: "own",
           member: true,
+          technician: true,
           admin: true,
         },
       },
@@ -205,6 +219,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: false,
           guest: "own",
           member: true,
+          technician: true,
           admin: true,
         },
       },
@@ -216,6 +231,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: false,
           guest: false,
           member: true,
+          technician: true,
           admin: true,
         },
       },
@@ -227,6 +243,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: false,
           guest: false,
           member: true,
+          technician: true,
           admin: true,
         },
       },
@@ -238,6 +255,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: false,
           guest: true,
           member: true,
+          technician: true,
           admin: true,
         },
       },
@@ -255,6 +273,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: true,
           guest: true,
           member: true,
+          technician: true,
           admin: true,
         },
       },
@@ -266,28 +285,33 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: false,
           guest: true,
           member: true,
+          technician: true,
           admin: true,
         },
       },
       {
-        id: "comments.edit.own",
-        label: "Edit own comments",
-        description: "Modify your own comments",
+        id: "comments.edit",
+        label: "Edit comments",
+        description:
+          "Guests can edit their own comments; members, technicians, and admins can edit any comment.",
         access: {
           unauthenticated: false,
           guest: "own",
-          member: "own",
+          member: true,
+          technician: true,
           admin: true,
         },
       },
       {
-        id: "comments.delete.own",
-        label: "Delete own comments",
-        description: "Remove your own comments",
+        id: "comments.delete",
+        label: "Delete comments",
+        description:
+          "Guests can delete their own comments; members, technicians, and admins can delete any comment.",
         access: {
           unauthenticated: false,
           guest: "own",
-          member: "own",
+          member: true,
+          technician: true,
           admin: true,
         },
       },
@@ -299,6 +323,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: false,
           guest: false,
           member: false,
+          technician: false,
           admin: true,
         },
       },
@@ -316,6 +341,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: true,
           guest: true,
           member: true,
+          technician: true,
           admin: true,
         },
       },
@@ -327,6 +353,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: false,
           guest: true,
           member: true,
+          technician: true,
           admin: true,
         },
       },
@@ -339,6 +366,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: false,
           guest: false,
           member: "owner",
+          technician: "owner",
           admin: "owner",
         },
       },
@@ -350,6 +378,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: false,
           guest: true,
           member: true,
+          technician: true,
           admin: true,
         },
       },
@@ -361,6 +390,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: false,
           guest: false,
           member: false,
+          technician: true,
           admin: true,
         },
       },
@@ -373,6 +403,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: false,
           guest: false,
           member: "owner",
+          technician: true,
           admin: true,
         },
       },
@@ -385,6 +416,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: false,
           guest: false,
           member: "owner",
+          technician: "owner",
           admin: "owner",
         },
       },
@@ -405,6 +437,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: true,
           guest: true,
           member: true,
+          technician: true,
           admin: true,
         },
       },
@@ -422,6 +455,7 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: false,
           guest: false,
           member: false,
+          technician: false,
           admin: true,
         },
       },
@@ -433,17 +467,19 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
           unauthenticated: false,
           guest: false,
           member: false,
+          technician: false,
           admin: true,
         },
       },
       {
         id: "admin.users.roles",
         label: "Manage user roles",
-        description: "Change user roles (guest, member, admin)",
+        description: "Change user roles (guest, member, technician, admin)",
         access: {
           unauthenticated: false,
           guest: false,
           member: false,
+          technician: false,
           admin: true,
         },
       },
