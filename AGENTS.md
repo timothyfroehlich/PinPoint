@@ -196,35 +196,26 @@ bash scripts/workflow/respond-to-copilot.sh <PR> <path:line> <msg>  # Reply + re
 
 For multiple independent tasks (UI fixes, Copilot feedback, parallel features), use worktree-isolated subagents.
 
-**When to Use**:
+**Coordination**: Built-in **Agent Teams** is the primary mechanism. Use `TeamCreate`, spawn teammates with the `Task` tool (with `team_name`), and coordinate via `SendMessage`/`TaskUpdate`. Fall back to background subagents (`run_in_background: true`) if Agent Teams is unreliable.
 
-- 2+ independent beads issues ready to work
-- Copilot review feedback on multiple PRs
-- Parallel feature development
+**Quality Enforcement**: Automatic via Claude Code hooks:
 
-**Permission Requirements**:
-Worktree permissions must be in `.claude/settings.json`:
+- `TaskCompleted` hook → runs `pnpm run check` before allowing task completion
+- `TeammateIdle` hook → blocks idle if unpushed commits or uncommitted changes exist
 
-```json
-"Read(//home/froeht/Code/pinpoint-worktrees/**)",
-"Glob(//home/froeht/Code/pinpoint-worktrees/**)",
-"Edit(//home/froeht/Code/pinpoint-worktrees/**)",
-"Write(//home/froeht/Code/pinpoint-worktrees/**)"
-```
+**Worktree Creation**: Always use `pinpoint-wt.py` (not built-in `isolation: "worktree"`) — it handles port allocation and Supabase isolation.
 
 **Workflow**:
 
 1. Create worktrees: `./pinpoint-wt.py create <branch>` for each task
-2. Dispatch subagents with full worktree paths in prompts
-3. Monitor: `gh pr checks`, Copilot comments
+2. Dispatch subagents/teammates with full absolute worktree paths in prompts
+3. Monitor: `bash scripts/workflow/pr-dashboard.sh`, Copilot comments
 4. Clean up: `./pinpoint-wt.py remove <branch>`
-
-**Critical**: Agent prompts must include the full worktree path and instruct agents to work ONLY in that path. Agents inherit the parent session's cwd - they will NOT cd into worktrees on their own.
 
 **Anti-patterns**:
 
-- DON'T spawn agents from parent dir with `cd /path/to/worktree` instructions
-- DON'T assume agents will respect directory instructions without explicit paths
+- DON'T use built-in `isolation: "worktree"` — it doesn't set up ports or Supabase config
+- DON'T spawn agents without absolute worktree paths — they inherit parent cwd
 - DON'T forget to check Copilot comments before merging
 
 See `pinpoint-orchestrator` skill for the full workflow.
@@ -239,21 +230,21 @@ See `pinpoint-orchestrator` skill for the full workflow.
 
 **When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
 
+> **Note**: The `TeammateIdle` hook now enforces push-before-idle automatically for teammates.
+> The manual checklist below applies to the lead agent and solo sessions.
+
 **MANDATORY WORKFLOW:**
 
 1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
+2. **Update issue status** - Close finished work, update in-progress items
+3. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
    git pull --rebase
    bd sync
    git push
    git status  # MUST show "up to date with origin"
    ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
+4. **Hand off** - Provide context for next session
 
 **CRITICAL RULES:**
 

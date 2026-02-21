@@ -1,5 +1,8 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# Claude Code hook safeword file (Ralph Loop escape hatch)
+.claude-hook-bypass
+
 # dependencies
 /node_modules
 /.pnp

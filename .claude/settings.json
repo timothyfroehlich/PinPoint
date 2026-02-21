@@ -159,6 +159,7 @@
       "Bash(bd epic:*)",
       "Bash(bd label:*)",
       "Read(//tmp/**)",
+      "Read(//home/froeht/.claude/plans/**)",
       "mcp__playwright__browser_navigate",
       "mcp__playwright__browser_snapshot",
       "mcp__playwright__browser_type",
@@ -289,6 +290,28 @@
             "type": "command",
             "command": "node .claude/hooks/pattern-reminder.cjs",
             "timeout": 2000
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/definition-of-done.sh",
+            "timeout": 120000
+          }
+        ]
+      }
+    ],
+    "TeammateIdle": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/push-check.sh",
+            "timeout": 15000
           }
         ]
       }
