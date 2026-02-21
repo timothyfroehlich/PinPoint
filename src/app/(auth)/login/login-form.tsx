@@ -6,6 +6,7 @@ import { useActionState, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
+import { PasswordInput } from "~/components/ui/password-input";
 import { Label } from "~/components/ui/label";
 import { loginAction, type LoginResult } from "~/app/(auth)/actions";
 import { cn } from "~/lib/utils";
@@ -82,10 +83,9 @@ export function LoginForm({
               Forgot password?
             </Link>
           </div>
-          <Input
+          <PasswordInput
             id="password"
             name="password"
-            type="password"
             autoComplete="current-password"
             required
             className="bg-input border-border text-foreground placeholder:text-muted-foreground"

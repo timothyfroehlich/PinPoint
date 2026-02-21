@@ -8,6 +8,25 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Authentication Smoke", () => {
+  test("password toggle switches input type on login page", async ({
+    page,
+  }) => {
+    await page.goto("/login");
+
+    const passwordInput = page.getByLabel("Password");
+    await expect(passwordInput).toHaveAttribute("type", "password");
+
+    // Click the show-password toggle button
+    const toggleButton = page.getByRole("button", { name: /show password/i });
+    await toggleButton.click();
+
+    await expect(passwordInput).toHaveAttribute("type", "text");
+
+    // Click again to hide
+    await toggleButton.click();
+    await expect(passwordInput).toHaveAttribute("type", "password");
+  });
+
   test("login flow - sign in with existing account", async ({
     page,
   }, testInfo) => {
