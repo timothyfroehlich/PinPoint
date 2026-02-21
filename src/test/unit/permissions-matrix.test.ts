@@ -204,11 +204,9 @@ describe("Permission hierarchy", () => {
         const memberValue = permission.access.member;
         const techValue = permission.access.technician;
 
-        // If member has unconditional permission, technician should too
+        // If member has unconditional permission, technician should too (unconditional)
         if (memberValue === true) {
-          expect(
-            techValue === true || techValue === "own" || techValue === "owner"
-          ).toBe(true);
+          expect(techValue).toBe(true);
         }
 
         // If member has conditional permission, technician should have at least the same

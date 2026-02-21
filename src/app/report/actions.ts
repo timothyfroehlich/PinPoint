@@ -143,7 +143,7 @@ export async function submitPublicIssueAction(
   // Enforce priority for non-members
   let finalPriority = priority;
   let finalAssignedTo: string | null | undefined = undefined;
-  let isMemberOrAdmin = false;
+  let canSetWorkflowFields = false;
 
   if (reportedBy) {
     // Optimization: Check if we have the profile already?
@@ -158,12 +158,12 @@ export async function submitPublicIssueAction(
       profile?.role === "technician" ||
       profile?.role === "member"
     ) {
-      isMemberOrAdmin = true;
+      canSetWorkflowFields = true;
     }
   }
 
   let finalStatus = status;
-  if (isMemberOrAdmin) {
+  if (canSetWorkflowFields) {
     finalAssignedTo = assignedTo === "" ? undefined : assignedTo;
   } else {
     // Force medium priority and new status for guests/anonymous
@@ -179,7 +179,7 @@ export async function submitPublicIssueAction(
       reporterEmail,
       finalPriority,
       finalAssignedTo,
-      isMemberOrAdmin,
+      canSetWorkflowFields,
     },
     "Submitting unified issue report..."
   );
