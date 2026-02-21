@@ -80,4 +80,24 @@ describe("SignupForm", () => {
       expect(screen.getByText(/invalid input/i)).toBeInTheDocument();
     });
   });
+
+  it("should show mismatch indicator when passwords differ", async () => {
+    const user = userEvent.setup();
+    render(<SignupForm />);
+
+    await user.type(screen.getByLabelText(/^password$/i), "Password123!");
+    await user.type(screen.getByLabelText(/confirm password/i), "Different!");
+
+    expect(screen.getByText(/passwords do not match/i)).toBeInTheDocument();
+  });
+
+  it("should show match indicator when passwords match", async () => {
+    const user = userEvent.setup();
+    render(<SignupForm />);
+
+    await user.type(screen.getByLabelText(/^password$/i), "Password123!");
+    await user.type(screen.getByLabelText(/confirm password/i), "Password123!");
+
+    expect(screen.getByText(/passwords match/i)).toBeInTheDocument();
+  });
 });

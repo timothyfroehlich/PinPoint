@@ -1,10 +1,12 @@
 "use client";
 
 import type React from "react";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { PasswordInput } from "~/components/ui/password-input";
+import { PasswordMismatch } from "~/components/password-mismatch";
+import { PasswordStrength } from "~/components/password-strength";
 import {
   resetPasswordAction,
   type ResetPasswordResult,
@@ -15,6 +17,8 @@ export function ResetPasswordForm(): React.JSX.Element {
     ResetPasswordResult | undefined,
     FormData
   >(resetPasswordAction, undefined);
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   return (
     <form action={formAction} className="space-y-4">
@@ -31,33 +35,40 @@ export function ResetPasswordForm(): React.JSX.Element {
       {/* New Password */}
       <div className="space-y-2">
         <Label htmlFor="password">New Password</Label>
-        <Input
+        <PasswordInput
           id="password"
           name="password"
-          type="password"
           autoComplete="new-password"
           required
           minLength={8}
           maxLength={128}
           className="bg-surface-variant"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
         />
         <p className="text-xs text-on-surface-variant">
           Must be at least 8 characters
         </p>
+        <PasswordStrength password={password} />
       </div>
 
       {/* Confirm Password */}
       <div className="space-y-2">
         <Label htmlFor="confirmPassword">Confirm Password</Label>
-        <Input
+        <PasswordInput
           id="confirmPassword"
           name="confirmPassword"
-          type="password"
           autoComplete="new-password"
           required
           minLength={8}
           maxLength={128}
           className="bg-surface-variant"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+        />
+        <PasswordMismatch
+          password={password}
+          confirmPassword={confirmPassword}
         />
       </div>
 

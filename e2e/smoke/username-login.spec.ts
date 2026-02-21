@@ -8,7 +8,7 @@ test.describe("Username Account Login", () => {
 
     // Type just the username, not the email
     await page.getByLabel("Email").fill("testuser");
-    await page.getByLabel("Password").fill("TestPassword123");
+    await page.getByLabel("Password", { exact: true }).fill("TestPassword123");
     await page.getByRole("button", { name: "Sign In" }).click();
 
     // Should redirect to dashboard

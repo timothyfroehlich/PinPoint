@@ -43,19 +43,13 @@ describe("LoginForm", () => {
 
     render(<LoginForm />);
 
-    // Check if button is disabled
-    expect(screen.getByRole("button")).toBeDisabled();
+    // Check if submit button is disabled
+    const button = screen.getByRole("button", { name: /sign in/i });
+    expect(button).toBeDisabled();
 
     // With standardized Button component, text remains "Sign In" but a spinner is added.
-    // However, looking at the code: <Button ... loading={isPending}>Sign In</Button>
-    // The Button component logic is: {loading && <Loader2 ... />} {children}
-    // So the text "Sign In" is still there.
-    expect(screen.getByRole("button")).toHaveTextContent("Sign In");
+    expect(button).toHaveTextContent("Sign In");
 
-    // We can check if the button contains the loader
-    // Loader2 renders an SVG.
-    // Since we mocked useActionState to return isPending=true, the loading prop on Button is true.
-    const button = screen.getByRole("button");
     // Check for the spinner SVG which has the animate-spin class
     const spinner = button.querySelector(".animate-spin");
     expect(spinner).toBeInTheDocument();

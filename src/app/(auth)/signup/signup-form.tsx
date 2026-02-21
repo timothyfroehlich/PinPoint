@@ -4,6 +4,8 @@ import React, { useState, useActionState, useCallback } from "react";
 import Link from "next/link";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
+import { PasswordInput } from "~/components/ui/password-input";
+import { PasswordMismatch } from "~/components/password-mismatch";
 import { Label } from "~/components/ui/label";
 import { Checkbox } from "~/components/ui/checkbox";
 import { PasswordStrength } from "~/components/password-strength";
@@ -28,6 +30,7 @@ export function SignupForm({
     FormData
   >(signupAction, undefined);
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
 
   const handleTurnstileVerify = useCallback((token: string) => {
@@ -131,10 +134,9 @@ export function SignupForm({
       {/* Password */}
       <div className="space-y-2">
         <Label htmlFor="password">Password</Label>
-        <Input
+        <PasswordInput
           id="password"
           name="password"
-          type="password"
           autoComplete="new-password"
           required
           minLength={8}
@@ -152,13 +154,18 @@ export function SignupForm({
       {/* Confirm Password */}
       <div className="space-y-2">
         <Label htmlFor="confirmPassword">Confirm Password</Label>
-        <Input
+        <PasswordInput
           id="confirmPassword"
           name="confirmPassword"
-          type="password"
           autoComplete="new-password"
           required
           className="bg-surface-variant"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+        />
+        <PasswordMismatch
+          password={password}
+          confirmPassword={confirmPassword}
         />
       </div>
 
