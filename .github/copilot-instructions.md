@@ -54,10 +54,11 @@ Conventional commit messages required.
 7. **Memory safety**: Worker-scoped DB setup in tests.
 8. **E2E quality**: Semantic selectors, no hard-coded delays, independent tests.
 9. **Help page accuracy**: If a PR changes roles, statuses, permissions, UI flows, or user-facing terminology, read through `src/app/(app)/help/` pages and flag any content that becomes outdated or inaccurate. Help pages must reflect the current state of the app. Key things to check:
-   - Role names must match the access levels in `src/lib/permissions/matrix.ts` (Guest, Member, Admin — no "Technician")
+   - Role names must match the access levels in `src/lib/permissions/matrix.ts` (Guest, Member, Technician, Admin)
    - Status names must use display labels from `STATUS_CONFIG` in `src/lib/issues/status.ts`, not raw database values
    - Descriptions of features, workflows, and form fields should match the actual implementation
    - No references to removed features (e.g., roadmap)
+   - **Permissions matrix ↔ enforcement sync (CORE-ARCH-008)**: If a PR changes authorization logic in server actions (`actions.ts`), verify that `src/lib/permissions/matrix.ts` values and descriptions match. If a PR changes `matrix.ts`, verify the server actions enforce it. `true` means unconditional access, `"own"` means only resources the user created — mismatches here cause the help page to show incorrect permission information.
 
 ## Do Not Generate
 
@@ -69,4 +70,4 @@ Conventional commit messages required.
 
 ---
 
-Last Updated: 2026-02-16 (Added help page accuracy review priority)
+Last Updated: 2026-02-21 (Added CORE-ARCH-008 permissions matrix sync check, fixed stale "no Technician" text)
