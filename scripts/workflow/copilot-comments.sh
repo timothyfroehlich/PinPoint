@@ -146,8 +146,13 @@ fetch_pr_comments() {
     count=$(echo "$comments" | jq 'length')
 
     if [ "$MODE" = "--raw" ]; then
-        echo "{\"pr\": $PR, \"review_status\": \"$review_status\", \"unresolved_count\": $count}"
-        echo "$comments" | jq -c ".[] | . + {pr: $PR}"
+        echo "$comments" | jq -c --argjson pr "$PR" --arg review_status "$review_status" --argjson unresolved_count "$count" '
+          {
+            pr: $pr,
+            review_status: $review_status,
+            unresolved_count: $unresolved_count,
+            comments: [ .[] | . + { pr: $pr, review_status: $review_status } ]
+          }'
         return
     fi
 

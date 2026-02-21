@@ -3,11 +3,16 @@
 # Non-blocking reminder to run preflight after pushing.
 # Always exits 0 — this is a nudge, not a gate.
 
+# If jq is not available, exit successfully to keep this hook non-blocking.
+if ! command -v jq >/dev/null 2>&1; then
+  exit 0
+fi
+
 INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
 # Only trigger on git push commands
-if ! echo "$COMMAND" | grep -qE '(^|\s|;|&&)\s*git\s+push'; then
+if ! echo "$COMMAND" | grep -qE '(^|[[:space:]]|;|&&)[[:space:]]*git[[:space:]]+push'; then
   exit 0
 fi
 
