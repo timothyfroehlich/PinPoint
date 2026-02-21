@@ -1,5 +1,5 @@
 ---
-name: tmf-typescript
+name: pinpoint-typescript
 description: TypeScript strictest patterns, type guards, optional properties (exactOptionalPropertyTypes), Drizzle query safety, null checks. Use when fixing type errors, implementing complex types, or when user mentions TypeScript/types/generics.
 ---
 

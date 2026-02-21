@@ -1,5 +1,5 @@
 ---
-name: tmf-security
+name: pinpoint-security
 description: Security patterns, CSP nonces, input validation, auth checks, Supabase SSR patterns. Use when implementing authentication, forms, security features, or when user mentions security/validation/auth.
 ---
 

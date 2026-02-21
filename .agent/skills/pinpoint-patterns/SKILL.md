@@ -1,5 +1,5 @@
 ---
-name: tmf-patterns
+name: pinpoint-patterns
 description: Project-specific code patterns for Server Actions, data fetching, error handling, file organization. Use when implementing features to follow established patterns, or when user asks about project conventions/patterns/architecture.
 ---
 

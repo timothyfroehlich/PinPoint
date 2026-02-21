@@ -5,7 +5,7 @@ audience: dispatched teammate
 ---
 
 > **Audience**: This skill is for **teammates dispatched to worktrees**.
-> If you are the lead agent coordinating work, use `tmf-orchestrator` instead.
+> If you are the lead agent coordinating work, use `pinpoint-orchestrator` instead.
 
 ---
 
@@ -128,7 +128,7 @@ gh pr checks $PR_NUMBER
 
 Or poll until complete:
 ```bash
-bash .agent/skills/tmf-commit/scripts/watch-ci.sh $PR_NUMBER
+bash .agent/skills/pinpoint-commit/scripts/watch-ci.sh $PR_NUMBER
 ```
 
 Only check off "CI passing" after these commands confirm it.

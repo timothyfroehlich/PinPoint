@@ -1,5 +1,5 @@
 ---
-name: tmf-e2e
+name: pinpoint-e2e
 description: E2E testing guide for PinPoint (Playwright, Isolation, Mailpit, Supabase). Use when writing, debugging, or fixing E2E tests to ensure worker isolation and stability.
 ---
 
