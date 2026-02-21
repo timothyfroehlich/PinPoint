@@ -7,7 +7,7 @@
 #   2 = block (unpushed work detected, agent must push first)
 #
 # Reads the teammate's cwd from stdin JSON so it checks the RIGHT repo,
-# not the lead agent's main repo (which caused Ralph Loops 2026-02-21).
+# not the lead agent's main repo (which caused Ralph Loops 2026-02-20).
 #
 # SAFEWORD: If the agent is truly stuck, it can run:
 #   touch .claude-hook-bypass
@@ -46,14 +46,19 @@ if [ -z "$UPSTREAM" ]; then
   exit 0
 fi
 
-AHEAD=$(git rev-list --count '@{u}..HEAD' 2>/dev/null)
+AHEAD=$(git rev-list --count '@{u}..HEAD' 2>/dev/null) || AHEAD=""
+if [ -z "$AHEAD" ]; then
+  echo "🔁 Ralph says: Could not determine unpushed commit count for '$BRANCH'. Verify git state manually. — or if stuck: touch $AGENT_CWD/.claude-hook-bypass" >&2
+  exit 2
+fi
 if [ "$AHEAD" -gt 0 ]; then
   echo "🔁 Ralph says: Branch '$BRANCH' has $AHEAD unpushed commit(s). Run: git push — or if stuck: touch $AGENT_CWD/.claude-hook-bypass" >&2
   exit 2
 fi
 
+# Note: checks tracked file modifications vs HEAD; does not catch untracked files
 if ! git diff --quiet HEAD 2>/dev/null; then
-  echo "🔁 Ralph says: Uncommitted changes detected. Commit and push. — or if stuck: touch $AGENT_CWD/.claude-hook-bypass" >&2
+  echo "🔁 Ralph says: Uncommitted changes to tracked files detected. Commit and push. — or if stuck: touch $AGENT_CWD/.claude-hook-bypass" >&2
   exit 2
 fi
 

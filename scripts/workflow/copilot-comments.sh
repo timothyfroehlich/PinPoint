@@ -74,14 +74,21 @@ get_review_status() {
     fi
 
     # Get the HEAD commit's committer date for this PR
-    head_sha=$(gh api "repos/$OWNER/$REPO/pulls/$PR" --jq '.head.sha')
-    head_date=$(gh api "repos/$OWNER/$REPO/commits/$head_sha" --jq '.commit.committer.date')
+    head_sha=$(gh api "repos/$OWNER/$REPO/pulls/$PR" --jq '.head.sha // empty')
+    if [ -z "$head_sha" ]; then
+        echo "pending"
+        return
+    fi
+    head_date=$(gh api "repos/$OWNER/$REPO/commits/$head_sha" --jq '.commit.committer.date // empty')
 
     if [ -z "$head_date" ]; then
-        echo "current"
+        # Unknown state: conservatively report pending rather than silently claiming current
+        echo "pending"
         return
     fi
 
+    # ISO 8601 timestamps are lexicographically sortable when both use UTC (Z suffix).
+    # Both GitHub API responses use this format, so string comparison is correct here.
     # Compare: if commit is newer than last review → pending
     if [[ "$head_date" > "$latest_review" ]]; then
         echo "pending"

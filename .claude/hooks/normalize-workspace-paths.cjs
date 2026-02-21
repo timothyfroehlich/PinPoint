@@ -82,4 +82,9 @@ async function main() {
   process.exit(0);
 }
 
-main().catch(() => process.exit(0));
+main().catch((err) => {
+  process.stderr.write(
+    `[normalize-workspace-paths] Hook error: ${err?.message ?? err}\n`
+  );
+  process.exit(0);
+});

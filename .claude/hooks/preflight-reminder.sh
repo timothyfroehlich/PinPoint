@@ -7,7 +7,7 @@ INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
 # Only trigger on git push commands
-if ! echo "$COMMAND" | grep -qE '^\s*git\s+push|&&\s*git\s+push'; then
+if ! echo "$COMMAND" | grep -qE '(^|\s|;|&&)\s*git\s+push'; then
   exit 0
 fi
 

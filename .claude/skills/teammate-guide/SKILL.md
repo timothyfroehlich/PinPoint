@@ -88,11 +88,14 @@ The output always shows review status:
 - **`⏳ Copilot review pending`** — last push is newer than last review. Wait and retry.
 - **`✅ Copilot review is current`** — review is up to date.
 
-### Polling loop (up to 5 minutes):
+### Polling loop (up to 5 minutes, breaks early when review arrives):
 
 ```bash
 for i in $(seq 1 5); do
-    bash scripts/workflow/copilot-comments.sh $PR_NUMBER
+    output=$(bash scripts/workflow/copilot-comments.sh $PR_NUMBER)
+    echo "$output"
+    # Break early if review is current (no ⏳ pending banner)
+    echo "$output" | grep -q "⏳" || break
     sleep 60
 done
 ```

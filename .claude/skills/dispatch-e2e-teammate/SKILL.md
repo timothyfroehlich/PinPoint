@@ -16,7 +16,7 @@ Use when assigning an issue end-to-end to a teammate — they will implement, cr
 ## Step 1: Create the Worktree
 
 ```bash
-python3 pinpoint-wt.py create feat/<branch-name>
+python3 ./pinpoint-wt.py create feat/<branch-name>
 ```
 
 `pinpoint-wt.py` handles:
@@ -26,7 +26,7 @@ python3 pinpoint-wt.py create feat/<branch-name>
 
 Check the output for the allocated ports and worktree path. Verify:
 ```bash
-python3 pinpoint-wt.py list    # confirm ports are assigned
+python3 ./pinpoint-wt.py list    # confirm ports are assigned
 ```
 
 Worktrees land at: `/home/froeht/Code/pinpoint-worktrees/feat-<branch-name>`
@@ -103,7 +103,7 @@ The teammate will message you (Agent Teams) or you can check `TaskOutput` (backg
 
 Once the PR merges:
 ```bash
-python3 pinpoint-wt.py remove feat/<branch-name>
+python3 ./pinpoint-wt.py remove feat/<branch-name>
 bd close <issue-id> --reason="Fixed in PR #NNN"
 bd sync
 ```

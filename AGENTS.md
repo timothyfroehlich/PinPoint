@@ -39,6 +39,8 @@ If your tool does not support skills, read the file path directly.
 | **Workflow**   | `tmf-commit`            | `.agent/skills/tmf-commit/SKILL.md`            | Intelligent commit-to-PR workflow and CI monitoring.                     |
 | **Workflow**   | `tmf-github-monitor`    | `.agent/skills/tmf-github-monitor/SKILL.md`    | Monitoring GitHub Actions and build status.                              |
 | **Workflow**   | `tmf-orchestrator`      | `.claude/skills/tmf-orchestrator/SKILL.md`     | Parallel subagent work in worktrees (background agents or Claude Teams). |
+| **Workflow**   | `dispatch-e2e-teammate` | `.claude/skills/dispatch-e2e-teammate/SKILL.md` | Dispatching a teammate end-to-end (worktree + contract + prompt).       |
+| **Workflow**   | `teammate-guide`        | `.claude/skills/teammate-guide/SKILL.md`        | For dispatched teammates: environment, contract, Copilot loop, CI.     |
 
 ## 4. Environment & Workflow
 
