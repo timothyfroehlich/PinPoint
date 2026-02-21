@@ -26,7 +26,7 @@ function PasswordInput({
       <button
         type="button"
         aria-label={visible ? "Hide password" : "Show password"}
-        className="absolute right-0 top-0 flex h-full items-center px-3 text-muted-foreground hover:text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-r-md"
+        className="absolute right-0 top-0 flex h-full items-center px-3 text-muted-foreground enabled:hover:text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-r-md disabled:pointer-events-none disabled:opacity-50"
         onMouseDown={(event) => event.preventDefault()}
         onClick={() => setVisible((v) => !v)}
         disabled={disabled}
