@@ -18,6 +18,7 @@ No application code changes. All work happens on `feat/orchestration-migration` 
 Rename all 8 directories from `pinpoint-*`/`github-monitor` to `tmf-*`.
 
 **Files:**
+
 - Rename: `.agent/skills/pinpoint-commit` → `.agent/skills/tmf-commit`
 - Rename: `.agent/skills/pinpoint-e2e` → `.agent/skills/tmf-e2e`
 - Rename: `.agent/skills/pinpoint-patterns` → `.agent/skills/tmf-patterns`
@@ -44,6 +45,7 @@ git mv .agent/skills/github-monitor .agent/skills/tmf-github-monitor
 **Step 2: Update `name:` frontmatter in each SKILL.md**
 
 In each `.agent/skills/tmf-*/SKILL.md`, update the `name:` field:
+
 - `pinpoint-commit` → `tmf-commit`
 - `pinpoint-e2e` → `tmf-e2e`
 - `pinpoint-patterns` → `tmf-patterns`
@@ -69,6 +71,7 @@ Delete old symlinks, create new ones pointing to renamed directories. Also renam
 real `pinpoint-orchestrator` directory.
 
 **Files:**
+
 - Delete + recreate: 8 symlinks in `.claude/skills/`
 - Rename: `.claude/skills/pinpoint-orchestrator` → `.claude/skills/tmf-orchestrator`
 - Modify: `.claude/skills/tmf-orchestrator/SKILL.md` (name field)
@@ -124,6 +127,7 @@ Expected: All symlinks resolve to `.agent/skills/tmf-*`.
 Update all references to old skill names in AGENTS.md and within skills.
 
 **Files:**
+
 - Modify: `AGENTS.md` (§3 skill table, lines ~31-41)
 - Modify: `.claude/skills/tmf-orchestrator/SKILL.md` (reference to `.agent/skills/pinpoint-commit/scripts/watch-ci.sh`)
 
@@ -132,17 +136,17 @@ Update all references to old skill names in AGENTS.md and within skills.
 Replace the skill table (lines 31-41) with:
 
 ```markdown
-| Category       | Skill Name         | Path                                         | When to Use                                                              |
-| :------------- | :----------------- | :------------------------------------------- | :----------------------------------------------------------------------- |
-| **UI**         | `tmf-ui`           | `.agent/skills/tmf-ui/SKILL.md`              | Components, shadcn/ui, forms, responsive design.                         |
-| **TypeScript** | `tmf-typescript`   | `.agent/skills/tmf-typescript/SKILL.md`      | Type errors, generics, strict mode, Drizzle types.                       |
-| **Testing**    | `tmf-testing`      | `.agent/skills/tmf-testing/SKILL.md`         | Writing tests, PGlite setup, Playwright.                                 |
-| **Testing**    | `tmf-e2e`          | `.agent/skills/tmf-e2e/SKILL.md`             | E2E tests, worker isolation, stability patterns.                         |
-| **Security**   | `tmf-security`     | `.agent/skills/tmf-security/SKILL.md`        | Auth flows, CSP, Zod validation, Supabase SSR.                           |
-| **Patterns**   | `tmf-patterns`     | `.agent/skills/tmf-patterns/SKILL.md`        | Server Actions, architecture, data fetching.                             |
-| **Workflow**   | `tmf-commit`       | `.agent/skills/tmf-commit/SKILL.md`          | Intelligent commit-to-PR workflow and CI monitoring.                     |
-| **Workflow**   | `tmf-github-monitor` | `.agent/skills/tmf-github-monitor/SKILL.md`| Monitoring GitHub Actions and build status.                              |
-| **Workflow**   | `tmf-orchestrator` | `.claude/skills/tmf-orchestrator/SKILL.md`   | Parallel subagent work in worktrees (background agents or Claude Teams). |
+| Category       | Skill Name           | Path                                        | When to Use                                                              |
+| :------------- | :------------------- | :------------------------------------------ | :----------------------------------------------------------------------- |
+| **UI**         | `tmf-ui`             | `.agent/skills/tmf-ui/SKILL.md`             | Components, shadcn/ui, forms, responsive design.                         |
+| **TypeScript** | `tmf-typescript`     | `.agent/skills/tmf-typescript/SKILL.md`     | Type errors, generics, strict mode, Drizzle types.                       |
+| **Testing**    | `tmf-testing`        | `.agent/skills/tmf-testing/SKILL.md`        | Writing tests, PGlite setup, Playwright.                                 |
+| **Testing**    | `tmf-e2e`            | `.agent/skills/tmf-e2e/SKILL.md`            | E2E tests, worker isolation, stability patterns.                         |
+| **Security**   | `tmf-security`       | `.agent/skills/tmf-security/SKILL.md`       | Auth flows, CSP, Zod validation, Supabase SSR.                           |
+| **Patterns**   | `tmf-patterns`       | `.agent/skills/tmf-patterns/SKILL.md`       | Server Actions, architecture, data fetching.                             |
+| **Workflow**   | `tmf-commit`         | `.agent/skills/tmf-commit/SKILL.md`         | Intelligent commit-to-PR workflow and CI monitoring.                     |
+| **Workflow**   | `tmf-github-monitor` | `.agent/skills/tmf-github-monitor/SKILL.md` | Monitoring GitHub Actions and build status.                              |
+| **Workflow**   | `tmf-orchestrator`   | `.claude/skills/tmf-orchestrator/SKILL.md`  | Parallel subagent work in worktrees (background agents or Claude Teams). |
 ```
 
 **Step 2: Fix orchestrator cross-reference**
@@ -168,6 +172,7 @@ Expected: No matches (all references updated).
 Remove the redundant PostToolUse quality check hook (replaced by TaskCompleted hook).
 
 **Files:**
+
 - Delete: `.claude/hooks/quality-check.cjs`
 - Delete: `.claude/hooks/hook-config.json`
 - Delete: `.claude/hooks/tsconfig-cache.json`
@@ -201,6 +206,7 @@ Expected: `valid`
 Remove stale pre-beta migration patterns from the pattern reminder hook.
 
 **Files:**
+
 - Modify: `.claude/hooks/pattern-reminder.cjs`
 
 **Step 1: Remove the stale pattern**
@@ -224,6 +230,7 @@ Expected: Outputs pattern reminder text, exits 0.
 Create a non-blocking PostToolUse hook that nudges Claude to run preflight after `git push`.
 
 **Files:**
+
 - Create: `.claude/hooks/preflight-reminder.sh`
 - Modify: `.claude/settings.json` (add PostToolUse entry for Bash)
 
@@ -297,6 +304,7 @@ Expected: No output, exits 0.
 Add Claude Code-specific behavioral guardrails.
 
 **Files:**
+
 - Modify: `CLAUDE.md`
 
 **Step 1: Add Working Style section**
@@ -319,6 +327,7 @@ After the existing "Specialized Subagents" section, add:
 Add universal project rules for CI workflow, safety, and testing after refactors.
 
 **Files:**
+
 - Modify: `AGENTS.md`
 
 **Step 1: Add CI Workflow subsection**
@@ -362,13 +371,14 @@ After the "Key Commands" subsection, add:
 Add merge-conflict-first check as step 0 in the monitoring flow.
 
 **Files:**
+
 - Modify: `.agent/skills/tmf-github-monitor/SKILL.md`
 
 **Step 1: Add pre-check step**
 
 Before "## 1. Environment Detection & Strategy", add:
 
-```markdown
+````markdown
 ## 0. Pre-Check: Merge Conflicts
 
 Before investigating CI failures, ALWAYS check merge status first:
@@ -376,10 +386,12 @@ Before investigating CI failures, ALWAYS check merge status first:
 ```bash
 gh pr view <PR> --json mergeable --jq '.mergeable'
 ```
+````
 
 If the result is `CONFLICTING`, resolve merge conflicts before investigating other
 failures. A dirty merge state blocks all CI checks and wastes debugging time.
-```
+
+````
 
 ---
 
@@ -401,7 +413,7 @@ After CI completes, check for Copilot review comments:
 
 ```bash
 bash scripts/workflow/copilot-comments.sh <PR>
-```
+````
 
 If comments exist, address each one and resolve the thread:
 
@@ -416,7 +428,8 @@ Once CI is green and Copilot comments are resolved:
 ```bash
 bash scripts/workflow/label-ready.sh <PR>
 ```
-```
+
+````
 
 ---
 
@@ -426,7 +439,7 @@ bash scripts/workflow/label-ready.sh <PR>
 
 ```bash
 shellcheck .claude/hooks/preflight-reminder.sh
-```
+````
 
 Expected: No errors.
 

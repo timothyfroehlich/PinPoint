@@ -16,19 +16,19 @@ admin > technician > member > guest
 
 ### Issues
 
-| Permission               | Guest | Member | Technician | Admin |
-| :----------------------- | :---- | :----- | :--------- | :---- |
-| `issues.view`            | Yes   | Yes    | Yes        | Yes   |
-| `issues.report`          | Yes   | Yes    | Yes        | Yes   |
-| `issues.report.status`   | No    | Yes    | Yes        | Yes   |
-| `issues.report.priority` | No    | Yes    | Yes        | Yes   |
-| `issues.report.assignee` | No    | Yes    | Yes        | Yes   |
-| `issues.update.severity` | Own   | Yes    | Yes        | Yes   |
-| `issues.update.frequency`| Own   | Yes    | Yes        | Yes   |
-| `issues.update.status`   | Own   | Yes    | Yes        | Yes   |
-| `issues.update.priority` | No    | Yes    | Yes        | Yes   |
-| `issues.update.assignee` | No    | Yes    | Yes        | Yes   |
-| `issues.watch`           | Yes   | Yes    | Yes        | Yes   |
+| Permission                | Guest | Member | Technician | Admin |
+| :------------------------ | :---- | :----- | :--------- | :---- |
+| `issues.view`             | Yes   | Yes    | Yes        | Yes   |
+| `issues.report`           | Yes   | Yes    | Yes        | Yes   |
+| `issues.report.status`    | No    | Yes    | Yes        | Yes   |
+| `issues.report.priority`  | No    | Yes    | Yes        | Yes   |
+| `issues.report.assignee`  | No    | Yes    | Yes        | Yes   |
+| `issues.update.severity`  | Own   | Yes    | Yes        | Yes   |
+| `issues.update.frequency` | Own   | Yes    | Yes        | Yes   |
+| `issues.update.status`    | Own   | Yes    | Yes        | Yes   |
+| `issues.update.priority`  | No    | Yes    | Yes        | Yes   |
+| `issues.update.assignee`  | No    | Yes    | Yes        | Yes   |
+| `issues.watch`            | Yes   | Yes    | Yes        | Yes   |
 
 Technician is identical to member and admin for all issue permissions.
 
@@ -48,15 +48,15 @@ Technician is identical to member — own comments only, no moderation.
 
 ### Machines
 
-| Permission                       | Guest | Member | Technician | Admin |
-| :------------------------------- | :---- | :----- | :--------- | :---- |
-| `machines.view`                  | Yes   | Yes    | Yes        | Yes   |
-| `machines.view.ownerRequirements`| Yes   | Yes    | Yes        | Yes   |
-| `machines.view.ownerNotes`       | Owner | Owner  | Owner      | Owner |
-| `machines.watch`                 | Yes   | Yes    | Yes        | Yes   |
-| `machines.create`                | No    | No     | Yes        | Yes   |
-| `machines.edit`                  | No    | Owner  | Yes        | Yes   |
-| `machines.edit.ownerNotes`       | No    | Owner  | Owner      | Owner |
+| Permission                        | Guest | Member | Technician | Admin |
+| :-------------------------------- | :---- | :----- | :--------- | :---- |
+| `machines.view`                   | Yes   | Yes    | Yes        | Yes   |
+| `machines.view.ownerRequirements` | Yes   | Yes    | Yes        | Yes   |
+| `machines.view.ownerNotes`        | Owner | Owner  | Owner      | Owner |
+| `machines.watch`                  | Yes   | Yes    | Yes        | Yes   |
+| `machines.create`                 | No    | No     | Yes        | Yes   |
+| `machines.edit`                   | No    | Owner  | Yes        | Yes   |
+| `machines.edit.ownerNotes`        | No    | Owner  | Owner      | Owner |
 
 Key differentiator: technicians can create machines and edit any machine (like admin). Owner notes remain owner-exclusive for everyone.
 
@@ -70,11 +70,11 @@ No change.
 
 ### Admin
 
-| Permission          | Guest | Member | Technician | Admin |
-| :------------------ | :---- | :----- | :--------- | :---- |
-| `admin.access`      | No    | No     | No         | Yes   |
-| `admin.users.invite`| No    | No     | No         | Yes   |
-| `admin.users.roles` | No    | No     | No         | Yes   |
+| Permission           | Guest | Member | Technician | Admin |
+| :------------------- | :---- | :----- | :--------- | :---- |
+| `admin.access`       | No    | No     | No         | Yes   |
+| `admin.users.invite` | No    | No     | No         | Yes   |
+| `admin.users.roles`  | No    | No     | No         | Yes   |
 
 Technicians have zero admin panel access. Role management is admin-only.
 

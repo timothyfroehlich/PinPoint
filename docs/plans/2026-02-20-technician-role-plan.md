@@ -17,15 +17,19 @@
 ### Task 1: Type System — Add `"technician"` to `UserRole`
 
 **Files:**
+
 - Modify: `src/lib/types/user.ts`
 
 **Step 1: Update USER_ROLES array**
 
 In `src/lib/types/user.ts:5`, change:
+
 ```typescript
 export const USER_ROLES = ["admin", "member", "guest"] as const;
 ```
+
 to:
+
 ```typescript
 export const USER_ROLES = ["admin", "technician", "member", "guest"] as const;
 ```
@@ -50,20 +54,30 @@ git commit -m "feat(roles): add technician to UserRole type"
 ### Task 2: Permission Matrix — Add `technician` Access Level + Rename Comment Permissions
 
 **Files:**
+
 - Modify: `src/lib/permissions/matrix.ts`
 
 **Step 1: Update AccessLevel type and constants**
 
 In `src/lib/permissions/matrix.ts:56`, change:
+
 ```typescript
 export type AccessLevel = "unauthenticated" | "guest" | "member" | "admin";
 ```
+
 to:
+
 ```typescript
-export type AccessLevel = "unauthenticated" | "guest" | "member" | "technician" | "admin";
+export type AccessLevel =
+  | "unauthenticated"
+  | "guest"
+  | "member"
+  | "technician"
+  | "admin";
 ```
 
 In `src/lib/permissions/matrix.ts:58-63`, change:
+
 ```typescript
 export const ACCESS_LEVELS = [
   "unauthenticated",
@@ -72,7 +86,9 @@ export const ACCESS_LEVELS = [
   "admin",
 ] as const;
 ```
+
 to:
+
 ```typescript
 export const ACCESS_LEVELS = [
   "unauthenticated",
@@ -86,11 +102,13 @@ export const ACCESS_LEVELS = [
 **Step 2: Add technician to labels and descriptions**
 
 In `ACCESS_LEVEL_LABELS` (line 68), add after `member`:
+
 ```typescript
 technician: "Technician",
 ```
 
 In `ACCESS_LEVEL_DESCRIPTIONS` (line 78), add after `member`:
+
 ```typescript
 technician: "Machine maintenance and full issue management",
 ```
@@ -104,6 +122,7 @@ The `RolePermissions` type at line 85 is `Record<AccessLevel, PermissionValue>` 
 For each permission in the matrix, add a `technician` value. The design document specifies the exact value for each permission. Here's the complete mapping:
 
 Issues (all same as member):
+
 - `issues.view`: `technician: true`
 - `issues.report`: `technician: true`
 - `issues.report.status`: `technician: true`
@@ -117,6 +136,7 @@ Issues (all same as member):
 - `issues.watch`: `technician: true`
 
 Comments (same as member, plus rename):
+
 - `comments.view`: `technician: true`
 - `comments.add`: `technician: true`
 - `comments.edit` (renamed from `comments.edit.own`): `technician: true`
@@ -124,6 +144,7 @@ Comments (same as member, plus rename):
 - `comments.delete.any`: `technician: false`
 
 Machines (key differentiator — like admin for create/edit):
+
 - `machines.view`: `technician: true`
 - `machines.view.ownerRequirements`: `technician: true`
 - `machines.view.ownerNotes`: `technician: "owner"` (owner-only)
@@ -133,9 +154,11 @@ Machines (key differentiator — like admin for create/edit):
 - `machines.edit.ownerNotes`: `technician: "owner"` (owner-only)
 
 Images:
+
 - `images.upload`: `technician: true`
 
 Admin:
+
 - `admin.access`: `technician: false`
 - `admin.users.invite`: `technician: false`
 - `admin.users.roles`: `technician: false`
@@ -143,6 +166,7 @@ Admin:
 **Step 5: Rename comment permissions**
 
 Change `comments.edit.own` to `comments.edit`:
+
 - Line 273: `id: "comments.edit.own"` → `id: "comments.edit"`
 - Line 274: `label: "Edit own comments"` → `label: "Edit comments"`
 - Line 275: `description: "Modify your own comments"` → `description: "Modify your own comments"`
@@ -152,6 +176,7 @@ Change `comments.edit.own` to `comments.edit`:
 - Line 280: `admin: true` stays
 
 Change `comments.delete.own` to `comments.delete`:
+
 - Line 284: `id: "comments.delete.own"` → `id: "comments.delete"`
 - Line 285: `label: "Delete own comments"` → `label: "Delete comments"`
 - Line 286: `description: "Remove your own comments"` → `description: "Remove your own comments"`
@@ -182,17 +207,21 @@ git commit -m "feat(permissions): add technician access level and rename comment
 ### Task 3: Permission Helpers — Update `getAccessLevel` and Denied Reason Messages
 
 **Files:**
+
 - Modify: `src/lib/permissions/helpers.ts`
 
 **Step 1: Update `getAccessLevel` function**
 
 In `src/lib/permissions/helpers.ts:31-36`, change the function signature to accept `"technician"`:
+
 ```typescript
 export function getAccessLevel(
   role: "guest" | "member" | "admin" | undefined | null
 ): AccessLevel {
 ```
+
 to:
+
 ```typescript
 export function getAccessLevel(
   role: "guest" | "member" | "technician" | "admin" | undefined | null
@@ -213,7 +242,9 @@ case "role":
   }
   return "You don't have permission to perform this action";
 ```
+
 to:
+
 ```typescript
 case "role":
   if (accessLevel === "guest") {
@@ -242,15 +273,19 @@ git commit -m "feat(permissions): update helpers for technician access level"
 ### Task 4: Legacy Permissions — Update Role Checks
 
 **Files:**
+
 - Modify: `src/lib/permissions.ts`
 
 **Step 1: Update UserRole type**
 
 In `src/lib/permissions.ts:1`, change:
+
 ```typescript
 export type UserRole = "guest" | "member" | "admin";
 ```
+
 to:
+
 ```typescript
 export type UserRole = "guest" | "member" | "technician" | "admin";
 ```
@@ -258,10 +293,13 @@ export type UserRole = "guest" | "member" | "technician" | "admin";
 **Step 2: Update `canUpdateIssue`**
 
 In `src/lib/permissions.ts:31`, the function checks `user.role === "admin"`. Technicians should also be able to update issues. Change:
+
 ```typescript
 if (user.role === "admin") return true;
 ```
+
 to:
+
 ```typescript
 if (user.role === "admin" || user.role === "technician") return true;
 ```
@@ -269,11 +307,14 @@ if (user.role === "admin" || user.role === "technician") return true;
 **Step 3: Update `canEditIssueTitle`**
 
 In `src/lib/permissions.ts:51-52`, technicians (like members) should be able to edit titles:
+
 ```typescript
 if (user.role === "admin") return true;
 if (user.role === "member") return true;
 ```
+
 to:
+
 ```typescript
 if (user.role === "admin") return true;
 if (user.role === "technician") return true;
@@ -292,28 +333,35 @@ git commit -m "feat(permissions): add technician to legacy permission checks"
 ### Task 5: Database Schema — Add `"technician"` to Drizzle Enum
 
 **Files:**
+
 - Modify: `src/server/db/schema.ts`
 
 **Step 1: Update user_profiles role enum**
 
 In `src/server/db/schema.ts:53`, change:
+
 ```typescript
-role: text("role", { enum: ["guest", "member", "admin"] })
+role: text("role", { enum: ["guest", "member", "admin"] });
 ```
+
 to:
+
 ```typescript
-role: text("role", { enum: ["guest", "member", "technician", "admin"] })
+role: text("role", { enum: ["guest", "member", "technician", "admin"] });
 ```
 
 **Step 2: Update invited_users role enum**
 
 In `src/server/db/schema.ts:79`, change:
+
 ```typescript
-role: text("role", { enum: ["guest", "member", "admin"] })
+role: text("role", { enum: ["guest", "member", "admin"] });
 ```
+
 to:
+
 ```typescript
-role: text("role", { enum: ["guest", "member", "technician", "admin"] })
+role: text("role", { enum: ["guest", "member", "technician", "admin"] });
 ```
 
 **Step 3: Generate and review migration**
@@ -338,6 +386,7 @@ git commit -m "feat(db): add technician to role enum in schema"
 ### Task 6: Server Actions — Update Hardcoded Role Checks
 
 **Files:**
+
 - Modify: `src/app/(app)/m/actions.ts`
 - Modify: `src/app/(app)/m/new/page.tsx`
 - Modify: `src/app/(app)/issues/actions.ts`
@@ -346,33 +395,43 @@ git commit -m "feat(db): add technician to role enum in schema"
 **Step 1: Update createMachineAction**
 
 In `src/app/(app)/m/actions.ts:103`, change:
+
 ```typescript
 if (profile.role !== "admin") {
 ```
+
 to:
+
 ```typescript
 if (profile.role !== "admin" && profile.role !== "technician") {
 ```
 
 Also update the log message at line 107 and error at line 108:
+
 ```typescript
 log.warn(
   { userId: user.id, action: "createMachineAction" },
   "Unauthorized user attempted to create a machine"
 );
-return err("UNAUTHORIZED", "You must be an admin or technician to create a machine.");
+return err(
+  "UNAUTHORIZED",
+  "You must be an admin or technician to create a machine."
+);
 ```
 
 **Step 2: Update updateMachineAction**
 
 In `src/app/(app)/m/actions.ts:265-268`, the where condition uses `profile.role === "admin"`. Change:
+
 ```typescript
 const whereConditions =
   profile.role === "admin"
     ? eq(machines.id, id)
     : and(eq(machines.id, id), eq(machines.ownerId, user.id));
 ```
+
 to:
+
 ```typescript
 const whereConditions =
   profile.role === "admin" || profile.role === "technician"
@@ -383,48 +442,63 @@ const whereConditions =
 **Step 3: Update updateMachineTextField**
 
 In `src/app/(app)/m/actions.ts:568`, change:
+
 ```typescript
 const isAdmin = profile.role === "admin";
 ```
+
 to:
+
 ```typescript
-const isAdminOrTechnician = profile.role === "admin" || profile.role === "technician";
+const isAdminOrTechnician =
+  profile.role === "admin" || profile.role === "technician";
 ```
 
 And in line 580, change:
+
 ```typescript
 if (!isOwner && !isAdmin) {
 ```
+
 to:
+
 ```typescript
 if (!isOwner && !isAdminOrTechnician) {
 ```
 
 Also update the error message at line 583:
+
 ```typescript
-"Only the machine owner, technicians, or admins can edit this field."
+"Only the machine owner, technicians, or admins can edit this field.";
 ```
 
 **Step 4: Update updateMachineAction isOwnerOrAdmin**
 
 In `src/app/(app)/m/actions.ts:287`, change:
+
 ```typescript
 const isOwnerOrAdmin = profile.role === "admin" || isActualOwner;
 ```
+
 to:
+
 ```typescript
-const isOwnerOrAdmin = profile.role === "admin" || profile.role === "technician" || isActualOwner;
+const isOwnerOrAdmin =
+  profile.role === "admin" || profile.role === "technician" || isActualOwner;
 ```
 
 **Step 5: Update machine new page**
 
 In `src/app/(app)/m/new/page.tsx:40-42`, change:
+
 ```typescript
 const isAdmin = currentUserProfile?.role === "admin";
 
 if (!isAdmin) {
 ```
+
 to:
+
 ```typescript
 const canCreateMachine = currentUserProfile?.role === "admin" || currentUserProfile?.role === "technician";
 
@@ -432,6 +506,7 @@ if (!canCreateMachine) {
 ```
 
 Also update line 93 where `isAdmin` is passed to the form — check if `isAdmin` controls anything beyond create access (like owner selection). Read the create-machine-form.tsx to understand:
+
 - `isAdmin` at line 97 controls whether the OwnerSelect component is shown
 - Technicians should also be able to select an owner when creating a machine
 - Change the prop: pass `canCreateMachine` instead of `isAdmin`, or rename the prop
@@ -441,19 +516,25 @@ In `src/app/(app)/m/new/page.tsx`, replace all uses of `isAdmin` with `canCreate
 Actually, look at the form — it uses `isAdmin` to conditionally render owner selection. Since technicians should also pick owners, the simplest fix: pass `canCreateMachine` and rename the prop in the form from `isAdmin` to `canSelectOwner` (or just pass `true` when role is admin or technician).
 
 In `src/app/(app)/m/new/create-machine-form.tsx:22`, change:
+
 ```typescript
 isAdmin: boolean;
 ```
+
 to:
+
 ```typescript
 canSelectOwner: boolean;
 ```
 
 And update line 97:
+
 ```typescript
 {isAdmin && <OwnerSelect users={users} onUsersChange={setUsers} />}
 ```
+
 to:
+
 ```typescript
 {canSelectOwner && <OwnerSelect users={users} onUsersChange={setUsers} />}
 ```
@@ -465,18 +546,23 @@ Update the parent page.tsx to pass `canSelectOwner={canCreateMachine}`.
 In `src/app/(app)/m/[initials]/page.tsx:152`, the variable `isAdmin` is used. Check how it's used — it's passed to `UpdateMachineForm`. Read `src/app/(app)/m/[initials]/update-machine-form.tsx` to see how `isAdmin` is used there (lines 70, 77, 115, 245).
 
 The update form uses `isAdmin` to:
+
 - Show owner transfer warning (line 115)
 - Show owner selection or read-only display (line 245)
 
 Technicians should also have these abilities. Change `isAdmin` to `canEditAnyMachine` in the page and form:
 
 In `src/app/(app)/m/[initials]/page.tsx:152`:
+
 ```typescript
 const isAdmin = accessLevel === "admin";
 ```
+
 to:
+
 ```typescript
-const canEditAnyMachine = accessLevel === "admin" || accessLevel === "technician";
+const canEditAnyMachine =
+  accessLevel === "admin" || accessLevel === "technician";
 ```
 
 Pass this to the form and update the form's prop name accordingly.
@@ -484,6 +570,7 @@ Pass this to the form and update the form's prop name accordingly.
 **Step 7: Update deleteCommentAction**
 
 In `src/app/(app)/issues/actions.ts:809`, change:
+
 ```typescript
 if (existingComment.authorId !== user.id && userProfile?.role !== "admin") {
 ```
@@ -493,10 +580,13 @@ This stays the same — only admins can delete others' comments. Technicians do 
 **Step 8: Update report actions**
 
 In `src/app/report/actions.ts:156`, change:
+
 ```typescript
 if (profile?.role === "admin" || profile?.role === "member") {
 ```
+
 to:
+
 ```typescript
 if (profile?.role === "admin" || profile?.role === "technician" || profile?.role === "member") {
 ```
@@ -504,12 +594,18 @@ if (profile?.role === "admin" || profile?.role === "technician" || profile?.role
 **Step 9: Update report form**
 
 In `src/app/report/unified-report-form.tsx:205`, change:
+
 ```typescript
 const isAdminOrMember = accessLevel === "admin" || accessLevel === "member";
 ```
+
 to:
+
 ```typescript
-const isAdminOrMember = accessLevel === "admin" || accessLevel === "technician" || accessLevel === "member";
+const isAdminOrMember =
+  accessLevel === "admin" ||
+  accessLevel === "technician" ||
+  accessLevel === "member";
 ```
 
 **Step 10: Update issues page**
@@ -528,15 +624,19 @@ git commit -m "feat(actions): update server actions and pages for technician rol
 ### Task 7: Zod Schemas — Add `"technician"` to Validation
 
 **Files:**
+
 - Modify: `src/app/(app)/admin/users/schema.ts`
 
 **Step 1: Update updateUserRoleSchema**
 
 In `src/app/(app)/admin/users/schema.ts:5`, change:
+
 ```typescript
 newRole: z.enum(["guest", "member", "admin"]),
 ```
+
 to:
+
 ```typescript
 newRole: z.enum(["guest", "member", "technician", "admin"]),
 ```
@@ -544,10 +644,13 @@ newRole: z.enum(["guest", "member", "technician", "admin"]),
 **Step 2: Update inviteUserSchema**
 
 In line 24, change:
+
 ```typescript
 role: z.enum(["guest", "member"]), // Explicitly exclude "admin"
 ```
+
 to:
+
 ```typescript
 role: z.enum(["guest", "member", "technician"]), // Explicitly exclude "admin"
 ```
@@ -564,6 +667,7 @@ git commit -m "feat(validation): add technician to Zod role schemas"
 ### Task 8: UI Components — Admin Panel + Sidebar + Forbidden
 
 **Files:**
+
 - Modify: `src/app/(app)/admin/users/user-role-select.tsx`
 - Modify: `src/components/layout/Sidebar.tsx`
 - Modify: `src/app/(app)/admin/users/actions.ts`
@@ -571,24 +675,31 @@ git commit -m "feat(validation): add technician to Zod role schemas"
 **Step 1: Update UserRoleSelect**
 
 In `src/app/(app)/admin/users/user-role-select.tsx:17`, change:
+
 ```typescript
 currentRole: "guest" | "member" | "admin";
 ```
+
 to:
+
 ```typescript
 currentRole: "guest" | "member" | "technician" | "admin";
 ```
 
 In line 31:
+
 ```typescript
 const handleRoleChange = (newRole: "guest" | "member" | "admin"): void => {
 ```
+
 to:
+
 ```typescript
 const handleRoleChange = (newRole: "guest" | "member" | "technician" | "admin"): void => {
 ```
 
 In line 69, add the Technician option between Member and Admin:
+
 ```tsx
 <SelectItem value="guest">Guest</SelectItem>
 <SelectItem value="member">Member</SelectItem>
@@ -599,10 +710,13 @@ In line 69, add the Technician option between Member and Admin:
 **Step 2: Update updateUserRole action**
 
 In `src/app/(app)/admin/users/actions.ts:31`, change:
+
 ```typescript
 newRole: "guest" | "member" | "admin",
 ```
+
 to:
+
 ```typescript
 newRole: "guest" | "member" | "technician" | "admin",
 ```
@@ -610,10 +724,13 @@ newRole: "guest" | "member" | "technician" | "admin",
 **Step 3: Update admin role description in admin panel**
 
 In `src/app/(app)/admin/users/actions.ts:447` (the `admin.users.roles` description in the matrix), update from:
+
 ```
 "Change user roles (guest, member, admin)"
 ```
+
 to:
+
 ```
 "Change user roles (guest, member, technician, admin)"
 ```
@@ -636,6 +753,7 @@ git commit -m "feat(ui): add technician option to role select and update types"
 ### Task 9: RLS Context — Update UserRole Import
 
 **Files:**
+
 - Modify: `src/server/db/utils/rls.ts` (only if needed)
 
 **Step 1: Verify rls.ts**
@@ -653,20 +771,19 @@ No code change needed. Just verify with type check.
 ### Task 10: Unit Tests — Update Permission Matrix Tests
 
 **Files:**
+
 - Modify: `src/test/unit/permissions-matrix.test.ts`
 
 **Step 1: Update ACCESS_LEVELS test**
 
 In `src/test/unit/permissions-matrix.test.ts:22-27`, change:
+
 ```typescript
-expect(ACCESS_LEVELS).toEqual([
-  "unauthenticated",
-  "guest",
-  "member",
-  "admin",
-]);
+expect(ACCESS_LEVELS).toEqual(["unauthenticated", "guest", "member", "admin"]);
 ```
+
 to:
+
 ```typescript
 expect(ACCESS_LEVELS).toEqual([
   "unauthenticated",
@@ -702,8 +819,12 @@ describe("Technician role permissions", () => {
   });
 
   it("should restrict technician ownerNotes to owner-only", () => {
-    expect(getPermission("machines.edit.ownerNotes", "technician")).toBe("owner");
-    expect(getPermission("machines.view.ownerNotes", "technician")).toBe("owner");
+    expect(getPermission("machines.edit.ownerNotes", "technician")).toBe(
+      "owner"
+    );
+    expect(getPermission("machines.view.ownerNotes", "technician")).toBe(
+      "owner"
+    );
   });
 
   it("should allow technician all issue permissions like member", () => {
@@ -754,7 +875,9 @@ it("should grant admin all permissions that technician has (except owner-only)",
         expect(adminValue).toBe(true);
       }
       if (techValue === "own" || techValue === "owner") {
-        expect(adminValue === true || adminValue === "own" || adminValue === "owner").toBe(true);
+        expect(
+          adminValue === true || adminValue === "own" || adminValue === "owner"
+        ).toBe(true);
       }
     }
   }
@@ -784,6 +907,7 @@ Update the existing admin-member test to also check admin > technician transitiv
 **Step 5: Update machines test**
 
 The test "should only allow admin to create machines" at line 312 needs to include technician:
+
 ```typescript
 it("should allow admin and technician to create machines", () => {
   expect(getPermission("machines.create", "guest")).toBe(false);
@@ -811,11 +935,13 @@ git commit -m "test(permissions): update matrix tests for technician role"
 ### Task 11: Unit Tests — Update Permission Helpers Tests
 
 **Files:**
+
 - Modify: `src/test/unit/permissions-helpers.test.ts`
 
 **Step 1: Update getAccessLevel test**
 
 Add at line 29:
+
 ```typescript
 expect(getAccessLevel("technician")).toBe("technician");
 ```
@@ -849,8 +975,12 @@ describe("Technician permissions", () => {
       userId,
       machineOwnerId: "other-user",
     };
-    expect(checkPermission("machines.edit.ownerNotes", "technician", ownerContext)).toBe(true);
-    expect(checkPermission("machines.edit.ownerNotes", "technician", nonOwnerContext)).toBe(false);
+    expect(
+      checkPermission("machines.edit.ownerNotes", "technician", ownerContext)
+    ).toBe(true);
+    expect(
+      checkPermission("machines.edit.ownerNotes", "technician", nonOwnerContext)
+    ).toBe(false);
   });
 
   it("should deny technician admin access", () => {
@@ -862,6 +992,7 @@ describe("Technician permissions", () => {
 **Step 4: Update denied reason tests**
 
 Update the test at line 175-178. The member denial message now says "Technicians or admins":
+
 ```typescript
 it("should return technicians/admin message for member role denial on machine create", () => {
   const reason = getPermissionDeniedReason("machines.create", "member");
@@ -892,6 +1023,7 @@ git commit -m "test(permissions): update helper tests for technician role"
 ### Task 12: Legacy Permission Tests
 
 **Files:**
+
 - Modify: `src/lib/permissions.test.ts`
 
 **Step 1: Add technician test cases**
@@ -931,6 +1063,7 @@ git commit -m "test(permissions): add technician cases to legacy permission test
 ### Task 13: Seed SQL — Update Trigger Comment
 
 **Files:**
+
 - Modify: `supabase/seed.sql`
 
 **Step 1: Update trigger comment**
@@ -938,6 +1071,7 @@ git commit -m "test(permissions): add technician cases to legacy permission test
 The `handle_new_user()` function at `supabase/seed.sql:16` already uses `COALESCE(v_role, 'guest')` which will naturally pass through `"technician"` from `invited_users.role`. No code change needed.
 
 Update the COMMENT ON FUNCTION at line 122 to mention the technician role:
+
 ```sql
 COMMENT ON FUNCTION public.handle_new_user() IS
   'Automatically creates a user_profile and notification_preferences when a new user signs up via Supabase Auth. Works for both email/password and OAuth (Google, GitHub). Also transfers guest issues (by reporter_email) and handles legacy invited_users cleanup by transferring their machines/issues and removing the invited_users record. Non-invited signups default to guest role. Invited users inherit their role (guest, member, technician, or admin).';

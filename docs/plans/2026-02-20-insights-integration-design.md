@@ -29,17 +29,17 @@ from plugin-provided ones.
 
 **Mapping:**
 
-| Old Name               | New Name            | Location        |
-| :--------------------- | :------------------ | :-------------- |
-| pinpoint-commit        | tmf-commit          | .agent (symlink) |
-| pinpoint-e2e           | tmf-e2e             | .agent (symlink) |
-| pinpoint-patterns      | tmf-patterns        | .agent (symlink) |
-| pinpoint-security      | tmf-security        | .agent (symlink) |
-| pinpoint-testing       | tmf-testing         | .agent (symlink) |
-| pinpoint-typescript    | tmf-typescript      | .agent (symlink) |
-| pinpoint-ui            | tmf-ui              | .agent (symlink) |
-| github-monitor         | tmf-github-monitor  | .agent (symlink) |
-| pinpoint-orchestrator  | tmf-orchestrator    | .claude (real)   |
+| Old Name              | New Name           | Location         |
+| :-------------------- | :----------------- | :--------------- |
+| pinpoint-commit       | tmf-commit         | .agent (symlink) |
+| pinpoint-e2e          | tmf-e2e            | .agent (symlink) |
+| pinpoint-patterns     | tmf-patterns       | .agent (symlink) |
+| pinpoint-security     | tmf-security       | .agent (symlink) |
+| pinpoint-testing      | tmf-testing        | .agent (symlink) |
+| pinpoint-typescript   | tmf-typescript     | .agent (symlink) |
+| pinpoint-ui           | tmf-ui             | .agent (symlink) |
+| github-monitor        | tmf-github-monitor | .agent (symlink) |
+| pinpoint-orchestrator | tmf-orchestrator   | .claude (real)   |
 
 ### 2. New Hook: Post-push Preflight Reminder
 
@@ -48,6 +48,7 @@ from plugin-provided ones.
 Gives Claude judgment to skip for trivial changes. CI catches wrong decisions.
 
 **Message example:**
+
 ```
 Reminder: Did you run `pnpm run preflight` before pushing?
 If this was a trivial change (comments, docs, formatting), carry on — CI will validate.
@@ -57,10 +58,12 @@ For code changes, consider running preflight before marking the task done.
 ### 3. Hook Cleanup
 
 **Remove `quality-check.cjs` + `hook-config.json` + `tsconfig-cache.json`:**
+
 - Redundant now that `definition-of-done.sh` runs `pnpm run check` on TaskCompleted
 - Remove PostToolUse hook entry for `quality-check.cjs` from `settings.json`
 
 **Update `pattern-reminder.cjs`:**
+
 - Remove "Migration Files in Pre-Beta" CRITICAL pattern (stale — we're post-launch)
 - Remove `drizzle-kit generate` / `pnpm run db:generate` patterns (legitimate commands)
 
@@ -83,6 +86,7 @@ over-engineering friction identified in the insights report.
 Universal project rules that apply to any agent.
 
 **New "CI Workflow" subsection in §4:**
+
 - Check merge conflicts FIRST when investigating CI failures
   (`gh pr view --json mergeable`). Dirty mergeable state blocks all CI.
 - Never push directly to protected branches (main). Always use a feature branch.
@@ -90,9 +94,11 @@ Universal project rules that apply to any agent.
   For trivial changes (comments, docs), `pnpm run check` is sufficient.
 
 **Addition to existing "Commit Safety" subsection:**
+
 - Never add `gh pr merge` or broad wildcard tool patterns without explicit user approval.
 
 **New "Testing After Refactors" guidance:**
+
 - After any refactor, verify that test mocks reflect the new code structure
   (transaction wrappers, changed defaults, new parameters). Update fixtures proactively
   rather than waiting for CI.
