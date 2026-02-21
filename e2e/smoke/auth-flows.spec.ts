@@ -17,13 +17,12 @@ test.describe("Authentication Smoke", () => {
     await expect(passwordInput).toHaveAttribute("type", "password");
 
     // Click the show-password toggle button
-    const toggleButton = page.getByRole("button", { name: /show password/i });
-    await toggleButton.click();
+    await page.getByRole("button", { name: /show password/i }).click();
 
     await expect(passwordInput).toHaveAttribute("type", "text");
 
-    // Click again to hide
-    await toggleButton.click();
+    // Click again to hide (aria-label is now "Hide password")
+    await page.getByRole("button", { name: /hide password/i }).click();
     await expect(passwordInput).toHaveAttribute("type", "password");
   });
 
