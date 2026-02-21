@@ -145,6 +145,24 @@ conflicts across worktrees and force-push requirements on open PRs.
 
 ### Migration Conflict Resolution
 
+**CRITICAL RULE: NEVER MANUALLY RESOLVE `drizzle/meta` CONFLICTS.**
+The `drizzle/meta` folder contains binary-like snapshots of the schema. Manual resolution (e.g., accepting "both" or editing JSON files) leads to corruption and snapshot collisions.
+
+**Protocol: If `drizzle/meta` conflicts on merge/pull:**
+
+1.  **Accept Incoming**: Take the upstream version of `drizzle/meta` (theirs).
+2.  **Delete Local**: Delete your local migration files (`.sql` and `snapshot.json`).
+3.  **Regenerate**: Run `pnpm db:generate`. Drizzle will create a fresh migration on top of the new upstream state.
+
+**Why this works**: Drizzle regenerates consistent meta files (prevId chain, journal idx).
+Eliminates manual JSON surgery and uncertainty.
+
+**Snapshot Verification**:
+Before merging any PR involving migrations, ensure that:
+
+1.  Every new `.sql` file has a corresponding `_snapshot.json` in `drizzle/meta`.
+2.  `pnpm db:generate` runs locally without error (outputs "No schema changes").
+
 When merging branches with competing migrations (both created same number):
 
 **Regeneration Protocol** (Standard):
@@ -155,9 +173,6 @@ When merging branches with competing migrations (both created same number):
 4. **Regenerate**: `pnpm db:generate` creates fresh migration with correct number
 5. **Verify SQL** - Compare new SQL to deleted SQL, confirm intent preserved
 6. **Test**: `pnpm db:reset` to rebuild from scratch
-
-**Why this works**: Drizzle regenerates consistent meta files (prevId chain, journal idx).
-Eliminates manual JSON surgery and uncertainty.
 
 ### GitHub Copilot Reviews
 
