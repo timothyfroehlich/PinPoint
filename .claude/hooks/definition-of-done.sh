@@ -55,7 +55,7 @@ if [ -f "$CONTRACT_FILE" ]; then
   fi
 fi
 
-if ! pnpm run check >&2 2>&1; then
+if ! pnpm run check >&2; then
   echo "🔁 Ralph says: Quality gates failed for '$TASK_SUBJECT'. Fix issues before completing. — or if stuck: touch $WORKTREE_ROOT/.claude-hook-bypass" >&2
   exit 2
 fi
