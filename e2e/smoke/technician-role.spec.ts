@@ -23,6 +23,15 @@ test.describe("Technician Role Permissions", () => {
     await logout(page);
   });
 
+  test("Technician can see Add Machine button on list page", async ({
+    page,
+  }) => {
+    await page.goto("/m");
+    await expect(page.getByTestId("add-machine-button")).toBeVisible();
+    await page.getByTestId("add-machine-button").click();
+    await expect(page).toHaveURL(/\/m\/new/);
+  });
+
   test("Technician can access machine creation page", async ({ page }) => {
     await page.goto("/m/new");
     await expect(page).toHaveURL(/\/m\/new/);
