@@ -21,6 +21,13 @@ test.describe("Status Overhaul E2E", () => {
 
     // 1. Create Issue
     await page.goto(`/report?machine=${machine.initials}`);
+    await page.waitForLoadState("networkidle");
+
+    // Verify the page rendered with authenticated state before filling the form.
+    // The priority select is only visible for members/admins, so its presence
+    // confirms the server component saw the auth cookie correctly.
+    await expect(page.getByTestId("issue-priority-select")).toBeVisible();
+
     await page.getByTestId("machine-select").selectOption(machine.id);
     await fillReportForm(page, {
       title: "E2E Status Overhaul Test",
@@ -31,7 +38,9 @@ test.describe("Status Overhaul E2E", () => {
     await page.getByRole("button", { name: "Submit Issue Report" }).click();
 
     // 2. Verify redirect and badges
-    await expect(page).toHaveURL(/\/m\/TAF\/i\/[0-9]+/);
+    // Use a generous timeout: Server Action redirects can be slow on Mobile Chrome
+    // in CI due to cookie propagation timing.
+    await expect(page).toHaveURL(/\/m\/TAF\/i\/[0-9]+/, { timeout: 30000 });
 
     await expect(page.getByTestId("issue-status-badge").first()).toHaveText(
       /New/i
