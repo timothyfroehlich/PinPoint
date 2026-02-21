@@ -6,7 +6,7 @@ import { PasswordInput } from "./password-input";
 describe("PasswordInput", () => {
   it("renders as password type by default", () => {
     render(<PasswordInput id="pw" name="password" />);
-    // password inputs don't have role="textbox", so query by id
+    // Query by id to avoid ambiguity with the toggle button's aria-label
     const input = document.querySelector<HTMLInputElement>("#pw");
     expect(input).toBeInTheDocument();
     expect(input?.type).toBe("password");

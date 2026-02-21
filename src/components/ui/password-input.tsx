@@ -10,6 +10,7 @@ type PasswordInputProps = Omit<React.ComponentProps<typeof Input>, "type">;
 
 function PasswordInput({
   className,
+  disabled,
   ...props
 }: PasswordInputProps): React.JSX.Element {
   const [visible, setVisible] = useState(false);
@@ -19,14 +20,16 @@ function PasswordInput({
       <Input
         type={visible ? "text" : "password"}
         className={cn("pr-10", className)}
+        disabled={disabled}
         {...props}
       />
       <button
         type="button"
-        tabIndex={-1}
         aria-label={visible ? "Hide password" : "Show password"}
-        className="absolute right-0 top-0 flex h-full items-center px-3 text-muted-foreground hover:text-foreground"
+        className="absolute right-0 top-0 flex h-full items-center px-3 text-muted-foreground hover:text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-r-md"
+        onMouseDown={(event) => event.preventDefault()}
         onClick={() => setVisible((v) => !v)}
+        disabled={disabled}
       >
         {visible ? (
           <EyeOff className="size-4" aria-hidden="true" />

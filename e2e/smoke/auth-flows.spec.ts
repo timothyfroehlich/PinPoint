@@ -13,7 +13,7 @@ test.describe("Authentication Smoke", () => {
   }) => {
     await page.goto("/login");
 
-    const passwordInput = page.getByLabel("Password");
+    const passwordInput = page.getByLabel("Password", { exact: true });
     await expect(passwordInput).toHaveAttribute("type", "password");
 
     // Click the show-password toggle button
@@ -46,7 +46,7 @@ test.describe("Authentication Smoke", () => {
 
     // Fill out login form
     await page.getByLabel("Email").fill(testEmail);
-    await page.getByLabel("Password").fill(testPassword);
+    await page.getByLabel("Password", { exact: true }).fill(testPassword);
 
     // Verify "Remember Me" checkbox is checked by default
     const rememberMeCheckbox = page.getByLabel(/Remember me/i);

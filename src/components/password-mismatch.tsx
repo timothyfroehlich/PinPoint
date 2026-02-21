@@ -21,7 +21,7 @@ export function PasswordMismatch({
   return (
     <p
       aria-live="polite"
-      className={`flex items-center gap-1 text-xs ${matches ? "text-green-600" : "text-destructive"}`}
+      className={`flex items-center gap-1 text-xs ${matches ? "text-success" : "text-destructive"}`}
     >
       {matches ? (
         <>

@@ -78,7 +78,7 @@ test.describe("Extended Authentication", () => {
     const testPassword = seededMember.password;
 
     await page.getByLabel("Email").fill(testEmail);
-    await page.getByLabel("Password").fill(testPassword);
+    await page.getByLabel("Password", { exact: true }).fill(testPassword);
 
     // Submit form
     await page.getByRole("button", { name: "Sign In" }).click();

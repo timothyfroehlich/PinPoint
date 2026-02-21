@@ -40,7 +40,7 @@ test.describe("Change Password", () => {
     // Login with new password
     await page.goto("/login");
     await page.getByLabel("Email").fill("member@test.com");
-    await page.getByLabel("Password").fill(newPassword);
+    await page.getByLabel("Password", { exact: true }).fill(newPassword);
     await page.getByRole("button", { name: "Sign In" }).click();
     await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
 
