@@ -59,7 +59,6 @@ export async function uploadToBlob(
       pathname,
       contentType: file.type,
       contentDisposition: `inline; filename="${file.name}"`,
-      etag: "mock-etag",
     };
   }
 
