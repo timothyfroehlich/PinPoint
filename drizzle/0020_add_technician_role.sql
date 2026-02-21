@@ -100,3 +100,15 @@ $$;
 
 COMMENT ON FUNCTION public.handle_new_user() IS
   'Automatically creates a user_profile and notification_preferences when a new user signs up via Supabase Auth. Uses lower() for email matching. Non-invited signups default to guest role. Invited users inherit their role (guest, member, technician, or admin). Transfers guest issues and invited_users records on signup.';
+
+-- 2. Update role CHECK constraints to include technician
+-- Note: Drizzle manages these as table-level check constraints
+ALTER TABLE public.user_profiles
+  DROP CONSTRAINT IF EXISTS user_profiles_role_check,
+  ADD CONSTRAINT user_profiles_role_check
+    CHECK (role IN ('guest', 'member', 'technician', 'admin'));
+
+ALTER TABLE public.invited_users
+  DROP CONSTRAINT IF EXISTS invited_users_role_check,
+  ADD CONSTRAINT invited_users_role_check
+    CHECK (role IN ('guest', 'member', 'technician', 'admin'));

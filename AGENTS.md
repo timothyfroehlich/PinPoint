@@ -151,7 +151,7 @@ The `drizzle/meta` folder contains binary-like snapshots of the schema. Manual r
 **Protocol: If `drizzle/meta` conflicts on merge/pull:**
 
 1.  **Accept Incoming**: Take the upstream version of `drizzle/meta` (theirs).
-2.  **Delete Local**: Delete your local migration files (`.sql` and `snapshot.json`).
+2.  **Delete Local**: Delete only your branch-created/conflicted migration files: the local `.sql` migration(s) and their matching `drizzle/meta/NNNN_snapshot.json` file(s). Do **not** delete other files under `drizzle/meta`.
 3.  **Regenerate**: Run `pnpm db:generate`. Drizzle will create a fresh migration on top of the new upstream state.
 
 **Why this works**: Drizzle regenerates consistent meta files (prevId chain, journal idx).
