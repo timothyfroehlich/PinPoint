@@ -266,6 +266,11 @@
             "type": "command",
             "command": "node .claude/hooks/block-dangerous-commands.cjs",
             "timeout": 5000
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/normalize-workspace-paths.cjs",
+            "timeout": 5000
           }
         ]
       }
