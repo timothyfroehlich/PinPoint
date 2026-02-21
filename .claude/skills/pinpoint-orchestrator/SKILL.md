@@ -296,12 +296,12 @@ python3 ./pinpoint-wt.py remove <branch>
 
 ## Task Contract (End-to-End Dispatch)
 
-For full lifecycle tasks where a teammate handles everything (implement → PR → Copilot → CI), use the **`dispatch-e2e-teammate`** skill. It handles:
+For full lifecycle tasks where a teammate handles everything (implement → PR → Copilot → CI), use the **`pinpoint-dispatch-e2e-teammate`** skill. It handles:
 - Worktree creation with port allocation
 - Writing `.claude-task-contract` (the checklist the TaskCompleted hook enforces)
 - Teammate prompt with correct context
 
-Teammates should load **`teammate-guide`** at the start — it covers the Copilot review loop, CI verification, Supabase startup, and contract protocol.
+Teammates should load **`pinpoint-teammate-guide`** at the start — it covers the Copilot review loop, CI verification, Supabase startup, and contract protocol.
 
 ---
 

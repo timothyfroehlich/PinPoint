@@ -1,5 +1,5 @@
 ---
-name: teammate-guide
+name: pinpoint-teammate-guide
 description: Guide for teammates dispatched to worktrees. Covers environment setup, task contract protocol, Copilot review loop, and CI verification.
 audience: dispatched teammate
 ---

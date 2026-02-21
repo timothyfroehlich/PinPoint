@@ -39,6 +39,21 @@ async function main() {
   }
 
   const agentCwd = input.cwd || process.cwd();
+
+  // Resolve worktree/repo root for path existence checks (handles subdirectory cwd)
+  let repoRoot = agentCwd;
+  try {
+    const { execSync } = require("child_process");
+    repoRoot =
+      execSync("git rev-parse --show-toplevel", {
+        cwd: agentCwd,
+        encoding: "utf8",
+        stdio: ["pipe", "pipe", "pipe"],
+      }).trim() || agentCwd;
+  } catch {
+    // Not in a git repo — fall back to cwd
+  }
+
   let modified = command;
   const rewrites = [];
 
@@ -52,8 +67,8 @@ async function main() {
     const fullAbsPath = match[0];
     const relativePart = match[1];
 
-    // Only rewrite if the file exists relative to the agent's cwd
-    const localPath = path.join(agentCwd, relativePart);
+    // Only rewrite if the file exists relative to the repo/worktree root
+    const localPath = path.join(repoRoot, relativePart);
     if (fs.existsSync(localPath)) {
       modified = modified.replace(fullAbsPath, relativePart);
       rewrites.push(`  ${fullAbsPath} -> ${relativePart}`);
@@ -71,7 +86,7 @@ async function main() {
         hookEventName: "PreToolUse",
         permissionDecision: "allow",
         permissionDecisionReason: reason,
-        updatedInput: { command: modified },
+        updatedInput: { ...input.tool_input, command: modified },
       },
     };
     process.stdout.write(JSON.stringify(decision));

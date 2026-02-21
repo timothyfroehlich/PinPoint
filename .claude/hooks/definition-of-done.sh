@@ -15,6 +15,12 @@
 # SAFEWORD: If the agent is truly stuck, it can run:
 #   touch .claude-hook-bypass
 
+# Ensure jq is available (hooks fail closed without it)
+if ! command -v jq >/dev/null 2>&1; then
+  echo "Error: 'jq' is required by definition-of-done.sh but is not installed." >&2
+  exit 2
+fi
+
 INPUT=$(cat)
 TASK_SUBJECT=$(echo "$INPUT" | jq -r '.task_subject // "unknown"')
 AGENT_CWD=$(echo "$INPUT" | jq -r '.cwd // empty')

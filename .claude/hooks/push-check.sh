@@ -12,6 +12,12 @@
 # SAFEWORD: If the agent is truly stuck, it can run:
 #   touch .claude-hook-bypass
 
+# Ensure jq is available (hooks fail closed without it)
+if ! command -v jq >/dev/null 2>&1; then
+  echo "Error: 'jq' is required by push-check.sh but is not installed." >&2
+  exit 2
+fi
+
 INPUT=$(cat)
 AGENT_CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
 
@@ -56,9 +62,9 @@ if [ "$AHEAD" -gt 0 ]; then
   exit 2
 fi
 
-# Note: checks tracked file modifications vs HEAD; does not catch untracked files
-if ! git diff --quiet HEAD 2>/dev/null; then
-  echo "🔁 Ralph says: Uncommitted changes to tracked files detected. Commit and push. — or if stuck: touch $AGENT_CWD/.claude-hook-bypass" >&2
+# Note: checks staged + unstaged tracked file changes vs HEAD; does not catch untracked files
+if ! git diff-index --quiet HEAD -- 2>/dev/null; then
+  echo "🔁 Ralph says: Uncommitted changes detected. Commit and push. — or if stuck: touch $AGENT_CWD/.claude-hook-bypass" >&2
   exit 2
 fi
 

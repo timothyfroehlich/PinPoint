@@ -1,11 +1,11 @@
 ---
-name: dispatch-e2e-teammate
+name: pinpoint-dispatch-e2e-teammate
 description: Dispatch a teammate for end-to-end issue work. Creates worktree, writes task contract, and launches teammate with correct context.
 audience: lead agent coordinating work
 ---
 
 > **Audience**: This skill is for the **lead agent** dispatching teammates.
-> If you are a dispatched teammate, load `teammate-guide` instead.
+> If you are a dispatched teammate, load `pinpoint-teammate-guide` instead.
 
 ## When to Use
 
@@ -67,7 +67,7 @@ Use the `Task` tool with this prompt structure:
 ```
 You are working in a git worktree at: /home/froeht/Code/pinpoint-worktrees/feat-<branch-name>
 
-Start by loading the `teammate-guide` skill (or read .claude/skills/teammate-guide/SKILL.md directly).
+Start by loading the `teammate-guide` skill (or read .claude/skills/pinpoint-teammate-guide/SKILL.md directly).
 
 ## Task: <issue title>
 <beads issue ID and description>
