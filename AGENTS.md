@@ -189,7 +189,7 @@ bash scripts/workflow/respond-to-copilot.sh <PR> "<path>:<line>" "Fixed: <what y
 bash scripts/workflow/respond-to-copilot.sh <PR> "<path>:<line>" "Ignored: <why this is wrong/unnecessary>. —Claude"
 ```
 
-Sign replies with your agent name (`—Claude`, `—Codex`, etc.).
+Sign replies with your agent name (`—Gemini`, `—Antigravity`, `—Claude`, `—Codex`, etc.).
 
 **Scripts:**
 
