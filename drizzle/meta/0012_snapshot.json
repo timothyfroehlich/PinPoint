@@ -1,6 +1,6 @@
 {
-  "id": "153ea110-036c-4240-99e2-1323492cb14e",
-  "prevId": "02b019ad-337a-4b7d-a084-46f29b565179",
+  "id": "c9a83dd1-4341-4d43-9ea4-193f2d254a1f",
+  "prevId": "ee262dd7-721c-4dd4-8630-750eacaf2c1f",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -73,7 +73,7 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "'guest'"
+          "default": "'member'"
         },
         "created_at": {
           "name": "created_at",
@@ -1259,7 +1259,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "'member'"
+          "default": "'guest'"
+        },
+        "terms_accepted_at": {
+          "name": "terms_accepted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
