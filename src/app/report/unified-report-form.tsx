@@ -202,7 +202,10 @@ export function UnifiedReportForm({
     }
   }, [defaultMachineId]);
 
-  const isAdminOrMember = accessLevel === "admin" || accessLevel === "member";
+  const isAdminOrMember =
+    accessLevel === "admin" ||
+    accessLevel === "technician" ||
+    accessLevel === "member";
 
   return (
     <div className="w-full max-w-5xl mx-auto">

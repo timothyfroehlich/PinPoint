@@ -29,7 +29,7 @@ async function verifyAdmin(userId: string): Promise<void> {
 
 export async function updateUserRole(
   userId: string,
-  newRole: "guest" | "member" | "admin",
+  newRole: "guest" | "member" | "technician" | "admin",
   userType: "active" | "invited" = "active"
 ): Promise<void> {
   const supabase = await createClient();

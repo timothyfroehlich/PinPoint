@@ -18,7 +18,7 @@ export function MobileNav({
   issuesPath,
   newChangelogCount = 0,
 }: {
-  role?: "guest" | "member" | "admin" | undefined;
+  role?: "guest" | "member" | "technician" | "admin" | undefined;
   issuesPath?: string;
   newChangelogCount?: number;
 }): React.JSX.Element {

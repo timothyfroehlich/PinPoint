@@ -50,7 +50,7 @@ export const userProfiles = pgTable("user_profiles", {
     .generatedAlwaysAs(sql`first_name || ' ' || last_name`)
     .notNull(),
   avatarUrl: text("avatar_url"),
-  role: text("role", { enum: ["guest", "member", "admin"] })
+  role: text("role", { enum: ["guest", "member", "technician", "admin"] })
     .notNull()
     .default("guest"), // Default for new signups (no invitation)
   termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
@@ -76,7 +76,7 @@ export const invitedUsers = pgTable("invited_users", {
     .generatedAlwaysAs(sql`first_name || ' ' || last_name`)
     .notNull(),
   email: citext("email").notNull().unique(),
-  role: text("role", { enum: ["guest", "member", "admin"] })
+  role: text("role", { enum: ["guest", "member", "technician", "admin"] })
     .notNull()
     .default("member"), // Default for invited users (trusted)
   createdAt: timestamp("created_at", { withTimezone: true })

@@ -140,9 +140,32 @@ describe("createMachineAction", () => {
     expect(result).toEqual({
       ok: false,
       code: "UNAUTHORIZED",
-      message: "You must be an admin to create a machine.",
+      message: "You must be an admin or technician to create a machine.",
     });
     expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it("should allow technician to create a machine", async () => {
+    // Mock profile with technician role
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      role: "technician",
+    } as any);
+
+    // Mock successful insert
+    const mockMachine = { id: "machine-123", initials: "MM" };
+    chain.returning.mockResolvedValue([mockMachine]);
+
+    const formData = new FormData();
+    formData.append("name", "Medieval Madness");
+    formData.append("initials", "MM");
+
+    try {
+      await createMachineAction(initialState, formData);
+    } catch (e: any) {
+      expect(e.message).toBe("NEXT_REDIRECT");
+    }
+
+    expect(db.insert).toHaveBeenCalled();
   });
 });
 

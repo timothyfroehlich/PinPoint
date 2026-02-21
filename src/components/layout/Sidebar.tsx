@@ -53,7 +53,7 @@ export function Sidebar({
   initialCollapsed = false,
   newChangelogCount = 0,
 }: {
-  role?: "guest" | "member" | "admin" | undefined;
+  role?: "guest" | "member" | "technician" | "admin" | undefined;
   onNavigate?: () => void;
   isMobile?: boolean;
   /** The issues link path, read from cookie on the server */

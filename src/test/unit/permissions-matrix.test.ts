@@ -18,11 +18,12 @@ import {
  */
 
 describe("ACCESS_LEVELS", () => {
-  it("should define all four access levels in order", () => {
+  it("should define all five access levels in order", () => {
     expect(ACCESS_LEVELS).toEqual([
       "unauthenticated",
       "guest",
       "member",
+      "technician",
       "admin",
     ]);
   });
@@ -177,21 +178,44 @@ describe("Permission hierarchy", () => {
     "machines.view.ownerNotes",
   ]);
 
-  it("should grant admin all permissions that member has (except owner-only)", () => {
+  it("should grant admin all permissions that technician has (except owner-only)", () => {
     for (const category of PERMISSIONS_MATRIX) {
       for (const permission of category.permissions) {
         if (ownerOnlyPermissions.has(permission.id)) continue;
 
-        const memberValue = permission.access.member;
+        const techValue = permission.access.technician;
         const adminValue = permission.access.admin;
 
-        // If member has permission, admin should too
-        if (memberValue === true) {
+        // If technician has permission, admin should too
+        if (techValue === true) {
           expect(adminValue).toBe(true);
         }
-        // If member has conditional, admin should have full
-        if (memberValue === "own" || memberValue === "owner") {
+        // If technician has conditional, admin should have full
+        if (techValue === "own" || techValue === "owner") {
           expect(adminValue).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("should grant technician all permissions that member has", () => {
+    for (const category of PERMISSIONS_MATRIX) {
+      for (const permission of category.permissions) {
+        const memberValue = permission.access.member;
+        const techValue = permission.access.technician;
+
+        // If member has unconditional permission, technician should too
+        if (memberValue === true) {
+          expect(
+            techValue === true || techValue === "own" || techValue === "owner"
+          ).toBe(true);
+        }
+
+        // If member has conditional permission, technician should have at least the same
+        if (memberValue === "own" || memberValue === "owner") {
+          expect(
+            techValue === true || techValue === "own" || techValue === "owner"
+          ).toBe(true);
         }
       }
     }
@@ -266,12 +290,14 @@ describe("Specific permission rules from design", () => {
       expect(getPermission("issues.update.assignee", "guest")).toBe(false);
     });
 
-    it("should allow members to update any issue", () => {
-      expect(getPermission("issues.update.severity", "member")).toBe(true);
-      expect(getPermission("issues.update.frequency", "member")).toBe(true);
-      expect(getPermission("issues.update.status", "member")).toBe(true);
-      expect(getPermission("issues.update.priority", "member")).toBe(true);
-      expect(getPermission("issues.update.assignee", "member")).toBe(true);
+    it("should allow members and technicians to update any issue", () => {
+      for (const role of ["member", "technician"] as const) {
+        expect(getPermission("issues.update.severity", role)).toBe(true);
+        expect(getPermission("issues.update.frequency", role)).toBe(true);
+        expect(getPermission("issues.update.status", role)).toBe(true);
+        expect(getPermission("issues.update.priority", role)).toBe(true);
+        expect(getPermission("issues.update.assignee", role)).toBe(true);
+      }
     });
   });
 
@@ -285,39 +311,42 @@ describe("Specific permission rules from design", () => {
       expect(getPermission("comments.add", "guest")).toBe(true);
     });
 
-    it("should use ownership checks for editing own comments", () => {
-      expect(getPermission("comments.edit.own", "unauthenticated")).toBe(false);
-      expect(getPermission("comments.edit.own", "guest")).toBe("own");
-      expect(getPermission("comments.edit.own", "member")).toBe("own");
-      expect(getPermission("comments.edit.own", "admin")).toBe(true);
+    it("should use ownership checks for editing comments", () => {
+      expect(getPermission("comments.edit", "unauthenticated")).toBe(false);
+      expect(getPermission("comments.edit", "guest")).toBe("own");
+      expect(getPermission("comments.edit", "member")).toBe(true);
+      expect(getPermission("comments.edit", "technician")).toBe(true);
+      expect(getPermission("comments.edit", "admin")).toBe(true);
     });
 
-    it("should use ownership checks for deleting own comments", () => {
-      expect(getPermission("comments.delete.own", "unauthenticated")).toBe(
-        false
-      );
-      expect(getPermission("comments.delete.own", "guest")).toBe("own");
-      expect(getPermission("comments.delete.own", "member")).toBe("own");
-      expect(getPermission("comments.delete.own", "admin")).toBe(true);
+    it("should use ownership checks for deleting comments", () => {
+      expect(getPermission("comments.delete", "unauthenticated")).toBe(false);
+      expect(getPermission("comments.delete", "guest")).toBe("own");
+      expect(getPermission("comments.delete", "member")).toBe(true);
+      expect(getPermission("comments.delete", "technician")).toBe(true);
+      expect(getPermission("comments.delete", "admin")).toBe(true);
     });
 
     it("should only allow admin to delete others comments", () => {
       expect(getPermission("comments.delete.any", "guest")).toBe(false);
       expect(getPermission("comments.delete.any", "member")).toBe(false);
+      expect(getPermission("comments.delete.any", "technician")).toBe(false);
       expect(getPermission("comments.delete.any", "admin")).toBe(true);
     });
   });
 
   describe("Machines", () => {
-    it("should only allow admin to create machines", () => {
+    it("should allow admin and technician to create machines", () => {
       expect(getPermission("machines.create", "guest")).toBe(false);
       expect(getPermission("machines.create", "member")).toBe(false);
+      expect(getPermission("machines.create", "technician")).toBe(true);
       expect(getPermission("machines.create", "admin")).toBe(true);
     });
 
-    it("should allow machine owners to edit their machines", () => {
+    it("should allow machine owners, technicians, and admins to edit machines", () => {
       expect(getPermission("machines.edit", "guest")).toBe(false);
       expect(getPermission("machines.edit", "member")).toBe("owner");
+      expect(getPermission("machines.edit", "technician")).toBe(true);
       expect(getPermission("machines.edit", "admin")).toBe(true);
     });
 
@@ -332,7 +361,9 @@ describe("Specific permission rules from design", () => {
       );
       expect(getPermission("machines.edit.ownerNotes", "guest")).toBe(false);
       expect(getPermission("machines.edit.ownerNotes", "member")).toBe("owner");
-      // Even admins need to be the owner to edit owner notes
+      expect(getPermission("machines.edit.ownerNotes", "technician")).toBe(
+        "owner"
+      );
       expect(getPermission("machines.edit.ownerNotes", "admin")).toBe("owner");
     });
 
@@ -342,6 +373,9 @@ describe("Specific permission rules from design", () => {
       );
       expect(getPermission("machines.view.ownerNotes", "guest")).toBe(false);
       expect(getPermission("machines.view.ownerNotes", "member")).toBe("owner");
+      expect(getPermission("machines.view.ownerNotes", "technician")).toBe(
+        "owner"
+      );
       expect(getPermission("machines.view.ownerNotes", "admin")).toBe("owner");
     });
 
@@ -355,6 +389,9 @@ describe("Specific permission rules from design", () => {
       expect(getPermission("machines.view.ownerRequirements", "member")).toBe(
         true
       );
+      expect(
+        getPermission("machines.view.ownerRequirements", "technician")
+      ).toBe(true);
       expect(getPermission("machines.view.ownerRequirements", "admin")).toBe(
         true
       );
@@ -365,12 +402,15 @@ describe("Specific permission rules from design", () => {
     it("should only allow admin to access admin features", () => {
       expect(getPermission("admin.access", "guest")).toBe(false);
       expect(getPermission("admin.access", "member")).toBe(false);
+      expect(getPermission("admin.access", "technician")).toBe(false);
       expect(getPermission("admin.access", "admin")).toBe(true);
 
       expect(getPermission("admin.users.invite", "member")).toBe(false);
+      expect(getPermission("admin.users.invite", "technician")).toBe(false);
       expect(getPermission("admin.users.invite", "admin")).toBe(true);
 
       expect(getPermission("admin.users.roles", "member")).toBe(false);
+      expect(getPermission("admin.users.roles", "technician")).toBe(false);
       expect(getPermission("admin.users.roles", "admin")).toBe(true);
     });
   });

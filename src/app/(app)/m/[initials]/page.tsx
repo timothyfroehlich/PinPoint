@@ -149,7 +149,8 @@ export default async function MachineDetailPage({
     accessLevel,
     ownershipContext
   );
-  const isAdmin = accessLevel === "admin";
+  const canEditAnyMachine =
+    accessLevel === "admin" || accessLevel === "technician";
   const isOwner =
     !!user &&
     (user.id === machine.ownerId || user.id === machine.invitedOwnerId);
@@ -322,7 +323,7 @@ export default async function MachineDetailPage({
                   <EditMachineDialog
                     machine={machine}
                     allUsers={allUsers}
-                    isAdmin={isAdmin}
+                    canEditAnyMachine={canEditAnyMachine}
                     isOwner={isOwner}
                   />
                 )}

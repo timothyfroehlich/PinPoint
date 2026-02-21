@@ -153,7 +153,11 @@ export async function submitPublicIssueAction(
       columns: { role: true },
     });
 
-    if (profile?.role === "admin" || profile?.role === "member") {
+    if (
+      profile?.role === "admin" ||
+      profile?.role === "technician" ||
+      profile?.role === "member"
+    ) {
       isMemberOrAdmin = true;
     }
   }

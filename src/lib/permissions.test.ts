@@ -18,6 +18,11 @@ describe("canUpdateIssue", () => {
     expect(canUpdateIssue(adminUser, issue, machine)).toBe(true);
   });
 
+  it("should allow technicians to update any issue", () => {
+    const techUser = { id: "tech-1", role: "technician" as UserRole };
+    expect(canUpdateIssue(techUser, issue, machine)).toBe(true);
+  });
+
   it("should allow machine owner to update issue", () => {
     expect(canUpdateIssue(memberUser, issue, machine)).toBe(true);
   });
@@ -51,6 +56,11 @@ describe("canEditIssueTitle", () => {
 
   it("should allow admins to edit any issue title", () => {
     expect(canEditIssueTitle(adminUser, issue)).toBe(true);
+  });
+
+  it("should allow technicians to edit any issue title", () => {
+    const techUser = { id: "tech-1", role: "technician" as UserRole };
+    expect(canEditIssueTitle(techUser, issue)).toBe(true);
   });
 
   it("should allow members to edit any issue title", () => {
