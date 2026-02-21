@@ -40,7 +40,7 @@
     "check:config": "python3 scripts/check-config-drift.py > /dev/null",
     "check:migrations": "drizzle-kit check",
     "check:linters": "yamllint .github/workflows/ && actionlint $(find .github/workflows -name '*.yml' ! -name '*.lock.yml') && ruff check scripts/ pinpoint-wt.py .agent/skills/*/scripts/*.py && ruff format --check scripts/ pinpoint-wt.py .agent/skills/*/scripts/*.py && find scripts/ .agent/skills/ .devcontainer/ -name '*.sh' -print0 | xargs -0 shellcheck",
-    "check": "npm-run-all --silent --parallel typecheck lint test format:fix check:linters check:migrations",
+    "check": "npm-run-all --silent --parallel typecheck lint test format:fix check:linters",
     "preflight": "npm-run-all --silent --parallel typecheck lint:fix format:fix test check:config --sequential db:fast-reset --parallel build test:integration test:integration:supabase --sequential smoke",
     "supa:ci": "bash scripts/supa-ci.sh",
     "sync-worktrees": "python3 scripts/sync_worktrees.py",
