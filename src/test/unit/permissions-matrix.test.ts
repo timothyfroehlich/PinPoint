@@ -172,16 +172,21 @@ describe("requiresOwnershipCheck", () => {
 });
 
 describe("Permission hierarchy", () => {
-  // Owner-only permissions (not subject to admin escalation)
-  const ownerOnlyPermissions = new Set([
+  // Permissions where admin intentionally does NOT escalate beyond technician.
+  // - ownerNotes: privacy-scoped to machine owner, even admins can't see/edit
+  // - comments.edit/delete: all roles are "own" only; admin deleting others'
+  //   comments is handled by the separate "comments.delete.any" permission
+  const noAdminEscalation = new Set([
     "machines.edit.ownerNotes",
     "machines.view.ownerNotes",
+    "comments.edit",
+    "comments.delete",
   ]);
 
-  it("should grant admin all permissions that technician has (except owner-only)", () => {
+  it("should grant admin all permissions that technician has (except excluded)", () => {
     for (const category of PERMISSIONS_MATRIX) {
       for (const permission of category.permissions) {
-        if (ownerOnlyPermissions.has(permission.id)) continue;
+        if (noAdminEscalation.has(permission.id)) continue;
 
         const techValue = permission.access.technician;
         const adminValue = permission.access.admin;
@@ -309,20 +314,20 @@ describe("Specific permission rules from design", () => {
       expect(getPermission("comments.add", "guest")).toBe(true);
     });
 
-    it("should use ownership checks for editing comments", () => {
+    it("should only allow editing own comments for all roles", () => {
       expect(getPermission("comments.edit", "unauthenticated")).toBe(false);
       expect(getPermission("comments.edit", "guest")).toBe("own");
-      expect(getPermission("comments.edit", "member")).toBe(true);
-      expect(getPermission("comments.edit", "technician")).toBe(true);
-      expect(getPermission("comments.edit", "admin")).toBe(true);
+      expect(getPermission("comments.edit", "member")).toBe("own");
+      expect(getPermission("comments.edit", "technician")).toBe("own");
+      expect(getPermission("comments.edit", "admin")).toBe("own");
     });
 
-    it("should use ownership checks for deleting comments", () => {
+    it("should only allow deleting own comments for all roles", () => {
       expect(getPermission("comments.delete", "unauthenticated")).toBe(false);
       expect(getPermission("comments.delete", "guest")).toBe("own");
-      expect(getPermission("comments.delete", "member")).toBe(true);
-      expect(getPermission("comments.delete", "technician")).toBe(true);
-      expect(getPermission("comments.delete", "admin")).toBe(true);
+      expect(getPermission("comments.delete", "member")).toBe("own");
+      expect(getPermission("comments.delete", "technician")).toBe("own");
+      expect(getPermission("comments.delete", "admin")).toBe("own");
     });
 
     it("should only allow admin to delete others comments", () => {

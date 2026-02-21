@@ -292,27 +292,25 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
       {
         id: "comments.edit",
         label: "Edit comments",
-        description:
-          "Guests can edit their own comments; members, technicians, and admins can edit any comment.",
+        description: "Edit your own comments",
         access: {
           unauthenticated: false,
           guest: "own",
-          member: true,
-          technician: true,
-          admin: true,
+          member: "own",
+          technician: "own",
+          admin: "own",
         },
       },
       {
         id: "comments.delete",
         label: "Delete comments",
-        description:
-          "Guests can delete their own comments; members, technicians, and admins can delete any comment.",
+        description: "Delete your own comments",
         access: {
           unauthenticated: false,
           guest: "own",
-          member: true,
-          technician: true,
-          admin: true,
+          member: "own",
+          technician: "own",
+          admin: "own",
         },
       },
       {
