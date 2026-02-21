@@ -33,7 +33,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
 
   if (!profile) {
     // Should not happen due to trigger, but handle gracefully
-    redirect("/login");
+    redirect(getLoginUrl("/settings"));
   }
 
   // Fetch notification preferences

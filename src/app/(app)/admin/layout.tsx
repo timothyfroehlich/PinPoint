@@ -5,6 +5,7 @@ import { userProfiles } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import type React from "react";
 import { Forbidden } from "~/components/errors/Forbidden";
+import { getLoginUrl } from "~/lib/url";
 
 export default async function AdminLayout({
   children,
@@ -17,7 +18,7 @@ export default async function AdminLayout({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    redirect(getLoginUrl("/admin"));
   }
 
   const profile = await db.query.userProfiles.findFirst({

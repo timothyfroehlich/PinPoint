@@ -285,6 +285,7 @@ test.describe("Issues System", () => {
     }) => {
       // Navigate to issues list page
       await page.goto("/issues");
+      await page.waitForLoadState("networkidle");
 
       // Wait for issues to load
       await expect(
@@ -306,8 +307,8 @@ test.describe("Issues System", () => {
         // Click next page
         await nextButton.click();
 
-        // Wait for URL to change
-        await page.waitForURL(/page=2/);
+        // Wait for URL to change (generous timeout for Mobile Chrome in CI)
+        await page.waitForURL(/page=2/, { timeout: 30000 });
 
         // Previous button should now be enabled
         await expect(bottomPrevButton).toBeEnabled();
