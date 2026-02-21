@@ -89,12 +89,6 @@
       "Bash(supabase start:*)",
       "Bash(supabase db reset:*)",
       "Bash(supabase:*)",
-      "Bash(./scripts/safe-curl.sh:*)",
-      "Bash(./scripts/safe-psql.sh:*)",
-      "Bash(./scripts/check-security-deps.sh:*)",
-      "Bash(./scripts/check-file-security.sh:*)",
-      "Bash(./scripts/check-db-schema.sh:*)",
-      "Bash(./scripts/check-pnpm-audit.sh:*)",
       "Bash(bash scripts/workflow/copilot-comments.sh:*)",
       "Bash(bash scripts/workflow/label-ready.sh:*)",
       "Bash(bash scripts/workflow/pr-dashboard.sh:*)",
@@ -188,10 +182,28 @@
       "mcp__vercel__get_deployment",
       "mcp__vercel__get_deployment_build_logs",
       "mcp__vercel__web_fetch_vercel_url",
+      "Skill(pinpoint-commit)",
+      "Skill(pinpoint-commit:*)",
+      "Skill(pinpoint-e2e)",
+      "Skill(pinpoint-e2e:*)",
       "Skill(pinpoint-patterns)",
       "Skill(pinpoint-patterns:*)",
+      "Skill(pinpoint-security)",
+      "Skill(pinpoint-security:*)",
+      "Skill(pinpoint-testing)",
+      "Skill(pinpoint-testing:*)",
       "Skill(pinpoint-typescript)",
       "Skill(pinpoint-typescript:*)",
+      "Skill(pinpoint-ui)",
+      "Skill(pinpoint-ui:*)",
+      "Skill(pinpoint-github-monitor)",
+      "Skill(pinpoint-github-monitor:*)",
+      "Skill(pinpoint-orchestrator)",
+      "Skill(pinpoint-orchestrator:*)",
+      "Skill(pinpoint-dispatch-e2e-teammate)",
+      "Skill(pinpoint-dispatch-e2e-teammate:*)",
+      "Skill(pinpoint-teammate-guide)",
+      "Skill(pinpoint-teammate-guide:*)",
       "Skill(superpowers:systematic-debugging)",
       "Skill(superpowers:brainstorming)",
       "Skill(superpowers:executing-plans)",
@@ -283,18 +295,6 @@
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/preflight-reminder.sh",
             "timeout": 5000
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "matcher": ".*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node .claude/hooks/pattern-reminder.cjs",
-            "timeout": 2000
           }
         ]
       }

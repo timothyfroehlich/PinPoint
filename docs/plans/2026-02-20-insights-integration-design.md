@@ -12,34 +12,19 @@ from unupdated mocks, and CI merge-conflict blindness.
 
 ## Changes
 
-### 1. Skill Rename: `pinpoint-*` / `github-monitor` → `tmf-*`
+### 1. Skill Rename: `github-monitor` → `pinpoint-github-monitor`
 
-Rename all custom skills to use a `tmf-` prefix so Tim can easily distinguish his custom skills
-from plugin-provided ones.
+**Original plan:** Rename all skills to `tmf-*` prefix. **Revised:** Keep `pinpoint-*` prefix
+(natural project naming), but fix the one inconsistency: `github-monitor` → `pinpoint-github-monitor`.
 
-**Scope:**
+The `tmf-*` rename was implemented and then reverted — the `pinpoint-*` convention was clearer
+since all custom skills already used it except `github-monitor`.
 
-- 8 directories in `.agent/skills/` (source of truth): rename `pinpoint-X` → `tmf-X`,
-  `github-monitor` → `tmf-github-monitor`
-- 8 symlinks in `.claude/skills/`: delete old, recreate with new names
-- 1 real directory in `.claude/skills/`: rename `pinpoint-orchestrator` → `tmf-orchestrator`
-- Update `name:` frontmatter in each `SKILL.md`
-- Update AGENTS.md §3 skill table
-- Update any cross-references between skills
+**What shipped:**
 
-**Mapping:**
-
-| Old Name              | New Name           | Location         |
-| :-------------------- | :----------------- | :--------------- |
-| pinpoint-commit       | tmf-commit         | .agent (symlink) |
-| pinpoint-e2e          | tmf-e2e            | .agent (symlink) |
-| pinpoint-patterns     | tmf-patterns       | .agent (symlink) |
-| pinpoint-security     | tmf-security       | .agent (symlink) |
-| pinpoint-testing      | tmf-testing        | .agent (symlink) |
-| pinpoint-typescript   | tmf-typescript     | .agent (symlink) |
-| pinpoint-ui           | tmf-ui             | .agent (symlink) |
-| github-monitor        | tmf-github-monitor | .agent (symlink) |
-| pinpoint-orchestrator | tmf-orchestrator   | .claude (real)   |
+- Renamed `.agent/skills/github-monitor` → `.agent/skills/pinpoint-github-monitor`
+- Updated symlink in `.claude/skills/`
+- Updated `name:` frontmatter and AGENTS.md skill table
 
 ### 2. New Hook: Post-push Preflight Reminder
 
@@ -66,6 +51,16 @@ For code changes, consider running preflight before marking the task done.
 
 - Remove "Migration Files in Pre-Beta" CRITICAL pattern (stale — we're post-launch)
 - Remove `drizzle-kit generate` / `pnpm run db:generate` patterns (legitimate commands)
+
+**Remove `pattern-reminder.cjs` entirely (added post-design):**
+
+- SubagentStop only fires for Task tool subagents, not Agent Teams teammates
+- Most Task subagents are read-only (Explore, Plan, investigator) — they never change files
+- The few that do write files often work in worktrees where `git status` in the parent
+  cwd won't see their changes
+- Net effect: the hook scans an empty diff most of the time
+- The patterns it enforced (PGlite, deprecated auth, snake case) are better caught by
+  `pnpm run check` (already runs on TaskCompleted via `definition-of-done.sh`)
 
 ### 4. CLAUDE.md Additions
 
@@ -105,9 +100,9 @@ Universal project rules that apply to any agent.
 
 ### 6. Enhance Existing Skills
 
-**`tmf-github-monitor`:** Add "check merge conflicts first" as step 1 in the monitoring flow.
+**`pinpoint-github-monitor`:** Add "check merge conflicts first" as step 0 in the monitoring flow.
 
-**`tmf-commit`:** Add Copilot comment resolution + label-ready flow after push/PR creation.
+**`pinpoint-commit`:** Add Copilot comment resolution + label-ready flow after push/PR creation.
 
 ## Non-Goals
 
