@@ -670,7 +670,7 @@ Before providing feedback, verify:
 
 **Works Alongside**:
 - Generic code-review skill (language/framework basics)
-- PinPoint skills (pinpoint-ui, pinpoint-typescript, pinpoint-testing, etc.)
+- PinPoint skills (tmf-ui, tmf-typescript, tmf-testing, etc.)
 - AGENTS.md (project context and priorities)
 
 **When to Use**:

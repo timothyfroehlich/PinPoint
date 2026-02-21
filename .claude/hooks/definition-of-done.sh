@@ -9,6 +9,9 @@
 # Reads the agent's cwd from stdin JSON so it runs checks in the RIGHT repo
 # (learned from Ralph Loops 2026-02-21).
 #
+# CONTRACT MODE: If .claude-task-contract exists in the worktree root,
+# all checklist items must be checked off before task completion is allowed.
+#
 # SAFEWORD: If the agent is truly stuck, it can run:
 #   touch .claude-hook-bypass
 
@@ -24,6 +27,20 @@ fi
 if [ -f ".claude-hook-bypass" ]; then
   rm -f ".claude-hook-bypass"
   exit 0
+fi
+
+# Contract mode: find contract at worktree root (handles subdirectory cwd)
+WORKTREE_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+CONTRACT_FILE="$WORKTREE_ROOT/.claude-task-contract"
+
+if [ -f "$CONTRACT_FILE" ]; then
+  unchecked=$(grep -c '^\- \[ \]' "$CONTRACT_FILE" || true)
+  if [ "$unchecked" -gt 0 ]; then
+    echo "🔁 Ralph says: Task contract has $unchecked unchecked item(s) for '$TASK_SUBJECT':" >&2
+    grep '^\- \[ \]' "$CONTRACT_FILE" | sed 's/^/  /' >&2
+    echo "Check off all items in $CONTRACT_FILE before completing. — or if stuck: touch $WORKTREE_ROOT/.claude-hook-bypass" >&2
+    exit 2
+  fi
 fi
 
 if ! pnpm run check 2>&1; then
