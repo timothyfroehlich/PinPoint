@@ -1,6 +1,6 @@
 {
-  "id": "153ea110-036c-4240-99e2-1323492cb14e",
-  "prevId": "02b019ad-337a-4b7d-a084-46f29b565179",
+  "id": "02b019ad-337a-4b7d-a084-46f29b565179",
+  "prevId": "8c90b567-c8df-474f-8abf-49c466f059e7",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -528,8 +528,8 @@
           "notNull": true,
           "default": "'medium'"
         },
-        "frequency": {
-          "name": "frequency",
+        "consistency": {
+          "name": "consistency",
           "type": "text",
           "primaryKey": false,
           "notNull": true,

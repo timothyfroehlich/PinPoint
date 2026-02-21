@@ -386,6 +386,9 @@ jobs:
       - name: Apply migrations to fresh database
         run: pnpm run db:migrate
 
+      - name: Verify migration metadata integrity
+        run: pnpm run check:migrations
+
       - name: Ensure test schema is current
         run: |
           set -a
