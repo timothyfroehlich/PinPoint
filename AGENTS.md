@@ -106,6 +106,15 @@ conflicts across worktrees and force-push requirements on open PRs.
 - **NEVER use `--no-verify`** without explicit user permission
 - This flag bypasses pre-commit hooks (lint, format, type checks)
 - Only use when user explicitly requests it
+- Never add `gh pr merge` or broad wildcard tool patterns without explicit user approval.
+
+### CI Workflow
+
+- When investigating CI failures, check for merge conflicts FIRST:
+  `gh pr view <PR> --json mergeable`. A dirty mergeable state blocks all CI.
+- Never push directly to protected branches (main). Always use a feature branch.
+- After code changes, run `pnpm run preflight` before considering work complete.
+  For trivial changes (comments, docs), `pnpm run check` is sufficient.
 
 ### Key Commands
 
@@ -116,6 +125,12 @@ conflicts across worktrees and force-push requirements on open PRs.
 - `pnpm run db:seed:from-prod`: Reset local DB and seed from the latest production backup.
 - `pnpm run e2e:full`: Full E2E suite (Don't run Safari locally on Linux).
 - `ruff check <file> && ruff format <file>`: Lint and format Python files (`pinpoint-wt.py`, scripts). Ruff is installed globally — no venv needed.
+
+### Testing After Refactors
+
+- After any refactor, verify that test mocks reflect the new code structure
+  (transaction wrappers, changed defaults, new parameters).
+- Update test fixtures and seed data proactively rather than waiting for CI to fail.
 
 ### Safe Command Patterns
 

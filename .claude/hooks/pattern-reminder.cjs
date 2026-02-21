@@ -37,18 +37,6 @@ const FORBIDDEN_PATTERNS = {
     solution: 'Use worker-scoped pattern: import { test, withIsolatedTest } from "~/test/helpers/worker-scoped-db"'
   },
   
-  // Migration File Creation (CRITICAL)
-  'Migration Files in Pre-Beta': {
-    patterns: [
-      /supabase\/migrations\//g,
-      /drizzle-kit generate/g,
-      /pnpm run db:generate/g
-    ],
-    severity: 'CRITICAL', 
-    message: 'Migration files forbidden in pre-beta phase (zero users, schema in flux)',
-    solution: 'Direct schema changes only - no migration file generation needed'
-  },
-  
   // Vitest Command Issues (HIGH)
   'Vitest Redirection': {
     patterns: [

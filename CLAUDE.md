@@ -14,3 +14,10 @@
 - **enforcer** - Code review with XML-guided workflows
 - **investigator** - Deep read-only analysis and diagnostics
 - **Explore** - Fast codebase exploration and search
+
+### Working Style
+
+- If you've spent more than 3 tool calls on environment setup without reproducing
+  the actual issue, stop and ask the user for guidance.
+- For simple PRs (< 5 files changed), do not spawn more than 2 sub-agents.
+- Do not over-engineer or spawn excessive parallel agents for straightforward tasks.

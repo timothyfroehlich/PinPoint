@@ -277,12 +277,12 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/quality-check.cjs",
-            "timeout": 30000
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/preflight-reminder.sh",
+            "timeout": 5000
           }
         ]
       }
