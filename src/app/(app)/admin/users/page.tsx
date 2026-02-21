@@ -14,6 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { UserManagementHeader } from "./user-management-header";
 import { Badge } from "~/components/ui/badge";
 import { ResendInviteButton } from "./resend-invite-button";
+import { RemoveInvitedUserButton } from "./remove-invited-user-button";
 import type { UnifiedUser } from "~/lib/types";
 
 function UserRow({
@@ -77,7 +78,10 @@ function UserRow({
       </TableCell>
       <TableCell className="text-right">
         {user.status === "invited" && (
-          <ResendInviteButton userId={user.id} userName={user.name} />
+          <div className="flex justify-end gap-2">
+            <ResendInviteButton userId={user.id} userName={user.name} />
+            <RemoveInvitedUserButton userId={user.id} userName={user.name} />
+          </div>
         )}
       </TableCell>
     </TableRow>

@@ -2,7 +2,13 @@
 
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
-import { userProfiles, invitedUsers, authUsers } from "~/server/db/schema";
+import {
+  userProfiles,
+  invitedUsers,
+  authUsers,
+  machines,
+  issues,
+} from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { sendInviteEmail } from "~/lib/email/invite";
@@ -224,6 +230,71 @@ export async function inviteUser(
     throw new Error("An unexpected error occurred while inviting the user", {
       cause: error,
     });
+  }
+}
+
+export async function removeInvitedUser(
+  userId: string
+): Promise<{ ok: boolean }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    throw new Error("Unauthorized");
+  }
+
+  try {
+    await verifyAdmin(user.id);
+
+    const invited = await db.query.invitedUsers.findFirst({
+      where: eq(invitedUsers.id, userId),
+    });
+
+    if (!invited) {
+      throw new Error("Invited user not found");
+    }
+
+    await db.transaction(async (tx) => {
+      await tx
+        .update(machines)
+        .set({ invitedOwnerId: null })
+        .where(eq(machines.invitedOwnerId, userId));
+
+      await tx
+        .update(issues)
+        .set({ invitedReportedBy: null })
+        .where(eq(issues.invitedReportedBy, userId));
+
+      await tx.delete(invitedUsers).where(eq(invitedUsers.id, userId));
+    });
+
+    revalidatePath("/admin/users");
+    return { ok: true };
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message === "Unauthorized" ||
+        error.message.startsWith("Forbidden") ||
+        error.message === "Invited user not found")
+    ) {
+      throw error;
+    }
+
+    log.error(
+      {
+        action: "removeInvitedUser",
+        userId,
+        error: error instanceof Error ? error.message : "Unknown",
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+      "Remove invited user failed"
+    );
+    throw new Error(
+      "An unexpected error occurred while removing the invited user",
+      { cause: error }
+    );
   }
 }
 
