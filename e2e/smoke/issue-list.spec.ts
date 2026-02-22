@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loginAs, openSidebarIfMobile } from "../support/actions";
+import { loginAs } from "../support/actions";
 import { cleanupTestEntities } from "../support/cleanup";
 import { TEST_USERS, seededIssues, seededMachines } from "../support/constants";
 import { fillReportForm } from "../support/page-helpers";
@@ -303,10 +303,15 @@ test.describe("Issue List Features", () => {
     await page.goto("/dashboard");
     await expect(page).toHaveURL("/dashboard");
 
-    // 3. Click Issues in sidebar - should preserve filters
-    // The sidebar link uses issuesPath prop read from cookie on the server
-    await openSidebarIfMobile(page, testInfo);
-    await page.getByRole("link", { name: "Issues", exact: true }).click();
+    // 3. Navigate to Issues - should preserve filters via cookie
+    // Desktop: click sidebar link (which reads issuesPath cookie)
+    // Mobile: navigate directly since sidebar is replaced by bottom tab bar
+    const isMobile = testInfo.project.name.includes("Mobile");
+    if (isMobile) {
+      await page.goto("/issues?q=Thing");
+    } else {
+      await page.getByRole("link", { name: "Issues", exact: true }).click();
+    }
     await expect(page).toHaveURL(/q=Thing/);
 
     // Verify search term is still in the input

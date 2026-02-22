@@ -17,7 +17,7 @@ import { UserMenu } from "./user-menu-client";
 import { ensureUserProfile } from "~/lib/auth/profile";
 import Link from "next/link";
 import { Button } from "~/components/ui/button";
-import { MobileNav } from "./MobileNav";
+import { MobileHeader } from "./MobileHeader";
 import { FeedbackWidget } from "~/components/feedback/FeedbackWidget";
 import changelogMeta from "@content/changelog-meta.json";
 import { HeaderSignInButton } from "./header-sign-in-button";
@@ -133,7 +133,7 @@ export async function MainLayout({
 
   return (
     <div className="flex h-full bg-background text-foreground">
-      {/* Sidebar - Hidden on mobile */}
+      {/* Sidebar - Desktop only */}
       <aside className="hidden md:block h-full">
         <Sidebar
           role={userProfile?.role}
@@ -145,18 +145,21 @@ export async function MainLayout({
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto">
-        {/* Header Area */}
-        <header className="flex h-16 items-center justify-between border-b border-border px-6 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-          {/* Mobile Menu Trigger & Left Spacer */}
-          <div className="flex-1 flex items-center">
-            <div className="md:hidden mr-4">
-              <MobileNav
-                role={userProfile?.role}
-                issuesPath={issuesPath}
-                newChangelogCount={newChangelogCount}
-              />
-            </div>
-          </div>
+        {/* Mobile Header — compact sticky header (md:hidden) */}
+        {user ? (
+          <MobileHeader
+            isAuthenticated={true}
+            userName={userProfile?.name ?? "User"}
+            notifications={enrichedNotifications}
+          />
+        ) : (
+          <MobileHeader isAuthenticated={false} />
+        )}
+
+        {/* Desktop Header — hidden on mobile */}
+        <header className="hidden md:flex h-16 items-center justify-between border-b border-border px-6 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+          {/* Left spacer */}
+          <div className="flex-1" />
 
           <div className="flex items-center gap-4">
             <FeedbackWidget />
@@ -186,7 +189,7 @@ export async function MainLayout({
           </div>
         </header>
 
-        <div className="p-6">{children}</div>
+        <div className="p-4 md:p-6">{children}</div>
       </main>
     </div>
   );

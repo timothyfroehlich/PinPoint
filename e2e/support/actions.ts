@@ -29,7 +29,7 @@ export async function loginAs(
   const isMobile = testInfo.project.name.includes("Mobile");
 
   if (isMobile) {
-    await expect(page.getByTestId("mobile-menu-trigger")).toBeVisible();
+    await expect(page.getByTestId("mobile-header")).toBeVisible();
   } else {
     await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
   }
@@ -62,7 +62,7 @@ export async function ensureLoggedIn(
 
   // Assert we are truly logged in
   if (isMobile) {
-    await expect(page.getByTestId("mobile-menu-trigger")).toBeVisible();
+    await expect(page.getByTestId("mobile-header")).toBeVisible();
   } else {
     await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
   }
@@ -89,17 +89,15 @@ export async function logout(page: Page): Promise<void> {
 }
 
 /**
- * Opens the mobile sidebar menu if running on a mobile viewport.
- * No-op on desktop viewports where sidebar is always visible.
+ * No-op: The hamburger sidebar has been replaced by a bottom tab bar
+ * on mobile (see design/phase3-bottom-tabs). Navigation links are now
+ * accessible directly via the tab bar without opening a drawer.
  */
 export async function openSidebarIfMobile(
-  page: Page,
-  testInfo: TestInfo
+  _page: Page,
+  _testInfo: TestInfo
 ): Promise<void> {
-  const isMobile = testInfo.project.name.includes("Mobile");
-  if (isMobile) {
-    await page.getByTestId("mobile-menu-trigger").click();
-  }
+  // No-op — mobile navigation is handled by the bottom tab bar
 }
 
 /**
