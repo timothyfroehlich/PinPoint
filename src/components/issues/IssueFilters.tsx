@@ -12,6 +12,7 @@ import { cn } from "~/lib/utils";
 import {
   STATUS_CONFIG,
   STATUS_GROUPS,
+  STATUS_GROUP_LABELS,
   SEVERITY_CONFIG,
   PRIORITY_CONFIG,
   FREQUENCY_CONFIG,
@@ -53,7 +54,7 @@ import {
  * - `STATUS_CONFIG` / `STATUS_GROUPS` (from `~/lib/issues/status`) drive status display
  * - `OPEN_STATUSES` is the default status selection (all non-closed)
  * - `getBadges()` builds smart badge chips: when all statuses in a group are
- *   selected, it shows the group name ("New", "In Progress") instead of
+ *   selected, it shows the group name ("Open", "In Progress") instead of
  *   individual status names. This component currently implements that logic
  *   inline; a shared version for other surfaces lives in
  *   `~/lib/issues/filter-utils`.
@@ -166,21 +167,21 @@ export function IssueFilters({
   const statusGroups = React.useMemo(
     () => [
       {
-        label: "New",
+        label: STATUS_GROUP_LABELS.new,
         options: STATUS_GROUPS.new.map((s) => ({
           label: STATUS_CONFIG[s].label,
           value: s,
         })),
       },
       {
-        label: "In Progress",
+        label: STATUS_GROUP_LABELS.in_progress,
         options: STATUS_GROUPS.in_progress.map((s) => ({
           label: STATUS_CONFIG[s].label,
           value: s,
         })),
       },
       {
-        label: "Closed",
+        label: STATUS_GROUP_LABELS.closed,
         options: STATUS_GROUPS.closed.map((s) => ({
           label: STATUS_CONFIG[s].label,
           value: s,
@@ -267,9 +268,13 @@ export function IssueFilters({
         }
       };
 
-      checkGroup("new", STATUS_GROUPS.new, "New");
-      checkGroup("in_progress", STATUS_GROUPS.in_progress, "In Progress");
-      checkGroup("closed", STATUS_GROUPS.closed, "Closed");
+      checkGroup("new", STATUS_GROUPS.new, STATUS_GROUP_LABELS.new);
+      checkGroup(
+        "in_progress",
+        STATUS_GROUPS.in_progress,
+        STATUS_GROUP_LABELS.in_progress
+      );
+      checkGroup("closed", STATUS_GROUPS.closed, STATUS_GROUP_LABELS.closed);
 
       activeStatuses.forEach((s) => {
         if (!processedStatuses.has(s)) {
@@ -290,13 +295,13 @@ export function IssueFilters({
     } else if (filters.status === undefined) {
       badges.push({
         id: "status-group-new-default",
-        label: "New",
+        label: STATUS_GROUP_LABELS.new,
         clear: () =>
           pushFilters({ status: [...STATUS_GROUPS.in_progress], page: 1 }),
       });
       badges.push({
         id: "status-group-ip-default",
-        label: "In Progress",
+        label: STATUS_GROUP_LABELS.in_progress,
         clear: () => pushFilters({ status: [...STATUS_GROUPS.new], page: 1 }),
       });
     }

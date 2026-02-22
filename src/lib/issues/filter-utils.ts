@@ -9,6 +9,7 @@
 import {
   STATUS_GROUPS,
   STATUS_CONFIG,
+  STATUS_GROUP_LABELS,
   ALL_ISSUE_STATUSES,
   OPEN_STATUSES,
   type IssueStatus,
@@ -26,7 +27,7 @@ import {
  * 2. All 11 selected -> "All"
  * 3. All open (new + in_progress) -> "Open"
  * 4. All closed -> "Closed"
- * 5. Entire "New" group only -> "New"
+ * 5. Entire "New" group only -> "Open" (STATUS_GROUP_LABELS.new)
  * 6. Entire "In Progress" group only -> "In Progress"
  * 7. Single status -> status label from STATUS_CONFIG
  * 8. Mixed selection -> "N statuses"
@@ -75,7 +76,7 @@ export function getSmartBadgeLabel(selectedStatuses: IssueStatus[]): string {
 
   // Entire "New" group only
   if (hasAllNew && selectedStatuses.length === STATUS_GROUPS.new.length) {
-    return "New";
+    return STATUS_GROUP_LABELS.new;
   }
 
   // Entire "In Progress" group only

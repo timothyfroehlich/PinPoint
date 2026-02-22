@@ -19,6 +19,7 @@ import {
 import {
   STATUS_CONFIG,
   STATUS_GROUPS,
+  STATUS_GROUP_LABELS,
   type IssueStatus,
 } from "~/lib/issues/status";
 
@@ -36,8 +37,7 @@ import {
  * - `STATUS_GROUPS.new`, `.in_progress`, `.closed` define which statuses
  *   appear in each section
  * - `STATUS_CONFIG[status]` provides icon, iconColor, label, and description
- * - Group labels are currently "New", "In Progress", "Closed" — a rename of
- *   "New" to "Open" is planned for a later PR
+ * - Group labels are driven by `STATUS_GROUP_LABELS`: "Open", "In Progress", "Closed"
  *
  * ## Key Abstractions
  * - `value` / `onValueChange` follow the controlled component pattern
@@ -84,10 +84,10 @@ export function StatusSelect({
         </SelectValue>
       </SelectTrigger>
       <SelectContent>
-        {/* New Group */}
+        {/* Open Group */}
         <SelectGroup>
           <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-            New
+            {STATUS_GROUP_LABELS.new}
           </div>
           {STATUS_GROUPS.new.map((status) => {
             const config = STATUS_CONFIG[status];
@@ -118,7 +118,7 @@ export function StatusSelect({
         {/* In Progress Group */}
         <SelectGroup>
           <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-            In Progress
+            {STATUS_GROUP_LABELS.in_progress}
           </div>
           {STATUS_GROUPS.in_progress.map((status) => {
             const config = STATUS_CONFIG[status];
@@ -149,7 +149,7 @@ export function StatusSelect({
         {/* Closed Group */}
         <SelectGroup>
           <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-            Closed
+            {STATUS_GROUP_LABELS.closed}
           </div>
           {STATUS_GROUPS.closed.map((status) => {
             const config = STATUS_CONFIG[status];
