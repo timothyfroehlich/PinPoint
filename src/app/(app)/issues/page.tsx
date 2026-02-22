@@ -71,6 +71,16 @@ export default async function IssuesPage({
     columns: { initials: true, name: true },
   });
 
+  // Fetch owned machine initials for the "My machines" quick-select toggle.
+  // Computed server-side so no user IDs are sent to the client (CORE-SEC-006).
+  const ownedMachineInitialsPromise = user?.id
+    ? db.query.machines.findMany({
+        where: (m, { eq }) => eq(m.ownerId, user.id),
+        columns: { initials: true },
+        orderBy: (m, { asc }) => [asc(m.initials)],
+      })
+    : Promise.resolve([]);
+
   const usersPromise = getUnifiedUsers();
 
   const issuesPromise = db.query.issues.findMany({
@@ -110,13 +120,21 @@ export default async function IssuesPage({
     .where(and(...where));
 
   // 3. Await all promises in parallel
-  const [allMachines, allUsers, issuesListRaw, totalCountResult] =
-    await Promise.all([
-      machinesPromise,
-      usersPromise,
-      issuesPromise,
-      totalCountPromise,
-    ]);
+  const [
+    allMachines,
+    allUsers,
+    issuesListRaw,
+    totalCountResult,
+    ownedMachineRows,
+  ] = await Promise.all([
+    machinesPromise,
+    usersPromise,
+    issuesPromise,
+    totalCountPromise,
+    ownedMachineInitialsPromise,
+  ]);
+
+  const ownedMachineInitials = ownedMachineRows.map((m) => m.initials);
 
   const totalCount = totalCountResult[0]?.value ?? 0;
 
@@ -156,6 +174,7 @@ export default async function IssuesPage({
           machines={allMachines}
           filters={filters}
           currentUserId={user?.id ?? null}
+          ownedMachineInitials={ownedMachineInitials}
         />
 
         {/* Issues List */}

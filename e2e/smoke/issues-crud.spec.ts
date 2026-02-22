@@ -222,7 +222,7 @@ test.describe("Issues System", () => {
       // Self-assign via the "Me" quick-select (current user is excluded from
       // the alphabetical list and only appears as "Me" at the top of the picker)
       await assigneePicker.click();
-      await page.getByRole("option", { name: "Me" }).click();
+      await page.getByTestId("assignee-option-me").click();
 
       // Verify the assignee name is now displayed
       await expect(assigneePicker).toContainText("Member User");

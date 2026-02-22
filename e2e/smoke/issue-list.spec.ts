@@ -151,26 +151,26 @@ test.describe("Issue List Features", () => {
       page
         .getByTestId("filter-bar")
         .locator('[data-slot="badge"]')
-        .filter({ hasText: "New" })
+        .filter({ hasText: "Open" })
     ).toBeVisible();
 
     // Open Status Filter
     await page.getByTestId("filter-status").click();
 
     // The MultiSelect value defaults to all OPEN_STATUSES.
-    // Clicking "New" group header will DESELECT "new" and "confirmed".
-    const newGroupHeader = page.getByTestId("filter-status-group-new");
+    // Clicking "Open" group header will DESELECT "new" and "confirmed".
+    const newGroupHeader = page.getByTestId("filter-status-group-open");
     await expect(newGroupHeader).toBeVisible();
     await newGroupHeader.click();
 
     // Close the popover
     await page.keyboard.press("Escape");
     await page.waitForURL((url) => url.searchParams.has("status"));
-    // After deselecting "New" group (new, confirmed), we should only see
+    // After deselecting "Open" group (new, confirmed), we should only see
     // in_progress group issues: in_progress (3), need_parts (1), wait_owner (1) = 5 total
     await expect(page.getByText(/Showing \d+ of \d+ issues/)).toBeVisible();
 
-    // Verify "New" badge is hidden (deselected)
+    // Verify "Open" badge is hidden (deselected)
     // "In Progress" should still be visible as we didn't touch it
     await expect(
       page
@@ -182,7 +182,7 @@ test.describe("Issue List Features", () => {
       page
         .getByTestId("filter-bar")
         .locator('[data-slot="badge"]')
-        .filter({ hasText: "New" })
+        .filter({ hasText: "Open" })
     ).toBeHidden();
 
     // Click again to re-select
@@ -190,12 +190,12 @@ test.describe("Issue List Features", () => {
     await newGroupHeader.click();
     await page.keyboard.press("Escape");
 
-    // Verify "New" badge is back
+    // Verify "Open" badge is back
     await expect(
       page
         .getByTestId("filter-bar")
         .locator('[data-slot="badge"]')
-        .filter({ hasText: "New" })
+        .filter({ hasText: "Open" })
     ).toBeVisible();
 
     // Test clearing to "All"
@@ -211,7 +211,7 @@ test.describe("Issue List Features", () => {
       page
         .getByTestId("filter-bar")
         .locator('[data-slot="badge"]')
-        .filter({ hasText: "New" })
+        .filter({ hasText: "Open" })
     ).toBeHidden();
     await expect(
       page
@@ -345,5 +345,32 @@ test.describe("Issue List Features", () => {
         .filter({ hasText: "Major" })
     ).toBeVisible();
     await expect(page.getByPlaceholder("Search issues...")).toHaveValue("bird");
+  });
+
+  test('should show and activate "My machines" quick-select in Machine filter', async ({
+    page,
+  }) => {
+    // Admin user owns: BK (Black Knight), GDZ (Godzilla), HD (Humpty Dumpty), MM (Medieval Madness)
+    // Clicking "My machines" should filter to those four machines (sorted alphabetically by initials)
+    await page.goto("/issues");
+
+    // Open the Machine filter dropdown
+    await page.getByTestId("filter-machine").click();
+
+    // Verify "My machines" quick-select toggle is visible
+    await expect(page.getByText("My machines")).toBeVisible();
+
+    // Click "My machines" to select all owned machines
+    await page.getByText("My machines").click();
+    await page.keyboard.press("Escape");
+
+    // URL should contain the admin's owned machine initials
+    await page.waitForURL(/machine=/);
+    const url = new URL(page.url());
+    const machineParam = url.searchParams.get("machine") ?? "";
+    expect(machineParam).toContain("BK");
+    expect(machineParam).toContain("GDZ");
+    expect(machineParam).toContain("HD");
+    expect(machineParam).toContain("MM");
   });
 });

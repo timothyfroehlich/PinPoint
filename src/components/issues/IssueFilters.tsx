@@ -12,6 +12,7 @@ import { cn } from "~/lib/utils";
 import {
   STATUS_CONFIG,
   STATUS_GROUPS,
+  STATUS_GROUP_LABELS,
   SEVERITY_CONFIG,
   PRIORITY_CONFIG,
   FREQUENCY_CONFIG,
@@ -54,7 +55,7 @@ import {
  * - `STATUS_CONFIG` / `STATUS_GROUPS` (from `~/lib/issues/status`) drive status display
  * - `OPEN_STATUSES` is the default status selection (all non-closed)
  * - `getBadges()` builds smart badge chips: when all statuses in a group are
- *   selected, it shows the group name ("New", "In Progress") instead of
+ *   selected, it shows the group name ("Open", "In Progress") instead of
  *   individual status names. This component currently implements that logic
  *   inline; a shared version for other surfaces lives in
  *   `~/lib/issues/filter-utils`.
@@ -84,6 +85,12 @@ interface IssueFiltersProps {
   users: IssueFilterUser[];
   filters: FilterState;
   currentUserId?: string | null;
+  /**
+   * Initials of machines owned by the current user, pre-computed server-side.
+   * Used to render the "My machines" quick-select toggle. Empty array or
+   * undefined means the toggle is hidden (user not logged in or owns no machines).
+   */
+  ownedMachineInitials?: string[];
 }
 
 export function IssueFilters({
@@ -91,6 +98,7 @@ export function IssueFilters({
   users,
   filters,
   currentUserId = null,
+  ownedMachineInitials,
 }: IssueFiltersProps): React.JSX.Element {
   const { pushFilters } = useSearchFilters(filters);
   const [isSearching, startTransition] = React.useTransition();
@@ -110,6 +118,11 @@ export function IssueFilters({
       })),
     [machines]
   );
+
+  const machineQuickSelectActions = React.useMemo(() => {
+    if (!ownedMachineInitials || ownedMachineInitials.length === 0) return [];
+    return [{ label: "My machines", values: [...ownedMachineInitials].sort() }];
+  }, [ownedMachineInitials]);
 
   const severityOptions = React.useMemo(
     () =>
@@ -171,21 +184,21 @@ export function IssueFilters({
   const statusGroups = React.useMemo(
     () => [
       {
-        label: "New",
+        label: STATUS_GROUP_LABELS.new,
         options: STATUS_GROUPS.new.map((s) => ({
           label: STATUS_CONFIG[s].label,
           value: s,
         })),
       },
       {
-        label: "In Progress",
+        label: STATUS_GROUP_LABELS.in_progress,
         options: STATUS_GROUPS.in_progress.map((s) => ({
           label: STATUS_CONFIG[s].label,
           value: s,
         })),
       },
       {
-        label: "Closed",
+        label: STATUS_GROUP_LABELS.closed,
         options: STATUS_GROUPS.closed.map((s) => ({
           label: STATUS_CONFIG[s].label,
           value: s,
@@ -272,9 +285,13 @@ export function IssueFilters({
         }
       };
 
-      checkGroup("new", STATUS_GROUPS.new, "New");
-      checkGroup("in_progress", STATUS_GROUPS.in_progress, "In Progress");
-      checkGroup("closed", STATUS_GROUPS.closed, "Closed");
+      checkGroup("new", STATUS_GROUPS.new, STATUS_GROUP_LABELS.new);
+      checkGroup(
+        "in_progress",
+        STATUS_GROUPS.in_progress,
+        STATUS_GROUP_LABELS.in_progress
+      );
+      checkGroup("closed", STATUS_GROUPS.closed, STATUS_GROUP_LABELS.closed);
 
       activeStatuses.forEach((s) => {
         if (!processedStatuses.has(s)) {
@@ -295,13 +312,13 @@ export function IssueFilters({
     } else if (filters.status === undefined) {
       badges.push({
         id: "status-group-new-default",
-        label: "New",
+        label: STATUS_GROUP_LABELS.new,
         clear: () =>
           pushFilters({ status: [...STATUS_GROUPS.in_progress], page: 1 }),
       });
       badges.push({
         id: "status-group-ip-default",
-        label: "In Progress",
+        label: STATUS_GROUP_LABELS.in_progress,
         clear: () => pushFilters({ status: [...STATUS_GROUPS.new], page: 1 }),
       });
     }
@@ -558,6 +575,7 @@ export function IssueFilters({
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
           <MultiSelect
             options={machineOptions}
+            quickSelectActions={machineQuickSelectActions}
             value={filters.machine ?? []}
             onChange={(val) => pushFilters({ machine: val, page: 1 })}
             placeholder="Machine"
