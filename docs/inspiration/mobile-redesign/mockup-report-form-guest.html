@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>PinPoint Mobile Mockup — Report Issue (Guest)</title>
+<link rel="stylesheet" href="components/styles.css">
+</head>
+<body>
+
+<!-- ==========================================
+     PAGE: REPORT ISSUE (unauthenticated guest view)
+     - No Priority, Status, or Assign To fields
+     - Reporter info section (name, email)
+     - 2 photo max instead of 4
+     - Header shows Sign In / Sign Up instead of bell + avatar
+     - No Admin Panel in More sheet
+     ========================================== -->
+<div class="content">
+  <div class="page-header" style="margin-bottom: 12px;">
+    <h1 class="page-title">Report Issue</h1>
+  </div>
+
+  <!-- Form Card -->
+  <div class="form-card">
+    <!-- Machine Select -->
+    <div class="form-group">
+      <label class="form-label">Machine <span class="required">*</span></label>
+      <div class="select-wrapper">
+        <select class="form-select">
+          <option disabled>Select a machine...</option>
+          <option>Attack from Mars (AFM)</option>
+          <option selected>Humpty Dumpty (HD)</option>
+          <option>Medieval Madness (MM)</option>
+          <option>The Addams Family (TAF)</option>
+          <option>Creature from the Black Lagoon (CFTBL)</option>
+          <option>Twilight Zone (TZ)</option>
+        </select>
+        <svg class="select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="m6 9 6 6 6-6"/></svg>
+      </div>
+    </div>
+
+    <!-- Recent Issues for selected machine (mobile compact, limit=3) -->
+    <div class="recent-issues-banner">
+      <div class="recent-issues-header">
+        <span class="recent-label">Recent for HD</span>
+        <button class="recent-toggle" onclick="toggleRecent()">
+          <span id="recentCount">3 open</span>
+          <svg id="recentChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </div>
+      <div class="recent-issues-list" id="recentList">
+        <a class="recent-issue-item" href="#">
+          <span class="recent-issue-tag">HD-01</span>
+          <span class="recent-issue-title">Worn flipper bushings</span>
+          <span class="status-badge status-in-progress">In Progress</span>
+        </a>
+        <a class="recent-issue-item" href="#">
+          <span class="recent-issue-tag">HD-02</span>
+          <span class="recent-issue-title">Ball trough sensor intermittent</span>
+          <span class="status-badge status-new">New</span>
+        </a>
+        <a class="recent-issue-item" href="#">
+          <span class="recent-issue-tag">HD-03</span>
+          <span class="recent-issue-title">Pop bumper cap loose</span>
+          <span class="status-badge status-confirmed">Confirmed</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Divider -->
+    <div class="form-divider"></div>
+
+    <!-- Title -->
+    <div class="form-group">
+      <div class="label-row">
+        <label class="form-label">Issue Title <span class="required">*</span></label>
+        <span class="char-count">0/60</span>
+      </div>
+      <input type="text" class="form-input" placeholder="e.g., Left flipper not responding">
+    </div>
+
+    <!-- Description -->
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <textarea class="form-textarea" rows="3" placeholder="Tell us what happened, and how often it occurs."></textarea>
+    </div>
+
+    <!-- Severity + Frequency (side by side, dropdowns) -->
+    <div class="form-row-2">
+      <div class="form-group">
+        <label class="form-label">Severity <span class="required">*</span></label>
+        <div class="select-wrapper">
+          <select class="form-select">
+            <option>Cosmetic</option>
+            <option selected>Minor</option>
+            <option>Major</option>
+            <option>Unplayable</option>
+          </select>
+          <svg class="select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Frequency <span class="required">*</span></label>
+        <div class="select-wrapper">
+          <select class="form-select">
+            <option>Intermittent</option>
+            <option>Frequent</option>
+            <option selected>Constant</option>
+          </select>
+          <svg class="select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- NO Priority, Status, or Assign To for guests -->
+
+    <!-- Divider -->
+    <div class="form-divider"></div>
+
+    <!-- Photos (2 max for guests) -->
+    <div class="form-group">
+      <label class="form-label">Photos</label>
+      <div class="photo-upload-area">
+        <button class="photo-upload-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" x2="12" y1="3" y2="15"/>
+          </svg>
+          <span>Upload Photo</span>
+        </button>
+        <span class="photo-limit">0 / 2 photos</span>
+      </div>
+    </div>
+
+    <!-- Divider -->
+    <div class="form-divider"></div>
+
+    <!-- Reporter Info (guest only) -->
+    <div class="form-group">
+      <div class="reporter-section-header">
+        <span class="form-label" style="margin-bottom:0;">Your Information</span>
+        <span class="optional-tag">Optional</span>
+      </div>
+    </div>
+    <div class="reporter-info-card">
+      <div class="form-row-2">
+        <div class="form-group">
+          <label class="form-label-sm">First Name</label>
+          <input type="text" class="form-input form-input-sm" placeholder="Jane">
+        </div>
+        <div class="form-group">
+          <label class="form-label-sm">Last Name</label>
+          <input type="text" class="form-input form-input-sm" placeholder="Doe">
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom: 4px;">
+        <label class="form-label-sm">Email Address</label>
+        <input type="email" class="form-input form-input-sm" placeholder="jane@example.com">
+        <span class="form-hint">Verified emails link to your profile.</span>
+      </div>
+    </div>
+
+    <!-- Login prompt -->
+    <p class="login-prompt">
+      Already have an account? <a href="#">Log in</a>
+    </p>
+
+    <!-- Submit -->
+    <button class="submit-btn">Submit Issue Report</button>
+  </div>
+</div>
+
+<script src="components/shell.js"></script>
+<script>initShell({ activePage: 'report', auth: false });</script>
+
+<script>
+function toggleRecent() {
+  const list = document.getElementById('recentList');
+  const chevron = document.getElementById('recentChevron');
+  list.classList.toggle('collapsed');
+  chevron.style.transform = list.classList.contains('collapsed') ? 'rotate(-90deg)' : '';
+}
+</script>
+
+<!-- Page-specific styles (shared with authenticated version + guest additions) -->
+<style>
+  .form-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+
+  .form-group {
+    margin-bottom: 14px;
+  }
+
+  .form-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--foreground);
+    margin-bottom: 6px;
+  }
+
+  .form-label .required {
+    color: var(--error);
+  }
+
+  .form-label-sm {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--foreground);
+    margin-bottom: 4px;
+  }
+
+  .label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+
+  .label-row .form-label {
+    margin-bottom: 0;
+  }
+
+  .char-count {
+    font-size: 11px;
+    color: var(--muted-fg);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .form-input,
+  .form-textarea,
+  .form-select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--outline);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+    color: var(--foreground);
+    outline: none;
+    transition: border-color 0.15s;
+    font-family: inherit;
+  }
+
+  .form-input-sm {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  .form-input:focus,
+  .form-textarea:focus,
+  .form-select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 1px var(--primary);
+  }
+
+  .form-textarea {
+    resize: vertical;
+    min-height: 72px;
+    line-height: 1.5;
+  }
+
+  .form-hint {
+    display: block;
+    font-size: 10px;
+    color: var(--muted-fg);
+    margin-top: 4px;
+  }
+
+  .select-wrapper {
+    position: relative;
+  }
+
+  .select-wrapper .form-select {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 32px;
+    cursor: pointer;
+  }
+
+  .select-chevron {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted-fg);
+    pointer-events: none;
+  }
+
+  .form-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 16px 0;
+  }
+
+  /* Side-by-side fields */
+  .form-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  /* Recent issues banner */
+  .recent-issues-banner {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+  }
+
+  .recent-issues-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .recent-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted-fg);
+  }
+
+  .recent-toggle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .recent-toggle svg {
+    transition: transform 0.2s;
+  }
+
+  .recent-issues-list {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow: hidden;
+    transition: max-height 0.2s ease, margin-top 0.2s ease;
+    max-height: 200px;
+  }
+
+  .recent-issues-list.collapsed {
+    max-height: 0;
+    margin-top: 0;
+  }
+
+  .recent-issue-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 12px;
+    color: var(--foreground);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .recent-issue-item:active {
+    background: var(--card-hover);
+  }
+
+  .recent-issue-tag {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--muted);
+    color: var(--muted-fg);
+    flex-shrink: 0;
+  }
+
+  .recent-issue-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+  }
+
+  /* Photo upload */
+  .photo-upload-area {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .photo-upload-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 8px;
+    border: 1px dashed var(--outline);
+    background: transparent;
+    color: var(--muted-fg);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .photo-upload-btn:active {
+    background: var(--muted);
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+
+  .photo-limit {
+    font-size: 11px;
+    color: var(--muted-fg);
+  }
+
+  /* Reporter info (guest only) */
+  .reporter-section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .optional-tag {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--muted-fg);
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--outline);
+  }
+
+  .reporter-info-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+
+  /* Login prompt */
+  .login-prompt {
+    font-size: 13px;
+    color: var(--muted-fg);
+    margin-bottom: 14px;
+  }
+
+  .login-prompt a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+  }
+
+  .login-prompt a:active {
+    text-decoration: underline;
+  }
+
+  /* Submit button */
+  .submit-btn {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: none;
+    background: var(--primary);
+    color: var(--primary-dark);
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+
+  .submit-btn:active {
+    opacity: 0.85;
+  }
+
+  /* Status badges - matching STATUS_CONFIG colors */
+  .status-badge {
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    white-space: nowrap;
+    border: 1px solid;
+  }
+
+  /* New group - cyan/teal */
+  .status-new {
+    background: rgba(6, 182, 212, 0.2); /* cyan-500/20 */
+    color: #22d3ee; /* cyan-400 */
+    border-color: #06b6d4; /* cyan-500 */
+  }
+
+  .status-confirmed {
+    background: rgba(20, 184, 166, 0.2); /* teal-500/20 */
+    color: #2dd4bf; /* teal-400 */
+    border-color: #14b8a6; /* teal-500 */
+  }
+
+  /* In Progress group - fuchsia/purple/pink */
+  .status-in-progress {
+    background: rgba(217, 70, 239, 0.2); /* fuchsia-500/20 */
+    color: #e879f9; /* fuchsia-400 */
+    border-color: #d946ef; /* fuchsia-500 */
+  }
+
+  .status-need-parts {
+    background: rgba(147, 51, 234, 0.2); /* purple-600/20 */
+    color: #c084fc; /* purple-300 */
+    border-color: #9333ea; /* purple-600 */
+  }
+
+  .status-need-help {
+    background: rgba(236, 72, 153, 0.2); /* pink-500/20 */
+    color: #f472b6; /* pink-400 */
+    border-color: #ec4899; /* pink-500 */
+  }
+
+  .status-wait-owner {
+    background: rgba(168, 85, 247, 0.2); /* purple-500/20 */
+    color: #c084fc; /* purple-400 */
+    border-color: #a855f7; /* purple-500 */
+  }
+
+  /* Closed group - green/zinc/slate/neutral */
+  .status-fixed {
+    background: rgba(34, 197, 94, 0.2); /* green-500/20 */
+    color: #4ade80; /* green-400 */
+    border-color: #22c55e; /* green-500 */
+  }
+
+  .status-wontfix {
+    background: rgba(113, 113, 122, 0.2); /* zinc-500/20 */
+    color: #a1a1aa; /* zinc-400 */
+    border-color: #71717a; /* zinc-500 */
+  }
+
+  .status-wai {
+    background: rgba(113, 113, 122, 0.2); /* zinc-500/20 */
+    color: #a1a1aa; /* zinc-400 */
+    border-color: #71717a; /* zinc-500 */
+  }
+
+  .status-no-repro {
+    background: rgba(100, 116, 139, 0.2); /* slate-500/20 */
+    color: #94a3b8; /* slate-400 */
+    border-color: #64748b; /* slate-500 */
+  }
+
+  .status-duplicate {
+    background: rgba(82, 82, 82, 0.2); /* neutral-600/20 */
+    color: #a3a3a3; /* neutral-400 */
+    border-color: #525252; /* neutral-600 */
+  }
+</style>
+
+</body>
+</html>

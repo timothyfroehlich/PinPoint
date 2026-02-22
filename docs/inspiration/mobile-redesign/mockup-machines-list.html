@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>PinPoint Mobile Mockup — Machines List</title>
+<link rel="stylesheet" href="components/styles.css">
+</head>
+<body>
+
+<!-- Header, tabs, and panels are injected by shell.js -->
+<div class="content">
+  <!-- Page header -->
+  <h1 class="page-title">Machines</h1>
+
+  <!-- Search bar -->
+  <div class="search-bar" style="margin-bottom:0;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+      <circle cx="11" cy="11" r="8"/>
+      <path d="m21 21-4.3-4.3"/>
+    </svg>
+    <input type="text" placeholder="Search machines...">
+    <button class="clear-search-btn" style="display:none;" aria-label="Clear search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+    </button>
+  </div>
+
+  <!-- Filter chips row -->
+  <div class="filter-row" style="margin-top:8px;">
+    <button class="filter-chip" onclick="openSort()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
+      Sort
+    </button>
+
+    <button class="filter-chip filter-chip-active filter-chip-dropdown" id="statusChip" onclick="toggleDropdown('statusDropdown')">
+      <span id="statusChipLabel">All</span>
+      <svg class="chip-chevron" id="statusChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+
+    <button class="filter-chip filter-chip-dropdown" id="presenceChip" onclick="toggleDropdown('presenceDropdown')">
+      <span id="presenceChipLabel">On Floor</span>
+      <svg class="chip-chevron" id="presenceChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+
+    <button class="filter-chip filter-chip-dropdown" id="ownerChip" onclick="toggleDropdown('ownerDropdown')">
+      <span id="ownerChipLabel">Owner</span>
+      <svg class="chip-chevron" id="ownerChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+  </div>
+
+  <!-- Status dropdown -->
+  <div class="chip-dropdown" id="statusDropdown">
+    <button class="chip-dropdown-item chip-dropdown-item-check checked" onclick="toggleCheck(this)">
+      <span class="item-checkbox"></span>
+      <span class="status-dot status-dot-operational"></span>
+      Operational
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-check checked" onclick="toggleCheck(this)">
+      <span class="item-checkbox"></span>
+      <span class="status-dot status-dot-needs-service"></span>
+      Needs Service
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-check checked" onclick="toggleCheck(this)">
+      <span class="item-checkbox"></span>
+      <span class="status-dot status-dot-unplayable"></span>
+      Unplayable
+    </button>
+  </div>
+
+  <!-- Presence dropdown -->
+  <div class="chip-dropdown" id="presenceDropdown">
+    <button class="chip-dropdown-item chip-dropdown-item-check checked" onclick="toggleCheck(this)">
+      <span class="item-checkbox"></span>
+      On the Floor
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-check" onclick="toggleCheck(this)">
+      <span class="item-checkbox"></span>
+      Off the Floor
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-check" onclick="toggleCheck(this)">
+      <span class="item-checkbox"></span>
+      On Loan
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-check" onclick="toggleCheck(this)">
+      <span class="item-checkbox"></span>
+      Pending Arrival
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-check" onclick="toggleCheck(this)">
+      <span class="item-checkbox"></span>
+      Removed
+    </button>
+  </div>
+
+  <!-- Owner dropdown -->
+  <div class="chip-dropdown" id="ownerDropdown">
+    <button class="chip-dropdown-item chip-dropdown-item-quick" onclick="toggleQuick(this, 'ownerDropdown')">
+      <span class="item-checkbox item-checkbox-indeterminate"></span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Your machines
+    </button>
+    <div class="chip-dropdown-divider"></div>
+    <button class="chip-dropdown-item chip-dropdown-item-check" onclick="toggleCheck(this)">
+      <span class="item-checkbox"></span>
+      Jake Martinez (3)
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-check" onclick="toggleCheck(this)">
+      <span class="item-checkbox"></span>
+      Sarah Chen (2)
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-check" onclick="toggleCheck(this)">
+      <span class="item-checkbox"></span>
+      Tim Froehlich (1)
+    </button>
+  </div>
+
+  <!-- Count row -->
+  <div class="list-context-row">
+    <span class="list-context-count">1–6 of 6</span>
+  </div>
+
+  <!-- Machine cards -->
+  <!-- Machine 1: Needs service, off floor -->
+  <a href="#" class="machine-card">
+    <div class="machine-card-top">
+      <span class="machine-name">Attack from Mars</span>
+    </div>
+    <div class="machine-card-bottom">
+      <div class="machine-badge-row">
+        <span class="status-badge status-needs-service">Needs Service</span>
+        <span class="presence-badge presence-off-floor">Off Floor</span>
+      </div>
+      <div class="machine-meta-row">
+        <span class="machine-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          1 issue
+        </span>
+        <span class="assignee-avatar" title="Jake Martinez">JM</span>
+      </div>
+    </div>
+  </a>
+
+  <!-- Machine 2: Operational, on floor (no presence badge shown) -->
+  <a href="#" class="machine-card">
+    <div class="machine-card-top">
+      <span class="machine-name">Creature from the Black Lagoon</span>
+    </div>
+    <div class="machine-card-bottom">
+      <div class="machine-badge-row">
+        <!-- Hidden default badges -->
+      </div>
+      <div class="machine-meta-row">
+        <!-- 0 cases hidden or just no text, but let's hide it to be clean, or show 0 issues -->
+        <span class="machine-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          0 issues
+        </span>
+        <span class="assignee-avatar" title="Sarah Chen">SC</span>
+      </div>
+    </div>
+  </a>
+
+  <!-- Machine 3: Operational, on floor (no presence badge shown) -->
+  <a href="#" class="machine-card">
+    <div class="machine-card-top">
+      <span class="machine-name">Harley Davidson</span>
+    </div>
+    <div class="machine-card-bottom">
+      <div class="machine-badge-row">
+      </div>
+      <div class="machine-meta-row">
+        <span class="machine-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          0 issues
+        </span>
+        <span class="assignee-avatar" title="Tim Froehlich">TF</span>
+      </div>
+    </div>
+  </a>
+
+  <!-- Machine 4: Operational, on floor (no presence badge shown) -->
+  <a href="#" class="machine-card">
+    <div class="machine-card-top">
+      <span class="machine-name">Medieval Madness</span>
+    </div>
+    <div class="machine-card-bottom">
+      <div class="machine-badge-row">
+      </div>
+      <div class="machine-meta-row">
+        <span class="machine-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          2 issues
+        </span>
+        <span class="assignee-avatar" title="Jake Martinez">JM</span>
+      </div>
+    </div>
+  </a>
+
+  <!-- Machine 5: Unplayable, pending -->
+  <a href="#" class="machine-card machine-card-urgent">
+    <div class="machine-card-top">
+      <span class="machine-name">The Addams Family</span>
+    </div>
+    <div class="machine-card-bottom">
+      <div class="machine-badge-row">
+        <span class="status-badge status-unplayable">Unplayable</span>
+        <span class="presence-badge presence-pending">Pending</span>
+      </div>
+      <div class="machine-meta-row">
+        <span class="machine-meta-item" style="color: var(--error);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          3 issues
+        </span>
+        <span class="assignee-avatar" title="Sarah Chen">SC</span>
+      </div>
+    </div>
+  </a>
+
+  <!-- Machine 6: Operational, on loan -->
+  <a href="#" class="machine-card">
+    <div class="machine-card-top">
+      <span class="machine-name">Twilight Zone</span>
+    </div>
+    <div class="machine-card-bottom">
+      <div class="machine-badge-row">
+        <span class="presence-badge presence-on-loan">On Loan</span>
+      </div>
+      <div class="machine-meta-row">
+        <span class="machine-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          0 issues
+        </span>
+        <span class="assignee-avatar" title="Jake Martinez">JM</span>
+      </div>
+    </div>
+  </a>
+
+  <!-- Pagination -->
+  <div class="pagination">
+    <button class="pagination-btn" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="m15 18-6-6 6-6"/></svg>
+      Previous
+    </button>
+    <span class="pagination-info">Page 1 of 1</span>
+    <button class="pagination-btn" disabled>
+      Next
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="m9 18 6-6-6-6"/></svg>
+    </button>
+  </div>
+
+</div>
+
+<!-- ===== SORT SHEET ===== -->
+<div class="sort-sheet-scrim" id="sortScrim" onclick="closeSort()"></div>
+<div class="sort-sheet" id="sortSheet">
+  <div class="sheet-handle-wrap"><div class="sheet-handle"></div></div>
+  <div class="sort-sheet-header">
+    <span class="sort-sheet-title">Sort by</span>
+    <button class="sort-sheet-close" onclick="closeSort()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="sort-options">
+    <button class="sort-option" onclick="selectSort(this)">
+      <span>Name (A-Z)</span>
+      <svg class="sort-radio sort-radio-selected" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/></svg>
+    </button>
+    <button class="sort-option" onclick="selectSort(this)">
+      <span>Name (Z-A)</span>
+      <svg class="sort-radio" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="10"/></svg>
+    </button>
+    <button class="sort-option" onclick="selectSort(this)">
+      <span>Status (Worst First)</span>
+      <svg class="sort-radio" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="10"/></svg>
+    </button>
+    <button class="sort-option" onclick="selectSort(this)">
+      <span>Status (Best First)</span>
+      <svg class="sort-radio" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="10"/></svg>
+    </button>
+    <button class="sort-option" onclick="selectSort(this)">
+      <span>Open Issues (Most)</span>
+      <svg class="sort-radio" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="10"/></svg>
+    </button>
+    <button class="sort-option" onclick="selectSort(this)">
+      <span>Open Issues (Least)</span>
+      <svg class="sort-radio" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="10"/></svg>
+    </button>
+    <button class="sort-option" onclick="selectSort(this)">
+      <span>Date Added (Newest)</span>
+      <svg class="sort-radio" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="10"/></svg>
+    </button>
+    <button class="sort-option" onclick="selectSort(this)">
+      <span>Date Added (Oldest)</span>
+      <svg class="sort-radio" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="10"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- ===== FILTERS MODAL ===== -->
+<div class="filters-scrim" id="filtersScrim" onclick="closeFilters()"></div>
+<div class="filters-modal" id="filtersModal">
+  <div class="filters-header">
+    <span class="filters-title">Filters</span>
+    <button class="filters-close" onclick="closeFilters()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="filters-body">
+    <div class="filter-group">
+      <div class="filter-group-label">Status</div>
+      <button class="filter-option">
+        <span>Operational</span>
+        <svg class="filter-check filter-check-selected" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M20 6 9 17l-5-5"/></svg>
+      </button>
+      <button class="filter-option">
+        <span>Needs Service</span>
+        <svg class="filter-check filter-check-selected" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M20 6 9 17l-5-5"/></svg>
+      </button>
+      <button class="filter-option">
+        <span>Unplayable</span>
+        <svg class="filter-check filter-check-selected" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M20 6 9 17l-5-5"/></svg>
+      </button>
+    </div>
+
+    <div class="filter-group">
+      <div class="filter-group-label">Availability</div>
+      <button class="filter-option">
+        <span>On the Floor</span>
+        <svg class="filter-check filter-check-selected" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M20 6 9 17l-5-5"/></svg>
+      </button>
+      <button class="filter-option">
+        <span>Off the Floor</span>
+        <svg class="filter-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M20 6 9 17l-5-5"/></svg>
+      </button>
+      <button class="filter-option">
+        <span>On Loan</span>
+        <svg class="filter-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M20 6 9 17l-5-5"/></svg>
+      </button>
+      <button class="filter-option">
+        <span>Pending Arrival</span>
+        <svg class="filter-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M20 6 9 17l-5-5"/></svg>
+      </button>
+      <button class="filter-option">
+        <span>Removed</span>
+        <svg class="filter-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M20 6 9 17l-5-5"/></svg>
+      </button>
+    </div>
+
+    <div class="filter-group">
+      <div class="filter-group-label">Owner</div>
+      <button class="filter-option">
+        <span>Jake Martinez (3)</span>
+        <svg class="filter-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M20 6 9 17l-5-5"/></svg>
+      </button>
+      <button class="filter-option">
+        <span>Sarah Chen (2)</span>
+        <svg class="filter-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M20 6 9 17l-5-5"/></svg>
+      </button>
+      <button class="filter-option">
+        <span>Tim Froehlich (1)</span>
+        <svg class="filter-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M20 6 9 17l-5-5"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="filters-footer">
+    <button class="filters-clear-btn" onclick="clearAllFilters()">Clear All</button>
+    <button class="filters-apply-btn" onclick="closeFilters()">Show 6 machines</button>
+  </div>
+</div>
+
+<script src="components/shell.js"></script>
+<script>initShell({ activePage: 'machines' });</script>
+
+<script>
+const dropdownChevrons = {
+  statusDropdown: 'statusChevron',
+  presenceDropdown: 'presenceChevron',
+  ownerDropdown: 'ownerChevron',
+};
+
+function toggleDropdown(id) {
+  const dropdown = document.getElementById(id);
+  const isOpen = dropdown.classList.contains('open');
+  closeAllDropdowns();
+  if (!isOpen) {
+    dropdown.classList.add('open');
+    const chevronId = dropdownChevrons[id];
+    if (chevronId) document.getElementById(chevronId).style.transform = 'rotate(180deg)';
+  }
+}
+
+function closeAllDropdowns() {
+  document.querySelectorAll('.chip-dropdown').forEach(d => d.classList.remove('open'));
+  Object.values(dropdownChevrons).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.transform = 'rotate(0deg)';
+  });
+}
+
+function toggleCheck(btn) {
+  btn.classList.toggle('checked');
+}
+
+function toggleQuick(btn, dropdownId) {
+  const dropdown = document.getElementById(dropdownId);
+  const regularItems = [...dropdown.querySelectorAll('.chip-dropdown-item-check:not(.chip-dropdown-item-quick)')];
+  const allChecked = regularItems.every(item => item.classList.contains('checked'));
+  regularItems.forEach(item => item.classList.toggle('checked', !allChecked));
+  const checkbox = btn.querySelector('.item-checkbox');
+  if (!allChecked) {
+    checkbox.classList.remove('item-checkbox-indeterminate');
+    checkbox.classList.add('item-checkbox-checked');
+  } else {
+    checkbox.classList.remove('item-checkbox-checked');
+    checkbox.classList.add('item-checkbox-indeterminate');
+  }
+}
+
+function openSort() {
+  document.getElementById('sortScrim').classList.add('open');
+  document.getElementById('sortSheet').classList.add('open');
+}
+
+function closeSort() {
+  document.getElementById('sortScrim').classList.remove('open');
+  document.getElementById('sortSheet').classList.remove('open');
+}
+
+function selectSort(btn) {
+  document.querySelectorAll('.sort-option .sort-radio').forEach(r => {
+    r.classList.remove('sort-radio-selected');
+    const circle = r.querySelector('circle[fill]');
+    if (circle) circle.remove();
+  });
+  const radio = btn.querySelector('.sort-radio');
+  radio.classList.add('sort-radio-selected');
+  const newCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  newCircle.setAttribute('cx', '12');
+  newCircle.setAttribute('cy', '12');
+  newCircle.setAttribute('r', '4');
+  newCircle.setAttribute('fill', 'currentColor');
+  newCircle.setAttribute('stroke', 'none');
+  radio.appendChild(newCircle);
+  setTimeout(() => closeSort(), 200);
+}
+
+function openFilters() {
+  document.getElementById('filtersScrim').classList.add('open');
+  document.getElementById('filtersModal').classList.add('open');
+}
+
+function closeFilters() {
+  document.getElementById('filtersScrim').classList.remove('open');
+  document.getElementById('filtersModal').classList.remove('open');
+}
+
+function clearAllFilters() {
+  document.querySelectorAll('.filter-check-selected').forEach(c => c.classList.remove('filter-check-selected'));
+}
+
+// Close dropdowns on click outside
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.chip-dropdown') && !e.target.closest('.filter-chip-dropdown')) {
+    closeAllDropdowns();
+  }
+});
+</script>
+
+<style>
+/* Chip dropdown styles */
+.chip-dropdown {
+  display: none;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--outline);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  position: relative;
+  z-index: 10;
+}
+.chip-dropdown.open { display: flex; }
+
+.chip-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--foreground);
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.chip-dropdown-item:active { background: var(--muted); }
+
+.chip-dropdown-item-quick {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.chip-dropdown-item-check {
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.item-checkbox {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1.5px solid var(--outline);
+  background: transparent;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.chip-dropdown-item-check.checked .item-checkbox {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.chip-dropdown-item-check.checked .item-checkbox::after {
+  content: '';
+  display: block;
+  width: 9px;
+  height: 5px;
+  border-left: 2px solid var(--primary-dark);
+  border-bottom: 2px solid var(--primary-dark);
+  transform: rotate(-45deg) translateY(-1px);
+}
+
+.item-checkbox-indeterminate {
+  border-color: #3b82f6;
+}
+.item-checkbox-indeterminate::after {
+  content: '';
+  display: block;
+  width: 8px;
+  height: 2px;
+  background: #3b82f6;
+  border-radius: 1px;
+}
+
+.chip-dropdown-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 0;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Machine card styles (matches issue card pattern) */
+.machine-card {
+  display: block;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.machine-card:active {
+  background: var(--card-hover);
+  border-color: var(--outline);
+}
+
+.machine-card-urgent {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.04);
+}
+
+.machine-card-urgent:active {
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.machine-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.machine-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--foreground);
+  line-height: 1.3;
+}
+
+.machine-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.machine-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.machine-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.machine-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted-fg);
+}
+
+.machine-meta-item svg {
+  color: var(--muted-fg);
+  flex-shrink: 0;
+}
+
+.assignee-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--primary-dark);
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.status-operational {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.status-needs-service {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+}
+
+.status-unplayable {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+/* Presence badges */
+.presence-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.presence-on-floor {
+  background: rgba(74, 222, 128, 0.12);
+  color: var(--primary);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+}
+
+.presence-off-floor {
+  background: rgba(113, 113, 122, 0.12);
+  color: #71717a;
+  border: 1px solid rgba(113, 113, 122, 0.3);
+}
+
+.presence-on-loan {
+  background: rgba(96, 165, 250, 0.12);
+  color: #60a5fa;
+  border: 1px solid rgba(96, 165, 250, 0.3);
+}
+
+.presence-pending {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+/* Status dots for dropdowns */
+.status-dot-operational { background: #22c55e; }
+.status-dot-needs-service { background: #fbbf24; }
+.status-dot-unplayable { background: #ef4444; }
+
+/* Pagination */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0 24px;
+  gap: 12px;
+}
+
+.pagination-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--surface-container);
+  border: 1px solid var(--outline);
+  border-radius: 8px;
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pagination-btn:not(:disabled):active {
+  background: var(--surface-container-high);
+  transform: scale(0.97);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pagination-info {
+  font-size: 13px;
+  color: var(--muted-fg);
+}
+</style>
+
+</body>
+</html>

@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>PinPoint Mobile Mockup — Issues List</title>
+<link rel="stylesheet" href="components/styles.css">
+</head>
+<body>
+
+<!-- Header, tabs, and panels are injected by shell.js -->
+<div class="content">
+
+  <!-- Page header -->
+  <div class="issues-header-row">
+    <div>
+      <h1 class="page-title">Issues</h1>
+    </div>
+    <span class="issues-total-badge">47</span>
+  </div>
+
+  <!-- Search bar + filter icon button -->
+  <div class="search-filter-row">
+    <div class="search-bar" style="margin-bottom:0;flex:1;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18">
+        <circle cx="11" cy="11" r="8"/>
+        <path d="m21 21-4.3-4.3"/>
+      </svg>
+      <input type="text" placeholder="Search issues...">
+      <button class="clear-search-btn" aria-label="Clear search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+    <button class="filter-icon-btn" onclick="openFilters()" aria-label="Open filters">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><line x1="4" x2="20" y1="6" y2="6"/><line x1="8" x2="16" y1="12" y2="12"/><line x1="11" x2="13" y1="18" y2="18"/></svg>
+    </button>
+  </div>
+
+  <!-- Chip row: Sort | Open | Machine▾ | Assigned▾ -->
+  <div class="filter-row" style="margin-top:8px;">
+    <button class="filter-chip" onclick="openSort()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
+      Sort
+    </button>
+    <button class="filter-chip filter-chip-active filter-chip-dropdown" id="statusChip" onclick="toggleDropdown('statusDropdown')">
+      <span id="statusChipLabel">Open</span>
+      <svg class="chip-chevron" id="statusChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    <button class="filter-chip filter-chip-dropdown" onclick="toggleDropdown('machineDropdown')">
+      Machine
+      <svg class="chip-chevron" id="machineChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    <button class="filter-chip filter-chip-dropdown" onclick="toggleDropdown('assignedDropdown')">
+      Assigned
+      <svg class="chip-chevron" id="assignedChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+  </div>
+
+  <!-- Status dropdown (hidden by default) -->
+  <div class="chip-dropdown" id="statusDropdown">
+    <!-- Group quick-selects at top -->
+    <button class="chip-dropdown-item chip-dropdown-item-quick" onclick="toggleStatusGroup(this, 'new')">
+      <span class="item-checkbox item-checkbox-indeterminate"></span>
+      New
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-quick" onclick="toggleStatusGroup(this, 'in_progress')">
+      <span class="item-checkbox item-checkbox-indeterminate"></span>
+      In Progress
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-quick" onclick="toggleStatusGroup(this, 'closed')">
+      <span class="item-checkbox item-checkbox-indeterminate"></span>
+      Closed
+    </button>
+    <div class="chip-dropdown-divider"></div>
+
+    <!-- Open group (2 statuses) -->
+    <div class="chip-dropdown-section-label">Open</div>
+    <button class="chip-dropdown-item chip-dropdown-item-check checked" data-group="new" onclick="toggleStatusCheck(this)">
+      <span class="item-checkbox"></span>
+      <span class="status-dot status-dot-new"></span>
+      New
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-check checked" data-group="new" onclick="toggleStatusCheck(this)">
+      <span class="item-checkbox"></span>
+      <span class="status-dot status-dot-confirmed"></span>
+      Confirmed
+    </button>
+
+    <!-- In Progress group (4 statuses) -->
+    <div class="chip-dropdown-section-label" style="margin-top:8px;">In Progress</div>
+    <button class="chip-dropdown-item chip-dropdown-item-check checked" data-group="in_progress" onclick="toggleStatusCheck(this)">
+      <span class="item-checkbox"></span>
+      <span class="status-dot status-dot-in-progress"></span>
+      In Progress
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-check checked" data-group="in_progress" onclick="toggleStatusCheck(this)">
+      <span class="item-checkbox"></span>
+      <span class="status-dot status-dot-need-parts"></span>
+      Need Parts
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-check checked" data-group="in_progress" onclick="toggleStatusCheck(this)">
+      <span class="item-checkbox"></span>
+      <span class="status-dot status-dot-need-help"></span>
+      Need Help
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-check checked" data-group="in_progress" onclick="toggleStatusCheck(this)">
+      <span class="item-checkbox"></span>
+      <span class="status-dot status-dot-wait-owner"></span>
+      Wait Owner
+    </button>
+
+    <!-- Closed group (5 statuses) -->
+    <div class="chip-dropdown-divider"></div>
+    <div class="chip-dropdown-section-label">Closed</div>
+    <button class="chip-dropdown-item chip-dropdown-item-check" data-group="closed" onclick="toggleStatusCheck(this)">
+      <span class="item-checkbox"></span>
+      <span class="status-dot status-dot-fixed"></span>
+      Fixed
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-check" data-group="closed" onclick="toggleStatusCheck(this)">
+      <span class="item-checkbox"></span>
+      <span class="status-dot status-dot-wontfix"></span>
+      Won't Fix
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-check chip-dropdown-item-muted" data-group="closed" onclick="toggleStatusCheck(this)">
+      <span class="item-checkbox"></span>
+      <span class="status-dot status-dot-wai"></span>
+      WAI
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-check chip-dropdown-item-muted" data-group="closed" onclick="toggleStatusCheck(this)">
+      <span class="item-checkbox"></span>
+      <span class="status-dot status-dot-no-repro"></span>
+      No Repro
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-check chip-dropdown-item-muted" data-group="closed" onclick="toggleStatusCheck(this)">
+      <span class="item-checkbox"></span>
+      <span class="status-dot status-dot-duplicate"></span>
+      Duplicate
+    </button>
+  </div>
+
+  <!-- Machine dropdown (initials, hidden by default) -->
+  <div class="chip-dropdown" id="machineDropdown">
+    <button class="chip-dropdown-item chip-dropdown-item-check chip-dropdown-item-quick" onclick="toggleQuick(this, 'machineDropdown')">
+      <span class="item-checkbox item-checkbox-indeterminate"></span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      My machines
+    </button>
+    <div class="chip-dropdown-divider"></div>
+    <button class="chip-dropdown-item chip-dropdown-item-check" onclick="toggleCheck(this)">
+      <span class="item-checkbox"></span>
+      AFM
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-check" onclick="toggleCheck(this)">
+      <span class="item-checkbox"></span>
+      CFTBL
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-check" onclick="toggleCheck(this)">
+      <span class="item-checkbox"></span>
+      HD
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-check" onclick="toggleCheck(this)">
+      <span class="item-checkbox"></span>
+      MM
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-check" onclick="toggleCheck(this)">
+      <span class="item-checkbox"></span>
+      TAF
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-check" onclick="toggleCheck(this)">
+      <span class="item-checkbox"></span>
+      TZ
+    </button>
+  </div>
+
+  <!-- Assigned dropdown (hidden by default) -->
+  <div class="chip-dropdown" id="assignedDropdown">
+    <button class="chip-dropdown-item chip-dropdown-item-check checked" onclick="toggleCheck(this)">
+      <span class="item-checkbox"></span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Me
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-check chip-dropdown-item-muted" onclick="toggleCheck(this)">
+      <span class="item-checkbox"></span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      Unassigned
+    </button>
+    <div class="chip-dropdown-divider"></div>
+    <button class="chip-dropdown-item chip-dropdown-item-check" onclick="toggleCheck(this)">
+      <span class="item-checkbox"></span>
+      Jake Martinez
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-check" onclick="toggleCheck(this)">
+      <span class="item-checkbox"></span>
+      Sarah Chen
+    </button>
+    <button class="chip-dropdown-item chip-dropdown-item-check" onclick="toggleCheck(this)">
+      <span class="item-checkbox"></span>
+      Tim Froehlich
+    </button>
+  </div>
+
+  <!-- Count row -->
+  <div class="list-context-row">
+    <span class="list-context-count">1–15 of 47</span>
+    <div class="list-pagination-btns">
+      <button class="page-btn" disabled aria-label="Previous page">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <button class="page-btn" aria-label="Next page">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Issue 1: In Progress, Major, assigned -->
+  <a href="mockup-issue-detail.html" class="issue-card">
+    <div class="issue-card-top">
+      <div class="issue-id-machine">
+        <span class="issue-id-chip">AFM-03</span>
+        <span class="issue-machine-name">Attack from Mars</span>
+      </div>
+      <span class="issue-age">2h ago</span>
+    </div>
+    <div class="issue-title-text">Broken coin door latch won't stay closed</div>
+    <div class="issue-card-bottom">
+      <div class="issue-badge-row">
+        <span class="status-badge status-in-progress">In Progress</span>
+        <span class="issue-severity-dot severity-major"></span>
+        <span class="issue-sev-label">Major</span>
+      </div>
+      <span class="assignee-avatar">JM</span>
+    </div>
+  </a>
+
+  <!-- Issue 2: New, Unplayable, unassigned -->
+  <a href="#" class="issue-card issue-card-urgent">
+    <div class="issue-card-top">
+      <div class="issue-id-machine">
+        <span class="issue-id-chip">HD-02</span>
+        <span class="issue-machine-name">Harley Davidson</span>
+      </div>
+      <span class="issue-age">5h ago</span>
+    </div>
+    <div class="issue-title-text">Ball drain ramp not diverting — machine unplayable</div>
+    <div class="issue-card-bottom">
+      <div class="issue-badge-row">
+        <span class="status-badge status-new">New</span>
+        <span class="issue-severity-dot severity-unplayable"></span>
+        <span class="issue-sev-label sev-label-unplayable">Unplayable</span>
+      </div>
+      <span class="assignee-avatar assignee-avatar-empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </span>
+    </div>
+  </a>
+
+  <!-- Issue 3: In Progress, Minor, assigned -->
+  <a href="#" class="issue-card">
+    <div class="issue-card-top">
+      <div class="issue-id-machine">
+        <span class="issue-id-chip">MM-07</span>
+        <span class="issue-machine-name">Medieval Madness</span>
+      </div>
+      <span class="issue-age">1d ago</span>
+    </div>
+    <div class="issue-title-text">Left flipper losing power mid-game</div>
+    <div class="issue-card-bottom">
+      <div class="issue-badge-row">
+        <span class="status-badge status-in-progress">In Progress</span>
+        <span class="issue-severity-dot severity-minor"></span>
+        <span class="issue-sev-label">Minor</span>
+      </div>
+      <span class="assignee-avatar">JM</span>
+    </div>
+  </a>
+
+  <!-- Issue 4: New, Major, unassigned -->
+  <a href="#" class="issue-card">
+    <div class="issue-card-top">
+      <div class="issue-id-machine">
+        <span class="issue-id-chip">TAF-12</span>
+        <span class="issue-machine-name">The Addams Family</span>
+      </div>
+      <span class="issue-age">2d ago</span>
+    </div>
+    <div class="issue-title-text">Swamp kickout missing shots — ball going SDTM</div>
+    <div class="issue-card-bottom">
+      <div class="issue-badge-row">
+        <span class="status-badge status-new">New</span>
+        <span class="issue-severity-dot severity-major"></span>
+        <span class="issue-sev-label">Major</span>
+      </div>
+      <span class="assignee-avatar assignee-avatar-empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </span>
+    </div>
+  </a>
+
+  <!-- Issue 5: New, Cosmetic, unassigned -->
+  <a href="#" class="issue-card">
+    <div class="issue-card-top">
+      <div class="issue-id-machine">
+        <span class="issue-id-chip">CFTBL-01</span>
+        <span class="issue-machine-name">Creature from the Black Lagoon</span>
+      </div>
+      <span class="issue-age">4d ago</span>
+    </div>
+    <div class="issue-title-text">GI lights flickering on left side of playfield</div>
+    <div class="issue-card-bottom">
+      <div class="issue-badge-row">
+        <span class="status-badge status-new">New</span>
+        <span class="issue-severity-dot severity-cosmetic"></span>
+        <span class="issue-sev-label">Cosmetic</span>
+      </div>
+      <span class="assignee-avatar assignee-avatar-empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </span>
+    </div>
+  </a>
+
+  <!-- Issue 6: In Progress, Major, assigned, watched -->
+  <a href="#" class="issue-card">
+    <div class="issue-card-top">
+      <div class="issue-id-machine">
+        <span class="issue-id-chip">TZ-08</span>
+        <span class="issue-machine-name">Twilight Zone</span>
+      </div>
+      <span class="issue-age">1w ago</span>
+    </div>
+    <div class="issue-title-text">Powerball missing from game — gumball machine jammed</div>
+    <div class="issue-card-bottom">
+      <div class="issue-badge-row">
+        <span class="status-badge status-in-progress">In Progress</span>
+        <span class="issue-severity-dot severity-major"></span>
+        <span class="issue-sev-label">Major</span>
+        <span class="watched-dot" title="You're watching this issue">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="11" height="11"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3" fill="var(--primary-dark)"/></svg>
+        </span>
+      </div>
+      <span class="assignee-avatar">SC</span>
+    </div>
+  </a>
+
+  <div style="height: 8px;"></div>
+
+  <!-- Bottom pagination -->
+  <div class="list-pagination-footer">
+    <span class="list-context-count">1–6 of 47</span>
+    <div class="list-pagination-btns">
+      <button class="page-btn" disabled aria-label="Previous page">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <button class="page-btn" aria-label="Next page">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===== FILTERS MODAL ===== -->
+<div class="filters-modal" id="filtersModal">
+  <div class="filters-modal-header">
+    <button class="filters-cancel-btn" onclick="closeFilters()">Cancel</button>
+    <span class="filters-title">Filters</span>
+    <button class="filters-reset-btn" onclick="closeFilters()">Reset</button>
+  </div>
+  <div class="filters-scroll">
+
+    <!-- Group 1: issue properties -->
+    <div class="filter-group">
+      <div class="filter-group-row" onclick="">
+        <span class="filter-group-label">Machine</span>
+        <div class="filter-group-right">
+          <span class="filter-group-value">All</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="m9 18 6-6-6-6"/></svg>
+        </div>
+      </div>
+      <div class="filter-group-row" onclick="">
+        <span class="filter-group-label">Status</span>
+        <div class="filter-group-right">
+          <span class="filter-group-value filter-group-value-active">Open</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="m9 18 6-6-6-6"/></svg>
+        </div>
+      </div>
+      <div class="filter-group-row" onclick="">
+        <span class="filter-group-label">Severity</span>
+        <div class="filter-group-right">
+          <span class="filter-group-value">All</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="m9 18 6-6-6-6"/></svg>
+        </div>
+      </div>
+      <div class="filter-group-row" onclick="">
+        <span class="filter-group-label">Priority</span>
+        <div class="filter-group-right">
+          <span class="filter-group-value">All</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="m9 18 6-6-6-6"/></svg>
+        </div>
+      </div>
+      <div class="filter-group-row no-border" onclick="">
+        <span class="filter-group-label">Frequency</span>
+        <div class="filter-group-right">
+          <span class="filter-group-value">All</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="m9 18 6-6-6-6"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Group 2: people -->
+    <div class="filter-group">
+      <div class="filter-group-row" onclick="">
+        <span class="filter-group-label">Assignee</span>
+        <div class="filter-group-right">
+          <span class="filter-group-value">All</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="m9 18 6-6-6-6"/></svg>
+        </div>
+      </div>
+      <div class="filter-group-row" onclick="">
+        <span class="filter-group-label">Owner</span>
+        <div class="filter-group-right">
+          <span class="filter-group-value">All</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="m9 18 6-6-6-6"/></svg>
+        </div>
+      </div>
+      <div class="filter-group-row no-border" onclick="">
+        <span class="filter-group-label">Reporter</span>
+        <div class="filter-group-right">
+          <span class="filter-group-value">All</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="m9 18 6-6-6-6"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Group 3: date ranges -->
+    <div class="filter-group">
+      <div class="filter-group-row" onclick="">
+        <span class="filter-group-label">Created</span>
+        <div class="filter-group-right">
+          <span class="filter-group-date-pair">
+            <span class="filter-date-btn">From</span>
+            <span class="filter-date-sep">→</span>
+            <span class="filter-date-btn">To</span>
+          </span>
+        </div>
+      </div>
+      <div class="filter-group-row no-border" onclick="">
+        <span class="filter-group-label">Modified</span>
+        <div class="filter-group-right">
+          <span class="filter-group-date-pair">
+            <span class="filter-date-btn">From</span>
+            <span class="filter-date-sep">→</span>
+            <span class="filter-date-btn">To</span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Group 4: toggle -->
+    <div class="filter-group">
+      <div class="filter-group-row no-border">
+        <span class="filter-group-label">Watched only</span>
+        <div class="filter-toggle" id="watchedToggle" onclick="toggleWatched()">
+          <div class="filter-toggle-thumb"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <div class="filters-footer">
+    <button class="filters-apply-btn" onclick="closeFilters()">Show 45 issues</button>
+  </div>
+</div>
+
+<!-- ===== SORT SHEET ===== -->
+<div class="sort-sheet-scrim" id="sortScrim" onclick="closeSort()"></div>
+<div class="sort-sheet" id="sortSheet">
+  <div class="sheet-handle-wrap"><div class="sheet-handle"></div></div>
+  <div class="sort-sheet-header">
+    <span class="sort-sheet-title">Sort by</span>
+    <button class="sort-sheet-close" onclick="closeSort()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="sort-options">
+    <button class="sort-option" onclick="selectSort(this)">
+      <span>Created Date (Newest first)</span>
+      <svg class="sort-radio sort-radio-selected" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/></svg>
+    </button>
+    <button class="sort-option" onclick="selectSort(this)">
+      <span>Created Date (Oldest first)</span>
+      <svg class="sort-radio" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="10"/></svg>
+    </button>
+    <button class="sort-option" onclick="selectSort(this)">
+      <span>Modified Date (Newest first)</span>
+      <svg class="sort-radio" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="10"/></svg>
+    </button>
+    <button class="sort-option" onclick="selectSort(this)">
+      <span>Modified Date (Oldest first)</span>
+      <svg class="sort-radio" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="10"/></svg>
+    </button>
+    <button class="sort-option" onclick="selectSort(this)">
+      <span>Assignee (A to Z)</span>
+      <svg class="sort-radio" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="10"/></svg>
+    </button>
+  </div>
+</div>
+
+<script src="components/shell.js"></script>
+<script>initShell({ activePage: 'issues' });</script>
+
+<script>
+function openFilters() {
+  document.getElementById('filtersModal').classList.add('open');
+  closeAllDropdowns();
+}
+function closeFilters() {
+  document.getElementById('filtersModal').classList.remove('open');
+}
+function openSort() {
+  document.getElementById('sortSheet').classList.add('open');
+  document.getElementById('sortScrim').classList.add('open');
+  closeAllDropdowns();
+}
+function closeSort() {
+  document.getElementById('sortSheet').classList.remove('open');
+  document.getElementById('sortScrim').classList.remove('open');
+}
+function selectSort(btn) {
+  btn.closest('.sort-options').querySelectorAll('.sort-radio').forEach(r => r.classList.remove('sort-radio-selected'));
+  btn.querySelector('.sort-radio').classList.add('sort-radio-selected');
+  setTimeout(closeSort, 180);
+}
+function toggleWatched() {
+  document.getElementById('watchedToggle').classList.toggle('on');
+}
+function closeAllDropdowns() {
+  document.querySelectorAll('.chip-dropdown').forEach(d => d.classList.remove('open'));
+  document.querySelectorAll('.chip-chevron').forEach(c => c.style.transform = '');
+}
+const dropdownChevrons = {
+  statusDropdown: 'statusChevron',
+  machineDropdown: 'machineChevron',
+  assignedDropdown: 'assignedChevron',
+};
+function toggleDropdown(id) {
+  const dropdown = document.getElementById(id);
+  const isOpen = dropdown.classList.contains('open');
+  closeAllDropdowns();
+  if (!isOpen) {
+    dropdown.classList.add('open');
+    const chevronId = dropdownChevrons[id];
+    if (chevronId) document.getElementById(chevronId).style.transform = 'rotate(180deg)';
+  }
+}
+function toggleCheck(btn) {
+  btn.classList.toggle('checked');
+}
+function toggleStatusCheck(btn) {
+  btn.classList.toggle('checked');
+  updateStatusChip();
+}
+function toggleStatusGroup(btn, groupName) {
+  const dropdown = document.getElementById('statusDropdown');
+  const groupItems = [...dropdown.querySelectorAll(`[data-group="${groupName}"]`)];
+  const allChecked = groupItems.every(item => item.classList.contains('checked'));
+
+  // Toggle all items in this group
+  groupItems.forEach(item => {
+    item.classList.toggle('checked', !allChecked);
+  });
+
+  updateStatusChip();
+}
+function updateStatusChip() {
+  const dropdown = document.getElementById('statusDropdown');
+  const allItems = [...dropdown.querySelectorAll('.chip-dropdown-item-check')];
+  const checked = allItems.filter(b => b.classList.contains('checked'));
+  const chip = document.getElementById('statusChip');
+  const label = document.getElementById('statusChipLabel');
+
+  // Define status groups
+  const newStatuses = ['New', 'Confirmed'];
+  const progressStatuses = ['In Progress', 'Need Parts', 'Need Help', 'Wait Owner'];
+  const closedStatuses = ['Fixed', "Won't Fix", 'WAI', 'No Repro', 'Duplicate'];
+
+  const checkedLabels = checked.map(b => b.textContent.trim());
+
+  // Check if entire groups are selected
+  const allNew = newStatuses.every(s => checkedLabels.includes(s));
+  const allProgress = progressStatuses.every(s => checkedLabels.includes(s));
+  const allClosed = closedStatuses.every(s => checkedLabels.includes(s));
+
+  let text;
+  if (checked.length === 0) {
+    text = 'Status';
+  } else if (checked.length === allItems.length) {
+    text = 'All';
+  } else if (allNew && allProgress && !allClosed) {
+    text = 'Open';
+  } else if (allClosed && !allNew && !allProgress) {
+    text = 'Closed';
+  } else if (allNew && checked.length === newStatuses.length) {
+    text = 'New';
+  } else if (allProgress && checked.length === progressStatuses.length) {
+    text = 'In Progress';
+  } else if (checked.length === 1) {
+    text = checkedLabels[0];
+  } else {
+    text = checked.length + ' statuses';
+  }
+
+  label.textContent = text;
+  // Active styling: any non-"all" selection keeps active style
+  chip.classList.toggle('filter-chip-active', checked.length > 0 && text !== 'All');
+}
+function toggleQuick(btn, dropdownId) {
+  const dropdown = document.getElementById(dropdownId);
+  const checkItems = [...dropdown.querySelectorAll('.chip-dropdown-item-check:not(.chip-dropdown-item-quick)')];
+  const allChecked = checkItems.every(b => b.classList.contains('checked'));
+  checkItems.forEach(b => b.classList.toggle('checked', !allChecked));
+}
+// Close dropdowns when tapping outside
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.filter-chip-dropdown') && !e.target.closest('.chip-dropdown')) {
+    closeAllDropdowns();
+  }
+});
+</script>
+
+<style>
+  /* Search + filter icon row */
+  .search-filter-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 0;
+  }
+
+  .filter-icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: 1px solid var(--outline);
+    background: var(--card);
+    color: var(--foreground);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .filter-icon-btn:active { background: var(--muted); }
+
+  /* Filters modal (full screen) */
+  .filters-modal {
+    position: fixed;
+    inset: 0;
+    background: #09090b;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    max-width: 390px;
+    margin: 0 auto;
+  }
+
+  .filters-modal.open { transform: translateY(0); }
+
+  .filters-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .filters-cancel-btn, .filters-reset-btn {
+    background: none;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px 0;
+    color: #3b82f6;
+  }
+
+  .filters-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--foreground);
+  }
+
+  .filters-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .filter-group {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .filter-group-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 44px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+  }
+
+  .filter-group-row.no-border { border-bottom: none; }
+  .filter-group-row:active { background: var(--muted); }
+
+  .filter-group-label {
+    font-size: 16px;
+    color: var(--foreground);
+  }
+
+  .filter-group-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted-fg);
+  }
+
+  .filter-group-value {
+    font-size: 16px;
+    color: var(--muted-fg);
+  }
+
+  .filter-group-value-active {
+    color: var(--primary);
+    font-weight: 500;
+  }
+
+  .filter-group-date-pair {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .filter-date-btn {
+    font-size: 13px;
+    color: var(--muted-fg);
+    background: var(--muted);
+    padding: 3px 10px;
+    border-radius: 6px;
+  }
+
+  .filter-date-sep {
+    font-size: 12px;
+    color: var(--muted-fg);
+  }
+
+  /* Watched toggle */
+  .filter-toggle {
+    width: 44px;
+    height: 24px;
+    border-radius: 12px;
+    background: var(--outline);
+    padding: 2px;
+    cursor: pointer;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+
+  .filter-toggle.on { background: #3b82f6; }
+
+  .filter-toggle-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.2s;
+  }
+
+  .filter-toggle.on .filter-toggle-thumb { transform: translateX(20px); }
+
+  .filters-footer {
+    padding: 16px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .filters-apply-btn {
+    width: 100%;
+    height: 44px;
+    border-radius: 8px;
+    border: none;
+    background: #2563eb;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .filters-apply-btn:active { opacity: 0.85; }
+
+  /* Sort bottom sheet */
+  .sort-sheet-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 49;
+    display: none;
+    max-width: 390px;
+    margin: 0 auto;
+  }
+
+  .sort-sheet-scrim.open { display: block; }
+
+  .sort-sheet {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%) translateY(100%);
+    width: 100%;
+    max-width: 390px;
+    background: var(--card);
+    border-radius: 16px 16px 0 0;
+    border-top: 1px solid var(--border);
+    z-index: 50;
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .sort-sheet.open { transform: translateX(-50%) translateY(0); }
+
+  .sheet-handle-wrap {
+    display: flex;
+    justify-content: center;
+    padding: 10px 0 0;
+  }
+
+  .sheet-handle {
+    width: 40px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--outline);
+  }
+
+  .sort-sheet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sort-sheet-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--foreground);
+  }
+
+  .sort-sheet-close {
+    background: none;
+    border: none;
+    color: var(--muted-fg);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+  }
+
+  .sort-options {
+    padding: 8px 0 32px;
+  }
+
+  .sort-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 16px 24px;
+    background: none;
+    border: none;
+    font-size: 16px;
+    color: var(--muted-fg);
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .sort-option:active { background: var(--muted); }
+
+  .sort-radio { color: var(--outline); }
+  .sort-radio-selected { color: #3b82f6; }
+
+  .sort-option:has(.sort-radio-selected) span { color: var(--foreground); }
+
+  .issues-header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+
+  .issues-total-badge {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--muted-fg);
+    background: var(--muted);
+    padding: 3px 9px;
+    border-radius: 99px;
+    margin-top: 4px;
+    flex-shrink: 0;
+  }
+
+  .clear-search-btn {
+    background: none;
+    border: none;
+    color: var(--muted-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .clear-search-btn:active { color: var(--foreground); }
+
+  .filter-chip-active {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(74, 222, 128, 0.08);
+  }
+
+  .filter-chip-dropdown {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .chip-chevron {
+    transition: transform 0.18s;
+    flex-shrink: 0;
+  }
+
+  /* Dropdown panel */
+  .chip-dropdown {
+    display: none;
+    flex-direction: column;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+
+  .chip-dropdown.open { display: flex; }
+
+  .chip-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--foreground);
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+
+  .chip-dropdown-item:active { background: var(--muted); }
+
+  .chip-dropdown-item-quick {
+    color: var(--primary);
+    font-weight: 600;
+  }
+
+  .chip-dropdown-item-muted { color: var(--muted-fg); }
+
+  .chip-dropdown-item-check {
+    justify-content: flex-start;
+    gap: 10px;
+  }
+
+  .item-checkbox {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1.5px solid var(--outline);
+    background: transparent;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.12s, background 0.12s;
+  }
+
+  .chip-dropdown-item-check.checked .item-checkbox {
+    background: var(--primary);
+    border-color: var(--primary);
+  }
+
+  .chip-dropdown-item-check.checked .item-checkbox::after {
+    content: '';
+    display: block;
+    width: 9px;
+    height: 5px;
+    border-left: 2px solid var(--primary-dark);
+    border-bottom: 2px solid var(--primary-dark);
+    transform: rotate(-45deg) translateY(-1px);
+  }
+
+  /* Indeterminate state (My machines partial selection) */
+  .item-checkbox-indeterminate {
+    border-color: #3b82f6;
+  }
+  .item-checkbox-indeterminate::after {
+    content: '';
+    display: block;
+    width: 8px;
+    height: 2px;
+    background: #3b82f6;
+    border-radius: 1px;
+  }
+
+  .chip-dropdown-item-check.checked {
+    color: var(--foreground);
+  }
+
+  .chip-dropdown-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 0;
+  }
+
+  .chip-dropdown-section-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted-fg);
+    padding: 8px 14px 4px;
+  }
+
+  /* Status dots inside dropdown */
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  /* New group - cyan/teal */
+  .status-dot-new         { background: #06b6d4; } /* cyan-500 */
+  .status-dot-confirmed   { background: #14b8a6; } /* teal-500 */
+
+  /* In Progress group - fuchsia/purple/pink */
+  .status-dot-in-progress { background: #d946ef; } /* fuchsia-500 */
+  .status-dot-need-parts  { background: #9333ea; } /* purple-600 */
+  .status-dot-need-help   { background: #ec4899; } /* pink-500 */
+  .status-dot-wait-owner  { background: #a855f7; } /* purple-500 */
+
+  /* Closed group - green/zinc/slate/neutral */
+  .status-dot-fixed       { background: #22c55e; } /* green-500 */
+  .status-dot-wontfix     { background: #71717a; } /* zinc-500 */
+  .status-dot-wai         { background: #71717a; } /* zinc-500 */
+  .status-dot-no-repro    { background: #64748b; } /* slate-500 */
+  .status-dot-duplicate   { background: #525252; } /* neutral-600 */
+
+  /* Count / pagination row */
+  .list-context-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .list-context-count {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted-fg);
+  }
+
+  .list-pagination-btns {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .page-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    border: 1px solid var(--outline);
+    background: transparent;
+    color: var(--muted-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .page-btn:disabled { opacity: 0.35; cursor: default; }
+  .page-btn:not(:disabled):active { background: var(--muted); color: var(--foreground); }
+
+  /* Issue cards */
+  .issue-card {
+    display: block;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.15s, background 0.15s;
+  }
+
+  .issue-card:active {
+    background: var(--card-hover);
+    border-color: var(--outline);
+  }
+
+  .issue-card-urgent {
+    border-color: rgba(239, 68, 68, 0.3);
+    background: rgba(239, 68, 68, 0.04);
+  }
+
+  .issue-card-urgent:active { border-color: rgba(239, 68, 68, 0.5); }
+
+  .issue-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 5px;
+  }
+
+  .issue-id-machine {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .issue-id-chip {
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--primary);
+    background: rgba(74, 222, 128, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    letter-spacing: 0.02em;
+  }
+
+  .issue-machine-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted-fg);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  .issue-age {
+    font-size: 11px;
+    color: var(--muted-fg);
+    flex-shrink: 0;
+  }
+
+  .issue-title-text {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--foreground);
+    line-height: 1.4;
+    margin-bottom: 9px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .issue-card-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .issue-badge-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+
+  .issue-severity-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .severity-unplayable { background: var(--error); }
+  .severity-major      { background: var(--warning); }
+  .severity-minor      { background: #60a5fa; }
+  .severity-cosmetic   { background: var(--muted-fg); }
+
+  .issue-sev-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted-fg);
+  }
+
+  .sev-label-unplayable { color: var(--error); font-weight: 600; }
+
+  .watched-dot {
+    display: inline-flex;
+    align-items: center;
+    color: var(--primary);
+    margin-left: 2px;
+  }
+
+  .assignee-avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: var(--primary-dark);
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .assignee-avatar-empty {
+    background: var(--muted);
+    color: var(--muted-fg);
+  }
+
+  .list-pagination-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 2px;
+    margin-bottom: 4px;
+  }
+</style>
+
+</body>
+</html>

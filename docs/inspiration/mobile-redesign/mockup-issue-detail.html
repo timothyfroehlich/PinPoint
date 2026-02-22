@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>PinPoint Mobile Mockup — Issue Detail</title>
+<link rel="stylesheet" href="components/styles.css">
+</head>
+<body>
+
+<!-- ==========================================
+     PAGE: ISSUE DETAIL (authenticated member view)
+     Demonstrates: compact header, tappable badge row,
+     collapsible details panel, timeline, comment form
+     ========================================== -->
+<div class="content">
+
+  <!-- Back navigation + Issue ID -->
+  <div class="issue-nav-row">
+    <a href="#" class="back-link">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="m15 18-6-6 6-6"/></svg>
+      <span>Issues</span>
+    </a>
+    <span class="issue-id-chip">AFM-03</span>
+  </div>
+
+  <!-- Machine context -->
+  <a href="#" class="machine-context-link">Attack from Mars</a>
+
+  <!-- Issue title -->
+  <h1 class="issue-title">Broken coin door latch won't stay closed</h1>
+
+  <!-- Badge strip -->
+  <div class="badge-strip">
+    <span class="status-badge status-in-progress-badge">In Progress</span>
+    <span class="status-badge status-severity-major">Major</span>
+    <span class="status-badge status-priority-high">High</span>
+    <span class="status-badge status-frequency-constant">Constant</span>
+  </div>
+
+  <!-- Owner Requirements callout (auth only, shown when machine has ownerRequirements set) -->
+  <div class="owner-req-callout">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" class="owner-req-icon"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+    <div class="owner-req-body">
+      <div class="owner-req-title">Owner's Requirements for Attack from Mars</div>
+      <div class="owner-req-text">Do not adjust spring tension on flippers. Contact Jake before any playfield work. Machine is on loan — treat with extra care.</div>
+    </div>
+  </div>
+
+  <!-- Assignee + Watch row (always visible) -->
+  <div class="assignee-watch-row">
+    <div class="assignee-display">
+      <span class="mini-avatar">JM</span>
+      <div class="assignee-info">
+        <span class="assignee-label">Assignee</span>
+        <span class="assignee-name">Jake Martinez</span>
+      </div>
+    </div>
+    <div class="row-actions">
+      <button class="watch-btn active" onclick="this.classList.toggle('active')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        <span class="watch-count">3</span>
+      </button>
+      <button class="edit-details-btn" onclick="toggleDetails()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        <span>Edit Details</span>
+        <svg id="detailsChevron" class="edit-details-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Collapsible details panel (replaces desktop sidebar) -->
+  <div class="details-panel" id="detailsPanel">
+    <div class="details-panel-header">
+      <span class="details-panel-title">Edit Issue Details</span>
+    </div>
+    <div class="details-grid">
+      <span class="detail-label">Status</span>
+      <button class="detail-status-btn" onclick="toggleStatusDropdown()">
+        <span class="status-dot status-dot-in-progress"></span>
+        <span id="selectedStatusLabel">In Progress</span>
+        <svg class="select-chevron" id="statusDetailChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+
+      <!-- Status dropdown (hidden by default) -->
+      <div class="detail-status-dropdown" id="statusDetailDropdown">
+        <!-- Group quick-selects at top -->
+        <button class="chip-dropdown-item chip-dropdown-item-quick" onclick="selectStatusGroup('new')">
+          New
+        </button>
+        <button class="chip-dropdown-item chip-dropdown-item-quick" onclick="selectStatusGroup('in_progress')">
+          In Progress
+        </button>
+        <button class="chip-dropdown-item chip-dropdown-item-quick" onclick="selectStatusGroup('closed')">
+          Closed
+        </button>
+        <div class="chip-dropdown-divider"></div>
+
+        <!-- Open group (2 statuses) -->
+        <div class="chip-dropdown-section-label">Open</div>
+        <button class="chip-dropdown-item" data-status="new" data-group="new" onclick="selectStatus(this, 'New')">
+          <span class="status-dot status-dot-new"></span>
+          New
+        </button>
+        <button class="chip-dropdown-item" data-status="confirmed" data-group="new" onclick="selectStatus(this, 'Confirmed')">
+          <span class="status-dot status-dot-confirmed"></span>
+          Confirmed
+        </button>
+
+        <!-- In Progress group (4 statuses) -->
+        <div class="chip-dropdown-section-label" style="margin-top:8px;">In Progress</div>
+        <button class="chip-dropdown-item chip-dropdown-item-selected" data-status="in_progress" data-group="in_progress" onclick="selectStatus(this, 'In Progress')">
+          <span class="status-dot status-dot-in-progress"></span>
+          In Progress
+        </button>
+        <button class="chip-dropdown-item" data-status="need_parts" data-group="in_progress" onclick="selectStatus(this, 'Need Parts')">
+          <span class="status-dot status-dot-need-parts"></span>
+          Need Parts
+        </button>
+        <button class="chip-dropdown-item" data-status="need_help" data-group="in_progress" onclick="selectStatus(this, 'Need Help')">
+          <span class="status-dot status-dot-need-help"></span>
+          Need Help
+        </button>
+        <button class="chip-dropdown-item" data-status="wait_owner" data-group="in_progress" onclick="selectStatus(this, 'Wait Owner')">
+          <span class="status-dot status-dot-wait-owner"></span>
+          Wait Owner
+        </button>
+
+        <!-- Closed group (5 statuses) -->
+        <div class="chip-dropdown-divider"></div>
+        <div class="chip-dropdown-section-label">Closed</div>
+        <button class="chip-dropdown-item" data-status="fixed" data-group="closed" onclick="selectStatus(this, 'Fixed')">
+          <span class="status-dot status-dot-fixed"></span>
+          Fixed
+        </button>
+        <button class="chip-dropdown-item" data-status="wontfix" data-group="closed" onclick="selectStatus(this, 'Won&apos;t Fix')">
+          <span class="status-dot status-dot-wontfix"></span>
+          Won't Fix
+        </button>
+        <button class="chip-dropdown-item chip-dropdown-item-muted" data-status="wai" data-group="closed" onclick="selectStatus(this, 'WAI')">
+          <span class="status-dot status-dot-wai"></span>
+          WAI
+        </button>
+        <button class="chip-dropdown-item chip-dropdown-item-muted" data-status="no_repro" data-group="closed" onclick="selectStatus(this, 'No Repro')">
+          <span class="status-dot status-dot-no-repro"></span>
+          No Repro
+        </button>
+        <button class="chip-dropdown-item chip-dropdown-item-muted" data-status="duplicate" data-group="closed" onclick="selectStatus(this, 'Duplicate')">
+          <span class="status-dot status-dot-duplicate"></span>
+          Duplicate
+        </button>
+      </div>
+
+      <span class="detail-label">Severity</span>
+      <div class="select-wrapper detail-select">
+        <select class="form-select">
+          <option>Cosmetic</option>
+          <option>Minor</option>
+          <option selected>Major</option>
+          <option>Unplayable</option>
+        </select>
+        <svg class="select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="m6 9 6 6 6-6"/></svg>
+      </div>
+
+      <span class="detail-label">Priority</span>
+      <div class="select-wrapper detail-select">
+        <select class="form-select">
+          <option>Low</option>
+          <option>Medium</option>
+          <option selected>High</option>
+        </select>
+        <svg class="select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="m6 9 6 6 6-6"/></svg>
+      </div>
+
+      <span class="detail-label">Frequency</span>
+      <div class="select-wrapper detail-select">
+        <select class="form-select">
+          <option>Intermittent</option>
+          <option>Frequent</option>
+          <option selected>Constant</option>
+        </select>
+        <svg class="select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="m6 9 6 6 6-6"/></svg>
+      </div>
+
+      <span class="detail-label">Assigned</span>
+      <button class="detail-assignee-btn" onclick="toggleAssigneeDropdown()">
+        <span class="mini-avatar">JM</span>
+        <span id="selectedAssigneeLabel">Jake Martinez</span>
+        <svg class="select-chevron" id="assigneeDetailChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+
+      <!-- Assignee dropdown (hidden by default) -->
+      <div class="detail-assignee-dropdown" id="assigneeDetailDropdown">
+        <button class="chip-dropdown-item" onclick="selectAssignee(this, 'Admin User', 'AU')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Me
+        </button>
+        <button class="chip-dropdown-item chip-dropdown-item-muted" onclick="selectAssignee(this, 'Unassigned', null)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          Unassigned
+        </button>
+        <div class="chip-dropdown-divider"></div>
+        <button class="chip-dropdown-item chip-dropdown-item-selected" onclick="selectAssignee(this, 'Jake Martinez', 'JM')">
+          <span class="mini-avatar mini-avatar-sm">JM</span>
+          Jake Martinez
+        </button>
+        <button class="chip-dropdown-item" onclick="selectAssignee(this, 'Sarah Chen', 'SC')">
+          <span class="mini-avatar mini-avatar-sm">SC</span>
+          Sarah Chen
+        </button>
+        <button class="chip-dropdown-item" onclick="selectAssignee(this, 'Tim Froehlich', 'TF')">
+          <span class="mini-avatar mini-avatar-sm">TF</span>
+          Tim Froehlich
+        </button>
+      </div>
+    </div>
+
+    <div class="details-meta-row">
+      <div class="detail-meta-item">
+        <span class="detail-label">Reporter</span>
+        <div class="reporter-chip">
+          <span class="mini-avatar">SC</span>
+          <span>Sarah Chen</span>
+        </div>
+      </div>
+      <div class="detail-meta-item">
+        <span class="detail-label">Created</span>
+        <span class="detail-value">Feb 10, 2026</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Images section (expandable, collapsed by default) -->
+  <button class="section-header section-header-expandable" onclick="toggleImages()">
+    <span class="section-label">IMAGES (2)</span>
+    <svg id="imagesChevron" class="section-chevron section-chevron-collapsed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="m6 9 6 6 6-6"/></svg>
+  </button>
+  <div class="image-strip collapsed" id="imagesPanel">
+    <div class="image-thumb">
+      <div class="image-placeholder">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+      </div>
+    </div>
+    <div class="image-thumb">
+      <div class="image-placeholder">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Activity / Timeline -->
+  <div class="section-header" style="margin-top: 16px;">
+    <span class="section-label">ACTIVITY</span>
+  </div>
+
+  <div class="timeline">
+    <!-- Initial report -->
+    <div class="timeline-item">
+      <div class="timeline-marker"></div>
+      <div class="timeline-content">
+        <div class="timeline-header">
+          <span class="timeline-author">Sarah Chen</span>
+          <span class="timeline-label-initial">Initial report</span>
+          <span class="timeline-time">Feb 10</span>
+        </div>
+        <div class="timeline-body">
+          The coin door latch mechanism is broken. The door swings open during play and occasionally hits players. Need to replace the latch assembly — the spring is completely shot.
+        </div>
+      </div>
+    </div>
+
+    <!-- System event -->
+    <div class="timeline-event">
+      <span class="timeline-event-dot"></span>
+      <span><strong>Jake Martinez</strong> changed status to <strong>In Progress</strong></span>
+      <span class="timeline-time">Feb 11</span>
+    </div>
+
+    <!-- System event -->
+    <div class="timeline-event">
+      <span class="timeline-event-dot"></span>
+      <span><strong>Jake Martinez</strong> self-assigned this issue</span>
+      <span class="timeline-time">Feb 11</span>
+    </div>
+
+    <!-- Comment -->
+    <div class="timeline-item">
+      <div class="timeline-marker"></div>
+      <div class="timeline-content">
+        <div class="timeline-header">
+          <span class="mini-avatar" style="width:22px;height:22px;font-size:9px;">JM</span>
+          <span class="timeline-author">Jake Martinez</span>
+          <span class="timeline-time">Feb 12</span>
+          <button class="timeline-menu-btn" aria-label="Comment actions">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+          </button>
+        </div>
+        <div class="timeline-body">
+          Ordered replacement latch assembly from Marco Specialties. Part #500-6438-00. Should arrive by Thursday. I'll install it over the weekend.
+        </div>
+      </div>
+    </div>
+
+    <!-- Comment -->
+    <div class="timeline-item">
+      <div class="timeline-marker"></div>
+      <div class="timeline-content">
+        <div class="timeline-header">
+          <span class="mini-avatar" style="width:22px;height:22px;font-size:9px;">SC</span>
+          <span class="timeline-author">Sarah Chen</span>
+          <span class="owner-badge">Owner</span>
+          <span class="timeline-time">Feb 13</span>
+        </div>
+        <div class="timeline-body">
+          Thanks Jake! I put a temporary zip-tie on it so it stays shut for now. Not pretty but it works.
+        </div>
+        <div class="comment-images">
+          <div class="comment-image-thumb">
+            <div class="image-placeholder">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- System event -->
+    <div class="timeline-event">
+      <span class="timeline-event-dot"></span>
+      <span><strong>Jake Martinez</strong> changed severity from <strong>Minor</strong> to <strong>Major</strong></span>
+      <span class="timeline-time">Feb 14</span>
+    </div>
+  </div>
+
+  <!-- Add comment form -->
+  <div class="comment-form">
+    <div class="comment-form-header">
+      <span class="mini-avatar">AU</span>
+      <span class="comment-form-label">Add a comment</span>
+    </div>
+    <textarea class="form-textarea comment-textarea" rows="2" placeholder="Write a comment..."></textarea>
+    <div class="comment-form-actions">
+      <button class="photo-upload-btn-sm">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" x2="12" y1="3" y2="15"/>
+        </svg>
+      </button>
+      <button class="comment-submit-btn">Comment</button>
+    </div>
+  </div>
+
+</div>
+
+<script src="components/shell.js"></script>
+<script>initShell({ activePage: 'issues' });</script>
+
+<script>
+function toggleDetails() {
+  const panel = document.getElementById('detailsPanel');
+  const chevron = document.getElementById('detailsChevron');
+  panel.classList.toggle('open');
+  chevron.style.transform = panel.classList.contains('open') ? 'rotate(180deg)' : '';
+}
+
+function toggleStatusDropdown() {
+  const dropdown = document.getElementById('statusDetailDropdown');
+  const chevron = document.getElementById('statusDetailChevron');
+  const isOpen = dropdown.classList.contains('open');
+
+  // Close assignee dropdown if open
+  document.getElementById('assigneeDetailDropdown').classList.remove('open');
+  document.getElementById('assigneeDetailChevron').style.transform = '';
+
+  dropdown.classList.toggle('open');
+  chevron.style.transform = dropdown.classList.contains('open') ? 'rotate(180deg)' : '';
+}
+
+function toggleAssigneeDropdown() {
+  const dropdown = document.getElementById('assigneeDetailDropdown');
+  const chevron = document.getElementById('assigneeDetailChevron');
+  const isOpen = dropdown.classList.contains('open');
+
+  // Close status dropdown if open
+  document.getElementById('statusDetailDropdown').classList.remove('open');
+  document.getElementById('statusDetailChevron').style.transform = '';
+
+  dropdown.classList.toggle('open');
+  chevron.style.transform = dropdown.classList.contains('open') ? 'rotate(180deg)' : '';
+}
+
+function selectStatus(btn, label) {
+  // Remove selected class from all status items
+  document.querySelectorAll('#statusDetailDropdown .chip-dropdown-item').forEach(item => {
+    item.classList.remove('chip-dropdown-item-selected');
+  });
+
+  // Add selected class to clicked item
+  btn.classList.add('chip-dropdown-item-selected');
+
+  // Update label and dot
+  const statusKey = btn.dataset.status;
+  document.getElementById('selectedStatusLabel').textContent = label;
+
+  // Update the status dot in the button
+  const dotInButton = document.querySelector('.detail-status-btn .status-dot');
+  dotInButton.className = 'status-dot status-dot-' + statusKey;
+
+  // Close dropdown
+  toggleStatusDropdown();
+}
+
+function selectStatusGroup(group) {
+  // Map groups to their first status
+  const groupMap = {
+    'new': { status: 'new', label: 'New' },
+    'in_progress': { status: 'in_progress', label: 'In Progress' },
+    'closed': { status: 'fixed', label: 'Fixed' }
+  };
+
+  const target = groupMap[group];
+  const btn = document.querySelector(`#statusDetailDropdown [data-status="${target.status}"]`);
+  selectStatus(btn, target.label);
+}
+
+function selectAssignee(btn, label, initials) {
+  // Remove selected class from all assignee items
+  document.querySelectorAll('#assigneeDetailDropdown .chip-dropdown-item').forEach(item => {
+    item.classList.remove('chip-dropdown-item-selected');
+  });
+
+  // Add selected class to clicked item
+  btn.classList.add('chip-dropdown-item-selected');
+
+  // Update label and avatar
+  document.getElementById('selectedAssigneeLabel').textContent = label;
+
+  // Update avatar in button
+  const avatarContainer = document.querySelector('.detail-assignee-btn');
+  const oldAvatar = avatarContainer.querySelector('.mini-avatar, svg');
+
+  if (initials) {
+    const newAvatar = document.createElement('span');
+    newAvatar.className = 'mini-avatar';
+    newAvatar.textContent = initials;
+    oldAvatar.replaceWith(newAvatar);
+  } else {
+    // Unassigned - show X icon
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2');
+    svg.setAttribute('width', '13');
+    svg.setAttribute('height', '13');
+    svg.style.color = 'var(--muted-fg)';
+
+    const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line1.setAttribute('x1', '18');
+    line1.setAttribute('y1', '6');
+    line1.setAttribute('x2', '6');
+    line1.setAttribute('y2', '18');
+
+    const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line2.setAttribute('x1', '6');
+    line2.setAttribute('y1', '6');
+    line2.setAttribute('x2', '18');
+    line2.setAttribute('y2', '18');
+
+    svg.appendChild(line1);
+    svg.appendChild(line2);
+    oldAvatar.replaceWith(svg);
+  }
+
+  // Close dropdown
+  toggleAssigneeDropdown();
+}
+
+function toggleImages() {
+  const panel = document.getElementById('imagesPanel');
+  const chevron = document.getElementById('imagesChevron');
+  panel.classList.toggle('collapsed');
+  chevron.classList.toggle('section-chevron-collapsed');
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.detail-status-btn') && !e.target.closest('#statusDetailDropdown')) {
+    document.getElementById('statusDetailDropdown').classList.remove('open');
+    document.getElementById('statusDetailChevron').style.transform = '';
+  }
+  if (!e.target.closest('.detail-assignee-btn') && !e.target.closest('#assigneeDetailDropdown')) {
+    document.getElementById('assigneeDetailDropdown').classList.remove('open');
+    document.getElementById('assigneeDetailChevron').style.transform = '';
+  }
+});
+</script>
+
+<!-- Page-specific styles -->
+<style>
+  /* Back nav + Issue ID row */
+  .issue-nav-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+
+  .back-link {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--muted-fg);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .back-link:active { color: var(--foreground); }
+
+  .issue-id-chip {
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted-fg);
+    background: var(--muted);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  /* Machine context */
+  .machine-context-link {
+    display: inline-block;
+    font-size: 12px;
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+
+  .machine-context-link:active { text-decoration: underline; }
+
+  /* Issue title */
+  .issue-title {
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+    margin-bottom: 10px;
+  }
+
+  /* Badge strip */
+  .badge-strip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+
+  /* Owner Requirements callout */
+  .owner-req-callout {
+    display: flex;
+    gap: 10px;
+    background: rgba(234, 179, 8, 0.08);
+    border: 1px solid rgba(234, 179, 8, 0.35);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+
+  .owner-req-icon {
+    color: #eab308;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .owner-req-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .owner-req-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #eab308;
+  }
+
+  .owner-req-text {
+    font-size: 12px;
+    color: var(--foreground);
+    line-height: 1.5;
+    opacity: 0.9;
+  }
+
+  /* Assignee + Watch + Edit Details row */
+  .assignee-watch-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 14px;
+    padding: 8px 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .assignee-display {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .assignee-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .assignee-label {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--muted-fg);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .assignee-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--foreground);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .row-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .watch-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--outline);
+    background: transparent;
+    color: var(--muted-fg);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .watch-btn:active { background: var(--muted); }
+
+  .watch-btn.active {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(74, 222, 128, 0.08);
+  }
+
+  .watch-count { font-variant-numeric: tabular-nums; }
+
+  .edit-details-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--outline);
+    background: transparent;
+    color: var(--muted-fg);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .edit-details-btn:active { background: var(--muted); }
+
+  .edit-details-chevron {
+    transition: transform 0.2s;
+  }
+
+  /* Status badge colors (STATUS_CONFIG) */
+  .status-in-progress-badge {
+    background: rgba(217, 70, 239, 0.12);
+    color: #d946ef;
+    border: 1px solid rgba(217, 70, 239, 0.3);
+  }
+
+  /* Additional badge colors */
+  .status-severity-major {
+    background: var(--warning-container);
+    color: var(--warning);
+    border: 1px solid var(--warning);
+  }
+
+  .status-priority-high {
+    background: var(--error-container);
+    color: var(--error);
+    border: 1px solid var(--error);
+  }
+
+  .status-frequency-constant {
+    background: rgba(217, 70, 239, 0.12);
+    color: var(--secondary);
+    border: 1px solid rgba(217, 70, 239, 0.3);
+  }
+
+  /* Collapsible details panel */
+  .details-panel-header {
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .details-panel-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--foreground);
+  }
+
+  .details-panel {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease, margin-bottom 0.25s ease, padding 0.25s ease;
+    background: var(--card);
+    border-radius: 10px;
+    border: 1px solid transparent;
+    margin-bottom: 0;
+  }
+
+  .details-panel.open {
+    max-height: 500px;
+    padding: 14px;
+    border-color: var(--border);
+    margin-bottom: 14px;
+  }
+
+  .details-grid {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 8px 12px;
+    align-items: center;
+  }
+
+  .detail-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted-fg);
+  }
+
+  .detail-select .form-select {
+    padding: 6px 28px 6px 10px;
+    font-size: 13px;
+    border-radius: 6px;
+  }
+
+  .detail-select .select-chevron {
+    right: 8px;
+  }
+
+  .details-meta-row {
+    display: flex;
+    gap: 16px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  .detail-meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .detail-value {
+    font-size: 13px;
+    color: var(--foreground);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .reporter-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--foreground);
+  }
+
+  .mini-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: var(--primary-dark);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  /* Section headers */
+  .section-header {
+    margin-bottom: 8px;
+  }
+
+  .section-header-expandable {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .section-chevron {
+    color: var(--muted-fg);
+    transition: transform 0.2s ease;
+    transform: rotate(180deg);
+    flex-shrink: 0;
+  }
+
+  .section-chevron-collapsed {
+    transform: rotate(0deg);
+  }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted-fg);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* Image strip (horizontal scroll) */
+  .image-strip {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+    max-height: 1000px;
+    opacity: 1;
+    transition: max-height 0.3s ease, opacity 0.2s ease, margin-top 0.3s ease;
+    margin-top: 0;
+  }
+
+  .image-strip.collapsed {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    padding-bottom: 0;
+    margin-top: -8px;
+  }
+
+  .image-strip::-webkit-scrollbar { display: none; }
+
+  .image-thumb {
+    width: 100px;
+    height: 100px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    overflow: hidden;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  .image-thumb:active { border-color: var(--primary); }
+
+  .image-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted-fg);
+  }
+
+  /* Timeline */
+  .timeline {
+    position: relative;
+    padding-left: 16px;
+    margin-bottom: 16px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 3px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: var(--border);
+    border-radius: 1px;
+  }
+
+  .timeline-item {
+    position: relative;
+    margin-bottom: 14px;
+  }
+
+  .timeline-marker {
+    position: absolute;
+    left: -14px;
+    top: 8px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--primary);
+    border: 2px solid var(--bg);
+  }
+
+  .timeline-content {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+  }
+
+  .timeline-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+
+  .timeline-author {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--foreground);
+  }
+
+  .timeline-label-initial {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--primary);
+    background: rgba(74, 222, 128, 0.12);
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+
+  .owner-badge {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--secondary);
+    background: rgba(217, 70, 239, 0.12);
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+
+  .timeline-time {
+    font-size: 11px;
+    color: var(--muted-fg);
+    margin-left: auto;
+  }
+
+  .timeline-menu-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: var(--muted-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .timeline-menu-btn:active { background: var(--muted); }
+
+  .timeline-body {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--foreground);
+  }
+
+  /* Comment inline images */
+  .comment-images {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .comment-image-thumb {
+    width: 80px;
+    height: 80px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    overflow: hidden;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  .comment-image-thumb:active { border-color: var(--primary); }
+
+  /* System events */
+  .timeline-event {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+    margin-bottom: 6px;
+    font-size: 12px;
+    color: var(--muted-fg);
+    flex-wrap: wrap;
+  }
+
+  .timeline-event strong {
+    color: var(--foreground);
+    font-weight: 600;
+  }
+
+  .timeline-event-dot {
+    position: absolute;
+    left: -16px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--outline);
+    border: 1.5px solid var(--bg);
+  }
+
+  /* Comment form */
+  .comment-form {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 8px;
+  }
+
+  .comment-form-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .comment-form-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted-fg);
+  }
+
+  .comment-textarea {
+    min-height: 56px;
+    font-size: 13px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--bg);
+    border: 1px solid var(--outline);
+    margin-bottom: 8px;
+  }
+
+  .comment-form-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .photo-upload-btn-sm {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--outline);
+    background: transparent;
+    color: var(--muted-fg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .photo-upload-btn-sm:active {
+    background: var(--muted);
+    color: var(--primary);
+    border-color: var(--primary);
+  }
+
+  .comment-submit-btn {
+    padding: 6px 16px;
+    border-radius: 8px;
+    border: none;
+    background: var(--primary);
+    color: var(--primary-dark);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .comment-submit-btn:active { opacity: 0.85; }
+
+  /* Form selects (reused from report mockup) */
+  .form-select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--outline);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+    color: var(--foreground);
+    outline: none;
+    transition: border-color 0.15s;
+    font-family: inherit;
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 32px;
+    cursor: pointer;
+  }
+
+  .form-select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 1px var(--primary);
+  }
+
+  .form-textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--outline);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+    color: var(--foreground);
+    outline: none;
+    transition: border-color 0.15s;
+    font-family: inherit;
+    resize: vertical;
+    line-height: 1.5;
+  }
+
+  .form-textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 1px var(--primary);
+  }
+
+  .select-wrapper {
+    position: relative;
+  }
+
+  .select-chevron {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted-fg);
+    pointer-events: none;
+  }
+
+  /* Status dots (matching issues-list.html) */
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* New group - cyan/teal */
+  .status-dot-new         { background: #06b6d4; } /* cyan-500 */
+  .status-dot-confirmed   { background: #14b8a6; } /* teal-500 */
+
+  /* In Progress group - fuchsia/purple/pink */
+  .status-dot-in-progress { background: #d946ef; } /* fuchsia-500 */
+  .status-dot-need-parts  { background: #9333ea; } /* purple-600 */
+  .status-dot-need-help   { background: #ec4899; } /* pink-500 */
+  .status-dot-wait-owner  { background: #a855f7; } /* purple-500 */
+
+  /* Closed group - green/zinc/slate/neutral */
+  .status-dot-fixed       { background: #22c55e; } /* green-500 */
+  .status-dot-wontfix     { background: #71717a; } /* zinc-500 */
+  .status-dot-wai         { background: #71717a; } /* zinc-500 */
+  .status-dot-no-repro    { background: #64748b; } /* slate-500 */
+  .status-dot-duplicate   { background: #525252; } /* neutral-600 */
+
+  /* Detail status button (replaces select) */
+  .detail-status-btn,
+  .detail-assignee-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--bg);
+    border: 1px solid var(--outline);
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--foreground);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s;
+    position: relative;
+  }
+
+  .detail-status-btn:active,
+  .detail-assignee-btn:active {
+    border-color: var(--primary);
+  }
+
+  .detail-status-btn .select-chevron,
+  .detail-assignee-btn .select-chevron {
+    position: absolute;
+    right: 12px;
+    transition: transform 0.18s;
+  }
+
+  .detail-status-btn #selectedStatusLabel,
+  .detail-assignee-btn #selectedAssigneeLabel {
+    flex: 1;
+  }
+
+  /* Detail dropdowns */
+  .detail-status-dropdown,
+  .detail-assignee-dropdown {
+    display: none;
+    flex-direction: column;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 4px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    max-height: 300px;
+    overflow-y: auto;
+    grid-column: 2 / 3;
+  }
+
+  .detail-status-dropdown.open,
+  .detail-assignee-dropdown.open {
+    display: flex;
+  }
+
+  /* Dropdown items (reuse from issues-list) */
+  .chip-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--foreground);
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+
+  .chip-dropdown-item:active { background: var(--muted); }
+
+  .chip-dropdown-item-quick {
+    color: var(--primary);
+    font-weight: 600;
+  }
+
+  .chip-dropdown-item-muted { color: var(--muted-fg); }
+
+  .chip-dropdown-item-selected {
+    background: rgba(74, 222, 128, 0.08);
+  }
+
+  .chip-dropdown-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 0;
+  }
+
+  .chip-dropdown-section-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted-fg);
+    padding: 8px 14px 4px;
+  }
+
+  .mini-avatar-sm {
+    width: 18px;
+    height: 18px;
+    font-size: 8px;
+  }
+</style>
+
+</body>
+</html>

@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>PinPoint Mobile Mockup — Report Issue</title>
+<link rel="stylesheet" href="components/styles.css">
+</head>
+<body>
+
+<!-- ==========================================
+     PAGE: REPORT ISSUE (authenticated member view)
+     Header, tabs, and panels are injected by shell.js
+     ========================================== -->
+<div class="content">
+  <div class="page-header" style="margin-bottom: 12px;">
+    <h1 class="page-title">Report Issue</h1>
+  </div>
+
+  <!-- Form Card -->
+  <div class="form-card">
+    <!-- Machine Select -->
+    <div class="form-group">
+      <label class="form-label">Machine <span class="required">*</span></label>
+      <div class="select-wrapper">
+        <select class="form-select">
+          <option disabled>Select a machine...</option>
+          <option>Attack from Mars (AFM)</option>
+          <option selected>Humpty Dumpty (HD)</option>
+          <option>Medieval Madness (MM)</option>
+          <option>The Addams Family (TAF)</option>
+          <option>Creature from the Black Lagoon (CFTBL)</option>
+          <option>Twilight Zone (TZ)</option>
+        </select>
+        <svg class="select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="m6 9 6 6 6-6"/></svg>
+      </div>
+    </div>
+
+    <!-- Recent Issues for selected machine (mobile compact, limit=3) -->
+    <div class="recent-issues-banner">
+      <div class="recent-issues-header">
+        <span class="recent-label">Recent for HD</span>
+        <button class="recent-toggle" onclick="toggleRecent()">
+          <span id="recentCount">3 open</span>
+          <svg id="recentChevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </div>
+      <div class="recent-issues-list" id="recentList">
+        <a class="recent-issue-item" href="#">
+          <span class="recent-issue-tag">HD-01</span>
+          <span class="recent-issue-title">Worn flipper bushings</span>
+          <span class="status-badge status-in-progress" style="font-size:9px; padding:2px 6px;">In Progress</span>
+        </a>
+        <a class="recent-issue-item" href="#">
+          <span class="recent-issue-tag">HD-02</span>
+          <span class="recent-issue-title">Ball trough sensor intermittent</span>
+          <span class="status-badge status-new" style="font-size:9px; padding:2px 6px;">New</span>
+        </a>
+        <a class="recent-issue-item" href="#">
+          <span class="recent-issue-tag">HD-03</span>
+          <span class="recent-issue-title">Pop bumper cap loose</span>
+          <span class="status-badge status-new" style="font-size:9px; padding:2px 6px;">New</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Divider -->
+    <div class="form-divider"></div>
+
+    <!-- Title -->
+    <div class="form-group">
+      <div class="label-row">
+        <label class="form-label">Issue Title <span class="required">*</span></label>
+        <span class="char-count">18/60</span>
+      </div>
+      <input type="text" class="form-input" placeholder="e.g., Left flipper not responding" value="Display keeps dimming">
+    </div>
+
+    <!-- Description -->
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <textarea class="form-textarea" rows="3" placeholder="Tell us what happened, and how often it occurs.">The DMD display dims to almost unreadable after about 10 minutes of play. Cycling power fixes it temporarily.</textarea>
+    </div>
+
+    <!-- Severity + Frequency (side by side) -->
+    <div class="form-row-2">
+      <div class="form-group">
+        <label class="form-label">Severity <span class="required">*</span></label>
+        <div class="select-wrapper">
+          <select class="form-select">
+            <option>Cosmetic</option>
+            <option selected>Minor</option>
+            <option>Major</option>
+            <option>Unplayable</option>
+          </select>
+          <svg class="select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Frequency <span class="required">*</span></label>
+        <div class="select-wrapper">
+          <select class="form-select">
+            <option>Intermittent</option>
+            <option>Frequent</option>
+            <option selected>Constant</option>
+          </select>
+          <svg class="select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Priority + Status (member/admin only, side by side) -->
+    <div class="form-row-2">
+      <div class="form-group">
+        <label class="form-label">Priority <span class="required">*</span></label>
+        <div class="select-wrapper">
+          <select class="form-select">
+            <option>Low</option>
+            <option selected>Medium</option>
+            <option>High</option>
+          </select>
+          <svg class="select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status <span class="required">*</span></label>
+        <div class="select-wrapper">
+          <select class="form-select">
+            <!-- Open group -->
+            <option selected>New</option>
+            <option>Confirmed</option>
+            <!-- In Progress group -->
+            <option>In Progress</option>
+            <option>Need Parts</option>
+            <option>Need Help</option>
+            <option>Wait Owner</option>
+            <!-- Closed group -->
+            <option>Fixed</option>
+            <option>Won't Fix</option>
+            <option>WAI</option>
+            <option>No Repro</option>
+            <option>Duplicate</option>
+          </select>
+          <svg class="select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Assign To (member/admin only) -->
+    <div class="form-group">
+      <label class="form-label">Assign To</label>
+      <div class="select-wrapper">
+        <select class="form-select">
+          <option>Me</option>
+          <option selected>Unassigned</option>
+          <option>Jake Martinez</option>
+          <option>Sarah Chen</option>
+          <option>Tim Froehlich</option>
+        </select>
+        <svg class="select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="m6 9 6 6 6-6"/></svg>
+      </div>
+    </div>
+
+    <!-- Divider -->
+    <div class="form-divider"></div>
+
+    <!-- Photos -->
+    <div class="form-group">
+      <label class="form-label">Photos</label>
+      <div class="photo-upload-area">
+        <button class="photo-upload-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" x2="12" y1="3" y2="15"/>
+          </svg>
+          <span>Upload Photo</span>
+        </button>
+        <span class="photo-limit">0 / 4 photos</span>
+      </div>
+    </div>
+
+    <!-- Watch this issue (auth only) -->
+    <div class="watch-row">
+      <input type="checkbox" id="watchIssue" class="watch-checkbox" checked>
+      <div class="watch-label-group">
+        <label for="watchIssue" class="watch-label">Watch this issue</label>
+        <span class="watch-desc">Get updates when status or comments change.</span>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <button class="submit-btn">Submit Issue Report</button>
+  </div>
+</div>
+
+<script src="components/shell.js"></script>
+<script>initShell({ activePage: 'report' });</script>
+
+<script>
+function toggleRecent() {
+  const list = document.getElementById('recentList');
+  const chevron = document.getElementById('recentChevron');
+  list.classList.toggle('collapsed');
+  chevron.style.transform = list.classList.contains('collapsed') ? 'rotate(-90deg)' : '';
+}
+</script>
+
+<!-- Page-specific styles -->
+<style>
+  .form-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+
+  .form-group {
+    margin-bottom: 14px;
+  }
+
+  .form-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--foreground);
+    margin-bottom: 6px;
+  }
+
+  .form-label .required {
+    color: var(--error);
+  }
+
+  .label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+
+  .label-row .form-label {
+    margin-bottom: 0;
+  }
+
+  .char-count {
+    font-size: 11px;
+    color: var(--muted-fg);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .form-input,
+  .form-textarea,
+  .form-select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--outline);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+    color: var(--foreground);
+    outline: none;
+    transition: border-color 0.15s;
+    font-family: inherit;
+  }
+
+  .form-input:focus,
+  .form-textarea:focus,
+  .form-select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 1px var(--primary);
+  }
+
+  .form-textarea {
+    resize: vertical;
+    min-height: 72px;
+    line-height: 1.5;
+  }
+
+  .select-wrapper {
+    position: relative;
+  }
+
+  .select-wrapper .form-select {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 32px;
+    cursor: pointer;
+  }
+
+  .select-chevron {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted-fg);
+    pointer-events: none;
+  }
+
+  .form-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 16px 0;
+  }
+
+  /* Side-by-side fields */
+  .form-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  /* Recent issues banner */
+  .recent-issues-banner {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+  }
+
+  .recent-issues-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .recent-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted-fg);
+  }
+
+  .recent-toggle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .recent-toggle svg {
+    transition: transform 0.2s;
+  }
+
+  .recent-issues-list {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow: hidden;
+    transition: max-height 0.2s ease, margin-top 0.2s ease;
+    max-height: 200px;
+  }
+
+  .recent-issues-list.collapsed {
+    max-height: 0;
+    margin-top: 0;
+  }
+
+  .recent-issue-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 12px;
+    color: var(--foreground);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .recent-issue-item:active {
+    background: var(--card-hover);
+  }
+
+  .recent-issue-tag {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: var(--muted);
+    color: var(--muted-fg);
+    flex-shrink: 0;
+  }
+
+  .recent-issue-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+  }
+
+  /* Photo upload */
+  .photo-upload-area {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .photo-upload-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 8px;
+    border: 1px dashed var(--outline);
+    background: transparent;
+    color: var(--muted-fg);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .photo-upload-btn:active {
+    background: var(--muted);
+    border-color: var(--primary);
+    color: var(--primary);
+  }
+
+  .photo-limit {
+    font-size: 11px;
+    color: var(--muted-fg);
+  }
+
+  /* Submit button */
+  .submit-btn {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: none;
+    background: var(--primary);
+    color: var(--primary-dark);
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+
+  .submit-btn:active {
+    opacity: 0.85;
+  }
+
+  /* Watch this issue */
+  .watch-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 0 4px;
+  }
+
+  .watch-checkbox {
+    width: 16px;
+    height: 16px;
+    margin-top: 2px;
+    accent-color: var(--primary);
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  .watch-label-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .watch-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--foreground);
+    cursor: pointer;
+  }
+
+  .watch-desc {
+    font-size: 11px;
+    color: var(--muted-fg);
+  }
+</style>
+
+</body>
+</html>
