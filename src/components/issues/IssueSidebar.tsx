@@ -47,6 +47,7 @@ export function IssueSidebar({
               <SidebarActions
                 issue={issue}
                 allUsers={allUsers}
+                currentUserId={currentUserId}
                 accessLevel={accessLevel}
                 ownershipContext={ownershipContext}
               />
