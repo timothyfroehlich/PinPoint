@@ -34,25 +34,62 @@ Use this skill when:
 pnpm exec shadcn@latest add [component]
 ```
 
-## Detailed Documentation
+## Key Files Registry
 
-Read these files for comprehensive UI guidance:
+These are the canonical pattern sources. Read these files to understand PinPoint's UI patterns -- they ARE the documentation.
 
-```bash
-# Primary UI guide - the "Goto" manual for all UI work
-cat docs/UI_GUIDE.md
+### Status & Filter System
 
-# Specific UI implementation patterns
-ls docs/ui-patterns/
-cat docs/ui-patterns/*.md
-```
+| File                                            | What It Teaches                                                                      |
+| :---------------------------------------------- | :----------------------------------------------------------------------------------- |
+| `src/lib/issues/status.ts`                      | STATUS_CONFIG, STATUS_GROUPS, color system, all 11 statuses. Single source of truth. |
+| `src/components/issues/IssueFilters.tsx`        | Smart badge grouping, filter composition, MultiSelect usage, "More Filters" pattern  |
+| `src/components/issues/fields/StatusSelect.tsx` | Grouped select with icons, STATUS_GROUP_LABELS, separator pattern                    |
+| `src/components/ui/multi-select.tsx`            | Grouped/flat modes, indeterminate group headers, selected-items-first sorting        |
+
+### Pickers & Selects
+
+| File                                         | What It Teaches                                                 |
+| :------------------------------------------- | :-------------------------------------------------------------- |
+| `src/components/issues/AssigneePicker.tsx`   | Listbox pattern, "Unassigned" special value, user search/filter |
+| `src/components/machines/MachineFilters.tsx` | Inline filter bar, sort dropdown, owner display with metadata   |
+| `src/components/machines/OwnerSelect.tsx`    | Owner select with machine count and invite status metadata      |
+
+### Styling & Tokens
+
+| File                                       | What It Teaches                                                             |
+| :----------------------------------------- | :-------------------------------------------------------------------------- |
+| `src/app/globals.css`                      | Material Design 3 color system, Tailwind v4 @theme block, custom properties |
+| `src/lib/issues/status.ts` (STATUS_CONFIG) | Canonical color assignments per status (Tailwind class names)               |
+
+### Layout
+
+| File                                   | What It Teaches                                     |
+| :------------------------------------- | :-------------------------------------------------- |
+| `src/components/layout/PageShell.tsx`  | Page wrapper with size variants, consistent padding |
+| `src/components/layout/MainLayout.tsx` | App shell, header, sidebar integration, mobile nav  |
+| `src/components/layout/Sidebar.tsx`    | Navigation, collapsed state, mobile sheet pattern   |
+
+## Label Standards (Decided)
+
+- Status group labels: "Open" (not "New"), "In Progress", "Closed" -- see `STATUS_GROUP_LABELS` in `status.ts`
+- Quick-select labels: "Me" (assignee), "My machines" (not "Your machines")
+- Status "wait_owner": Use `STATUS_CONFIG.wait_owner.label` as canonical source (currently "Pending Owner"). Note: mockups use "Wait Owner" -- this may be reconciled later.
+
+## Color System
+
+- **Always use Tailwind token names** (e.g., `bg-cyan-500`), never hex values
+- Status colors are defined in `STATUS_CONFIG` in `status.ts` -- never hardcode
+- Theme uses Material Design 3 via CSS custom properties in `globals.css`
+- Primary: `--color-primary` (APC Neon Green #4ade80)
+- Secondary: `--color-secondary` (Fuchsia #d946ef)
 
 ## Core UI Patterns
 
 ### Server vs Client Components
 
 ```typescript
-// ✅ Good: Server Component (default)
+// Server Component (default)
 export default async function MachinesPage() {
   const machines = await getMachines();
 
@@ -65,7 +102,7 @@ export default async function MachinesPage() {
   );
 }
 
-// ✅ Good: Client Component (only when needed)
+// Client Component (only when needed)
 "use client";
 import { useState } from "react";
 
@@ -85,7 +122,7 @@ export function IssueFilter() {
 ### Forms with Progressive Enhancement
 
 ```typescript
-// ✅ Good: Direct Server Action reference
+// Direct Server Action reference
 import { createIssue } from "~/server/actions/issues";
 
 export function CreateIssueForm() {
@@ -98,7 +135,7 @@ export function CreateIssueForm() {
   );
 }
 
-// ❌ Bad: Inline wrapper (breaks Next.js form handling)
+// BAD: Inline wrapper (breaks Next.js form handling)
 <form action={async () => { await createIssue(); }}>
 ```
 
@@ -141,7 +178,7 @@ export function IssueActionsMenu({ issueId }: { issueId: string }) {
         <Button variant="ghost">Actions</Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent>
-        {/* ✅ Good: Use onSelect */}
+        {/* Use onSelect, not forms inside dropdowns */}
         <DropdownMenuItem
           onSelect={async () => {
             await deleteIssue(issueId);
@@ -154,7 +191,7 @@ export function IssueActionsMenu({ issueId }: { issueId: string }) {
   );
 }
 
-// ❌ Bad: Form inside dropdown (unmounts before submission)
+// BAD: Form inside dropdown (unmounts before submission)
 <DropdownMenuItem>
   <form action={deleteIssue}>
     <button>Delete</button>
@@ -167,19 +204,19 @@ export function IssueActionsMenu({ issueId }: { issueId: string }) {
 ### CSS Variables (No Hardcoded Colors)
 
 ```typescript
-// ✅ Good: Use CSS variables from globals.css
+// Use CSS variables from globals.css
 <div className="bg-background text-foreground">
   <p className="text-muted-foreground">Muted text</p>
 </div>
 
-// ❌ Bad: Hardcoded hex colors
+// BAD: Hardcoded hex colors
 <div style={{ backgroundColor: "#ffffff", color: "#000000" }}>
 ```
 
 ### Component Styling
 
 ```typescript
-// ✅ Good: Use className with cn() for merging
+// Use className with cn() for merging
 import { cn } from "~/lib/utils";
 
 export function Button({ className, ...props }: ButtonProps) {
@@ -194,31 +231,31 @@ export function Button({ className, ...props }: ButtonProps) {
   );
 }
 
-// ❌ Bad: String concatenation (doesn't handle conflicts)
+// BAD: String concatenation (doesn't handle conflicts)
 <button className={`base-classes ${className}`} />
 
-// ❌ Bad: Inline styles
+// BAD: Inline styles
 <button style={{ marginTop: '10px' }} />
 ```
 
 ### Global vs Local Styles
 
 ```typescript
-// ✅ Global styles (globals.css)
+// Global styles (globals.css)
 // - Typography (headings, body text)
 // - Theme variables (colors, spacing)
 
-// ✅ Local styles (component className)
+// Local styles (component className)
 // - Component-specific layout
 // - Responsive design
 // - Interactive states (hover, focus)
 
-// ❌ Bad: Hardcoded spacing in reusable components
+// BAD: Hardcoded spacing in reusable components
 export function Card({ children }: CardProps) {
   return <div className="m-4 p-4">{children}</div>; // Too opinionated
 }
 
-// ✅ Good: Allow className override
+// GOOD: Allow className override
 export function Card({ children, className }: CardProps) {
   return <div className={cn("rounded-lg border", className)}>{children}</div>;
 }
@@ -300,7 +337,7 @@ export function IssueForm() {
 ### Semantic HTML
 
 ```typescript
-// ✅ Good: Semantic HTML
+// Semantic HTML
 <nav aria-label="Main navigation">
   <ul>
     <li><a href="/machines">Machines</a></li>
@@ -308,7 +345,7 @@ export function IssueForm() {
   </ul>
 </nav>
 
-// ❌ Bad: Div soup
+// BAD: Div soup
 <div className="nav">
   <div className="nav-item">Machines</div>
   <div className="nav-item">Issues</div>
@@ -318,12 +355,12 @@ export function IssueForm() {
 ### ARIA Labels
 
 ```typescript
-// ✅ Good: ARIA labels for screen readers
+// ARIA labels for screen readers
 <Button aria-label="Delete issue">
   <TrashIcon className="h-4 w-4" />
 </Button>
 
-// ✅ Good: Label association
+// Label association
 <Label htmlFor="email">Email</Label>
 <Input id="email" name="email" type="email" />
 ```
@@ -333,14 +370,14 @@ export function IssueForm() {
 ### CSS-Only Patterns
 
 ```typescript
-// ✅ Good: CSS-only hover effects
+// CSS-only hover effects
 <div className="group">
   <Button className="group-hover:bg-primary/90">
     Hover Me
   </Button>
 </div>
 
-// ✅ Good: Peer patterns for form validation
+// Peer patterns for form validation
 <Input className="peer" />
 <p className="peer-invalid:visible invisible text-red-500">
   Invalid input
@@ -350,14 +387,13 @@ export function IssueForm() {
 ### Fallback for No JS
 
 ```typescript
-// ✅ Good: Form works without JavaScript
+// Form works without JavaScript
 <form action={createIssue} method="POST">
   <input name="title" required />
   <button type="submit">Submit</button>
-  {/* No client-side validation required */}
 </form>
 
-// ❌ Bad: Requires JavaScript
+// BAD: Requires JavaScript
 <form onSubmit={(e) => {
   e.preventDefault();
   // Client-side only logic
@@ -369,7 +405,7 @@ export function IssueForm() {
 ### Page Layout
 
 ```typescript
-// ✅ Good: Consistent page structure
+// Consistent page structure
 export default async function MachinesPage() {
   const machines = await getMachines();
 
@@ -395,7 +431,7 @@ export default async function MachinesPage() {
 ### Responsive Grid
 
 ```typescript
-// ✅ Good: Responsive grid with Tailwind
+// Responsive grid with Tailwind
 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
   {items.map((item) => (
     <Card key={item.id}>{item.name}</Card>
@@ -405,30 +441,30 @@ export default async function MachinesPage() {
 
 ## UI Anti-Patterns
 
-### ❌ Don't Do These
+### Don't Do These
 
 **Global CSS Resets**:
 
 ```css
-/* ❌ Bad: Breaks component internals */
+/* BAD: Breaks component internals */
 * {
   margin: 0;
   padding: 0;
 }
 
-/* ✅ Good: Use Tailwind's Preflight */
+/* GOOD: Use Tailwind's Preflight */
 @tailwind base;
 ```
 
 **Hardcoded Spacing in Components**:
 
 ```typescript
-// ❌ Bad: Rigid component
+// BAD: Rigid component
 export function Card({ children }: CardProps) {
   return <div className="m-4 p-4">{children}</div>;
 }
 
-// ✅ Good: Flexible component
+// GOOD: Flexible component
 export function Card({ children, className }: CardProps) {
   return <div className={cn("rounded-lg", className)}>{children}</div>;
 }
@@ -437,12 +473,17 @@ export function Card({ children, className }: CardProps) {
 **Inline Styles**:
 
 ```typescript
-// ❌ Bad: Inline styles
+// BAD: Inline styles
 <div style={{ marginTop: '10px', color: '#ff0000' }}>
 
-// ✅ Good: Tailwind utilities
+// GOOD: Tailwind utilities
 <div className="mt-2.5 text-red-500">
 ```
+
+## Troubleshooting
+
+- **Styles not applying**: Check Tailwind specificity, check `cn()` usage, clear `.next` cache
+- **Hydration errors**: Ensure no random data (dates, Math.random) renders without `useEffect` or `suppressHydrationWarning`. Check for invalid HTML nesting (`<div>` inside `<p>`).
 
 ## UI Checklist
 
@@ -459,9 +500,7 @@ Before committing UI code:
 - [ ] Responsive design (mobile-first)
 - [ ] shadcn/ui components only (no MUI)
 
-## Additional Resources
+## External References
 
-- UI guide: `docs/UI_GUIDE.md`
-- UI patterns: `docs/ui-patterns/*.md`
 - shadcn/ui docs: Use Context7 MCP for latest components
 - Tailwind CSS v4 docs: Use Context7 MCP for latest utilities
