@@ -22,6 +22,29 @@ import {
   type IssueStatus,
 } from "~/lib/issues/status";
 
+/**
+ * StatusSelect — Single-value status picker for the issue detail page.
+ *
+ * ## Pattern
+ * Grouped `<Select>` dropdown with three sections (New, In Progress, Closed),
+ * separated by visual dividers. Each option shows a colored icon and label
+ * driven entirely by `STATUS_CONFIG`. Tooltips on each option display the
+ * status description on hover.
+ *
+ * ## Composition
+ * - Uses shadcn `<Select>` with `<SelectGroup>` per status group
+ * - `STATUS_GROUPS.new`, `.in_progress`, `.closed` define which statuses
+ *   appear in each section
+ * - `STATUS_CONFIG[status]` provides icon, iconColor, label, and description
+ * - Group labels are currently "New", "In Progress", "Closed" — a rename of
+ *   "New" to "Open" is planned for a later PR
+ *
+ * ## Key Abstractions
+ * - `value` / `onValueChange` follow the controlled component pattern
+ * - Icons are assigned per-group: `Circle` (new), `CircleDot` (in progress),
+ *   `Disc` (closed) — defined in `STATUS_CONFIG`
+ * - The trigger displays the currently selected status icon + label
+ */
 interface StatusSelectProps {
   value: IssueStatus;
   onValueChange: (value: IssueStatus) => void;
