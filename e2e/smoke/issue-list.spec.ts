@@ -159,7 +159,7 @@ test.describe("Issue List Features", () => {
 
     // The MultiSelect value defaults to all OPEN_STATUSES.
     // Clicking "Open" group header will DESELECT "new" and "confirmed".
-    const newGroupHeader = page.getByTestId("filter-status-group-new");
+    const newGroupHeader = page.getByTestId("filter-status-group-open");
     await expect(newGroupHeader).toBeVisible();
     await newGroupHeader.click();
 
