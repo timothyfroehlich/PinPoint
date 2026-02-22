@@ -350,8 +350,8 @@ test.describe("Issue List Features", () => {
   test('should show and activate "My machines" quick-select in Machine filter', async ({
     page,
   }) => {
-    // Member user owns: AFM (Attack from Mars), EBD (Eight Ball Deluxe), SC (Slick Chick)
-    // Clicking "My machines" should filter to those three machines (sorted alphabetically by initials)
+    // Admin user owns: BK (Black Knight), GDZ (Godzilla), HD (Humpty Dumpty), MM (Medieval Madness)
+    // Clicking "My machines" should filter to those four machines (sorted alphabetically by initials)
     await page.goto("/issues");
 
     // Open the Machine filter dropdown
@@ -364,12 +364,13 @@ test.describe("Issue List Features", () => {
     await page.getByText("My machines").click();
     await page.keyboard.press("Escape");
 
-    // URL should contain the member's owned machine initials
+    // URL should contain the admin's owned machine initials
     await page.waitForURL(/machine=/);
     const url = new URL(page.url());
     const machineParam = url.searchParams.get("machine") ?? "";
-    expect(machineParam).toContain("AFM");
-    expect(machineParam).toContain("EBD");
-    expect(machineParam).toContain("SC");
+    expect(machineParam).toContain("BK");
+    expect(machineParam).toContain("GDZ");
+    expect(machineParam).toContain("HD");
+    expect(machineParam).toContain("MM");
   });
 });
