@@ -219,9 +219,10 @@ test.describe("Issues System", () => {
       await expect(assigneePicker).toBeVisible();
       await expect(assigneePicker).toContainText("Unassigned");
 
-      // Assign to Member User (self-assign)
+      // Self-assign via the "Me" quick-select (current user is excluded from
+      // the alphabetical list and only appears as "Me" at the top of the picker)
       await assigneePicker.click();
-      await page.getByRole("option", { name: /Member User/i }).click();
+      await page.getByRole("option", { name: "Me" }).click();
 
       // Verify the assignee name is now displayed
       await expect(assigneePicker).toContainText("Member User");
