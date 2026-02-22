@@ -10,7 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     if: >-
       github.event.issue.pull_request &&
-      contains(github.event.comment.body, '!screenshots')
+      contains(github.event.comment.body, '!screenshots') &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
     concurrency:
       group: gh-pages
       cancel-in-progress: false
