@@ -7,6 +7,11 @@ set -euo pipefail
 INPUT=$(cat)
 NAME=$(echo "$INPUT" | jq -r '.name')
 
+if [ -z "${NAME}" ] || [ "${NAME}" = "null" ]; then
+  echo "Error: invalid or missing worktree name in input JSON ('.name' must be a non-empty string)" >&2
+  exit 1
+fi
+
 # Use the name as a branch: worktree/<name>
 BRANCH="worktree/${NAME}"
 
