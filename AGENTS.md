@@ -229,24 +229,28 @@ bash scripts/workflow/respond-to-copilot.sh <PR> <path:line> <msg>  # Reply + re
 
 For multiple independent tasks (UI fixes, Copilot feedback, parallel features), use worktree-isolated subagents.
 
-**Coordination**: Built-in **Agent Teams** is the primary mechanism. Use `TeamCreate`, spawn teammates with the `Task` tool (with `team_name`), and coordinate via `SendMessage`/`TaskUpdate`. Fall back to background subagents (`run_in_background: true`) if Agent Teams is unreliable.
+**Coordination**: Built-in **Agent Teams** is the primary mechanism. Use `TeamCreate`, spawn teammates with the `Task` tool (with `team_name` and `isolation: "worktree"`), and coordinate via `SendMessage`/`TaskUpdate`. Fall back to background subagents (`run_in_background: true`) if Agent Teams is unreliable.
 
 **Quality Enforcement**: Automatic via Claude Code hooks:
 
 - `TaskCompleted` hook → runs `pnpm run check` before allowing task completion
 - `TeammateIdle` hook → blocks idle if unpushed commits or uncommitted changes exist
+- **Hooks require correct CWD**: Both hooks read `.cwd` from the event JSON. Without `isolation: "worktree"`, `.cwd` points to the lead's repo and hooks skip checks (safe but unenforced). With `isolation: "worktree"`, hooks run against the correct worktree.
 
-**Worktree Creation**: Use `pinpoint-wt.py` directly or `isolation: "worktree"` (which delegates to `pinpoint-wt.py` via the WorktreeCreate hook) — both handle port allocation and Supabase isolation.
+**Worktree Creation**:
+
+- **For teammates**: Always use `isolation: "worktree"` in the Task tool call. This delegates to `pinpoint-wt.py` via the `WorktreeCreate` hook, handling port allocation, Supabase config, AND correct hook CWD.
+- **For the lead**: Use `pinpoint-wt.py` directly for pre-creating worktrees, listing ports, or cleanup.
 
 **Workflow**:
 
-1. Create worktrees: `./pinpoint-wt.py create <branch>` for each task
-2. Dispatch subagents/teammates with full absolute worktree paths in prompts
-3. Monitor: `bash scripts/workflow/pr-dashboard.sh`, Copilot comments
-4. Clean up: `./pinpoint-wt.py remove <branch>`
+1. Spawn teammates with `isolation: "worktree"` — worktrees are created automatically
+2. Monitor: `bash scripts/workflow/pr-dashboard.sh`, Copilot comments
+3. Clean up: `./pinpoint-wt.py remove <branch>`
 
 **Anti-patterns**:
 
+- DON'T spawn teammates without `isolation: "worktree"` — hooks can't enforce quality
 - DON'T forget to check Copilot comments before merging
 
 See `pinpoint-orchestrator` skill for the full workflow.

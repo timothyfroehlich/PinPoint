@@ -109,13 +109,17 @@ Before proceeding, verify:
 
 ## Phase 2: Worktree Setup
 
-Use `pinpoint-wt.py` for worktree creation — it handles port allocation, Supabase isolation, and config generation. The built-in `isolation: "worktree"` is also supported via the `WorktreeCreate` hook (which delegates to `pinpoint-wt.py` automatically).
+**REQUIRED for teammates**: Always use `isolation: "worktree"` when spawning teammates via the Task tool. This is mandatory because:
+- Claude Code hooks (`TeammateIdle`, `TaskCompleted`) read `.cwd` from the event JSON
+- Without `isolation: "worktree"`, `.cwd` resolves to the **lead's** project dir, not the teammate's worktree
+- Hooks detect this mismatch (teammate + non-worktree CWD) and skip checks — but that means no quality enforcement
+- With `isolation: "worktree"`, the `WorktreeCreate` hook calls `pinpoint-wt.py` automatically, setting up ports, Supabase config, AND correct `.cwd`
+
+**Manual `pinpoint-wt.py`** is for the lead's own use (pre-creating worktrees, listing ports, cleanup):
 
 ```bash
 python3 ./pinpoint-wt.py create <branch-name>   # Works for new or existing branches
 ```
-
-When dispatching teammates with the Task tool, you may also pass `isolation: "worktree"` — the `WorktreeCreate` hook will call `pinpoint-wt.py` and set up ports and Supabase config automatically.
 
 Track the mapping (note: paths are flat — `feat/task-abc` → `feat-task-abc`):
 
@@ -140,7 +144,7 @@ Use built-in Agent Teams for coordination when tasks have dependencies, need mid
 TeamCreate(team_name: "pinpoint-<summary>")
 ```
 
-**Create tasks** using built-in TaskCreate, then **spawn teammates**:
+**Create tasks** using built-in TaskCreate, then **spawn teammates with `isolation: "worktree"`**:
 
 ```
 Task(
@@ -148,9 +152,12 @@ Task(
   model: "sonnet",    // Use Sonnet for teammates — faster, cheaper. Opus is for the lead only.
   team_name: "pinpoint-<summary>",
   name: "dropdown-fix",
-  prompt: "<prompt with worktree path and task details>"
+  isolation: "worktree",   // REQUIRED — hooks depend on correct CWD
+  prompt: "<prompt with task details>"
 )
 ```
+
+> **Why `isolation: "worktree"` is required**: Without it, the teammate's `.cwd` in hook events points to the lead's repo. The `TeammateIdle` and `TaskCompleted` hooks detect this and skip checks (exit 0), meaning no quality enforcement. With `isolation: "worktree"`, the WorktreeCreate hook calls `pinpoint-wt.py`, creating a proper worktree with correct CWD.
 
 Assign tasks with `TaskUpdate(taskId: "1", owner: "dropdown-fix")`.
 
@@ -359,6 +366,6 @@ If a teammate's work needs fixes, message them. If they're shut down and fixes a
 | Teammate unresponsive | Idle is normal — send follow-up message. If stuck, shutdown + replace |
 | Team cleanup fails | Shutdown remaining teammates first, then `TeamDelete()` |
 | Session dies with active team | `rm -rf ~/.claude/teams/<name> ~/.claude/tasks/<name>` |
-| Hooks fire from wrong directory | Known issue (PinPoint-ro06). PreToolUse hooks with relative paths may resolve against lead's CLAUDE_PROJECT_DIR. Workaround: teammates can `touch .claude-hook-bypass` if stuck. |
+| Hooks fire from wrong directory | Fixed: hooks now detect teammate + non-worktree CWD and skip (exit 0). Use `isolation: "worktree"` when spawning teammates for full hook enforcement. Safeword `touch .claude-hook-bypass` still works as persistent fallback. |
 | Background agent can't run Bash in worktree | Sandbox restrictions may block worktree paths. Use Agent Teams teammates (which get their own session) instead of background agents for implementation work. |
 | Husky post-checkout hook fails | Check `.husky/post-checkout` for merge conflict markers. Fix in main worktree before creating new worktrees. |
