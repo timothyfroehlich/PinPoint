@@ -80,6 +80,14 @@ export const STATUS_GROUPS = {
   ],
 } as const;
 
+// Display labels for status groups (user-facing). Internal keys stay unchanged.
+// "new" group displays as "Open" — the decision was made for Phase 2 label consistency.
+export const STATUS_GROUP_LABELS: Record<keyof typeof STATUS_GROUPS, string> = {
+  new: "Open",
+  in_progress: "In Progress",
+  closed: "Closed",
+};
+
 // Single-level exports for better re-use
 export const NEW_STATUSES = STATUS_GROUPS.new;
 export const IN_PROGRESS_STATUSES = STATUS_GROUPS.in_progress;

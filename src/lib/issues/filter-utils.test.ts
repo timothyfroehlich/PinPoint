@@ -24,8 +24,8 @@ describe("getSmartBadgeLabel", () => {
     expect(getSmartBadgeLabel([...STATUS_GROUPS.closed])).toBe("Closed");
   });
 
-  it("returns group name when entire 'New' group selected", () => {
-    expect(getSmartBadgeLabel([...STATUS_GROUPS.new])).toBe("New");
+  it("returns group label when entire 'New' group selected", () => {
+    expect(getSmartBadgeLabel([...STATUS_GROUPS.new])).toBe("Open");
   });
 
   it("returns group name when entire 'In Progress' group selected", () => {

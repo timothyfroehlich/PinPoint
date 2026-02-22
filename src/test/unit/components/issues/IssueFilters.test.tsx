@@ -50,11 +50,11 @@ describe("IssueFilters", () => {
     // Wait for layout effect
     await new Promise((resolve) => setTimeout(resolve, 0));
     // Default state: Open statuses are selected, so badges should be visible
-    expect(screen.getByText("New")).toBeInTheDocument();
+    expect(screen.getByText("Open")).toBeInTheDocument();
     expect(screen.getByText("In Progress")).toBeInTheDocument();
   });
 
-  it("clears 'New' group statuses when X is clicked", async () => {
+  it("clears 'Open' group statuses when X is clicked", async () => {
     render(
       <IssueFilters
         {...defaultProps}
@@ -63,12 +63,12 @@ describe("IssueFilters", () => {
     );
 
     // Wait for badges to render (layout effect)
-    const newBadge = await screen.findByText("New");
-    expect(newBadge).toBeInTheDocument();
+    const openBadge = await screen.findByText("Open");
+    expect(openBadge).toBeInTheDocument();
 
-    // Find the 'x' button inside the "New" badge
+    // Find the 'x' button inside the "Open" badge
     // The new badge structure uses data-testid="filter-badge"
-    const badgeElement = newBadge.closest('[data-testid="filter-badge"]');
+    const badgeElement = openBadge.closest('[data-testid="filter-badge"]');
     const clearButton = badgeElement?.querySelector(
       'button[aria-label*="Clear"]'
     );
@@ -76,7 +76,7 @@ describe("IssueFilters", () => {
     expect(clearButton).toBeInTheDocument();
     fireEvent.click(clearButton!);
 
-    // Expect push to be called with statuses excluding 'new' group
+    // Expect push to be called with statuses excluding 'new' group (displayed as "Open")
     // Default = OPEN_STATUSES
     // New Group = NEW_STATUSES (new, confirmed)
     // Expected = OPEN_STATUSES without NEW_STATUSES
