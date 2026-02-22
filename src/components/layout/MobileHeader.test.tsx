@@ -23,9 +23,13 @@ vi.mock("~/components/notifications/NotificationList", () => ({
 }));
 
 vi.mock("./user-menu-client", () => ({
-  UserMenu: ({ userName }: { userName: string }) => (
-    <button data-testid="user-menu-button">{userName}</button>
-  ),
+  UserMenu: ({
+    userName,
+    testId = "user-menu-button",
+  }: {
+    userName: string;
+    testId?: string;
+  }) => <button data-testid={testId}>{userName}</button>,
 }));
 
 vi.mock("~/lib/login-url", () => ({
@@ -78,7 +82,9 @@ describe("MobileHeader", () => {
       expect(
         screen.queryByRole("button", { name: "Notifications" })
       ).not.toBeInTheDocument();
-      expect(screen.queryByTestId("user-menu-button")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("mobile-user-menu-button")
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -105,7 +111,7 @@ describe("MobileHeader", () => {
       expect(
         screen.getByRole("button", { name: "Notifications" })
       ).toBeInTheDocument();
-      expect(screen.getByTestId("user-menu-button")).toBeInTheDocument();
+      expect(screen.getByTestId("mobile-user-menu-button")).toBeInTheDocument();
     });
 
     it("passes userName to UserMenu", () => {
@@ -116,7 +122,7 @@ describe("MobileHeader", () => {
           notifications={[]}
         />
       );
-      expect(screen.getByTestId("user-menu-button")).toHaveTextContent(
+      expect(screen.getByTestId("mobile-user-menu-button")).toHaveTextContent(
         "Alex Smith"
       );
     });

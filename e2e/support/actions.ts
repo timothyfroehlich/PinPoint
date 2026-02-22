@@ -1,6 +1,21 @@
 import { expect, type Page, type TestInfo } from "@playwright/test";
 import { TEST_USERS } from "./constants.js";
 
+/**
+ * Returns the visible user-menu trigger regardless of viewport.
+ *
+ * On desktop the trigger lives in the desktop header (data-testid="user-menu-button").
+ * On mobile it lives in the compact header (data-testid="mobile-user-menu-button").
+ * Both are always in the DOM; the filter ensures we get the visible one.
+ */
+function visibleUserMenu(page: Page) {
+  return page
+    .locator(
+      '[data-testid="user-menu-button"],[data-testid="mobile-user-menu-button"]'
+    )
+    .filter({ visible: true });
+}
+
 interface LoginOptions {
   email?: string;
   password?: string;
@@ -36,7 +51,7 @@ export async function loginAs(
 
   // Wait for user menu to hydrate before continuing
   // This prevents race conditions when tests immediately call logout()
-  await expect(page.getByTestId("user-menu-button")).toBeVisible();
+  await expect(visibleUserMenu(page)).toBeVisible();
 }
 
 /**
@@ -51,9 +66,8 @@ export async function ensureLoggedIn(
   await page.goto("/dashboard");
   await page.waitForLoadState("domcontentloaded");
 
-  // Check for authenticated indicator (User Menu)
-  const userMenu = page.getByTestId("user-menu-button");
-  if (!(await userMenu.isVisible())) {
+  // Check for authenticated indicator (User Menu — works on both mobile and desktop viewports)
+  if (!(await visibleUserMenu(page).isVisible())) {
     await loginAs(page, testInfo, options);
   }
 
@@ -67,14 +81,14 @@ export async function ensureLoggedIn(
     await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
   }
   // Double check user menu
-  await expect(page.getByTestId("user-menu-button")).toBeVisible();
+  await expect(visibleUserMenu(page)).toBeVisible();
 }
 
 /**
  * Logs out the current user via the User Menu.
  */
 export async function logout(page: Page): Promise<void> {
-  const userMenu = page.getByTestId("user-menu-button");
+  const userMenu = visibleUserMenu(page);
   await expect(userMenu).toBeVisible({ timeout: 10000 });
   await userMenu.click();
 
@@ -85,7 +99,11 @@ export async function logout(page: Page): Promise<void> {
   // Wait for redirect to public dashboard
   // Increased timeout to account for potential Supabase delays
   await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
-  await expect(page.getByTestId("nav-signin")).toBeVisible({ timeout: 15000 });
+  // Sign-in button appears in either mobile header or desktop header depending on viewport
+  const signIn = page
+    .locator('[data-testid="nav-signin"],[data-testid="mobile-nav-signin"]')
+    .filter({ visible: true });
+  await expect(signIn).toBeVisible({ timeout: 15000 });
 }
 
 /**

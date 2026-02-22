@@ -61,7 +61,10 @@ export function MobileHeader(props: MobileHeaderProps): React.JSX.Element {
         {props.isAuthenticated ? (
           <>
             <NotificationList notifications={props.notifications} />
-            <UserMenu userName={props.userName} />
+            <UserMenu
+              userName={props.userName}
+              testId="mobile-user-menu-button"
+            />
           </>
         ) : (
           <>

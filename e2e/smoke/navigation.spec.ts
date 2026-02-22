@@ -73,7 +73,12 @@ test.describe.serial("Navigation", () => {
     }
 
     // Verify User Menu works on both mobile and desktop
-    const userMenu = page.getByTestId("user-menu-button");
+    // Mobile uses mobile-user-menu-button; desktop uses user-menu-button
+    const userMenu = page
+      .locator(
+        '[data-testid="user-menu-button"],[data-testid="mobile-user-menu-button"]'
+      )
+      .filter({ visible: true });
     await expect(userMenu).toBeVisible();
     await userMenu.click();
 
