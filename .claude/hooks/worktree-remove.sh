@@ -17,4 +17,5 @@ fi
 # Find pinpoint-wt.py relative to this script (hooks/ -> .claude/ -> repo root)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-python3 "${SCRIPT_DIR}/pinpoint-wt.py" remove "${BRANCH}" --json >/dev/null 2>&1 || true
+# Removal failures are non-fatal (worktree may already be gone); stderr passes through for debugging
+python3 "${SCRIPT_DIR}/pinpoint-wt.py" remove "${BRANCH}" --json >/dev/null || true
