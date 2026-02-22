@@ -72,8 +72,8 @@ These are the canonical pattern sources. Read these files to understand PinPoint
 
 ## Label Standards (Decided)
 
-- Status group labels: "Open" (not "New"), "In Progress", "Closed" -- see `STATUS_GROUP_LABELS` in `status.ts`
-- Quick-select labels: "Me" (assignee), "My machines" (not "Your machines")
+- Status group labels: "Open" (not "New"), "In Progress", "Closed" -- decided standard for Phase 2. Currently hardcoded as "New" in StatusSelect.tsx and IssueFilters.tsx; `STATUS_GROUP_LABELS` will be added in the label rename PR.
+- Quick-select labels: "Me" (assignee), "My machines" (not "Your machines") -- decided standard for Phase 2. Will be added in the "Me" quick-select (PinPoint-2y2) and "My machines" (PinPoint-x04) PRs.
 - Status "wait_owner": Use `STATUS_CONFIG.wait_owner.label` as canonical source (currently "Pending Owner"). Note: mockups use "Wait Owner" -- this may be reconciled later.
 
 ## Color System
