@@ -32,7 +32,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
-import { getMachineQuickSelectOrdering } from "~/lib/issues/filter-utils";
 
 /**
  * IssueFilters — Primary filter bar for the issues list page.
@@ -69,7 +68,6 @@ import { getMachineQuickSelectOrdering } from "~/lib/issues/filter-utils";
 interface MachineOption {
   initials: string;
   name: string;
-  ownerId: string | null;
 }
 
 /** Minimal user shape for filter dropdowns (CORE-SEC-006) */
@@ -84,15 +82,19 @@ interface IssueFiltersProps {
   machines: MachineOption[];
   users: IssueFilterUser[];
   filters: FilterState;
-  /** The current user's ID, used to compute the "My machines" quick-select toggle. */
-  currentUserId?: string | null;
+  /**
+   * Initials of machines owned by the current user, pre-computed server-side.
+   * Used to render the "My machines" quick-select toggle. Empty array or
+   * undefined means the toggle is hidden (user not logged in or owns no machines).
+   */
+  ownedMachineInitials?: string[];
 }
 
 export function IssueFilters({
   machines,
   users,
   filters,
-  currentUserId,
+  ownedMachineInitials,
 }: IssueFiltersProps): React.JSX.Element {
   const { pushFilters } = useSearchFilters(filters);
   const [isSearching, startTransition] = React.useTransition();
@@ -114,25 +116,9 @@ export function IssueFilters({
   );
 
   const machineQuickSelectActions = React.useMemo(() => {
-    const ordering = getMachineQuickSelectOrdering(
-      machines,
-      currentUserId ?? null
-    );
-    return ordering
-      .filter(
-        (
-          item
-        ): item is {
-          type: "quick-select";
-          label: string;
-          machines: MachineOption[];
-        } => item.type === "quick-select"
-      )
-      .map((item) => ({
-        label: item.label,
-        values: item.machines.map((m) => m.initials),
-      }));
-  }, [machines, currentUserId]);
+    if (!ownedMachineInitials || ownedMachineInitials.length === 0) return [];
+    return [{ label: "My machines", values: [...ownedMachineInitials].sort() }];
+  }, [ownedMachineInitials]);
 
   const severityOptions = React.useMemo(
     () =>

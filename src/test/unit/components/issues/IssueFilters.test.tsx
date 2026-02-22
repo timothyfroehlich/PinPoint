@@ -115,19 +115,22 @@ describe("IssueFilters - My machines quick-select", () => {
     vi.clearAllMocks();
   });
 
-  const machinesWithOwner = [
-    { initials: "AFM", name: "Addams Family", ownerId: "user-1" },
-    { initials: "TZ", name: "Twilight Zone", ownerId: "user-2" },
-    { initials: "MM", name: "Medieval Madness", ownerId: "user-1" },
+  const machines = [
+    { initials: "AFM", name: "Addams Family" },
+    { initials: "TZ", name: "Twilight Zone" },
+    { initials: "MM", name: "Medieval Madness" },
   ];
 
-  it('shows "My machines" toggle when user owns machines', async () => {
+  // Pre-computed server-side: user owns AFM and MM
+  const ownedMachineInitials = ["AFM", "MM"];
+
+  it('shows "My machines" toggle when ownedMachineInitials is non-empty', async () => {
     const user = userEvent.setup();
     render(
       <IssueFilters
-        machines={machinesWithOwner}
+        machines={machines}
         users={[]}
-        currentUserId="user-1"
+        ownedMachineInitials={ownedMachineInitials}
         filters={{}}
       />
     );
@@ -136,13 +139,13 @@ describe("IssueFilters - My machines quick-select", () => {
     expect(screen.getByText("My machines")).toBeInTheDocument();
   });
 
-  it('does not show "My machines" toggle when currentUserId is null', async () => {
+  it('does not show "My machines" toggle when ownedMachineInitials is empty', async () => {
     const user = userEvent.setup();
     render(
       <IssueFilters
-        machines={machinesWithOwner}
+        machines={machines}
         users={[]}
-        currentUserId={null}
+        ownedMachineInitials={[]}
         filters={{}}
       />
     );
@@ -151,16 +154,9 @@ describe("IssueFilters - My machines quick-select", () => {
     expect(screen.queryByText("My machines")).not.toBeInTheDocument();
   });
 
-  it('does not show "My machines" toggle when user owns no machines', async () => {
+  it('does not show "My machines" toggle when ownedMachineInitials is undefined', async () => {
     const user = userEvent.setup();
-    render(
-      <IssueFilters
-        machines={machinesWithOwner}
-        users={[]}
-        currentUserId="user-3"
-        filters={{}}
-      />
-    );
+    render(<IssueFilters machines={machines} users={[]} filters={{}} />);
 
     await user.click(screen.getByTestId("filter-machine"));
     expect(screen.queryByText("My machines")).not.toBeInTheDocument();
@@ -170,9 +166,9 @@ describe("IssueFilters - My machines quick-select", () => {
     const user = userEvent.setup();
     render(
       <IssueFilters
-        machines={machinesWithOwner}
+        machines={machines}
         users={[]}
-        currentUserId="user-1"
+        ownedMachineInitials={ownedMachineInitials}
         filters={{ machine: [] }}
       />
     );
@@ -180,7 +176,7 @@ describe("IssueFilters - My machines quick-select", () => {
     await user.click(screen.getByTestId("filter-machine"));
     await user.click(screen.getByText("My machines"));
 
-    // getMachineQuickSelectOrdering sorts by initials: AFM < MM
+    // Values are sorted alphabetically: AFM < MM
     expect(pushMock).toHaveBeenCalledWith(
       expect.stringContaining("machine=AFM%2CMM")
     );
@@ -190,9 +186,9 @@ describe("IssueFilters - My machines quick-select", () => {
     const user = userEvent.setup();
     render(
       <IssueFilters
-        machines={machinesWithOwner}
+        machines={machines}
         users={[]}
-        currentUserId="user-1"
+        ownedMachineInitials={ownedMachineInitials}
         filters={{ machine: ["AFM", "MM", "TZ"] }}
       />
     );
