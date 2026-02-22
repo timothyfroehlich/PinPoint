@@ -38,6 +38,42 @@ function isSentryFeedbackWidget(obj: unknown): obj is SentryFeedbackWidget {
   );
 }
 
+export function openFeedbackForm(): void {
+  const rawFeedback = Sentry.getFeedback();
+  const feedback = rawFeedback as unknown;
+
+  if (isSentryFeedbackWidget(feedback)) {
+    const widget = feedback;
+
+    if (typeof widget.createForm === "function") {
+      const createFormFn = widget.createForm;
+
+      window.setTimeout(() => {
+        void (async () => {
+          try {
+            const dialog = await createFormFn();
+
+            if (dialog) {
+              if (typeof dialog.appendToDom === "function") {
+                dialog.appendToDom();
+              }
+              if (typeof dialog.open === "function") {
+                dialog.open();
+              }
+            }
+          } catch (err) {
+            console.error("[FeedbackWidget] Error calling createForm:", err);
+          }
+        })();
+      }, DROPDOWN_CLOSE_DELAY);
+    } else if (typeof widget.openDialog === "function") {
+      widget.openDialog();
+    } else if (typeof widget.open === "function") {
+      widget.open();
+    }
+  }
+}
+
 function handleFeedback(type: "bug" | "feature"): void {
   const rawFeedback = Sentry.getFeedback();
   // Cast to unknown to allow type guard to work

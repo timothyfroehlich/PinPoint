@@ -1,7 +1,8 @@
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, type MockedFunction } from "vitest";
+import { openFeedbackForm } from "~/components/feedback/FeedbackWidget";
 import { BottomTabBar } from "./BottomTabBar";
 
 vi.mock("next/navigation", () => ({
@@ -22,7 +23,7 @@ vi.mock("next/link", () => ({
 
 // FeedbackWidget uses Sentry — mock it to keep tests simple
 vi.mock("~/components/feedback/FeedbackWidget", () => ({
-  FeedbackWidget: () => <button type="button">Feedback</button>,
+  openFeedbackForm: vi.fn(),
 }));
 
 describe("BottomTabBar", () => {
@@ -82,9 +83,30 @@ describe("BottomTabBar", () => {
 
     await user.click(screen.getByRole("button", { name: /more options/i }));
 
+    expect(screen.getByTestId("more-sheet-feedback")).toBeInTheDocument();
     expect(screen.getByTestId("more-sheet-help")).toBeInTheDocument();
     expect(screen.getByTestId("more-sheet-whats-new")).toBeInTheDocument();
     expect(screen.getByTestId("more-sheet-about")).toBeInTheDocument();
+  });
+
+  it("calls openFeedbackForm and closes the sheet when Feedback is clicked", async () => {
+    const user = userEvent.setup();
+    const mockedOpenFeedbackForm = openFeedbackForm as MockedFunction<
+      typeof openFeedbackForm
+    >;
+    mockedOpenFeedbackForm.mockClear();
+
+    render(<BottomTabBar />);
+
+    await user.click(screen.getByRole("button", { name: /more options/i }));
+
+    const feedbackButton = screen.getByTestId("more-sheet-feedback");
+    expect(feedbackButton).toBeInTheDocument();
+    expect(screen.getByText("Feedback")).toBeInTheDocument();
+
+    await user.click(feedbackButton);
+
+    expect(mockedOpenFeedbackForm).toHaveBeenCalledOnce();
   });
 
   it("does not show Admin Panel in More sheet for non-admin roles", async () => {

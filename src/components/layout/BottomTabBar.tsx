@@ -12,6 +12,7 @@ import {
   MoreVertical,
   HelpCircle,
   Info,
+  MessageSquare,
   Sparkles,
   Settings,
 } from "lucide-react";
@@ -22,7 +23,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "~/components/ui/sheet";
-import { FeedbackWidget } from "~/components/feedback/FeedbackWidget";
+import { openFeedbackForm } from "~/components/feedback/FeedbackWidget";
 
 type UserRole = "guest" | "member" | "technician" | "admin" | undefined;
 
@@ -128,9 +129,18 @@ export function BottomTabBar({
             aria-label="additional navigation"
             className="pt-2 pb-4 space-y-1"
           >
-            <div className="px-4 pt-2 pb-1">
-              <FeedbackWidget />
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setMoreOpen(false);
+                openFeedbackForm();
+              }}
+              className={sheetItemClass}
+              data-testid="more-sheet-feedback"
+            >
+              <MessageSquare className="size-5 shrink-0" aria-hidden="true" />
+              <span>Feedback</span>
+            </button>
 
             <Link
               href="/help"
