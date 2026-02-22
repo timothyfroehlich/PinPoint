@@ -227,30 +227,20 @@ bash scripts/workflow/respond-to-copilot.sh <PR> <path:line> <msg>  # Reply + re
 
 ### Parallel Subagent Workflow
 
-For multiple independent tasks (UI fixes, Copilot feedback, parallel features), use worktree-isolated subagents.
+For multiple independent tasks, use worktree-isolated subagents.
 
-**Coordination**: Built-in **Agent Teams** is the primary mechanism. Use `TeamCreate`, spawn teammates with the `Task` tool (with `team_name` and `isolation: "worktree"`), and coordinate via `SendMessage`/`TaskUpdate`. Fall back to background subagents (`run_in_background: true`) if Agent Teams is unreliable.
+**Primary**: Standalone subagents with `isolation: "worktree"` + `run_in_background: true`. Use `resume` for follow-up (Copilot comments, CI fixes). The `WorktreeCreate` hook delegates to `pinpoint-wt.py` for port allocation and Supabase config.
 
-**Quality Enforcement**: Automatic via Claude Code hooks:
+**Fallback**: Agent Teams for bidirectional real-time communication. Note: `isolation: "worktree"` is broken when `team_name` is set — teammates land in the lead's repo. Create worktrees manually with `pinpoint-wt.py`.
 
-- `TaskCompleted` hook → runs `pnpm run check` before allowing task completion
-- `TeammateIdle` hook → blocks idle if unpushed commits or uncommitted changes exist
-- **Hooks require correct CWD**: Both hooks read `.cwd` from the event JSON. Without `isolation: "worktree"`, `.cwd` points to the lead's repo and hooks skip checks (safe but unenforced). With `isolation: "worktree"`, hooks run against the correct worktree.
+**Quality Enforcement**:
 
-**Worktree Creation**:
-
-- **For teammates**: Always use `isolation: "worktree"` in the Task tool call. This delegates to `pinpoint-wt.py` via the `WorktreeCreate` hook, handling port allocation, Supabase config, AND correct hook CWD.
-- **For the lead**: Use `pinpoint-wt.py` directly for pre-creating worktrees, listing ports, or cleanup.
-
-**Workflow**:
-
-1. Spawn teammates with `isolation: "worktree"` — worktrees are created automatically
-2. Monitor: `bash scripts/workflow/pr-dashboard.sh`, Copilot comments
-3. Clean up: `./pinpoint-wt.py remove <branch>`
+- **Standalone subagents**: Self-enforced via prompt instructions (`pnpm run check` before returning). Hooks don't fire.
+- **Agent Teams**: `TaskCompleted` hook runs `pnpm run check`; `TeammateIdle` hook blocks unpushed commits. Requires `isolation: "worktree"` for correct CWD (broken — see above).
 
 **Anti-patterns**:
 
-- DON'T spawn teammates without `isolation: "worktree"` — hooks can't enforce quality
+- DON'T use Agent Teams as default — standalone subagents have working worktree isolation
 - DON'T forget to check Copilot comments before merging
 
 See `pinpoint-orchestrator` skill for the full workflow.
