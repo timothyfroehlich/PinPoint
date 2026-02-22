@@ -310,19 +310,45 @@ describe("Integration: Comment ownership flow", () => {
     expect(checkPermission("comments.delete", "guest", context)).toBe(false);
   });
 
-  it("should allow member to edit any comment unconditionally", () => {
-    expect(checkPermission("comments.edit", "member")).toBe(true);
-    expect(checkPermission("comments.delete", "member")).toBe(true);
+  it("should allow member to edit/delete only own comments", () => {
+    const ownContext: OwnershipContext = { userId, reporterId: userId };
+    const otherContext: OwnershipContext = { userId, reporterId: otherUserId };
+    expect(checkPermission("comments.edit", "member", ownContext)).toBe(true);
+    expect(checkPermission("comments.delete", "member", ownContext)).toBe(true);
+    expect(checkPermission("comments.edit", "member", otherContext)).toBe(
+      false
+    );
+    expect(checkPermission("comments.delete", "member", otherContext)).toBe(
+      false
+    );
   });
 
-  it("should allow technician to edit any comment unconditionally", () => {
-    expect(checkPermission("comments.edit", "technician")).toBe(true);
-    expect(checkPermission("comments.delete", "technician")).toBe(true);
+  it("should allow technician to edit/delete only own comments", () => {
+    const ownContext: OwnershipContext = { userId, reporterId: userId };
+    const otherContext: OwnershipContext = { userId, reporterId: otherUserId };
+    expect(checkPermission("comments.edit", "technician", ownContext)).toBe(
+      true
+    );
+    expect(checkPermission("comments.delete", "technician", ownContext)).toBe(
+      true
+    );
+    expect(checkPermission("comments.edit", "technician", otherContext)).toBe(
+      false
+    );
+    expect(checkPermission("comments.delete", "technician", otherContext)).toBe(
+      false
+    );
   });
 
-  it("should allow admin to edit any comment unconditionally", () => {
-    expect(checkPermission("comments.edit", "admin")).toBe(true);
-    expect(checkPermission("comments.delete", "admin")).toBe(true);
+  it("should allow admin to edit/delete only own comments", () => {
+    const ownContext: OwnershipContext = { userId, reporterId: userId };
+    const otherContext: OwnershipContext = { userId, reporterId: otherUserId };
+    expect(checkPermission("comments.edit", "admin", ownContext)).toBe(true);
+    expect(checkPermission("comments.delete", "admin", ownContext)).toBe(true);
+    expect(checkPermission("comments.edit", "admin", otherContext)).toBe(false);
+    expect(checkPermission("comments.delete", "admin", otherContext)).toBe(
+      false
+    );
   });
 
   it("should deny unauthenticated from editing any comment", () => {

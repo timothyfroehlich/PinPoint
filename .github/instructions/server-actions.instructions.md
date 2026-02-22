@@ -59,6 +59,12 @@ export async function createIssue(
 - After mutations that affect read views, call `revalidatePath()` on relevant route segments.
 - Avoid premature global cache invalidation—targeted paths only.
 
+## Permissions Matrix Sync (CORE-ARCH-008)
+
+- When adding or changing authorization checks in server actions, update `src/lib/permissions/matrix.ts` to match.
+- The help page `/help/permissions` is auto-generated from the matrix — drift causes users to see incorrect capability information.
+- `true` = unconditional access, `"own"` = only resources the user created. Verify these match the actual `if` checks.
+
 ## Forbidden Patterns
 
 - Multi-tenant permission checks (obsolete).

@@ -33,6 +33,7 @@ trigger: always_on
 13. Keep auth host consistent: use `localhost` everywhere (Supabase site_url, Next dev, Playwright baseURL) to prevent cookie host mismatches
 14. E2E interaction coverage: if you add a clickable element, click it in a test
 15. Email addresses never displayed outside admin views and user's own settings page
+16. Permissions matrix (`matrix.ts`) must match actual server action enforcement (CORE-ARCH-008)
 
 ---
 
@@ -295,6 +296,13 @@ trigger: always_on
 - **Don't:** Use flash messages (`setFlash`/`readFlash`) for form validation or success feedback
 - **Rationale:** `useActionState` provides instant, state-based feedback without cookies or redirects, aligning with React 19 Server Actions architecture
 
+**CORE-ARCH-008:** Permissions matrix must match server action enforcement
+
+- **Severity:** Critical
+- **Why:** The help page (`/help/permissions`) is auto-generated from `src/lib/permissions/matrix.ts`. If the matrix drifts from what server actions actually enforce, users see incorrect capability information.
+- **Do:** When changing permission logic in server actions, update `matrix.ts` values and descriptions to match. Review both directions during PR review.
+- **Don't:** Change server action authorization checks without updating the matrix (or vice versa)
+
 ---
 
 ## UI & Styling
@@ -358,6 +366,7 @@ trigger: always_on
 - **Direct auth.users queries**: Never query Supabase's internal `auth.users` table in application code (use `user_profiles` instead)
 - **Over-serialization to client**: Don't pass full domain objects to Client Components; map to minimal shapes at the server→client boundary (especially user/account data)
 - **Email display outside admin**: Never display `reporterEmail` in non-admin UI, timeline text, or seed data (use names or "Anonymous")
+- **Permissions matrix drift**: Never change server action auth checks without updating `matrix.ts` (help page auto-generates from it)
 
 ---
 
@@ -392,7 +401,7 @@ If all Yes → ship it. Perfect is the enemy of done.
 - CORE‑SEC‑001..007: Security
 - CORE‑PERF‑001..002: Performance
 - CORE‑TEST‑001..005: Testing
-- CORE‑ARCH‑001..007: Architecture
+- CORE‑ARCH‑001..008: Architecture
 
 **Cross-References:**
 
