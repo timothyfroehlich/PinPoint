@@ -236,7 +236,7 @@ For multiple independent tasks (UI fixes, Copilot feedback, parallel features), 
 - `TaskCompleted` hook → runs `pnpm run check` before allowing task completion
 - `TeammateIdle` hook → blocks idle if unpushed commits or uncommitted changes exist
 
-**Worktree Creation**: Always use `pinpoint-wt.py` (not built-in `isolation: "worktree"`) — it handles port allocation and Supabase isolation.
+**Worktree Creation**: Use `pinpoint-wt.py` directly or `isolation: "worktree"` (which delegates to `pinpoint-wt.py` via the WorktreeCreate hook) — both handle port allocation and Supabase isolation.
 
 **Workflow**:
 
@@ -247,8 +247,6 @@ For multiple independent tasks (UI fixes, Copilot feedback, parallel features), 
 
 **Anti-patterns**:
 
-- DON'T use built-in `isolation: "worktree"` — it doesn't set up ports or Supabase config
-- DON'T spawn agents without absolute worktree paths — they inherit parent cwd
 - DON'T forget to check Copilot comments before merging
 
 See `pinpoint-orchestrator` skill for the full workflow.
