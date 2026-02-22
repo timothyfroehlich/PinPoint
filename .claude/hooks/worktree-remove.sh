@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # Claude Code WorktreeRemove hook
 # Receives JSON on stdin: {"worktree_path": "/absolute/path", ...}
 set -euo pipefail
