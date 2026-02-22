@@ -17,6 +17,10 @@ import {
 /**
  * Compute a smart badge label for a set of selected statuses.
  *
+ * Intended for mobile filter chip labels and dropdown triggers. Desktop
+ * IssueFilters uses inline badge logic that creates multiple separate chips;
+ * this function returns a single summary label.
+ *
  * Priority order (most specific to least specific):
  * 1. No selection -> "Status"
  * 2. All 11 selected -> "All"

@@ -54,13 +54,16 @@ import {
  * - `OPEN_STATUSES` is the default status selection (all non-closed)
  * - `getBadges()` builds smart badge chips: when all statuses in a group are
  *   selected, it shows the group name ("New", "In Progress") instead of
- *   individual status names. See `filter-utils.ts` for the extractable logic.
+ *   individual status names. This component currently implements that logic
+ *   inline; a shared version for other surfaces lives in
+ *   `~/lib/issues/filter-utils`.
  * - Search input is debounced at 300ms before pushing to URL params
  *
  * ## Mobile Notes
  * Desktop uses this component directly. Mobile will use a separate chip-based
- * filter bar but should import shared utilities from `~/lib/issues/filter-utils`
- * for badge grouping and filter state management.
+ * filter bar that imports the shared utilities from `~/lib/issues/filter-utils`
+ * for badge grouping and filter state management; those utilities are not
+ * consumed by this component today.
  */
 interface MachineOption {
   initials: string;
