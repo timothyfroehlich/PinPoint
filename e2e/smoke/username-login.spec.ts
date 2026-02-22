@@ -17,7 +17,7 @@ test.describe("Username Account Login", () => {
     // Verify we're logged in
     const isMobile = testInfo.project.name.includes("Mobile");
     if (isMobile) {
-      await expect(page.getByTestId("mobile-menu-trigger")).toBeVisible();
+      await expect(page.getByTestId("mobile-header")).toBeVisible();
     } else {
       await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
     }

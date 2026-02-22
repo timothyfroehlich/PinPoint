@@ -64,7 +64,7 @@ test.describe("Authentication Smoke", () => {
 
     // Verify dashboard content based on device type
     if (isMobile) {
-      await expect(page.getByTestId("mobile-menu-trigger")).toBeVisible();
+      await expect(page.getByTestId("mobile-header")).toBeVisible();
     } else {
       await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
     }
