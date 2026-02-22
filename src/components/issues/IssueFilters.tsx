@@ -12,12 +12,14 @@ import { cn } from "~/lib/utils";
 import {
   STATUS_CONFIG,
   STATUS_GROUPS,
+  STATUS_GROUP_LABELS,
   SEVERITY_CONFIG,
   PRIORITY_CONFIG,
   FREQUENCY_CONFIG,
   OPEN_STATUSES,
 } from "~/lib/issues/status";
 import { type IssueFilters as FilterState } from "~/lib/issues/filters";
+import { getAssigneeOrdering } from "~/lib/issues/filter-utils";
 import type {
   IssueStatus,
   IssueSeverity,
@@ -33,6 +35,38 @@ import {
   TooltipTrigger,
 } from "~/components/ui/tooltip";
 
+/**
+ * IssueFilters — Primary filter bar for the issues list page.
+ *
+ * ## Pattern
+ * Renders a search input with inline badge chips, a grid of MultiSelect
+ * dropdowns (machine, status, severity, priority, assignee), and a "More
+ * Filters" toggle that expands date ranges, frequency, owner, reporter,
+ * and watching filters.
+ *
+ * ## Composition
+ * - Each filter is a `<MultiSelect>` configured with domain constant options
+ * - Status filter uses grouped mode with `STATUS_GROUPS` sections (New, In Progress, Closed)
+ * - Machine filter shows initials as badge labels via `badgeLabel` prop
+ * - Filter state is managed via URL search params (see `useSearchFilters` hook)
+ * - Owner options display machine count and invite status metadata inline
+ *
+ * ## Key Abstractions
+ * - `STATUS_CONFIG` / `STATUS_GROUPS` (from `~/lib/issues/status`) drive status display
+ * - `OPEN_STATUSES` is the default status selection (all non-closed)
+ * - `getBadges()` builds smart badge chips: when all statuses in a group are
+ *   selected, it shows the group name ("Open", "In Progress") instead of
+ *   individual status names. This component currently implements that logic
+ *   inline; a shared version for other surfaces lives in
+ *   `~/lib/issues/filter-utils`.
+ * - Search input is debounced at 300ms before pushing to URL params
+ *
+ * ## Mobile Notes
+ * Desktop uses this component directly. Mobile will use a separate chip-based
+ * filter bar that imports the shared utilities from `~/lib/issues/filter-utils`
+ * for badge grouping and filter state management; those utilities are not
+ * consumed by this component today.
+ */
 interface MachineOption {
   initials: string;
   name: string;
@@ -50,12 +84,21 @@ interface IssueFiltersProps {
   machines: MachineOption[];
   users: IssueFilterUser[];
   filters: FilterState;
+  currentUserId?: string | null;
+  /**
+   * Initials of machines owned by the current user, pre-computed server-side.
+   * Used to render the "My machines" quick-select toggle. Empty array or
+   * undefined means the toggle is hidden (user not logged in or owns no machines).
+   */
+  ownedMachineInitials?: string[];
 }
 
 export function IssueFilters({
   machines,
   users,
   filters,
+  currentUserId = null,
+  ownedMachineInitials,
 }: IssueFiltersProps): React.JSX.Element {
   const { pushFilters } = useSearchFilters(filters);
   const [isSearching, startTransition] = React.useTransition();
@@ -75,6 +118,11 @@ export function IssueFilters({
       })),
     [machines]
   );
+
+  const machineQuickSelectActions = React.useMemo(() => {
+    if (!ownedMachineInitials || ownedMachineInitials.length === 0) return [];
+    return [{ label: "My machines", values: [...ownedMachineInitials].sort() }];
+  }, [ownedMachineInitials]);
 
   const severityOptions = React.useMemo(
     () =>
@@ -104,14 +152,16 @@ export function IssueFilters({
   );
 
   const userOptions = React.useMemo(
-    () => [
-      { label: "Unassigned", value: "UNASSIGNED" },
-      ...users.map((u) => ({
-        label: u.name,
-        value: u.id,
-      })),
-    ],
-    [users]
+    () =>
+      getAssigneeOrdering(users, currentUserId ?? null)
+        .filter((item) => item.type !== "separator")
+        .map((item) => {
+          if (item.type === "quick-select") {
+            return { label: item.label, value: item.value };
+          }
+          return { label: item.user.name, value: item.user.id };
+        }),
+    [users, currentUserId]
   );
 
   const ownerOptions = React.useMemo(
@@ -134,21 +184,21 @@ export function IssueFilters({
   const statusGroups = React.useMemo(
     () => [
       {
-        label: "New",
+        label: STATUS_GROUP_LABELS.new,
         options: STATUS_GROUPS.new.map((s) => ({
           label: STATUS_CONFIG[s].label,
           value: s,
         })),
       },
       {
-        label: "In Progress",
+        label: STATUS_GROUP_LABELS.in_progress,
         options: STATUS_GROUPS.in_progress.map((s) => ({
           label: STATUS_CONFIG[s].label,
           value: s,
         })),
       },
       {
-        label: "Closed",
+        label: STATUS_GROUP_LABELS.closed,
         options: STATUS_GROUPS.closed.map((s) => ({
           label: STATUS_CONFIG[s].label,
           value: s,
@@ -235,9 +285,13 @@ export function IssueFilters({
         }
       };
 
-      checkGroup("new", STATUS_GROUPS.new, "New");
-      checkGroup("in_progress", STATUS_GROUPS.in_progress, "In Progress");
-      checkGroup("closed", STATUS_GROUPS.closed, "Closed");
+      checkGroup("new", STATUS_GROUPS.new, STATUS_GROUP_LABELS.new);
+      checkGroup(
+        "in_progress",
+        STATUS_GROUPS.in_progress,
+        STATUS_GROUP_LABELS.in_progress
+      );
+      checkGroup("closed", STATUS_GROUPS.closed, STATUS_GROUP_LABELS.closed);
 
       activeStatuses.forEach((s) => {
         if (!processedStatuses.has(s)) {
@@ -258,13 +312,13 @@ export function IssueFilters({
     } else if (filters.status === undefined) {
       badges.push({
         id: "status-group-new-default",
-        label: "New",
+        label: STATUS_GROUP_LABELS.new,
         clear: () =>
           pushFilters({ status: [...STATUS_GROUPS.in_progress], page: 1 }),
       });
       badges.push({
         id: "status-group-ip-default",
-        label: "In Progress",
+        label: STATUS_GROUP_LABELS.in_progress,
         clear: () => pushFilters({ status: [...STATUS_GROUPS.new], page: 1 }),
       });
     }
@@ -521,6 +575,7 @@ export function IssueFilters({
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
           <MultiSelect
             options={machineOptions}
+            quickSelectActions={machineQuickSelectActions}
             value={filters.machine ?? []}
             onChange={(val) => pushFilters({ machine: val, page: 1 })}
             placeholder="Machine"

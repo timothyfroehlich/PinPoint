@@ -100,10 +100,24 @@ The teammate will message you (Agent Teams) or you can check `TaskOutput` (backg
 
 ---
 
-## Step 5: Cleanup
+## Step 5: Standby After PR Completion
 
-Once the PR merges:
+When a teammate reports their PR is ready (CI green, Copilot addressed):
+
+1. **Verify** via `pr-dashboard.sh` — confirm CI + Copilot + merge state
+2. **Keep teammate alive** — do NOT shut down. They stay idle until user reviews.
+3. **If user requests changes** → message the teammate with feedback, they iterate in-place
+4. **If user approves/merges** → shut down teammate, proceed to cleanup
+
+**Why standby?** Re-spinning a teammate loses all context (file familiarity, Copilot thread history, failed approaches). Idle teammates cost nothing until messaged.
+
+---
+
+## Step 6: Cleanup
+
+Once the PR merges and user confirms:
 ```bash
+SendMessage(type: "shutdown_request", recipient: "<name>", content: "PR merged")
 python3 ./pinpoint-wt.py remove feat/<branch-name>
 bd close <issue-id> --reason="Fixed in PR #NNN"
 bd sync

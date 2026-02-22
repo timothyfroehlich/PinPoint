@@ -37,6 +37,23 @@ const name =
 const name = issue.reporterName ?? issue.reporterEmail ?? "Guest";
 ```
 
+## Permissions: Matrix Must Match Enforcement
+
+**Rule:** The permissions matrix (`src/lib/permissions/matrix.ts`) must always match the actual authorization checks in server actions.
+
+**Why:** The help page (`/help/permissions`) is auto-generated from the matrix. If the matrix drifts from what server actions enforce, users see incorrect capability information. This exact bug shipped once — the matrix claimed members could edit/delete any comment, but the server actions only allowed editing/deleting your own.
+
+**Applies to:**
+
+- Permission values (true/false/"own"/"owner") in `matrix.ts`
+- Permission descriptions shown on the help page
+- Server action authorization checks in `actions.ts` files
+
+**When changing permissions:**
+
+- If you change a server action's auth check → update `matrix.ts` to match
+- If you change `matrix.ts` → verify the server action enforces it
+
 ## Network: localhost Domain Standard
 
 **Rule:** Always use `localhost` (not `127.0.0.1`) for local development URLs.

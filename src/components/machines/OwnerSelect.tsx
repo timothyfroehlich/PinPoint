@@ -16,6 +16,31 @@ import { InviteUserDialog } from "~/components/users/InviteUserDialog";
 import { Plus } from "lucide-react";
 import { compareUnifiedUsers } from "~/lib/users/comparators";
 
+/**
+ * OwnerSelect — Single-select dropdown for assigning a machine owner.
+ *
+ * ## Pattern
+ * Standard `<Select>` with an inline "Invite New" button that opens an
+ * `<InviteUserDialog>`. After a user is invited, the new user is
+ * optimistically added to the list and auto-selected via a pending
+ * selection ref that fires once the `users` prop updates.
+ *
+ * ## Composition
+ * - Users are sorted by `compareUnifiedUsers` (confirmed first, by machine
+ *   count descending, then by last name)
+ * - Each option shows: name, machine count badge (if > 0), and "(Invited)"
+ *   tag for users with `status === "invited"`
+ * - `onUsersChange` callback allows the parent to update its user list
+ *   without a server round-trip after an invite
+ *
+ * ## Key Abstractions
+ * - `OwnerSelectUser` includes `machineCount` and `status` for metadata display
+ * - `pendingSelectionRef` handles the async flow: invite dialog closes ->
+ *   parent updates users -> effect detects the new user and selects them
+ * - `compareUnifiedUsers` from `~/lib/users/comparators` drives sort order
+ * - The help text below the select explains the notification implication of
+ *   owner assignment
+ */
 /** Minimal user shape for owner selection (CORE-SEC-006) */
 export interface OwnerSelectUser {
   id: string;

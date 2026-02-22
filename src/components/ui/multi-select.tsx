@@ -11,6 +11,7 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  CommandSeparator,
 } from "~/components/ui/command";
 import {
   Popover,
@@ -20,6 +21,34 @@ import {
 import { Badge } from "~/components/ui/badge";
 import { Checkbox } from "~/components/ui/checkbox";
 
+/**
+ * MultiSelect — Reusable multi-select dropdown with flat and grouped modes.
+ *
+ * ## Pattern
+ * Popover-based command palette that supports two modes:
+ * - **Flat mode** (`options` prop): A single list of checkboxes, sorted with
+ *   selected items first for quick scanning.
+ * - **Grouped mode** (`groups` prop): Sections with clickable group headers
+ *   that have indeterminate checkbox state. Clicking a group header toggles
+ *   all options in that group.
+ *
+ * ## Composition
+ * - Built on shadcn `<Command>` + `<Popover>` + `<Checkbox>`
+ * - Trigger button shows the placeholder text plus a count badge when items
+ *   are selected
+ * - Command search input filters options within the dropdown
+ * - `badgeLabel` on individual options customizes how they appear as filter
+ *   bar badges (e.g., machine initials instead of full names)
+ *
+ * ## Key Abstractions
+ * - `options` (flat) vs `groups` (grouped) — pass one or the other, not both
+ * - `value: string[]` / `onChange: (string[]) => void` — controlled multi-select
+ * - Selected-items-first sorting ensures users see their active filters at top
+ * - Group headers show indeterminate state when partially selected, and
+ *   toggle all/none on click
+ * - `data-testid` propagates to trigger, group headers, and individual options
+ *   for E2E targeting
+ */
 export interface Option {
   label: string;
   value: string;
@@ -33,9 +62,25 @@ export interface GroupedOption {
   options: Option[];
 }
 
+/**
+ * A quick-select action for flat mode.
+ *
+ * Renders as a clickable row with an indeterminate checkbox at the top of the
+ * options list. Clicking toggles all `values` in/out without affecting other
+ * selected values. This is used for "My machines" style bulk-selection shortcuts.
+ */
+export interface QuickSelectAction {
+  /** Display label shown in the dropdown row */
+  label: string;
+  /** The option values this action controls */
+  values: string[];
+}
+
 interface MultiSelectProps {
   options?: Option[];
   groups?: GroupedOption[];
+  /** Quick-select actions shown above flat options (flat mode only). */
+  quickSelectActions?: QuickSelectAction[];
   value?: string[];
   onChange: (value: string[]) => void;
   placeholder?: string;
@@ -47,6 +92,7 @@ interface MultiSelectProps {
 export function MultiSelect({
   options = [],
   groups,
+  quickSelectActions,
   value = [],
   onChange,
   placeholder = "Select options...",
@@ -215,27 +261,90 @@ export function MultiSelect({
                 );
               })
             ) : (
-              <CommandGroup>
-                {sortedOptions.map((option) => {
-                  const isSelected = value.includes(option.value);
-                  return (
-                    <CommandItem
-                      key={option.value}
-                      onSelect={() => toggleOption(option.value)}
-                      className="flex items-center gap-2"
-                      data-testid={
-                        testId ? `${testId}-option-${option.value}` : undefined
-                      }
-                    >
-                      <Checkbox checked={isSelected} className="h-4 w-4" />
-                      {option.icon && (
-                        <option.icon className="h-4 w-4 text-muted-foreground" />
-                      )}
-                      <span className="flex-1">{option.label}</span>
-                    </CommandItem>
-                  );
-                })}
-              </CommandGroup>
+              <>
+                {quickSelectActions && quickSelectActions.length > 0 && (
+                  <>
+                    <CommandGroup>
+                      {quickSelectActions.map((action) => {
+                        const selectedCount = action.values.filter((v) =>
+                          value.includes(v)
+                        ).length;
+                        const isAllSelected =
+                          action.values.length > 0 &&
+                          selectedCount === action.values.length;
+                        const isIndeterminate =
+                          selectedCount > 0 && !isAllSelected;
+
+                        const toggleAction = (): void => {
+                          if (isAllSelected) {
+                            onChange(
+                              value.filter((v) => !action.values.includes(v))
+                            );
+                          } else {
+                            const others = value.filter(
+                              (v) => !action.values.includes(v)
+                            );
+                            onChange([...others, ...action.values]);
+                          }
+                        };
+
+                        return (
+                          <CommandItem
+                            key={action.label}
+                            onSelect={toggleAction}
+                            className="flex items-center gap-2"
+                            data-testid={
+                              testId
+                                ? `${testId}-quick-select-${action.label.toLowerCase().replace(/\s+/g, "-")}`
+                                : undefined
+                            }
+                          >
+                            <Checkbox
+                              checked={
+                                isAllSelected
+                                  ? true
+                                  : isIndeterminate
+                                    ? "indeterminate"
+                                    : false
+                              }
+                              className="h-4 w-4"
+                              onCheckedChange={toggleAction}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <span className="flex-1 font-medium">
+                              {action.label}
+                            </span>
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                    <CommandSeparator />
+                  </>
+                )}
+                <CommandGroup>
+                  {sortedOptions.map((option) => {
+                    const isSelected = value.includes(option.value);
+                    return (
+                      <CommandItem
+                        key={option.value}
+                        onSelect={() => toggleOption(option.value)}
+                        className="flex items-center gap-2"
+                        data-testid={
+                          testId
+                            ? `${testId}-option-${option.value}`
+                            : undefined
+                        }
+                      >
+                        <Checkbox checked={isSelected} className="h-4 w-4" />
+                        {option.icon && (
+                          <option.icon className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <span className="flex-1">{option.label}</span>
+                      </CommandItem>
+                    );
+                  })}
+                </CommandGroup>
+              </>
             )}
           </CommandList>
         </Command>

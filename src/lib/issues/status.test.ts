@@ -3,6 +3,7 @@ import {
   getIssueStatusLabel,
   getIssueStatusIcon,
   STATUS_STYLES,
+  STATUS_GROUP_LABELS,
   SEVERITY_STYLES,
   ALL_STATUS_OPTIONS,
   ISSUE_STATUSES,
@@ -40,6 +41,20 @@ describe("Issue Status Utilities", () => {
       expect(getIssueStatusLabel("wont_fix")).toBe("Won't Fix");
       expect(getIssueStatusLabel("no_repro")).toBe("No Repro");
       expect(getIssueStatusLabel("duplicate")).toBe("Duplicate");
+    });
+  });
+
+  describe("STATUS_GROUP_LABELS", () => {
+    it("displays 'Open' for the new group (user-facing rename)", () => {
+      expect(STATUS_GROUP_LABELS.new).toBe("Open");
+    });
+
+    it("displays 'In Progress' for the in_progress group", () => {
+      expect(STATUS_GROUP_LABELS.in_progress).toBe("In Progress");
+    });
+
+    it("displays 'Closed' for the closed group", () => {
+      expect(STATUS_GROUP_LABELS.closed).toBe("Closed");
     });
   });
 

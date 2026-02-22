@@ -325,6 +325,47 @@ async function createIssue(prevState: unknown, formData: FormData) {
 
 ---
 
+### ⚡ CORE-ARCH-008: Permissions Matrix Must Match Enforcement
+
+**Rule**: The permissions matrix (`src/lib/permissions/matrix.ts`) MUST match the actual authorization checks in server actions. The help page auto-generates from the matrix.
+
+**Why**: If the matrix drifts from what server actions enforce, users see incorrect capability information on `/help/permissions`. This exact bug shipped once — the matrix claimed members could edit/delete any comment, but the server actions only allowed editing/deleting your own.
+
+**Detection**:
+- When a PR modifies server action authorization checks (e.g., in `actions.ts`), verify `matrix.ts` is also updated
+- When a PR modifies `matrix.ts`, verify the corresponding server action enforces the same rule
+- Check that permission descriptions match the actual behavior
+- Look for `"own"` vs `true` mismatches: `true` means "any" (unconditional), `"own"` means "only resources you created"
+
+**Anti-Pattern**:
+```typescript
+// ❌ DRIFT - matrix says member can edit any comment...
+// matrix.ts
+{ id: "comments.edit", access: { member: true } }  // true = any comment
+
+// ...but server action only allows own
+// actions.ts
+if (existingComment.authorId !== user.id) {
+  return err("UNAUTHORIZED", "You can only edit your own comments");
+}
+```
+
+**Correct Pattern**:
+```typescript
+// ✅ CONSISTENT - matrix and server action agree
+// matrix.ts
+{ id: "comments.edit", access: { member: "own" } }  // "own" = your comments only
+
+// actions.ts
+if (existingComment.authorId !== user.id) {
+  return err("UNAUTHORIZED", "You can only edit your own comments");
+}
+```
+
+**Reference**: CORE-ARCH-008 (NON_NEGOTIABLES.md)
+
+---
+
 ## Security Patterns
 
 ### 🔒 CORE-SEC-003: CSP Headers via Middleware

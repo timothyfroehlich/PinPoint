@@ -22,6 +22,7 @@
 10. **Code Cleanliness**: Follow Rule of Three. DRY up code only after 3rd duplication.
 11. **E2E Interaction Coverage**: If you add a clickable UI element, you must click it in an E2E test.
 12. **Email Privacy**: User email addresses must NEVER be displayed outside of admin views and the user's own settings page. Use names, "Anonymous", or role labels instead. This applies to UI, seed data, timeline events, and any client-facing serialization.
+13. **Permissions Matrix Accuracy**: The permissions matrix (`matrix.ts`) must match actual server action enforcement. The help page auto-generates from the matrix — if it drifts, users see wrong information. Update both when changing auth logic.
 
 ## 3. Agent Skills (Progressive Disclosure)
 
@@ -235,7 +236,7 @@ For multiple independent tasks (UI fixes, Copilot feedback, parallel features), 
 - `TaskCompleted` hook → runs `pnpm run check` before allowing task completion
 - `TeammateIdle` hook → blocks idle if unpushed commits or uncommitted changes exist
 
-**Worktree Creation**: Always use `pinpoint-wt.py` (not built-in `isolation: "worktree"`) — it handles port allocation and Supabase isolation.
+**Worktree Creation**: Use `pinpoint-wt.py` directly or `isolation: "worktree"` (which delegates to `pinpoint-wt.py` via the WorktreeCreate hook) — both handle port allocation and Supabase isolation.
 
 **Workflow**:
 
@@ -246,8 +247,6 @@ For multiple independent tasks (UI fixes, Copilot feedback, parallel features), 
 
 **Anti-patterns**:
 
-- DON'T use built-in `isolation: "worktree"` — it doesn't set up ports or Supabase config
-- DON'T spawn agents without absolute worktree paths — they inherit parent cwd
 - DON'T forget to check Copilot comments before merging
 
 See `pinpoint-orchestrator` skill for the full workflow.
