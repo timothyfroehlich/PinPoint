@@ -1,7 +1,12 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
-import { MultiSelect, type Option, type GroupedOption } from "./multi-select";
+import {
+  MultiSelect,
+  type Option,
+  type GroupedOption,
+  type QuickSelectAction,
+} from "./multi-select";
 
 // Mock ResizeObserver for Radix UI
 class MockResizeObserver {
@@ -159,5 +164,194 @@ describe("MultiSelect sorting", () => {
     expect(options[0]).toHaveTextContent("Cherry");
     expect(options[1]).toHaveTextContent("Apple");
     expect(options[2]).toHaveTextContent("Banana");
+  });
+});
+
+describe("MultiSelect quick-select actions", () => {
+  const testOptionsForQS: Option[] = [
+    { label: "Addams Family", value: "AFM" },
+    { label: "Medieval Madness", value: "MM" },
+    { label: "Twilight Zone", value: "TZ" },
+  ];
+
+  // user-1 owns AFM and MM
+  const myMachinesAction: QuickSelectAction = {
+    label: "My machines",
+    values: ["AFM", "MM"],
+  };
+
+  it("renders quick-select action above regular options", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(
+      <MultiSelect
+        options={testOptionsForQS}
+        quickSelectActions={[myMachinesAction]}
+        value={[]}
+        onChange={onChange}
+        data-testid="filter-machine"
+      />
+    );
+
+    await user.click(screen.getByRole("combobox"));
+    const options = screen.getAllByRole("option");
+
+    // Quick-select action should appear before the regular options
+    expect(options[0]).toHaveTextContent("My machines");
+    expect(options[1]).toHaveTextContent("Addams Family");
+    expect(options[2]).toHaveTextContent("Medieval Madness");
+    expect(options[3]).toHaveTextContent("Twilight Zone");
+  });
+
+  it("selects all controlled values when nothing is selected", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(
+      <MultiSelect
+        options={testOptionsForQS}
+        quickSelectActions={[myMachinesAction]}
+        value={[]}
+        onChange={onChange}
+        data-testid="filter-machine"
+      />
+    );
+
+    await user.click(screen.getByRole("combobox"));
+    await user.click(screen.getByText("My machines"));
+
+    expect(onChange).toHaveBeenCalledWith(["AFM", "MM"]);
+  });
+
+  it("deselects all controlled values when all are selected", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(
+      <MultiSelect
+        options={testOptionsForQS}
+        quickSelectActions={[myMachinesAction]}
+        value={["AFM", "MM"]}
+        onChange={onChange}
+        data-testid="filter-machine"
+      />
+    );
+
+    await user.click(screen.getByRole("combobox"));
+    await user.click(screen.getByText("My machines"));
+
+    expect(onChange).toHaveBeenCalledWith([]);
+  });
+
+  it("deselects only controlled values leaving other selections intact", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(
+      <MultiSelect
+        options={testOptionsForQS}
+        quickSelectActions={[myMachinesAction]}
+        value={["AFM", "MM", "TZ"]}
+        onChange={onChange}
+        data-testid="filter-machine"
+      />
+    );
+
+    await user.click(screen.getByRole("combobox"));
+    await user.click(screen.getByText("My machines"));
+
+    // Only AFM and MM should be removed, TZ should remain
+    expect(onChange).toHaveBeenCalledWith(["TZ"]);
+  });
+
+  it("shows unchecked state when none of the controlled values are selected", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(
+      <MultiSelect
+        options={testOptionsForQS}
+        quickSelectActions={[myMachinesAction]}
+        value={["TZ"]}
+        onChange={onChange}
+        data-testid="filter-machine"
+      />
+    );
+
+    await user.click(screen.getByRole("combobox"));
+
+    const myMachinesItem = screen.getByTestId(
+      "filter-machine-quick-select-my-machines"
+    );
+    const checkbox = myMachinesItem.querySelector('[role="checkbox"]');
+    expect(checkbox).toHaveAttribute("data-state", "unchecked");
+  });
+
+  it("shows indeterminate state when some but not all controlled values are selected", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(
+      <MultiSelect
+        options={testOptionsForQS}
+        quickSelectActions={[myMachinesAction]}
+        value={["AFM"]}
+        onChange={onChange}
+        data-testid="filter-machine"
+      />
+    );
+
+    await user.click(screen.getByRole("combobox"));
+
+    const myMachinesItem = screen.getByTestId(
+      "filter-machine-quick-select-my-machines"
+    );
+    const checkbox = myMachinesItem.querySelector('[role="checkbox"]');
+    expect(checkbox).toHaveAttribute("data-state", "indeterminate");
+  });
+
+  it("shows checked state when all controlled values are selected", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(
+      <MultiSelect
+        options={testOptionsForQS}
+        quickSelectActions={[myMachinesAction]}
+        value={["AFM", "MM"]}
+        onChange={onChange}
+        data-testid="filter-machine"
+      />
+    );
+
+    await user.click(screen.getByRole("combobox"));
+
+    const myMachinesItem = screen.getByTestId(
+      "filter-machine-quick-select-my-machines"
+    );
+    const checkbox = myMachinesItem.querySelector('[role="checkbox"]');
+    expect(checkbox).toHaveAttribute("data-state", "checked");
+  });
+
+  it("does not render quick-select section when quickSelectActions is empty", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(
+      <MultiSelect
+        options={testOptionsForQS}
+        quickSelectActions={[]}
+        value={[]}
+        onChange={onChange}
+        data-testid="filter-machine"
+      />
+    );
+
+    await user.click(screen.getByRole("combobox"));
+    const options = screen.getAllByRole("option");
+
+    // No quick-select item — only the 3 regular options
+    expect(options).toHaveLength(3);
   });
 });

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { IssueFilters } from "~/components/issues/IssueFilters";
 import { STATUS_GROUPS, OPEN_STATUSES } from "~/lib/issues/status";
 import type { IssueStatus } from "~/lib/types";
@@ -106,5 +107,105 @@ describe("IssueFilters", () => {
     expect(pushMock).toHaveBeenCalledWith(
       expect.stringContaining("status=all")
     );
+  });
+});
+
+describe("IssueFilters - My machines quick-select", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const machinesWithOwner = [
+    { initials: "AFM", name: "Addams Family", ownerId: "user-1" },
+    { initials: "TZ", name: "Twilight Zone", ownerId: "user-2" },
+    { initials: "MM", name: "Medieval Madness", ownerId: "user-1" },
+  ];
+
+  it('shows "My machines" toggle when user owns machines', async () => {
+    const user = userEvent.setup();
+    render(
+      <IssueFilters
+        machines={machinesWithOwner}
+        users={[]}
+        currentUserId="user-1"
+        filters={{}}
+      />
+    );
+
+    await user.click(screen.getByTestId("filter-machine"));
+    expect(screen.getByText("My machines")).toBeInTheDocument();
+  });
+
+  it('does not show "My machines" toggle when currentUserId is null', async () => {
+    const user = userEvent.setup();
+    render(
+      <IssueFilters
+        machines={machinesWithOwner}
+        users={[]}
+        currentUserId={null}
+        filters={{}}
+      />
+    );
+
+    await user.click(screen.getByTestId("filter-machine"));
+    expect(screen.queryByText("My machines")).not.toBeInTheDocument();
+  });
+
+  it('does not show "My machines" toggle when user owns no machines', async () => {
+    const user = userEvent.setup();
+    render(
+      <IssueFilters
+        machines={machinesWithOwner}
+        users={[]}
+        currentUserId="user-3"
+        filters={{}}
+      />
+    );
+
+    await user.click(screen.getByTestId("filter-machine"));
+    expect(screen.queryByText("My machines")).not.toBeInTheDocument();
+  });
+
+  it('clicking "My machines" selects all owned machine initials (AFM and MM)', async () => {
+    const user = userEvent.setup();
+    render(
+      <IssueFilters
+        machines={machinesWithOwner}
+        users={[]}
+        currentUserId="user-1"
+        filters={{ machine: [] }}
+      />
+    );
+
+    await user.click(screen.getByTestId("filter-machine"));
+    await user.click(screen.getByText("My machines"));
+
+    // getMachineQuickSelectOrdering sorts by initials: AFM < MM
+    expect(pushMock).toHaveBeenCalledWith(
+      expect.stringContaining("machine=AFM%2CMM")
+    );
+  });
+
+  it('clicking "My machines" when all owned selected deselects only owned machines', async () => {
+    const user = userEvent.setup();
+    render(
+      <IssueFilters
+        machines={machinesWithOwner}
+        users={[]}
+        currentUserId="user-1"
+        filters={{ machine: ["AFM", "MM", "TZ"] }}
+      />
+    );
+
+    await user.click(screen.getByTestId("filter-machine"));
+    await user.click(screen.getByText("My machines"));
+
+    // AFM and MM removed, TZ should remain
+    expect(pushMock).toHaveBeenCalledWith(
+      expect.stringContaining("machine=TZ")
+    );
+    const callUrl = pushMock.mock.calls[0][0] as string;
+    expect(callUrl).not.toContain("AFM");
+    expect(callUrl).not.toContain("MM");
   });
 });

@@ -68,7 +68,7 @@ export default async function IssuesPage({
   // 2. Start independent queries immediately
   const machinesPromise = db.query.machines.findMany({
     orderBy: (m, { asc }) => [asc(m.name)],
-    columns: { initials: true, name: true },
+    columns: { initials: true, name: true, ownerId: true },
   });
 
   const usersPromise = getUnifiedUsers();
@@ -155,6 +155,7 @@ export default async function IssuesPage({
           users={filterUsers}
           machines={allMachines}
           filters={filters}
+          currentUserId={user?.id ?? null}
         />
 
         {/* Issues List */}

@@ -32,6 +32,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
+import { getMachineQuickSelectOrdering } from "~/lib/issues/filter-utils";
 
 /**
  * IssueFilters — Primary filter bar for the issues list page.
@@ -68,6 +69,7 @@ import {
 interface MachineOption {
   initials: string;
   name: string;
+  ownerId: string | null;
 }
 
 /** Minimal user shape for filter dropdowns (CORE-SEC-006) */
@@ -82,12 +84,15 @@ interface IssueFiltersProps {
   machines: MachineOption[];
   users: IssueFilterUser[];
   filters: FilterState;
+  /** The current user's ID, used to compute the "My machines" quick-select toggle. */
+  currentUserId?: string | null;
 }
 
 export function IssueFilters({
   machines,
   users,
   filters,
+  currentUserId,
 }: IssueFiltersProps): React.JSX.Element {
   const { pushFilters } = useSearchFilters(filters);
   const [isSearching, startTransition] = React.useTransition();
@@ -107,6 +112,27 @@ export function IssueFilters({
       })),
     [machines]
   );
+
+  const machineQuickSelectActions = React.useMemo(() => {
+    const ordering = getMachineQuickSelectOrdering(
+      machines,
+      currentUserId ?? null
+    );
+    return ordering
+      .filter(
+        (
+          item
+        ): item is {
+          type: "quick-select";
+          label: string;
+          machines: MachineOption[];
+        } => item.type === "quick-select"
+      )
+      .map((item) => ({
+        label: item.label,
+        values: item.machines.map((m) => m.initials),
+      }));
+  }, [machines, currentUserId]);
 
   const severityOptions = React.useMemo(
     () =>
@@ -553,6 +579,7 @@ export function IssueFilters({
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
           <MultiSelect
             options={machineOptions}
+            quickSelectActions={machineQuickSelectActions}
             value={filters.machine ?? []}
             onChange={(val) => pushFilters({ machine: val, page: 1 })}
             placeholder="Machine"
