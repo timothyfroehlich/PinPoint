@@ -13,7 +13,7 @@ export default function AuthLayout({
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <main className="flex min-h-screen items-center justify-center px-6 py-12 bg-background">
+    <main className="flex min-h-screen items-center justify-center px-4 sm:px-6 py-12 bg-background">
       <div className="w-full max-w-md">
         {/* Logo and title */}
         <Link

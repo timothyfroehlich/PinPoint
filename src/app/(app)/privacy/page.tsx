@@ -16,7 +16,7 @@ export const metadata: Metadata = {
  */
 export default function PrivacyPage(): React.JSX.Element {
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-6 px-4 sm:px-6">
       <Card className="border-border bg-card">
         <CardHeader>
           <CardTitle className="text-2xl">Privacy Policy</CardTitle>
