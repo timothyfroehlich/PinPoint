@@ -18,6 +18,7 @@ import {
   OPEN_STATUSES,
 } from "~/lib/issues/status";
 import { type IssueFilters as FilterState } from "~/lib/issues/filters";
+import { getAssigneeOrdering } from "~/lib/issues/filter-utils";
 import type {
   IssueStatus,
   IssueSeverity,
@@ -82,12 +83,14 @@ interface IssueFiltersProps {
   machines: MachineOption[];
   users: IssueFilterUser[];
   filters: FilterState;
+  currentUserId?: string | null;
 }
 
 export function IssueFilters({
   machines,
   users,
   filters,
+  currentUserId = null,
 }: IssueFiltersProps): React.JSX.Element {
   const { pushFilters } = useSearchFilters(filters);
   const [isSearching, startTransition] = React.useTransition();
@@ -136,14 +139,16 @@ export function IssueFilters({
   );
 
   const userOptions = React.useMemo(
-    () => [
-      { label: "Unassigned", value: "UNASSIGNED" },
-      ...users.map((u) => ({
-        label: u.name,
-        value: u.id,
-      })),
-    ],
-    [users]
+    () =>
+      getAssigneeOrdering(users, currentUserId ?? null)
+        .filter((item) => item.type !== "separator")
+        .map((item) => {
+          if (item.type === "quick-select") {
+            return { label: item.label, value: item.value };
+          }
+          return { label: item.user.name, value: item.user.id };
+        }),
+    [users, currentUserId]
   );
 
   const ownerOptions = React.useMemo(

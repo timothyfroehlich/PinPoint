@@ -155,6 +155,7 @@ export default async function IssuesPage({
           users={filterUsers}
           machines={allMachines}
           filters={filters}
+          currentUserId={user?.id ?? null}
         />
 
         {/* Issues List */}
