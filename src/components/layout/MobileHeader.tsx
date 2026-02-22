@@ -26,8 +26,8 @@ type MobileHeaderProps = MobileHeaderAuthProps | MobileHeaderUnauthProps;
 /**
  * Compact sticky header for mobile viewports (hidden on md+).
  *
- * Auth state:   [P PinPoint]         [🔔 badge] [AU avatar]
- * Unauth state: [P PinPoint]         [Sign In]  [Sign Up ↗]
+ * Auth state:   [P PinPoint]  [APC logo]  [🔔 badge] [AU avatar]
+ * Unauth state: [P PinPoint]  [APC logo]  [Sign In]  [Sign Up ↗]
  *
  * Height: 52px — matches the mockup's --header-h variable.
  */
@@ -55,6 +55,22 @@ export function MobileHeader(props: MobileHeaderProps): React.JSX.Element {
           PinPoint
         </span>
       </Link>
+
+      {/* APC logo — center */}
+      <a
+        href="https://austinpinballcollective.org"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Austin Pinball Collective"
+      >
+        <Image
+          src="/apc-logo.png"
+          alt="Austin Pinball Collective"
+          width={64}
+          height={38}
+          className="h-6 w-auto object-contain shrink-0"
+        />
+      </a>
 
       {/* Right side actions */}
       <div className="flex items-center gap-2">

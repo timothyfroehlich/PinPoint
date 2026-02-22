@@ -62,6 +62,23 @@ describe("MobileHeader", () => {
     expect(screen.getByTestId("mobile-header")).toBeInTheDocument();
   });
 
+  it("renders APC logo linking to austinpinballcollective.org", () => {
+    render(<MobileHeader isAuthenticated={false} />);
+    const apcLink = screen.getByRole("link", {
+      name: "Austin Pinball Collective",
+    });
+    expect(apcLink).toBeInTheDocument();
+    expect(apcLink).toHaveAttribute(
+      "href",
+      "https://austinpinballcollective.org"
+    );
+    expect(apcLink).toHaveAttribute("target", "_blank");
+    expect(apcLink).toHaveAttribute("rel", "noopener noreferrer");
+    expect(
+      screen.getByAltText("Austin Pinball Collective")
+    ).toBeInTheDocument();
+  });
+
   describe("unauthenticated state", () => {
     it("shows Sign In and Sign Up buttons with correct testids", () => {
       render(<MobileHeader isAuthenticated={false} />);
