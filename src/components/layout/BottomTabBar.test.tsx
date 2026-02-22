@@ -83,7 +83,7 @@ describe("BottomTabBar", () => {
     await user.click(screen.getByRole("button", { name: /more options/i }));
 
     expect(screen.getByTestId("more-sheet-help")).toBeInTheDocument();
-    expect(screen.getByTestId("more-sheet-roadmap")).toBeInTheDocument();
+    expect(screen.getByTestId("more-sheet-whats-new")).toBeInTheDocument();
     expect(screen.getByTestId("more-sheet-about")).toBeInTheDocument();
   });
 

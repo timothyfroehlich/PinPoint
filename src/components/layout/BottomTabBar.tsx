@@ -116,7 +116,7 @@ export function BottomTabBar({
 
       {/* "More" bottom sheet */}
       <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
-        <SheetContent side="bottom" className="rounded-t-2xl pb-safe-none">
+        <SheetContent side="bottom" className="rounded-t-2xl pb-0">
           <div className="sr-only">
             <SheetTitle>More Options</SheetTitle>
             <SheetDescription>
@@ -146,10 +146,10 @@ export function BottomTabBar({
               href="/whats-new"
               onClick={() => setMoreOpen(false)}
               className={sheetItemClass}
-              data-testid="more-sheet-roadmap"
+              data-testid="more-sheet-whats-new"
             >
               <Sparkles className="size-5 shrink-0" aria-hidden="true" />
-              <span>Roadmap</span>
+              <span>What&apos;s New</span>
             </Link>
 
             <Link

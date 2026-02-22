@@ -6,6 +6,7 @@
 
 import { test, expect } from "@playwright/test";
 import { loginAs } from "../support/actions.js";
+import { TEST_USERS } from "../support/constants.js";
 
 test.describe.serial("Navigation", () => {
   test("unauthenticated navigation - show Sign In and Sign Up buttons", async ({
@@ -90,5 +91,83 @@ test.describe.serial("Navigation", () => {
     await expect(
       menuContent.getByRole("menuitem", { name: "Sign Out" })
     ).toBeVisible();
+  });
+});
+
+test.describe.serial("Bottom Tab Bar (mobile only)", () => {
+  test("tab bar is visible on mobile and links to correct routes", async ({
+    page,
+  }, testInfo) => {
+    const isMobile = testInfo.project.name.includes("Mobile");
+    if (!isMobile) {
+      test.skip();
+    }
+
+    await loginAs(page, testInfo);
+
+    const tabBar = page.getByTestId("bottom-tab-bar");
+    await expect(tabBar).toBeVisible();
+
+    // Verify tab links point to correct hrefs
+    await expect(
+      tabBar.getByRole("link", { name: /dashboard/i })
+    ).toHaveAttribute("href", "/dashboard");
+    await expect(tabBar.getByRole("link", { name: /issues/i })).toHaveAttribute(
+      "href",
+      /\/issues/
+    );
+    await expect(
+      tabBar.getByRole("link", { name: /machines/i })
+    ).toHaveAttribute("href", "/m");
+    await expect(tabBar.getByRole("link", { name: /report/i })).toHaveAttribute(
+      "href",
+      "/report"
+    );
+  });
+
+  test("More tab opens a sheet with secondary nav links", async ({
+    page,
+  }, testInfo) => {
+    const isMobile = testInfo.project.name.includes("Mobile");
+    if (!isMobile) {
+      test.skip();
+    }
+
+    await loginAs(page, testInfo);
+
+    // Open the More sheet
+    const moreButton = page.getByRole("button", { name: /more options/i });
+    await expect(moreButton).toBeVisible();
+    await moreButton.click();
+
+    // Sheet should open with secondary nav items
+    await expect(page.getByTestId("more-sheet-help")).toBeVisible();
+    await expect(page.getByTestId("more-sheet-whats-new")).toBeVisible();
+    await expect(page.getByTestId("more-sheet-about")).toBeVisible();
+  });
+
+  test("More sheet shows Admin Panel only for admin users", async ({
+    page,
+  }, testInfo) => {
+    const isMobile = testInfo.project.name.includes("Mobile");
+    if (!isMobile) {
+      test.skip();
+    }
+
+    // Log in as admin
+    await loginAs(page, testInfo, {
+      email: TEST_USERS.admin.email,
+      password: TEST_USERS.admin.password,
+    });
+
+    const moreButton = page.getByRole("button", { name: /more options/i });
+    await moreButton.click();
+
+    // Admin Panel should be visible for admin role
+    await expect(page.getByTestId("more-sheet-admin")).toBeVisible();
+    await expect(page.getByTestId("more-sheet-admin")).toHaveAttribute(
+      "href",
+      "/admin/users"
+    );
   });
 });
