@@ -145,6 +145,7 @@ TeamCreate(team_name: "pinpoint-<summary>")
 ```
 Task(
   subagent_type: "general-purpose",
+  model: "sonnet",    // Use Sonnet for teammates — faster, cheaper. Opus is for the lead only.
   team_name: "pinpoint-<summary>",
   name: "dropdown-fix",
   prompt: "<prompt with worktree path and task details>"
@@ -158,6 +159,8 @@ Assign tasks with `TaskUpdate(taskId: "1", owner: "dropdown-fix")`.
 2. Explicit instruction to work ONLY in that path
 3. Beads issue context (`bd show` output)
 4. Reference to `{worktree_path}/AGENTS.md` for project rules
+5. **Full PR lifecycle instructions**: "After pushing, monitor CI with `gh pr checks <PR>`, address Copilot comments with `bash scripts/workflow/copilot-comments.sh <PR>` and `bash scripts/workflow/respond-to-copilot.sh`, push fixes, and report back. Stay alive until CI is green and all Copilot threads are resolved."
+6. **Hooks debugging request** (if PinPoint-ro06 is still open): "Watch for hook errors about wrong directories and report any you see."
 
 **Coordination:**
 - Direct messages: `SendMessage(type: "message", recipient: "<name>", ...)`
@@ -165,21 +168,20 @@ Assign tasks with `TaskUpdate(taskId: "1", owner: "dropdown-fix")`.
 - Idle is normal — teammates wake when messaged
 - Unblock dependent tasks by assigning to idle teammates
 
-**Teammate Lifecycle — Standby After PR:**
+**Teammate Lifecycle — DO NOT shut down after initial push:**
 
-Teammates stay on standby after reporting their PR is complete. Do NOT auto-shutdown.
+Teammates own the PR through its FULL lifecycle:
+1. Implement + push + create PR
+2. **Stay alive** — monitor CI with `gh pr checks <PR>` or `bash scripts/workflow/monitor-gh-actions.sh`
+3. Address Copilot review comments (using `bash scripts/workflow/copilot-comments.sh` + `respond-to-copilot.sh`)
+4. Push fixes, wait for CI again
+5. Only shut down when: PR is approved/merged, OR lead explicitly requests shutdown
 
-1. Teammate reports PR ready (CI green, Copilot addressed)
-2. Verify via `pr-dashboard.sh` — confirm status
-3. **Keep teammate alive** — they remain idle, waiting for review feedback
-4. User reviews the PR:
-   - **Approved/merged** → shut down teammate, clean up worktree
-   - **Changes requested** → message teammate with feedback, they iterate
-5. Only shut down after user gives the green light
+**Why:** Shutting down after push loses context. Re-spinning an agent to fix Copilot comments costs more than keeping one alive. The lead orchestrator should NOT fix code directly — send messages to teammates instead.
 
+**Shutdown (only when PR lifecycle is complete):**
 ```
-# After user approves:
-SendMessage(type: "shutdown_request", recipient: "<name>", content: "PR approved, shutting down")
+SendMessage(type: "shutdown_request", recipient: "<name>", content: "PR merged/approved, wrapping up")
 # Wait for each shutdown_response(approve: true)
 TeamDelete()   # Only after ALL teammates shut down
 ```
@@ -327,12 +329,25 @@ Teammates should load **`pinpoint-teammate-guide`** at the start — it covers t
 
 ---
 
+## Lead Orchestrator Role
+
+The lead agent (you) is a **coordinator, not an implementer**:
+- **DO** launch teammates, review their output, send them corrections via messages
+- **DO** create PRs, check CI dashboards, manage beads
+- **DON'T** directly fix code in worktrees — send a message to the teammate instead
+- **DON'T** shut down teammates after their initial push — they own the full PR lifecycle
+- **DON'T** use background subagents when you need iteration (Copilot comments, CI fixes) — use Agent Teams
+
+If a teammate's work needs fixes, message them. If they're shut down and fixes are needed, spawn a new teammate in the same worktree.
+
 ## Anti-Patterns
 
 - **DON'T auto-shutdown teammates after PR completion** — keep them on standby for review feedback. Shutting down loses context (file familiarity, Copilot thread history). Only shut down after user approves the PR.
 - **DON'T spawn agents without absolute worktree paths** — agents inherit the parent's cwd and will NOT cd on their own. If using `isolation: "worktree"`, the hook returns the path — capture it and pass it to the agent.
 - **DON'T forget to check Copilot comments before merging.**
 - **DON'T assume Agent Teams is stable** — it's experimental. Fall back to background agents if coordination breaks down.
+- **DON'T shut down teammates after initial push** — they need to stay alive for CI monitoring and Copilot comment resolution.
+- **DON'T fix code yourself as the orchestrator** — message the teammate. You lose context switching between orchestration and implementation.
 
 ## Error Recovery
 
@@ -344,3 +359,6 @@ Teammates should load **`pinpoint-teammate-guide`** at the start — it covers t
 | Teammate unresponsive | Idle is normal — send follow-up message. If stuck, shutdown + replace |
 | Team cleanup fails | Shutdown remaining teammates first, then `TeamDelete()` |
 | Session dies with active team | `rm -rf ~/.claude/teams/<name> ~/.claude/tasks/<name>` |
+| Hooks fire from wrong directory | Known issue (PinPoint-ro06). PreToolUse hooks with relative paths may resolve against lead's CLAUDE_PROJECT_DIR. Workaround: teammates can `touch .claude-hook-bypass` if stuck. |
+| Background agent can't run Bash in worktree | Sandbox restrictions may block worktree paths. Use Agent Teams teammates (which get their own session) instead of background agents for implementation work. |
+| Husky post-checkout hook fails | Check `.husky/post-checkout` for merge conflict markers. Fix in main worktree before creating new worktrees. |

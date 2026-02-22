@@ -81,6 +81,7 @@ Start by loading the `teammate-guide` skill (or read .claude/skills/pinpoint-tea
 
 Launch with:
 - `subagent_type: "general-purpose"`
+- `model: "sonnet"` — use Sonnet for teammates (faster, cheaper). Reserve Opus for the lead orchestrator only.
 - `mode: "bypassPermissions"`
 - `team_name` if using Agent Teams
 
