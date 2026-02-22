@@ -1,0 +1,144 @@
+name: PR Screenshots (on-demand)
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  screenshots:
+    name: PR Screenshots
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '!screenshots')
+    concurrency:
+      group: gh-pages
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: React to comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+        run: |
+          gh api "repos/${REPO}/issues/comments/${COMMENT_ID}/reactions" \
+            -f content=eyes
+
+      - name: Get PR head SHA
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          PR_DATA=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}")
+          echo "sha=$(echo "$PR_DATA" | jq -r .head.sha)" >> "$GITHUB_OUTPUT"
+          echo "ref=$(echo "$PR_DATA" | jq -r .head.ref)" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.sha }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Restore node_modules cache
+        id: cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install dependencies (if cache miss)
+        if: steps.cache-restore.outputs.cache-hit != 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Cache Playwright browsers (chromium + webkit)
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: >-
+            ${{ runner.os }}-playwright-chromium-webkit-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-webkit-
+
+      - name: Install Playwright system dependencies
+        run: pnpm exec playwright install-deps chromium webkit
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install chromium webkit
+
+      - name: Generate config.toml from template
+        run: cp supabase/config.toml.template supabase/config.toml
+
+      - name: Make E2E script executable
+        run: chmod +x ./scripts/supabase-init-for-tests.sh
+
+      - name: Initialize Supabase
+        run: ./scripts/supabase-init-for-tests.sh
+
+      - name: Capture screenshots
+        env:
+          MOCK_BLOB_STORAGE: "true"
+          PLAYWRIGHT_STDOUT: "pipe"
+          PLAYWRIGHT_STDERR: "pipe"
+        run: pnpm run screenshots || true
+
+      - name: Deploy report to GitHub Pages
+        if: always()
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./playwright-report
+          destination_dir: >-
+            pr-${{ github.event.issue.number }}
+          keep_files: true
+
+      - name: Comment on PR with report link
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          OWNER="${REPO%%/*}"
+          REPORT_URL="https://${OWNER}.github.io/${REPO##*/}/pr-${PR_NUMBER}/"
+          COMMENT_BODY="<!-- playwright-screenshots -->
+          ## 📸 Screenshot Report
+
+          **[View interactive Playwright report](${REPORT_URL})**
+
+          Captured across Desktop (1280×720), iPhone 13 Mini (375×812, WebKit), and Pixel 5 viewports."
+
+          # Find existing comment by marker
+          EXISTING=$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+            --jq '.[] | select(.body | contains("<!-- playwright-screenshots -->")) | .id' \
+            | head -1)
+
+          if [ -n "$EXISTING" ]; then
+            gh api "repos/${REPO}/issues/comments/${EXISTING}" \
+              -X PATCH -f body="$COMMENT_BODY"
+          else
+            gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+              -f body="$COMMENT_BODY"
+          fi
