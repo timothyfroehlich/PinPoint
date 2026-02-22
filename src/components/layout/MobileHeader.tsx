@@ -6,8 +6,8 @@ import {
   type EnrichedNotification,
 } from "~/components/notifications/NotificationList";
 import { UserMenu } from "./user-menu-client";
+import { HeaderSignInButton } from "./header-sign-in-button";
 import { Button } from "~/components/ui/button";
-import { getLoginUrl } from "~/lib/login-url";
 
 interface MobileHeaderAuthProps {
   isAuthenticated: true;
@@ -68,15 +68,10 @@ export function MobileHeader(props: MobileHeaderProps): React.JSX.Element {
           </>
         ) : (
           <>
-            <Button
-              asChild
-              variant="ghost"
-              size="sm"
+            <HeaderSignInButton
+              testId="mobile-nav-signin"
               className="text-muted-foreground hover:text-foreground text-sm"
-              data-testid="mobile-nav-signin"
-            >
-              <Link href={getLoginUrl("/dashboard")}>Sign In</Link>
-            </Button>
+            />
             <Button
               asChild
               size="sm"

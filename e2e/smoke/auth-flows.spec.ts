@@ -33,9 +33,11 @@ test.describe("Authentication Smoke", () => {
     const testEmail = "member@test.com";
     const testPassword = "TestPassword123";
 
-    // Navigate to login page via dashboard header
+    // Navigate to login page via header sign-in button (mobile or desktop)
     await page.goto("/");
-    const signInLink = page.getByTestId("nav-signin");
+    const signInLink = page
+      .locator('[data-testid="nav-signin"],[data-testid="mobile-nav-signin"]')
+      .filter({ visible: true });
     await expect(signInLink).toBeVisible();
     await signInLink.click();
 

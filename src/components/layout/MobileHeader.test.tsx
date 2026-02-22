@@ -32,8 +32,17 @@ vi.mock("./user-menu-client", () => ({
   }) => <button data-testid={testId}>{userName}</button>,
 }));
 
-vi.mock("~/lib/login-url", () => ({
-  getLoginUrl: (path: string) => `/login?next=${encodeURIComponent(path)}`,
+vi.mock("./header-sign-in-button", () => ({
+  HeaderSignInButton: ({
+    testId = "nav-signin",
+  }: {
+    testId?: string;
+    className?: string;
+  }) => (
+    <a href="/login?next=%2Fdashboard" data-testid={testId}>
+      Sign In
+    </a>
+  ),
 }));
 
 describe("MobileHeader", () => {
