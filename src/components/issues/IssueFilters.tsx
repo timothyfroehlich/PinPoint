@@ -33,6 +33,35 @@ import {
   TooltipTrigger,
 } from "~/components/ui/tooltip";
 
+/**
+ * IssueFilters — Primary filter bar for the issues list page.
+ *
+ * ## Pattern
+ * Renders a search input with inline badge chips, a grid of MultiSelect
+ * dropdowns (machine, status, severity, priority, assignee), and a "More
+ * Filters" toggle that expands date ranges, frequency, owner, reporter,
+ * and watching filters.
+ *
+ * ## Composition
+ * - Each filter is a `<MultiSelect>` configured with domain constant options
+ * - Status filter uses grouped mode with `STATUS_GROUPS` sections (New, In Progress, Closed)
+ * - Machine filter shows initials as badge labels via `badgeLabel` prop
+ * - Filter state is managed via URL search params (see `useSearchFilters` hook)
+ * - Owner options display machine count and invite status metadata inline
+ *
+ * ## Key Abstractions
+ * - `STATUS_CONFIG` / `STATUS_GROUPS` (from `~/lib/issues/status`) drive status display
+ * - `OPEN_STATUSES` is the default status selection (all non-closed)
+ * - `getBadges()` builds smart badge chips: when all statuses in a group are
+ *   selected, it shows the group name ("New", "In Progress") instead of
+ *   individual status names. See `filter-utils.ts` for the extractable logic.
+ * - Search input is debounced at 300ms before pushing to URL params
+ *
+ * ## Mobile Notes
+ * Desktop uses this component directly. Mobile will use a separate chip-based
+ * filter bar but should import shared utilities from `~/lib/issues/filter-utils`
+ * for badge grouping and filter state management.
+ */
 interface MachineOption {
   initials: string;
   name: string;

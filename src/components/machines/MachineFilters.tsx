@@ -27,6 +27,32 @@ import {
   type MachinePresenceStatus,
 } from "~/lib/machines/presence";
 
+/**
+ * MachineFilters — Inline filter bar for the machines list page.
+ *
+ * ## Pattern
+ * Always-visible horizontal bar (not a modal) with a rounded search input,
+ * sort dropdown, and a row of MultiSelect filters for status, owner, and
+ * presence/availability. Active filter badges appear inline inside the
+ * search bar on sm+ screens.
+ *
+ * ## Composition
+ * - Search input with 300ms debounce pushes `q` to URL params
+ * - Sort uses a `<DropdownMenu>` with options from `SORT_LABELS`
+ * - Status filter uses machine-specific statuses (operational, needs_service,
+ *   unplayable) — not issue statuses
+ * - Owner filter shows user name with machine count and invite status metadata
+ * - Presence filter defaults to `["on_the_floor"]`; non-default presence
+ *   values appear as removable badges
+ * - "Clear All" button resets all filters and sort to defaults
+ *
+ * ## Key Abstractions
+ * - `useSearchFilters(filters)` provides `pushFilters` for URL param sync
+ * - Owner metadata format: "Name (count) (Invited)" — same pattern as
+ *   `IssueFilters` owner options
+ * - `getMachineStatusLabel` / `getMachinePresenceLabel` from domain libs
+ *   provide display labels for badge text
+ */
 interface FilterUser {
   id: string;
   name: string;

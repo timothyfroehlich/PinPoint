@@ -20,6 +20,34 @@ import {
 import { Badge } from "~/components/ui/badge";
 import { Checkbox } from "~/components/ui/checkbox";
 
+/**
+ * MultiSelect — Reusable multi-select dropdown with flat and grouped modes.
+ *
+ * ## Pattern
+ * Popover-based command palette that supports two modes:
+ * - **Flat mode** (`options` prop): A single list of checkboxes, sorted with
+ *   selected items first for quick scanning.
+ * - **Grouped mode** (`groups` prop): Sections with clickable group headers
+ *   that have indeterminate checkbox state. Clicking a group header toggles
+ *   all options in that group.
+ *
+ * ## Composition
+ * - Built on shadcn `<Command>` + `<Popover>` + `<Checkbox>`
+ * - Trigger button shows the placeholder text plus a count badge when items
+ *   are selected
+ * - Command search input filters options within the dropdown
+ * - `badgeLabel` on individual options customizes how they appear as filter
+ *   bar badges (e.g., machine initials instead of full names)
+ *
+ * ## Key Abstractions
+ * - `options` (flat) vs `groups` (grouped) — pass one or the other, not both
+ * - `value: string[]` / `onChange: (string[]) => void` — controlled multi-select
+ * - Selected-items-first sorting ensures users see their active filters at top
+ * - Group headers show indeterminate state when partially selected, and
+ *   toggle all/none on click
+ * - `data-testid` propagates to trigger, group headers, and individual options
+ *   for E2E targeting
+ */
 export interface Option {
   label: string;
   value: string;

@@ -4,6 +4,34 @@ import React from "react";
 import { cn } from "~/lib/utils";
 import { Loader2 } from "lucide-react";
 
+/**
+ * AssigneePicker — Listbox-style dropdown for assigning a user to an issue.
+ *
+ * ## Pattern
+ * Custom listbox with local open/close state, a search input for filtering
+ * users by name, and an "Unassigned" option that maps to `null`. Used on
+ * the issue detail page (single-select, immediate mutation) — distinct from
+ * the multi-select assignee filter in `IssueFilters`.
+ *
+ * ## Composition
+ * - Trigger button shows the selected user's avatar initial + name, or "Unassigned"
+ * - Dropdown includes a text input for filtering, then "Unassigned" as a
+ *   permanent first option, followed by filtered users
+ * - Click-outside closes the dropdown via a `mousedown` document listener
+ * - `onAssign(userId | null)` fires on selection; `null` means unassigned
+ *
+ * ## Key Abstractions
+ * - `assignedToId: string | null` — `null` represents the unassigned state
+ * - `isPending` shows a spinner overlay during optimistic update transitions
+ * - `disabled` / `disabledReason` support permission-gated assignment
+ * - User list is pre-filtered client-side; no "Me" quick-select in this
+ *   component (that pattern lives in the filter bar's assignee MultiSelect)
+ *
+ * ## Mobile Notes
+ * The standardized assignee ordering (Me -> Unassigned -> separator -> alpha)
+ * from `~/lib/issues/filter-utils` can be used to build a consistent mobile
+ * variant of this picker.
+ */
 interface PickerUser {
   id: string;
   name: string;
