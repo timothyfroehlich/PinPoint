@@ -83,12 +83,19 @@ interface IssueFiltersProps {
   machines: MachineOption[];
   users: IssueFilterUser[];
   filters: FilterState;
+  /**
+   * Initials of machines owned by the current user, pre-computed server-side.
+   * Used to render the "My machines" quick-select toggle. Empty array or
+   * undefined means the toggle is hidden (user not logged in or owns no machines).
+   */
+  ownedMachineInitials?: string[];
 }
 
 export function IssueFilters({
   machines,
   users,
   filters,
+  ownedMachineInitials,
 }: IssueFiltersProps): React.JSX.Element {
   const { pushFilters } = useSearchFilters(filters);
   const [isSearching, startTransition] = React.useTransition();
@@ -108,6 +115,11 @@ export function IssueFilters({
       })),
     [machines]
   );
+
+  const machineQuickSelectActions = React.useMemo(() => {
+    if (!ownedMachineInitials || ownedMachineInitials.length === 0) return [];
+    return [{ label: "My machines", values: [...ownedMachineInitials].sort() }];
+  }, [ownedMachineInitials]);
 
   const severityOptions = React.useMemo(
     () =>
@@ -558,6 +570,7 @@ export function IssueFilters({
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
           <MultiSelect
             options={machineOptions}
+            quickSelectActions={machineQuickSelectActions}
             value={filters.machine ?? []}
             onChange={(val) => pushFilters({ machine: val, page: 1 })}
             placeholder="Machine"

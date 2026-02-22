@@ -346,4 +346,31 @@ test.describe("Issue List Features", () => {
     ).toBeVisible();
     await expect(page.getByPlaceholder("Search issues...")).toHaveValue("bird");
   });
+
+  test('should show and activate "My machines" quick-select in Machine filter', async ({
+    page,
+  }) => {
+    // Admin user owns: BK (Black Knight), GDZ (Godzilla), HD (Humpty Dumpty), MM (Medieval Madness)
+    // Clicking "My machines" should filter to those four machines (sorted alphabetically by initials)
+    await page.goto("/issues");
+
+    // Open the Machine filter dropdown
+    await page.getByTestId("filter-machine").click();
+
+    // Verify "My machines" quick-select toggle is visible
+    await expect(page.getByText("My machines")).toBeVisible();
+
+    // Click "My machines" to select all owned machines
+    await page.getByText("My machines").click();
+    await page.keyboard.press("Escape");
+
+    // URL should contain the admin's owned machine initials
+    await page.waitForURL(/machine=/);
+    const url = new URL(page.url());
+    const machineParam = url.searchParams.get("machine") ?? "";
+    expect(machineParam).toContain("BK");
+    expect(machineParam).toContain("GDZ");
+    expect(machineParam).toContain("HD");
+    expect(machineParam).toContain("MM");
+  });
 });
