@@ -109,11 +109,13 @@ Before proceeding, verify:
 
 ## Phase 2: Worktree Setup
 
-**Always use `pinpoint-wt.py`** for worktree creation — it handles port allocation, Supabase isolation, and config generation that built-in `isolation: "worktree"` does not.
+Use `pinpoint-wt.py` for worktree creation — it handles port allocation, Supabase isolation, and config generation. The built-in `isolation: "worktree"` is also supported via the `WorktreeCreate` hook (which delegates to `pinpoint-wt.py` automatically).
 
 ```bash
 python3 ./pinpoint-wt.py create <branch-name>   # Works for new or existing branches
 ```
+
+When dispatching teammates with the Task tool, you may also pass `isolation: "worktree"` — the `WorktreeCreate` hook will call `pinpoint-wt.py` and set up ports and Supabase config automatically.
 
 Track the mapping (note: paths are flat — `feat/task-abc` → `feat-task-abc`):
 
@@ -307,8 +309,7 @@ Teammates should load **`pinpoint-teammate-guide`** at the start — it covers t
 
 ## Anti-Patterns
 
-- **DON'T use built-in `isolation: "worktree"`** for PinPoint — it doesn't set up ports or Supabase config. Always use `pinpoint-wt.py`.
-- **DON'T spawn agents without absolute worktree paths** — agents inherit the parent's cwd and will NOT cd on their own.
+- **DON'T spawn agents without absolute worktree paths** — agents inherit the parent's cwd and will NOT cd on their own. If using `isolation: "worktree"`, the hook returns the path — capture it and pass it to the agent.
 - **DON'T forget to check Copilot comments before merging.**
 - **DON'T assume Agent Teams is stable** — it's experimental. Fall back to background agents if coordination breaks down.
 
