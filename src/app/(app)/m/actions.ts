@@ -23,6 +23,8 @@ import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { log } from "~/lib/logger";
 import { createNotification } from "~/lib/notifications";
+import { getOpdbMachineDetails } from "~/lib/opdb/client";
+import type { OpdbMachineDetails } from "~/lib/opdb/types";
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
 
@@ -48,6 +50,43 @@ const isPostgresError = (error: unknown): error is PostgresError => {
     "code" in error &&
     typeof (error as PostgresError).code === "string"
   );
+};
+
+interface MachineOpdbValues {
+  opdbId: string;
+  opdbTitle: string | null;
+  opdbManufacturer: string | null;
+  opdbYear: number | null;
+  opdbImageUrl: string | null;
+  opdbMachineType: string | null;
+  opdbLastSyncedAt: Date | null;
+}
+
+const mapOpdbDetailsToMachineValues = (
+  opdbId: string,
+  details: OpdbMachineDetails | null
+): MachineOpdbValues => {
+  if (!details) {
+    return {
+      opdbId,
+      opdbTitle: null,
+      opdbManufacturer: null,
+      opdbYear: null,
+      opdbImageUrl: null,
+      opdbMachineType: null,
+      opdbLastSyncedAt: null,
+    };
+  }
+
+  return {
+    opdbId,
+    opdbTitle: details.title,
+    opdbManufacturer: details.manufacturer,
+    opdbYear: details.year,
+    opdbImageUrl: details.imageUrl,
+    opdbMachineType: details.machineType,
+    opdbLastSyncedAt: new Date(),
+  };
 };
 
 export type CreateMachineResult = Result<
@@ -120,6 +159,11 @@ export async function createMachineAction(
       (formData.get("ownerId") as string).length > 0
         ? (formData.get("ownerId") as string)
         : undefined,
+    opdbId:
+      typeof formData.get("opdbId") === "string" &&
+      (formData.get("opdbId") as string).length > 0
+        ? (formData.get("opdbId") as string)
+        : undefined,
   };
 
   // Validate input (CORE-SEC-002)
@@ -129,7 +173,7 @@ export async function createMachineAction(
     return err("VALIDATION", firstError?.message ?? "Invalid input");
   }
 
-  const { name, initials, ownerId } = validation.data;
+  const { name, initials, ownerId, opdbId } = validation.data;
 
   // Resolve owner type
   let finalOwnerId: string | undefined = undefined;
@@ -157,15 +201,27 @@ export async function createMachineAction(
     finalOwnerId = user.id;
   }
 
+  let opdbValues: MachineOpdbValues | undefined = undefined;
+  let machineName = name;
+
+  if (opdbId) {
+    const opdbDetails = await getOpdbMachineDetails(opdbId);
+    opdbValues = mapOpdbDetailsToMachineValues(opdbId, opdbDetails);
+    if (opdbDetails?.title) {
+      machineName = opdbDetails.title;
+    }
+  }
+
   // Insert machine
   try {
     const [machine] = await db
       .insert(machines)
       .values({
-        name,
+        name: machineName,
         initials,
         ownerId: finalOwnerId,
         invitedOwnerId: finalInvitedOwnerId,
+        ...(opdbValues ?? {}),
       })
       .returning();
 
@@ -253,6 +309,11 @@ export async function updateMachineAction(
       (formData.get("presenceStatus") as string).length > 0
         ? (formData.get("presenceStatus") as string)
         : undefined,
+    opdbId:
+      typeof formData.get("opdbId") === "string" &&
+      (formData.get("opdbId") as string).length > 0
+        ? (formData.get("opdbId") as string)
+        : undefined,
   };
 
   const validation = updateMachineSchema.safeParse(rawData);
@@ -261,7 +322,7 @@ export async function updateMachineAction(
     return err("VALIDATION", firstError?.message ?? "Invalid input");
   }
 
-  const { id, name, ownerId, presenceStatus } = validation.data;
+  const { id, name, ownerId, presenceStatus, opdbId } = validation.data;
 
   try {
     // Admins and technicians can update any machine, non-privileged users can only update their own machines
@@ -274,7 +335,7 @@ export async function updateMachineAction(
     // Get current machine state to check for owner change
     const currentMachine = await db.query.machines.findFirst({
       where: whereConditions,
-      columns: { ownerId: true, name: true },
+      columns: { ownerId: true, name: true, opdbId: true, opdbTitle: true },
     });
 
     if (!currentMachine) {
@@ -310,10 +371,33 @@ export async function updateMachineAction(
       }
     }
 
+    const existingOpdbId = currentMachine.opdbId ?? undefined;
+    const selectedOpdbId = opdbId ?? existingOpdbId;
+    let finalName = name;
+    let opdbUpdateValues: Partial<MachineOpdbValues> = {};
+
+    if (selectedOpdbId) {
+      const opdbChanged = selectedOpdbId !== existingOpdbId;
+
+      if (opdbChanged) {
+        const opdbDetails = await getOpdbMachineDetails(selectedOpdbId);
+        opdbUpdateValues = mapOpdbDetailsToMachineValues(
+          selectedOpdbId,
+          opdbDetails
+        );
+        if (opdbDetails?.title) {
+          finalName = opdbDetails.title;
+        }
+      } else {
+        finalName = currentMachine.opdbTitle ?? currentMachine.name;
+      }
+    }
+
     const [machine] = await db
       .update(machines)
       .set({
-        name,
+        name: finalName,
+        ...opdbUpdateValues,
         ...(presenceStatus !== undefined && { presenceStatus }),
         ...(shouldUpdateOwner && {
           ownerId: finalOwnerId,
