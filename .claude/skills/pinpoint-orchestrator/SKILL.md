@@ -165,12 +165,29 @@ Assign tasks with `TaskUpdate(taskId: "1", owner: "dropdown-fix")`.
 - Idle is normal — teammates wake when messaged
 - Unblock dependent tasks by assigning to idle teammates
 
-**Shutdown:**
+**Teammate Lifecycle — Standby After PR:**
+
+Teammates stay on standby after reporting their PR is complete. Do NOT auto-shutdown.
+
+1. Teammate reports PR ready (CI green, Copilot addressed)
+2. Verify via `pr-dashboard.sh` — confirm status
+3. **Keep teammate alive** — they remain idle, waiting for review feedback
+4. User reviews the PR:
+   - **Approved/merged** → shut down teammate, clean up worktree
+   - **Changes requested** → message teammate with feedback, they iterate
+5. Only shut down after user gives the green light
+
 ```
-SendMessage(type: "shutdown_request", recipient: "<name>", content: "All tasks done")
+# After user approves:
+SendMessage(type: "shutdown_request", recipient: "<name>", content: "PR approved, shutting down")
 # Wait for each shutdown_response(approve: true)
 TeamDelete()   # Only after ALL teammates shut down
 ```
+
+**Why standby matters**:
+- Re-spinning a teammate from scratch loses all context (file familiarity, failed approaches, Copilot thread history)
+- When parallel PRs touch overlapping files, merging one often creates conflicts in others. A teammate on standby can resolve its own merge conflicts immediately — a new teammate would need to re-learn the entire change set first.
+- Idle teammates consume no resources until messaged
 
 ### Option B: Background Agents (Fallback)
 
@@ -233,8 +250,11 @@ bash scripts/workflow/label-ready.sh <PR> --cleanup     # Label + remove worktre
 
 ### 4.5 Review Feedback Loop
 
-**Approved** → User merges. Done.
-**Changes requested** → Re-create worktree and re-dispatch with feedback.
+Teammates remain on standby after reporting PR completion. Do NOT shut them down until the user reviews.
+
+**Approved** → User merges. Shut down teammate, clean up worktree.
+**Changes requested** → Message the idle teammate with feedback. They iterate in the same worktree with full context.
+**No response yet** → Teammate stays idle. This is free — no resources consumed.
 
 ---
 
@@ -309,6 +329,7 @@ Teammates should load **`pinpoint-teammate-guide`** at the start — it covers t
 
 ## Anti-Patterns
 
+- **DON'T auto-shutdown teammates after PR completion** — keep them on standby for review feedback. Shutting down loses context (file familiarity, Copilot thread history). Only shut down after user approves the PR.
 - **DON'T spawn agents without absolute worktree paths** — agents inherit the parent's cwd and will NOT cd on their own. If using `isolation: "worktree"`, the hook returns the path — capture it and pass it to the agent.
 - **DON'T forget to check Copilot comments before merging.**
 - **DON'T assume Agent Teams is stable** — it's experimental. Fall back to background agents if coordination breaks down.
