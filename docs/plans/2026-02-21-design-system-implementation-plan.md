@@ -47,6 +47,7 @@ Side:
 ### Task 1.1: Update pinpoint-ui Skill (PR 1)
 
 **Files:**
+
 - Modify: `.agent/skills/pinpoint-ui/SKILL.md`
 - Delete: `docs/ui-patterns/styling-principles.md`
 - Delete: `docs/ui-patterns/components.md`
@@ -65,18 +66,19 @@ Understand the current structure. The skill currently points agents to `docs/UI_
 
 Remove the section that says "Read these files for comprehensive UI guidance" and replace it with a structured registry of canonical source files. The new section should list:
 
-| Pattern | Canonical File | What to Learn |
-|:--------|:---------------|:--------------|
-| Status system | `src/lib/issues/status.ts` | STATUS_CONFIG, STATUS_GROUPS, OPEN_STATUSES, getter functions, color/icon system |
-| Issue filters | `src/components/issues/IssueFilters.tsx` | Smart badge grouping, filter composition, inline badge pattern, debounced search |
-| Status selection | `src/components/issues/fields/StatusSelect.tsx` | Grouped select with icons, tooltip descriptions, separator pattern |
-| Assignee picker | `src/components/issues/AssigneePicker.tsx` | Listbox pattern, search filtering, "Unassigned" special value, accessibility |
-| Machine filters | `src/components/machines/MachineFilters.tsx` | Inline filter bar, MultiSelect composition, sort dropdown, user label formatting |
-| Multi-select | `src/components/ui/multi-select.tsx` | Grouped/flat modes, selected-items-first sorting, indeterminate group headers |
-| Owner select | `src/components/machines/OwnerSelect.tsx` | User display format (name + count + invited status) |
-| CSS tokens | `src/app/globals.css` | Material Design 3 color system, custom breakpoints, glow utilities |
+| Pattern          | Canonical File                                  | What to Learn                                                                    |
+| :--------------- | :---------------------------------------------- | :------------------------------------------------------------------------------- |
+| Status system    | `src/lib/issues/status.ts`                      | STATUS_CONFIG, STATUS_GROUPS, OPEN_STATUSES, getter functions, color/icon system |
+| Issue filters    | `src/components/issues/IssueFilters.tsx`        | Smart badge grouping, filter composition, inline badge pattern, debounced search |
+| Status selection | `src/components/issues/fields/StatusSelect.tsx` | Grouped select with icons, tooltip descriptions, separator pattern               |
+| Assignee picker  | `src/components/issues/AssigneePicker.tsx`      | Listbox pattern, search filtering, "Unassigned" special value, accessibility     |
+| Machine filters  | `src/components/machines/MachineFilters.tsx`    | Inline filter bar, MultiSelect composition, sort dropdown, user label formatting |
+| Multi-select     | `src/components/ui/multi-select.tsx`            | Grouped/flat modes, selected-items-first sorting, indeterminate group headers    |
+| Owner select     | `src/components/machines/OwnerSelect.tsx`       | User display format (name + count + invited status)                              |
+| CSS tokens       | `src/app/globals.css`                           | Material Design 3 color system, custom breakpoints, glow utilities               |
 
 Also add a "Color System" subsection documenting the status color groups:
+
 - New group: cool colors (cyan-500, teal-500)
 - In Progress group: vibrant colors (fuchsia-500, purple-600, pink-500, purple-500)
 - Closed group: muted colors (green-500, zinc-500, slate-500, neutral-600)
@@ -122,6 +124,7 @@ gh pr create --title "Update pinpoint-ui skill with key files registry" --body "
 ### Task 1.2: JSDoc Key Components + CSS Token Audit (PR 2)
 
 **Files:**
+
 - Modify: `src/components/issues/IssueFilters.tsx`
 - Modify: `src/components/issues/fields/StatusSelect.tsx`
 - Modify: `src/components/issues/AssigneePicker.tsx`
@@ -132,6 +135,7 @@ gh pr create --title "Update pinpoint-ui skill with key files registry" --body "
 **Step 1: Add JSDoc to IssueFilters.tsx**
 
 Add a component-level JSDoc block before the `IssueFilters` function. It should describe:
+
 - Purpose: Main filter bar for issues list, combining search + multi-select dropdowns
 - Key pattern: Smart badge grouping — status badges collapse to group names ("Open", "In Progress") when all statuses in a group are selected
 - Composition: Uses `MultiSelect` for all dropdown filters, `DateRangePicker` for date ranges
@@ -142,6 +146,7 @@ Do NOT add JSDoc to every internal function — just the exported component and 
 **Step 2: Add JSDoc to the remaining 5 components**
 
 Same pattern — one component-level JSDoc block per file describing:
+
 - What the component does
 - What pattern it demonstrates
 - Key props and their purpose
@@ -182,6 +187,7 @@ gh pr create --title "Add JSDoc to key domain components" --body "..."
 ### Task 2.1: "Me" Quick-Select in AssigneePicker (PR 3)
 
 **Files:**
+
 - Modify: `src/components/issues/AssigneePicker.tsx`
 - Modify: `src/components/issues/AssigneePicker.test.tsx`
 - Modify: `src/components/issues/IssueFilters.tsx` (pass current user)
@@ -229,7 +235,7 @@ Update the interface:
 ```typescript
 interface AssigneePickerProps {
   assignedToId: string | null;
-  currentUserId?: string | null;  // NEW
+  currentUserId?: string | null; // NEW
   users: PickerUser[];
   isPending: boolean;
   onAssign: (userId: string | null) => void;
@@ -288,6 +294,7 @@ gh pr create --title "Add 'Me' quick-select to AssigneePicker" --body "..."
 ### Task 2.2: "My Machines" Quick Filter (PR 4)
 
 **Files:**
+
 - Modify: `src/components/issues/IssueFilters.tsx`
 - Modify: `src/components/machines/MachineFilters.tsx`
 - Modify or create: Relevant test files
@@ -330,10 +337,8 @@ The machine MultiSelect currently receives flat options. Add a "My machines" act
 
 ```typescript
 const userMachineInitials = useMemo(
-  () => machines
-    .filter((m) => m.ownerId === currentUserId)
-    .map((m) => m.value),
-  [machines, currentUserId],
+  () => machines.filter((m) => m.ownerId === currentUserId).map((m) => m.value),
+  [machines, currentUserId]
 );
 
 // Build machine options with "My machines" at top
@@ -366,6 +371,7 @@ git checkout -b feat/my-machines-quick-filter
 ### Task 2.3: Status Group Label "New" → "Open" (PR 5)
 
 **Files:**
+
 - Modify: `src/lib/issues/status.ts`
 - Modify: `src/components/issues/fields/StatusSelect.tsx`
 - Modify: `src/components/issues/IssueFilters.tsx`
@@ -395,7 +401,7 @@ In `status.ts`, consider adding a `STATUS_GROUP_LABELS` constant:
 
 ```typescript
 export const STATUS_GROUP_LABELS: Record<keyof typeof STATUS_GROUPS, string> = {
-  new: "Open",           // Display label — users see "Open", not "New"
+  new: "Open", // Display label — users see "Open", not "New"
   in_progress: "In Progress",
   closed: "Closed",
 };
@@ -432,12 +438,14 @@ git checkout -b feat/status-group-open-label
 ### Task 3.1: Mobile Layout/Nav Components (PR 6)
 
 **Before starting:** Load the `pinpoint-ui` skill. Read the HTML mockups:
+
 - `docs/inspiration/mobile-redesign/mockup-issues-list.html`
 - `docs/inspiration/mobile-redesign/mockup-machines-list.html`
 
 Also read the `.pen` file via `mcp__pencil__batch_get` for the mobile layout structure.
 
 **Files:**
+
 - Create: `src/components/layout/MobileNav.tsx` (or similar — check if mobile nav already exists in `Sidebar.tsx`)
 - Create: `src/components/layout/MobilePageShell.tsx` (if needed)
 - Test: Unit tests for new components
@@ -453,6 +461,7 @@ rg "mobile" src/components/layout/ --type tsx -l
 **Step 2: Extract mobile navigation pattern from mockups**
 
 Read the mockup HTML to understand:
+
 - Bottom navigation vs hamburger menu
 - Page transitions
 - Header structure on mobile
@@ -476,6 +485,7 @@ PR description should include mobile screenshots showing the nav component in is
 **Before starting:** Load `pinpoint-ui` skill. Read `IssueFilters.tsx` (the desktop version) and the mobile mockup filter pattern from `docs/design-consistency/03-patterns.md` (Chip Dropdown section).
 
 **Files:**
+
 - Create: `src/components/mobile/MobileFilterBar.tsx` (or appropriate path)
 - Create: `src/components/ui/chip-dropdown.tsx` (if the mobile filter uses chips instead of MultiSelect)
 - Test: Unit tests
@@ -487,6 +497,7 @@ Read the mockup. The mobile filter uses a "chip dropdown" pattern (compact chips
 **Step 2: Build the mobile filter component**
 
 It should:
+
 - Use the same `STATUS_GROUPS`, `STATUS_CONFIG` from `status.ts`
 - Support the same smart badge grouping logic as desktop `IssueFilters.tsx`
 - Implement quick-select toggles (Open/In Progress/Closed) at the top
@@ -505,31 +516,37 @@ PR includes screenshots of the filter bar in mobile viewport. This is reviewable
 ### Tasks 3.3-3.6: Mobile Page PRs (PRs 8-11)
 
 Each mobile page gets its own PR. Each PR:
+
 1. Creates or modifies the page route
 2. Composes already-reviewed components (MobileNav, MobileFilterBar, etc.)
 3. Includes unit tests for page-specific logic
 4. PR description includes mobile screenshots
 
 **PR 8: Mobile Issues List Page**
+
 - Route: The existing issues list page, responsive for mobile
 - Composes: MobileFilterBar, MobileNav, issue card components
 - Reference: `mockup-issues-list.html`
 
 **PR 9: Mobile Issue Detail Page**
+
 - Route: Existing issue detail page, responsive for mobile
 - Composes: StatusSelect, AssigneePicker, timeline components
 - Reference: `mockup-issue-detail.html`
 
 **PR 10: Mobile Report Form Page**
+
 - Route: Existing report form, responsive for mobile
 - Reference: `mockup-report-form.html`
 
 **PR 11: Mobile Machines List Page**
+
 - Route: Existing machines list, responsive for mobile
 - Composes: MachineFilters (mobile variant), MobileNav
 - Reference: `mockup-machines-list.html`
 
 Each of these tasks follows the same pattern:
+
 1. Read the mockup HTML for the target page
 2. Read the current desktop page implementation
 3. Write failing tests for mobile-specific behavior
@@ -545,9 +562,11 @@ Each of these tasks follows the same pattern:
 ### Task 4.1: Desktop E2E for New Features (PR 12)
 
 **Files:**
+
 - Create: `e2e/desktop-quick-select.spec.ts` (or add to existing filter specs)
 
 **Tests to write:**
+
 - "Me" quick-select in AssigneePicker: click "Me", verify filter applied
 - "My machines" toggle: click, verify owned machines selected
 - Status group "Open" label: verify visible in status dropdown
@@ -579,6 +598,7 @@ pnpm exec playwright test e2e/desktop-quick-select.spec.ts --project="Desktop Ch
 ### Task 4.2: Mobile E2E Strategy + Suite (PR 13)
 
 **Files:**
+
 - Modify: `.agent/skills/pinpoint-e2e/SKILL.md` (add mobile testing strategy)
 - Create: `e2e/mobile-issues.spec.ts`
 - Create: `e2e/mobile-filters.spec.ts`
@@ -586,6 +606,7 @@ pnpm exec playwright test e2e/desktop-quick-select.spec.ts --project="Desktop Ch
 **Step 1: Add mobile testing strategy to pinpoint-e2e skill**
 
 Document:
+
 - **What to test on mobile vs desktop:** Mobile tests focus on touch interactions, viewport-specific layouts, mobile navigation, responsive breakpoints. Desktop tests focus on hover states, keyboard navigation, wide-screen layouts.
 - **Viewport breakpoints:** Pixel 5 (393x851), iPhone 13 Mini (375x812)
 - **Mobile-specific patterns:** `openSidebarIfMobile()`, `scrollIntoViewIfNeeded()`, `force: true` clicks for Radix dropdowns
@@ -594,6 +615,7 @@ Document:
 **Step 2: Write mobile E2E tests**
 
 Focus on:
+
 - Mobile filter bar opens/closes correctly
 - Chip dropdowns work on tap
 - Issue list scrolls and loads correctly
@@ -615,6 +637,7 @@ pnpm exec playwright test e2e/mobile-issues.spec.ts --project="Mobile Chrome"
 **Independent — can be done at any time.**
 
 Create a beads issue for this. Scope:
+
 - Audit `docs/` for stale content beyond UI patterns
 - Consider merging `docs/UI_GUIDE.md` content into `pinpoint-ui` skill
 - Check if `docs/design-consistency/` should be archived after implementation
@@ -648,6 +671,7 @@ For each phase:
 ```
 
 **Parallel work within phases:**
+
 - Phase 1: Tasks 1.1 and 1.2 can run in parallel (2 agents)
 - Phase 2: Tasks 2.1, 2.2, and 2.3 can run in parallel (3 agents)
 - Phase 3: Tasks 3.1 and 3.2 (component PRs) in parallel, then 3.3-3.6 (page PRs) in parallel after review
