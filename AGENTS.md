@@ -247,7 +247,6 @@ For multiple independent tasks (UI fixes, Copilot feedback, parallel features), 
 
 **Anti-patterns**:
 
-- DON'T spawn agents without absolute worktree paths — they inherit parent cwd
 - DON'T forget to check Copilot comments before merging
 
 See `pinpoint-orchestrator` skill for the full workflow.
