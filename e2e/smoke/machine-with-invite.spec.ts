@@ -137,6 +137,9 @@ test.describe("Machine with Inline Invite (Smoke)", () => {
     await expect(ownerSelect).toContainText("(Invited)");
 
     // 5. Submit machine creation
+    // Re-fill initials defensively: the InviteUserDialog is a focus-trapping
+    // portal. Some browser/driver combinations can drop uncontrolled input
+    // values when focus returns to the parent form after a dialog closes.
     await page.getByLabel(/Initials/i).fill(machineInitials);
     await page.getByRole("button", { name: /Create Machine/i }).click();
 
