@@ -155,7 +155,7 @@ export default async function IssuesPage({
   }));
 
   return (
-    <PageShell size="wide">
+    <PageShell size="wide" padded={false} className="py-8">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">All Issues</h1>

@@ -17,7 +17,7 @@ export const metadata: Metadata = {
  */
 export default function PrivacyPage(): React.JSX.Element {
   return (
-    <PageShell size="narrow" className="space-y-6">
+    <PageShell size="narrow" padded={false} className="space-y-6">
       <Card className="border-border bg-card">
         <CardHeader>
           <CardTitle className="text-2xl">Privacy Policy</CardTitle>

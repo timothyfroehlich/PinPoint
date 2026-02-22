@@ -81,7 +81,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
     )[0]?.count === 0;
 
   return (
-    <PageShell size="narrow" className="space-y-6">
+    <PageShell size="narrow" padded={false} className="py-6 space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
         <p className="text-muted-foreground">
