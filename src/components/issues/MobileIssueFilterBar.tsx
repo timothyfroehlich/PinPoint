@@ -1,10 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { Search, SlidersHorizontal, X, ChevronDown } from "lucide-react";
+import { Search, X, ChevronDown } from "lucide-react";
 import { useSearchFilters } from "~/hooks/use-search-filters";
 import { cn } from "~/lib/utils";
-import { OPEN_STATUSES } from "~/lib/issues/status";
+import {
+  OPEN_STATUSES,
+  CLOSED_STATUSES,
+  ALL_STATUS_OPTIONS,
+} from "~/lib/issues/status";
 import { getSmartBadgeLabel } from "~/lib/issues/filter-utils";
 import { type IssueFilters as FilterState } from "~/lib/issues/filters";
 import type { IssueStatus } from "~/lib/types";
@@ -25,14 +29,14 @@ interface MobileIssueFilterBarProps {
  *
  * Renders below the md: breakpoint. Provides:
  * - Search input with clear button
- * - Filter icon button (opens the full IssueFilters panel via URL)
- * - Horizontally scrollable chip row: Sort | Status | Machine | Assignee
+ * - Horizontally scrollable chip row: Sort | Status
+ * - Machine/Assignee clear chips (only shown when filter is active)
  *
  * All filter state is managed via URL search params (useSearchFilters hook).
  * No local modal state — chips push to URL, server re-fetches.
  *
  * The "Status" chip shows a smart summary label via getSmartBadgeLabel().
- * The "Machine" chip shows the count of selected machines when filtered.
+ * Machine/Assignee chips only render when a filter is active and act as clear buttons.
  */
 export function MobileIssueFilterBar({
   filters,
@@ -58,7 +62,13 @@ export function MobileIssueFilterBar({
     setSearch(filters.q ?? "");
   }, [filters.q]);
 
-  const activeStatuses: IssueStatus[] = filters.status ?? [...OPEN_STATUSES];
+  // filters.status === undefined means "default open filter"; [] means "all statuses"
+  const activeStatuses: IssueStatus[] =
+    filters.status === undefined
+      ? [...OPEN_STATUSES]
+      : filters.status.length === 0
+        ? [...ALL_STATUS_OPTIONS]
+        : filters.status;
   const statusLabel = getSmartBadgeLabel(activeStatuses);
   const hasStatusFilter = filters.status !== undefined;
 
@@ -120,19 +130,7 @@ export function MobileIssueFilterBar({
           )}
         </div>
 
-        {/* Filter icon button — links to full desktop filter URL */}
-        <button
-          type="button"
-          aria-label="Open filters"
-          className="h-10 w-10 flex items-center justify-center border border-border rounded-lg bg-card text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors shrink-0"
-          onClick={() => {
-            // Scroll to top of page to reveal the desktop filter bar
-            // On mobile, this button could open a full-screen filter sheet in a future iteration.
-            // For now it's a visual affordance that filters exist.
-          }}
-        >
-          <SlidersHorizontal className="h-4 w-4" />
-        </button>
+        {/* TODO: Add mobile filter sheet (tracked in PinPoint-eddl) */}
       </div>
 
       {/* Horizontally scrollable chip row */}
@@ -163,7 +161,7 @@ export function MobileIssueFilterBar({
             if (!hasStatusFilter) {
               // Currently showing open (default), switch to closed
               pushFilters({
-                status: ["fixed", "wont_fix", "wai", "no_repro", "duplicate"],
+                status: [...CLOSED_STATUSES],
                 page: 1,
               });
             } else if (statusLabel === "Closed") {
@@ -179,57 +177,35 @@ export function MobileIssueFilterBar({
           <ChevronDown className="h-3 w-3 opacity-60" />
         </button>
 
-        {/* Machine chip */}
-        <button
-          type="button"
-          className={cn(
-            "flex items-center gap-1 px-3 py-1.5 rounded-lg border text-[13px] font-medium whitespace-nowrap shrink-0 transition-colors",
-            hasMachineFilter
-              ? "border-green-500/50 bg-green-500/10 text-green-400"
-              : "border-border bg-transparent text-muted-foreground hover:bg-muted/50"
-          )}
-          aria-label={
-            hasMachineFilter
-              ? `Machine filter: ${machineCount.toString()} selected`
-              : "Filter by machine"
-          }
-          onClick={() => {
-            if (hasMachineFilter) {
+        {/* Machine chip — only shown when a machine filter is active (acts as clear chip) */}
+        {hasMachineFilter && (
+          <button
+            type="button"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg border text-[13px] font-medium whitespace-nowrap shrink-0 transition-colors border-green-500/50 bg-green-500/10 text-green-400"
+            aria-label={`Machine filter: ${machineCount.toString()} selected. Tap to clear.`}
+            onClick={() => {
               pushFilters({ machine: [], page: 1 });
-            }
-          }}
-        >
-          {hasMachineFilter
-            ? `Machine (${machineCount.toString()})`
-            : "Machine"}
-          <ChevronDown className="h-3 w-3 opacity-60" />
-        </button>
+            }}
+          >
+            {`Machine (${machineCount.toString()})`}
+            <X className="h-3 w-3 opacity-60" />
+          </button>
+        )}
 
-        {/* Assignee chip */}
-        <button
-          type="button"
-          className={cn(
-            "flex items-center gap-1 px-3 py-1.5 rounded-lg border text-[13px] font-medium whitespace-nowrap shrink-0 transition-colors",
-            hasAssigneeFilter
-              ? "border-green-500/50 bg-green-500/10 text-green-400"
-              : "border-border bg-transparent text-muted-foreground hover:bg-muted/50"
-          )}
-          aria-label={
-            hasAssigneeFilter
-              ? `Assignee filter: ${assigneeCount.toString()} selected`
-              : "Filter by assignee"
-          }
-          onClick={() => {
-            if (hasAssigneeFilter) {
+        {/* Assignee chip — only shown when an assignee filter is active (acts as clear chip) */}
+        {hasAssigneeFilter && (
+          <button
+            type="button"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg border text-[13px] font-medium whitespace-nowrap shrink-0 transition-colors border-green-500/50 bg-green-500/10 text-green-400"
+            aria-label={`Assignee filter: ${assigneeCount.toString()} selected. Tap to clear.`}
+            onClick={() => {
               pushFilters({ assignee: [], page: 1 });
-            }
-          }}
-        >
-          {hasAssigneeFilter
-            ? `Assigned (${assigneeCount.toString()})`
-            : "Assigned"}
-          <ChevronDown className="h-3 w-3 opacity-60" />
-        </button>
+            }}
+          >
+            {`Assigned (${assigneeCount.toString()})`}
+            <X className="h-3 w-3 opacity-60" />
+          </button>
+        )}
       </div>
     </div>
   );
