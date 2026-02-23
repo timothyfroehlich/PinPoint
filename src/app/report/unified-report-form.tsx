@@ -252,7 +252,7 @@ export function UnifiedReportForm({
   return (
     <div className="w-full max-w-5xl mx-auto">
       <Card className="border-outline-variant bg-surface shadow-md">
-        <CardHeader className="space-y-1 pb-4 px-4 md:px-6 border-b border-outline-variant/50">
+        <CardHeader className="space-y-1 pb-3 px-4 md:pb-4 md:px-6 border-b border-outline-variant/50">
           <CardTitle className="text-xl md:text-2xl font-bold text-on-surface">
             Report an Issue
           </CardTitle>
@@ -261,10 +261,10 @@ export function UnifiedReportForm({
             from here.
           </p>
         </CardHeader>
-        <CardContent className="p-4 md:p-6">
+        <CardContent className="p-3 md:p-6">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* Main Form Column */}
-            <div className="lg:col-span-7 space-y-4">
+            <div className="lg:col-span-7 space-y-3 md:space-y-4">
               {(initialError ?? state.error) && (
                 <div
                   role="alert"
@@ -274,7 +274,7 @@ export function UnifiedReportForm({
                 </div>
               )}
 
-              <form action={formAction} className="space-y-4">
+              <form action={formAction} className="space-y-3 md:space-y-4">
                 {/* Honeypot field for bot detection */}
                 <input
                   type="text"
@@ -453,7 +453,7 @@ export function UnifiedReportForm({
                 )}
 
                 {/* Divider before photos */}
-                <div className="border-t border-outline-variant/30 pt-4">
+                <div className="border-t border-outline-variant/30 pt-3 md:pt-4">
                   <div className="space-y-3">
                     <div className="space-y-1.5">
                       <Label className="text-on-surface">Photos</Label>

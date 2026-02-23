@@ -55,11 +55,11 @@ export function RecentIssuesPanelClient({
           className
         )}
       >
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-3 flex items-center justify-between">
           <Skeleton className="h-4 w-40" />
           <Skeleton className="h-3 w-16" />
         </div>
-        <div className="space-y-2">
+        <div className="space-y-1">
           {Array.from({ length: limit }, (_, i) => (
             <div
               key={i}
@@ -97,7 +97,7 @@ export function RecentIssuesPanelClient({
         className
       )}
     >
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-on-surface">
           Recent Issues for {machineName || machineInitials}
         </h3>
@@ -112,19 +112,19 @@ export function RecentIssuesPanelClient({
       </div>
 
       {displayIssues.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-8 text-center animate-in fade-in zoom-in duration-300">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-variant/50 mb-3">
-            <CheckCircle2 className="h-6 w-6 text-green-600/70 dark:text-green-400/70" />
+        <div className="flex flex-col items-center justify-center py-4 text-center animate-in fade-in zoom-in duration-300">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-variant/50 mb-2">
+            <CheckCircle2 className="h-5 w-5 text-green-600/70 dark:text-green-400/70" />
           </div>
           <p className="text-sm font-medium text-on-surface">
             No recent issues
           </p>
-          <p className="text-xs text-on-surface-variant mt-1">
+          <p className="text-xs text-on-surface-variant mt-0.5">
             This machine is running smoothly.
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1">
           {displayIssues.map((issue) => (
             <Link
               key={issue.id}
