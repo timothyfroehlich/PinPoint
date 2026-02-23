@@ -271,7 +271,7 @@ export default async function IssueDetailPage({
           {/* ── Badge strip ── */}
           <div
             className="flex flex-wrap items-center gap-2"
-            data-testid="mobile-badge-strip"
+            data-testid="issue-badge-strip"
           >
             <IssueBadgeGrid
               issue={
@@ -307,7 +307,7 @@ export default async function IssueDetailPage({
 
         {/* ── Main content area (two-column on desktop) ── */}
         <div className="grid gap-10 md:grid-cols-[minmax(0,1fr)_320px]">
-          <section className="space-y-5 lg:pr-4" data-testid="mobile-timeline">
+          <section className="space-y-5 lg:pr-4" data-testid="issue-timeline">
             {issue.images.length > 0 && (
               <div className="space-y-3">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">

@@ -85,6 +85,7 @@ export function MobileDetailsPanel({
               <circle cx="12" cy="12" r="3" />
             </svg>
             <span>{watchCount}</span>
+            <span className="sr-only">watching</span>
           </div>
 
           {/* Watch toggle (authenticated users only) */}
