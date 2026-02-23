@@ -1,6 +1,7 @@
 import type React from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { issues, userProfiles } from "~/server/db/schema";
@@ -9,11 +10,11 @@ import { PageShell } from "~/components/layout/PageShell";
 import { IssueTimeline } from "~/components/issues/IssueTimeline";
 import { IssueSidebar } from "~/components/issues/IssueSidebar";
 import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
+import { MobileDetailsPanel } from "~/components/issues/MobileDetailsPanel";
 import { getMachineOwnerId, getMachineOwnerName } from "~/lib/issues/owner";
 import { formatIssueId } from "~/lib/issues/utils";
 import { ImageGallery } from "~/components/images/ImageGallery";
 import type { Issue, IssueWithAllRelations } from "~/lib/types";
-import { BackToIssuesLink } from "~/components/issues/BackToIssuesLink";
 import { getLastIssuesPath } from "~/lib/cookies/preferences";
 import { canEditIssueTitle } from "~/lib/permissions";
 import { EditableIssueTitle } from "./editable-issue-title";
@@ -21,11 +22,21 @@ import {
   type OwnershipContext,
   getAccessLevel,
 } from "~/lib/permissions/helpers";
+import { OwnerRequirementsCallout } from "~/components/machines/OwnerRequirementsCallout";
 
 /**
  * Issue Detail Page
  *
- * Displays issue details, timeline, and update actions.
+ * Mobile-first layout:
+ * - Back nav row + issue ID chip
+ * - Machine context link
+ * - Inline badge strip
+ * - Owner requirements callout (conditional)
+ * - Assignee + Watch + Edit Details row (with collapsible details panel)
+ * - Images section
+ * - Activity/Timeline
+ *
+ * Desktop (md:) falls back to the original two-column sidebar layout.
  */
 export default async function IssueDetailPage({
   params,
@@ -180,28 +191,64 @@ export default async function IssueDetailPage({
       )
     : false;
 
-  return (
-    <PageShell className="space-y-8" size="wide">
-      {/* Back button */}
-      <BackToIssuesLink href={issuesPath} />
+  const issueId = formatIssueId(initials, issue.issueNumber);
+  const ownerRequirements = user
+    ? (issue.machine.ownerRequirements ?? undefined)
+    : undefined;
 
-      {/* Header */}
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-muted-foreground font-mono font-bold">
-            {formatIssueId(initials, issue.issueNumber)}
-          </span>
+  return (
+    <PageShell
+      className="space-y-0 px-0 py-0 sm:px-8 sm:py-10 lg:px-10"
+      size="wide"
+    >
+      <div className="px-4 py-4 sm:px-0 sm:py-0 space-y-4 sm:space-y-8">
+        {/* ── MOBILE: Back nav row + issue ID chip ── */}
+        <div
+          className="flex items-center justify-between gap-2 md:hidden"
+          data-testid="mobile-nav-row"
+        >
           <Link
-            href={`/m/${initials}`}
-            className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            href={issuesPath}
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            aria-label="Back to issues"
           >
-            {issue.machine.name}
+            <ArrowLeft className="size-4" />
+            <span>Issues</span>
           </Link>
+          <span className="rounded-full border border-border bg-muted px-2.5 py-0.5 font-mono text-xs font-semibold text-muted-foreground">
+            {issueId}
+          </span>
+        </div>
+
+        {/* ── DESKTOP: Back button (hidden on mobile) ── */}
+        <div className="hidden md:block">
+          <Link
+            href={issuesPath}
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="size-4" />
+            Back to Issues
+          </Link>
+        </div>
+
+        {/* ── Machine context link ── */}
+        <Link
+          href={`/m/${initials}`}
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-primary transition-colors hover:text-primary/80"
+          data-testid="mobile-machine-link"
+        >
+          {issue.machine.name}
+        </Link>
+
+        {/* ── DESKTOP: Issue ID + machine + owner (hidden on mobile) ── */}
+        <div className="hidden md:flex flex-wrap items-center gap-2">
+          <span className="text-muted-foreground font-mono font-bold">
+            {issueId}
+          </span>
           {ownerName && (
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <span>•</span>
               <span>Game Owner:</span>
-              {/* Only link for registered owners - invited owner IDs won't filter correctly */}
               {issue.machine.owner?.id ? (
                 <Link
                   href={`/issues?owner=${issue.machine.owner.id}`}
@@ -215,13 +262,20 @@ export default async function IssueDetailPage({
             </div>
           )}
         </div>
+
+        {/* ── Issue title ── */}
         <div className="space-y-3">
           <EditableIssueTitle
             issueId={issue.id}
             title={issue.title}
             canEdit={userCanEditTitle}
           />
-          <div className="flex flex-wrap items-center gap-2">
+
+          {/* ── Badge strip ── */}
+          <div
+            className="flex flex-wrap items-center gap-2"
+            data-testid="mobile-badge-strip"
+          >
             <IssueBadgeGrid
               issue={
                 issue as unknown as Pick<
@@ -234,50 +288,72 @@ export default async function IssueDetailPage({
             />
           </div>
         </div>
-      </div>
 
-      <div className="grid gap-10 md:grid-cols-[minmax(0,1fr)_320px]">
-        <section className="space-y-5 lg:pr-4">
-          {issue.images.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Images ({issue.images.length})
-              </h2>
-              <ImageGallery
-                images={issue.images.map((img) => ({
-                  id: img.id,
-                  fullImageUrl: img.fullImageUrl,
-                  originalFilename: img.originalFilename,
-                }))}
-              />
-            </div>
-          )}
+        {/* ── Owner requirements callout (mobile: above fold; desktop: in timeline) ── */}
+        {ownerRequirements && (
+          <div className="md:hidden">
+            <OwnerRequirementsCallout
+              ownerRequirements={ownerRequirements}
+              machineName={issue.machine.name}
+            />
+          </div>
+        )}
 
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Activity
-          </h2>
-          <IssueTimeline
-            issue={issueWithRelations}
-            currentUserId={user?.id ?? null}
-            currentUserRole={accessLevel}
-            currentUserInitials={
-              currentUserProfile?.name.slice(0, 2).toUpperCase() ?? "??"
-            }
-            ownerRequirements={
-              user ? (issue.machine.ownerRequirements ?? undefined) : undefined
-            }
-            machineName={issue.machine.name}
-          />
-        </section>
-
-        {/* Sticky Sidebar */}
-        <IssueSidebar
+        {/* ── MOBILE: Collapsible details panel (replaces sidebar) ── */}
+        <MobileDetailsPanel
           issue={issueWithRelations}
           allUsers={allUsers}
           currentUserId={user?.id ?? null}
           accessLevel={accessLevel}
           ownershipContext={ownershipContext}
         />
+
+        {/* ── Main content area (two-column on desktop) ── */}
+        <div className="grid gap-10 md:grid-cols-[minmax(0,1fr)_320px]">
+          <section className="space-y-5 lg:pr-4" data-testid="mobile-timeline">
+            {issue.images.length > 0 && (
+              <div className="space-y-3">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                  Images ({issue.images.length})
+                </h2>
+                <ImageGallery
+                  images={issue.images.map((img) => ({
+                    id: img.id,
+                    fullImageUrl: img.fullImageUrl,
+                    originalFilename: img.originalFilename,
+                  }))}
+                />
+              </div>
+            )}
+
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Activity
+            </h2>
+            <IssueTimeline
+              issue={issueWithRelations}
+              currentUserId={user?.id ?? null}
+              currentUserRole={accessLevel}
+              currentUserInitials={
+                currentUserProfile?.name.slice(0, 2).toUpperCase() ?? "??"
+              }
+              ownerRequirements={
+                // On mobile, owner requirements are shown above the fold.
+                // On desktop (md:), show them in the timeline after the initial report.
+                ownerRequirements
+              }
+              machineName={issue.machine.name}
+            />
+          </section>
+
+          {/* ── DESKTOP: Sticky Sidebar (hidden on mobile via md: grid) ── */}
+          <IssueSidebar
+            issue={issueWithRelations}
+            allUsers={allUsers}
+            currentUserId={user?.id ?? null}
+            accessLevel={accessLevel}
+            ownershipContext={ownershipContext}
+          />
+        </div>
       </div>
     </PageShell>
   );

@@ -432,7 +432,9 @@ export function IssueTimeline({
                 userContext={userContext}
               />
               {index === 0 && ownerRequirements && machineName && (
-                <div className="ml-20">
+                // On mobile, the owner requirements are shown above the fold.
+                // On desktop (md:), show them inline in the timeline.
+                <div className="ml-20 hidden md:block">
                   <OwnerRequirementsCallout
                     ownerRequirements={ownerRequirements}
                     machineName={machineName}
@@ -459,7 +461,10 @@ export function IssueTimeline({
         </div>
 
         {/* Add Comment Form */}
-        <div className="relative mt-8 flex gap-4 pt-2">
+        <div
+          className="relative mt-8 flex gap-4 pt-2"
+          data-testid="mobile-comment-form"
+        >
           <div className="flex w-16 flex-none flex-col items-center">
             <Avatar className="relative z-10 size-10 border border-border/60 ring-4 ring-background">
               <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
