@@ -197,11 +197,8 @@ export default async function IssueDetailPage({
     : undefined;
 
   return (
-    <PageShell
-      className="space-y-0 px-0 py-0 sm:px-8 sm:py-10 lg:px-10"
-      size="wide"
-    >
-      <div className="px-4 py-4 sm:px-0 sm:py-0 space-y-4 sm:space-y-8">
+    <PageShell className="space-y-0" size="wide" padded={false}>
+      <div className="px-4 py-4 sm:px-8 sm:py-10 lg:px-10 space-y-4 sm:space-y-8">
         {/* ── MOBILE: Back nav row + issue ID chip ── */}
         <div
           className="flex items-center justify-between gap-2 md:hidden"
@@ -231,11 +228,11 @@ export default async function IssueDetailPage({
           </Link>
         </div>
 
-        {/* ── Machine context link ── */}
+        {/* ── Machine context link (shown on all viewports) ── */}
         <Link
           href={`/m/${initials}`}
           className="inline-flex items-center gap-1.5 text-sm font-medium text-primary transition-colors hover:text-primary/80"
-          data-testid="mobile-machine-link"
+          data-testid="machine-link"
         >
           {issue.machine.name}
         </Link>
@@ -345,14 +342,16 @@ export default async function IssueDetailPage({
             />
           </section>
 
-          {/* ── DESKTOP: Sticky Sidebar (hidden on mobile via md: grid) ── */}
-          <IssueSidebar
-            issue={issueWithRelations}
-            allUsers={allUsers}
-            currentUserId={user?.id ?? null}
-            accessLevel={accessLevel}
-            ownershipContext={ownershipContext}
-          />
+          {/* ── DESKTOP: Sticky Sidebar (hidden on mobile) ── */}
+          <div className="hidden md:block">
+            <IssueSidebar
+              issue={issueWithRelations}
+              allUsers={allUsers}
+              currentUserId={user?.id ?? null}
+              accessLevel={accessLevel}
+              ownershipContext={ownershipContext}
+            />
+          </div>
         </div>
       </div>
     </PageShell>

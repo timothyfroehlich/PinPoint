@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Settings, ChevronDown } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { SidebarActions } from "~/components/issues/SidebarActions";
+import { WatchButton } from "~/components/issues/WatchButton";
 import { type IssueWithAllRelations } from "~/lib/types";
 import { type OwnershipContext } from "~/lib/permissions/helpers";
 import { type AccessLevel } from "~/lib/permissions/matrix";
@@ -38,9 +39,12 @@ export function MobileDetailsPanel({
   const assignedUser = issue.assignedToUser ?? null;
   const assigneeName = assignedUser?.name ?? "Unassigned";
   const assigneeInitials = assignedUser
-    ? assignedUser.name.slice(0, 2).toUpperCase()
+    ? (assignedUser.name[0] ?? "U").toUpperCase()
     : "--";
   const watchCount = issue.watchers.length;
+  const isWatching = currentUserId
+    ? issue.watchers.some((w) => w.userId === currentUserId)
+    : false;
   const reporterName = reporter.name;
   const reporterInitial = reporter.initial;
 
@@ -82,6 +86,11 @@ export function MobileDetailsPanel({
             </svg>
             <span>{watchCount}</span>
           </div>
+
+          {/* Watch toggle (authenticated users only) */}
+          {accessLevel !== "unauthenticated" && (
+            <WatchButton issueId={issue.id} initialIsWatching={isWatching} />
+          )}
 
           {/* Edit Details toggle button */}
           <button
