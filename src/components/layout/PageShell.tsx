@@ -26,7 +26,7 @@ export function PageShell({
     <div
       className={cn(
         "mx-auto w-full",
-        padded && "px-6 py-10 sm:px-8 lg:px-10",
+        padded && "px-4 py-6 sm:px-6 sm:py-10 lg:px-10",
         sizeClassName[size],
         className
       )}
