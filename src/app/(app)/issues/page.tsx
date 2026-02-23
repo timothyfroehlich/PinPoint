@@ -16,6 +16,7 @@ import {
   buildOrderBy,
 } from "~/lib/issues/filters-queries";
 import { count, eq } from "drizzle-orm";
+import { PageShell } from "~/components/layout/PageShell";
 
 export const metadata: Metadata = {
   title: "Issues | PinPoint",
@@ -154,7 +155,7 @@ export default async function IssuesPage({
   }));
 
   return (
-    <div className="container mx-auto max-w-7xl py-8 px-4 sm:px-6">
+    <PageShell size="wide" padded={false} className="py-8">
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">All Issues</h1>
@@ -187,6 +188,6 @@ export default async function IssuesPage({
           allUsers={assigneeUsers}
         />
       </div>
-    </div>
+    </PageShell>
   );
 }
