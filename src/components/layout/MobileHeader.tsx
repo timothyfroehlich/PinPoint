@@ -34,13 +34,13 @@ type MobileHeaderProps = MobileHeaderAuthProps | MobileHeaderUnauthProps;
 export function MobileHeader(props: MobileHeaderProps): React.JSX.Element {
   return (
     <header
-      className="md:hidden flex h-[52px] items-center justify-between px-4 border-b border-border bg-card/85 backdrop-blur-sm sticky top-0 z-20"
+      className="md:hidden flex h-[52px] items-center gap-3 px-4 border-b border-border bg-card/85 backdrop-blur-sm sticky top-0 z-20"
       data-testid="mobile-header"
     >
       {/* Logo — left side */}
       <Link
         href="/dashboard"
-        className="flex flex-1 items-center gap-2"
+        className="flex items-center gap-2"
         aria-label="PinPoint"
       >
         <Image
@@ -74,7 +74,7 @@ export function MobileHeader(props: MobileHeaderProps): React.JSX.Element {
       </a>
 
       {/* Right side actions */}
-      <div className="flex flex-1 items-center justify-end gap-2">
+      <div className="flex items-center ml-auto gap-2">
         {props.isAuthenticated ? (
           <>
             <NotificationList notifications={props.notifications} />
