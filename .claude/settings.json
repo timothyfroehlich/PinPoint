@@ -95,6 +95,10 @@
       "Bash(./scripts/workflow/copilot-comments.sh:*)",
       "Bash(./scripts/workflow/label-ready.sh:*)",
       "Bash(./scripts/workflow/pr-dashboard.sh:*)",
+      "Bash(bash scripts/workflow/orchestration-status.sh:*)",
+      "Bash(./scripts/workflow/orchestration-status.sh:*)",
+      "Bash(bash scripts/workflow/stale-worktrees.sh:*)",
+      "Bash(./scripts/workflow/stale-worktrees.sh:*)",
       "Bash(bash scripts/workflow/respond-to-copilot.sh:*)",
       "Bash(bash scripts/workflow/resolve-copilot-threads.sh:*)",
       "Bash(bash scripts/workflow/monitor-gh-actions.sh:*)",
@@ -293,7 +297,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/preflight-reminder.sh",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/preflight-reminder.sh",
             "timeout": 5000
           }
         ]
@@ -304,7 +308,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/definition-of-done.sh",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/definition-of-done.sh",
             "timeout": 120000
           }
         ]
@@ -315,8 +319,30 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/push-check.sh",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/push-check.sh",
             "timeout": 15000
+          }
+        ]
+      }
+    ],
+    "WorktreeCreate": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/worktree-create.sh",
+            "timeout": 120000
+          }
+        ]
+      }
+    ],
+    "WorktreeRemove": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}\"/.claude/hooks/worktree-remove.sh",
+            "timeout": 60000
           }
         ]
       }

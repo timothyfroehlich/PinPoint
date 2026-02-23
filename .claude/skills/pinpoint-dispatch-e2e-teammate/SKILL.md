@@ -1,47 +1,25 @@
 ---
 name: pinpoint-dispatch-e2e-teammate
-description: Dispatch a teammate for end-to-end issue work. Creates worktree, writes task contract, and launches teammate with correct context.
+description: Dispatch a subagent for end-to-end issue work. Creates worktree via isolation, writes task contract, and launches subagent with correct context.
 audience: lead agent coordinating work
 ---
 
-> **Audience**: This skill is for the **lead agent** dispatching teammates.
-> If you are a dispatched teammate, load `pinpoint-teammate-guide` instead.
+> **Audience**: This skill is for the **lead agent** dispatching subagents.
+> If you are a dispatched subagent, load `pinpoint-teammate-guide` instead.
 
 ## When to Use
 
-Use when assigning an issue end-to-end to a teammate — they will implement, create a PR, wait for Copilot review, address comments, and verify CI before reporting done.
+Use when assigning an issue end-to-end to a subagent — they will implement, create a PR, wait for Copilot review, address comments, and verify CI before returning.
 
 ---
 
-## Step 1: Create the Worktree
+## Step 1: Prepare the Task Contract
 
-```bash
-python3 ./pinpoint-wt.py create feat/<branch-name>
+Define the checklist the subagent will write to `.claude-task-contract` in its worktree:
+
 ```
-
-`pinpoint-wt.py` handles:
-- **Port allocation**: unique Next.js, Supabase API, and Postgres ports per worktree
-- **Config generation**: `supabase/config.toml` and `.env.local` auto-generated (read-only)
-- **Dependency install**: `pnpm install` runs automatically
-
-Check the output for the allocated ports and worktree path. Verify:
-```bash
-python3 ./pinpoint-wt.py list    # confirm ports are assigned
-```
-
-Worktrees land at: `/home/froeht/Code/pinpoint-worktrees/feat-<branch-name>`
-
----
-
-## Step 2: Write the Task Contract
-
-Create `.claude-task-contract` in the **worktree root** (not the main repo):
-
-```bash
-cat > /home/froeht/Code/pinpoint-worktrees/feat-<branch-name>/.claude-task-contract << 'EOF'
 # Task Contract
 # Check off each item as you complete it.
-# The TaskCompleted hook blocks until all items are checked.
 
 - [ ] Code changes implemented and tests pass (pnpm run check)
 - [ ] PR created (#___)
@@ -49,53 +27,77 @@ cat > /home/froeht/Code/pinpoint-worktrees/feat-<branch-name>/.claude-task-contr
 - [ ] CI passing on final push
 
 ## Timeline
-EOF
 ```
 
-**Customize** the checklist for the task:
-- Remove the Copilot line for trivial/doc-only changes
-- Add task-specific items (e.g., "Migration generated and tested")
-
-> **Must be sequential**: Write the contract BEFORE dispatching the teammate.
+Customize: remove Copilot line for trivial changes, add task-specific items.
 
 ---
 
-## Step 3: Dispatch the Teammate
-
-Use the `Task` tool with this prompt structure:
+## Step 2: Dispatch the Subagent
 
 ```
-You are working in a git worktree at: /home/froeht/Code/pinpoint-worktrees/feat-<branch-name>
+Task(
+  subagent_type: "general-purpose",
+  model: "sonnet",
+  isolation: "worktree",
+  run_in_background: true,
+  mode: "bypassPermissions",
+  prompt: "<see template below>"
+)
+```
 
-Start by loading the `teammate-guide` skill (or read .claude/skills/pinpoint-teammate-guide/SKILL.md directly).
+**Prompt template:**
+
+```markdown
+Start by loading the `pinpoint-teammate-guide` skill (or read .claude/skills/pinpoint-teammate-guide/SKILL.md directly).
 
 ## Task: <issue title>
 <beads issue ID and description>
 
-## Files to modify
+## Task Contract
+Write this to `.claude-task-contract` in your worktree root:
+<contract from Step 1>
+
+## Files to Modify
 <specific files and what to change>
 
 ## Notes
 <any task-specific context>
+
+## Quality Gates
+Run `pnpm run check` before returning. Check off all contract items.
+If Copilot review doesn't arrive within 5 minutes, note timeout and return.
+
+## Return Format
+Report back with:
+- **Branch**: <branch name>
+- **PR**: #<number>
+- **CI**: passing/failing/pending
+- **Copilot**: no comments / N comments addressed / pending timeout
+- **Blockers**: none or description
 ```
 
-Launch with:
-- `subagent_type: "general-purpose"`
-- `mode: "bypassPermissions"`
-- `team_name` if using Agent Teams
+> **Agent Teams fallback**: Add `team_name`, `name`, absolute worktree path (created manually via `pinpoint-wt.py`), and replace return format with SendMessage instructions.
 
 ---
 
-## Step 4: Monitor
+## Step 3: Monitor
 
-While the teammate works:
 ```bash
 bash scripts/workflow/pr-dashboard.sh          # overview of open PRs
-bash scripts/workflow/copilot-comments.sh <PR> # check review status + comments
+bash scripts/workflow/copilot-comments.sh <PR> # check review status
 gh pr checks <PR>                              # CI status
 ```
 
-The teammate will message you (Agent Teams) or you can check `TaskOutput` (background agents).
+---
+
+## Step 4: Follow-Up via Resume
+
+Resume the subagent with follow-up work (Copilot comments, CI fixes, review feedback). Common scenarios:
+
+- Subagent returns "Copilot pending" → wait → resume with actual comments
+- CI fails → get logs → resume with failure context
+- User requests changes → resume with review feedback
 
 ---
 

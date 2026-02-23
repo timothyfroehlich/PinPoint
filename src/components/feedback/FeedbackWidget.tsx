@@ -38,61 +38,109 @@ function isSentryFeedbackWidget(obj: unknown): obj is SentryFeedbackWidget {
   );
 }
 
+// Shared helper that opens the Sentry feedback widget without type-specific form options.
+// Applies a consistent delay to all open methods to prevent focus conflicts with Radix UI portals.
+// Used by both openFeedbackForm and handleFeedback (for fallback branches).
+function openSentryFeedbackWidget(
+  feedback: unknown,
+  delayMs: number = DROPDOWN_CLOSE_DELAY
+): void {
+  if (!isSentryFeedbackWidget(feedback)) {
+    return;
+  }
+
+  const widget = feedback;
+
+  if (typeof widget.createForm === "function") {
+    const createFormFn = widget.createForm;
+
+    window.setTimeout(() => {
+      void (async () => {
+        try {
+          const dialog = await createFormFn();
+
+          if (dialog) {
+            if (typeof dialog.appendToDom === "function") {
+              dialog.appendToDom();
+            }
+            if (typeof dialog.open === "function") {
+              dialog.open();
+            }
+          }
+        } catch (err) {
+          console.error("[FeedbackWidget] Error calling createForm:", err);
+        }
+      })();
+    }, delayMs);
+  } else if (typeof widget.openDialog === "function") {
+    const openDialogFn = widget.openDialog;
+    window.setTimeout(() => {
+      openDialogFn();
+    }, delayMs);
+  } else if (typeof widget.open === "function") {
+    const openFn = widget.open;
+    window.setTimeout(() => {
+      openFn();
+    }, delayMs);
+  }
+}
+
+export function openFeedbackForm(): void {
+  const rawFeedback = Sentry.getFeedback();
+  const feedback = rawFeedback as unknown;
+
+  openSentryFeedbackWidget(feedback, DROPDOWN_CLOSE_DELAY);
+}
+
 function handleFeedback(type: "bug" | "feature"): void {
   const rawFeedback = Sentry.getFeedback();
   // Cast to unknown to allow type guard to work
   const feedback = rawFeedback as unknown;
 
-  if (isSentryFeedbackWidget(feedback)) {
-    const widget = feedback;
+  if (!isSentryFeedbackWidget(feedback)) {
+    return;
+  }
 
-    if (typeof widget.createForm === "function") {
-      // Wrap in arrow function to preserve 'this' context if needed, though bind isn't strictly required if method doesn't use 'this'
-      const createFormFn = widget.createForm;
+  const widget = feedback;
 
-      window.setTimeout(() => {
-        void (async () => {
-          try {
-            const dialog = await createFormFn({
-              formTitle: type === "bug" ? "Report a Bug" : "Request a Feature",
-              messagePlaceholder:
-                type === "bug"
-                  ? "Describe the bug, what was expected, and what happened..."
-                  : "Describe the feature you'd like to see...",
-              submitButtonLabel:
-                type === "bug" ? "Send Bug Report" : "Send Feature Request",
-              tags: {
-                feedback_type: type,
-              },
-            });
+  if (typeof widget.createForm === "function") {
+    // Wrap in arrow function to preserve 'this' context if needed, though bind isn't strictly required if method doesn't use 'this'
+    const createFormFn = widget.createForm;
 
-            if (dialog) {
-              // Ensure dialog is attached to DOM before opening
-              if (typeof dialog.appendToDom === "function") {
-                dialog.appendToDom();
-              }
-              if (typeof dialog.open === "function") {
-                dialog.open();
-              }
+    window.setTimeout(() => {
+      void (async () => {
+        try {
+          const dialog = await createFormFn({
+            formTitle: type === "bug" ? "Report a Bug" : "Request a Feature",
+            messagePlaceholder:
+              type === "bug"
+                ? "Describe the bug, what was expected, and what happened..."
+                : "Describe the feature you'd like to see...",
+            submitButtonLabel:
+              type === "bug" ? "Send Bug Report" : "Send Feature Request",
+            tags: {
+              feedback_type: type,
+            },
+          });
+
+          if (dialog) {
+            // Ensure dialog is attached to DOM before opening
+            if (typeof dialog.appendToDom === "function") {
+              dialog.appendToDom();
             }
-          } catch (err) {
-            console.error("[FeedbackWidget] Error calling createForm:", err);
+            if (typeof dialog.open === "function") {
+              dialog.open();
+            }
           }
-        })();
-      }, DROPDOWN_CLOSE_DELAY);
-    } else if (typeof widget.openDialog === "function") {
-      widget.openDialog({
-        formTitle: type === "bug" ? "Report a Bug" : "Request a Feature",
-        messagePlaceholder:
-          type === "bug"
-            ? "Describe the bug, what was expected, and what happened..."
-            : "Describe the feature you'd like to see...",
-        submitButtonLabel:
-          type === "bug" ? "Send Bug Report" : "Send Feature Request",
-      });
-    } else if (typeof widget.open === "function") {
-      widget.open();
-    }
+        } catch (err) {
+          console.error("[FeedbackWidget] Error calling createForm:", err);
+        }
+      })();
+    }, DROPDOWN_CLOSE_DELAY);
+  } else {
+    // Delegate to shared helper for fallback widget APIs (openDialog / open).
+    // Type-specific options (formTitle etc.) are not available on these older APIs.
+    openSentryFeedbackWidget(feedback, DROPDOWN_CLOSE_DELAY);
   }
 }
 

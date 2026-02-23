@@ -19,6 +19,7 @@ import Link from "next/link";
 import { Button } from "~/components/ui/button";
 import { MobileHeader } from "./MobileHeader";
 import { FeedbackWidget } from "~/components/feedback/FeedbackWidget";
+import { BottomTabBar } from "./BottomTabBar";
 import changelogMeta from "@content/changelog-meta.json";
 import { HeaderSignInButton } from "./header-sign-in-button";
 import {
@@ -191,8 +192,14 @@ export async function MainLayout({
           </div>
         </header>
 
-        <div className="p-4 md:p-6">{children}</div>
+        {/* Extra bottom padding on mobile so content isn't hidden behind the fixed tab bar */}
+        <div className="p-4 md:p-6 pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-6">
+          {children}
+        </div>
       </main>
+
+      {/* Fixed bottom tab bar — mobile only (md:hidden is applied inside the component) */}
+      <BottomTabBar role={userProfile?.role} issuesPath={issuesPath} />
     </div>
   );
 }

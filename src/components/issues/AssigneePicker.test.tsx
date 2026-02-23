@@ -9,6 +9,7 @@ import React from "react";
 const mockUsers = [
   { id: "1", name: "Alice" },
   { id: "2", name: "Bob" },
+  { id: "3", name: "Carol" },
 ];
 
 describe("AssigneePicker Accessibility", () => {
@@ -83,5 +84,136 @@ describe("AssigneePicker Accessibility", () => {
     expect(loader).toBeInTheDocument();
     expect(loader).toHaveAttribute("aria-hidden", "true");
     expect(loader).toHaveClass("animate-spin");
+  });
+});
+
+describe("AssigneePicker — Me quick-select", () => {
+  it("shows 'Me' option when currentUserId matches a user in the list", () => {
+    const onAssign = vi.fn();
+    render(
+      <AssigneePicker
+        assignedToId={null}
+        users={mockUsers}
+        isPending={false}
+        onAssign={onAssign}
+        currentUserId="1"
+      />
+    );
+
+    fireEvent.click(screen.getByTestId("assignee-picker-trigger"));
+
+    const meOption = screen.getByTestId("assignee-option-me");
+    expect(meOption).toBeInTheDocument();
+    expect(meOption).toHaveTextContent("Me");
+  });
+
+  it("does NOT show 'Me' option when currentUserId is null", () => {
+    const onAssign = vi.fn();
+    render(
+      <AssigneePicker
+        assignedToId={null}
+        users={mockUsers}
+        isPending={false}
+        onAssign={onAssign}
+        currentUserId={null}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId("assignee-picker-trigger"));
+
+    expect(screen.queryByTestId("assignee-option-me")).not.toBeInTheDocument();
+  });
+
+  it("does NOT show 'Me' option when currentUserId prop is omitted", () => {
+    const onAssign = vi.fn();
+    render(
+      <AssigneePicker
+        assignedToId={null}
+        users={mockUsers}
+        isPending={false}
+        onAssign={onAssign}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId("assignee-picker-trigger"));
+
+    expect(screen.queryByTestId("assignee-option-me")).not.toBeInTheDocument();
+  });
+
+  it("selecting 'Me' calls onAssign with the current user's ID", () => {
+    const onAssign = vi.fn();
+    render(
+      <AssigneePicker
+        assignedToId={null}
+        users={mockUsers}
+        isPending={false}
+        onAssign={onAssign}
+        currentUserId="2"
+      />
+    );
+
+    fireEvent.click(screen.getByTestId("assignee-picker-trigger"));
+    fireEvent.click(screen.getByTestId("assignee-option-me"));
+
+    expect(onAssign).toHaveBeenCalledOnce();
+    expect(onAssign).toHaveBeenCalledWith("2");
+  });
+
+  it("excludes current user from the alphabetical list (they appear only as 'Me')", () => {
+    const onAssign = vi.fn();
+    render(
+      <AssigneePicker
+        assignedToId={null}
+        users={mockUsers}
+        isPending={false}
+        onAssign={onAssign}
+        currentUserId="1"
+      />
+    );
+
+    fireEvent.click(screen.getByTestId("assignee-picker-trigger"));
+
+    // "Me" is present
+    expect(screen.getByTestId("assignee-option-me")).toBeInTheDocument();
+    // Alice (id=1) must NOT also appear in the alphabetical section
+    expect(screen.queryByTestId("assignee-option-1")).not.toBeInTheDocument();
+    // Other users ARE in the alphabetical section
+    expect(screen.getByTestId("assignee-option-2")).toBeInTheDocument();
+    expect(screen.getByTestId("assignee-option-3")).toBeInTheDocument();
+  });
+
+  it("marks 'Me' as aria-selected when the current user is assigned", () => {
+    const onAssign = vi.fn();
+    render(
+      <AssigneePicker
+        assignedToId="1"
+        users={mockUsers}
+        isPending={false}
+        onAssign={onAssign}
+        currentUserId="1"
+      />
+    );
+
+    fireEvent.click(screen.getByTestId("assignee-picker-trigger"));
+
+    const meOption = screen.getByTestId("assignee-option-me");
+    expect(meOption).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("does NOT show 'Me' when currentUserId does not match any user in the list", () => {
+    const onAssign = vi.fn();
+    render(
+      <AssigneePicker
+        assignedToId={null}
+        users={mockUsers}
+        isPending={false}
+        onAssign={onAssign}
+        currentUserId="999"
+      />
+    );
+
+    fireEvent.click(screen.getByTestId("assignee-picker-trigger"));
+
+    expect(screen.queryByTestId("assignee-option-me")).not.toBeInTheDocument();
   });
 });

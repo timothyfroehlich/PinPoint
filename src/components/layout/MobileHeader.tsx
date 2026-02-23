@@ -40,7 +40,7 @@ export function MobileHeader(props: MobileHeaderProps): React.JSX.Element {
       {/* Logo — left side */}
       <Link
         href="/dashboard"
-        className="flex items-center gap-2"
+        className="flex flex-1 items-center gap-2"
         aria-label="PinPoint"
       >
         <Image
@@ -74,7 +74,7 @@ export function MobileHeader(props: MobileHeaderProps): React.JSX.Element {
       </a>
 
       {/* Right side actions */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-1 items-center justify-end gap-2">
         {props.isAuthenticated ? (
           <>
             <NotificationList notifications={props.notifications} />

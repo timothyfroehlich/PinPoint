@@ -15,6 +15,7 @@ import { NotificationPreferencesForm } from "./notifications/notification-prefer
 import { ChangePasswordSection } from "./change-password-section";
 import { DeleteAccountSection } from "./delete-account-section";
 import { Separator } from "~/components/ui/separator";
+import { PageShell } from "~/components/layout/PageShell";
 
 export default async function SettingsPage(): Promise<React.JSX.Element> {
   const supabase = await createClient();
@@ -80,7 +81,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
     )[0]?.count === 0;
 
   return (
-    <div className="container max-w-3xl py-6 space-y-6">
+    <PageShell size="narrow" padded={false} className="py-6 space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
         <p className="text-muted-foreground">
@@ -153,6 +154,6 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
           />
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }
