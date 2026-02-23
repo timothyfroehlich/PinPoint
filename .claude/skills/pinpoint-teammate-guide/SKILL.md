@@ -1,20 +1,29 @@
 ---
 name: pinpoint-teammate-guide
-description: Guide for teammates dispatched to worktrees. Covers environment setup, task contract protocol, Copilot review loop, and CI verification.
-audience: dispatched teammate
+description: Guide for subagents dispatched to worktrees. Covers environment setup, task contract protocol, Copilot review loop, and CI verification.
+audience: dispatched subagent
 ---
 
-> **Audience**: This skill is for **teammates dispatched to worktrees**.
+> **Audience**: This skill is for **subagents dispatched to worktrees**.
 > If you are the lead agent coordinating work, use `pinpoint-orchestrator` instead.
+
+---
+
+## Standalone Subagent Mode
+
+If you were launched without `team_name` (no `SendMessage` available):
+- Quality gates are YOUR responsibility — run `pnpm run check` before returning
+- Self-check `.claude-task-contract` items before returning
+- Return a structured report: branch, PR#, CI status, Copilot status, blockers
 
 ---
 
 ## Environment
 
-You are working in a **git worktree** — an isolated copy of the repo with its own Supabase instance and ports. Key differences from the main repo:
+You are working in a **git worktree** — an isolated copy of the repo with its own Supabase instance and ports.
 
 - **Ports**: Your Next.js and Supabase ports are in `.env.local`. Never hardcode `localhost:3000`.
-- **Config files**: `supabase/config.toml` and `.env.local` are auto-generated and **read-only**. Do not edit them. To regenerate: `python3 pinpoint-wt.py sync`.
+- **Config files**: `supabase/config.toml` and `.env.local` are auto-generated and **read-only**. To regenerate: `python3 pinpoint-wt.py sync`.
 - **Supabase**: Must be started before running E2E tests. Not needed for `pnpm run check`.
 
 ### Supabase Startup
@@ -27,13 +36,13 @@ supabase start    # required before E2E tests
 1. `supabase stop --all` — stop any running instances
 2. `docker ps` — check for orphaned containers on conflicting ports
 3. `python3 pinpoint-wt.py sync` — regenerate config if mismatched
-4. If Docker itself is down: you cannot run E2E tests. Notify the lead via `SendMessage`.
+4. If Docker itself is down: note this as a blocker in your return report.
 
 ---
 
 ## Task Contract
 
-Your worktree root contains `.claude-task-contract` — your obligation checklist. The `TaskCompleted` hook **will block** until all items are checked off.
+Your worktree root should contain `.claude-task-contract` — your obligation checklist.
 
 **As you complete each item**, edit the file to check it off:
 
@@ -69,32 +78,25 @@ Or after creation:
 PR_NUMBER=$(gh pr list --head "$(git branch --show-current)" --json number --jq '.[0].number')
 ```
 
-Update the contract:
-```
-- [x] PR created (#1042)
-```
-
 ---
 
 ## Copilot Review Loop
 
-After creating the PR, run:
+After creating the PR:
 
 ```bash
 bash scripts/workflow/copilot-comments.sh $PR_NUMBER
 ```
 
-The output always shows review status:
-- **`⏳ Copilot review pending`** — last push is newer than last review. Wait and retry.
+- **`⏳ Copilot review pending`** — wait and retry.
 - **`✅ Copilot review is current`** — review is up to date.
 
-### Polling loop (up to 5 minutes, breaks early when review arrives):
+### Polling loop (up to 5 minutes):
 
 ```bash
 for i in $(seq 1 5); do
     output=$(bash scripts/workflow/copilot-comments.sh $PR_NUMBER)
     echo "$output"
-    # Break early if review is current (no ⏳ pending banner)
     echo "$output" | grep -q "⏳" || break
     sleep 60
 done
@@ -104,23 +106,18 @@ done
 1. Address each comment (evaluate critically — not all Copilot suggestions are correct)
 2. Reply to each thread: `bash scripts/workflow/respond-to-copilot.sh $PR_NUMBER "path:line" "Fixed: ... —Claude"`
 3. Push your fix
-4. Poll again — Copilot may re-review the new push
+4. Poll again — Copilot may re-review
 
 ### Timeout (5 minutes, no review):
-Check off the item with a note and add a timeline entry:
 ```
 - [x] Copilot review received and comments addressed (no review after 5min timeout)
 ```
-
-### Done when:
-- Status shows "current" (not pending)
-- Zero unresolved comments
 
 ---
 
 ## CI Verification
 
-After your final push, verify CI on GitHub (local `pnpm run check` is not the same as CI):
+After your final push, verify CI on GitHub:
 
 ```bash
 gh pr checks $PR_NUMBER
@@ -143,8 +140,6 @@ Only check off "CI passing" after these commands confirm it.
 | `pnpm run preflight` | Before final push | No |
 | `pnpm run e2e:full` | After `supabase start` | Yes |
 
-The `TaskCompleted` hook runs `pnpm run check` automatically, but don't rely on it as your only check — run it yourself during development.
-
 ---
 
 ## Project Rules (Quick Reference)
@@ -160,10 +155,6 @@ The `TaskCompleted` hook runs `pnpm run check` automatically, but don't rely on 
 
 ## When You're Truly Stuck
 
-If a hook is blocking you in a loop and you cannot resolve it:
-
 ```bash
-touch .claude-hook-bypass    # consumed once by the hook, then deleted
+touch .claude-hook-bypass    # persistent bypass for hooks blocking you
 ```
-
-If you're using Agent Teams, message the lead explaining what's blocking you.
