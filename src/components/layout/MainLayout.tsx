@@ -188,7 +188,7 @@ export async function MainLayout({
         </header>
 
         {/* Extra bottom padding on mobile so content isn't hidden behind the fixed tab bar */}
-        <div className="p-6 pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-6">
+        <div className="pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-0">
           {children}
         </div>
       </main>
