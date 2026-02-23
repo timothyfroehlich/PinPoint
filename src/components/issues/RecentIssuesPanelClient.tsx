@@ -1,33 +1,36 @@
+"use client";
+
 import React from "react";
 import Link from "next/link";
 import { IssueBadge } from "~/components/issues/IssueBadge";
 import { cn } from "~/lib/utils";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
-import { db } from "~/server/db";
-import { issues as issuesTable } from "~/server/db/schema";
-import { eq, desc } from "drizzle-orm";
-import { log } from "~/lib/logger";
+import { Skeleton } from "~/components/ui/skeleton";
 import { getIssueStatusLabel } from "~/lib/issues/status";
-import type {
-  IssueStatus,
-  IssueSeverity,
-  IssuePriority,
-  IssueFrequency,
-} from "~/lib/types";
+import type { RecentIssueData } from "~/app/report/actions";
 
-interface RecentIssuesPanelProps {
+interface RecentIssuesPanelClientProps {
   machineInitials: string;
   machineName: string;
+  issues: RecentIssueData[];
+  isLoading: boolean;
+  isError: boolean;
   className?: string;
-  limit?: number;
+  limit: number;
 }
 
-export async function RecentIssuesPanel({
+export function RecentIssuesPanelClient({
   machineInitials,
   machineName,
+  issues,
+  isLoading,
+  isError,
   className,
-  limit = 5,
-}: RecentIssuesPanelProps): Promise<React.JSX.Element> {
+  limit,
+}: RecentIssuesPanelClientProps): React.JSX.Element {
+  const displayIssues = issues.slice(0, limit);
+
+  // No machine selected
   if (!machineInitials) {
     return (
       <div
@@ -43,38 +46,36 @@ export async function RecentIssuesPanel({
     );
   }
 
-  let issues: {
-    id: string;
-    issueNumber: number;
-    title: string;
-    status: IssueStatus;
-    severity: IssueSeverity;
-    priority: IssuePriority;
-    frequency: IssueFrequency;
-    createdAt: Date;
-  }[] = [];
-  try {
-    // Type assertion needed because Drizzle infers status as string, not IssueStatus
-    issues = (await db.query.issues.findMany({
-      where: eq(issuesTable.machineInitials, machineInitials),
-      orderBy: [desc(issuesTable.createdAt)],
-      limit: limit,
-      columns: {
-        id: true,
-        issueNumber: true,
-        title: true,
-        status: true,
-        severity: true,
-        priority: true,
-        frequency: true,
-        createdAt: true,
-      },
-    })) as typeof issues;
-  } catch (err) {
-    log.error(
-      { err, machineInitials },
-      "Error fetching recent issues in Server Component"
+  // Loading skeleton
+  if (isLoading) {
+    return (
+      <div
+        className={cn(
+          "rounded-xl border border-outline-variant bg-surface-container-low p-4 shadow-sm h-fit",
+          className
+        )}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-3 w-16" />
+        </div>
+        <div className="space-y-2">
+          {Array.from({ length: limit }, (_, i) => (
+            <div
+              key={i}
+              className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5"
+            >
+              <Skeleton className="h-3.5 flex-1" />
+              <Skeleton className="h-5 w-16 rounded-full" />
+            </div>
+          ))}
+        </div>
+      </div>
     );
+  }
+
+  // Error state
+  if (isError) {
     return (
       <div
         className={cn(
@@ -88,6 +89,7 @@ export async function RecentIssuesPanel({
     );
   }
 
+  // Data loaded
   return (
     <div
       className={cn(
@@ -99,7 +101,7 @@ export async function RecentIssuesPanel({
         <h3 className="text-sm font-semibold text-on-surface">
           Recent Issues for {machineName || machineInitials}
         </h3>
-        {issues.length > 0 && (
+        {displayIssues.length > 0 && (
           <Link
             href={`/m/${machineInitials}/i`}
             className="text-xs text-link font-medium"
@@ -109,7 +111,7 @@ export async function RecentIssuesPanel({
         )}
       </div>
 
-      {issues.length === 0 ? (
+      {displayIssues.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 text-center animate-in fade-in zoom-in duration-300">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-variant/50 mb-3">
             <CheckCircle2 className="h-6 w-6 text-green-600/70 dark:text-green-400/70" />
@@ -123,7 +125,7 @@ export async function RecentIssuesPanel({
         </div>
       ) : (
         <div className="space-y-2">
-          {issues.map((issue) => (
+          {displayIssues.map((issue) => (
             <Link
               key={issue.id}
               href={`/m/${machineInitials}/i/${issue.issueNumber}`}

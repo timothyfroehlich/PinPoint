@@ -14,9 +14,13 @@ import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { cn } from "~/lib/utils";
-import { submitPublicIssueAction } from "./actions";
+import {
+  submitPublicIssueAction,
+  getRecentIssuesAction,
+  type RecentIssueData,
+} from "./actions";
 import { SeveritySelect } from "~/components/issues/fields/SeveritySelect";
 import { FrequencySelect } from "~/components/issues/fields/FrequencySelect";
 import { PrioritySelect } from "~/components/issues/fields/PrioritySelect";
@@ -33,6 +37,7 @@ import { type ImageMetadata } from "~/types/images";
 import type { AccessLevel } from "~/lib/permissions/matrix";
 import { TurnstileWidget } from "~/components/security/TurnstileWidget";
 import { getLoginUrl } from "~/lib/login-url";
+import { RecentIssuesPanelClient } from "~/components/issues/RecentIssuesPanelClient";
 
 interface Machine {
   id: string;
@@ -57,8 +62,8 @@ interface UnifiedReportFormProps {
   accessLevel: AccessLevel;
   assignees?: Assignee[];
   initialError?: string | undefined;
-  recentIssuesPanelMobile?: React.ReactNode;
-  recentIssuesPanelDesktop?: React.ReactNode;
+  initialIssues: RecentIssueData[] | null;
+  initialMachineInitials: string;
 }
 
 export function UnifiedReportForm({
@@ -68,10 +73,9 @@ export function UnifiedReportForm({
   accessLevel,
   assignees = [],
   initialError,
-  recentIssuesPanelMobile,
-  recentIssuesPanelDesktop,
+  initialIssues,
+  initialMachineInitials,
 }: UnifiedReportFormProps): React.JSX.Element {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const hasRestored = useRef(false);
   const [selectedMachineId, setSelectedMachineId] = useState(
@@ -88,6 +92,14 @@ export function UnifiedReportForm({
 
   const [uploadedImages, setUploadedImages] = useState<ImageMetadata[]>([]);
   const [turnstileToken, setTurnstileToken] = useState("");
+
+  // Recent issues panel state
+  const [issues, setIssues] = useState<RecentIssueData[]>(initialIssues ?? []);
+  const [isLoadingIssues, setIsLoadingIssues] = useState(false);
+  const [issuesError, setIssuesError] = useState(
+    initialIssues === null && initialMachineInitials !== ""
+  );
+  const prevMachineRef = useRef(initialMachineInitials);
 
   const handleTurnstileVerify = useCallback((token: string) => {
     setTurnstileToken(token);
@@ -148,7 +160,7 @@ export function UnifiedReportForm({
         if (machine) {
           const params = new URLSearchParams(searchParams.toString());
           params.set("machine", machine.initials);
-          router.replace(`?${params.toString()}`, { scroll: false });
+          window.history.replaceState(null, "", `?${params.toString()}`);
         }
       }
 
@@ -163,7 +175,7 @@ export function UnifiedReportForm({
       // Clear corrupted localStorage
       window.localStorage.removeItem("report_form_state");
     }
-  }, [defaultMachineId, machinesList, router, searchParams]);
+  }, [defaultMachineId, machinesList, searchParams]);
 
   // Persistence: Save to localStorage on change
   useEffect(() => {
@@ -191,16 +203,46 @@ export function UnifiedReportForm({
     watchIssue,
   ]);
 
-  // Cleanup: Clear storage on success (handled by redirect usually, but good for robust logic if no redirect)
-  // Actually, review says: "cleanup effect will never execute because action redirects".
-  // Removing it to follow advice.
-
   // Sync with defaultMachineId prop when it changes (from URL)
   useEffect(() => {
     if (defaultMachineId) {
       setSelectedMachineId(defaultMachineId);
     }
   }, [defaultMachineId]);
+
+  // Fetch recent issues when selected machine changes
+  useEffect(() => {
+    const currentInitials = selectedMachine?.initials ?? "";
+
+    // Skip if machine hasn't actually changed
+    if (currentInitials === prevMachineRef.current) return;
+    prevMachineRef.current = currentInitials;
+
+    // No machine selected — clear issues
+    if (!currentInitials) {
+      setIssues([]);
+      setIssuesError(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingIssues(true);
+    setIssuesError(false);
+
+    void getRecentIssuesAction(currentInitials, 5).then((result) => {
+      if (cancelled) return;
+      setIsLoadingIssues(false);
+      if (result.ok) {
+        setIssues(result.value);
+      } else {
+        setIssuesError(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedMachine?.initials]);
 
   const canSetWorkflowFields =
     accessLevel === "admin" ||
@@ -255,14 +297,18 @@ export function UnifiedReportForm({
                     onChange={(e) => {
                       const newId = e.target.value;
                       setSelectedMachineId(newId);
-                      // Update URL for parent to re-render Server Components
+                      // Update URL without triggering RSC re-render
                       const machine = machinesList.find((m) => m.id === newId);
                       if (machine) {
                         const params = new URLSearchParams(
                           searchParams.toString()
                         );
                         params.set("machine", machine.initials);
-                        router.push(`?${params.toString()}`, { scroll: false });
+                        window.history.replaceState(
+                          null,
+                          "",
+                          `?${params.toString()}`
+                        );
                       }
                     }}
                     className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
@@ -279,7 +325,17 @@ export function UnifiedReportForm({
                 </div>
 
                 {/* Mobile Recent Issues (Compact) - Visible only on small screens */}
-                <div className="lg:hidden">{recentIssuesPanelMobile}</div>
+                <div className="lg:hidden">
+                  <RecentIssuesPanelClient
+                    machineInitials={selectedMachine?.initials ?? ""}
+                    machineName={selectedMachine?.name ?? ""}
+                    issues={issues}
+                    isLoading={isLoadingIssues}
+                    isError={issuesError}
+                    className="border-0 bg-surface-container-low/50 shadow-none p-3"
+                    limit={3}
+                  />
+                </div>
 
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
@@ -553,7 +609,15 @@ export function UnifiedReportForm({
 
             {/* Right Sidebar: Recent Issues (Desktop) */}
             <div className="hidden lg:block lg:col-span-5 border-l border-outline-variant/50 pl-8">
-              {recentIssuesPanelDesktop}
+              <RecentIssuesPanelClient
+                machineInitials={selectedMachine?.initials ?? ""}
+                machineName={selectedMachine?.name ?? ""}
+                issues={issues}
+                isLoading={isLoadingIssues}
+                isError={issuesError}
+                className="border-0 shadow-none bg-transparent p-0"
+                limit={5}
+              />
             </div>
           </div>
         </CardContent>

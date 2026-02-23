@@ -14,12 +14,24 @@ import { parsePublicIssueForm } from "./validation";
 import { verifyTurnstileToken } from "~/lib/security/turnstile";
 import { BLOB_CONFIG } from "~/lib/blob/config";
 import { db } from "~/server/db";
-import { machines, userProfiles, issueImages } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
+import {
+  machines,
+  userProfiles,
+  issueImages,
+  issues as issuesTable,
+} from "~/server/db/schema";
+import { eq, desc } from "drizzle-orm";
 import { createClient } from "~/lib/supabase/server";
 import type { ActionState } from "./unified-report-form";
 import { imagesMetadataArraySchema } from "../(app)/issues/schemas";
 import { deleteFromBlob } from "~/lib/blob/client";
+import { ok, err, type Result } from "~/lib/result";
+import type {
+  IssueStatus,
+  IssueSeverity,
+  IssuePriority,
+  IssueFrequency,
+} from "~/lib/types";
 
 /**
  * Server Action: submit anonymous issue
@@ -326,5 +338,63 @@ export async function submitPublicIssueAction(
     return {
       error: "Unable to submit the issue. Please try again.",
     };
+  }
+}
+
+/** Serializable issue data for client-side rendering */
+export interface RecentIssueData {
+  id: string;
+  issueNumber: number;
+  title: string;
+  status: IssueStatus;
+  severity: IssueSeverity;
+  priority: IssuePriority;
+  frequency: IssueFrequency;
+  createdAt: string; // ISO 8601
+}
+
+/** Fetch recent issues for a machine (called client-side on machine change) */
+export async function getRecentIssuesAction(
+  machineInitials: string,
+  limit: number
+): Promise<Result<RecentIssueData[], "SERVER">> {
+  try {
+    const rows = (await db.query.issues.findMany({
+      where: eq(issuesTable.machineInitials, machineInitials),
+      orderBy: [desc(issuesTable.createdAt)],
+      limit,
+      columns: {
+        id: true,
+        issueNumber: true,
+        title: true,
+        status: true,
+        severity: true,
+        priority: true,
+        frequency: true,
+        createdAt: true,
+      },
+    })) as {
+      id: string;
+      issueNumber: number;
+      title: string;
+      status: IssueStatus;
+      severity: IssueSeverity;
+      priority: IssuePriority;
+      frequency: IssueFrequency;
+      createdAt: Date;
+    }[];
+
+    return ok(
+      rows.map((r) => ({
+        ...r,
+        createdAt: r.createdAt.toISOString(),
+      }))
+    );
+  } catch (error) {
+    log.error(
+      { err: error, machineInitials },
+      "Error fetching recent issues via server action"
+    );
+    return err("SERVER", "Could not load recent issues");
   }
 }

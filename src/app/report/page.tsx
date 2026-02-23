@@ -1,13 +1,23 @@
 import type React from "react";
-import { asc, eq, sql } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "~/server/db";
-import { machines, userProfiles } from "~/server/db/schema";
+import {
+  machines,
+  userProfiles,
+  issues as issuesTable,
+} from "~/server/db/schema";
 import { MainLayout } from "~/components/layout/MainLayout";
 import { resolveDefaultMachineId } from "./default-machine";
 import { UnifiedReportForm } from "./unified-report-form";
 import { createClient } from "~/lib/supabase/server";
 import { getAccessLevel } from "~/lib/permissions/helpers";
-import { RecentIssuesPanel } from "~/components/issues/RecentIssuesPanel";
+import type { RecentIssueData } from "./actions";
+import type {
+  IssueStatus,
+  IssueSeverity,
+  IssuePriority,
+  IssueFrequency,
+} from "~/lib/types";
 
 // Avoid SSG hitting Supabase during builds that run parallel to db resets
 export const dynamic = "force-dynamic";
@@ -71,6 +81,45 @@ export default async function PublicReportPage({
 
   const selectedMachine = machinesList.find((m) => m.id === defaultMachineId);
 
+  // Pre-fetch initial issues for the selected machine (avoids first-load skeleton flash)
+  let initialIssues: RecentIssueData[] | null = null;
+  if (selectedMachine) {
+    try {
+      const rows = (await db.query.issues.findMany({
+        where: eq(issuesTable.machineInitials, selectedMachine.initials),
+        orderBy: [desc(issuesTable.createdAt)],
+        limit: 5,
+        columns: {
+          id: true,
+          issueNumber: true,
+          title: true,
+          status: true,
+          severity: true,
+          priority: true,
+          frequency: true,
+          createdAt: true,
+        },
+      })) as {
+        id: string;
+        issueNumber: number;
+        title: string;
+        status: IssueStatus;
+        severity: IssueSeverity;
+        priority: IssuePriority;
+        frequency: IssueFrequency;
+        createdAt: Date;
+      }[];
+
+      initialIssues = rows.map((r) => ({
+        ...r,
+        createdAt: r.createdAt.toISOString(),
+      }));
+    } catch {
+      // Non-blocking: panel will show error state on client
+      initialIssues = null;
+    }
+  }
+
   return (
     <MainLayout>
       <div className="container mx-auto max-w-5xl py-4 px-2 md:py-8 md:px-4">
@@ -82,22 +131,8 @@ export default async function PublicReportPage({
           accessLevel={accessLevel}
           assignees={assignees}
           initialError={errorMessage}
-          recentIssuesPanelMobile={
-            <RecentIssuesPanel
-              machineInitials={selectedMachine?.initials ?? ""}
-              machineName={selectedMachine?.name ?? ""}
-              className="border-0 bg-surface-container-low/50 shadow-none p-3"
-              limit={3}
-            />
-          }
-          recentIssuesPanelDesktop={
-            <RecentIssuesPanel
-              machineInitials={selectedMachine?.initials ?? ""}
-              machineName={selectedMachine?.name ?? ""}
-              className="border-0 shadow-none bg-transparent p-0"
-              limit={5}
-            />
-          }
+          initialIssues={initialIssues}
+          initialMachineInitials={selectedMachine?.initials ?? ""}
         />
       </div>
     </MainLayout>
