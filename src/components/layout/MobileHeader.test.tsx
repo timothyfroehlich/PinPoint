@@ -5,9 +5,19 @@ import { MobileHeader } from "./MobileHeader";
 
 // Mock dependencies
 vi.mock("next/image", () => ({
-  default: ({ alt, ...props }: React.ComponentProps<"img">) => (
-    <img alt={alt} {...props} />
-  ),
+  default: ({
+    alt,
+    priority,
+    fill,
+    sizes,
+    quality,
+    ...props
+  }: React.ComponentProps<"img"> & {
+    priority?: boolean;
+    fill?: boolean;
+    sizes?: string;
+    quality?: number;
+  }) => <img alt={alt} {...props} />,
 }));
 
 vi.mock("next/link", () => ({
@@ -51,8 +61,11 @@ describe("MobileHeader", () => {
     const logo = screen.getByRole("link", { name: "PinPoint" });
     expect(logo).toBeInTheDocument();
     expect(logo).toHaveAttribute("href", "/dashboard");
-    // Logo image present
-    expect(screen.getByAltText("P")).toBeInTheDocument();
+    // Logo image is decorative (aria-hidden, alt="") — verify via src attribute
+    const logoImg = logo.querySelector("img");
+    expect(logoImg).toBeInTheDocument();
+    expect(logoImg).toHaveAttribute("alt", "");
+    expect(logoImg).toHaveAttribute("aria-hidden", "true");
     // Logo text present
     expect(screen.getByText("PinPoint")).toBeInTheDocument();
   });

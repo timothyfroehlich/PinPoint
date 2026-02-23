@@ -45,7 +45,8 @@ export function MobileHeader(props: MobileHeaderProps): React.JSX.Element {
       >
         <Image
           src="/logo-pinpoint-transparent.png"
-          alt="P"
+          alt=""
+          aria-hidden="true"
           width={28}
           height={28}
           className="object-contain h-7 w-7"

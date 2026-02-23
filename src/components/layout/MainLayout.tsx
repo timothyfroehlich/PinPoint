@@ -144,7 +144,9 @@ export async function MainLayout({
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto">
+      {/* scroll-pt-[52px]: reserves space for the 52px sticky mobile header so
+          browser scroll-into-view doesn't place interactive elements under it. */}
+      <main className="flex-1 overflow-y-auto scroll-pt-[52px] md:scroll-pt-0">
         {/* Mobile Header — compact sticky header (md:hidden) */}
         {user ? (
           <MobileHeader

@@ -22,12 +22,9 @@ test.describe("Landing Page", () => {
       page.getByRole("heading", { name: /Welcome to PinPoint/i })
     ).toBeVisible();
 
-    // Verify APC logo is visible in the hero section (using main landmark to be specific)
-    await expect(
-      page
-        .getByRole("main")
-        .getByRole("img", { name: /Austin Pinball Collective/i })
-    ).toBeVisible();
+    // Verify APC logo is visible in the hero section (scoped by testid to avoid
+    // matching the MobileHeader's APC logo on mobile viewports)
+    await expect(page.getByTestId("hero-apc-logo")).toBeVisible();
 
     // Verify primary CTAs
     await expect(page.getByTestId("cta-browse-machines")).toBeVisible();
