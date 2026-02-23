@@ -73,7 +73,7 @@ export default async function PublicReportPage({
 
   return (
     <MainLayout>
-      <div className="container mx-auto max-w-5xl py-8 px-4">
+      <div className="container mx-auto max-w-5xl py-4 px-2 md:py-8 md:px-4">
         {/* CORE-SEC-006: Pass minimal user shape, not full Supabase user */}
         <UnifiedReportForm
           machinesList={machinesList}

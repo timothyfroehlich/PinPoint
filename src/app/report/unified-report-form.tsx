@@ -210,8 +210,8 @@ export function UnifiedReportForm({
   return (
     <div className="w-full max-w-5xl mx-auto">
       <Card className="border-outline-variant bg-surface shadow-md">
-        <CardHeader className="space-y-1.5 pb-4 border-b border-outline-variant/50">
-          <CardTitle className="text-2xl font-bold text-on-surface">
+        <CardHeader className="space-y-1 pb-4 px-4 md:px-6 border-b border-outline-variant/50">
+          <CardTitle className="text-xl md:text-2xl font-bold text-on-surface">
             Report an Issue
           </CardTitle>
           <p className="text-sm text-on-surface-variant">
@@ -219,7 +219,7 @@ export function UnifiedReportForm({
             from here.
           </p>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent className="p-4 md:p-6">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* Main Form Column */}
             <div className="lg:col-span-7 space-y-4">
@@ -323,7 +323,8 @@ export function UnifiedReportForm({
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Severity + Frequency: always side-by-side */}
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="severity" className="text-on-surface">
                       Severity *
@@ -346,8 +347,11 @@ export function UnifiedReportForm({
                       testId="issue-frequency-select"
                     />
                   </div>
+                </div>
 
-                  {canSetWorkflowFields && (
+                {/* Priority + Status: always side-by-side when visible */}
+                {canSetWorkflowFields && (
+                  <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label htmlFor="priority" className="text-on-surface">
                         Priority *
@@ -358,8 +362,6 @@ export function UnifiedReportForm({
                         onValueChange={setPriority}
                       />
                     </div>
-                  )}
-                  {canSetWorkflowFields && (
                     <div className="space-y-1.5">
                       <Label htmlFor="status" className="text-on-surface">
                         Status *
@@ -367,34 +369,36 @@ export function UnifiedReportForm({
                       <input type="hidden" name="status" value={status} />
                       <StatusSelect value={status} onValueChange={setStatus} />
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {canSetWorkflowFields && assignees.length > 0 && (
-                    <div className="space-y-1.5 md:col-span-2">
-                      <Label htmlFor="assignedTo" className="text-on-surface">
-                        Assign To
-                      </Label>
-                      <select
-                        id="assignedTo"
-                        name="assignedTo"
-                        data-testid="assigned-to-select"
-                        value={assignedTo}
-                        onChange={(e) => setAssignedTo(e.target.value)}
-                        className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                      >
-                        <option value="">Unassigned</option>
-                        {assignees.map((assignee) => (
-                          <option key={assignee.id} value={assignee.id}>
-                            {assignee.name ?? "Unnamed User"}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </div>
+                {/* Assign To: full-width */}
+                {canSetWorkflowFields && assignees.length > 0 && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="assignedTo" className="text-on-surface">
+                      Assign To
+                    </Label>
+                    <select
+                      id="assignedTo"
+                      name="assignedTo"
+                      data-testid="assigned-to-select"
+                      value={assignedTo}
+                      onChange={(e) => setAssignedTo(e.target.value)}
+                      className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                    >
+                      <option value="">Unassigned</option>
+                      {assignees.map((assignee) => (
+                        <option key={assignee.id} value={assignee.id}>
+                          {assignee.name ?? "Unnamed User"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
-                <div className="space-y-3 pb-2 pt-1 border-t border-b border-outline-variant/30 py-4">
-                  <div className="flex flex-col gap-4">
+                {/* Divider before photos */}
+                <div className="border-t border-outline-variant/30 pt-4">
+                  <div className="space-y-3">
                     <div className="space-y-1.5">
                       <Label className="text-on-surface">Photos</Label>
                       <ImageUploadButton
@@ -409,7 +413,7 @@ export function UnifiedReportForm({
                     </div>
 
                     {uploadedImages.length > 0 && (
-                      <div className="mt-2">
+                      <div>
                         <ImageGallery
                           images={uploadedImages.map((img) => ({
                             id: img.blobPathname,
@@ -499,27 +503,25 @@ export function UnifiedReportForm({
                 )}
 
                 {userAuthenticated && (
-                  <div className="space-y-2 rounded-lg border border-outline-variant/30 bg-surface-container-low p-3">
-                    <div className="flex items-start gap-3">
-                      <Checkbox
-                        id="watchIssue"
-                        checked={watchIssue}
-                        onCheckedChange={(checked) =>
-                          setWatchIssue(checked === true)
-                        }
-                        className="mt-0.5 border-outline-variant data-[state=checked]:border-primary"
-                      />
-                      <div className="space-y-1">
-                        <Label
-                          htmlFor="watchIssue"
-                          className="text-sm font-medium text-on-surface"
-                        >
-                          Watch this issue
-                        </Label>
-                        <p className="text-xs text-on-surface-variant">
-                          Get updates when status or comments change.
-                        </p>
-                      </div>
+                  <div className="flex items-start gap-3 py-1">
+                    <Checkbox
+                      id="watchIssue"
+                      checked={watchIssue}
+                      onCheckedChange={(checked) =>
+                        setWatchIssue(checked === true)
+                      }
+                      className="mt-0.5 border-outline-variant data-[state=checked]:border-primary"
+                    />
+                    <div className="space-y-0.5">
+                      <Label
+                        htmlFor="watchIssue"
+                        className="text-sm font-medium text-on-surface cursor-pointer"
+                      >
+                        Watch this issue
+                      </Label>
+                      <p className="text-xs text-on-surface-variant">
+                        Get updates when status or comments change.
+                      </p>
                     </div>
                     <input
                       type="hidden"
