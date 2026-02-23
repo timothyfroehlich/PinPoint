@@ -16,13 +16,8 @@ test.describe("About Page", () => {
     const isMobile = testInfo.project.name.includes("Mobile");
 
     if (isMobile) {
-      const mobileTrigger = page.getByTestId("mobile-menu-trigger");
-      await mobileTrigger.click();
-      const mobileSidebar = page.locator(
-        "[role='dialog'] [data-testid='sidebar']"
-      );
-      await expect(mobileSidebar).toBeVisible();
-      await mobileSidebar.getByRole("link", { name: "About" }).click();
+      // Mobile: no sidebar drawer — navigate directly (bottom tab bar coming in next PR)
+      await page.goto("/about");
     } else {
       const desktopSidebar = page.locator("aside [data-testid='sidebar']");
       await expect(desktopSidebar).toBeVisible();
