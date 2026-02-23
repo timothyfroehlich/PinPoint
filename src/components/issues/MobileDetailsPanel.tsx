@@ -51,7 +51,7 @@ export function MobileDetailsPanel({
   return (
     <div data-testid="mobile-details-panel" className="md:hidden">
       {/* Assignee + Watch + Edit Details row */}
-      <div className="flex items-center justify-between gap-3 py-3 border-b border-border">
+      <div className="flex items-center justify-between gap-3 py-3 border-y border-border">
         {/* Assignee display */}
         <div className="flex items-center gap-2 min-w-0">
           <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-semibold text-muted-foreground">
@@ -123,10 +123,15 @@ export function MobileDetailsPanel({
         id="mobile-details-content"
         className={cn(
           "overflow-hidden transition-all duration-200 ease-in-out",
-          isOpen ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0"
+          isOpen ? "max-h-[80vh] opacity-100" : "max-h-0 opacity-0"
         )}
       >
-        <div className="py-4 space-y-1">
+        <div
+          className={cn(
+            "mt-3 space-y-1 overflow-auto",
+            isOpen && "rounded-xl border border-border bg-card p-4"
+          )}
+        >
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
             Edit Issue Details
           </p>
@@ -139,27 +144,31 @@ export function MobileDetailsPanel({
           />
 
           {/* Reporter + Created at the bottom */}
-          <div className="grid grid-cols-[110px,1fr] items-center gap-3 pt-4 border-t border-border mt-4">
-            <span className="text-sm text-muted-foreground">Reporter</span>
-            <div className="flex items-center gap-2">
-              <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground">
-                {reporterInitial}
+          <div className="flex flex-wrap gap-4 pt-4 border-t border-border mt-4">
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">
+                Reporter
+              </span>
+              <div className="flex items-center gap-1.5">
+                <div className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-[9px] font-medium text-muted-foreground">
+                  {reporterInitial}
+                </div>
+                <span className="text-sm text-foreground">{reporterName}</span>
               </div>
-              <span className="text-sm font-medium text-foreground truncate">
-                {reporterName}
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">
+                Created
+              </span>
+              <span className="text-sm text-foreground">
+                {new Date(issue.createdAt).toLocaleDateString(undefined, {
+                  year: "numeric",
+                  month: "short",
+                  day: "numeric",
+                })}
               </span>
             </div>
-          </div>
-
-          <div className="grid grid-cols-[110px,1fr] items-center gap-3">
-            <span className="text-sm text-muted-foreground">Created</span>
-            <span className="text-sm text-foreground">
-              {new Date(issue.createdAt).toLocaleDateString(undefined, {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-              })}
-            </span>
           </div>
         </div>
       </div>

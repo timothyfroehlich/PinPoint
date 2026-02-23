@@ -472,7 +472,7 @@ export function IssueTimeline({
               </AvatarFallback>
             </Avatar>
           </div>
-          <div className="flex-1 rounded-lg border bg-card p-6 shadow-sm">
+          <div className="flex-1 rounded-lg border bg-card p-4 shadow-sm sm:p-6">
             {currentUserRole === "unauthenticated" ? (
               <div
                 className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/20 px-4 py-3 text-sm text-muted-foreground"
