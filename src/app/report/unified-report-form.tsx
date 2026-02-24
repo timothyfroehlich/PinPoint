@@ -225,22 +225,29 @@ export function UnifiedReportForm({
       return;
     }
 
-    let cancelled = false;
+    const cancellation = { cancelled: false };
     setIsLoadingIssues(true);
     setIssuesError(false);
 
-    void getRecentIssuesAction(currentInitials, 5).then((result) => {
-      if (cancelled) return;
-      setIsLoadingIssues(false);
-      if (result.ok) {
-        setIssues(result.value);
-      } else {
+    void (async () => {
+      try {
+        const result = await getRecentIssuesAction(currentInitials, 5);
+        if (cancellation.cancelled) return;
+        setIsLoadingIssues(false);
+        if (result.ok) {
+          setIssues(result.value);
+        } else {
+          setIssuesError(true);
+        }
+      } catch {
+        if (cancellation.cancelled) return;
+        setIsLoadingIssues(false);
         setIssuesError(true);
       }
-    });
+    })();
 
     return () => {
-      cancelled = true;
+      cancellation.cancelled = true;
     };
   }, [selectedMachine?.initials]);
 
@@ -297,7 +304,7 @@ export function UnifiedReportForm({
                     onChange={(e) => {
                       const newId = e.target.value;
                       setSelectedMachineId(newId);
-                      // Update URL without triggering RSC re-render
+                      // Update URL silently without triggering navigation
                       const machine = machinesList.find((m) => m.id === newId);
                       if (machine) {
                         const params = new URLSearchParams(

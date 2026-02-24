@@ -114,8 +114,13 @@ export default async function PublicReportPage({
         ...r,
         createdAt: r.createdAt.toISOString(),
       }));
-    } catch {
+    } catch (error) {
       // Non-blocking: panel will show error state on client
+      console.error("Failed to pre-fetch recent issues for selected machine", {
+        machineId: selectedMachine.id,
+        machineInitials: selectedMachine.initials,
+        error,
+      });
       initialIssues = null;
     }
   }

@@ -25,6 +25,7 @@ import { createClient } from "~/lib/supabase/server";
 import type { ActionState } from "./unified-report-form";
 import { imagesMetadataArraySchema } from "../(app)/issues/schemas";
 import { deleteFromBlob } from "~/lib/blob/client";
+import { z } from "zod";
 import { ok, err, type Result } from "~/lib/result";
 import type {
   IssueStatus,
@@ -32,6 +33,22 @@ import type {
   IssuePriority,
   IssueFrequency,
 } from "~/lib/types";
+
+const recentIssuesParamsSchema = z.object({
+  machineInitials: z
+    .string()
+    .min(1, "machineInitials must not be empty")
+    .max(10, "machineInitials must be 10 characters or fewer")
+    .regex(
+      /^[A-Za-z0-9-]+$/,
+      "machineInitials must be alphanumeric with hyphens only"
+    ),
+  limit: z
+    .number()
+    .int("limit must be an integer")
+    .min(1, "limit must be at least 1")
+    .max(20, "limit must be 20 or fewer"),
+});
 
 /**
  * Server Action: submit anonymous issue
@@ -358,11 +375,20 @@ export async function getRecentIssuesAction(
   machineInitials: string,
   limit: number
 ): Promise<Result<RecentIssueData[], "SERVER">> {
+  const parsed = recentIssuesParamsSchema.safeParse({ machineInitials, limit });
+  if (!parsed.success) {
+    log.warn(
+      { machineInitials, limit, issues: parsed.error.issues },
+      "getRecentIssuesAction: invalid input"
+    );
+    return err("SERVER", "Invalid input");
+  }
+
   try {
     const rows = (await db.query.issues.findMany({
-      where: eq(issuesTable.machineInitials, machineInitials),
+      where: eq(issuesTable.machineInitials, parsed.data.machineInitials),
       orderBy: [desc(issuesTable.createdAt)],
-      limit,
+      limit: parsed.data.limit,
       columns: {
         id: true,
         issueNumber: true,
