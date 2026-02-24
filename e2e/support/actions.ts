@@ -1,4 +1,9 @@
-import { expect, type Page, type TestInfo } from "@playwright/test";
+import {
+  expect,
+  type Page,
+  type TestInfo,
+  type Locator,
+} from "@playwright/test";
 import { TEST_USERS } from "./constants.js";
 
 interface LoginOptions {
@@ -100,6 +105,24 @@ export async function openSidebarIfMobile(
   if (isMobile) {
     await page.getByTestId("mobile-menu-trigger").click();
   }
+}
+
+/**
+ * Returns the visible issue search input for the current viewport.
+ *
+ * The issues list page renders two search inputs — one for desktop
+ * (`data-testid="issue-search"`) and one for mobile
+ * (`data-testid="mobile-issues-search"`). Both are always in the DOM;
+ * CSS hides the inactive one. Playwright strict mode rejects
+ * `getByPlaceholder("Search issues...")` because it finds both.
+ *
+ * Use this helper instead of `getByPlaceholder("Search issues...")`.
+ */
+export function getIssueSearchInput(page: Page, testInfo: TestInfo): Locator {
+  const isMobile = testInfo.project.name.includes("Mobile");
+  return isMobile
+    ? page.getByTestId("mobile-issues-search")
+    : page.getByTestId("issue-search");
 }
 
 /**

@@ -1,5 +1,9 @@
 import { test, expect } from "@playwright/test";
-import { loginAs, openSidebarIfMobile } from "../support/actions";
+import {
+  loginAs,
+  openSidebarIfMobile,
+  getIssueSearchInput,
+} from "../support/actions";
 import { cleanupTestEntities } from "../support/cleanup";
 import { TEST_USERS, seededIssues, seededMachines } from "../support/constants";
 import { fillReportForm } from "../support/page-helpers";
@@ -27,7 +31,7 @@ test.describe("Issue List Features", () => {
     }
   });
 
-  test("should filter and search issues", async ({ page }) => {
+  test("should filter and search issues", async ({ page }, testInfo) => {
     // 1. Setup: Use seeded issues
     // Issue 1: "Thing flips the bird" (TAF-01)
     // Issue 2: "Bookcase not registering" (TAF-02)
@@ -38,9 +42,7 @@ test.describe("Issue List Features", () => {
 
     // 2. Test Searching
     // Search for Issue 1
-    await page
-      .getByPlaceholder("Search issues...")
-      .fill("Thing flips the bird");
+    await getIssueSearchInput(page, testInfo).fill("Thing flips the bird");
     await page.keyboard.press("Enter");
     await page.waitForURL((url) => url.searchParams.has("q"));
     await expect(page.getByText("Showing 1 of 1 issues")).toBeVisible();
@@ -93,7 +95,7 @@ test.describe("Issue List Features", () => {
 
     // Navigate to issues list and search for our unique issue
     await page.goto("/issues");
-    await page.getByPlaceholder("Search issues...").fill(issueTitle);
+    await getIssueSearchInput(page, testInfo).fill(issueTitle);
     await page.keyboard.press("Enter");
     await page.waitForURL((url) => url.searchParams.get("q") === issueTitle);
     await expect(page.getByText("Showing 1 of 1 issues")).toBeVisible();
@@ -117,7 +119,7 @@ test.describe("Issue List Features", () => {
 
     // Verify persistence after reload
     await page.reload();
-    await page.getByPlaceholder("Search issues...").fill(issueTitle);
+    await getIssueSearchInput(page, testInfo).fill(issueTitle);
     await page.keyboard.press("Enter");
     await page.waitForURL((url) => url.searchParams.get("q") === issueTitle);
 
@@ -295,7 +297,7 @@ test.describe("Issue List Features", () => {
   }, testInfo) => {
     // 1. Go to issues and apply a search filter
     await page.goto("/issues");
-    await page.getByPlaceholder("Search issues...").fill("Thing");
+    await getIssueSearchInput(page, testInfo).fill("Thing");
     await page.keyboard.press("Enter");
     await page.waitForURL(/q=Thing/);
 
@@ -310,12 +312,12 @@ test.describe("Issue List Features", () => {
     await expect(page).toHaveURL(/q=Thing/);
 
     // Verify search term is still in the input
-    await expect(page.getByPlaceholder("Search issues...")).toHaveValue(
-      "Thing"
-    );
+    await expect(getIssueSearchInput(page, testInfo)).toHaveValue("Thing");
   });
 
-  test("should persist filters across page reload", async ({ page }) => {
+  test("should persist filters across page reload", async ({
+    page,
+  }, testInfo) => {
     // 1. Go to issues and apply multiple filters
     await page.goto("/issues");
 
@@ -326,7 +328,7 @@ test.describe("Issue List Features", () => {
     await page.waitForURL(/severity=major/);
 
     // Apply search
-    await page.getByPlaceholder("Search issues...").fill("bird");
+    await getIssueSearchInput(page, testInfo).fill("bird");
     await page.keyboard.press("Enter");
     await page.waitForURL(/q=bird/);
 
@@ -344,7 +346,7 @@ test.describe("Issue List Features", () => {
         .locator('[data-slot="badge"]')
         .filter({ hasText: "Major" })
     ).toBeVisible();
-    await expect(page.getByPlaceholder("Search issues...")).toHaveValue("bird");
+    await expect(getIssueSearchInput(page, testInfo)).toHaveValue("bird");
   });
 
   test('should show and activate "My machines" quick-select in Machine filter', async ({
