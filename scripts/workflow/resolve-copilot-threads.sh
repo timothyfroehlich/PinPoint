@@ -12,8 +12,9 @@
 
 set -euo pipefail
 
-OWNER="timothyfroehlich"
-REPO="PinPoint"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/workflow/_review-config.sh
+source "$SCRIPT_DIR/_review-config.sh"
 
 if [ $# -lt 1 ]; then
     echo "Usage: $0 <PR_NUMBER> [--dry-run|--all]"
@@ -56,16 +57,13 @@ threads_json=$(gh api graphql -f query="
   }
 }")
 
-# Filter to unresolved Copilot threads
-unresolved=$(echo "$threads_json" | jq -r '
+# Filter to unresolved AI review threads (any known reviewer bot)
+unresolved=$(echo "$threads_json" | jq -r --argjson bots "$REVIEWER_BOTS_JSON" '
   [.data.repository.pullRequest.reviewThreads.nodes[]
    | select(.isResolved == false)
    | select(.comments.nodes | length > 0)
    | .comments.nodes[0] as $comment
-   | select(
-       $comment.author.login == "copilot-pull-request-reviewer"
-       or $comment.author.login == "copilot-pull-request-reviewer[bot]"
-     )
+   | select($comment.author.login as $login | $bots | any(. == $login))
    | {
        id: .id,
        path: $comment.path,
@@ -77,11 +75,11 @@ unresolved=$(echo "$threads_json" | jq -r '
 count=$(echo "$unresolved" | jq 'length')
 
 if [ "$count" -eq 0 ]; then
-    echo "No unresolved Copilot threads on PR #${PR}."
+    echo "No unresolved review threads on PR #${PR}."
     exit 0
 fi
 
-echo "Found $count unresolved Copilot thread(s) on PR #${PR}:"
+echo "Found $count unresolved review thread(s) on PR #${PR}:"
 echo ""
 
 # If not --all, check timestamps to find addressed threads

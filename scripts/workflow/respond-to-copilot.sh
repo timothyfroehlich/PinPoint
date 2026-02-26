@@ -18,8 +18,9 @@
 
 set -euo pipefail
 
-OWNER="timothyfroehlich"
-REPO="PinPoint"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/workflow/_review-config.sh
+source "$SCRIPT_DIR/_review-config.sh"
 
 if [ $# -lt 3 ]; then
     echo "Usage: $0 <PR_NUMBER> <path:line> <message>"
@@ -79,29 +80,23 @@ thread_data=$(gh api graphql -f query="
 
 # Find matching thread (match on path, optionally line)
 if [ "$TARGET_LINE" = "null" ]; then
-    match=$(echo "$thread_data" | jq -r --arg path "$TARGET_PATH" '
+    match=$(echo "$thread_data" | jq -r --arg path "$TARGET_PATH" --argjson bots "$REVIEWER_BOTS_JSON" '
       [.data.repository.pullRequest.reviewThreads.nodes[]
       | select(.isResolved == false)
       | select(.comments.nodes | length > 0)
       | .comments.nodes[0] as $comment
-      | select(
-          $comment.author.login == "copilot-pull-request-reviewer"
-          or $comment.author.login == "copilot-pull-request-reviewer[bot]"
-        )
+      | select($comment.author.login as $login | $bots | any(. == $login))
       | select($comment.path == $path)
       | select($comment.line == null)
       | {threadId: .id, commentDbId: $comment.databaseId, body: ($comment.body | split("\n")[0] | .[0:60])}]
       | first // empty')
 else
-    match=$(echo "$thread_data" | jq -r --arg path "$TARGET_PATH" --argjson line "$TARGET_LINE" '
+    match=$(echo "$thread_data" | jq -r --arg path "$TARGET_PATH" --argjson line "$TARGET_LINE" --argjson bots "$REVIEWER_BOTS_JSON" '
       [.data.repository.pullRequest.reviewThreads.nodes[]
       | select(.isResolved == false)
       | select(.comments.nodes | length > 0)
       | .comments.nodes[0] as $comment
-      | select(
-          $comment.author.login == "copilot-pull-request-reviewer"
-          or $comment.author.login == "copilot-pull-request-reviewer[bot]"
-        )
+      | select($comment.author.login as $login | $bots | any(. == $login))
       | select($comment.path == $path)
       | select($comment.line == $line)
       | {threadId: .id, commentDbId: $comment.databaseId, body: ($comment.body | split("\n")[0] | .[0:60])}]
@@ -109,7 +104,7 @@ else
 fi
 
 if [ -z "$match" ] || [ "$match" = "" ]; then
-    echo "No unresolved Copilot thread found at ${PATH_LINE}. It may already be resolved."
+    echo "No unresolved review thread found at ${PATH_LINE}. It may already be resolved."
     exit 1
 fi
 

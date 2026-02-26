@@ -8,6 +8,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/workflow/_review-config.sh
+source "$SCRIPT_DIR/_review-config.sh"
+
 # Get PR list
 if [ $# -gt 0 ]; then
     PRS="$*"
@@ -21,7 +25,7 @@ if [ -z "$PRS" ]; then
 fi
 
 # Header
-printf "%-6s %-40s %-12s %-10s %-10s %-8s %s\n" "PR" "Title" "CI" "Copilot" "Merge" "Draft" "Branch"
+printf "%-6s %-40s %-12s %-10s %-10s %-8s %s\n" "PR" "Title" "CI" "Review" "Merge" "Draft" "Branch"
 printf "%-6s %-40s %-12s %-10s %-10s %-8s %s\n" "------" "----------------------------------------" "------------" "----------" "----------" "--------" "-------------------"
 
 for pr in $PRS; do
@@ -52,11 +56,11 @@ for pr in $PRS; do
         ci_status="All passed"
     fi
 
-    # Copilot comments (unresolved threads only)
+    # AI review comments (unresolved threads from any known reviewer bot)
     # shellcheck disable=SC2016
-    copilot_count=$(gh api graphql -f query="
+    review_count=$(gh api graphql -f query="
       {
-        repository(owner: \"timothyfroehlich\", name: \"PinPoint\") {
+        repository(owner: \"$OWNER\", name: \"$REPO\") {
           pullRequest(number: $pr) {
             reviewThreads(first: 100) {
               nodes {
@@ -68,16 +72,13 @@ for pr in $PRS; do
             }
           }
         }
-      }" --jq '
+      }" 2>/dev/null | jq --argjson bots "$REVIEWER_BOTS_JSON" '
       [.data.repository.pullRequest.reviewThreads.nodes[]
        | select(.isResolved == false)
        | select(.comments.nodes | length > 0)
-       | .comments.nodes[0] as $comment
-       | select(
-           $comment.author.login == "copilot-pull-request-reviewer"
-           or $comment.author.login == "copilot-pull-request-reviewer[bot]"
-         )]
-       | length' 2>/dev/null) || copilot_count="?"
+       | .comments.nodes[0].author.login as $login
+       | select($bots | any(. == $login))]
+       | length') || review_count="?"
 
     # Merge status
     case "$merge_state" in
@@ -96,5 +97,5 @@ for pr in $PRS; do
         draft_str="draft"
     fi
 
-    printf "%-6s %-40s %-12s %-10s %-10s %-8s %s\n" "#${pr}" "$title" "$ci_status" "$copilot_count" "$merge_str" "$draft_str" "$branch"
+    printf "%-6s %-40s %-12s %-10s %-10s %-8s %s\n" "#${pr}" "$title" "$ci_status" "$review_count" "$merge_str" "$draft_str" "$branch"
 done

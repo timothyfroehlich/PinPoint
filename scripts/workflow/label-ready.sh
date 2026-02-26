@@ -11,6 +11,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/workflow/_review-config.sh
+source "$SCRIPT_DIR/_review-config.sh"
+
 if [ $# -lt 1 ]; then
     echo "Usage: $0 <PR_NUMBER> [--cleanup] [--force] [--dry-run]"
     exit 1
@@ -73,11 +77,11 @@ fi
 
 echo "CI: All checks passed."
 
-# Check Copilot comments (unresolved threads only via GraphQL)
+# Check AI review comments (unresolved threads from any known reviewer bot)
 # shellcheck disable=SC2016
-copilot_count=$(gh api graphql -f query="
+review_count=$(gh api graphql -f query="
   {
-    repository(owner: \"timothyfroehlich\", name: \"PinPoint\") {
+    repository(owner: \"$OWNER\", name: \"$REPO\") {
       pullRequest(number: $PR) {
         reviewThreads(first: 100) {
           nodes {
@@ -89,26 +93,23 @@ copilot_count=$(gh api graphql -f query="
         }
       }
     }
-  }" --jq '
+  }" 2>/dev/null | jq --argjson bots "$REVIEWER_BOTS_JSON" '
   [.data.repository.pullRequest.reviewThreads.nodes[]
    | select(.isResolved == false)
    | select(.comments.nodes | length > 0)
-   | .comments.nodes[0] as $comment
-   | select(
-       $comment.author.login == "copilot-pull-request-reviewer"
-       or $comment.author.login == "copilot-pull-request-reviewer[bot]"
-     )]
-   | length' 2>/dev/null) || { echo "FAIL: Could not fetch Copilot threads (API error). Use --force to skip."; exit 1; }
+   | .comments.nodes[0].author.login as $login
+   | select($bots | any(. == $login))]
+   | length') || { echo "FAIL: Could not fetch review threads (API error). Use --force to skip."; exit 1; }
 
-if [ "$copilot_count" -gt 0 ] && [ "$FORCE" = "false" ]; then
-    echo "BLOCK: ${copilot_count} unresolved Copilot thread(s). Use --force to label anyway."
+if [ "$review_count" -gt 0 ] && [ "$FORCE" = "false" ]; then
+    echo "BLOCK: ${review_count} unresolved AI review thread(s). Use --force to label anyway."
     exit 1
 fi
 
-if [ "$copilot_count" -gt 0 ]; then
-    echo "WARN: ${copilot_count} unresolved Copilot thread(s) (--force used)."
+if [ "$review_count" -gt 0 ]; then
+    echo "WARN: ${review_count} unresolved AI review thread(s) (--force used)."
 else
-    echo "Copilot: 0 unresolved threads."
+    echo "Review: 0 unresolved threads."
 fi
 
 # Label
