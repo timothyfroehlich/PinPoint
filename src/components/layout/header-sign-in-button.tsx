@@ -6,7 +6,15 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Button } from "~/components/ui/button";
 import { getLoginUrl } from "~/lib/login-url";
 
-export function HeaderSignInButton(): React.JSX.Element {
+interface HeaderSignInButtonProps {
+  testId?: string;
+  className?: string;
+}
+
+export function HeaderSignInButton({
+  testId = "nav-signin",
+  className = "text-muted-foreground hover:text-foreground",
+}: HeaderSignInButtonProps = {}): React.JSX.Element {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const query = searchParams.toString();
@@ -17,8 +25,8 @@ export function HeaderSignInButton(): React.JSX.Element {
       asChild
       variant="ghost"
       size="sm"
-      className="text-muted-foreground hover:text-foreground"
-      data-testid="nav-signin"
+      className={className}
+      data-testid={testId}
     >
       <Link href={getLoginUrl(returnTo)}>Sign In</Link>
     </Button>

@@ -222,7 +222,10 @@ test.describe("Public Issue Reporting", () => {
       includePriority: false,
     });
 
-    await page.getByTestId("nav-signin").click();
+    await page
+      .locator('[data-testid="nav-signin"],[data-testid="mobile-nav-signin"]')
+      .filter({ visible: true })
+      .click();
     await expect(page).toHaveURL(/\/login\?/);
 
     const next = new URL(page.url()).searchParams.get("next");
