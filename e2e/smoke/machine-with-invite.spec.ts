@@ -146,11 +146,11 @@ test.describe("Machine with Inline Invite (Smoke)", () => {
     // 6. Verify redirect and owner assignment
     await expect(page).toHaveURL(`/m/${machineInitials}`);
     await expect(
-      page.getByRole("heading", { name: "Medieval Madness" })
-    ).toBeVisible();
+      page.getByRole("main").getByRole("heading", { level: 1 })
+    ).toContainText("Medieval Madness");
 
     // 7. Edit machine and change OPDB model
-    await page.getByTestId("edit-machine-button").click();
+    await page.getByTitle("Edit Machine").click();
     await page.getByTestId("opdb-model-search-input").fill("Attack");
     await page.getByTestId("opdb-model-result-0").click();
     await expect(page.getByLabel(/Machine Name/i)).toHaveValue(
@@ -159,7 +159,7 @@ test.describe("Machine with Inline Invite (Smoke)", () => {
     await page.getByRole("button", { name: /Update Machine/i }).click();
 
     await expect(
-      page.getByRole("heading", { name: "Attack from Mars" })
-    ).toBeVisible();
+      page.getByRole("main").getByRole("heading", { level: 1 })
+    ).toContainText("Attack from Mars");
   });
 });

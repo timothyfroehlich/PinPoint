@@ -4,6 +4,7 @@ import type React from "react";
 import Link from "next/link";
 import { cn } from "~/lib/utils";
 import { Card, CardHeader, CardTitle } from "~/components/ui/card";
+import { IssueBadge } from "~/components/issues/IssueBadge";
 import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
 import { formatIssueId, resolveIssueReporter } from "~/lib/issues/utils";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
@@ -29,7 +30,7 @@ export type IssueCardIssue = Pick<
 interface IssueCardProps {
   issue: IssueCardIssue;
   machine: { name: string };
-  variant?: "normal" | "compact";
+  variant?: "normal" | "compact" | "mini";
   className?: string;
   showReporter?: boolean;
   dataTestId?: string;
@@ -50,6 +51,43 @@ export function IssueCard({
   const initials = issue.machineInitials;
   const reporter = resolveIssueReporter(issue);
 
+  if (variant === "mini") {
+    return (
+      <Link href={`/m/${initials}/i/${issue.issueNumber}`} className="block">
+        <Card
+          className={cn(
+            "transition-all cursor-pointer border-outline-variant hover:border-primary/50",
+            isClosed
+              ? "bg-surface-variant/30"
+              : "bg-surface hover:glow-primary",
+            className
+          )}
+          data-testid={dataTestId ?? "issue-card"}
+        >
+          <div className="flex items-center gap-2 p-2">
+            <span className="text-xs text-muted-foreground font-mono shrink-0">
+              {formatIssueId(initials, issue.issueNumber)}
+            </span>
+            <span
+              className={cn(
+                "text-sm truncate flex-1 min-w-0",
+                isClosed ? "text-muted-foreground" : "text-foreground"
+              )}
+            >
+              {issue.title}
+            </span>
+            <IssueBadge
+              type="status"
+              value={issue.status}
+              variant="strip"
+              showTooltip={false}
+            />
+          </div>
+        </Card>
+      </Link>
+    );
+  }
+
   return (
     <Link
       href={`/m/${initials}/i/${issue.issueNumber}`}
@@ -65,11 +103,18 @@ export function IssueCard({
       >
         <CardHeader
           className={cn(
-            "h-full !flex !flex-col justify-center",
+            "h-full flex! flex-col! justify-center",
             variant === "compact" ? "p-3" : "p-4"
           )}
         >
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
+          <div
+            className={cn(
+              "flex w-full justify-between",
+              variant === "compact"
+                ? "flex-col gap-3"
+                : "flex-col sm:flex-row flex-wrap sm:items-start md:items-center gap-4"
+            )}
+          >
             <div className="flex-1 min-w-0">
               <CardTitle
                 className={cn(

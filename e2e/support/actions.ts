@@ -37,6 +37,19 @@ export async function loginAs(
   // Wait for user menu to hydrate before continuing
   // This prevents race conditions when tests immediately call logout()
   await expect(page.getByTestId("user-menu-button")).toBeVisible();
+
+  // Ensure server-side auth cookie is present before continuing.
+  // Without this, an immediate navigation can render as unauthenticated
+  // even when client state appears logged in.
+  await expect
+    .poll(async () => {
+      const cookies = await page.context().cookies();
+      return cookies.some(
+        (cookie) =>
+          cookie.name.endsWith("-auth-token") && cookie.value.trim().length > 0
+      );
+    })
+    .toBe(true);
 }
 
 /**

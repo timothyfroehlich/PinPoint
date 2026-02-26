@@ -1,10 +1,12 @@
 "use client";
 
 import type React from "react";
+import { FileText, Lock, Shield, Trophy } from "lucide-react";
 import {
   InlineEditableField,
   type InlineEditSaveResult,
 } from "~/components/inline-editable-field";
+import { Separator } from "~/components/ui/separator";
 import {
   updateMachineDescription,
   updateMachineTournamentNotes,
@@ -49,8 +51,9 @@ export function MachineTextFields({
   canViewOwnerNotes,
 }: MachineTextFieldsProps): React.JSX.Element {
   return (
-    <div className="space-y-4">
+    <div className="rounded-xl border border-outline-variant/30 bg-surface-variant/10 p-4 space-y-4">
       <InlineEditableField
+        icon={FileText}
         label="Description"
         value={description}
         onSave={wrapAction(updateMachineDescription)}
@@ -61,6 +64,7 @@ export function MachineTextFields({
       />
 
       <InlineEditableField
+        icon={Trophy}
         label="Tournament Notes"
         value={tournamentNotes}
         onSave={wrapAction(updateMachineTournamentNotes)}
@@ -70,8 +74,13 @@ export function MachineTextFields({
         testId="machine-tournament-notes"
       />
 
+      {(canViewOwnerRequirements || canViewOwnerNotes) && (
+        <Separator className="bg-outline-variant/50" />
+      )}
+
       {canViewOwnerRequirements && (
         <InlineEditableField
+          icon={Shield}
           label="Owner's Requirements"
           value={ownerRequirements}
           onSave={wrapAction(updateMachineOwnerRequirements)}
@@ -84,13 +93,15 @@ export function MachineTextFields({
 
       {canViewOwnerNotes && (
         <InlineEditableField
-          label="Owner's Notes"
+          icon={Lock}
+          label="Owner's Notes (Private)"
           value={ownerNotes}
           onSave={wrapAction(updateMachineOwnerNotes)}
           machineId={machineId}
           canEdit={canEditOwnerNotes}
           placeholder="Add private notes (only visible to you)..."
           testId="machine-owner-notes"
+          variant="private"
         />
       )}
     </div>

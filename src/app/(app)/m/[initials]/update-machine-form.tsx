@@ -48,6 +48,12 @@ import { OpdbModelSelect } from "~/components/machines/OpdbModelSelect";
 import type { OwnerSelectUser } from "~/components/machines/OwnerSelect";
 import type { OpdbModelSelection } from "~/lib/opdb/types";
 
+function isMachinePresenceStatus(
+  value: string
+): value is MachinePresenceStatus {
+  return (VALID_MACHINE_PRESENCE_STATUSES as readonly string[]).includes(value);
+}
+
 // --- Edit Machine Dialog ---
 
 interface EditMachineDialogProps {
@@ -82,7 +88,8 @@ export function EditMachineDialog({
   allUsers,
   canEditAnyMachine,
   isOwner,
-}: EditMachineDialogProps): React.JSX.Element {
+  trigger,
+}: EditMachineDialogProps & { trigger?: React.ReactNode }): React.JSX.Element {
   const initialModel = useMemo<OpdbModelSelection | null>(
     () =>
       machine.opdbId
@@ -115,6 +122,9 @@ export function EditMachineDialog({
   const [machineName, setMachineName] = useState(
     initialModel?.title ?? machine.name
   );
+  const [presenceStatus, setPresenceStatus] = useState<MachinePresenceStatus>(
+    machine.presenceStatus
+  );
   const currentOwnerId = machine.ownerId ?? machine.invitedOwnerId ?? "";
 
   const [state, formAction, isPending] = useActionState<
@@ -135,9 +145,16 @@ export function EditMachineDialog({
       setSelectedOwnerId(currentOwnerId);
       setSelectedModel(initialModel);
       setMachineName(initialModel?.title ?? machine.name);
+      setPresenceStatus(machine.presenceStatus);
       transferConfirmedRef.current = false;
     }
-  }, [open, currentOwnerId, initialModel, machine.name]);
+  }, [
+    open,
+    currentOwnerId,
+    initialModel,
+    machine.name,
+    machine.presenceStatus,
+  ]);
 
   // Find the selected owner's name for the confirmation dialog
   const selectedOwnerName =
@@ -173,15 +190,17 @@ export function EditMachineDialog({
     <>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full border-outline text-on-surface hover:bg-surface-variant"
-            data-testid="edit-machine-button"
-          >
-            <Pencil className="mr-2 size-4" />
-            Edit Machine
-          </Button>
+          {trigger ?? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full border-outline text-on-surface hover:bg-surface-variant"
+              data-testid="edit-machine-button"
+            >
+              <Pencil className="mr-2 size-4" />
+              Edit Machine
+            </Button>
+          )}
         </DialogTrigger>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -198,6 +217,7 @@ export function EditMachineDialog({
             className="space-y-6"
           >
             <input type="hidden" name="id" value={machine.id} />
+            <input type="hidden" name="presenceStatus" value={presenceStatus} />
 
             {/* Flash message */}
             {state && !state.ok && (
@@ -267,8 +287,12 @@ export function EditMachineDialog({
                 Availability
               </Label>
               <Select
-                name="presenceStatus"
-                defaultValue={machine.presenceStatus}
+                value={presenceStatus}
+                onValueChange={(value) => {
+                  if (isMachinePresenceStatus(value)) {
+                    setPresenceStatus(value);
+                  }
+                }}
               >
                 <SelectTrigger
                   id="edit-presence"

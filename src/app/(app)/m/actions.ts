@@ -53,13 +53,13 @@ const isPostgresError = (error: unknown): error is PostgresError => {
 };
 
 interface MachineOpdbValues {
-  opdbId: string;
-  opdbTitle: string | null;
-  opdbManufacturer: string | null;
-  opdbYear: number | null;
-  opdbImageUrl: string | null;
-  opdbMachineType: string | null;
-  opdbLastSyncedAt: Date | null;
+  opdbId: string | null;
+  opdbTitle?: string | null;
+  opdbManufacturer?: string | null;
+  opdbYear?: number | null;
+  opdbImageUrl?: string | null;
+  opdbMachineType?: string | null;
+  opdbLastSyncedAt?: Date | null;
 }
 
 const mapOpdbDetailsToMachineValues = (
@@ -67,26 +67,19 @@ const mapOpdbDetailsToMachineValues = (
   details: OpdbMachineDetails | null
 ): MachineOpdbValues => {
   if (!details) {
-    return {
-      opdbId,
-      opdbTitle: null,
-      opdbManufacturer: null,
-      opdbYear: null,
-      opdbImageUrl: null,
-      opdbMachineType: null,
-      opdbLastSyncedAt: null,
-    };
+    return { opdbId };
   }
 
-  return {
-    opdbId,
-    opdbTitle: details.title,
-    opdbManufacturer: details.manufacturer,
-    opdbYear: details.year,
-    opdbImageUrl: details.imageUrl,
-    opdbMachineType: details.machineType,
-    opdbLastSyncedAt: new Date(),
-  };
+  // Only include fields that actually have a value to prevent overwriting with null
+  // unless we explicitly want to clear them.
+  const mapped: MachineOpdbValues = { opdbId, opdbLastSyncedAt: new Date() };
+  if (details.title) mapped.opdbTitle = details.title;
+  if (details.manufacturer) mapped.opdbManufacturer = details.manufacturer;
+  if (details.year) mapped.opdbYear = details.year;
+  if (details.imageUrl) mapped.opdbImageUrl = details.imageUrl;
+  if (details.machineType) mapped.opdbMachineType = details.machineType;
+
+  return mapped;
 };
 
 export type CreateMachineResult = Result<
@@ -310,10 +303,10 @@ export async function updateMachineAction(
         ? (formData.get("presenceStatus") as string)
         : undefined,
     opdbId:
-      typeof formData.get("opdbId") === "string" &&
-      (formData.get("opdbId") as string).length > 0
+      typeof formData.get("opdbId") === "string"
         ? (formData.get("opdbId") as string)
         : undefined,
+    overrideOpdbName: formData.get("overrideOpdbName") === "true",
   };
 
   const validation = updateMachineSchema.safeParse(rawData);
@@ -322,7 +315,8 @@ export async function updateMachineAction(
     return err("VALIDATION", firstError?.message ?? "Invalid input");
   }
 
-  const { id, name, ownerId, presenceStatus, opdbId } = validation.data;
+  const { id, name, ownerId, presenceStatus, opdbId, overrideOpdbName } =
+    validation.data;
 
   try {
     // Admins and technicians can update any machine, non-privileged users can only update their own machines
@@ -350,7 +344,8 @@ export async function updateMachineAction(
     // Derive ownership from the actual machine record, not from form fields
     const isActualOwner = currentMachine.ownerId === user.id;
     const isOwnerOrPrivileged = isPrivileged || isActualOwner;
-    if (isOwnerOrPrivileged && ownerId) {
+    if (isOwnerOrPrivileged && ownerId !== undefined) {
+      // Only update if ownerId was explicitly provided in the form
       shouldUpdateOwner = true;
       const isActive = await db.query.userProfiles.findFirst({
         where: eq(userProfiles.id, ownerId),
@@ -371,25 +366,39 @@ export async function updateMachineAction(
       }
     }
 
-    const existingOpdbId = currentMachine.opdbId ?? undefined;
-    const selectedOpdbId = opdbId ?? existingOpdbId;
     let finalName = name;
     let opdbUpdateValues: Partial<MachineOpdbValues> = {};
 
-    if (selectedOpdbId) {
-      const opdbChanged = selectedOpdbId !== existingOpdbId;
+    // Handle OPDB ID changes
+    if (opdbId !== undefined) {
+      // opdbId can be a string (new ID), or an empty string (clear), or undefined (no change)
+      if (opdbId === "") {
+        // Explicitly clear OPDB linkage
+        opdbUpdateValues = {
+          opdbId: null,
+          opdbTitle: null,
+          opdbManufacturer: null,
+          opdbYear: null,
+          opdbImageUrl: null,
+          opdbMachineType: null,
+          opdbLastSyncedAt: null,
+        };
+        // When clearing OPDB linkage, keep the form-submitted name.
+        // The user can change it in the form if they want.
+      } else if (opdbId !== currentMachine.opdbId) {
+        // Changed/Set OPDB model
+        const opdbDetails = await getOpdbMachineDetails(opdbId);
+        opdbUpdateValues = mapOpdbDetailsToMachineValues(opdbId, opdbDetails);
 
-      if (opdbChanged) {
-        const opdbDetails = await getOpdbMachineDetails(selectedOpdbId);
-        opdbUpdateValues = mapOpdbDetailsToMachineValues(
-          selectedOpdbId,
-          opdbDetails
-        );
-        if (opdbDetails?.title) {
+        // If a new OPDB model is selected and not overriding, use its title
+        if (opdbDetails?.title && !overrideOpdbName) {
           finalName = opdbDetails.title;
         }
-      } else {
-        finalName = currentMachine.opdbTitle ?? currentMachine.name;
+      } else if (opdbId === currentMachine.opdbId && !overrideOpdbName) {
+        // OPDB ID is the same, and not overriding name, so ensure name matches OPDB title if available
+        if (currentMachine.opdbTitle) {
+          finalName = currentMachine.opdbTitle;
+        }
       }
     }
 

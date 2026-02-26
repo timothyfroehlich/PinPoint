@@ -15,6 +15,8 @@ export interface InlineEditSaveResult {
 interface InlineEditableFieldProps {
   /** The field label displayed above the content */
   label: string;
+  /** Optional icon displayed next to the label */
+  icon?: React.ElementType;
   /** Current value (null/undefined/empty treated as empty) */
   value: string | null | undefined;
   /** Server action to save the updated value */
@@ -27,16 +29,20 @@ interface InlineEditableFieldProps {
   placeholder?: string;
   /** data-testid for the component root */
   testId?: string;
+  /** Visual variation. 'private' adds a distinct border and background */
+  variant?: "default" | "private";
 }
 
 export function InlineEditableField({
   label,
+  icon: Icon,
   value,
   onSave,
   machineId,
   canEdit,
   placeholder,
   testId,
+  variant = "default",
 }: InlineEditableFieldProps): React.JSX.Element | null {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value ?? "");
@@ -95,10 +101,35 @@ export function InlineEditableField({
   }
 
   return (
-    <div data-testid={testId} className="space-y-1.5">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
-        {label}
-      </p>
+    <div
+      data-testid={testId}
+      className={cn(
+        "space-y-1.5",
+        variant === "private" &&
+          "bg-primary/5 border border-primary/20 rounded-xl p-4"
+      )}
+    >
+      <div className="flex items-center gap-1.5">
+        {Icon && (
+          <Icon
+            className={cn(
+              "size-3.5",
+              variant === "private"
+                ? "text-primary/60"
+                : "text-on-surface-variant/60"
+            )}
+            aria-hidden="true"
+          />
+        )}
+        <p
+          className={cn(
+            "text-[10px] font-bold uppercase tracking-wider",
+            variant === "private" ? "text-primary" : "text-on-surface-variant"
+          )}
+        >
+          {label}
+        </p>
+      </div>
 
       {isEditing ? (
         <div className="space-y-2">
@@ -139,7 +170,7 @@ export function InlineEditableField({
       ) : (
         <div
           className={cn(
-            "group relative",
+            "group relative min-h-[80px]",
             canEdit && "cursor-pointer rounded-md hover:bg-surface-variant/50"
           )}
           onClick={canEdit ? handleEdit : undefined}
@@ -168,7 +199,7 @@ export function InlineEditableField({
           )}
           {canEdit && (
             <Pencil
-              className="absolute right-2 top-1 size-3.5 text-on-surface-variant opacity-0 transition-opacity group-hover:opacity-100"
+              className="absolute right-2 top-1 size-3.5 text-on-surface-variant opacity-30 transition-opacity group-hover:opacity-100"
               aria-hidden="true"
             />
           )}

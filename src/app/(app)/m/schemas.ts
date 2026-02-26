@@ -51,7 +51,8 @@ export const updateMachineSchema = z.object({
     .max(100, "Machine name must be less than 100 characters"),
   ownerId: z.string().uuid().optional(),
   presenceStatus: z.enum(VALID_MACHINE_PRESENCE_STATUSES).optional(),
-  opdbId: opdbIdSchema.optional(),
+  opdbId: z.union([opdbIdSchema, z.literal("")]).optional(),
+  overrideOpdbName: z.boolean().optional(),
 });
 
 export type UpdateMachineInput = z.infer<typeof updateMachineSchema>;
