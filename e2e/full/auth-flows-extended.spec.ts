@@ -16,9 +16,11 @@ test.describe("Extended Authentication", () => {
   test("signup flow - create new account and access dashboard", async ({
     page,
   }, testInfo) => {
-    // Navigate to signup page
+    // Navigate to signup page via visible sign-up button (mobile or desktop header)
     await page.goto("/");
-    const signupBtn = page.getByTestId("nav-signup");
+    const signupBtn = page
+      .locator('[data-testid="nav-signup"],[data-testid="mobile-nav-signup"]')
+      .filter({ visible: true });
     await expect(signupBtn).toBeVisible({ timeout: 5000 });
     await signupBtn.click();
 
@@ -103,8 +105,11 @@ test.describe("Extended Authentication", () => {
     // Sign out via header
     await logout(page);
 
-    // Verify we're logged out
-    await expect(page.getByTestId("nav-signin")).toBeVisible();
+    // Verify we're logged out (sign-in button visible in mobile or desktop header)
+    const signIn = page
+      .locator('[data-testid="nav-signin"],[data-testid="mobile-nav-signin"]')
+      .filter({ visible: true });
+    await expect(signIn).toBeVisible();
   });
 
   test("password reset flow - user journey only", async ({ page }) => {

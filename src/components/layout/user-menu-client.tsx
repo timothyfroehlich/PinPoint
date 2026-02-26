@@ -14,6 +14,8 @@ import { logoutAction } from "~/app/(auth)/actions";
 
 interface UserMenuProps {
   userName: string;
+  /** Override the trigger's data-testid. Useful when rendered in multiple layout regions. */
+  testId?: string;
 }
 
 /**
@@ -24,7 +26,10 @@ interface UserMenuProps {
  * - Settings (future)
  * - Sign Out
  */
-export function UserMenu({ userName }: UserMenuProps): React.JSX.Element {
+export function UserMenu({
+  userName,
+  testId = "user-menu-button",
+}: UserMenuProps): React.JSX.Element {
   // Get user initials for avatar fallback
   const initials = userName
     .split(" ")
@@ -39,7 +44,7 @@ export function UserMenu({ userName }: UserMenuProps): React.JSX.Element {
       <DropdownMenuTrigger
         aria-label="User menu"
         className="flex items-center gap-1.5 rounded-lg px-1.5 py-1 hover:bg-primary hover:text-on-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-        data-testid="user-menu-button"
+        data-testid={testId}
       >
         <div className="flex items-center gap-1.5">
           <div className="hidden sm:block text-right">
