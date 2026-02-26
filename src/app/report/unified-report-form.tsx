@@ -304,18 +304,22 @@ export function UnifiedReportForm({
                     onChange={(e) => {
                       const newId = e.target.value;
                       setSelectedMachineId(newId);
-                      // Update URL silently without triggering navigation
+                      // Dismiss the mobile picker immediately
+                      e.target.blur();
+                      // Defer URL update so it doesn't race with the native picker closing
                       const machine = machinesList.find((m) => m.id === newId);
                       if (machine) {
-                        const params = new URLSearchParams(
-                          searchParams.toString()
-                        );
-                        params.set("machine", machine.initials);
-                        window.history.replaceState(
-                          null,
-                          "",
-                          `?${params.toString()}`
-                        );
+                        window.requestAnimationFrame(() => {
+                          const params = new URLSearchParams(
+                            searchParams.toString()
+                          );
+                          params.set("machine", machine.initials);
+                          window.history.replaceState(
+                            null,
+                            "",
+                            `?${params.toString()}`
+                          );
+                        });
                       }
                     }}
                     className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
@@ -341,7 +345,7 @@ export function UnifiedReportForm({
                     isError={issuesError}
                     className="border-0 bg-surface-container-low/50 shadow-none p-3"
                     limit={3}
-                    defaultOpen={false}
+                    defaultOpen
                   />
                 </div>
 
