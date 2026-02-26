@@ -20,12 +20,14 @@ interface RecentIssuesPanelClientProps {
   defaultOpen?: boolean;
 }
 
-/** Height for the issue list area to prevent reflow across states */
+/** Fixed height for the content area to prevent reflow across states.
+ *  Includes 8px for pt-2 padding (box-sizing: border-box). */
 const ROW_HEIGHT_PX = 28;
 const GAP_PX = 2;
+const PADDING_TOP_PX = 8;
 
-function getMinHeight(limit: number): string {
-  return `${limit * ROW_HEIGHT_PX + (limit - 1) * GAP_PX}px`;
+function getContentHeight(limit: number): string {
+  return `${limit * ROW_HEIGHT_PX + (limit - 1) * GAP_PX + PADDING_TOP_PX}px`;
 }
 
 export function RecentIssuesPanelClient({
@@ -40,7 +42,7 @@ export function RecentIssuesPanelClient({
 }: RecentIssuesPanelClientProps): React.JSX.Element {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const displayIssues = issues.slice(0, limit);
-  const contentMinHeight = getMinHeight(limit);
+  const contentHeight = getContentHeight(limit);
 
   // No machine selected
   if (!machineInitials) {
@@ -106,7 +108,10 @@ export function RecentIssuesPanelClient({
         )}
       >
         <div className="overflow-hidden">
-          <div className="pt-2" style={{ minHeight: contentMinHeight }}>
+          <div
+            className="pt-2 overflow-hidden"
+            style={{ height: contentHeight }}
+          >
             {isLoading ? (
               <div className="space-y-0.5">
                 {Array.from({ length: limit }, (_, i) => (
