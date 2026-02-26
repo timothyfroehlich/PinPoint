@@ -6,7 +6,6 @@ import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { issues, userProfiles } from "~/server/db/schema";
 import { eq, asc, and, notInArray } from "drizzle-orm";
-import { PageShell } from "~/components/layout/PageShell";
 import { IssueTimeline } from "~/components/issues/IssueTimeline";
 import { IssueSidebar } from "~/components/issues/IssueSidebar";
 import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
@@ -197,8 +196,8 @@ export default async function IssueDetailPage({
     : undefined;
 
   return (
-    <PageShell className="space-y-0" size="wide" padded={false}>
-      <div className="px-4 py-4 sm:px-8 sm:py-10 lg:px-10 space-y-4 sm:space-y-8">
+    <div className="max-w-7xl mx-auto space-y-0">
+      <div className="py-4 sm:py-10 space-y-4 sm:space-y-8">
         {/* ── MOBILE: Back nav row + issue ID chip ── */}
         <div
           className="flex items-center justify-between gap-2 md:hidden"
@@ -306,8 +305,11 @@ export default async function IssueDetailPage({
         />
 
         {/* ── Main content area (two-column on desktop) ── */}
-        <div className="grid gap-10 md:grid-cols-[minmax(0,1fr)_320px]">
-          <section className="space-y-5 lg:pr-4" data-testid="issue-timeline">
+        <div className="grid gap-10 md:grid-cols-[minmax(0,1fr)_320px] min-w-0">
+          <section
+            className="min-w-0 space-y-5 lg:pr-4"
+            data-testid="issue-timeline"
+          >
             {issue.images.length > 0 && (
               <div className="space-y-3">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
@@ -354,6 +356,6 @@ export default async function IssueDetailPage({
           </div>
         </div>
       </div>
-    </PageShell>
+    </div>
   );
 }

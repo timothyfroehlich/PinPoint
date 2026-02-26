@@ -1,6 +1,5 @@
 import type React from "react";
 import type { Metadata } from "next";
-import { PageShell } from "~/components/layout/PageShell";
 import { ChangelogSeenMarker } from "./changelog-seen-marker";
 import ChangelogContent from "@content/changelog.mdx";
 import changelogMeta from "@content/changelog-meta.json";
@@ -12,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function WhatsNewPage(): React.JSX.Element {
   return (
-    <PageShell size="narrow">
+    <div className="max-w-3xl mx-auto py-10">
       <ChangelogSeenMarker totalEntries={changelogMeta.totalEntries} />
 
       <header className="space-y-2 mb-8">
@@ -27,6 +26,6 @@ export default function WhatsNewPage(): React.JSX.Element {
       <article className="space-y-6">
         <ChangelogContent />
       </article>
-    </PageShell>
+    </div>
   );
 }

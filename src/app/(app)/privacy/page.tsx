@@ -1,7 +1,6 @@
 import type React from "react";
 import type { Metadata } from "next";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { PageShell } from "~/components/layout/PageShell";
 import { PrivacyContent } from "./privacy-content";
 
 export const metadata: Metadata = {
@@ -17,7 +16,7 @@ export const metadata: Metadata = {
  */
 export default function PrivacyPage(): React.JSX.Element {
   return (
-    <PageShell size="narrow" padded={false} className="space-y-6">
+    <div className="max-w-3xl mx-auto space-y-6">
       <Card className="border-border bg-card">
         <CardHeader>
           <CardTitle className="text-2xl">Privacy Policy</CardTitle>
@@ -29,6 +28,6 @@ export default function PrivacyPage(): React.JSX.Element {
           <PrivacyContent />
         </CardContent>
       </Card>
-    </PageShell>
+    </div>
   );
 }

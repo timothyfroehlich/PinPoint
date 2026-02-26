@@ -6,7 +6,7 @@
  */
 
 import { test, expect, type Page } from "@playwright/test";
-import { loginAs } from "../support/actions.js";
+import { getIssueSidebar, loginAs } from "../support/actions.js";
 import { cleanupTestEntities, extractIdFromUrl } from "../support/cleanup.js";
 import { seededMachines } from "../support/constants.js";
 import { fillReportForm } from "../support/page-helpers.js";
@@ -138,7 +138,7 @@ test.describe("Issues System", () => {
       rememberIssueId(page);
     });
 
-    test("should display issue details", async ({ page }) => {
+    test("should display issue details", async ({ page }, testInfo) => {
       // Navigate to the created issue's detail page
       await page.goto(issueUrl);
 
@@ -150,16 +150,25 @@ test.describe("Issues System", () => {
           .getByRole("heading", { level: 1, name: issueTitle })
       ).toBeVisible();
 
-      // Check ID is displayed (in layout above title, not in H1)
+      // Check ID is displayed (appears in viewport-specific location)
       const idText = `${machineInitials}-${String(issueNumber).padStart(2, "0")}`;
-      await expect(page.getByRole("main").getByText(idText)).toBeVisible();
+      const isMobile = testInfo.project.name.includes("Mobile");
+      if (isMobile) {
+        await expect(
+          page.getByTestId("mobile-nav-row").getByText(idText)
+        ).toBeVisible();
+      } else {
+        await expect(
+          page.getByRole("main").getByText(idText).last()
+        ).toBeVisible();
+      }
 
       // Should show metadata
       await expect(
         page.getByText(seededMachines.addamsFamily.name)
       ).toBeVisible();
 
-      const sidebar = page.getByTestId("issue-sidebar");
+      const sidebar = getIssueSidebar(page, testInfo);
       await expect(
         sidebar.getByText("Reporter", { exact: true })
       ).toBeVisible();
@@ -199,7 +208,9 @@ test.describe("Issues System", () => {
       rememberIssueId(page);
     });
 
-    test("should display assignee on issue detail page", async ({ page }) => {
+    test("should display assignee on issue detail page", async ({
+      page,
+    }, testInfo) => {
       // Navigate to the freshly created issue
       await page.goto(issueUrl);
 
@@ -211,9 +222,16 @@ test.describe("Issues System", () => {
         })
       ).toBeVisible();
 
+      const sidebar = getIssueSidebar(page, testInfo);
+
+      // On mobile, expand the details panel to reveal sidebar controls
+      const isMobile = testInfo.project.name.includes("Mobile");
+      if (isMobile) {
+        await sidebar.getByRole("button", { name: /details/i }).click();
+      }
+
       // Find the assignee picker - initially shows "Unassigned"
-      const assigneePicker = page
-        .getByTestId("issue-sidebar")
+      const assigneePicker = sidebar
         .getByTestId("assignee-picker-trigger")
         .first();
       await expect(assigneePicker).toBeVisible();
@@ -229,11 +247,14 @@ test.describe("Issues System", () => {
 
       // Reload page to verify persistence
       await page.reload();
+      const sidebarAfterReload = getIssueSidebar(page, testInfo);
+      if (isMobile) {
+        await sidebarAfterReload
+          .getByRole("button", { name: /details/i })
+          .click();
+      }
       await expect(
-        page
-          .getByTestId("issue-sidebar")
-          .getByTestId("assignee-picker-trigger")
-          .first()
+        sidebarAfterReload.getByTestId("assignee-picker-trigger").first()
       ).toContainText("Member User");
     });
   });

@@ -218,7 +218,7 @@ function TimelineItem({
       </div>
 
       {/* Right: Content */}
-      <div className="flex-1">
+      <div className="min-w-0 flex-1">
         {isSystem ? (
           <div className="flex items-center gap-2 py-1 text-xs leading-snug text-muted-foreground">
             {event.author.id && (
@@ -417,7 +417,7 @@ export function IssueTimeline({
   const noComments = allEvents.length === 1;
 
   return (
-    <div className="flex-1 space-y-6">
+    <div className="min-w-0 flex-1 space-y-6">
       <div className="relative">
         {/* Continuous Vertical Line */}
         <div className="absolute bottom-0 left-[34px] top-4 w-px -translate-x-1/2 bg-border" />
@@ -472,7 +472,7 @@ export function IssueTimeline({
               </AvatarFallback>
             </Avatar>
           </div>
-          <div className="flex-1 rounded-lg border bg-card p-4 shadow-sm sm:p-6">
+          <div className="min-w-0 flex-1 rounded-lg border bg-card p-4 shadow-sm sm:p-6">
             {currentUserRole === "unauthenticated" ? (
               <div
                 className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/20 px-4 py-3 text-sm text-muted-foreground"

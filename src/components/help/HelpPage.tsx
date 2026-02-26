@@ -1,8 +1,6 @@
 import type React from "react";
 import Link from "next/link";
 
-import { PageShell } from "~/components/layout/PageShell";
-
 interface HelpPageProps {
   breadcrumb: string;
   title: string;
@@ -10,6 +8,11 @@ interface HelpPageProps {
   size?: "narrow" | "default";
   children: React.ReactNode;
 }
+
+const sizeClassName = {
+  narrow: "max-w-3xl",
+  default: "max-w-6xl",
+} as const;
 
 export function HelpPage({
   breadcrumb,
@@ -19,7 +22,7 @@ export function HelpPage({
   children,
 }: HelpPageProps): React.JSX.Element {
   return (
-    <PageShell size={size}>
+    <div className={`${sizeClassName[size]} mx-auto py-10`}>
       <header className="space-y-2 mb-8">
         <p className="text-sm text-muted-foreground">
           <Link href="/help" className="text-link">
@@ -34,6 +37,6 @@ export function HelpPage({
         ) : null}
       </header>
       {children}
-    </PageShell>
+    </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import type React from "react";
+import { cn } from "~/lib/utils";
 import { Label } from "~/components/ui/label";
 import { type IssueWithAllRelations } from "~/lib/types";
 import { AssignIssueForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/assign-issue-form";
@@ -17,6 +18,8 @@ interface SidebarActionsProps {
   currentUserId: string | null;
   accessLevel: AccessLevel;
   ownershipContext: OwnershipContext;
+  /** Tighter vertical spacing for mobile expando. */
+  compact?: boolean;
 }
 
 export function SidebarActions({
@@ -25,11 +28,17 @@ export function SidebarActions({
   currentUserId,
   accessLevel,
   ownershipContext,
+  compact = false,
 }: SidebarActionsProps): React.JSX.Element {
+  const rowClassName = cn(
+    "grid items-center gap-x-3 gap-y-1",
+    compact ? "grid-cols-[80px_1fr]" : "grid-cols-[110px_1fr]"
+  );
+
   return (
-    <div className="space-y-5">
+    <div className={compact ? "space-y-2" : "space-y-5"}>
       {/* Assignee */}
-      <div className="grid grid-cols-[110px,1fr] items-center gap-3">
+      <div className={rowClassName}>
         <Label className="text-sm text-muted-foreground">Assignee</Label>
         <div className="min-w-0">
           <AssignIssueForm
@@ -44,7 +53,7 @@ export function SidebarActions({
       </div>
 
       {/* Update Status */}
-      <div className="grid grid-cols-[110px,1fr] items-center gap-3">
+      <div className={rowClassName}>
         <Label className="text-sm text-muted-foreground">Status</Label>
         <div className="min-w-0">
           <UpdateIssueStatusForm
@@ -57,7 +66,7 @@ export function SidebarActions({
       </div>
 
       {/* Update Severity */}
-      <div className="grid grid-cols-[110px,1fr] items-center gap-3">
+      <div className={rowClassName}>
         <Label className="text-sm text-muted-foreground">Severity</Label>
         <div className="min-w-0">
           <UpdateIssueSeverityForm
@@ -70,7 +79,7 @@ export function SidebarActions({
       </div>
 
       {/* Update Priority */}
-      <div className="grid grid-cols-[110px,1fr] items-center gap-3">
+      <div className={rowClassName}>
         <Label className="text-sm text-muted-foreground">Priority</Label>
         <div className="min-w-0">
           <UpdateIssuePriorityForm
@@ -83,7 +92,7 @@ export function SidebarActions({
       </div>
 
       {/* Update Frequency */}
-      <div className="grid grid-cols-[110px,1fr] items-center gap-3">
+      <div className={rowClassName}>
         <Label className="text-sm text-muted-foreground">Frequency</Label>
         <div className="min-w-0">
           <UpdateIssueFrequencyForm

@@ -210,10 +210,10 @@ export default async function MachineDetailPage({
   const watchMode = currentUserWatch?.watchMode ?? "notify";
 
   return (
-    <main className="min-h-screen bg-surface">
+    <>
       {/* Header */}
-      <div className="border-b border-outline-variant bg-surface-container">
-        <div className="container mx-auto px-4 py-6">
+      <div className="-mx-4 sm:-mx-8 lg:-mx-10 border-b border-outline-variant bg-surface-container">
+        <div className="px-4 sm:px-8 lg:px-10 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link href="/m">
@@ -282,7 +282,7 @@ export default async function MachineDetailPage({
       </div>
 
       {/* Content */}
-      <div className="container mx-auto space-y-6 px-4 py-8">
+      <div className="space-y-6 py-8">
         {!isOnTheFloor(machine.presenceStatus) && (
           <div className="rounded-md border border-outline-variant bg-surface-container px-4 py-2 text-sm text-on-surface-variant">
             This machine is currently{" "}
@@ -416,6 +416,6 @@ export default async function MachineDetailPage({
           totalIssuesCount={totalIssuesCount}
         />
       </div>
-    </main>
+    </>
   );
 }

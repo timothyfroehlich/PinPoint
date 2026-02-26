@@ -90,7 +90,11 @@ export function MobileDetailsPanel({
 
           {/* Watch toggle (authenticated users only) */}
           {accessLevel !== "unauthenticated" && (
-            <WatchButton issueId={issue.id} initialIsWatching={isWatching} />
+            <WatchButton
+              issueId={issue.id}
+              initialIsWatching={isWatching}
+              iconOnly
+            />
           )}
 
           {/* Edit Details toggle button */}
@@ -107,7 +111,7 @@ export function MobileDetailsPanel({
             )}
           >
             <Settings className="size-3.5" aria-hidden="true" />
-            <span>Edit Details</span>
+            <span>Details</span>
             <ChevronDown
               className={cn(
                 "size-3 transition-transform duration-200",
@@ -129,12 +133,12 @@ export function MobileDetailsPanel({
       >
         <div
           className={cn(
-            "mt-3 space-y-1 overflow-auto",
-            isOpen && "rounded-xl border border-border bg-card p-4"
+            "mt-2 space-y-1 overflow-auto",
+            isOpen && "rounded-lg border border-border bg-card px-3 py-2"
           )}
         >
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-            Edit Issue Details
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+            Issue Details
           </p>
           <SidebarActions
             issue={issue}
@@ -142,10 +146,11 @@ export function MobileDetailsPanel({
             currentUserId={currentUserId}
             accessLevel={accessLevel}
             ownershipContext={ownershipContext}
+            compact
           />
 
           {/* Reporter + Created at the bottom */}
-          <div className="flex flex-wrap gap-4 pt-4 border-t border-border mt-4">
+          <div className="flex flex-wrap gap-4 pt-2 border-t border-border mt-2">
             <div className="flex flex-col gap-1">
               <span className="text-xs font-medium text-muted-foreground">
                 Reporter

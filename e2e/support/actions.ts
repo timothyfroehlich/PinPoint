@@ -16,6 +16,19 @@ function visibleUserMenu(page: Page) {
     .filter({ visible: true });
 }
 
+/**
+ * Returns the visible issue-detail sidebar container.
+ * On desktop → `issue-sidebar`. On mobile → `mobile-details-panel`.
+ * Both exist in the DOM; scoping queries through this avoids strict-mode
+ * violations from duplicate test IDs.
+ */
+export function getIssueSidebar(page: Page, testInfo: TestInfo) {
+  const isMobile = testInfo.project.name.includes("Mobile");
+  return isMobile
+    ? page.getByTestId("mobile-details-panel")
+    : page.getByTestId("issue-sidebar");
+}
+
 interface LoginOptions {
   email?: string;
   password?: string;
