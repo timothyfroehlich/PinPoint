@@ -341,6 +341,7 @@ export function UnifiedReportForm({
                     isError={issuesError}
                     className="border-0 bg-surface-container-low/50 shadow-none p-3"
                     limit={3}
+                    defaultOpen={false}
                   />
                 </div>
 
