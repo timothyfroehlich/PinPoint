@@ -1,23 +1,13 @@
 import type React from "react";
-import { asc, desc, eq, sql } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { db } from "~/server/db";
-import {
-  machines,
-  userProfiles,
-  issues as issuesTable,
-} from "~/server/db/schema";
+import { machines, userProfiles } from "~/server/db/schema";
 import { MainLayout } from "~/components/layout/MainLayout";
 import { resolveDefaultMachineId } from "./default-machine";
 import { UnifiedReportForm } from "./unified-report-form";
 import { createClient } from "~/lib/supabase/server";
 import { getAccessLevel } from "~/lib/permissions/helpers";
-import type { RecentIssueData } from "./actions";
-import type {
-  IssueStatus,
-  IssueSeverity,
-  IssuePriority,
-  IssueFrequency,
-} from "~/lib/types";
+import { getRecentIssuesAction, type RecentIssueData } from "./actions";
 
 // Avoid SSG hitting Supabase during builds that run parallel to db resets
 export const dynamic = "force-dynamic";
@@ -84,45 +74,8 @@ export default async function PublicReportPage({
   // Pre-fetch initial issues for the selected machine (avoids first-load skeleton flash)
   let initialIssues: RecentIssueData[] | null = null;
   if (selectedMachine) {
-    try {
-      const rows = (await db.query.issues.findMany({
-        where: eq(issuesTable.machineInitials, selectedMachine.initials),
-        orderBy: [desc(issuesTable.createdAt)],
-        limit: 5,
-        columns: {
-          id: true,
-          issueNumber: true,
-          title: true,
-          status: true,
-          severity: true,
-          priority: true,
-          frequency: true,
-          createdAt: true,
-        },
-      })) as {
-        id: string;
-        issueNumber: number;
-        title: string;
-        status: IssueStatus;
-        severity: IssueSeverity;
-        priority: IssuePriority;
-        frequency: IssueFrequency;
-        createdAt: Date;
-      }[];
-
-      initialIssues = rows.map((r) => ({
-        ...r,
-        createdAt: r.createdAt.toISOString(),
-      }));
-    } catch (error) {
-      // Non-blocking: panel will show error state on client
-      console.error("Failed to pre-fetch recent issues for selected machine", {
-        machineId: selectedMachine.id,
-        machineInitials: selectedMachine.initials,
-        error,
-      });
-      initialIssues = null;
-    }
+    const result = await getRecentIssuesAction(selectedMachine.initials, 5);
+    initialIssues = result.ok ? result.value : null;
   }
 
   return (

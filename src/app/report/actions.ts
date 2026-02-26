@@ -385,7 +385,7 @@ export async function getRecentIssuesAction(
   }
 
   try {
-    const rows = (await db.query.issues.findMany({
+    const rows = await db.query.issues.findMany({
       where: eq(issuesTable.machineInitials, parsed.data.machineInitials),
       orderBy: [desc(issuesTable.createdAt)],
       limit: parsed.data.limit,
@@ -399,16 +399,7 @@ export async function getRecentIssuesAction(
         frequency: true,
         createdAt: true,
       },
-    })) as {
-      id: string;
-      issueNumber: number;
-      title: string;
-      status: IssueStatus;
-      severity: IssueSeverity;
-      priority: IssuePriority;
-      frequency: IssueFrequency;
-      createdAt: Date;
-    }[];
+    });
 
     return ok(
       rows.map((r) => ({
@@ -418,7 +409,7 @@ export async function getRecentIssuesAction(
     );
   } catch (error) {
     log.error(
-      { err: error, machineInitials },
+      { error, machineInitials },
       "Error fetching recent issues via server action"
     );
     return err("SERVER", "Could not load recent issues");
