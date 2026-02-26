@@ -446,7 +446,7 @@ export function IssueTimeline({
 
           {/* Delightful Empty State when no comments yet */}
           {noComments && (
-            <div className="ml-16 rounded-xl border border-dashed border-muted-foreground/30 bg-muted/10 p-6 text-center animate-in fade-in zoom-in duration-300">
+            <div className="ml-20 rounded-xl border border-dashed border-muted-foreground/30 bg-muted/10 p-6 text-center animate-in fade-in zoom-in duration-300">
               <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-full bg-muted">
                 <MessageSquare className="size-5 text-muted-foreground" />
               </div>
