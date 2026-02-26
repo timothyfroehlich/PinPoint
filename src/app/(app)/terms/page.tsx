@@ -1,6 +1,7 @@
 import type React from "react";
 import type { Metadata } from "next";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { PageShell } from "~/components/layout/PageShell";
 import { TermsContent } from "./terms-content";
 
 export const metadata: Metadata = {
@@ -16,7 +17,7 @@ export const metadata: Metadata = {
  */
 export default function TermsPage(): React.JSX.Element {
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <PageShell size="narrow" padded={false} className="space-y-6">
       <Card className="border-border bg-card">
         <CardHeader>
           <CardTitle className="text-2xl">Terms of Service</CardTitle>
@@ -28,6 +29,6 @@ export default function TermsPage(): React.JSX.Element {
           <TermsContent />
         </CardContent>
       </Card>
-    </div>
+    </PageShell>
   );
 }

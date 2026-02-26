@@ -2,7 +2,8 @@
 
 import React from "react";
 import { cn } from "~/lib/utils";
-import { Loader2 } from "lucide-react";
+import { Loader2, User } from "lucide-react";
+import { Separator } from "~/components/ui/separator";
 
 /**
  * AssigneePicker — Listbox-style dropdown for assigning a user to an issue.
@@ -22,15 +23,14 @@ import { Loader2 } from "lucide-react";
  *
  * ## Key Abstractions
  * - `assignedToId: string | null` — `null` represents the unassigned state
+ * - `currentUserId` — when provided, shows "Me" as a quick-select above
+ *   "Unassigned", and removes that user from the alphabetical list
  * - `isPending` shows a spinner overlay during optimistic update transitions
  * - `disabled` / `disabledReason` support permission-gated assignment
- * - User list is pre-filtered client-side; no "Me" quick-select in this
- *   component (that pattern lives in the filter bar's assignee MultiSelect)
  *
  * ## Mobile Notes
  * The standardized assignee ordering (Me -> Unassigned -> separator -> alpha)
- * from `~/lib/issues/filter-utils` can be used to build a consistent mobile
- * variant of this picker.
+ * from `~/lib/issues/filter-utils` follows the same pattern used here.
  */
 interface PickerUser {
   id: string;
@@ -44,6 +44,7 @@ interface AssigneePickerProps {
   onAssign: (userId: string | null) => void;
   disabled?: boolean;
   disabledReason?: string | null;
+  currentUserId?: string | null;
 }
 
 export function AssigneePicker({
@@ -53,6 +54,7 @@ export function AssigneePicker({
   onAssign,
   disabled = false,
   disabledReason = null,
+  currentUserId = null,
 }: AssigneePickerProps): React.JSX.Element {
   const [isOpen, setIsOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -62,6 +64,15 @@ export function AssigneePicker({
   const selectedUser = React.useMemo(
     () => users.find((user) => user.id === assignedToId) ?? null,
     [assignedToId, users]
+  );
+
+  // The "current user" for the "Me" quick-select; null if not found in the list.
+  const currentUser = React.useMemo(
+    () =>
+      currentUserId
+        ? (users.find((u) => u.id === currentUserId) ?? null)
+        : null,
+    [currentUserId, users]
   );
 
   React.useEffect(() => {
@@ -96,16 +107,20 @@ export function AssigneePicker({
 
   const filteredUsers = React.useMemo(() => {
     const normalized = query.trim().toLowerCase();
+    // Exclude the current user from the alphabetical list — they appear as "Me".
+    const candidates = currentUser
+      ? users.filter((u) => u.id !== currentUser.id)
+      : users;
     if (!normalized) {
-      return users;
+      return candidates;
     }
-    return users.filter((user) => {
+    return candidates.filter((user) => {
       const haystack = [user.name]
         .filter(Boolean)
         .map((value) => value.toLowerCase());
       return haystack.some((value) => value.includes(normalized));
     });
-  }, [query, users]);
+  }, [query, users, currentUser]);
 
   const handleAssign = (userId: string | null): void => {
     onAssign(userId);
@@ -191,6 +206,20 @@ export function AssigneePicker({
             role="listbox"
             aria-label="Assignee options"
           >
+            {/* "Me" quick-select — shown only when the current user is in the list */}
+            {currentUser ? (
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground aria-selected:bg-accent aria-selected:text-accent-foreground"
+                onClick={() => handleAssign(currentUser.id)}
+                data-testid="assignee-option-me"
+                role="option"
+                aria-selected={assignedToId === currentUser.id}
+              >
+                <User className="size-6 shrink-0 p-0.5 text-primary" />
+                <span className="font-medium text-primary">Me</span>
+              </button>
+            ) : null}
             <button
               type="button"
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-foreground hover:bg-accent hover:text-accent-foreground aria-selected:bg-accent aria-selected:text-accent-foreground"
@@ -204,6 +233,8 @@ export function AssigneePicker({
               </div>
               <span className="font-medium">Unassigned</span>
             </button>
+            {/* Separator between quick-selects and alphabetical user list */}
+            {currentUser ? <Separator className="my-1" /> : null}
             {filteredUsers.length === 0 ? (
               <p className="px-2 py-1.5 text-xs text-muted-foreground">
                 No matches found

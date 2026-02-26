@@ -1,6 +1,6 @@
 ---
 name: pinpoint-orchestrator
-description: Orchestrate parallel subagent work in git worktrees using built-in Agent Teams (primary) or background agents (fallback).
+description: Orchestrate parallel subagent work in git worktrees using resumed standalone subagents (primary) or Agent Teams (fallback).
 ---
 
 # Pinpoint Orchestrator
@@ -15,8 +15,6 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 - User says "spin up agents", "orchestrate", "parallel work", "use teams"
 
 ## Scripts Reference
-
-All monitoring and readiness commands are handled by scripts. Use these instead of raw `gh` commands.
 
 ```bash
 # Orchestration startup (ONE call for full situational awareness)
@@ -49,7 +47,7 @@ bash .agent/skills/pinpoint-commit/scripts/watch-ci.sh <PR> [timeout]  # Poll si
 bash scripts/workflow/stale-worktrees.sh                    # Report stale/active/dirty worktrees
 bash scripts/workflow/stale-worktrees.sh --clean            # Auto-remove stale worktrees
 
-# Worktree management (paths are now flat: feat/x → feat-x)
+# Worktree management (paths are flat: feat/x → feat-x)
 python3 ./pinpoint-wt.py create <branch>           # Create worktree (new or existing branch)
 python3 ./pinpoint-wt.py list                      # Show all worktrees with port assignments
 python3 ./pinpoint-wt.py remove <branch>           # Clean teardown (Supabase + Docker + worktree)
@@ -58,14 +56,20 @@ python3 ./pinpoint-wt.py sync [--all]              # Regenerate config files
 
 ---
 
-## Quality Gates (Automatic via Hooks)
+## Quality Gates
 
-Quality enforcement is handled by Claude Code hooks — agents do NOT need to manually check these.
+### Standalone Subagents (Primary) — Self-Enforced
 
-- **`TaskCompleted` hook** → runs `pnpm run check` before allowing task completion. If it fails, the agent gets stderr feedback and must fix before re-completing.
-- **`TeammateIdle` hook** → checks for unpushed commits/uncommitted changes before allowing idle. Agent is forced to push first.
+Hooks don't fire for standalone subagents. Include in every prompt:
+- `pnpm run check` before returning
+- Self-check `.claude-task-contract` items
+- Structured return format with CI/Copilot status
 
-This replaces the old "Definition of Done" manual checklist.
+### Agent Teams (Fallback) — Hook-Enforced
+
+- **`TaskCompleted` hook** → runs `pnpm run check`
+- **`TeammateIdle` hook** → blocks idle if unpushed commits
+- Requires `isolation: "worktree"` for correct CWD (broken with `team_name` — see Phase 2)
 
 ### Coverage Expectations by Change Type
 
@@ -81,164 +85,124 @@ This replaces the old "Definition of Done" manual checklist.
 
 ## Phase 1: Task Selection
 
-### 1.1 Load Available Work
-
 ```bash
 bd ready                    # Issues with no blockers
 bd list --status=open       # All open issues
 ```
 
-### 1.2 Present Options to User
-
-```
-Available tasks:
-1. [PinPoint-abc] Fix machine dropdown default
-2. [PinPoint-def] Add owner link to issue detail
-
-Which tasks should I work on in parallel?
-```
-
-### 1.3 Validate Independence
-
-Before proceeding, verify:
-- No task blocks another (`bd show <id>` to check blockedBy)
+Present options to user. Before proceeding, verify tasks are independent:
+- No task blocks another (`bd show <id>`)
 - Tasks don't modify the same files
-- Each task can be completed independently
 
 ---
 
 ## Phase 2: Worktree Setup
 
-**Always use `pinpoint-wt.py`** for worktree creation — it handles port allocation, Supabase isolation, and config generation that built-in `isolation: "worktree"` does not.
+`isolation: "worktree"` handles creation automatically via the `WorktreeCreate` hook (delegates to `pinpoint-wt.py`).
+
+> **Known bug**: `isolation: "worktree"` is silently ignored when `team_name` is set. For Agent Teams, create worktrees manually with `pinpoint-wt.py`.
+
+Manual `pinpoint-wt.py` is for the lead's own use or Agent Teams worktree setup:
 
 ```bash
-python3 ./pinpoint-wt.py create <branch-name>   # Works for new or existing branches
-```
-
-Track the mapping (note: paths are flat — `feat/task-abc` → `feat-task-abc`):
-
-```
-PinPoint-abc → /home/froeht/Code/pinpoint-worktrees/feat-task-abc
-PinPoint-def → /home/froeht/Code/pinpoint-worktrees/feat-task-def
+python3 ./pinpoint-wt.py create <branch-name>
 ```
 
 ---
 
 ## Phase 3: Agent Dispatch
 
-Two modes: **Agent Teams** (primary, interactive) and **Background Agents** (fallback, fire-and-forget).
-
-### Option A: Agent Teams (Primary)
-
-Use built-in Agent Teams for coordination when tasks have dependencies, need mid-flight steering, or benefit from shared task lists.
-
-**Setup:**
-
-```
-TeamCreate(team_name: "pinpoint-<summary>")
-```
-
-**Create tasks** using built-in TaskCreate, then **spawn teammates**:
+### Option A: Standalone Subagents (Primary)
 
 ```
 Task(
   subagent_type: "general-purpose",
-  team_name: "pinpoint-<summary>",
-  name: "dropdown-fix",
-  prompt: "<prompt with worktree path and task details>"
+  model: "sonnet",
+  isolation: "worktree",
+  run_in_background: true,
+  mode: "bypassPermissions",
+  prompt: "<full prompt — see agent-prompt-template.md>"
 )
 ```
 
-Assign tasks with `TaskUpdate(taskId: "1", owner: "dropdown-fix")`.
+Do NOT set `team_name` or `name` — these activate Agent Teams where `isolation: "worktree"` is broken.
 
-**Prompt requirements** — each teammate prompt MUST include:
-1. Full absolute worktree path (from Phase 2)
-2. Explicit instruction to work ONLY in that path
-3. Beads issue context (`bd show` output)
-4. Reference to `{worktree_path}/AGENTS.md` for project rules
+**Prompt requirements** — each subagent prompt MUST include:
+1. Load `pinpoint-teammate-guide` skill
+2. Beads issue context (`bd show` output)
+3. Specific files to modify and what to change
+4. Quality self-enforcement: "Run `pnpm run check` before returning. Verify all contract items."
+5. Full PR lifecycle: "Create PR, poll for Copilot review, address comments, verify CI green."
+6. Structured return format: branch, PR#, CI status, Copilot status, blockers
 
-**Coordination:**
-- Direct messages: `SendMessage(type: "message", recipient: "<name>", ...)`
-- Never broadcast for task-specific steering
-- Idle is normal — teammates wake when messaged
-- Unblock dependent tasks by assigning to idle teammates
+### Option B: Agent Teams (Fallback)
 
-**Shutdown:**
-```
-SendMessage(type: "shutdown_request", recipient: "<name>", content: "All tasks done")
-# Wait for each shutdown_response(approve: true)
-TeamDelete()   # Only after ALL teammates shut down
-```
+Use when you need bidirectional real-time communication (dependent tasks, mid-flight questions).
 
-### Option B: Background Agents (Fallback)
+Create worktrees manually (isolation is broken with `team_name`), then spawn:
 
-Use when Agent Teams is unreliable, or for simple fire-and-forget tasks.
-
-Dispatch all agents in a SINGLE message with multiple Task tool calls:
-
-```
-Task(subagent_type: "general-purpose", run_in_background: true, prompt: <prompt>)
-Task(subagent_type: "general-purpose", run_in_background: true, prompt: <prompt>)
+```bash
+python3 ./pinpoint-wt.py create feat/<branch-name>
 ```
 
-Track agent IDs for monitoring with `TaskOutput`.
+```
+Task(
+  subagent_type: "general-purpose",
+  model: "sonnet",
+  team_name: "pinpoint-<summary>",
+  name: "dropdown-fix",
+  mode: "bypassPermissions",
+  prompt: "<prompt with ABSOLUTE worktree path>"
+)
+```
 
 ---
 
 ## Phase 4: Monitor Loop
 
-### 4.1 Dashboard Check
-
-Run periodically to see all PR status at a glance:
+### Dashboard
 
 ```bash
 bash scripts/workflow/pr-dashboard.sh 940 941 942       # Specific PRs
 bash scripts/workflow/pr-dashboard.sh                    # All open PRs
 ```
 
-### 4.2 On Agent/Teammate Completion
+### Resume for Follow-Up
 
-1. **Get PR number**: `gh pr list --head <branch> --json number,url`
-2. **Check dashboard**: `bash scripts/workflow/pr-dashboard.sh <PR>`
+Common resume scenarios:
+- Subagent returns "Copilot pending" → lead waits for review → resumes with comments
+- CI fails → lead gets failure logs → resumes with failure context
+- User requests changes → resumes with review feedback
 
-### 4.3 Handle Failures
+### Handle Failures
 
-**CI fails** → Re-dispatch agent with failure context:
+**CI fails** → Get context, then resume subagent:
 ```bash
 gh run view <run-id> --log-failed | tail -50
 ```
 
-**Copilot comments** → Get details and re-dispatch:
+**Copilot comments** → Get details, then resume subagent:
 ```bash
 bash scripts/workflow/copilot-comments.sh <PR>
 ```
 
-Agents MUST resolve each Copilot thread using `bash scripts/workflow/respond-to-copilot.sh` (see AGENTS.md).
-
-**Infrastructure failures** (e.g., "Setup Supabase CLI: failure"):
+**Infrastructure failures**:
 ```bash
 gh run rerun <run-id> --failed
 ```
 
-### 4.4 Label Ready PRs
-
-**PROACTIVE**: Label PRs as soon as CI goes green and Copilot comments are resolved.
+### Label Ready PRs
 
 ```bash
 bash scripts/workflow/label-ready.sh <PR>               # Label (keeps worktree)
 bash scripts/workflow/label-ready.sh <PR> --cleanup     # Label + remove worktree
 ```
 
-### 4.5 Review Feedback Loop
-
-**Approved** → User merges. Done.
-**Changes requested** → Re-create worktree and re-dispatch with feedback.
-
 ---
 
 ## Phase 5: Completion
 
-### 5.1 Beads Issue Lifecycle
+### Beads Issue Lifecycle
 
 **Do NOT close beads issues when a PR is created.** Issues stay `in_progress` until PR **merges**.
 
@@ -248,7 +212,7 @@ bash scripts/workflow/label-ready.sh <PR> --cleanup     # Label + remove worktre
 | PR merges | `bd close <id> --reason="PR #N merged"` |
 | PR closed without merge | `bd update <id> --status=open` |
 
-### 5.2 Final Summary
+### Final Summary
 
 ```
 ## Orchestration Complete
@@ -263,7 +227,7 @@ Remaining Worktrees:
 - feat/task-def (PR #124 needs work)
 ```
 
-### 5.3 Cleanup
+### Cleanup
 
 ```bash
 python3 ./pinpoint-wt.py remove <branch>
@@ -296,29 +260,36 @@ python3 ./pinpoint-wt.py remove <branch>
 
 ## Task Contract (End-to-End Dispatch)
 
-For full lifecycle tasks where a teammate handles everything (implement → PR → Copilot → CI), use the **`pinpoint-dispatch-e2e-teammate`** skill. It handles:
-- Worktree creation with port allocation
-- Writing `.claude-task-contract` (the checklist the TaskCompleted hook enforces)
-- Teammate prompt with correct context
+For full lifecycle tasks, use the **`pinpoint-dispatch-e2e-teammate`** skill. It covers worktree creation, task contract, and prompt template.
 
-Teammates should load **`pinpoint-teammate-guide`** at the start — it covers the Copilot review loop, CI verification, Supabase startup, and contract protocol.
+Subagents should load **`pinpoint-teammate-guide`** at the start.
 
 ---
 
+## Lead Orchestrator Role
+
+You are a **coordinator, not an implementer**:
+- **DO** launch subagents, review their output, resume them with corrections
+- **DO** check CI dashboards, manage beads
+- **DON'T** directly fix code in worktrees — resume the subagent instead
+
+If a subagent can't be resumed (GC'd), spawn a new one on the same branch.
+
 ## Anti-Patterns
 
-- **DON'T use built-in `isolation: "worktree"`** for PinPoint — it doesn't set up ports or Supabase config. Always use `pinpoint-wt.py`.
-- **DON'T spawn agents without absolute worktree paths** — agents inherit the parent's cwd and will NOT cd on their own.
-- **DON'T forget to check Copilot comments before merging.**
-- **DON'T assume Agent Teams is stable** — it's experimental. Fall back to background agents if coordination breaks down.
+- **DON'T use Agent Teams as default** — `isolation: "worktree"` is broken with `team_name`
+- **DON'T assume hooks enforce quality for standalone subagents** — include `pnpm run check` in prompt
+- **DON'T forget to check Copilot comments before merging**
+- **DON'T fix code yourself as the orchestrator** — resume the subagent
 
 ## Error Recovery
 
 | Problem | Fix |
 |---------|-----|
-| Agent fails to create PR | Check output, verify worktree state, re-dispatch |
+| Subagent fails to create PR | Check output, verify worktree state, resume with context |
 | Permission denied on worktree | Add paths to `.claude/settings.json`, restart session |
 | Worktree creation fails | `python3 ./pinpoint-wt.py sync`, `supabase stop --all`, retry |
-| Teammate unresponsive | Idle is normal — send follow-up message. If stuck, shutdown + replace |
-| Team cleanup fails | Shutdown remaining teammates first, then `TeamDelete()` |
+| Agent Teams isolation broken | Known bug. Use standalone subagents (Option A) instead |
+| Hooks fire from wrong directory | Hooks skip for non-worktree CWD. Safeword: `touch .claude-hook-bypass` |
 | Session dies with active team | `rm -rf ~/.claude/teams/<name> ~/.claude/tasks/<name>` |
+| Husky post-checkout hook fails | Check `.husky/post-checkout` for merge conflict markers |

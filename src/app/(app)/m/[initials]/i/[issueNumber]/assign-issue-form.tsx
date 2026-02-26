@@ -24,6 +24,7 @@ interface AssignIssueFormProps {
   issueId: string;
   assignedToId: string | null;
   users: { id: string; name: string }[];
+  currentUserId?: string | null;
   accessLevel: AccessLevel;
   ownershipContext: OwnershipContext;
 }
@@ -32,6 +33,7 @@ export function AssignIssueForm({
   issueId,
   assignedToId,
   users,
+  currentUserId = null,
   accessLevel,
   ownershipContext,
 }: AssignIssueFormProps): React.JSX.Element {
@@ -72,6 +74,7 @@ export function AssignIssueForm({
     <AssigneePicker
       assignedToId={assignedToId}
       users={users}
+      currentUserId={currentUserId}
       isPending={isPending}
       disabled={!permissionState.allowed}
       disabledReason={deniedReason}

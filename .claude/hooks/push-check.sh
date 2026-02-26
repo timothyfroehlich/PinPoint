@@ -20,6 +20,7 @@ fi
 
 INPUT=$(cat)
 AGENT_CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
+TEAMMATE_NAME=$(echo "$INPUT" | jq -r '.teammate_name // empty')
 
 if [ -z "$AGENT_CWD" ] || [ ! -d "$AGENT_CWD" ]; then
   exit 0
@@ -27,10 +28,21 @@ fi
 
 cd "$AGENT_CWD" || exit 0
 
-# Safeword — agent is stuck and wants out
+# Safeword — agent is stuck and wants out (persistent until manual cleanup)
 if [ -f ".claude-hook-bypass" ]; then
-  rm -f ".claude-hook-bypass"
   exit 0
+fi
+
+# Smart teammate detection: if this is a teammate and the CWD is NOT a
+# worktree, then .cwd points to the lead's repo — we can't reliably check
+# push state. Only `isolation: "worktree"` sets the correct CWD for teammates.
+if [ -n "$TEAMMATE_NAME" ]; then
+  GIT_DIR=$(git rev-parse --git-dir 2>/dev/null)
+  GIT_COMMON_DIR=$(git rev-parse --git-common-dir 2>/dev/null)
+  if [ "$GIT_DIR" = "$GIT_COMMON_DIR" ]; then
+    # CWD is the main repo, not a worktree — skip check
+    exit 0
+  fi
 fi
 
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then

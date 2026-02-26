@@ -14,6 +14,7 @@ import { type AccessLevel } from "~/lib/permissions/matrix";
 interface SidebarActionsProps {
   issue: IssueWithAllRelations;
   allUsers: { id: string; name: string }[];
+  currentUserId: string | null;
   accessLevel: AccessLevel;
   ownershipContext: OwnershipContext;
 }
@@ -21,6 +22,7 @@ interface SidebarActionsProps {
 export function SidebarActions({
   issue,
   allUsers,
+  currentUserId,
   accessLevel,
   ownershipContext,
 }: SidebarActionsProps): React.JSX.Element {
@@ -34,6 +36,7 @@ export function SidebarActions({
             issueId={issue.id}
             assignedToId={issue.assignedTo ?? null}
             users={allUsers}
+            currentUserId={currentUserId}
             accessLevel={accessLevel}
             ownershipContext={ownershipContext}
           />

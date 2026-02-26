@@ -18,6 +18,7 @@ Port Allocation:
 
 import argparse
 import hashlib
+import json
 import os
 import re
 import stat
@@ -255,15 +256,23 @@ def cmd_create(args: argparse.Namespace) -> int:
     """Create a new ephemeral worktree."""
     branch = args.branch
     repo_root = Path.cwd()
+    use_json = getattr(args, "json", False)
 
-    print(f"🌿 Creating ephemeral worktree for branch: {branch}")
+    def log(*msg_args: object, **kwargs: object) -> None:
+        """Print to stderr in JSON mode, stdout otherwise."""
+        if use_json:
+            print(*msg_args, **kwargs, file=sys.stderr)
+        else:
+            print(*msg_args, **kwargs)
+
+    log(f"🌿 Creating ephemeral worktree for branch: {branch}")
 
     # Validate worktree doesn't already exist at target path
     worktree_dir = (
         repo_root / EPHEMERAL_WORKTREE_BASE / branch_to_dir_name(branch)
     ).resolve()
     if worktree_dir.exists():
-        print(f"❌ Error: Worktree already exists at {worktree_dir}")
+        log(f"❌ Error: Worktree already exists at {worktree_dir}")
         return 1
 
     # Check if branch already exists (local or remote)
@@ -286,22 +295,22 @@ def cmd_create(args: argparse.Namespace) -> int:
         )
 
     # Fetch latest from origin
-    print("  📥 Fetching from origin...")
+    log("  📥 Fetching from origin...")
     try:
         subprocess.run(["git", "fetch", "origin"], check=True, capture_output=True)
     except subprocess.CalledProcessError as e:
-        print("❌ Error: Failed to fetch from origin. Check your network connection.")
+        log("❌ Error: Failed to fetch from origin. Check your network connection.")
         if e.stderr:
             stderr_text = e.stderr.decode() if isinstance(e.stderr, bytes) else e.stderr
             if stderr_text.strip():
-                print(f"   git error: {stderr_text.strip()}")
+                log(f"   git error: {stderr_text.strip()}")
         return 1
 
     # Allocate port offset
     try:
         supabase_offset = find_free_offset(branch)
     except RuntimeError as e:
-        print(f"❌ Error: {e}")
+        log(f"❌ Error: {e}")
         return 1
 
     # Calculate nextjs offset (supabase_offset / 10 to keep in range)
@@ -316,7 +325,7 @@ def cmd_create(args: argparse.Namespace) -> int:
         is_static=False,
     )
 
-    print(
+    log(
         f"  🔌 Allocated ports: Next.js={port_config.nextjs_port}, API={port_config.api_port}, DB={port_config.db_port}"
     )
 
@@ -325,14 +334,14 @@ def cmd_create(args: argparse.Namespace) -> int:
 
     # Create worktree — use existing branch or create new one
     if branch_exists_locally:
-        print(f"  📂 Creating worktree for existing local branch: {branch}")
+        log(f"  📂 Creating worktree for existing local branch: {branch}")
         result = subprocess.run(
             ["git", "worktree", "add", str(worktree_dir), branch],
             capture_output=True,
             text=True,
         )
     elif branch_exists_remote:
-        print(f"  📂 Creating worktree for existing remote branch: {branch}")
+        log(f"  📂 Creating worktree for existing remote branch: {branch}")
         result = subprocess.run(
             ["git", "worktree", "add", str(worktree_dir), branch],
             capture_output=True,
@@ -340,7 +349,7 @@ def cmd_create(args: argparse.Namespace) -> int:
         )
     else:
         base_ref = args.base
-        print(
+        log(
             f"  📂 Creating worktree with new branch at {worktree_dir} (from {base_ref})..."
         )
         result = subprocess.run(
@@ -350,23 +359,23 @@ def cmd_create(args: argparse.Namespace) -> int:
         )
 
     if result.returncode != 0:
-        print(f"❌ Error creating worktree: {result.stderr}")
+        log(f"❌ Error creating worktree: {result.stderr}")
         return 1
 
     # Generate config.toml
-    print("  ⚙️  Generating supabase/config.toml...")
+    log("  ⚙️  Generating supabase/config.toml...")
     config_content = generate_config_toml(worktree_dir, port_config)
     config_path = worktree_dir / "supabase" / "config.toml"
     write_protected_file(config_path, config_content)
 
     # Generate .env.local
-    print("  📝 Generating .env.local...")
+    log("  📝 Generating .env.local...")
     env_content = merge_env_local(worktree_dir, port_config)
     env_path = worktree_dir / ".env.local"
     write_protected_file(env_path, env_content)
 
     # Install dependencies
-    print("  📦 Installing dependencies (pnpm install)...")
+    log("  📦 Installing dependencies (pnpm install)...")
     result = subprocess.run(
         ["pnpm", "install", "--frozen-lockfile"],
         cwd=worktree_dir,
@@ -374,7 +383,7 @@ def cmd_create(args: argparse.Namespace) -> int:
         text=True,
     )
     if result.returncode != 0:
-        print(f"  ⚠️  Warning: pnpm install failed: {result.stderr[:200]}")
+        log(f"  ⚠️  Warning: pnpm install failed: {result.stderr[:200]}")
 
     # Set up beads redirect (so `bd` commands work from this worktree)
     beads_dir = worktree_dir / ".beads"
@@ -382,21 +391,33 @@ def cmd_create(args: argparse.Namespace) -> int:
     main_beads = repo_root / ".beads"
     rel_path = os.path.relpath(main_beads, worktree_dir)
     (beads_dir / "redirect").write_text(rel_path + "\n")
-    print("  📋 Beads redirect configured")
+    log("  📋 Beads redirect configured")
 
-    print()
-    print("✅ Ephemeral worktree created successfully!")
-    print()
-    print(f"   Path:      {worktree_dir}")
-    print(f"   Branch:    {branch}")
-    print(f"   Next.js:   http://localhost:{port_config.nextjs_port}")
-    print(f"   Supabase:  http://localhost:{port_config.api_port}")
-    print()
-    print("   Next steps:")
-    print(f"   1. cd {worktree_dir}")
-    print("   2. supabase start")
-    print("   3. pnpm dev")
-    print()
+    log()
+    log("✅ Ephemeral worktree created successfully!")
+    log()
+    log(f"   Path:      {worktree_dir}")
+    log(f"   Branch:    {branch}")
+    log(f"   Next.js:   http://localhost:{port_config.nextjs_port}")
+    log(f"   Supabase:  http://localhost:{port_config.api_port}")
+    log()
+    log("   Next steps:")
+    log(f"   1. cd {worktree_dir}")
+    log("   2. supabase start")
+    log("   3. pnpm dev")
+    log()
+
+    if use_json:
+        print(
+            json.dumps(
+                {
+                    "path": str(worktree_dir),
+                    "branch": branch,
+                    "nextjs_port": port_config.nextjs_port,
+                    "api_port": port_config.api_port,
+                }
+            )
+        )
 
     return 0
 
@@ -445,6 +466,14 @@ def cmd_remove(args: argparse.Namespace) -> int:
     """Remove an ephemeral worktree with full cleanup."""
     branch = args.branch
     repo_root = Path.cwd()
+    use_json = getattr(args, "json", False)
+
+    def log(*msg_args: object, **kwargs: object) -> None:
+        """Print to stderr in JSON mode, stdout otherwise."""
+        if use_json:
+            print(*msg_args, **kwargs, file=sys.stderr)
+        else:
+            print(*msg_args, **kwargs)
 
     # Find the worktree path (flat name first, fallback to old nested path)
     worktree_dir = (
@@ -455,20 +484,20 @@ def cmd_remove(args: argparse.Namespace) -> int:
         worktree_dir = (repo_root / EPHEMERAL_WORKTREE_BASE / branch).resolve()
 
     if not worktree_dir.exists():
-        print(f"❌ Error: Worktree not found at {worktree_dir}")
+        log(f"❌ Error: Worktree not found at {worktree_dir}")
         return 1
 
     # Get project_id for Docker cleanup
     project_id = branch_to_project_id(branch)
 
-    print(f"🗑️  Removing ephemeral worktree: {branch}")
+    log(f"🗑️  Removing ephemeral worktree: {branch}")
 
     # Stop Supabase if running
-    print("  🛑 Stopping Supabase...")
+    log("  🛑 Stopping Supabase...")
     subprocess.run(["supabase", "stop"], cwd=worktree_dir, capture_output=True)
 
     # Remove Docker volumes
-    print(f"  🐳 Removing Docker volumes for project: {project_id}...")
+    log(f"  🐳 Removing Docker volumes for project: {project_id}...")
     result = subprocess.run(
         [
             "docker",
@@ -486,29 +515,32 @@ def cmd_remove(args: argparse.Namespace) -> int:
 
     if volumes:
         subprocess.run(["docker", "volume", "rm"] + volumes, capture_output=True)
-        print(f"     Removed {len(volumes)} volume(s)")
+        log(f"     Removed {len(volumes)} volume(s)")
     else:
-        print("     No volumes found")
+        log("     No volumes found")
 
     # Remove worktree
-    print("  📂 Removing worktree...")
+    log("  📂 Removing worktree...")
     result = subprocess.run(
         ["git", "worktree", "remove", "--force", str(worktree_dir)],
         capture_output=True,
         text=True,
     )
     if result.returncode != 0:
-        print(f"  ⚠️  Warning: {result.stderr}")
+        log(f"  ⚠️  Warning: {result.stderr}")
 
     # Prune worktrees
     subprocess.run(["git", "worktree", "prune"], capture_output=True)
 
-    print()
-    print("✅ Worktree removed successfully!")
-    print(
+    log()
+    log("✅ Worktree removed successfully!")
+    log(
         f"   Branch '{branch}' preserved (delete manually with: git branch -d -- '{branch}' (or: git branch -D -- '{branch}' to force))"
     )
-    print()
+    log()
+
+    if use_json:
+        print(json.dumps({"removed": True}))
 
     return 0
 
@@ -649,6 +681,11 @@ Examples:
         default="origin/main",
         help="Base revision/branch to create from (default: origin/main)",
     )
+    create_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output machine-readable JSON on stdout; route human output to stderr",
+    )
 
     # list
     subparsers.add_parser("list", help="List all worktrees with port assignments")
@@ -656,6 +693,11 @@ Examples:
     # remove
     remove_parser = subparsers.add_parser("remove", help="Remove ephemeral worktree")
     remove_parser.add_argument("branch", help="Branch name to remove")
+    remove_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output machine-readable JSON on stdout; route human output to stderr",
+    )
 
     # sync
     sync_parser = subparsers.add_parser("sync", help="Regenerate config files")
