@@ -13,7 +13,6 @@ import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
-import { PageShell } from "~/components/layout/PageShell";
 import {
   Card,
   CardDescription,
@@ -122,7 +121,7 @@ export default async function HelpPage(): Promise<React.JSX.Element> {
   }
 
   return (
-    <PageShell size="narrow">
+    <div className="max-w-3xl mx-auto py-10">
       <header className="mb-8 space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight">Help</h1>
         <p className="text-sm text-muted-foreground">
@@ -152,6 +151,6 @@ export default async function HelpPage(): Promise<React.JSX.Element> {
           <HelpCardGrid cards={adminCards} />
         </section>
       )}
-    </PageShell>
+    </div>
   );
 }

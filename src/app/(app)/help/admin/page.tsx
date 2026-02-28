@@ -5,7 +5,6 @@ import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { userProfiles } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
-import { PageShell } from "~/components/layout/PageShell";
 import { Forbidden } from "~/components/errors/Forbidden";
 
 export const metadata = {
@@ -32,7 +31,7 @@ export default async function AdminHelpPage(): Promise<React.JSX.Element> {
   }
 
   return (
-    <PageShell size="narrow">
+    <div className="max-w-3xl mx-auto py-10">
       <header className="space-y-2 mb-8">
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
           <Link href="/help" className="text-primary underline">
@@ -108,6 +107,6 @@ export default async function AdminHelpPage(): Promise<React.JSX.Element> {
           </li>
         </ul>
       </section>
-    </PageShell>
+    </div>
   );
 }

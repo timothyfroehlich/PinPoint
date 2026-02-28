@@ -16,6 +16,19 @@ function visibleUserMenu(page: Page) {
     .filter({ visible: true });
 }
 
+/**
+ * Returns the visible issue-detail sidebar container.
+ * On desktop → `issue-sidebar`. On mobile → `mobile-details-panel`.
+ * Both exist in the DOM; scoping queries through this avoids strict-mode
+ * violations from duplicate test IDs.
+ */
+export function getIssueSidebar(page: Page, testInfo: TestInfo) {
+  const isMobile = testInfo.project.name.includes("Mobile");
+  return isMobile
+    ? page.getByTestId("mobile-details-panel")
+    : page.getByTestId("issue-sidebar");
+}
+
 interface LoginOptions {
   email?: string;
   password?: string;
@@ -37,7 +50,6 @@ export async function loginAs(
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign In" }).click();
 
-  await page.waitForLoadState("networkidle");
   await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
 
   // Use project name to determine mobile vs desktop layout
@@ -144,11 +156,30 @@ export async function selectOption(
     ((value: string) =>
       `${triggerTestId.replace("issue-", "").replace("-select", "")}-option-${value}`);
 
+  // Handle mobile layout: if the controls are hidden inside a collapsible panel, expand it
+  const mobilePanel = page.getByTestId("mobile-details-panel");
+  if (await mobilePanel.isVisible()) {
+    const detailsBtn = mobilePanel.getByRole("button", { name: "Details" });
+    if (await detailsBtn.isVisible()) {
+      const isExpanded =
+        (await detailsBtn.getAttribute("aria-expanded")) === "true";
+      if (!isExpanded) {
+        await detailsBtn.click();
+        // Wait a brief moment for the expansion animation
+        await page.waitForTimeout(300);
+      }
+    }
+  }
+
   // Wait for and click the Select trigger
-  // Scroll trigger into view first to help position the dropdown on mobile viewports
-  const trigger = page.getByTestId(triggerTestId);
+  // Filter by visibility to handle responsive layouts where multiple instances exist
+  const triggers = page.getByTestId(triggerTestId);
+  const trigger = triggers.filter({ visible: true }).first();
   await expect(trigger).toBeVisible({ timeout: 10000 });
-  await trigger.scrollIntoViewIfNeeded();
+
+  // Center the element in the viewport to avoid sticky headers or footers
+  await trigger.evaluate((node) => node.scrollIntoView({ block: "center" }));
+  await page.waitForTimeout(100); // Allow scrolling to settle
   await trigger.click();
 
   // Wait for the dropdown to appear and find the option

@@ -90,8 +90,8 @@ test.describe("Machines CRUD", () => {
     const machineCards = page.getByTestId("machine-card");
     const cardCount = await machineCards.count();
 
-    // We seed 10 machines; other tests may add more but we should always have at least the seeds
-    expect(cardCount).toBeGreaterThanOrEqual(10);
+    // We seed 11 machines; other tests may add more but we should always have at least the seeds
+    expect(cardCount).toBeGreaterThanOrEqual(11);
 
     // Every card should surface a status badge and an open-issue count
     for (let i = 0; i < cardCount; i += 1) {
@@ -109,6 +109,7 @@ test.describe("Machines CRUD", () => {
     const addamsCard = page.locator(
       `a:has-text("${seededMachines.addamsFamily.name}")`
     );
+    await addamsCard.scrollIntoViewIfNeeded();
     await expect(
       addamsCard.getByText(machineStatuses.addamsFamily)
     ).toBeVisible();

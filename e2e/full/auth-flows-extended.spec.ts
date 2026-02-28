@@ -8,6 +8,7 @@
 import { test, expect } from "@playwright/test";
 import { loginAs, logout } from "../support/actions.js";
 import { seededMember } from "../support/constants.js";
+import { submitFormAndWaitForRedirect } from "../support/page-helpers.js";
 import { getPasswordResetLink } from "../support/mailpit.js";
 
 // Removed local signOut helper in favor of shared action
@@ -82,8 +83,12 @@ test.describe("Extended Authentication", () => {
     await page.getByLabel("Email").fill(testEmail);
     await page.getByLabel("Password", { exact: true }).fill(testPassword);
 
-    // Submit form
-    await page.getByRole("button", { name: "Sign In" }).click();
+    // Submit form and wait for redirect
+    await submitFormAndWaitForRedirect(
+      page,
+      page.getByRole("button", { name: "Sign In" }),
+      { awayFrom: "/login?next=%2Fsettings" }
+    );
 
     // Should redirect back to original destination (settings) after successful login
     await expect(page).toHaveURL("/settings", { timeout: 10000 });
@@ -164,7 +169,6 @@ test.describe("Extended Authentication", () => {
 
     // Safari ITP fix: Wait for page to fully load and stabilize after redirect
     // This ensures cookies are properly cleared and the form is ready
-    await page.waitForLoadState("networkidle");
     await expect(page.getByRole("heading", { name: "Sign In" })).toBeVisible();
 
     // Now log in with the new password

@@ -1,7 +1,6 @@
 import type React from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { PageShell } from "~/components/layout/PageShell";
 
 export const metadata: Metadata = {
   title: "About | PinPoint",
@@ -11,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function AboutPage(): React.JSX.Element {
   return (
-    <PageShell size="narrow">
+    <div className="max-w-3xl mx-auto py-10">
       <header className="space-y-2 mb-8">
         <h1 className="text-2xl font-semibold tracking-tight">
           About PinPoint
@@ -73,6 +72,6 @@ export default function AboutPage(): React.JSX.Element {
           </li>
         </ul>
       </section>
-    </PageShell>
+    </div>
   );
 }
