@@ -17,7 +17,7 @@ test.describe("Status Overhaul E2E", () => {
   });
 
   test("should create issue and verify all 4 badges", async ({ page }) => {
-    const machine = seededMachines.addamsFamily;
+    const machine = seededMachines.twilightZone;
 
     // 1. Create Issue
     await page.goto(`/report?machine=${machine.initials}`);
@@ -39,7 +39,7 @@ test.describe("Status Overhaul E2E", () => {
     // 2. Verify redirect and badges
     // Use a generous timeout: Server Action redirects can be slow on Mobile Chrome
     // in CI due to cookie propagation timing.
-    await expect(page).toHaveURL(/\/m\/TAF\/i\/[0-9]+/, { timeout: 30000 });
+    await expect(page).toHaveURL(/\/m\/TZ\/i\/[0-9]+/, { timeout: 30000 });
 
     await expect(page.getByTestId("issue-status-badge").first()).toHaveText(
       /New/i

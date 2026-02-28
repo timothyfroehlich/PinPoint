@@ -166,6 +166,7 @@ async function seedUsersAndData() {
       "MM": userIds.admin,
       "SM": userIds.guest,
       "GDZ": userIds.admin,
+      "TZ": userIds.admin,
     };
 
     for (const machine of machines) {
