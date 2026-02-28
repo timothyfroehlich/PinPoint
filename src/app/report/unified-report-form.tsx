@@ -335,7 +335,6 @@ export function UnifiedReportForm({
                 <div className="lg:hidden">
                   <RecentIssuesPanelClient
                     machineInitials={selectedMachine?.initials ?? ""}
-                    machineName={selectedMachine?.name ?? ""}
                     issues={issues}
                     isLoading={isLoadingIssues}
                     isError={issuesError}
@@ -464,7 +463,6 @@ export function UnifiedReportForm({
                 <div className="border-t border-outline-variant/30 pt-3 md:pt-4">
                   <div className="space-y-3">
                     <div className="space-y-1.5">
-                      <Label className="text-on-surface">Photos</Label>
                       <ImageUploadButton
                         issueId="new"
                         currentCount={uploadedImages.length}
@@ -497,13 +495,13 @@ export function UnifiedReportForm({
 
                 {/* Reporter Info (Only if NOT logged in) */}
                 {!userAuthenticated && (
-                  <div className="space-y-3 pt-2">
+                  <div className="space-y-2 pt-2">
                     <div className="space-y-1">
                       <h3 className="text-sm font-semibold text-on-surface">
                         Your Information (Optional)
                       </h3>
                     </div>
-                    <div className="space-y-3 rounded-lg border border-outline-variant/30 bg-surface-container-low p-3">
+                    <div className="space-y-2 rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2">
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1.5">
                           <Label
@@ -545,12 +543,12 @@ export function UnifiedReportForm({
                           type="email"
                           className="h-8 border-outline-variant bg-surface text-sm text-on-surface"
                         />
-                        <p className="text-[10px] text-on-surface-variant">
+                        <p className="text-[10px] text-on-surface-variant leading-none">
                           Verified emails link to your profile.
                         </p>
                       </div>
                     </div>
-                    <p className="text-sm text-on-surface-variant">
+                    <p className="text-sm text-on-surface-variant pb-1">
                       Already have an account?{" "}
                       <Link
                         href={getLoginUrl(
@@ -607,7 +605,7 @@ export function UnifiedReportForm({
 
                 <Button
                   type="submit"
-                  className="w-full bg-primary text-on-primary hover:bg-primary/90 mt-2 h-10 text-sm font-semibold"
+                  className="w-full bg-primary text-on-primary hover:bg-primary/90 mt-1 h-10 text-sm font-semibold"
                   loading={isPending}
                 >
                   Submit Issue Report
@@ -619,7 +617,6 @@ export function UnifiedReportForm({
             <div className="hidden lg:block lg:col-span-5 border-l border-outline-variant/50 pl-8">
               <RecentIssuesPanelClient
                 machineInitials={selectedMachine?.initials ?? ""}
-                machineName={selectedMachine?.name ?? ""}
                 issues={issues}
                 isLoading={isLoadingIssues}
                 isError={issuesError}
