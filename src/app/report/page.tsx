@@ -7,7 +7,7 @@ import { resolveDefaultMachineId } from "./default-machine";
 import { UnifiedReportForm } from "./unified-report-form";
 import { createClient } from "~/lib/supabase/server";
 import { getAccessLevel } from "~/lib/permissions/helpers";
-import { RecentIssuesPanel } from "~/components/issues/RecentIssuesPanel";
+import { getRecentIssuesAction, type RecentIssueData } from "./actions";
 
 // Avoid SSG hitting Supabase during builds that run parallel to db resets
 export const dynamic = "force-dynamic";
@@ -71,9 +71,16 @@ export default async function PublicReportPage({
 
   const selectedMachine = machinesList.find((m) => m.id === defaultMachineId);
 
+  // Pre-fetch initial issues for the selected machine (avoids first-load skeleton flash)
+  let initialIssues: RecentIssueData[] | null = null;
+  if (selectedMachine) {
+    const result = await getRecentIssuesAction(selectedMachine.initials, 5);
+    initialIssues = result.ok ? result.value : null;
+  }
+
   return (
     <MainLayout>
-      <div className="container mx-auto max-w-5xl py-8 px-4">
+      <div className="container mx-auto max-w-5xl py-4 px-2 md:py-8 md:px-4">
         {/* CORE-SEC-006: Pass minimal user shape, not full Supabase user */}
         <UnifiedReportForm
           machinesList={machinesList}
@@ -82,22 +89,8 @@ export default async function PublicReportPage({
           accessLevel={accessLevel}
           assignees={assignees}
           initialError={errorMessage}
-          recentIssuesPanelMobile={
-            <RecentIssuesPanel
-              machineInitials={selectedMachine?.initials ?? ""}
-              machineName={selectedMachine?.name ?? ""}
-              className="border-0 bg-surface-container-low/50 shadow-none p-3"
-              limit={3}
-            />
-          }
-          recentIssuesPanelDesktop={
-            <RecentIssuesPanel
-              machineInitials={selectedMachine?.initials ?? ""}
-              machineName={selectedMachine?.name ?? ""}
-              className="border-0 shadow-none bg-transparent p-0"
-              limit={5}
-            />
-          }
+          initialIssues={initialIssues}
+          initialMachineInitials={selectedMachine?.initials ?? ""}
         />
       </div>
     </MainLayout>

@@ -14,9 +14,13 @@ import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { cn } from "~/lib/utils";
-import { submitPublicIssueAction } from "./actions";
+import {
+  submitPublicIssueAction,
+  getRecentIssuesAction,
+  type RecentIssueData,
+} from "./actions";
 import { SeveritySelect } from "~/components/issues/fields/SeveritySelect";
 import { FrequencySelect } from "~/components/issues/fields/FrequencySelect";
 import { PrioritySelect } from "~/components/issues/fields/PrioritySelect";
@@ -33,6 +37,7 @@ import { type ImageMetadata } from "~/types/images";
 import type { AccessLevel } from "~/lib/permissions/matrix";
 import { TurnstileWidget } from "~/components/security/TurnstileWidget";
 import { getLoginUrl } from "~/lib/login-url";
+import { RecentIssuesPanelClient } from "~/components/issues/RecentIssuesPanelClient";
 
 interface Machine {
   id: string;
@@ -57,8 +62,8 @@ interface UnifiedReportFormProps {
   accessLevel: AccessLevel;
   assignees?: Assignee[];
   initialError?: string | undefined;
-  recentIssuesPanelMobile?: React.ReactNode;
-  recentIssuesPanelDesktop?: React.ReactNode;
+  initialIssues: RecentIssueData[] | null;
+  initialMachineInitials: string;
 }
 
 export function UnifiedReportForm({
@@ -68,10 +73,9 @@ export function UnifiedReportForm({
   accessLevel,
   assignees = [],
   initialError,
-  recentIssuesPanelMobile,
-  recentIssuesPanelDesktop,
+  initialIssues,
+  initialMachineInitials,
 }: UnifiedReportFormProps): React.JSX.Element {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const hasRestored = useRef(false);
   const [selectedMachineId, setSelectedMachineId] = useState(
@@ -88,6 +92,14 @@ export function UnifiedReportForm({
 
   const [uploadedImages, setUploadedImages] = useState<ImageMetadata[]>([]);
   const [turnstileToken, setTurnstileToken] = useState("");
+
+  // Recent issues panel state
+  const [issues, setIssues] = useState<RecentIssueData[]>(initialIssues ?? []);
+  const [isLoadingIssues, setIsLoadingIssues] = useState(false);
+  const [issuesError, setIssuesError] = useState(
+    initialIssues === null && initialMachineInitials !== ""
+  );
+  const prevMachineRef = useRef(initialMachineInitials);
 
   const handleTurnstileVerify = useCallback((token: string) => {
     setTurnstileToken(token);
@@ -148,7 +160,7 @@ export function UnifiedReportForm({
         if (machine) {
           const params = new URLSearchParams(searchParams.toString());
           params.set("machine", machine.initials);
-          router.replace(`?${params.toString()}`, { scroll: false });
+          window.history.replaceState(null, "", `?${params.toString()}`);
         }
       }
 
@@ -163,7 +175,7 @@ export function UnifiedReportForm({
       // Clear corrupted localStorage
       window.localStorage.removeItem("report_form_state");
     }
-  }, [defaultMachineId, machinesList, router, searchParams]);
+  }, [defaultMachineId, machinesList, searchParams]);
 
   // Persistence: Save to localStorage on change
   useEffect(() => {
@@ -191,16 +203,53 @@ export function UnifiedReportForm({
     watchIssue,
   ]);
 
-  // Cleanup: Clear storage on success (handled by redirect usually, but good for robust logic if no redirect)
-  // Actually, review says: "cleanup effect will never execute because action redirects".
-  // Removing it to follow advice.
-
   // Sync with defaultMachineId prop when it changes (from URL)
   useEffect(() => {
     if (defaultMachineId) {
       setSelectedMachineId(defaultMachineId);
     }
   }, [defaultMachineId]);
+
+  // Fetch recent issues when selected machine changes
+  useEffect(() => {
+    const currentInitials = selectedMachine?.initials ?? "";
+
+    // Skip if machine hasn't actually changed
+    if (currentInitials === prevMachineRef.current) return;
+    prevMachineRef.current = currentInitials;
+
+    // No machine selected — clear issues
+    if (!currentInitials) {
+      setIssues([]);
+      setIssuesError(false);
+      return;
+    }
+
+    const cancellation = { cancelled: false };
+    setIsLoadingIssues(true);
+    setIssuesError(false);
+
+    void (async () => {
+      try {
+        const result = await getRecentIssuesAction(currentInitials, 5);
+        if (cancellation.cancelled) return;
+        setIsLoadingIssues(false);
+        if (result.ok) {
+          setIssues(result.value);
+        } else {
+          setIssuesError(true);
+        }
+      } catch {
+        if (cancellation.cancelled) return;
+        setIsLoadingIssues(false);
+        setIssuesError(true);
+      }
+    })();
+
+    return () => {
+      cancellation.cancelled = true;
+    };
+  }, [selectedMachine?.initials]);
 
   const canSetWorkflowFields =
     accessLevel === "admin" ||
@@ -210,8 +259,8 @@ export function UnifiedReportForm({
   return (
     <div className="w-full max-w-5xl mx-auto">
       <Card className="border-outline-variant bg-surface shadow-md">
-        <CardHeader className="space-y-1.5 pb-4 border-b border-outline-variant/50">
-          <CardTitle className="text-2xl font-bold text-on-surface">
+        <CardHeader className="space-y-1 pb-3 px-4 md:pb-4 md:px-6 border-b border-outline-variant/50">
+          <CardTitle className="text-xl md:text-2xl font-bold text-on-surface">
             Report an Issue
           </CardTitle>
           <p className="text-sm text-on-surface-variant">
@@ -219,10 +268,10 @@ export function UnifiedReportForm({
             from here.
           </p>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent className="p-3 md:p-6">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             {/* Main Form Column */}
-            <div className="lg:col-span-7 space-y-4">
+            <div className="lg:col-span-7 space-y-3 md:space-y-4">
               {(initialError ?? state.error) && (
                 <div
                   role="alert"
@@ -232,7 +281,7 @@ export function UnifiedReportForm({
                 </div>
               )}
 
-              <form action={formAction} className="space-y-4">
+              <form action={formAction} className="space-y-3 md:space-y-4">
                 {/* Honeypot field for bot detection */}
                 <input
                   type="text"
@@ -255,14 +304,18 @@ export function UnifiedReportForm({
                     onChange={(e) => {
                       const newId = e.target.value;
                       setSelectedMachineId(newId);
-                      // Update URL for parent to re-render Server Components
+                      // Update URL silently without triggering navigation
                       const machine = machinesList.find((m) => m.id === newId);
                       if (machine) {
                         const params = new URLSearchParams(
                           searchParams.toString()
                         );
                         params.set("machine", machine.initials);
-                        router.push(`?${params.toString()}`, { scroll: false });
+                        window.history.replaceState(
+                          null,
+                          "",
+                          `?${params.toString()}`
+                        );
                       }
                     }}
                     className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
@@ -279,7 +332,17 @@ export function UnifiedReportForm({
                 </div>
 
                 {/* Mobile Recent Issues (Compact) - Visible only on small screens */}
-                <div className="lg:hidden">{recentIssuesPanelMobile}</div>
+                <div className="lg:hidden">
+                  <RecentIssuesPanelClient
+                    machineInitials={selectedMachine?.initials ?? ""}
+                    issues={issues}
+                    isLoading={isLoadingIssues}
+                    isError={issuesError}
+                    className="border-0 bg-surface-container-low/50 shadow-none p-3"
+                    limit={3}
+                    defaultOpen
+                  />
+                </div>
 
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
@@ -323,7 +386,8 @@ export function UnifiedReportForm({
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Severity + Frequency: always side-by-side */}
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="severity" className="text-on-surface">
                       Severity *
@@ -346,8 +410,11 @@ export function UnifiedReportForm({
                       testId="issue-frequency-select"
                     />
                   </div>
+                </div>
 
-                  {canSetWorkflowFields && (
+                {/* Priority + Status: always side-by-side when visible */}
+                {canSetWorkflowFields && (
+                  <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label htmlFor="priority" className="text-on-surface">
                         Priority *
@@ -358,8 +425,6 @@ export function UnifiedReportForm({
                         onValueChange={setPriority}
                       />
                     </div>
-                  )}
-                  {canSetWorkflowFields && (
                     <div className="space-y-1.5">
                       <Label htmlFor="status" className="text-on-surface">
                         Status *
@@ -367,36 +432,37 @@ export function UnifiedReportForm({
                       <input type="hidden" name="status" value={status} />
                       <StatusSelect value={status} onValueChange={setStatus} />
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {canSetWorkflowFields && assignees.length > 0 && (
-                    <div className="space-y-1.5 md:col-span-2">
-                      <Label htmlFor="assignedTo" className="text-on-surface">
-                        Assign To
-                      </Label>
-                      <select
-                        id="assignedTo"
-                        name="assignedTo"
-                        data-testid="assigned-to-select"
-                        value={assignedTo}
-                        onChange={(e) => setAssignedTo(e.target.value)}
-                        className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                      >
-                        <option value="">Unassigned</option>
-                        {assignees.map((assignee) => (
-                          <option key={assignee.id} value={assignee.id}>
-                            {assignee.name ?? "Unnamed User"}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </div>
+                {/* Assign To: full-width */}
+                {canSetWorkflowFields && assignees.length > 0 && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="assignedTo" className="text-on-surface">
+                      Assign To
+                    </Label>
+                    <select
+                      id="assignedTo"
+                      name="assignedTo"
+                      data-testid="assigned-to-select"
+                      value={assignedTo}
+                      onChange={(e) => setAssignedTo(e.target.value)}
+                      className="w-full rounded-md border border-outline-variant bg-surface px-3 h-9 text-sm text-on-surface focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                    >
+                      <option value="">Unassigned</option>
+                      {assignees.map((assignee) => (
+                        <option key={assignee.id} value={assignee.id}>
+                          {assignee.name ?? "Unnamed User"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
-                <div className="space-y-3 pb-2 pt-1 border-t border-b border-outline-variant/30 py-4">
-                  <div className="flex flex-col gap-4">
+                {/* Divider before photos */}
+                <div className="border-t border-outline-variant/30 pt-3 md:pt-4">
+                  <div className="space-y-3">
                     <div className="space-y-1.5">
-                      <Label className="text-on-surface">Photos</Label>
                       <ImageUploadButton
                         issueId="new"
                         currentCount={uploadedImages.length}
@@ -409,7 +475,7 @@ export function UnifiedReportForm({
                     </div>
 
                     {uploadedImages.length > 0 && (
-                      <div className="mt-2">
+                      <div>
                         <ImageGallery
                           images={uploadedImages.map((img) => ({
                             id: img.blobPathname,
@@ -429,13 +495,13 @@ export function UnifiedReportForm({
 
                 {/* Reporter Info (Only if NOT logged in) */}
                 {!userAuthenticated && (
-                  <div className="space-y-3 pt-2">
+                  <div className="space-y-2 pt-2">
                     <div className="space-y-1">
                       <h3 className="text-sm font-semibold text-on-surface">
                         Your Information (Optional)
                       </h3>
                     </div>
-                    <div className="space-y-3 rounded-lg border border-outline-variant/30 bg-surface-container-low p-3">
+                    <div className="space-y-2 rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2">
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1.5">
                           <Label
@@ -477,12 +543,12 @@ export function UnifiedReportForm({
                           type="email"
                           className="h-8 border-outline-variant bg-surface text-sm text-on-surface"
                         />
-                        <p className="text-[10px] text-on-surface-variant">
+                        <p className="text-[10px] text-on-surface-variant leading-none">
                           Verified emails link to your profile.
                         </p>
                       </div>
                     </div>
-                    <p className="text-sm text-on-surface-variant">
+                    <p className="text-sm text-on-surface-variant pb-1">
                       Already have an account?{" "}
                       <Link
                         href={getLoginUrl(
@@ -499,27 +565,25 @@ export function UnifiedReportForm({
                 )}
 
                 {userAuthenticated && (
-                  <div className="space-y-2 rounded-lg border border-outline-variant/30 bg-surface-container-low p-3">
-                    <div className="flex items-start gap-3">
-                      <Checkbox
-                        id="watchIssue"
-                        checked={watchIssue}
-                        onCheckedChange={(checked) =>
-                          setWatchIssue(checked === true)
-                        }
-                        className="mt-0.5 border-outline-variant data-[state=checked]:border-primary"
-                      />
-                      <div className="space-y-1">
-                        <Label
-                          htmlFor="watchIssue"
-                          className="text-sm font-medium text-on-surface"
-                        >
-                          Watch this issue
-                        </Label>
-                        <p className="text-xs text-on-surface-variant">
-                          Get updates when status or comments change.
-                        </p>
-                      </div>
+                  <div className="flex items-start gap-3 py-1">
+                    <Checkbox
+                      id="watchIssue"
+                      checked={watchIssue}
+                      onCheckedChange={(checked) =>
+                        setWatchIssue(checked === true)
+                      }
+                      className="mt-0.5 border-outline-variant data-[state=checked]:border-primary"
+                    />
+                    <div className="space-y-0.5">
+                      <Label
+                        htmlFor="watchIssue"
+                        className="text-sm font-medium text-on-surface cursor-pointer"
+                      >
+                        Watch this issue
+                      </Label>
+                      <p className="text-xs text-on-surface-variant">
+                        Get updates when status or comments change.
+                      </p>
                     </div>
                     <input
                       type="hidden"
@@ -541,7 +605,7 @@ export function UnifiedReportForm({
 
                 <Button
                   type="submit"
-                  className="w-full bg-primary text-on-primary hover:bg-primary/90 mt-2 h-10 text-sm font-semibold"
+                  className="w-full bg-primary text-on-primary hover:bg-primary/90 mt-1 h-10 text-sm font-semibold"
                   loading={isPending}
                 >
                   Submit Issue Report
@@ -551,7 +615,14 @@ export function UnifiedReportForm({
 
             {/* Right Sidebar: Recent Issues (Desktop) */}
             <div className="hidden lg:block lg:col-span-5 border-l border-outline-variant/50 pl-8">
-              {recentIssuesPanelDesktop}
+              <RecentIssuesPanelClient
+                machineInitials={selectedMachine?.initials ?? ""}
+                issues={issues}
+                isLoading={isLoadingIssues}
+                isError={issuesError}
+                className="border-0 shadow-none bg-transparent p-0"
+                limit={5}
+              />
             </div>
           </div>
         </CardContent>
