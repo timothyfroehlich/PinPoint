@@ -104,9 +104,10 @@ export function InlineEditableField({
     <div
       data-testid={testId}
       className={cn(
-        "space-y-1.5",
-        variant === "private" &&
-          "bg-primary/5 border border-primary/20 rounded-xl p-4"
+        "space-y-1.5 rounded-lg p-3",
+        variant === "private"
+          ? "bg-primary/5 border border-primary/20 rounded-xl p-4"
+          : "bg-surface-variant/15"
       )}
     >
       <div className="flex items-center gap-1.5">
@@ -170,8 +171,9 @@ export function InlineEditableField({
       ) : (
         <div
           className={cn(
-            "group relative min-h-[80px]",
-            canEdit && "cursor-pointer rounded-md hover:bg-surface-variant/50"
+            "group relative",
+            canEdit &&
+              "min-h-[80px] cursor-pointer rounded-md hover:bg-surface-variant/50"
           )}
           onClick={canEdit ? handleEdit : undefined}
           onKeyDown={

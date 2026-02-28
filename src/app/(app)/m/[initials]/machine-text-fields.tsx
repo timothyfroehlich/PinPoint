@@ -51,7 +51,11 @@ export function MachineTextFields({
   canViewOwnerNotes,
 }: MachineTextFieldsProps): React.JSX.Element {
   return (
-    <div className="rounded-xl border border-outline-variant/30 bg-surface-variant/10 p-4 space-y-4">
+    <div className="bg-surface-container border border-outline-variant rounded-xl p-5 shadow-sm flex flex-col gap-4">
+      <h3 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant border-b border-outline-variant/50 pb-2">
+        Notes &amp; Details
+      </h3>
+
       <InlineEditableField
         icon={FileText}
         label="Description"
