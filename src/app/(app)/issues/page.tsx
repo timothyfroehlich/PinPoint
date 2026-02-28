@@ -6,6 +6,7 @@ import { issues, userProfiles } from "~/server/db/schema";
 import { IssueFilters } from "~/components/issues/IssueFilters";
 import { getUnifiedUsers } from "~/lib/users/queries";
 import { IssueList } from "~/components/issues/IssueList";
+import { MobileIssueList } from "~/components/issues/MobileIssueList";
 import { createClient } from "~/lib/supabase/server";
 import type { IssueListItem } from "~/lib/types";
 
@@ -155,38 +156,53 @@ export default async function IssuesPage({
   }));
 
   return (
-    <PageShell size="wide" padded={false} className="py-8">
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">All Issues</h1>
-          <p className="text-muted-foreground">
-            Track and manage reported problems across the collection.
-          </p>
-        </div>
-        <div className="text-sm text-muted-foreground">
-          Showing {issuesList.length} of {totalCount} issues
-        </div>
-      </div>
-
-      <div className="space-y-6">
-        {/* Filters */}
-        <IssueFilters
-          users={filterUsers}
-          machines={allMachines}
-          filters={filters}
-          currentUserId={user?.id ?? null}
-          ownedMachineInitials={ownedMachineInitials}
-        />
-
-        {/* Issues List */}
-        <IssueList
+    <PageShell size="wide" padded={false} className="py-4 md:py-8">
+      {/* Mobile layout (< md breakpoint) */}
+      <div className="md:hidden px-4 pb-4 space-y-4">
+        <MobileIssueList
           issues={issuesList}
           totalCount={totalCount}
-          sort={filters.sort ?? "updated_desc"}
           page={page}
           pageSize={pageSize}
-          allUsers={assigneeUsers}
+          machines={allMachines}
+          currentUserId={user?.id ?? null}
         />
+      </div>
+
+      {/* Desktop layout (md and above) */}
+      <div className="hidden md:block">
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">All Issues</h1>
+            <p className="text-muted-foreground">
+              Track and manage reported problems across the collection.
+            </p>
+          </div>
+          <div className="text-sm text-muted-foreground">
+            Showing {issuesList.length} of {totalCount} issues
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          {/* Filters */}
+          <IssueFilters
+            users={filterUsers}
+            machines={allMachines}
+            filters={filters}
+            currentUserId={user?.id ?? null}
+            ownedMachineInitials={ownedMachineInitials}
+          />
+
+          {/* Issues List */}
+          <IssueList
+            issues={issuesList}
+            totalCount={totalCount}
+            sort={filters.sort ?? "updated_desc"}
+            page={page}
+            pageSize={pageSize}
+            allUsers={assigneeUsers}
+          />
+        </div>
       </div>
     </PageShell>
   );
