@@ -25,6 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.set-code.outputs.code }}
+      deps: ${{ steps.deps-filter.outputs.deps }}
     steps:
       - uses: actions/checkout@v6
       - id: filter
@@ -40,6 +41,15 @@ jobs:
               - '.claude/**'
               - 'LICENSE'
               - '.gitignore'
+      # Separate filter for dependency changes using default "some" quantifier
+      # so deps=true when ANY changed file is a dependency file (not ALL).
+      - id: deps-filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            deps:
+              - 'package.json'
+              - 'pnpm-lock.yaml'
       - name: Determine code changes
         id: set-code
         run: |
@@ -399,8 +409,8 @@ jobs:
   test-integration-supabase:
     name: Supabase Integration Tests
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' }}
-    needs: [setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
+    if: ${{ github.event_name == 'pull_request' || needs.changes.outputs.deps == 'true' }}
+    needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -449,8 +459,8 @@ jobs:
     # ==============================================================================
     name: E2E Smoke Tests (Chromium)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' }}
-    needs: [setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
+    if: ${{ github.event_name == 'pull_request' || needs.changes.outputs.deps == 'true' }}
+    needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -527,8 +537,8 @@ jobs:
     # ==============================================================================
     name: E2E Smoke Tests (Mobile Chrome)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' }}
-    needs: [setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
+    if: ${{ github.event_name == 'pull_request' || needs.changes.outputs.deps == 'true' }}
+    needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
     timeout-minutes: 15
     steps:
       - name: Checkout code
@@ -606,8 +616,8 @@ jobs:
     # ==============================================================================
     name: E2E Full Tests (Chromium)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' }}
-    needs: [setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
+    if: ${{ github.event_name == 'pull_request' || needs.changes.outputs.deps == 'true' }}
+    needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -684,8 +694,8 @@ jobs:
     # ==============================================================================
     name: E2E Full Tests (Mobile Chrome)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' }}
-    needs: [setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
+    if: ${{ github.event_name == 'pull_request' || needs.changes.outputs.deps == 'true' }}
+    needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -762,8 +772,8 @@ jobs:
     # ==============================================================================
     name: E2E Full Tests (Mobile Safari)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' }}
-    needs: [setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
+    if: ${{ github.event_name == 'pull_request' || needs.changes.outputs.deps == 'true' }}
+    needs: [changes, setup, typecheck, lint, format, linters, test-unit, test-integration, test-migrations]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
