@@ -77,14 +77,14 @@ export function WatchMachineButton({
         onClick={() => {
           handleToggleWatch();
         }}
-        className="border-outline text-on-surface hover:bg-surface-variant"
+        className="border-outline text-on-surface hover:bg-surface-variant/50"
       >
         {isPending ? (
           <Loader2 className="mr-2 size-4 animate-spin" />
         ) : (
-          <Eye className="mr-2 size-4" />
+          <Eye className="mr-2 size-4 opacity-70" />
         )}
-        Watch Machine
+        Watch
       </Button>
     );
   }
@@ -93,10 +93,10 @@ export function WatchMachineButton({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          variant="secondary"
+          variant="outline"
           size="sm"
           disabled={isPending}
-          className="bg-secondary text-on-secondary hover:bg-secondary/90"
+          className="bg-primary/10 text-primary border-primary/20 hover:bg-primary/20 hover:text-primary"
         >
           {isPending ? (
             <Loader2 className="mr-2 size-4 animate-spin" />

@@ -167,6 +167,32 @@ describe("createMachineAction", () => {
 
     expect(db.insert).toHaveBeenCalled();
   });
+
+  it("should store OPDB model metadata when opdbId is provided", async () => {
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      role: "admin",
+    } as any);
+
+    const mockMachine = { id: "machine-123", initials: "MM" };
+    chain.returning.mockResolvedValue([mockMachine]);
+
+    const formData = new FormData();
+    formData.append("name", "Manual Name");
+    formData.append("initials", "MM");
+    formData.append("opdbId", "G43W4-MrRpw");
+
+    try {
+      await createMachineAction(initialState, formData);
+    } catch (e: any) {
+      expect(e.message).toBe("NEXT_REDIRECT");
+    }
+
+    expect(chain.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        opdbId: "G43W4-MrRpw",
+      })
+    );
+  });
 });
 
 describe("updateMachineAction", () => {
@@ -457,5 +483,81 @@ describe("updateMachineAction", () => {
       expect(result.message).toBe("Selected owner does not exist.");
     }
     expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it("should update OPDB model metadata when opdbId changes", async () => {
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      id: mockUser.id,
+      role: "member",
+    } as any);
+
+    vi.mocked(db.query.machines.findFirst).mockResolvedValue({
+      id: machineId,
+      ownerId: mockUser.id,
+      name: "Legacy Name",
+      opdbId: null,
+      opdbTitle: null,
+    } as any);
+
+    const mockMachine = {
+      id: machineId,
+      initials: "MM",
+      name: "Updated Name",
+      ownerId: mockUser.id,
+      opdbId: "G5K2X-N8vQs",
+    };
+    chain.returning.mockResolvedValue([mockMachine]);
+
+    const formData = new FormData();
+    formData.append("id", machineId);
+    formData.append("name", "Updated Name");
+    formData.append("opdbId", "G5K2X-N8vQs");
+
+    const result = await updateMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(true);
+    expect(chain.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        opdbId: "G5K2X-N8vQs",
+      })
+    );
+  });
+
+  it("should ignore manual name edits for unchanged OPDB-linked machines", async () => {
+    vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
+      id: mockUser.id,
+      role: "member",
+    } as any);
+
+    vi.mocked(db.query.machines.findFirst).mockResolvedValue({
+      id: machineId,
+      ownerId: mockUser.id,
+      name: "Medieval Madness",
+      opdbId: "G5K2X-N8vQs",
+      opdbTitle: "Medieval Madness",
+    } as any);
+
+    const mockMachine = {
+      id: machineId,
+      initials: "MM",
+      name: "Medieval Madness",
+      ownerId: mockUser.id,
+      opdbId: "G5K2X-N8vQs",
+    };
+    chain.returning.mockResolvedValue([mockMachine]);
+
+    const formData = new FormData();
+    formData.append("id", machineId);
+    formData.append("name", "User Edited Name");
+    formData.append("opdbId", "G5K2X-N8vQs");
+
+    const result = await updateMachineAction(initialState, formData);
+
+    expect(result.ok).toBe(true);
+    expect(chain.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "Medieval Madness",
+      })
+    );
   });
 });

@@ -150,9 +150,9 @@ For preview and production, we use **Automated Migrations** via Vercel build hoo
    - Commit the resulting `drizzle/` files
 
 2. **Automated Deployment**:
-   - When you push to Vercel (Preview or Production), the build pipeline automatically runs `pnpm run migrate:production` via the `vercel-build` script.
-   - This applies pending migrations _before_ the new code is built and deployed.
-   - Requires `POSTGRES_URL` (or `POSTGRES_URL_NON_POOLING`) to be set in the Vercel environment.
+   - **Production deploys** run `pnpm run migrate:production` via the `vercel-build` script before building.
+   - **Preview deploys** skip `migrate:production` in Vercel because preview branch DBs are migrated/seeded by `.github/workflows/supabase-branch-setup.yaml`.
+   - Requires `POSTGRES_URL` (or `POSTGRES_URL_NON_POOLING`) in Vercel for production migration runs.
 
 3. **Migration State Mismatch (Troubleshooting)**:
 

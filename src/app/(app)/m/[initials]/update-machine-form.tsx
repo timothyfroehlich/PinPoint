@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useActionState, useState, useRef, useEffect } from "react";
+import { useActionState, useState, useRef, useEffect, useMemo } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -43,8 +43,16 @@ import {
   AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
 import { Pencil } from "lucide-react";
+import { OpdbModelSelect } from "~/components/machines/OpdbModelSelect";
 
 import type { OwnerSelectUser } from "~/components/machines/OwnerSelect";
+import type { OpdbModelSelection } from "~/lib/opdb/types";
+
+function isMachinePresenceStatus(
+  value: string
+): value is MachinePresenceStatus {
+  return (VALID_MACHINE_PRESENCE_STATUSES as readonly string[]).includes(value);
+}
 
 // --- Edit Machine Dialog ---
 
@@ -56,6 +64,10 @@ interface EditMachineDialogProps {
     presenceStatus: MachinePresenceStatus;
     ownerId: string | null;
     invitedOwnerId: string | null;
+    opdbId: string | null;
+    opdbTitle: string | null;
+    opdbManufacturer: string | null;
+    opdbYear: number | null;
     owner?: {
       id: string;
       name: string;
@@ -76,13 +88,42 @@ export function EditMachineDialog({
   allUsers,
   canEditAnyMachine,
   isOwner,
-}: EditMachineDialogProps): React.JSX.Element {
+  trigger,
+}: EditMachineDialogProps & { trigger?: React.ReactNode }): React.JSX.Element {
+  const initialModel = useMemo<OpdbModelSelection | null>(
+    () =>
+      machine.opdbId
+        ? {
+            id: machine.opdbId,
+            title: machine.opdbTitle ?? machine.name,
+            manufacturer: machine.opdbManufacturer,
+            year: machine.opdbYear,
+          }
+        : null,
+    [
+      machine.opdbId,
+      machine.opdbTitle,
+      machine.name,
+      machine.opdbManufacturer,
+      machine.opdbYear,
+    ]
+  );
+
   const [open, setOpen] = useState(false);
   const [showTransferConfirm, setShowTransferConfirm] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const transferConfirmedRef = useRef(false);
   const [selectedOwnerId, setSelectedOwnerId] = useState(
     machine.ownerId ?? machine.invitedOwnerId ?? ""
+  );
+  const [selectedModel, setSelectedModel] = useState<OpdbModelSelection | null>(
+    initialModel
+  );
+  const [machineName, setMachineName] = useState(
+    initialModel?.title ?? machine.name
+  );
+  const [presenceStatus, setPresenceStatus] = useState<MachinePresenceStatus>(
+    machine.presenceStatus
   );
   const currentOwnerId = machine.ownerId ?? machine.invitedOwnerId ?? "";
 
@@ -102,9 +143,18 @@ export function EditMachineDialog({
   useEffect(() => {
     if (open) {
       setSelectedOwnerId(currentOwnerId);
+      setSelectedModel(initialModel);
+      setMachineName(initialModel?.title ?? machine.name);
+      setPresenceStatus(machine.presenceStatus);
       transferConfirmedRef.current = false;
     }
-  }, [open, currentOwnerId]);
+  }, [
+    open,
+    currentOwnerId,
+    initialModel,
+    machine.name,
+    machine.presenceStatus,
+  ]);
 
   // Find the selected owner's name for the confirmation dialog
   const selectedOwnerName =
@@ -140,17 +190,19 @@ export function EditMachineDialog({
     <>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full border-outline text-on-surface hover:bg-surface-variant"
-            data-testid="edit-machine-button"
-          >
-            <Pencil className="mr-2 size-4" />
-            Edit Machine
-          </Button>
+          {trigger ?? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full border-outline text-on-surface hover:bg-surface-variant"
+              data-testid="edit-machine-button"
+            >
+              <Pencil className="mr-2 size-4" />
+              Edit Machine
+            </Button>
+          )}
         </DialogTrigger>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Machine</DialogTitle>
             <DialogDescription>
@@ -165,6 +217,7 @@ export function EditMachineDialog({
             className="space-y-6"
           >
             <input type="hidden" name="id" value={machine.id} />
+            <input type="hidden" name="presenceStatus" value={presenceStatus} />
 
             {/* Flash message */}
             {state && !state.ok && (
@@ -195,6 +248,17 @@ export function EditMachineDialog({
             </div>
 
             {/* Machine Name */}
+            <OpdbModelSelect
+              selectedModel={selectedModel}
+              onSelect={(selection) => {
+                setSelectedModel(selection);
+                if (selection) {
+                  setMachineName(selection.title);
+                }
+              }}
+              allowClear={false}
+            />
+
             <div className="space-y-2">
               <Label htmlFor="edit-name" className="text-on-surface">
                 Machine Name *
@@ -204,12 +268,16 @@ export function EditMachineDialog({
                 name="name"
                 type="text"
                 required
-                defaultValue={machine.name}
+                value={machineName}
+                onChange={(event) => setMachineName(event.target.value)}
+                readOnly={selectedModel !== null}
                 placeholder="e.g., Medieval Madness"
                 className="border-outline bg-surface text-on-surface placeholder:text-on-surface-variant"
               />
               <p className="text-xs text-on-surface-variant">
-                Enter the full name of the pinball machine
+                {selectedModel
+                  ? "Machine name is locked to the selected OPDB model."
+                  : "Enter the full name of the pinball machine"}
               </p>
             </div>
 
@@ -219,8 +287,12 @@ export function EditMachineDialog({
                 Availability
               </Label>
               <Select
-                name="presenceStatus"
-                defaultValue={machine.presenceStatus}
+                value={presenceStatus}
+                onValueChange={(value) => {
+                  if (isMachinePresenceStatus(value)) {
+                    setPresenceStatus(value);
+                  }
+                }}
               >
                 <SelectTrigger
                   id="edit-presence"
