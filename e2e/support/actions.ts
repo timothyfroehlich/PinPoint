@@ -50,7 +50,6 @@ export async function loginAs(
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign In" }).click();
 
-  await page.waitForLoadState("networkidle");
   await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
 
   // Use project name to determine mobile vs desktop layout
@@ -177,8 +176,11 @@ export async function selectOption(
   const triggers = page.getByTestId(triggerTestId);
   const trigger = triggers.filter({ visible: true }).first();
   await expect(trigger).toBeVisible({ timeout: 10000 });
-  await trigger.scrollIntoViewIfNeeded();
-  await trigger.click({ force: true });
+
+  // Center the element in the viewport to avoid sticky headers or footers
+  await trigger.evaluate((node) => node.scrollIntoView({ block: "center" }));
+  await page.waitForTimeout(100); // Allow scrolling to settle
+  await trigger.click();
 
   // Wait for the dropdown to appear and find the option
   const optionTestId = getOptionTestId(optionValue);
