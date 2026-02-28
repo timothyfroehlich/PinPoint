@@ -109,6 +109,7 @@ test.describe("Machines CRUD", () => {
     const addamsCard = page.locator(
       `a:has-text("${seededMachines.addamsFamily.name}")`
     );
+    await addamsCard.scrollIntoViewIfNeeded();
     await expect(
       addamsCard.getByText(machineStatuses.addamsFamily)
     ).toBeVisible();

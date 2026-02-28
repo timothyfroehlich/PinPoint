@@ -82,7 +82,8 @@ test.describe("Issues System", () => {
       const addamsFamilyCard = page
         .getByTestId("machine-card")
         .filter({ hasText: seededMachines.addamsFamily.name });
-      await addamsFamilyCard.click();
+      await addamsFamilyCard.scrollIntoViewIfNeeded();
+      await addamsFamilyCard.click({ force: true });
       await expect(page).toHaveURL(/\/m\/TAF/); // Expect TAF machine detail page
 
       // Click "Submit Issue Report" button on machine page (scope to main content to avoid global header button)
