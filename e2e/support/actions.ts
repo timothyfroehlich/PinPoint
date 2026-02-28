@@ -52,6 +52,16 @@ export async function loginAs(
   // Wait for user menu to hydrate before continuing
   // This prevents race conditions when tests immediately call logout()
   await expect(visibleUserMenu(page)).toBeVisible();
+
+  // Force a full server round-trip to ensure auth cookies are settled.
+  // Under concurrent load (3+ Playwright workers), Supabase cookie rotation
+  // (refresh token exchange) may not be fully committed by the time the NEXT
+  // navigation fires. Reloading the dashboard forces the browser to send the
+  // auth cookie back to the server, completing the rotation cycle. Without
+  // this, Server Actions on subsequent pages can see a stale/missing cookie
+  // and treat the user as anonymous.
+  await page.reload({ waitUntil: "networkidle" });
+  await expect(visibleUserMenu(page)).toBeVisible({ timeout: 10000 });
 }
 
 /**
