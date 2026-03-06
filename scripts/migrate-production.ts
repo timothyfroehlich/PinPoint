@@ -23,6 +23,18 @@ interface MigrationJournal {
 const connectionString =
   process.env["POSTGRES_URL_NON_POOLING"] ?? process.env["POSTGRES_URL"];
 
+const vercelEnv = process.env["VERCEL_ENV"];
+const forceDbMigrate = process.env["FORCE_DB_MIGRATE"] === "1";
+
+// Preview databases are migrated/seeded by .github/workflows/supabase-branch-setup.yaml.
+// Keep Vercel preview builds fast and avoid migration-history drift in branch DB clones.
+if (vercelEnv === "preview" && !forceDbMigrate) {
+  console.log(
+    "⏭️  Skipping migrate:production on Vercel preview (handled by Supabase Branch Setup)."
+  );
+  process.exit(0);
+}
+
 if (!connectionString) {
   console.error(
     "❌ No database connection string found (checked POSTGRES_URL_NON_POOLING, POSTGRES_URL)"

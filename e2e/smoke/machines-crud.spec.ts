@@ -116,48 +116,27 @@ test.describe("Machines CRUD", () => {
 
   // Machine creation moved to integration/full suite
 
-  test("should display machine issues on detail page via expando", async ({
-    page,
-  }) => {
+  test("should display machine issues on detail page", async ({ page }) => {
     // Navigate to The Addams Family (has unplayable issue)
     await page.goto(`/m/${seededMachines.addamsFamily.initials}`);
 
     // Should show machine details
     await expect(
-      page.getByRole("heading", { name: seededMachines.addamsFamily.name })
-    ).toBeVisible();
+      page.getByRole("main").getByRole("heading", { level: 1 })
+    ).toContainText(seededMachines.addamsFamily.name);
 
-    // Verify open issues count section is visible
-    await expect(page.getByTestId("detail-open-issues")).toBeVisible();
-    await expect(page.getByTestId("detail-open-issues-count")).toBeVisible();
+    // Issues section should be visible with cards rendered by default
+    await expect(page.getByTestId("issues-section")).toBeVisible();
 
-    // Issues expando should be visible (collapsed by default)
-    const expando = page.getByTestId("issues-expando");
-    await expect(expando).toBeVisible();
-
-    // Click the expando trigger to expand
-    await page.getByTestId("issues-expando-trigger").click();
-
-    // Now issue cards should be visible
+    // Issue cards should be visible
     const issueCards = page.getByTestId("issue-card");
-    const displayedCountText = await page
-      .getByTestId("detail-open-issues-count")
-      .textContent();
-    const displayedCount = Number(displayedCountText);
     const actualCardCount = await issueCards.count();
 
-    expect(actualCardCount).toBe(displayedCount);
     expect(actualCardCount).toBeGreaterThan(0); // Ensure we have issues to display
 
     // Verify specific seed issues are listed (using actual TAF seeded issues)
     await expect(page.getByText(seededIssues.TAF[0].title)).toBeVisible(); // "Thing flips the bird"
     await expect(page.getByText(seededIssues.TAF[1].title)).toBeVisible(); // "Bookcase not registering"
-
-    // Click trigger again to collapse
-    await page.getByTestId("issues-expando-trigger").click();
-
-    // Issue cards should no longer be visible
-    await expect(issueCards.first()).not.toBeVisible();
   });
 
   test("should display machine owner to all logged-in users", async ({
@@ -166,28 +145,17 @@ test.describe("Machines CRUD", () => {
     // Navigate to a machine detail page
     await page.goto(`/m/${seededMachines.medievalMadness.initials}`);
 
-    // Machine Information card should be visible
+    // Machine details card should be visible
     await expect(
-      page.getByRole("heading", { name: "Machine Information" })
+      page.getByRole("heading", { name: "Machine Details" })
     ).toBeVisible();
 
-    // As a member (default login), owner should be displayed in the static info display
-    const ownerDisplay = page.getByTestId("owner-display");
-    await expect(ownerDisplay).toBeVisible();
+    // As a member (default login), owner details should be visible
+    await expect(page.getByTestId("owner-badge")).toBeVisible();
+    await expect(page.getByText("Admin User")).toBeVisible();
 
-    // Verify owner label is present
-    await expect(ownerDisplay.getByText("Machine Owner")).toBeVisible();
-
-    // Verify owner name is shown (Admin User owns all seeded machines)
-    await expect(ownerDisplay.getByText("Admin User")).toBeVisible();
-
-    // Non-owner member should see a disabled edit button with tooltip
-    await expect(
-      page.getByTestId("edit-machine-button-disabled")
-    ).toBeVisible();
-
-    // Active edit button should NOT be visible (member is not the owner)
-    await expect(page.getByTestId("edit-machine-button")).not.toBeVisible();
+    // Active edit button should NOT be visible (member is not the owner/admin/technician)
+    await expect(page.getByTitle("Edit Machine")).not.toBeVisible();
   });
 
   // Empty state test (requires creation) moved to integration/full suite

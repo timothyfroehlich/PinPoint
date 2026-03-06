@@ -45,11 +45,64 @@ test.describe("Machine with Inline Invite (Smoke)", () => {
     testMachines.add(machineInitials);
     testEmails.add(userEmail);
 
+    await page.route("**/api/opdb/search**", async (route) => {
+      const url = new URL(route.request().url());
+      const query = url.searchParams.get("q") ?? "";
+      if (query.toLowerCase().includes("medieval")) {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            results: [
+              {
+                id: "G43W4-MrRpw",
+                title: "Medieval Madness",
+                manufacturer: "Williams",
+                year: 1997,
+                label: "Medieval Madness (Williams, 1997)",
+              },
+            ],
+          }),
+        });
+        return;
+      }
+
+      if (query.toLowerCase().includes("attack")) {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            results: [
+              {
+                id: "G5K2X-N8vQs",
+                title: "Attack from Mars",
+                manufacturer: "Bally",
+                year: 1995,
+                label: "Attack from Mars (Bally, 1995)",
+              },
+            ],
+          }),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ results: [] }),
+      });
+    });
+
     await page.goto("/m/new");
 
     // 1. Fill machine details
     await page.getByLabel(/Initials/i).fill(machineInitials);
-    await page.getByLabel(/Machine Name/i).fill(`Smoke Test Machine ${testId}`);
+
+    await page.getByTestId("opdb-model-search-input").fill("Medieval");
+    await page.getByTestId("opdb-model-result-0").click();
+    await expect(page.getByLabel(/Machine Name/i)).toHaveValue(
+      "Medieval Madness"
+    );
 
     // 2. Click "+ Invite New"
     await page.getByRole("button", { name: /Invite New/i }).click();
@@ -84,16 +137,29 @@ test.describe("Machine with Inline Invite (Smoke)", () => {
     await expect(ownerSelect).toContainText("(Invited)");
 
     // 5. Submit machine creation
+    // Re-fill initials defensively: the InviteUserDialog is a focus-trapping
+    // portal. Some browser/driver combinations can drop uncontrolled input
+    // values when focus returns to the parent form after a dialog closes.
+    await page.getByLabel(/Initials/i).fill(machineInitials);
     await page.getByRole("button", { name: /Create Machine/i }).click();
 
     // 6. Verify redirect and owner assignment
     await expect(page).toHaveURL(`/m/${machineInitials}`);
     await expect(
-      page.getByRole("heading", { name: `Smoke Test Machine ${testId}` })
-    ).toBeVisible();
+      page.getByRole("main").getByRole("heading", { level: 1 })
+    ).toContainText("Medieval Madness");
 
-    // Verify the owner name is shown on the detail page (if applicable)
-    // Looking at the detail page code or previous screenshots, there might be an owner badge.
-    // For now, URL and lack of error is a good smoke signal.
+    // 7. Edit machine and change OPDB model
+    await page.getByTitle("Edit Machine").click();
+    await page.getByTestId("opdb-model-search-input").fill("Attack");
+    await page.getByTestId("opdb-model-result-0").click();
+    await expect(page.getByLabel(/Machine Name/i)).toHaveValue(
+      "Attack from Mars"
+    );
+    await page.getByRole("button", { name: /Update Machine/i }).click();
+
+    await expect(
+      page.getByRole("main").getByRole("heading", { level: 1 })
+    ).toContainText("Attack from Mars");
   });
 });

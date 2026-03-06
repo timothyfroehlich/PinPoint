@@ -18,10 +18,9 @@ import {
   isOnTheFloor,
 } from "~/lib/machines/presence";
 import { CLOSED_STATUSES } from "~/lib/issues/status";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
-import { ArrowLeft, Calendar, Plus } from "lucide-react";
+import { ArrowLeft, Plus, QrCode, Pencil } from "lucide-react";
 import { headers } from "next/headers";
 import { resolveRequestUrl } from "~/lib/url";
 import { MachineInfoDisplay } from "./machine-info-display";
@@ -190,6 +189,11 @@ export default async function MachineDetailPage({
 
   // Derive machine status
   const machineStatus = deriveMachineStatus(openIssues);
+  const statusAccentClass = {
+    operational: "border-l-success",
+    needs_service: "border-l-warning",
+    unplayable: "border-l-error",
+  }[machineStatus];
 
   // Generate QR data for modal using dynamic host resolution
   const headersList = await headers();
@@ -212,11 +216,17 @@ export default async function MachineDetailPage({
   return (
     <main className="min-h-screen bg-surface">
       {/* Header */}
-      <div className="border-b border-outline-variant bg-surface-container">
+      <div
+        className={cn(
+          "border-b border-outline-variant bg-surface-container border-l-4",
+          statusAccentClass
+        )}
+      >
         <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/m">
+          {/* Single row: Back + Name/Badges + Actions */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4 min-w-0">
+              <Link href="/m" className="shrink-0">
                 <Button
                   variant="outline"
                   size="sm"
@@ -226,16 +236,19 @@ export default async function MachineDetailPage({
                   Back
                 </Button>
               </Link>
-              <div>
-                <div className="flex items-center gap-3">
-                  <h1 className="text-3xl font-bold text-on-surface">
+              <div className="min-w-0">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h1 className="text-2xl font-bold text-on-surface truncate sm:text-3xl">
                     {machine.name}
                   </h1>
+                  <span className="font-mono text-xs bg-surface-variant text-on-surface-variant px-2 py-1 rounded border border-outline-variant leading-none">
+                    {machine.initials}
+                  </span>
                   <Badge
                     data-testid="machine-status-badge"
                     className={cn(
                       getMachineStatusStyles(machineStatus),
-                      "border px-3 py-1 text-sm font-semibold"
+                      "border px-3 py-1 text-xs font-semibold"
                     )}
                   >
                     {getMachineStatusLabel(machineStatus)}
@@ -244,19 +257,54 @@ export default async function MachineDetailPage({
                     <Badge
                       className={cn(
                         getMachinePresenceStyles(machine.presenceStatus),
-                        "border px-3 py-1 text-sm font-semibold"
+                        "border px-3 py-1 text-xs font-semibold"
                       )}
                     >
                       {getMachinePresenceLabel(machine.presenceStatus)}
                     </Badge>
                   )}
                 </div>
-                <p className="mt-1 text-sm text-on-surface-variant">
-                  Machine details and issue tracking
-                </p>
               </div>
             </div>
-            <div className="flex flex-col gap-3 sm:flex-row">
+
+            {/* Actions */}
+            <div className="flex items-center gap-2 shrink-0">
+              {canEdit && user && (
+                <>
+                  <QrCodeDialog
+                    machineName={machine.name}
+                    machineInitials={machine.initials}
+                    qrDataUrl={qrDataUrl}
+                    reportUrl={reportUrl}
+                    trigger={
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="rounded-full border-outline-variant text-on-surface hover:bg-surface-variant shrink-0"
+                        title="Show QR Code"
+                      >
+                        <QrCode className="size-4" />
+                      </Button>
+                    }
+                  />
+                  <EditMachineDialog
+                    machine={machine}
+                    allUsers={allUsers}
+                    canEditAnyMachine={canEditAnyMachine}
+                    isOwner={isOwner}
+                    trigger={
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="rounded-full border-outline-variant text-on-surface hover:bg-surface-variant shrink-0"
+                        title="Edit Machine"
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                    }
+                  />
+                </>
+              )}
               {canWatch && (
                 <WatchMachineButton
                   machineId={machine.id}
@@ -293,128 +341,39 @@ export default async function MachineDetailPage({
           </div>
         )}
 
-        {/* Full-width Details Card */}
-        <Card className="border-outline-variant bg-surface">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
-            <CardTitle className="text-xl text-on-surface">
-              Machine Information
-            </CardTitle>
-            <QrCodeDialog
+        {/* Two-column layout: sidebar + main content */}
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Left: Machine Info + Open Issues */}
+          <div className="w-full lg:w-96 shrink-0 space-y-4">
+            <MachineInfoDisplay
+              machine={machine}
+              canEdit={canEdit}
+              editDeniedReason={editDeniedReason}
+              isAuthenticated={!!user}
+            />
+            <IssuesExpando
+              issues={openIssues}
               machineName={machine.name}
               machineInitials={machine.initials}
-              qrDataUrl={qrDataUrl}
-              reportUrl={reportUrl}
+              totalIssuesCount={totalIssuesCount}
             />
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-              {/* Left Column: Machine Metadata */}
-              <div className="space-y-6">
-                {/* Static read-only display */}
-                <MachineInfoDisplay
-                  machine={machine}
-                  canEdit={canEdit}
-                  editDeniedReason={editDeniedReason}
-                  isAuthenticated={!!user}
-                />
+          </div>
 
-                {/* Edit button (active) - only shown when user has permission */}
-                {canEdit && user && (
-                  <EditMachineDialog
-                    machine={machine}
-                    allUsers={allUsers}
-                    canEditAnyMachine={canEditAnyMachine}
-                    isOwner={isOwner}
-                  />
-                )}
-
-                <div className="space-y-4 border-t border-outline-variant/50 pt-6">
-                  {/* Status & Issues Count Row */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
-                        Status
-                      </p>
-                      <Badge
-                        className={cn(
-                          getMachineStatusStyles(machineStatus),
-                          "border px-2 py-0.5 text-[10px] font-bold"
-                        )}
-                      >
-                        {getMachineStatusLabel(machineStatus)}
-                      </Badge>
-                    </div>
-
-                    <div data-testid="detail-open-issues">
-                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
-                        Open Issues
-                      </p>
-                      <p
-                        className="text-xl font-bold text-on-surface"
-                        data-testid="detail-open-issues-count"
-                      >
-                        {openIssues.length}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Date & Total Row */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
-                        Added Date
-                      </p>
-                      <div className="flex items-center gap-1.5 text-on-surface-variant">
-                        <Calendar className="size-3" />
-                        <p className="text-xs font-medium">
-                          {new Date(machine.createdAt).toLocaleDateString(
-                            undefined,
-                            {
-                              month: "short",
-                              year: "numeric",
-                            }
-                          )}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div>
-                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
-                        Total Issues
-                      </p>
-                      <p className="text-xl font-bold text-on-surface">
-                        {totalIssuesCount}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column: Text Fields */}
-              <div className="border-t border-outline-variant/50 pt-6 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
-                <MachineTextFields
-                  machineId={machine.id}
-                  description={machine.description}
-                  tournamentNotes={machine.tournamentNotes}
-                  ownerRequirements={machine.ownerRequirements}
-                  ownerNotes={machine.ownerNotes}
-                  canEditGeneral={canEdit}
-                  canEditOwnerNotes={canEditOwnerNotes}
-                  canViewOwnerRequirements={canViewOwnerRequirements}
-                  canViewOwnerNotes={canViewOwnerNotes}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Collapsible Issues Section */}
-        <IssuesExpando
-          issues={openIssues}
-          machineName={machine.name}
-          machineInitials={machine.initials}
-          totalIssuesCount={totalIssuesCount}
-        />
+          {/* Right: Notes */}
+          <div className="flex-1 min-w-0">
+            <MachineTextFields
+              machineId={machine.id}
+              description={machine.description}
+              tournamentNotes={machine.tournamentNotes}
+              ownerRequirements={machine.ownerRequirements}
+              ownerNotes={machine.ownerNotes}
+              canEditGeneral={canEdit}
+              canEditOwnerNotes={canEditOwnerNotes}
+              canViewOwnerRequirements={canViewOwnerRequirements}
+              canViewOwnerNotes={canViewOwnerNotes}
+            />
+          </div>
+        </div>
       </div>
     </main>
   );

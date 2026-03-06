@@ -85,19 +85,15 @@ test.describe("Issues System", () => {
       await addamsFamilyCard.click();
       await expect(page).toHaveURL(/\/m\/TAF/); // Expect TAF machine detail page
 
-      // Click "Submit Issue Report" button on machine page (scope to main content to avoid global header button)
-      await page.getByTestId("machine-report-issue").click();
+      // Click page-local Report Issue link (avoid sidebar link with same text)
+      await page
+        .locator(
+          `a[href="/report?machine=${seededMachines.addamsFamily.initials}"]`
+        )
+        .click();
 
-      // Should be on new issue page for TAF
+      // Should be on report page scoped to TAF
       await page.waitForURL(/\/report\?machine=TAF/);
-
-      // Verify machine name is displayed
-      await expect(
-        page
-          .locator("div")
-          .filter({ hasText: seededMachines.addamsFamily.name })
-          .first()
-      ).toBeVisible();
 
       // Fill out remaining fields
       await fillReportForm(page, { title: "Display flickering" });

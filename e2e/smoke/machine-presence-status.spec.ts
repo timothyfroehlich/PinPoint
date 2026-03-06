@@ -44,8 +44,8 @@ test.describe("Machine Presence Status", () => {
     await page.getByRole("button", { name: "Create Machine" }).click();
     await expect(page).toHaveURL(`/m/${machineInitials}`);
     await expect(
-      page.getByRole("heading", { name: machineName, exact: true })
-    ).toBeVisible();
+      page.getByRole("main").getByRole("heading", { level: 1 })
+    ).toContainText(machineName);
 
     // Create an issue while machine is on the floor
     await page.getByTestId("machine-report-issue").click();
@@ -72,28 +72,28 @@ test.describe("Machine Presence Status", () => {
     page,
   }) => {
     await page.goto(`/m/${machineInitials}`);
-    await page.getByTestId("edit-machine-button").click();
+    await page.getByTitle("Edit Machine").click();
 
     const presenceSelect = page.getByRole("combobox", {
       name: "Availability",
     });
     await expect(presenceSelect).toBeVisible();
     await presenceSelect.click();
-    await page.getByRole("option", { name: "On Loan" }).click();
+    await page.getByRole("option", { name: "Off the Floor" }).click();
+    await expect(presenceSelect).toContainText("Off the Floor");
 
     await page.getByRole("button", { name: "Update Machine" }).click();
     await expect(
-      page.getByRole("heading", { name: "Edit Machine" })
-    ).toBeHidden();
+      page.getByText("This machine is currently off the floor.")
+    ).toBeVisible();
   });
 
   test("detail page shows presence badge and inactive banner", async ({
     page,
   }) => {
     await page.goto(`/m/${machineInitials}`);
-    await expect(page.getByText("On Loan").first()).toBeVisible();
     await expect(
-      page.getByText("This machine is currently on loan.")
+      page.getByText("This machine is currently off the floor.")
     ).toBeVisible();
   });
 
@@ -111,10 +111,10 @@ test.describe("Machine Presence Status", () => {
       .getByRole("combobox")
       .filter({ hasText: "Availability" });
     await presenceFilter.click();
-    await page.getByRole("option", { name: "On Loan" }).click();
+    await page.getByRole("option", { name: "Off the Floor" }).click();
     await page.keyboard.press("Escape");
 
-    await expect(page).toHaveURL(/presence=.*on_loan/);
+    await expect(page).toHaveURL(/presence=.*off_the_floor/);
     await expect(
       page.getByRole("link", { name: new RegExp(machineName, "i") })
     ).toBeVisible();

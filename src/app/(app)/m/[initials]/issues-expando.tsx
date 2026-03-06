@@ -1,11 +1,10 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
-import { ChevronRight } from "lucide-react";
 import { IssueCard, type IssueCardIssue } from "~/components/issues/IssueCard";
 import { MachineEmptyState } from "~/components/machines/MachineEmptyState";
-import { cn } from "~/lib/utils";
+import Link from "next/link";
+import { ExternalLink } from "lucide-react";
 
 interface IssuesExpandoProps {
   issues: IssueCardIssue[];
@@ -20,50 +19,52 @@ export function IssuesExpando({
   machineInitials,
   totalIssuesCount,
 }: IssuesExpandoProps): React.JSX.Element {
-  const [isOpen, setIsOpen] = useState(false);
-
   return (
-    <details
-      open={isOpen}
-      onToggle={(e) => setIsOpen(e.currentTarget.open)}
-      className="rounded-lg border border-outline-variant bg-surface"
-      data-testid="issues-expando"
+    <div
+      className="mt-2 bg-surface-container border border-outline-variant rounded-xl shadow-sm overflow-hidden flex flex-col"
+      data-testid="issues-section"
     >
-      <summary
-        className="flex cursor-pointer list-none items-center gap-2 px-6 py-4 text-on-surface hover:bg-surface-variant/30"
-        data-testid="issues-expando-trigger"
-      >
-        <ChevronRight
-          className={cn(
-            "size-5 transition-transform duration-200",
-            isOpen && "rotate-90"
-          )}
-        />
-        <span className="text-lg font-semibold">
-          Open Issues ({issues.length})
-        </span>
-        {totalIssuesCount > issues.length && (
-          <span className="text-sm text-on-surface-variant">
-            of {totalIssuesCount} total
+      <div className="flex items-center justify-between p-4 border-b border-outline-variant bg-surface-variant/20">
+        <h2 className="text-sm font-bold text-on-surface flex items-center gap-2">
+          Open Issues
+          <span className="bg-surface border border-outline-variant text-on-surface text-[10px] px-2 py-0.5 rounded-full font-medium">
+            {issues.length}
           </span>
-        )}
-      </summary>
+        </h2>
+        <div className="flex items-center gap-3">
+          {totalIssuesCount > issues.length && (
+            <span className="text-[10px] uppercase tracking-wider font-bold text-on-surface-variant">
+              of {totalIssuesCount} total
+            </span>
+          )}
+          <Link
+            href={`/issues?machine=${machineInitials}`}
+            className="text-[11px] text-on-surface-variant hover:text-primary transition-colors flex items-center gap-1"
+          >
+            View all
+            <ExternalLink className="size-3" />
+          </Link>
+        </div>
+      </div>
 
-      <div className="border-t border-outline-variant px-6 py-4">
+      <div className="p-4 bg-surface/30">
         {issues.length === 0 ? (
-          <MachineEmptyState machineInitials={machineInitials} />
+          <div className="py-4">
+            <MachineEmptyState machineInitials={machineInitials} />
+          </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {issues.map((issue) => (
               <IssueCard
                 key={issue.id}
                 issue={issue}
                 machine={{ name: machineName }}
+                variant="mini"
               />
             ))}
           </div>
         )}
       </div>
-    </details>
+    </div>
   );
 }

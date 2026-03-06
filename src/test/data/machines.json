@@ -4,69 +4,132 @@
     "name": "Humpty Dumpty",
     "initials": "HD",
     "year": 1947,
-    "manufacturer": "Gottlieb"
+    "manufacturer": "Gottlieb",
+    "opdbId": "G9VBN-MNPZV",
+    "opdbTitle": "Humpty Dumpty",
+    "opdbManufacturer": "D. Gottlieb & Co.",
+    "opdbYear": 1947,
+    "opdbMachineType": "Electro-mechanical",
+    "description": "The first pinball machine to feature flippers, though they faced outward rather than inward."
   },
   "slickChick": {
     "id": "22222222-2222-4222-8222-222222222222",
     "name": "Slick Chick",
     "initials": "SC",
     "year": 1963,
-    "manufacturer": "Gottlieb"
+    "manufacturer": "Gottlieb",
+    "opdbId": "G8XYP-MVQAW",
+    "opdbTitle": "Slick Chick",
+    "opdbManufacturer": "D. Gottlieb & Co.",
+    "opdbYear": 1963,
+    "opdbMachineType": "Electro-mechanical",
+    "description": "A classic wedgehead featuring playboy bunny inspired pop bumpers."
   },
   "fireball": {
     "id": "33333333-3333-4333-8333-333333333333",
     "name": "Fireball",
     "initials": "FB",
     "year": 1972,
-    "manufacturer": "Bally"
+    "manufacturer": "Bally",
+    "opdbId": "G3RTY-MLPZX",
+    "opdbTitle": "Fireball",
+    "opdbManufacturer": "Bally Manufacturing Co.",
+    "opdbYear": 1972,
+    "opdbMachineType": "Electro-mechanical",
+    "description": "Famous for its spinning disk, zipper flippers, and captive ball messengers."
   },
   "blackKnight": {
     "id": "44444444-4444-4444-8444-444444444444",
     "name": "Black Knight",
     "initials": "BK",
     "year": 1980,
-    "manufacturer": "Williams"
+    "manufacturer": "Williams",
+    "opdbId": "G5RbO-MQ0GZ",
+    "opdbTitle": "Black Knight",
+    "opdbManufacturer": "Williams Electronic Games, Inc.",
+    "opdbYear": 1980,
+    "opdbMachineType": "Solid State",
+    "description": "Introduced the 'Magna-Save' feature and was the first machine to feature a split-level playfield.",
+    "tournamentNotes": "Tends to play very fast. Ensure the magna-save magnets are fully operational before any IFPA event.",
+    "ownerRequirements": "DO NOT use abrasive cleaners on the upper playfield. Please wipe down the glass after league play.",
+    "ownerNotes": "Bought from Steve in 2021. The speech board sometimes crackles, need to recap it eventually. Currently missing the original coin door lock."
   },
   "eightBallDeluxe": {
     "id": "55555555-5555-4555-8555-555555555555",
     "name": "Eight Ball Deluxe",
     "initials": "EBD",
     "year": 1981,
-    "manufacturer": "Bally"
+    "manufacturer": "Bally",
+    "opdbId": "G2HJK-MNBVC",
+    "opdbTitle": "Eight Ball Deluxe",
+    "opdbManufacturer": "Bally Manufacturing Co.",
+    "opdbYear": 1981,
+    "opdbMachineType": "Solid State",
+    "description": "Quit talking and start chalking! A classic pool-themed game with iconic speech."
   },
   "addamsFamily": {
     "id": "66666666-6666-4666-8666-666666666666",
     "name": "The Addams Family",
     "initials": "TAF",
     "year": 1992,
-    "manufacturer": "Bally"
+    "manufacturer": "Bally",
+    "opdbId": "G7IOP-MKJNH",
+    "opdbTitle": "The Addams Family",
+    "opdbManufacturer": "Midway Manufacturing Company",
+    "opdbYear": 1992,
+    "opdbMachineType": "Solid State",
+    "description": "The best-selling pinball machine of all time, featuring the motorized Thing hand."
   },
   "attackFromMars": {
     "id": "77777777-7777-4777-8777-777777777777",
     "name": "Attack from Mars",
     "initials": "AFM",
     "year": 1995,
-    "manufacturer": "Bally"
+    "manufacturer": "Bally",
+    "opdbId": "G1QWE-MASDF",
+    "opdbTitle": "Attack from Mars",
+    "opdbManufacturer": "Midway Manufacturing Company",
+    "opdbYear": 1995,
+    "opdbMachineType": "Solid State",
+    "description": "Save the Earth from Martian invasion by destroying their flying saucers."
   },
   "medievalMadness": {
     "id": "88888888-8888-4888-8888-888888888888",
     "name": "Medieval Madness",
     "initials": "MM",
     "year": 1997,
-    "manufacturer": "Williams"
+    "manufacturer": "Williams",
+    "opdbId": "G6ZXC-MVBNM",
+    "opdbTitle": "Medieval Madness",
+    "opdbManufacturer": "Williams Electronic Games, Inc.",
+    "opdbYear": 1997,
+    "opdbMachineType": "Solid State",
+    "description": "Battle for the kingdom by destroying the castle, trolls, and rescuing the damsel."
   },
   "spiderMan": {
     "id": "99999999-9999-4999-8999-999999999999",
     "name": "Spider-Man",
     "initials": "SM",
     "year": 2007,
-    "manufacturer": "Stern"
+    "manufacturer": "Stern",
+    "opdbId": "G4TYU-MUIOP",
+    "opdbTitle": "Spider-Man",
+    "opdbManufacturer": "Stern Pinball, Inc.",
+    "opdbYear": 2007,
+    "opdbMachineType": "Solid State",
+    "description": "Defeat Doc Ock, Green Goblin, Sandman, and Venom with web-slinging action."
   },
   "godzilla": {
     "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     "name": "Godzilla",
     "initials": "GDZ",
     "year": 2021,
-    "manufacturer": "Stern"
+    "manufacturer": "Stern",
+    "opdbId": "G6KJL-MHGFD",
+    "opdbTitle": "Godzilla (Premium)",
+    "opdbManufacturer": "Stern Pinball, Inc.",
+    "opdbYear": 2021,
+    "opdbMachineType": "Solid State",
+    "description": "Help Godzilla defeat Mechagodzilla and Xiliens with a collapsing building feature."
   }
 }

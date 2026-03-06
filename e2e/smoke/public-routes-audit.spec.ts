@@ -186,7 +186,9 @@ test.describe("Public Routes Audit", () => {
       await page.goto(`/m/${machine.initials}`);
 
       // Click Report Issue button
-      await page.getByTestId("machine-report-issue").click();
+      await page
+        .locator(`a[href="/report?machine=${machine.initials}"]`)
+        .click();
       await expect(page).toHaveURL(/\/report/);
     });
   });

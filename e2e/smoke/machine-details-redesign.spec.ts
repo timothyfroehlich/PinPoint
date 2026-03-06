@@ -2,7 +2,7 @@
  * E2E Tests: Machine Details Redesign
  *
  * Tests the redesigned machine details page with inline editing,
- * collapsible issues section, and owner requirements callout.
+ * always-visible issues section, and owner requirements callout.
  */
 
 import { test, expect } from "@playwright/test";
@@ -22,52 +22,16 @@ test.describe("Machine Details Redesign", () => {
     // Navigate to a machine that admin owns (Medieval Madness)
     await page.goto(`/m/${seededMachines.medievalMadness.initials}`);
 
-    // Machine Information heading should be visible
+    // Machine name heading should render on the detail page
     await expect(
-      page.getByRole("heading", { name: "Machine Information" })
-    ).toBeVisible();
+      page.getByRole("main").getByRole("heading", { level: 1 })
+    ).toContainText(seededMachines.medievalMadness.name);
 
-    // Left column elements: name, initials, owner
-    await expect(page.getByTestId("owner-display")).toBeVisible();
-
-    // Status and issues counts should be visible
-    await expect(page.getByTestId("detail-open-issues")).toBeVisible();
-    await expect(page.getByTestId("detail-open-issues-count")).toBeVisible();
+    // Issues section should be visible in the left column
+    await expect(page.getByTestId("issues-section")).toBeVisible();
   });
 
-  test("should show issues expando collapsed by default", async ({ page }) => {
-    await page.goto(`/m/${seededMachines.addamsFamily.initials}`);
-
-    const expando = page.getByTestId("issues-expando");
-    await expect(expando).toBeVisible();
-
-    // The trigger should show "Open Issues" text
-    const trigger = page.getByTestId("issues-expando-trigger");
-    await expect(trigger).toBeVisible();
-    await expect(trigger).toContainText("Open Issues");
-
-    // Issue cards should NOT be visible when collapsed
-    // (details element is closed by default)
-    await expect(page.getByTestId("issue-card").first()).not.toBeVisible();
-  });
-
-  test("should expand and collapse issues section", async ({ page }) => {
-    await page.goto(`/m/${seededMachines.addamsFamily.initials}`);
-
-    // Click to expand
-    await page.getByTestId("issues-expando-trigger").click();
-
-    // Issue cards should now be visible
-    await expect(page.getByTestId("issue-card").first()).toBeVisible();
-
-    // Click to collapse
-    await page.getByTestId("issues-expando-trigger").click();
-
-    // Issue cards should be hidden again
-    await expect(page.getByTestId("issue-card").first()).not.toBeVisible();
-  });
-
-  test("should show description placeholder for owner", async ({
+  test("should show description field for owner", async ({
     page,
   }, testInfo) => {
     // Login as admin (owner of Medieval Madness)
@@ -79,10 +43,9 @@ test.describe("Machine Details Redesign", () => {
 
     await page.goto(`/m/${seededMachines.medievalMadness.initials}`);
 
-    // Description field should show placeholder since it's empty
+    // Description field should be present for machine owner
     const descField = page.getByTestId("machine-description");
     await expect(descField).toBeVisible();
-    await expect(descField).toContainText("Add a description");
 
     // Restore member login
     await logout(page);
@@ -195,9 +158,14 @@ test.describe("Machine Details Redesign", () => {
   test("should show Report Issue button in header", async ({ page }) => {
     await page.goto(`/m/${seededMachines.medievalMadness.initials}`);
 
-    const reportButton = page.getByTestId("machine-report-issue");
+    const reportButton = page
+      .getByRole("link", { name: "Report Issue" })
+      .and(
+        page.locator(
+          `a[href="/report?machine=${seededMachines.medievalMadness.initials}"]`
+        )
+      );
     await expect(reportButton).toBeVisible();
-    await expect(reportButton).toContainText("Report Issue");
   });
 
   test("should display owner requirements callout on issue page", async ({
@@ -231,9 +199,6 @@ test.describe("Machine Details Redesign", () => {
 
     // Now navigate to an issue for this machine to check the callout
     // Medieval Madness has seeded issues - navigate to first one
-    // Expand issues expando first
-    await page.getByTestId("issues-expando-trigger").click();
-
     // Click the first issue card
     const firstIssueCard = page.getByTestId("issue-card").first();
     await firstIssueCard.click();
@@ -262,9 +227,12 @@ test.describe("Machine Details Redesign", () => {
     // Default login is member, navigate to admin-owned machine
     await page.goto(`/m/${seededMachines.medievalMadness.initials}`);
 
-    // Description should not show pencil/edit affordance for non-owner
-    // Empty fields should be hidden entirely
-    await expect(page.getByTestId("machine-description")).not.toBeVisible();
+    // Description is visible to non-owner but should not enter edit mode
+    await expect(page.getByTestId("machine-description")).toBeVisible();
+    await page.getByTestId("machine-description-display").click();
+    await expect(
+      page.getByTestId("machine-description-textarea")
+    ).not.toBeVisible();
   });
 
   test("member should be able to edit their own machine fields", async ({

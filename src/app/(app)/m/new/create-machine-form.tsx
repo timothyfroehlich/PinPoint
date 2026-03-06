@@ -16,6 +16,8 @@ import {
   OwnerSelect,
   type OwnerSelectUser,
 } from "~/components/machines/OwnerSelect";
+import { OpdbModelSelect } from "~/components/machines/OpdbModelSelect";
+import type { OpdbModelSelection } from "~/lib/opdb/types";
 
 interface CreateMachineFormProps {
   allUsers: OwnerSelectUser[];
@@ -33,6 +35,10 @@ export function CreateMachineForm({
 
   // Lift users state to client so we can append new users without full refresh
   const [users, setUsers] = useState<OwnerSelectUser[]>(allUsers);
+  const [selectedModel, setSelectedModel] = useState<OpdbModelSelection | null>(
+    null
+  );
+  const [machineName, setMachineName] = useState("");
 
   return (
     <>
@@ -49,6 +55,17 @@ export function CreateMachineForm({
       )}
 
       <form action={formAction} className="space-y-6">
+        <OpdbModelSelect
+          selectedModel={selectedModel}
+          onSelect={(selection) => {
+            setSelectedModel(selection);
+            if (selection) {
+              setMachineName(selection.title);
+            }
+          }}
+          allowClear
+        />
+
         {/* Machine Name */}
         <div className="space-y-2">
           <Label htmlFor="name" className="text-on-surface">
@@ -59,12 +76,16 @@ export function CreateMachineForm({
             name="name"
             type="text"
             required
+            value={machineName}
+            onChange={(event) => setMachineName(event.target.value)}
+            readOnly={selectedModel !== null}
             placeholder="e.g., Medieval Madness"
             className="border-outline bg-surface text-on-surface placeholder:text-on-surface-variant"
-            autoFocus
           />
           <p className="text-xs text-on-surface-variant">
-            Enter the full name of the pinball machine
+            {selectedModel
+              ? "Machine name is locked to the selected OPDB model."
+              : "Enter the full name of the pinball machine"}
           </p>
         </div>
 

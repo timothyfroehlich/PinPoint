@@ -25,14 +25,17 @@ export function QrCodeDialog({
   machineInitials,
   qrDataUrl,
   reportUrl,
-}: QrCodeDialogProps): React.JSX.Element {
+  trigger,
+}: QrCodeDialogProps & { trigger?: React.ReactNode }): React.JSX.Element {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <QrCode className="size-4" />
-          Show QR Code
-        </Button>
+        {trigger ?? (
+          <Button variant="outline" size="sm" className="gap-2">
+            <QrCode className="size-4" />
+            Show QR Code
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>

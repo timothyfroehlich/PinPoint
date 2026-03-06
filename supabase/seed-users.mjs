@@ -173,12 +173,32 @@ async function seedUsersAndData() {
       const invitedOwnerId = machine.initials === "TAF" ? invitedUserId : null;
 
       await sql`
-        INSERT INTO machines (id, name, initials, owner_id, invited_owner_id, created_at, updated_at)
-        VALUES (${machine.id}, ${machine.name}, ${machine.initials}, ${ownerId}, ${invitedOwnerId}, NOW(), NOW())
+        INSERT INTO machines (
+          id, name, initials, owner_id, invited_owner_id, 
+          description, tournament_notes, owner_requirements, owner_notes,
+          opdb_id, opdb_title, opdb_manufacturer, opdb_year, opdb_machine_type,
+          created_at, updated_at
+        )
+        VALUES (
+          ${machine.id}, ${machine.name}, ${machine.initials}, ${ownerId}, ${invitedOwnerId}, 
+          ${machine.description || null}, ${machine.tournamentNotes || null}, ${machine.ownerRequirements || null}, ${machine.ownerNotes || null},
+          ${machine.opdbId || null}, ${machine.opdbTitle || null}, 
+          ${machine.opdbManufacturer || null}, ${machine.opdbYear || null}, ${machine.opdbMachineType || null},
+          NOW(), NOW()
+        )
         ON CONFLICT (id) DO UPDATE SET
           owner_id = ${ownerId},
           invited_owner_id = ${invitedOwnerId},
-          initials = ${machine.initials}
+          initials = ${machine.initials},
+          description = ${machine.description || null},
+          tournament_notes = ${machine.tournamentNotes || null},
+          owner_requirements = ${machine.ownerRequirements || null},
+          owner_notes = ${machine.ownerNotes || null},
+          opdb_id = ${machine.opdbId || null},
+          opdb_title = ${machine.opdbTitle || null},
+          opdb_manufacturer = ${machine.opdbManufacturer || null},
+          opdb_year = ${machine.opdbYear || null},
+          opdb_machine_type = ${machine.opdbMachineType || null}
       `;
 
       // Add owner to machine_watchers (full subscribe)

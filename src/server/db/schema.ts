@@ -115,6 +115,13 @@ export const machines = pgTable(
     initials: text("initials").notNull().unique(),
     nextIssueNumber: integer("next_issue_number").notNull().default(1),
     name: text("name").notNull(),
+    opdbId: text("opdb_id"),
+    opdbTitle: text("opdb_title"),
+    opdbManufacturer: text("opdb_manufacturer"),
+    opdbYear: integer("opdb_year"),
+    opdbImageUrl: text("opdb_image_url"),
+    opdbMachineType: text("opdb_machine_type"),
+    opdbLastSyncedAt: timestamp("opdb_last_synced_at", { withTimezone: true }),
     ownerId: uuid("owner_id").references(() => userProfiles.id),
     invitedOwnerId: uuid("invited_owner_id").references(() => invitedUsers.id),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -150,6 +157,7 @@ export const machines = pgTable(
       t.invitedOwnerId
     ),
     nameIdx: index("idx_machines_name").on(t.name),
+    opdbIdIdx: index("idx_machines_opdb_id").on(t.opdbId),
   })
 );
 

@@ -80,7 +80,7 @@ export async function fillReportForm(
     watchIssue = true,
   } = options;
 
-  await page.getByLabel("Issue Title *").fill(title);
+  await page.getByLabel(/Issue Title/).fill(title);
 
   if (description) {
     await page.getByLabel("Description").fill(description);

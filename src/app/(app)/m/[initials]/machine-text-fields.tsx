@@ -1,10 +1,12 @@
 "use client";
 
 import type React from "react";
+import { FileText, Lock, Shield, Trophy } from "lucide-react";
 import {
   InlineEditableField,
   type InlineEditSaveResult,
 } from "~/components/inline-editable-field";
+import { Separator } from "~/components/ui/separator";
 import {
   updateMachineDescription,
   updateMachineTournamentNotes,
@@ -49,8 +51,13 @@ export function MachineTextFields({
   canViewOwnerNotes,
 }: MachineTextFieldsProps): React.JSX.Element {
   return (
-    <div className="space-y-4">
+    <div className="bg-surface-container border border-outline-variant rounded-xl p-5 shadow-sm flex flex-col gap-4">
+      <h3 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant border-b border-outline-variant/50 pb-2">
+        Notes &amp; Details
+      </h3>
+
       <InlineEditableField
+        icon={FileText}
         label="Description"
         value={description}
         onSave={wrapAction(updateMachineDescription)}
@@ -61,6 +68,7 @@ export function MachineTextFields({
       />
 
       <InlineEditableField
+        icon={Trophy}
         label="Tournament Notes"
         value={tournamentNotes}
         onSave={wrapAction(updateMachineTournamentNotes)}
@@ -70,8 +78,13 @@ export function MachineTextFields({
         testId="machine-tournament-notes"
       />
 
+      {(canViewOwnerRequirements || canViewOwnerNotes) && (
+        <Separator className="bg-outline-variant/50" />
+      )}
+
       {canViewOwnerRequirements && (
         <InlineEditableField
+          icon={Shield}
           label="Owner's Requirements"
           value={ownerRequirements}
           onSave={wrapAction(updateMachineOwnerRequirements)}
@@ -84,13 +97,15 @@ export function MachineTextFields({
 
       {canViewOwnerNotes && (
         <InlineEditableField
-          label="Owner's Notes"
+          icon={Lock}
+          label="Owner's Notes (Private)"
           value={ownerNotes}
           onSave={wrapAction(updateMachineOwnerNotes)}
           machineId={machineId}
           canEdit={canEditOwnerNotes}
           placeholder="Add private notes (only visible to you)..."
           testId="machine-owner-notes"
+          variant="private"
         />
       )}
     </div>
