@@ -482,7 +482,7 @@ gh pr create --title "<title>" --body "<description>" --draft
 
 ---
 
-## Phase 6: CI Monitoring (Optional)
+## Phase 6: Ready for Review
 
 **Ask user**:
 
@@ -490,13 +490,16 @@ gh pr create --title "<title>" --body "<description>" --draft
 PR #123 created!
 URL: https://github.com/timothyfroehlich/PinPoint/pull/123
 
-Monitor GitHub Actions?
-Max wait: 10 minutes
+Get it ready for review? (CI + Copilot + label)
 
 Options:
-1. Watch CI (block until complete)
-2. Skip monitoring
+1. Yes — run ready-to-review flow
+2. Skip
 ```
+
+**Use `pinpoint-ready-to-review` skill** for the full CI → Copilot → label sequence.
+
+The flow below is kept for reference only. Load `pinpoint-ready-to-review` for the authoritative steps.
 
 ### 6.1 Watch CI
 

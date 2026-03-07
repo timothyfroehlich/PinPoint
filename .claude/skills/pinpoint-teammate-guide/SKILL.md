@@ -80,55 +80,11 @@ PR_NUMBER=$(gh pr list --head "$(git branch --show-current)" --json number --jq 
 
 ---
 
-## Copilot Review Loop
+## Ready-to-Review
 
-After creating the PR:
+After creating the PR, run the full CI → Copilot → label sequence.
 
-```bash
-bash scripts/workflow/copilot-comments.sh $PR_NUMBER
-```
-
-- **`⏳ Copilot review pending`** — wait and retry.
-- **`✅ Copilot review is current`** — review is up to date.
-
-### Polling loop (up to 5 minutes):
-
-```bash
-for i in $(seq 1 5); do
-    output=$(bash scripts/workflow/copilot-comments.sh $PR_NUMBER)
-    echo "$output"
-    echo "$output" | grep -q "⏳" || break
-    sleep 60
-done
-```
-
-### If comments exist:
-1. Address each comment (evaluate critically — not all Copilot suggestions are correct)
-2. Reply to each thread: `bash scripts/workflow/respond-to-copilot.sh $PR_NUMBER "path:line" "Fixed: ... —Claude"`
-3. Push your fix
-4. Poll again — Copilot may re-review
-
-### Timeout (5 minutes, no review):
-```
-- [x] Copilot review received and comments addressed (no review after 5min timeout)
-```
-
----
-
-## CI Verification
-
-After your final push, verify CI on GitHub:
-
-```bash
-gh pr checks $PR_NUMBER
-```
-
-Or poll until complete:
-```bash
-bash .agent/skills/pinpoint-commit/scripts/watch-ci.sh $PR_NUMBER
-```
-
-Only check off "CI passing" after these commands confirm it.
+**Use `pinpoint-ready-to-review` skill** — it covers CI watching, Copilot polling loop, comment resolution, and the final `label-ready.sh` call.
 
 ---
 
