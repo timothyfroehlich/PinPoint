@@ -46,14 +46,14 @@ export function UpdateIssueFrequencyForm({
     FormData
   >(updateIssueFrequencyAction, undefined);
   const permissionState = getPermissionState(
-    "issues.update.frequency",
+    "issues.update.reporting",
     accessLevel,
     ownershipContext
   );
   const deniedReason = permissionState.allowed
     ? null
     : getPermissionDeniedReason(
-        "issues.update.frequency",
+        "issues.update.reporting",
         accessLevel,
         ownershipContext
       );

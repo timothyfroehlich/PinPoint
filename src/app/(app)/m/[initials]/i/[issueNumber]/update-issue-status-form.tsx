@@ -45,14 +45,14 @@ export function UpdateIssueStatusForm({
     FormData
   >(updateIssueStatusAction, undefined);
   const permissionState = getPermissionState(
-    "issues.update.status",
+    "issues.update.reporting",
     accessLevel,
     ownershipContext
   );
   const deniedReason = permissionState.allowed
     ? null
     : getPermissionDeniedReason(
-        "issues.update.status",
+        "issues.update.reporting",
         accessLevel,
         ownershipContext
       );

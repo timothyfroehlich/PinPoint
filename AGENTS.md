@@ -23,6 +23,7 @@
 11. **E2E Interaction Coverage**: If you add a clickable UI element, you must click it in an E2E test.
 12. **Email Privacy**: User email addresses must NEVER be displayed outside of admin views and the user's own settings page. Use names, "Anonymous", or role labels instead. This applies to UI, seed data, timeline events, and any client-facing serialization.
 13. **Permissions Matrix Accuracy**: The permissions matrix (`matrix.ts`) must match actual server action enforcement. The help page auto-generates from the matrix — if it drifts, users see wrong information. Update both when changing auth logic.
+14. **Matrix-Only Permissions**: All permission checks MUST use `checkPermission()` from the matrix system (`~/lib/permissions/helpers`). No standalone permission functions outside `src/lib/permissions/`. The help page auto-generates from the matrix — if enforcement diverges, users see wrong information.
 
 ## 3. Agent Skills (Progressive Disclosure)
 

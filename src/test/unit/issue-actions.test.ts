@@ -4,7 +4,7 @@ import {
   updateIssueStatusAction,
   updateIssueFrequencyAction,
 } from "~/app/(app)/issues/actions";
-import { canUpdateIssue } from "~/lib/permissions";
+import { checkPermission } from "~/lib/permissions/helpers";
 
 // Mock Next.js modules
 vi.mock("next/navigation", () => ({
@@ -63,8 +63,9 @@ vi.mock("~/services/issues", () => ({
 }));
 
 // Mock permissions
-vi.mock("~/lib/permissions", () => ({
-  canUpdateIssue: vi.fn(),
+vi.mock("~/lib/permissions/helpers", () => ({
+  checkPermission: vi.fn(),
+  getAccessLevel: vi.fn().mockReturnValue("member"),
 }));
 
 import { revalidatePath } from "next/cache";
@@ -203,7 +204,7 @@ describe("updateIssueStatusAction", () => {
     });
 
     // Mock permission check true
-    vi.mocked(canUpdateIssue).mockReturnValue(true);
+    vi.mocked(checkPermission).mockReturnValue(true);
 
     // Mock update success
     vi.mocked(updateIssueStatus).mockResolvedValue({
@@ -219,7 +220,7 @@ describe("updateIssueStatusAction", () => {
     const result = await updateIssueStatusAction(initialState, formData);
 
     expect(result.ok).toBe(true);
-    expect(canUpdateIssue).toHaveBeenCalled();
+    expect(checkPermission).toHaveBeenCalled();
     expect(updateIssueStatus).toHaveBeenCalled();
     expect(revalidatePath).toHaveBeenCalledWith("/m/MM/i/1");
     expect(revalidatePath).toHaveBeenCalledWith("/m/MM");
@@ -242,7 +243,7 @@ describe("updateIssueStatusAction", () => {
     });
 
     // Mock permission check false
-    vi.mocked(canUpdateIssue).mockReturnValue(false);
+    vi.mocked(checkPermission).mockReturnValue(false);
 
     const formData = new FormData();
     formData.append("issueId", validUuid);
@@ -254,7 +255,7 @@ describe("updateIssueStatusAction", () => {
     if (!result.ok) {
       expect(result.code).toBe("UNAUTHORIZED");
     }
-    expect(canUpdateIssue).toHaveBeenCalled();
+    expect(checkPermission).toHaveBeenCalled();
     expect(updateIssueStatus).not.toHaveBeenCalled();
   });
 });
@@ -284,7 +285,7 @@ describe("updateIssueFrequencyAction", () => {
     vi.mocked(db.query.userProfiles.findFirst).mockResolvedValue({
       role: "member",
     } as any);
-    vi.mocked(canUpdateIssue).mockReturnValue(true);
+    vi.mocked(checkPermission).mockReturnValue(true);
     vi.mocked(updateIssueFrequency).mockResolvedValue({
       issueId: validUuid,
       oldFrequency: "intermittent",
@@ -298,7 +299,7 @@ describe("updateIssueFrequencyAction", () => {
     const result = await updateIssueFrequencyAction(initialState, formData);
 
     expect(result.ok).toBe(true);
-    expect(canUpdateIssue).toHaveBeenCalled();
+    expect(checkPermission).toHaveBeenCalled();
     expect(updateIssueFrequency).toHaveBeenCalled();
   });
 });

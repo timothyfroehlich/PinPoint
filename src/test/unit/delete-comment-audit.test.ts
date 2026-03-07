@@ -74,8 +74,9 @@ vi.mock("~/services/issues", () => ({
 }));
 
 // Mock permissions
-vi.mock("~/lib/permissions", () => ({
-  canUpdateIssue: vi.fn(),
+vi.mock("~/lib/permissions/helpers", () => ({
+  checkPermission: vi.fn(),
+  getAccessLevel: vi.fn().mockReturnValue("member"),
 }));
 
 import { revalidatePath } from "next/cache";

@@ -108,36 +108,36 @@ describe("Issue detail permission states (integration)", () => {
     };
   };
 
-  it("returns unauthenticated reason for status updates when not logged in", async () => {
+  it("returns unauthenticated reason for reporting updates when not logged in", async () => {
     const state = getPermissionState(
-      "issues.update.status",
+      "issues.update.reporting",
       "unauthenticated",
       await buildContext("unauthenticated")
     );
     expect(state).toEqual({ allowed: false, reason: "unauthenticated" });
   });
 
-  it("returns ownership reason for guest on another user's issue status", async () => {
+  it("returns ownership reason for guest on another user's issue reporting fields", async () => {
     const state = getPermissionState(
-      "issues.update.status",
+      "issues.update.reporting",
       "guest",
       await buildContext("guest", outsiderGuestId)
     );
     expect(state).toEqual({ allowed: false, reason: "ownership" });
   });
 
-  it("returns role reason for guest assignee updates", async () => {
+  it("returns role reason for guest triage updates", async () => {
     const state = getPermissionState(
-      "issues.update.assignee",
+      "issues.update.triage",
       "guest",
       await buildContext("guest", outsiderGuestId)
     );
     expect(state).toEqual({ allowed: false, reason: "role" });
   });
 
-  it("allows member assignee updates", async () => {
+  it("allows member triage updates", async () => {
     const state = getPermissionState(
-      "issues.update.assignee",
+      "issues.update.triage",
       "member",
       await buildContext("member", ownerId)
     );

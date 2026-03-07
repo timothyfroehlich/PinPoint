@@ -42,14 +42,14 @@ export function AssignIssueForm({
     FormData
   >(assignIssueAction, undefined);
   const permissionState = getPermissionState(
-    "issues.update.assignee",
+    "issues.update.triage",
     accessLevel,
     ownershipContext
   );
   const deniedReason = permissionState.allowed
     ? null
     : getPermissionDeniedReason(
-        "issues.update.assignee",
+        "issues.update.triage",
         accessLevel,
         ownershipContext
       );
