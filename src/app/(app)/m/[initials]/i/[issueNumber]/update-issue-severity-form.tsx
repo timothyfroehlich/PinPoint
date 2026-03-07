@@ -47,14 +47,14 @@ export function UpdateIssueSeverityForm({
     FormData
   >(updateIssueSeverityAction, undefined);
   const permissionState = getPermissionState(
-    "issues.update.severity",
+    "issues.update.reporting",
     accessLevel,
     ownershipContext
   );
   const deniedReason = permissionState.allowed
     ? null
     : getPermissionDeniedReason(
-        "issues.update.severity",
+        "issues.update.reporting",
         accessLevel,
         ownershipContext
       );

@@ -20,9 +20,3 @@ Handles the final merge of a reviewed PR and cleans up ephemeral resources.
       git checkout main
       git branch -D <branch_name>
       ```
-
-3.  **Sync**:
-    - Run `bd sync` to update the status of linked issues.
-      ```bash
-      bd sync
-      ```

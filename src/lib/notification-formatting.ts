@@ -96,7 +96,7 @@ export function getEmailHtml(
       body = `You have been assigned to this issue.`;
       break;
     case "issue_status_changed":
-      body = `Status changed to: <strong>${newStatus}</strong>`;
+      body = `Status changed to: <strong>${newStatus ? sanitizeHtml(newStatus) : ""}</strong>`;
       break;
     case "new_comment": {
       // Sanitize comment content to prevent XSS

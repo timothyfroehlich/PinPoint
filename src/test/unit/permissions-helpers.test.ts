@@ -52,7 +52,7 @@ describe("checkPermission", () => {
         userId,
         reporterId: userId, // Same as user - owns the issue
       };
-      expect(checkPermission("issues.update.status", "guest", context)).toBe(
+      expect(checkPermission("issues.update.reporting", "guest", context)).toBe(
         true
       );
     });
@@ -62,7 +62,7 @@ describe("checkPermission", () => {
         userId,
         reporterId: otherUserId, // Different user
       };
-      expect(checkPermission("issues.update.status", "guest", context)).toBe(
+      expect(checkPermission("issues.update.reporting", "guest", context)).toBe(
         false
       );
     });
@@ -84,7 +84,7 @@ describe("checkPermission", () => {
     });
 
     it("should deny if no context provided for conditional permission", () => {
-      expect(checkPermission("issues.update.status", "guest")).toBe(false);
+      expect(checkPermission("issues.update.reporting", "guest")).toBe(false);
       expect(checkPermission("machines.edit", "member")).toBe(false);
     });
 
@@ -92,7 +92,7 @@ describe("checkPermission", () => {
       const context: OwnershipContext = {
         reporterId: userId,
       };
-      expect(checkPermission("issues.update.status", "guest", context)).toBe(
+      expect(checkPermission("issues.update.reporting", "guest", context)).toBe(
         false
       );
     });
@@ -142,7 +142,7 @@ describe("checkPermission", () => {
       machineOwnerId: null,
     };
     // null !== userId, so should be false
-    expect(checkPermission("issues.update.status", "guest", context)).toBe(
+    expect(checkPermission("issues.update.reporting", "guest", context)).toBe(
       false
     );
     expect(checkPermission("machines.edit", "member", context)).toBe(false);
@@ -178,7 +178,11 @@ describe("getPermissionState", () => {
       userId,
       reporterId: "other-user",
     };
-    const state = getPermissionState("issues.update.status", "guest", context);
+    const state = getPermissionState(
+      "issues.update.reporting",
+      "guest",
+      context
+    );
     expect(state.allowed).toBe(false);
     if (!state.allowed) {
       expect(state.reason).toBe("ownership");
@@ -190,7 +194,11 @@ describe("getPermissionState", () => {
       userId,
       reporterId: userId,
     };
-    const state = getPermissionState("issues.update.status", "guest", context);
+    const state = getPermissionState(
+      "issues.update.reporting",
+      "guest",
+      context
+    );
     expect(state.allowed).toBe(true);
   });
 });
@@ -226,7 +234,7 @@ describe("getPermissionDeniedReason", () => {
       reporterId: "other-user",
     };
     const reason = getPermissionDeniedReason(
-      "issues.update.status",
+      "issues.update.reporting",
       "guest",
       context
     );
@@ -272,7 +280,9 @@ describe("checkAnyPermission", () => {
 
 describe("isConditionalPermission", () => {
   it("should return true for own-based permissions", () => {
-    expect(isConditionalPermission("issues.update.status", "guest")).toBe(true);
+    expect(isConditionalPermission("issues.update.reporting", "guest")).toBe(
+      true
+    );
   });
 
   it("should return true for owner-based permissions", () => {
@@ -281,7 +291,7 @@ describe("isConditionalPermission", () => {
 
   it("should return false for boolean permissions", () => {
     expect(isConditionalPermission("issues.view", "guest")).toBe(false);
-    expect(isConditionalPermission("issues.update.status", "member")).toBe(
+    expect(isConditionalPermission("issues.update.reporting", "member")).toBe(
       false
     );
     expect(isConditionalPermission("admin.access", "admin")).toBe(false);
@@ -444,51 +454,38 @@ describe("Integration: Guest issue update flow", () => {
   const guestId = "guest-user";
   const memberId = "member-user";
 
-  it("should allow guest to update all descriptive fields on own issue", () => {
+  it("should allow guest to update reporting fields on own issue", () => {
     const context: OwnershipContext = {
       userId: guestId,
       reporterId: guestId,
     };
 
-    expect(checkPermission("issues.update.severity", "guest", context)).toBe(
-      true
-    );
-    expect(checkPermission("issues.update.frequency", "guest", context)).toBe(
-      true
-    );
-    expect(checkPermission("issues.update.status", "guest", context)).toBe(
+    expect(checkPermission("issues.update.reporting", "guest", context)).toBe(
       true
     );
   });
 
-  it("should deny guest workflow fields even on own issue", () => {
+  it("should deny guest triage fields even on own issue", () => {
     const context: OwnershipContext = {
       userId: guestId,
       reporterId: guestId,
     };
 
-    // Priority and assignee are always denied for guests
-    expect(checkPermission("issues.update.priority", "guest", context)).toBe(
-      false
-    );
-    expect(checkPermission("issues.update.assignee", "guest", context)).toBe(
+    expect(checkPermission("issues.update.triage", "guest", context)).toBe(
       false
     );
   });
 
-  it("should allow member to update any issue", () => {
+  it("should allow member to update any issue (both tiers)", () => {
     const context: OwnershipContext = {
       userId: memberId,
       reporterId: guestId, // Issue reported by someone else
     };
 
-    expect(checkPermission("issues.update.severity", "member", context)).toBe(
+    expect(checkPermission("issues.update.reporting", "member", context)).toBe(
       true
     );
-    expect(checkPermission("issues.update.priority", "member", context)).toBe(
-      true
-    );
-    expect(checkPermission("issues.update.status", "member", context)).toBe(
+    expect(checkPermission("issues.update.triage", "member", context)).toBe(
       true
     );
   });

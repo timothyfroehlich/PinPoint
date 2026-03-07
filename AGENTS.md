@@ -23,25 +23,27 @@
 11. **E2E Interaction Coverage**: If you add a clickable UI element, you must click it in an E2E test.
 12. **Email Privacy**: User email addresses must NEVER be displayed outside of admin views and the user's own settings page. Use names, "Anonymous", or role labels instead. This applies to UI, seed data, timeline events, and any client-facing serialization.
 13. **Permissions Matrix Accuracy**: The permissions matrix (`matrix.ts`) must match actual server action enforcement. The help page auto-generates from the matrix — if it drifts, users see wrong information. Update both when changing auth logic.
+14. **Matrix-Only Permissions**: All permission checks MUST use `checkPermission()` from the matrix system (`~/lib/permissions/helpers`). No standalone permission functions outside `src/lib/permissions/`. The help page auto-generates from the matrix — if enforcement diverges, users see wrong information.
 
 ## 3. Agent Skills (Progressive Disclosure)
 
 **YOU MUST LOAD RELEVANT SKILLS FOR EVERY TASK.**
 If your tool does not support skills, read the file path directly.
 
-| Category       | Skill Name                       | Path                                                     | When to Use                                                              |
-| :------------- | :------------------------------- | :------------------------------------------------------- | :----------------------------------------------------------------------- |
-| **UI**         | `pinpoint-ui`                    | `.agent/skills/pinpoint-ui/SKILL.md`                     | Components, shadcn/ui, forms, responsive design.                         |
-| **TypeScript** | `pinpoint-typescript`            | `.agent/skills/pinpoint-typescript/SKILL.md`             | Type errors, generics, strict mode, Drizzle types.                       |
-| **Testing**    | `pinpoint-testing`               | `.agent/skills/pinpoint-testing/SKILL.md`                | Writing tests, PGlite setup, Playwright.                                 |
-| **Testing**    | `pinpoint-e2e`                   | `.agent/skills/pinpoint-e2e/SKILL.md`                    | E2E tests, worker isolation, stability patterns.                         |
-| **Security**   | `pinpoint-security`              | `.agent/skills/pinpoint-security/SKILL.md`               | Auth flows, CSP, Zod validation, Supabase SSR.                           |
-| **Patterns**   | `pinpoint-patterns`              | `.agent/skills/pinpoint-patterns/SKILL.md`               | Server Actions, architecture, data fetching.                             |
-| **Workflow**   | `pinpoint-commit`                | `.agent/skills/pinpoint-commit/SKILL.md`                 | Intelligent commit-to-PR workflow and CI monitoring.                     |
-| **Workflow**   | `pinpoint-github-monitor`        | `.agent/skills/pinpoint-github-monitor/SKILL.md`         | Monitoring GitHub Actions and build status.                              |
-| **Workflow**   | `pinpoint-orchestrator`          | `.claude/skills/pinpoint-orchestrator/SKILL.md`          | Parallel subagent work in worktrees (background agents or Claude Teams). |
-| **Workflow**   | `pinpoint-dispatch-e2e-teammate` | `.claude/skills/pinpoint-dispatch-e2e-teammate/SKILL.md` | Dispatching a teammate end-to-end (worktree + contract + prompt).        |
-| **Workflow**   | `pinpoint-teammate-guide`        | `.claude/skills/pinpoint-teammate-guide/SKILL.md`        | For dispatched teammates: environment, contract, Copilot loop, CI.       |
+| Category       | Skill Name                       | Path                                                     | When to Use                                                                                   |
+| :------------- | :------------------------------- | :------------------------------------------------------- | :-------------------------------------------------------------------------------------------- |
+| **UI**         | `pinpoint-ui`                    | `.agent/skills/pinpoint-ui/SKILL.md`                     | Components, shadcn/ui, forms, responsive design.                                              |
+| **TypeScript** | `pinpoint-typescript`            | `.agent/skills/pinpoint-typescript/SKILL.md`             | Type errors, generics, strict mode, Drizzle types.                                            |
+| **Testing**    | `pinpoint-testing`               | `.agent/skills/pinpoint-testing/SKILL.md`                | Writing tests, PGlite setup, Playwright.                                                      |
+| **Testing**    | `pinpoint-e2e`                   | `.agent/skills/pinpoint-e2e/SKILL.md`                    | E2E tests, worker isolation, stability patterns.                                              |
+| **Security**   | `pinpoint-security`              | `.agent/skills/pinpoint-security/SKILL.md`               | Auth flows, CSP, Zod validation, Supabase SSR.                                                |
+| **Patterns**   | `pinpoint-patterns`              | `.agent/skills/pinpoint-patterns/SKILL.md`               | Server Actions, architecture, data fetching.                                                  |
+| **Workflow**   | `pinpoint-commit`                | `.agent/skills/pinpoint-commit/SKILL.md`                 | Intelligent commit-to-PR workflow and CI monitoring.                                          |
+| **Workflow**   | `pinpoint-ready-to-review`       | `.agent/skills/pinpoint-ready-to-review/SKILL.md`        | CI green + Copilot comments addressed + label applied. Use standalone when PR already exists. |
+| **Workflow**   | `pinpoint-github-monitor`        | `.agent/skills/pinpoint-github-monitor/SKILL.md`         | Monitoring GitHub Actions and build status.                                                   |
+| **Workflow**   | `pinpoint-orchestrator`          | `.claude/skills/pinpoint-orchestrator/SKILL.md`          | Parallel subagent work in worktrees (background agents or Claude Teams).                      |
+| **Workflow**   | `pinpoint-dispatch-e2e-teammate` | `.claude/skills/pinpoint-dispatch-e2e-teammate/SKILL.md` | Dispatching a teammate end-to-end (worktree + contract + prompt).                             |
+| **Workflow**   | `pinpoint-teammate-guide`        | `.claude/skills/pinpoint-teammate-guide/SKILL.md`        | For dispatched teammates: environment, contract, Copilot loop, CI.                            |
 
 ## 4. Environment & Workflow
 
@@ -265,7 +267,6 @@ See `pinpoint-orchestrator` skill for the full workflow.
 3. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
    git pull --rebase
-   bd sync
    git push
    git status  # MUST show "up to date with origin"
    ```
@@ -277,66 +278,3 @@ See `pinpoint-orchestrator` skill for the full workflow.
 - NEVER stop before pushing - that leaves work stranded locally
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
-
-<!-- bv-agent-instructions-v1 -->
-
----
-
-## Beads Workflow Integration
-
-This project uses [beads_viewer](https://github.com/Dicklesworthstone/beads_viewer) for issue tracking. Issues are stored in `.beads/` and tracked in git.
-
-### Essential Commands
-
-```bash
-# View issues (launches TUI - avoid in automated sessions)
-bv
-
-# CLI commands for agents (use these instead)
-bd ready              # Show issues ready to work (no blockers)
-bd list --status=open # All open issues
-bd show <id>          # Full issue details with dependencies
-bd create --title="..." --type=task --priority=2
-bd update <id> --status=in_progress
-bd close <id> --reason="Completed"
-bd close <id1> <id2>  # Close multiple issues at once
-bd sync               # Commit and push changes
-```
-
-### Workflow Pattern
-
-1. **Start**: Run `bd ready` to find actionable work
-2. **Claim**: Use `bd update <id> --status=in_progress`
-3. **Work**: Implement the task
-4. **Complete**: Use `bd close <id>`
-5. **Sync**: Always run `bd sync` at session end
-
-### Key Concepts
-
-- **Dependencies**: Issues can block other issues. `bd ready` shows only unblocked work.
-- **Priority**: P0=critical, P1=high, P2=medium, P3=low, P4=backlog (use numbers, not words)
-- **Types**: task, bug, feature, epic, question, docs
-- **Blocking**: `bd dep add <issue> <depends-on>` to add dependencies
-
-### Session Protocol
-
-**Before ending any session, run this checklist:**
-
-```bash
-git status              # Check what changed
-git add <files>         # Stage code changes
-bd sync                 # Commit beads changes
-git commit -m "..."     # Commit code
-bd sync                 # Commit any new beads changes
-git push                # Push to remote
-```
-
-### Best Practices
-
-- Check `bd ready` at session start to find available work
-- Update status as you work (in_progress → closed)
-- Create new issues with `bd create` when you discover tasks
-- Use descriptive titles and set appropriate priority/type
-- Always `bd sync` before ending session
-
-<!-- end-bv-agent-instructions -->

@@ -107,5 +107,4 @@ Once the PR merges:
 ```bash
 python3 ./pinpoint-wt.py remove feat/<branch-name>
 bd close <issue-id> --reason="Fixed in PR #NNN"
-bd sync
 ```
