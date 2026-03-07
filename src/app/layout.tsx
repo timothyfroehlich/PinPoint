@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type React from "react";
+import { cookies } from "next/headers";
 import "./globals.css";
 import { Toaster } from "sonner";
 import { ClientLogger } from "~/components/dev/client-logger";
@@ -17,12 +18,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
-}>): React.JSX.Element {
+}>): Promise<React.JSX.Element> {
   const isDevelopment = process.env.NODE_ENV === "development";
+  const cookieStore = await cookies();
+  const forceShow = cookieStore.get("forceShowCookieBanner")?.value === "true";
+  const showCookieBanner =
+    process.env["VERCEL_ENV"] === "production" || forceShow;
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -31,7 +36,7 @@ export default function RootLayout({
         {isDevelopment && <ClientLogger />}
         <div className="flex-1 overflow-hidden">{children}</div>
         <Toaster />
-        <CookieConsentBanner />
+        {showCookieBanner && <CookieConsentBanner />}
       </body>
     </html>
   );

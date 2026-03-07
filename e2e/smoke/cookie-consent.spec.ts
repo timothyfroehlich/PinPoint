@@ -10,9 +10,22 @@
 
 import { test, expect } from "@playwright/test";
 
-// Override the default storageState (which pre-sets the consent cookie)
-// so the banner actually appears during these tests.
-test.use({ storageState: { cookies: [], origins: [] } });
+// Override the default storageState to specifically enable the banner for this test.
+// Even though it's disabled by default in E2E/Dev/Preview, the forceShowCookieBanner
+// cookie will trigger its visibility in RootLayout.
+test.use({
+  storageState: {
+    cookies: [
+      {
+        name: "forceShowCookieBanner",
+        value: "true",
+        domain: "localhost",
+        path: "/",
+      },
+    ],
+    origins: [],
+  },
+});
 
 test.describe("Cookie Consent Banner", () => {
   test("appears on first visit and dismisses on click", async ({ page }) => {

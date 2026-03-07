@@ -19,28 +19,33 @@ export function CookieConsentBanner(): React.JSX.Element | null {
 
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background p-4"
+      className="fixed bottom-4 right-4 z-50 max-w-[calc(100vw-2rem)] rounded-lg border bg-background p-4 shadow-lg animate-in fade-in slide-in-from-bottom-2 sm:max-w-sm"
       role="region"
       aria-label="Cookie consent notice"
     >
-      <div className="mx-auto flex max-w-screen-xl flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3">
         <p className="text-sm text-muted-foreground">
           PinPoint uses cookies for authentication and to remember your
           preferences.{" "}
-          <Link href="/privacy" className="text-link underline">
+          <Link
+            href="/privacy"
+            className="text-link underline hover:text-foreground"
+          >
             Learn more
           </Link>
         </p>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => {
-            storeCookieConsent();
-            setVisible(false);
-          }}
-        >
-          Got it
-        </Button>
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              storeCookieConsent();
+              setVisible(false);
+            }}
+          >
+            Got it
+          </Button>
+        </div>
       </div>
     </div>
   );
