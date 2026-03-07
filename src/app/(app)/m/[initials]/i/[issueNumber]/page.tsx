@@ -5,17 +5,17 @@ import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { issues, userProfiles } from "~/server/db/schema";
 import { eq, asc, and, notInArray } from "drizzle-orm";
-import { PageShell } from "~/components/layout/PageShell";
 import { IssueTimeline } from "~/components/issues/IssueTimeline";
 import { IssueSidebar } from "~/components/issues/IssueSidebar";
-import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
+import { SidebarActions } from "~/components/issues/SidebarActions";
+import { WatchButton } from "~/components/issues/WatchButton";
 import { getMachineOwnerId, getMachineOwnerName } from "~/lib/issues/owner";
 import { formatIssueId } from "~/lib/issues/utils";
-import { ImageGallery } from "~/components/images/ImageGallery";
-import type { Issue, IssueWithAllRelations } from "~/lib/types";
+import type { IssueWithAllRelations } from "~/lib/types";
 import { BackToIssuesLink } from "~/components/issues/BackToIssuesLink";
 import { getLastIssuesPath } from "~/lib/cookies/preferences";
 import { EditableIssueTitle } from "./editable-issue-title";
+import { OwnerRequirementsCallout } from "~/components/machines/OwnerRequirementsCallout";
 import {
   type OwnershipContext,
   checkPermission,
@@ -25,7 +25,8 @@ import {
 /**
  * Issue Detail Page
  *
- * Displays issue details, timeline, and update actions.
+ * Mobile-first layout: metadata badges + drawers above timeline.
+ * Desktop: full sidebar card on the right (unchanged).
  */
 export default async function IssueDetailPage({
   params,
@@ -179,14 +180,37 @@ export default async function IssueDetailPage({
     ownershipContext
   );
 
-  return (
-    <PageShell className="space-y-8" size="wide">
-      {/* Back button */}
-      <BackToIssuesLink href={issuesPath} />
+  const isWatching = user?.id
+    ? issue.watchers.some((w) => w.userId === user.id)
+    : false;
 
-      {/* Header */}
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
+  return (
+    <div className="mx-auto max-w-7xl px-4 sm:px-8 lg:px-10">
+      <div className="py-4 sm:py-10 space-y-4 sm:space-y-8">
+        {/* MOBILE: ID pill + Game name */}
+        <div
+          className="flex items-center gap-2 md:hidden"
+          data-testid="mobile-nav-row"
+        >
+          <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-mono font-bold">
+            {formatIssueId(initials, issue.issueNumber)}
+          </span>
+          <Link
+            href={`/m/${initials}`}
+            className="text-sm font-medium text-muted-foreground hover:text-foreground"
+            data-testid="machine-link"
+          >
+            {issue.machine.name}
+          </Link>
+        </div>
+
+        {/* DESKTOP: Back link */}
+        <div className="hidden md:block">
+          <BackToIssuesLink href={issuesPath} />
+        </div>
+
+        {/* DESKTOP: ID + machine + owner row */}
+        <div className="hidden md:flex flex-wrap items-center gap-2">
           <span className="text-muted-foreground font-mono font-bold">
             {formatIssueId(initials, issue.issueNumber)}
           </span>
@@ -200,7 +224,6 @@ export default async function IssueDetailPage({
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <span>•</span>
               <span>Game Owner:</span>
-              {/* Only link for registered owners - invited owner IDs won't filter correctly */}
               {issue.machine.owner?.id ? (
                 <Link
                   href={`/issues?owner=${issue.machine.owner.id}`}
@@ -214,70 +237,97 @@ export default async function IssueDetailPage({
             </div>
           )}
         </div>
-        <div className="space-y-3">
-          <EditableIssueTitle
-            issueId={issue.id}
-            title={issue.title}
-            canEdit={userCanEditTitle}
+
+        {/* Title (responsive sizing) */}
+        <EditableIssueTitle
+          issueId={issue.id}
+          title={issue.title}
+          canEdit={userCanEditTitle}
+          className="text-xl font-extrabold tracking-tight md:text-3xl lg:text-4xl"
+        />
+
+        {/* MOBILE: Assignee + Watch row */}
+        {accessLevel !== "unauthenticated" && (
+          <div className="flex items-center gap-3 border-y py-3 md:hidden">
+            <div className="flex-1 min-w-0">
+              <SidebarActions
+                only="assignee"
+                compact
+                issue={issueWithRelations}
+                allUsers={allUsers}
+                currentUserId={user?.id ?? null}
+                accessLevel={accessLevel}
+                ownershipContext={ownershipContext}
+              />
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <WatchButton
+                iconOnly
+                issueId={issue.id}
+                initialIsWatching={isWatching}
+              />
+              <span className="text-xs text-muted-foreground">
+                {issue.watchers.length}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* MOBILE: Badge grid */}
+        <div className="md:hidden" data-testid="issue-badge-strip">
+          <SidebarActions
+            exclude={["assignee"]}
+            compact
+            rowLayout
+            issue={issueWithRelations}
+            allUsers={allUsers}
+            currentUserId={user?.id ?? null}
+            accessLevel={accessLevel}
+            ownershipContext={ownershipContext}
           />
-          <div className="flex flex-wrap items-center gap-2">
-            <IssueBadgeGrid
-              issue={
-                issue as unknown as Pick<
-                  Issue,
-                  "status" | "severity" | "priority" | "frequency"
-                >
+        </div>
+
+        {/* MOBILE: Owner requirements */}
+        {user && issue.machine.ownerRequirements && (
+          <div className="md:hidden">
+            <OwnerRequirementsCallout
+              ownerRequirements={issue.machine.ownerRequirements}
+              machineName={issue.machine.name}
+            />
+          </div>
+        )}
+
+        {/* Two-column grid (content + sidebar) */}
+        <div className="grid gap-10 md:grid-cols-[minmax(0,1fr)_320px]">
+          <section className="min-w-0">
+            <IssueTimeline
+              issue={issueWithRelations}
+              currentUserId={user?.id ?? null}
+              currentUserRole={accessLevel}
+              currentUserInitials={
+                currentUserProfile?.name.slice(0, 2).toUpperCase() ?? "??"
               }
-              variant="strip"
-              size="lg"
+              ownerRequirements={
+                user
+                  ? (issue.machine.ownerRequirements ?? undefined)
+                  : undefined
+              }
+              machineName={issue.machine.name}
+            />
+          </section>
+
+          {/* Desktop sidebar only */}
+          <div className="hidden md:block">
+            <IssueSidebar
+              issue={issueWithRelations}
+              allUsers={allUsers}
+              currentUserId={user?.id ?? null}
+              accessLevel={accessLevel}
+              ownershipContext={ownershipContext}
             />
           </div>
         </div>
       </div>
-
-      <div className="grid gap-10 md:grid-cols-[minmax(0,1fr)_320px]">
-        <section className="space-y-5 lg:pr-4">
-          {issue.images.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Images ({issue.images.length})
-              </h2>
-              <ImageGallery
-                images={issue.images.map((img) => ({
-                  id: img.id,
-                  fullImageUrl: img.fullImageUrl,
-                  originalFilename: img.originalFilename,
-                }))}
-              />
-            </div>
-          )}
-
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Activity
-          </h2>
-          <IssueTimeline
-            issue={issueWithRelations}
-            currentUserId={user?.id ?? null}
-            currentUserRole={accessLevel}
-            currentUserInitials={
-              currentUserProfile?.name.slice(0, 2).toUpperCase() ?? "??"
-            }
-            ownerRequirements={
-              user ? (issue.machine.ownerRequirements ?? undefined) : undefined
-            }
-            machineName={issue.machine.name}
-          />
-        </section>
-
-        {/* Sticky Sidebar */}
-        <IssueSidebar
-          issue={issueWithRelations}
-          allUsers={allUsers}
-          currentUserId={user?.id ?? null}
-          accessLevel={accessLevel}
-          ownershipContext={ownershipContext}
-        />
-      </div>
-    </PageShell>
+    </div>
   );
 }

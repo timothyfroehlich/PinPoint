@@ -67,7 +67,7 @@ export function IssueSidebar({
 
             {/* Additional Metadata */}
             <div className="space-y-4 border-t pt-4">
-              <div className="grid grid-cols-[110px,1fr] items-center gap-3">
+              <div className="grid grid-cols-[110px_1fr] items-center gap-3">
                 <span className="text-sm text-muted-foreground">Reporter</span>
                 <div className="flex min-w-0 items-center gap-2">
                   <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-[11px] font-medium text-muted-foreground">
@@ -86,7 +86,7 @@ export function IssueSidebar({
                 </div>
               </div>
 
-              <div className="grid grid-cols-[110px,1fr] items-center gap-3">
+              <div className="grid grid-cols-[110px_1fr] items-center gap-3">
                 <span className="text-sm text-muted-foreground">Created</span>
                 <span className="text-sm text-foreground">
                   {new Date(issue.createdAt).toLocaleDateString(undefined, {

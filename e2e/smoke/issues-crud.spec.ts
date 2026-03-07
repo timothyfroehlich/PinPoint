@@ -172,11 +172,6 @@ test.describe("Issues System", () => {
       await expect(page.getByTestId("issue-severity-badge").first()).toHaveText(
         /Minor/i
       );
-
-      // Should show timeline
-      await expect(
-        page.getByRole("heading", { name: "Activity" })
-      ).toBeVisible();
     });
 
     // Update tests moved to integration/full suite

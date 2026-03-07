@@ -8,8 +8,10 @@ import {
   type UpdateIssueFrequencyResult,
 } from "~/app/(app)/issues/actions";
 import { FrequencySelect } from "~/components/issues/fields/FrequencySelect";
+import { MetadataDrawer } from "~/components/issues/fields/MetadataDrawer";
 import { type IssueFrequency } from "~/lib/types";
 import { IssueBadge } from "~/components/issues/IssueBadge";
+import { FREQUENCY_CONFIG } from "~/lib/issues/status";
 import {
   getPermissionDeniedReason,
   getPermissionState,
@@ -23,11 +25,24 @@ import {
   TooltipTrigger,
 } from "~/components/ui/tooltip";
 
+const FREQUENCY_DRAWER_OPTIONS = (
+  Object.entries(FREQUENCY_CONFIG) as [
+    IssueFrequency,
+    (typeof FREQUENCY_CONFIG)[IssueFrequency],
+  ][]
+).map(([value, config]) => ({
+  value,
+  label: config.label,
+  icon: config.icon,
+  iconColor: config.iconColor,
+}));
+
 interface UpdateIssueFrequencyFormProps {
   issueId: string;
   currentFrequency: IssueFrequency;
   accessLevel: AccessLevel;
   ownershipContext: OwnershipContext;
+  compact?: boolean | undefined;
 }
 
 export function UpdateIssueFrequencyForm({
@@ -35,6 +50,7 @@ export function UpdateIssueFrequencyForm({
   currentFrequency,
   accessLevel,
   ownershipContext,
+  compact,
 }: UpdateIssueFrequencyFormProps): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
   const [selectedFrequency, setSelectedFrequency] =
@@ -84,6 +100,25 @@ export function UpdateIssueFrequencyForm({
     );
   }
 
+  const compactControl = compact ? (
+    <MetadataDrawer
+      title="Frequency"
+      options={FREQUENCY_DRAWER_OPTIONS}
+      currentValue={selectedFrequency}
+      onSelect={handleValueChange}
+      disabled={isPending || !permissionState.allowed}
+      trigger={
+        <button type="button" className="cursor-pointer">
+          <IssueBadge
+            type="frequency"
+            value={selectedFrequency}
+            showTooltip={false}
+          />
+        </button>
+      }
+    />
+  ) : null;
+
   const selectControl = (
     <FrequencySelect
       value={selectedFrequency}
@@ -102,7 +137,9 @@ export function UpdateIssueFrequencyForm({
       <input type="hidden" name="issueId" value={issueId} />
       <input type="hidden" name="frequency" value={selectedFrequency} />
       <div className="relative" title={deniedReason ?? undefined}>
-        {permissionState.allowed ? (
+        {compact ? (
+          compactControl
+        ) : permissionState.allowed ? (
           selectControl
         ) : (
           <TooltipProvider>
@@ -112,13 +149,13 @@ export function UpdateIssueFrequencyForm({
             </Tooltip>
           </TooltipProvider>
         )}
-        {isPending && (
+        {isPending && !compact && (
           <div className="absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none">
             <Loader2 className="size-4 animate-spin text-muted-foreground" />
           </div>
         )}
       </div>
-      {state && !state.ok && (
+      {state && !state.ok && !compact && (
         <p className="text-sm text-destructive">{state.message}</p>
       )}
     </form>

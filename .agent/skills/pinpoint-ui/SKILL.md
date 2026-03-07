@@ -76,6 +76,17 @@ These are the canonical pattern sources. Read these files to understand PinPoint
 - Quick-select labels: "Me" (assignee), "My machines" (not "Your machines") -- decided standard for Phase 2. Will be added in the "Me" quick-select (PinPoint-2y2) and "My machines" (PinPoint-x04) PRs.
 - Status "wait_owner": Use `STATUS_CONFIG.wait_owner.label` as canonical source (currently "Pending Owner"). Note: mockups use "Wait Owner" -- this may be reconciled later.
 
+### Issue Field Display Order
+
+The canonical display order for issue metadata fields is:
+
+1. Status
+2. Priority
+3. Severity
+4. Frequency
+
+When assignee is present (edit contexts), it comes first. See `SidebarActions.tsx`.
+
 ## Color System
 
 - **Always use Tailwind token names** (e.g., `bg-cyan-500`), never hex values

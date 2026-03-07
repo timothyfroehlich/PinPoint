@@ -8,8 +8,14 @@ import {
   type UpdateIssueStatusResult,
 } from "~/app/(app)/issues/actions";
 import { StatusSelect } from "~/components/issues/fields/StatusSelect";
+import { MetadataDrawer } from "~/components/issues/fields/MetadataDrawer";
 import { IssueBadge } from "~/components/issues/IssueBadge";
 import type { IssueStatus } from "~/lib/types";
+import {
+  STATUS_CONFIG,
+  STATUS_GROUPS,
+  type IssueStatus as IssueStatusLiteral,
+} from "~/lib/issues/status";
 import {
   getPermissionDeniedReason,
   getPermissionState,
@@ -28,13 +34,31 @@ interface UpdateIssueStatusFormProps {
   currentStatus: IssueStatus;
   accessLevel: AccessLevel;
   ownershipContext: OwnershipContext;
+  compact?: boolean | undefined;
 }
+
+// Build status options for MetadataDrawer from config
+const STATUS_DRAWER_OPTIONS = [
+  ...STATUS_GROUPS.new,
+  ...STATUS_GROUPS.in_progress,
+  ...STATUS_GROUPS.closed,
+].map((status: IssueStatusLiteral) => {
+  const config = STATUS_CONFIG[status];
+  return {
+    value: status,
+    label: config.label,
+    description: config.description,
+    icon: config.icon,
+    iconColor: config.iconColor,
+  };
+});
 
 export function UpdateIssueStatusForm({
   issueId,
   currentStatus,
   accessLevel,
   ownershipContext,
+  compact,
 }: UpdateIssueStatusFormProps): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
   const [selectedStatus, setSelectedStatus] =
@@ -79,6 +103,25 @@ export function UpdateIssueStatusForm({
     );
   }
 
+  const compactControl = compact ? (
+    <MetadataDrawer
+      title="Status"
+      options={STATUS_DRAWER_OPTIONS}
+      currentValue={selectedStatus}
+      onSelect={handleValueChange}
+      disabled={isPending || !permissionState.allowed}
+      trigger={
+        <button type="button" className="cursor-pointer">
+          <IssueBadge
+            type="status"
+            value={selectedStatus}
+            showTooltip={false}
+          />
+        </button>
+      }
+    />
+  ) : null;
+
   const selectControl = (
     <StatusSelect
       value={selectedStatus}
@@ -97,7 +140,9 @@ export function UpdateIssueStatusForm({
       <input type="hidden" name="issueId" value={issueId} />
       <input type="hidden" name="status" value={selectedStatus} />
       <div className="relative" title={deniedReason ?? undefined}>
-        {permissionState.allowed ? (
+        {compact ? (
+          compactControl
+        ) : permissionState.allowed ? (
           selectControl
         ) : (
           <TooltipProvider>
@@ -107,18 +152,18 @@ export function UpdateIssueStatusForm({
             </Tooltip>
           </TooltipProvider>
         )}
-        {isPending && (
+        {isPending && !compact && (
           <div className="absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none">
             <Loader2 className="size-4 animate-spin text-muted-foreground" />
           </div>
         )}
       </div>
-      {state?.ok && (
+      {state?.ok && !compact && (
         <p className="text-sm text-success" data-testid="status-update-success">
           Status updated successfully
         </p>
       )}
-      {state && !state.ok && (
+      {state && !state.ok && !compact && (
         <p className="text-sm text-destructive">{state.message}</p>
       )}
     </form>

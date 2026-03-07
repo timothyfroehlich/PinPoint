@@ -110,6 +110,7 @@
     "server-only": "^0.0.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
+    "vaul": "^1.1.2",
     "zod": "^4.3.6",
     "zxcvbn": "^4.4.2"
   },

@@ -15,13 +15,19 @@ interface EditableIssueTitleProps {
   issueId: string;
   title: string;
   canEdit: boolean;
+  className?: string;
 }
+
+const DEFAULT_TITLE_CLASS =
+  "text-3xl lg:text-4xl font-extrabold tracking-tight";
 
 export function EditableIssueTitle({
   issueId,
   title,
   canEdit,
+  className: classNameProp,
 }: EditableIssueTitleProps): React.JSX.Element {
+  const titleClass = classNameProp ?? DEFAULT_TITLE_CLASS;
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(title);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -78,10 +84,7 @@ export function EditableIssueTitle({
 
   if (!canEdit) {
     return (
-      <h1
-        className="text-3xl lg:text-4xl font-extrabold tracking-tight"
-        title={title.length > 60 ? title : undefined}
-      >
+      <h1 className={titleClass} title={title.length > 60 ? title : undefined}>
         {title.length > 60 ? `${title.slice(0, 60)}...` : title}
       </h1>
     );
@@ -123,10 +126,7 @@ export function EditableIssueTitle({
 
   return (
     <div className="group/title flex items-center gap-2">
-      <h1
-        className="text-3xl lg:text-4xl font-extrabold tracking-tight"
-        title={title.length > 60 ? title : undefined}
-      >
+      <h1 className={titleClass} title={title.length > 60 ? title : undefined}>
         {title.length > 60 ? `${title.slice(0, 60)}...` : title}
       </h1>
       <Button

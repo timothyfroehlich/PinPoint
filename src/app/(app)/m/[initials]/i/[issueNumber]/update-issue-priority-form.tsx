@@ -8,8 +8,10 @@ import {
   type UpdateIssuePriorityResult,
 } from "~/app/(app)/issues/actions";
 import { PrioritySelect } from "~/components/issues/fields/PrioritySelect";
+import { MetadataDrawer } from "~/components/issues/fields/MetadataDrawer";
 import { type IssuePriority } from "~/lib/types";
 import { IssueBadge } from "~/components/issues/IssueBadge";
+import { PRIORITY_CONFIG } from "~/lib/issues/status";
 import {
   getPermissionDeniedReason,
   getPermissionState,
@@ -23,11 +25,24 @@ import {
   TooltipTrigger,
 } from "~/components/ui/tooltip";
 
+const PRIORITY_DRAWER_OPTIONS = (
+  Object.entries(PRIORITY_CONFIG) as [
+    IssuePriority,
+    (typeof PRIORITY_CONFIG)[IssuePriority],
+  ][]
+).map(([value, config]) => ({
+  value,
+  label: config.label,
+  icon: config.icon,
+  iconColor: config.iconColor,
+}));
+
 interface UpdateIssuePriorityFormProps {
   issueId: string;
   currentPriority: IssuePriority;
   accessLevel: AccessLevel;
   ownershipContext: OwnershipContext;
+  compact?: boolean | undefined;
 }
 
 /**
@@ -39,6 +54,7 @@ export function UpdateIssuePriorityForm({
   currentPriority,
   accessLevel,
   ownershipContext,
+  compact,
 }: UpdateIssuePriorityFormProps): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
   const [selectedPriority, setSelectedPriority] =
@@ -85,6 +101,25 @@ export function UpdateIssuePriorityForm({
     );
   }
 
+  const compactControl = compact ? (
+    <MetadataDrawer
+      title="Priority"
+      options={PRIORITY_DRAWER_OPTIONS}
+      currentValue={selectedPriority}
+      onSelect={handleValueChange}
+      disabled={isPending || !permissionState.allowed}
+      trigger={
+        <button type="button" className="cursor-pointer">
+          <IssueBadge
+            type="priority"
+            value={selectedPriority}
+            showTooltip={false}
+          />
+        </button>
+      }
+    />
+  ) : null;
+
   const selectControl = (
     <PrioritySelect
       value={selectedPriority}
@@ -103,7 +138,9 @@ export function UpdateIssuePriorityForm({
       <input type="hidden" name="issueId" value={issueId} />
       <input type="hidden" name="priority" value={selectedPriority} />
       <div className="relative" title={deniedReason ?? undefined}>
-        {permissionState.allowed ? (
+        {compact ? (
+          compactControl
+        ) : permissionState.allowed ? (
           selectControl
         ) : (
           <TooltipProvider>
@@ -113,13 +150,13 @@ export function UpdateIssuePriorityForm({
             </Tooltip>
           </TooltipProvider>
         )}
-        {isPending && (
+        {isPending && !compact && (
           <div className="absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none">
             <Loader2 className="size-4 animate-spin text-muted-foreground" />
           </div>
         )}
       </div>
-      {state && !state.ok && (
+      {state && !state.ok && !compact && (
         <p className="text-sm text-destructive">{state.message}</p>
       )}
     </form>
