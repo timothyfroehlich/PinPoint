@@ -137,21 +137,9 @@ export default defineConfig({
     // Base URL to use in actions like `await page.goto('/')`
     baseURL,
 
-    // Pre-dismiss the cookie consent banner so it doesn't overlay
-    // clickable elements during tests (especially on mobile viewports).
+    // Pre-dismissed cookies (none currently needed as banner is disabled in E2E)
     storageState: {
-      cookies: [
-        {
-          name: "cookieConsent",
-          value: "true",
-          domain: hostname,
-          path: "/",
-          httpOnly: false,
-          secure: false,
-          sameSite: "Lax" as const,
-          expires: -1,
-        },
-      ],
+      cookies: [],
       origins: [],
     },
 
