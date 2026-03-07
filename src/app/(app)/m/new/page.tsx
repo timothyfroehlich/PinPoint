@@ -56,49 +56,43 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
   }));
 
   return (
-    <main className="min-h-screen bg-surface">
+    <div className="max-w-6xl mx-auto py-10 space-y-6">
       {/* Header */}
-      <div className="border-b border-outline-variant bg-surface-container">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center gap-4">
-            <Link href="/m">
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-outline text-on-surface hover:bg-surface-variant"
-              >
-                <ArrowLeft className="mr-2 size-4" />
-                Back
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-3xl font-bold text-on-surface">
-                Add New Machine
-              </h1>
-              <p className="mt-1 text-sm text-on-surface-variant">
-                Create a new pinball machine entry
-              </p>
-            </div>
-          </div>
+      <div className="flex items-center gap-4">
+        <Link href="/m">
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-outline text-on-surface hover:bg-surface-variant"
+          >
+            <ArrowLeft className="mr-2 size-4" />
+            Back
+          </Button>
+        </Link>
+        <div>
+          <h1 className="text-3xl font-bold text-on-surface">
+            Add New Machine
+          </h1>
+          <p className="mt-1 text-sm text-on-surface-variant">
+            Create a new pinball machine entry
+          </p>
         </div>
       </div>
 
       {/* Form */}
-      <div className="container mx-auto px-4 py-8">
-        <Card className="max-w-2xl border-outline-variant">
-          <CardHeader>
-            <CardTitle className="text-2xl text-on-surface">
-              Machine Details
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <CreateMachineForm
-              allUsers={allUsers}
-              canSelectOwner={canCreateMachine}
-            />
-          </CardContent>
-        </Card>
-      </div>
-    </main>
+      <Card className="max-w-2xl border-outline-variant">
+        <CardHeader>
+          <CardTitle className="text-2xl text-on-surface">
+            Machine Details
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <CreateMachineForm
+            allUsers={allUsers}
+            canSelectOwner={canCreateMachine}
+          />
+        </CardContent>
+      </Card>
+    </div>
   );
 }

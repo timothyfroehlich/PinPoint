@@ -5,7 +5,6 @@ import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { issues, userProfiles } from "~/server/db/schema";
 import { eq, asc, and, notInArray } from "drizzle-orm";
-import { PageShell } from "~/components/layout/PageShell";
 import { IssueTimeline } from "~/components/issues/IssueTimeline";
 import { IssueSidebar } from "~/components/issues/IssueSidebar";
 import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
@@ -180,7 +179,7 @@ export default async function IssueDetailPage({
   );
 
   return (
-    <PageShell className="space-y-8" size="wide">
+    <div className="max-w-7xl mx-auto py-10 space-y-8">
       {/* Back button */}
       <BackToIssuesLink href={issuesPath} />
 
@@ -278,6 +277,6 @@ export default async function IssueDetailPage({
           ownershipContext={ownershipContext}
         />
       </div>
-    </PageShell>
+    </div>
   );
 }
