@@ -19,7 +19,7 @@ export function CookieConsentBanner(): React.JSX.Element | null {
 
   return (
     <div
-      className="fixed bottom-4 right-4 z-50 max-w-[calc(100vw-2rem)] rounded-lg border bg-background p-4 shadow-lg animate-in fade-in slide-in-from-bottom-2 sm:max-w-sm"
+      className="fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom))] right-4 z-50 max-w-[calc(100vw-2rem)] rounded-lg border bg-background p-4 shadow-lg animate-in fade-in slide-in-from-bottom-2 sm:bottom-4 sm:max-w-sm"
       role="region"
       aria-label="Cookie consent notice"
     >

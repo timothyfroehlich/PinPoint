@@ -9,17 +9,17 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { FORCE_SHOW_COOKIE_BANNER_KEY } from "~/lib/cookies/constants";
+import { ENABLE_COOKIE_BANNER_OVERRIDE_KEY } from "~/lib/cookies/constants";
 
 test.describe("Cookie Consent Banner", () => {
   // Override the default storageState to specifically enable the banner for this test.
-  // Even though it's disabled by default in E2E/Dev/Preview, the forceShowCookieBanner
+  // Even though it's disabled by default in E2E/Dev/Preview, the override
   // cookie will trigger its visibility in RootLayout.
   test.use({
     storageState: {
       cookies: [
         {
-          name: FORCE_SHOW_COOKIE_BANNER_KEY,
+          name: ENABLE_COOKIE_BANNER_OVERRIDE_KEY,
           value: "true",
           domain: process.env.PLAYWRIGHT_HOST ?? "localhost",
           path: "/",

@@ -9,7 +9,18 @@ export const CHANGELOG_SEEN_KEY = "changelogSeen";
 export const DEFAULT_ISSUES_PATH = "/issues";
 
 export const COOKIE_CONSENT_KEY = "cookieConsent";
-export const FORCE_SHOW_COOKIE_BANNER_KEY = "forceShowCookieBanner";
+
+/**
+ * Enables the cookie banner for environments where it is normally gated (Dev/Preview/E2E).
+ * Note: This does NOT override an existing `cookieConsent=true` value; the
+ * client banner component may still hide itself based on that cookie.
+ */
+export const ENABLE_COOKIE_BANNER_OVERRIDE_KEY = "forceShowCookieBanner";
+
+/**
+ * @deprecated Use ENABLE_COOKIE_BANNER_OVERRIDE_KEY instead.
+ */
+export const FORCE_SHOW_COOKIE_BANNER_KEY = ENABLE_COOKIE_BANNER_OVERRIDE_KEY;
 
 /** Cookie lifetime: 1 year in seconds */
 export const PREFERENCE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;

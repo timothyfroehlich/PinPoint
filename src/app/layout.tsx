@@ -7,7 +7,7 @@ import { ClientLogger } from "~/components/dev/client-logger";
 
 import { CookieConsentBanner } from "~/components/CookieConsentBanner";
 import { SentryInitializer } from "~/components/SentryInitializer";
-import { FORCE_SHOW_COOKIE_BANNER_KEY } from "~/lib/cookies/constants";
+import { ENABLE_COOKIE_BANNER_OVERRIDE_KEY } from "~/lib/cookies/constants";
 
 export const metadata: Metadata = {
   title: "PinPoint - Pinball Machine Issue Tracking",
@@ -25,13 +25,17 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>): Promise<React.JSX.Element> {
   const isDevelopment = process.env.NODE_ENV === "development";
-  const cookieStore = await cookies();
-  const forceShow =
-    cookieStore.get(FORCE_SHOW_COOKIE_BANNER_KEY)?.value === "true";
 
   const isProduction =
     process.env["VERCEL_ENV"] === "production" ||
     (!process.env["VERCEL_ENV"] && process.env.NODE_ENV === "production");
+
+  let forceShow = false;
+  if (!isProduction) {
+    const cookieStore = await cookies();
+    forceShow =
+      cookieStore.get(ENABLE_COOKIE_BANNER_OVERRIDE_KEY)?.value === "true";
+  }
 
   const showCookieBanner = isProduction || forceShow;
 
