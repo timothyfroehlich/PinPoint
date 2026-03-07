@@ -254,7 +254,7 @@ python3 ./pinpoint-wt.py remove <branch>
 ### On Session End
 
 - `bd list --status=in_progress` — anything done? Close it
-- `bd sync --from-main` to pull beads updates
+- `bd dolt pull` to pull beads updates from remote
 
 ---
 
