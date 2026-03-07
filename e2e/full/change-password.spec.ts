@@ -27,7 +27,11 @@ test.describe("Change Password", () => {
     await form.getByLabel("Confirm New Password").fill(newPassword);
 
     // Submit
-    await form.getByRole("button", { name: "Change Password" }).click();
+    const submitBtn = form.getByRole("button", { name: "Change Password" });
+    await submitBtn.evaluate((node) =>
+      node.scrollIntoView({ block: "center" })
+    );
+    await submitBtn.click();
 
     // Should show success (Saved! button state)
     await expect(form.getByRole("button", { name: "Saved!" })).toBeVisible();

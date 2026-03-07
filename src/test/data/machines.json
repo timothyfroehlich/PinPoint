@@ -68,5 +68,12 @@
     "initials": "GDZ",
     "year": 2021,
     "manufacturer": "Stern"
+  },
+  "twilightZone": {
+    "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    "name": "Twilight Zone",
+    "initials": "TZ",
+    "year": 1993,
+    "manufacturer": "Bally/Williams"
   }
 }

@@ -218,7 +218,7 @@ function TimelineItem({
       </div>
 
       {/* Right: Content */}
-      <div className="flex-1">
+      <div className="min-w-0 flex-1">
         {isSystem ? (
           <div className="flex items-center gap-2 py-1 text-xs leading-snug text-muted-foreground">
             {event.author.id && (
@@ -417,7 +417,7 @@ export function IssueTimeline({
   const noComments = allEvents.length === 1;
 
   return (
-    <div className="flex-1 space-y-6">
+    <div className="min-w-0 flex-1 space-y-6">
       <div className="relative">
         {/* Continuous Vertical Line */}
         <div className="absolute bottom-0 left-[34px] top-4 w-px -translate-x-1/2 bg-border" />
@@ -432,7 +432,9 @@ export function IssueTimeline({
                 userContext={userContext}
               />
               {index === 0 && ownerRequirements && machineName && (
-                <div className="ml-20">
+                // On mobile, the owner requirements are shown above the fold.
+                // On desktop (md:), show them inline in the timeline.
+                <div className="ml-20 hidden md:block">
                   <OwnerRequirementsCallout
                     ownerRequirements={ownerRequirements}
                     machineName={machineName}
@@ -444,7 +446,7 @@ export function IssueTimeline({
 
           {/* Delightful Empty State when no comments yet */}
           {noComments && (
-            <div className="ml-16 rounded-xl border border-dashed border-muted-foreground/30 bg-muted/10 p-6 text-center animate-in fade-in zoom-in duration-300">
+            <div className="ml-20 rounded-xl border border-dashed border-muted-foreground/30 bg-muted/10 p-6 text-center animate-in fade-in zoom-in duration-300">
               <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-full bg-muted">
                 <MessageSquare className="size-5 text-muted-foreground" />
               </div>
@@ -459,7 +461,10 @@ export function IssueTimeline({
         </div>
 
         {/* Add Comment Form */}
-        <div className="relative mt-8 flex gap-4 pt-2">
+        <div
+          className="relative mt-8 flex gap-4 pt-2"
+          data-testid="issue-comment-form"
+        >
           <div className="flex w-16 flex-none flex-col items-center">
             <Avatar className="relative z-10 size-10 border border-border/60 ring-4 ring-background">
               <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
@@ -467,7 +472,7 @@ export function IssueTimeline({
               </AvatarFallback>
             </Avatar>
           </div>
-          <div className="flex-1 rounded-lg border bg-card p-6 shadow-sm">
+          <div className="min-w-0 flex-1 rounded-lg border bg-card p-4 shadow-sm sm:p-6">
             {currentUserRole === "unauthenticated" ? (
               <div
                 className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/20 px-4 py-3 text-sm text-muted-foreground"

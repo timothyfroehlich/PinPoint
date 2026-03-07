@@ -56,10 +56,10 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
   }));
 
   return (
-    <main className="min-h-screen bg-surface">
+    <>
       {/* Header */}
-      <div className="border-b border-outline-variant bg-surface-container">
-        <div className="container mx-auto px-4 py-6">
+      <div className="-mx-4 sm:-mx-8 lg:-mx-10 border-b border-outline-variant bg-surface-container">
+        <div className="px-4 sm:px-8 lg:px-10 py-6">
           <div className="flex items-center gap-4">
             <Link href="/m">
               <Button
@@ -84,7 +84,7 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
       </div>
 
       {/* Form */}
-      <div className="container mx-auto px-4 py-8">
+      <div className="py-8">
         <Card className="max-w-2xl border-outline-variant">
           <CardHeader>
             <CardTitle className="text-2xl text-on-surface">
@@ -99,6 +99,6 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
           </CardContent>
         </Card>
       </div>
-    </main>
+    </>
   );
 }

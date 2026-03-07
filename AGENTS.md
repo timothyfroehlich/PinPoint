@@ -128,6 +128,7 @@ conflicts across worktrees and force-push requirements on open PRs.
 - `pnpm run db:seed:from-prod`: Reset local DB and seed from the latest production backup.
 - `pnpm run e2e:full`: Full E2E suite (Don't run Safari locally on Linux).
 - `ruff check <file> && ruff format <file>`: Lint and format Python files (`pinpoint-wt.py`, scripts). Ruff is installed globally — no venv needed.
+- `node scripts/screenshot-mobile.mjs`: Take iPhone 12 (390×844) screenshots of the issue detail page. Logs in, navigates to first issue, captures collapsed/expanded states, and reports any elements overflowing the viewport. Requires `pnpm run dev` running and a seeded DB.
 
 ### Testing After Refactors
 

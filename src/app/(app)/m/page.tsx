@@ -155,10 +155,10 @@ export default async function MachinesPage({
   );
 
   return (
-    <main className="min-h-screen bg-surface">
+    <>
       {/* Header */}
-      <div className="border-b border-outline-variant bg-surface-container">
-        <div className="container mx-auto px-4 py-6">
+      <div className="-mx-4 sm:-mx-8 lg:-mx-10 border-b border-outline-variant bg-surface-container">
+        <div className="px-4 sm:px-8 lg:px-10 py-6">
           <div className="flex flex-col gap-6">
             <div className="flex items-center justify-between">
               <div>
@@ -187,7 +187,7 @@ export default async function MachinesPage({
       </div>
 
       {/* Content */}
-      <div className="container mx-auto px-4 py-8">
+      <div className="py-8">
         {sortedMachines.length === 0 ? (
           // Empty state
           <Card className="border-outline-variant border-dashed bg-transparent">
@@ -318,6 +318,6 @@ export default async function MachinesPage({
           </div>
         )}
       </div>
-    </main>
+    </>
   );
 }

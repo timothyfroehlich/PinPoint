@@ -241,8 +241,11 @@ test.describe("Machine Details Redesign", () => {
     // Wait for issue detail page
     await page.waitForLoadState("networkidle");
 
-    // Owner requirements callout should be visible
-    const callout = page.getByTestId("owner-requirements-callout");
+    // Owner requirements callout is in md:hidden div (mobile) and hidden md:block timeline (desktop)
+    const isMobile = testInfo.project.name.includes("Mobile");
+    const callout = page
+      .getByTestId("owner-requirements-callout")
+      .nth(isMobile ? 0 : 1);
     await expect(callout).toBeVisible();
     await expect(callout).toContainText(
       "Please handle with care - vintage machine"

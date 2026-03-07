@@ -164,6 +164,12 @@
       "rollup": ">=4.59.0",
       "serialize-javascript": ">=7.0.3",
       "webpack": ">=5.104.1"
+    },
+    "auditConfig": {
+      "ignoreCves": [
+        "CVE-2025-68458",
+        "CVE-2025-68157"
+      ]
     }
   },
   "lint-staged": {

@@ -18,7 +18,7 @@ export default function BadgeDebugPage(): React.JSX.Element {
   ];
 
   return (
-    <div className="p-8 space-y-12 bg-background min-h-screen">
+    <div className="py-8 space-y-12 bg-background min-h-screen">
       <div className="space-y-2 text-center">
         <h1 className="text-4xl font-bold">Issue Badge System</h1>
         <p className="text-muted-foreground">

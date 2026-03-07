@@ -102,7 +102,7 @@ export default async function AdminUsersPage(): Promise<React.JSX.Element> {
   const users = await getUnifiedUsers({ includeEmails: true });
 
   return (
-    <div className="space-y-6">
+    <div className="py-6 space-y-6">
       <UserManagementHeader />
 
       <div className="rounded-md border">

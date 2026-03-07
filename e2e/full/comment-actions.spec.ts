@@ -17,7 +17,10 @@ test.skip(({ browserName }) => browserName === "webkit", "Skipped on WebKit");
 import { loginAs } from "../support/actions.js";
 import { cleanupTestEntities, extractIdFromUrl } from "../support/cleanup.js";
 import { seededMachines, TEST_USERS } from "../support/constants.js";
-import { fillReportForm } from "../support/page-helpers.js";
+import {
+  fillReportForm,
+  submitFormAndWaitForRedirect,
+} from "../support/page-helpers.js";
 
 // Track created issues for cleanup
 const createdIssueIds = new Set<string>();
@@ -40,7 +43,6 @@ async function createTestIssue(
 
   // Navigate to report page and wait for full load (Firefox can be slow under parallel load)
   await page.goto(`/report?machine=${machineInitials}`);
-  await page.waitForLoadState("networkidle");
 
   // Wait for form to be interactive before filling
   await expect(page.getByLabel("Issue Title *")).toBeVisible({
@@ -54,16 +56,17 @@ async function createTestIssue(
     priority: "medium",
   });
 
-  // Submit form
-  await page.getByRole("button", { name: "Submit Issue Report" }).click();
+  // Submit form and wait for redirect
+  await submitFormAndWaitForRedirect(
+    page,
+    page.getByRole("button", { name: "Submit Issue Report" }),
+    { awayFrom: `/report?machine=${machineInitials}` }
+  );
 
   // Wait for redirect to issue detail page
   await expect(page).toHaveURL(/\/m\/[A-Z0-9]{2,6}\/i\/[0-9]+/, {
     timeout: 30000,
   });
-
-  // Wait for issue detail page to fully hydrate
-  await page.waitForLoadState("networkidle");
 
   rememberIssueId(page);
   return page.url();
@@ -79,7 +82,6 @@ async function addComment(page: Page, content: string): Promise<void> {
   await expect(addButton).toBeEnabled({ timeout: 5000 });
   await addButton.click();
 
-  await page.waitForLoadState("networkidle");
   // Wait for comment to appear in the timeline
   await expect(page.getByText(content)).toBeVisible({ timeout: 10000 });
 }

@@ -4,6 +4,9 @@
 .claude-hook-bypass
 .claude-task-contract
 
+# Gemini agent control files (ephemeral, worktree-local)
+.gemini/
+
 # dependencies
 /node_modules
 /.pnp
