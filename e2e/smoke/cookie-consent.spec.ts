@@ -9,25 +9,26 @@
  */
 
 import { test, expect } from "@playwright/test";
-
-// Override the default storageState to specifically enable the banner for this test.
-// Even though it's disabled by default in E2E/Dev/Preview, the forceShowCookieBanner
-// cookie will trigger its visibility in RootLayout.
-test.use({
-  storageState: {
-    cookies: [
-      {
-        name: "forceShowCookieBanner",
-        value: "true",
-        domain: "localhost",
-        path: "/",
-      },
-    ],
-    origins: [],
-  },
-});
+import { FORCE_SHOW_COOKIE_BANNER_KEY } from "~/lib/cookies/constants";
 
 test.describe("Cookie Consent Banner", () => {
+  // Override the default storageState to specifically enable the banner for this test.
+  // Even though it's disabled by default in E2E/Dev/Preview, the forceShowCookieBanner
+  // cookie will trigger its visibility in RootLayout.
+  test.use({
+    storageState: {
+      cookies: [
+        {
+          name: FORCE_SHOW_COOKIE_BANNER_KEY,
+          value: "true",
+          domain: process.env.PLAYWRIGHT_HOST ?? "localhost",
+          path: "/",
+        },
+      ],
+      origins: [],
+    },
+  });
+
   test("appears on first visit and dismisses on click", async ({ page }) => {
     await page.goto("/m", { waitUntil: "networkidle" });
 
