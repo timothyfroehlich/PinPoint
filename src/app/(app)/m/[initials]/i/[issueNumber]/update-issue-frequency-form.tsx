@@ -8,6 +8,8 @@ import {
   type UpdateIssueFrequencyResult,
 } from "~/app/(app)/issues/actions";
 import { FrequencySelect } from "~/components/issues/fields/FrequencySelect";
+import { MetadataDrawer } from "~/components/issues/fields/MetadataDrawer";
+import { FREQUENCY_CONFIG } from "~/lib/issues/status";
 import { type IssueFrequency } from "~/lib/types";
 import { IssueBadge } from "~/components/issues/IssueBadge";
 import {
@@ -28,6 +30,7 @@ interface UpdateIssueFrequencyFormProps {
   currentFrequency: IssueFrequency;
   accessLevel: AccessLevel;
   ownershipContext: OwnershipContext;
+  compact?: boolean;
 }
 
 export function UpdateIssueFrequencyForm({
@@ -35,6 +38,7 @@ export function UpdateIssueFrequencyForm({
   currentFrequency,
   accessLevel,
   ownershipContext,
+  compact,
 }: UpdateIssueFrequencyFormProps): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
   const [selectedFrequency, setSelectedFrequency] =
@@ -84,7 +88,36 @@ export function UpdateIssueFrequencyForm({
     );
   }
 
-  const selectControl = (
+  const selectControl = compact ? (
+    <MetadataDrawer<IssueFrequency>
+      title="Frequency"
+      options={(Object.keys(FREQUENCY_CONFIG) as IssueFrequency[]).map(
+        (frequency) => ({
+          value: frequency,
+          label: FREQUENCY_CONFIG[frequency].label,
+          icon: FREQUENCY_CONFIG[frequency].icon,
+          iconColor: FREQUENCY_CONFIG[frequency].iconColor,
+        })
+      )}
+      currentValue={selectedFrequency}
+      onSelect={handleValueChange}
+      disabled={isPending || !permissionState.allowed}
+      trigger={
+        <button
+          type="button"
+          data-testid="issue-frequency-select-mobile"
+          className="text-left"
+          disabled={isPending || !permissionState.allowed}
+        >
+          <IssueBadge
+            type="frequency"
+            value={selectedFrequency}
+            showTooltip={false}
+          />
+        </button>
+      }
+    />
+  ) : (
     <FrequencySelect
       value={selectedFrequency}
       onValueChange={handleValueChange}

@@ -203,7 +203,7 @@ function TimelineItem({
       data-testid={`timeline-item-${event.id}`}
     >
       {/* Left: Marker (Fixed width track) */}
-      <div className="flex w-16 flex-none flex-col items-center">
+      <div className="hidden md:flex w-16 flex-none flex-col items-center">
         {isSystem ? (
           <div className="relative z-10 flex size-10 items-center justify-center">
             <div className="size-2.5 rounded-full bg-border ring-4 ring-background" />
@@ -218,7 +218,7 @@ function TimelineItem({
       </div>
 
       {/* Right: Content */}
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         {isSystem ? (
           <div className="flex items-center gap-2 py-1 text-xs leading-snug text-muted-foreground">
             {event.author.id && (
@@ -417,13 +417,13 @@ export function IssueTimeline({
   const noComments = allEvents.length === 1;
 
   return (
-    <div className="flex-1 space-y-6">
+    <div className="flex-1 space-y-4 md:space-y-6" data-testid="issue-timeline">
       <div className="relative">
         {/* Continuous Vertical Line */}
-        <div className="absolute bottom-0 left-[34px] top-4 w-px -translate-x-1/2 bg-border" />
+        <div className="hidden md:block absolute bottom-0 left-[34px] top-4 w-px -translate-x-1/2 bg-border" />
 
         {/* Events List */}
-        <div className="relative flex flex-col space-y-6">
+        <div className="relative flex flex-col space-y-4 md:space-y-6">
           {allEvents.map((event, index) => (
             <React.Fragment key={event.id}>
               <TimelineItem
@@ -432,7 +432,7 @@ export function IssueTimeline({
                 userContext={userContext}
               />
               {index === 0 && ownerRequirements && machineName && (
-                <div className="ml-20">
+                <div className="hidden md:block md:ml-20">
                   <OwnerRequirementsCallout
                     ownerRequirements={ownerRequirements}
                     machineName={machineName}
@@ -444,7 +444,7 @@ export function IssueTimeline({
 
           {/* Delightful Empty State when no comments yet */}
           {noComments && (
-            <div className="ml-16 rounded-xl border border-dashed border-muted-foreground/30 bg-muted/10 p-6 text-center animate-in fade-in zoom-in duration-300">
+            <div className="md:ml-20 rounded-xl border border-dashed border-muted-foreground/30 bg-muted/10 p-6 text-center animate-in fade-in zoom-in duration-300">
               <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-full bg-muted">
                 <MessageSquare className="size-5 text-muted-foreground" />
               </div>
@@ -457,28 +457,31 @@ export function IssueTimeline({
             </div>
           )}
         </div>
+      </div>
 
-        {/* Add Comment Form */}
-        <div className="relative mt-8 flex gap-4 pt-2">
-          <div className="flex w-16 flex-none flex-col items-center">
-            <Avatar className="relative z-10 size-10 border border-border/60 ring-4 ring-background">
-              <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
-                {currentUserInitials}
-              </AvatarFallback>
-            </Avatar>
-          </div>
-          <div className="flex-1 rounded-lg border bg-card p-6 shadow-sm">
-            {currentUserRole === "unauthenticated" ? (
-              <div
-                className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/20 px-4 py-3 text-sm text-muted-foreground"
-                data-testid="login-to-comment"
-              >
-                Log in to comment
-              </div>
-            ) : (
-              <AddCommentForm issueId={issue.id} />
-            )}
-          </div>
+      {/* Add Comment Form (outside timeline line structure) */}
+      <div className="relative flex gap-4 pt-2">
+        <div className="hidden md:flex w-16 flex-none flex-col items-center">
+          <Avatar className="relative z-10 size-10 border border-border/60 ring-4 ring-background">
+            <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
+              {currentUserInitials}
+            </AvatarFallback>
+          </Avatar>
+        </div>
+        <div
+          className="flex-1 rounded-lg border bg-card p-4 sm:p-6 shadow-sm"
+          data-testid="issue-comment-form"
+        >
+          {currentUserRole === "unauthenticated" ? (
+            <div
+              className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/20 px-4 py-3 text-sm text-muted-foreground"
+              data-testid="login-to-comment"
+            >
+              Log in to comment
+            </div>
+          ) : (
+            <AddCommentForm issueId={issue.id} />
+          )}
         </div>
       </div>
     </div>

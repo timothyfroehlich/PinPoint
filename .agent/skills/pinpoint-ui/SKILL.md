@@ -19,6 +19,17 @@ Use this skill when:
 
 ## Quick Reference
 
+### Issue Field Display Order
+
+The canonical display order for issue metadata fields is:
+
+1. Status
+2. Priority
+3. Severity
+4. Frequency
+
+When assignee is present (edit contexts), it comes first.
+
 ### Critical UI Rules
 
 1. **Server Components first**: Default to Server Components, use "use client" only for interactivity

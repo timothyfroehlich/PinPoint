@@ -69,12 +69,17 @@ export function AddCommentForm({
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-4">
-        <Button type="submit" size="sm" loading={isPending}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <Button
+          type="submit"
+          size="sm"
+          loading={isPending}
+          className="w-full sm:w-auto"
+        >
           Add Comment
         </Button>
 
-        <div className="flex-1 max-w-[200px]">
+        <div className="min-w-0 sm:max-w-[200px]">
           <ImageUploadButton
             issueId={issueId}
             currentCount={uploadedImages.length}

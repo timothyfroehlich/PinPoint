@@ -6,6 +6,7 @@ import { Pencil, Loader2 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { toast } from "sonner";
+import { cn } from "~/lib/utils";
 import {
   updateIssueTitleAction,
   type UpdateIssueTitleResult,
@@ -15,12 +16,14 @@ interface EditableIssueTitleProps {
   issueId: string;
   title: string;
   canEdit: boolean;
+  className?: string;
 }
 
 export function EditableIssueTitle({
   issueId,
   title,
   canEdit,
+  className,
 }: EditableIssueTitleProps): React.JSX.Element {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(title);
@@ -79,7 +82,10 @@ export function EditableIssueTitle({
   if (!canEdit) {
     return (
       <h1
-        className="text-3xl lg:text-4xl font-extrabold tracking-tight"
+        className={cn(
+          "text-3xl lg:text-4xl font-extrabold tracking-tight",
+          className
+        )}
         title={title.length > 60 ? title : undefined}
       >
         {title.length > 60 ? `${title.slice(0, 60)}...` : title}
@@ -110,7 +116,10 @@ export function EditableIssueTitle({
             }, 200);
           }}
           maxLength={100}
-          className="text-2xl lg:text-3xl font-extrabold tracking-tight h-auto py-1"
+          className={cn(
+            "text-2xl lg:text-3xl font-extrabold tracking-tight h-auto py-1",
+            className
+          )}
           aria-label="Edit issue title"
           disabled={isPending}
         />
@@ -124,7 +133,10 @@ export function EditableIssueTitle({
   return (
     <div className="group/title flex items-center gap-2">
       <h1
-        className="text-3xl lg:text-4xl font-extrabold tracking-tight"
+        className={cn(
+          "text-3xl lg:text-4xl font-extrabold tracking-tight",
+          className
+        )}
         title={title.length > 60 ? title : undefined}
       >
         {title.length > 60 ? `${title.slice(0, 60)}...` : title}

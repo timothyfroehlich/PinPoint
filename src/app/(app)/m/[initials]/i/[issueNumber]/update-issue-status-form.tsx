@@ -8,6 +8,8 @@ import {
   type UpdateIssueStatusResult,
 } from "~/app/(app)/issues/actions";
 import { StatusSelect } from "~/components/issues/fields/StatusSelect";
+import { MetadataDrawer } from "~/components/issues/fields/MetadataDrawer";
+import { ALL_STATUS_OPTIONS, STATUS_CONFIG } from "~/lib/issues/status";
 import { IssueBadge } from "~/components/issues/IssueBadge";
 import type { IssueStatus } from "~/lib/types";
 import {
@@ -28,6 +30,7 @@ interface UpdateIssueStatusFormProps {
   currentStatus: IssueStatus;
   accessLevel: AccessLevel;
   ownershipContext: OwnershipContext;
+  compact?: boolean;
 }
 
 export function UpdateIssueStatusForm({
@@ -35,6 +38,7 @@ export function UpdateIssueStatusForm({
   currentStatus,
   accessLevel,
   ownershipContext,
+  compact,
 }: UpdateIssueStatusFormProps): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
   const [selectedStatus, setSelectedStatus] =
@@ -79,7 +83,35 @@ export function UpdateIssueStatusForm({
     );
   }
 
-  const selectControl = (
+  const selectControl = compact ? (
+    <MetadataDrawer<IssueStatus>
+      title="Status"
+      options={ALL_STATUS_OPTIONS.map((status) => ({
+        value: status,
+        label: STATUS_CONFIG[status].label,
+        description: STATUS_CONFIG[status].description,
+        icon: STATUS_CONFIG[status].icon,
+        iconColor: STATUS_CONFIG[status].iconColor,
+      }))}
+      currentValue={selectedStatus}
+      onSelect={handleValueChange}
+      disabled={isPending || !permissionState.allowed}
+      trigger={
+        <button
+          type="button"
+          data-testid="issue-status-select-mobile"
+          className="text-left"
+          disabled={isPending || !permissionState.allowed}
+        >
+          <IssueBadge
+            type="status"
+            value={selectedStatus}
+            showTooltip={false}
+          />
+        </button>
+      }
+    />
+  ) : (
     <StatusSelect
       value={selectedStatus}
       onValueChange={handleValueChange}

@@ -8,6 +8,8 @@ import {
   type UpdateIssuePriorityResult,
 } from "~/app/(app)/issues/actions";
 import { PrioritySelect } from "~/components/issues/fields/PrioritySelect";
+import { MetadataDrawer } from "~/components/issues/fields/MetadataDrawer";
+import { PRIORITY_CONFIG } from "~/lib/issues/status";
 import { type IssuePriority } from "~/lib/types";
 import { IssueBadge } from "~/components/issues/IssueBadge";
 import {
@@ -28,6 +30,7 @@ interface UpdateIssuePriorityFormProps {
   currentPriority: IssuePriority;
   accessLevel: AccessLevel;
   ownershipContext: OwnershipContext;
+  compact?: boolean;
 }
 
 /**
@@ -39,6 +42,7 @@ export function UpdateIssuePriorityForm({
   currentPriority,
   accessLevel,
   ownershipContext,
+  compact,
 }: UpdateIssuePriorityFormProps): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
   const [selectedPriority, setSelectedPriority] =
@@ -85,7 +89,36 @@ export function UpdateIssuePriorityForm({
     );
   }
 
-  const selectControl = (
+  const selectControl = compact ? (
+    <MetadataDrawer<IssuePriority>
+      title="Priority"
+      options={(Object.keys(PRIORITY_CONFIG) as IssuePriority[]).map(
+        (priority) => ({
+          value: priority,
+          label: PRIORITY_CONFIG[priority].label,
+          icon: PRIORITY_CONFIG[priority].icon,
+          iconColor: PRIORITY_CONFIG[priority].iconColor,
+        })
+      )}
+      currentValue={selectedPriority}
+      onSelect={handleValueChange}
+      disabled={isPending || !permissionState.allowed}
+      trigger={
+        <button
+          type="button"
+          data-testid="issue-priority-select-mobile"
+          className="text-left"
+          disabled={isPending || !permissionState.allowed}
+        >
+          <IssueBadge
+            type="priority"
+            value={selectedPriority}
+            showTooltip={false}
+          />
+        </button>
+      }
+    />
+  ) : (
     <PrioritySelect
       value={selectedPriority}
       onValueChange={handleValueChange}

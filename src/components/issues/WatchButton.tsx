@@ -9,6 +9,8 @@ import { cn } from "~/lib/utils";
 interface WatchButtonProps {
   issueId: string;
   initialIsWatching: boolean;
+  iconOnly?: boolean;
+  className?: string;
 }
 
 import React from "react";
@@ -16,6 +18,8 @@ import React from "react";
 export function WatchButton({
   issueId,
   initialIsWatching,
+  iconOnly,
+  className,
 }: WatchButtonProps): React.JSX.Element {
   const [isWatching, setIsWatching] = useState(initialIsWatching);
   const [isPending, startTransition] = useTransition();
@@ -35,25 +39,29 @@ export function WatchButton({
   return (
     <Button
       variant="outline"
-      size="sm"
+      size={iconOnly ? "icon-sm" : "sm"}
       onClick={handleToggle}
       loading={isPending}
       className={cn(
-        "w-full justify-start gap-2",
+        !iconOnly && "w-full justify-start gap-2",
         isWatching
           ? "bg-primary/10 text-primary border-primary/20"
-          : "text-muted-foreground"
+          : "text-muted-foreground",
+        className
       )}
+      aria-label={
+        iconOnly ? (isWatching ? "Unwatch Issue" : "Watch Issue") : undefined
+      }
     >
       {isWatching ? (
         <>
           {!isPending && <EyeOff className="size-4" />}
-          Unwatch Issue
+          {!iconOnly && "Unwatch Issue"}
         </>
       ) : (
         <>
           {!isPending && <Eye className="size-4" />}
-          Watch Issue
+          {!iconOnly && "Watch Issue"}
         </>
       )}
     </Button>

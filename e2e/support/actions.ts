@@ -142,14 +142,43 @@ export async function selectOption(
   const getOptionTestId =
     triggerToOptionTestIdMap[triggerTestId] ??
     ((value: string) =>
-      `${triggerTestId.replace("issue-", "").replace("-select", "")}-option-${value}`);
+      `${triggerTestId.replace("-mobile", "").replace("issue-", "").replace("-select", "")}-option-${value}`);
+
+  // Determine actual trigger test ID based on viewport
+  const isMobile = page.viewportSize()?.width
+    ? page.viewportSize()!.width < 768
+    : false;
+  const actualTriggerTestId =
+    isMobile &&
+    triggerTestId.includes("issue-") &&
+    !triggerTestId.includes("-mobile")
+      ? `${triggerTestId}-mobile`
+      : triggerTestId;
 
   // Wait for and click the Select trigger
-  // Scroll trigger into view first to help position the dropdown on mobile viewports
-  const trigger = page.getByTestId(triggerTestId);
+  const trigger = page.getByTestId(actualTriggerTestId).first();
   await expect(trigger).toBeVisible({ timeout: 10000 });
   await trigger.scrollIntoViewIfNeeded();
   await trigger.click();
+
+  // On mobile, the MetadataDrawer doesn't use test ids for options (it renders labels directly)
+  // Instead of matching the optionTestId, we can just look for the text of the option, or click the button containing the check
+  // But wait, the drawers don't use the option test ids. The drawers just render regular buttons!
+  if (actualTriggerTestId.includes("-mobile")) {
+    const drawer = page.locator('[role="dialog"]').last();
+    // Assuming the value text is passed in uppercase or lowercase, we'll need to match it
+    // Wait, the option value in the tests is e.g. "minor". The label is "Minor".
+    // We can just click the button that has the value text case-insensitive
+    const option = drawer
+      .getByRole("button")
+      .filter({ hasText: new RegExp(optionValue.replace("_", " "), "i") })
+      .first();
+    await expect(option).toBeVisible({ timeout: 5000 });
+    await option.click({ force: true });
+    // Wait for drawer to close
+    await expect(option).toBeHidden({ timeout: 5000 });
+    return;
+  }
 
   // Wait for the dropdown to appear and find the option
   const optionTestId = getOptionTestId(optionValue);

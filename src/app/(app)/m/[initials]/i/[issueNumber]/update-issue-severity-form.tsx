@@ -8,6 +8,8 @@ import {
   type UpdateIssueSeverityResult,
 } from "~/app/(app)/issues/actions";
 import { SeveritySelect } from "~/components/issues/fields/SeveritySelect";
+import { MetadataDrawer } from "~/components/issues/fields/MetadataDrawer";
+import { SEVERITY_CONFIG } from "~/lib/issues/status";
 import { type IssueSeverity } from "~/lib/types";
 import { IssueBadge } from "~/components/issues/IssueBadge";
 import {
@@ -28,6 +30,7 @@ interface UpdateIssueSeverityFormProps {
   currentSeverity: IssueSeverity;
   accessLevel: AccessLevel;
   ownershipContext: OwnershipContext;
+  compact?: boolean;
 }
 
 export function UpdateIssueSeverityForm({
@@ -35,6 +38,7 @@ export function UpdateIssueSeverityForm({
   currentSeverity,
   accessLevel,
   ownershipContext,
+  compact,
 }: UpdateIssueSeverityFormProps): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
   const [selectedSeverity, setSelectedSeverity] =
@@ -81,7 +85,36 @@ export function UpdateIssueSeverityForm({
     );
   }
 
-  const selectControl = (
+  const selectControl = compact ? (
+    <MetadataDrawer<IssueSeverity>
+      title="Severity"
+      options={(Object.keys(SEVERITY_CONFIG) as IssueSeverity[]).map(
+        (severity) => ({
+          value: severity,
+          label: SEVERITY_CONFIG[severity].label,
+          icon: SEVERITY_CONFIG[severity].icon,
+          iconColor: SEVERITY_CONFIG[severity].iconColor,
+        })
+      )}
+      currentValue={selectedSeverity}
+      onSelect={handleValueChange}
+      disabled={isPending || !permissionState.allowed}
+      trigger={
+        <button
+          type="button"
+          data-testid="issue-severity-select-mobile"
+          className="text-left"
+          disabled={isPending || !permissionState.allowed}
+        >
+          <IssueBadge
+            type="severity"
+            value={selectedSeverity}
+            showTooltip={false}
+          />
+        </button>
+      }
+    />
+  ) : (
     <SeveritySelect
       value={selectedSeverity}
       onValueChange={handleValueChange}

@@ -15,6 +15,18 @@ test.describe("Issue detail permission-aware UI", () => {
       await expect(page.getByTestId("issue-severity-select")).toHaveCount(0);
       await expect(page.getByTestId("issue-priority-select")).toHaveCount(0);
       await expect(page.getByTestId("issue-frequency-select")).toHaveCount(0);
+      await expect(page.getByTestId("issue-status-select-mobile")).toHaveCount(
+        0
+      );
+      await expect(
+        page.getByTestId("issue-severity-select-mobile")
+      ).toHaveCount(0);
+      await expect(
+        page.getByTestId("issue-priority-select-mobile")
+      ).toHaveCount(0);
+      await expect(
+        page.getByTestId("issue-frequency-select-mobile")
+      ).toHaveCount(0);
 
       // Read-only badges should be visible (use first() since badges appear in both header and sidebar)
       await expect(
@@ -31,7 +43,7 @@ test.describe("Issue detail permission-aware UI", () => {
       ).toBeVisible();
 
       // Assignee should be read-only
-      await expect(page.getByTestId("assignee-readonly")).toBeVisible();
+      await expect(page.getByTestId("assignee-readonly").first()).toBeVisible();
 
       // Watch button should be hidden
       await expect(
@@ -58,14 +70,27 @@ test.describe("Issue detail permission-aware UI", () => {
       const otherIssue = seededIssues.AFM[0]; // reported by member
       await page.goto(`/m/AFM/i/${otherIssue.num}`);
 
+      const isMobile = testInfo.project.name.includes("Mobile");
+      const suffix = isMobile ? "-mobile" : "";
+
       // All selects should be visible but disabled
-      await expect(page.getByTestId("issue-status-select")).toBeDisabled();
-      await expect(page.getByTestId("issue-severity-select")).toBeDisabled();
-      await expect(page.getByTestId("issue-priority-select")).toBeDisabled();
-      await expect(page.getByTestId("issue-frequency-select")).toBeDisabled();
+      await expect(
+        page.getByTestId(`issue-status-select${suffix}`)
+      ).toBeDisabled();
+      await expect(
+        page.getByTestId(`issue-severity-select${suffix}`)
+      ).toBeDisabled();
+      await expect(
+        page.getByTestId(`issue-priority-select${suffix}`)
+      ).toBeDisabled();
+      await expect(
+        page.getByTestId(`issue-frequency-select${suffix}`)
+      ).toBeDisabled();
 
       // Assignee picker should be visible but disabled
-      await expect(page.getByTestId("assignee-picker-trigger")).toBeDisabled();
+      await expect(
+        page.getByTestId("assignee-picker-trigger").first()
+      ).toBeDisabled();
     });
 
     test("can see watch button and comment input", async ({
@@ -81,7 +106,7 @@ test.describe("Issue detail permission-aware UI", () => {
 
       // Watch button should be visible for authenticated users
       await expect(
-        page.getByRole("button", { name: /watch issue|unwatch issue/i })
+        page.getByRole("button", { name: /watch issue|unwatch issue/i }).first()
       ).toBeVisible();
 
       // Comment input should be visible (not the login prompt)
@@ -104,16 +129,29 @@ test.describe("Issue detail permission-aware UI", () => {
       const ownIssue = seededIssues.AFM[1]; // reported by guest
       await page.goto(`/m/AFM/i/${ownIssue.num}`);
 
+      const isMobile = testInfo.project.name.includes("Mobile");
+      const suffix = isMobile ? "-mobile" : "";
+
       // Status, severity, frequency should be enabled on own issue
-      await expect(page.getByTestId("issue-status-select")).toBeEnabled();
-      await expect(page.getByTestId("issue-severity-select")).toBeEnabled();
-      await expect(page.getByTestId("issue-frequency-select")).toBeEnabled();
+      await expect(
+        page.getByTestId(`issue-status-select${suffix}`)
+      ).toBeEnabled();
+      await expect(
+        page.getByTestId(`issue-severity-select${suffix}`)
+      ).toBeEnabled();
+      await expect(
+        page.getByTestId(`issue-frequency-select${suffix}`)
+      ).toBeEnabled();
 
       // Priority is always disabled for guests, even on own issue
-      await expect(page.getByTestId("issue-priority-select")).toBeDisabled();
+      await expect(
+        page.getByTestId(`issue-priority-select${suffix}`)
+      ).toBeDisabled();
 
       // Assignee is always disabled for guests, even on own issue
-      await expect(page.getByTestId("assignee-picker-trigger")).toBeDisabled();
+      await expect(
+        page.getByTestId("assignee-picker-trigger").first()
+      ).toBeDisabled();
     });
   });
 
@@ -127,14 +165,27 @@ test.describe("Issue detail permission-aware UI", () => {
       const issue = seededIssues.AFM[0];
       await page.goto(`/m/AFM/i/${issue.num}`);
 
+      const isMobile = testInfo.project.name.includes("Mobile");
+      const suffix = isMobile ? "-mobile" : "";
+
       // All selects should be enabled
-      await expect(page.getByTestId("issue-status-select")).toBeEnabled();
-      await expect(page.getByTestId("issue-severity-select")).toBeEnabled();
-      await expect(page.getByTestId("issue-priority-select")).toBeEnabled();
-      await expect(page.getByTestId("issue-frequency-select")).toBeEnabled();
+      await expect(
+        page.getByTestId(`issue-status-select${suffix}`)
+      ).toBeEnabled();
+      await expect(
+        page.getByTestId(`issue-severity-select${suffix}`)
+      ).toBeEnabled();
+      await expect(
+        page.getByTestId(`issue-priority-select${suffix}`)
+      ).toBeEnabled();
+      await expect(
+        page.getByTestId(`issue-frequency-select${suffix}`)
+      ).toBeEnabled();
 
       // Assignee picker should be enabled
-      await expect(page.getByTestId("assignee-picker-trigger")).toBeEnabled();
+      await expect(
+        page.getByTestId("assignee-picker-trigger").first()
+      ).toBeEnabled();
     });
 
     test("can see watch button and comment input", async ({
@@ -150,7 +201,7 @@ test.describe("Issue detail permission-aware UI", () => {
 
       // Watch button should be visible
       await expect(
-        page.getByRole("button", { name: /watch issue|unwatch issue/i })
+        page.getByRole("button", { name: /watch issue|unwatch issue/i }).first()
       ).toBeVisible();
 
       // Comment input should be visible
