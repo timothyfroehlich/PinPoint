@@ -42,7 +42,7 @@ export function getAccessLevel(
  * - 'own': Requires userId === reporterId
  * - 'owner': Requires userId === machineOwnerId
  *
- * @param permissionId - The permission to check (e.g., 'issues.update.status')
+ * @param permissionId - The permission to check (e.g., 'issues.update.reporting')
  * @param accessLevel - The user's access level
  * @param context - Optional ownership context for conditional permissions
  * @returns true if permission is granted, false otherwise

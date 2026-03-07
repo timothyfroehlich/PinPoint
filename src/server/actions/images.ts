@@ -21,7 +21,7 @@ import {
 } from "~/lib/rate-limit";
 import { eq, count, and, isNull } from "drizzle-orm";
 import { log } from "~/lib/logger";
-import { canUpdateIssue } from "~/lib/permissions";
+import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 
 const uploadSchema = z.object({
   issueId: z.string(), // Can be real UUID or 'new'
@@ -105,12 +105,15 @@ export async function uploadIssueImage(formData: FormData): Promise<
         columns: { role: true },
       });
 
+      const accessLevel = getAccessLevel(userProfile?.role);
+      const ownershipCtx = {
+        userId: user.id,
+        reporterId: currentIssue.reportedBy,
+        machineOwnerId: currentIssue.machine.ownerId,
+      };
+
       if (
-        !canUpdateIssue(
-          { id: user.id, role: userProfile?.role ?? "guest" },
-          currentIssue,
-          currentIssue.machine
-        )
+        !checkPermission("issues.update.reporting", accessLevel, ownershipCtx)
       ) {
         return err(
           "AUTH",

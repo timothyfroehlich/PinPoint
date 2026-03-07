@@ -14,15 +14,14 @@
  * - admin: Full control
  *
  * Naming conventions:
- * - Permission IDs use "update" for modifying resources (issues.update.status)
+ * - Permission IDs use "update" for modifying resources (issues.update.reporting)
  * - Comment permissions use "edit" / "delete" to match the UI actions
  *
- * Migration notes:
- * - The legacy src/lib/permissions.ts (canUpdateIssue) predates this matrix
- *   and should be migrated to use checkPermission() from helpers.ts.
- *   TODO: Replace canUpdateIssue() with matrix-based permission checks.
- * - src/lib/permissions.ts uses UserRole; this file uses AccessLevel.
- *   AccessLevel extends UserRole with "unauthenticated" (a state, not a DB role).
+ * Issue update permissions use a two-tier model:
+ * - issues.update.reporting: Fields the reporter naturally owns (title, status,
+ *   severity, frequency). Guests can edit these on their own issues ("own").
+ * - issues.update.triage: Organizational fields (priority, assignee). Requires
+ *   member or above — guests cannot triage even their own issues.
  */
 
 /**
@@ -188,9 +187,9 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         },
       },
       {
-        id: "issues.update.severity",
-        label: "Update severity",
-        description: "Change an issue's severity level",
+        id: "issues.update.reporting",
+        label: "Update issue details",
+        description: "Change title, status, severity, or frequency",
         access: {
           unauthenticated: false,
           guest: "own",
@@ -200,45 +199,9 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
         },
       },
       {
-        id: "issues.update.frequency",
-        label: "Update frequency",
-        description: "Change how often an issue occurs",
-        access: {
-          unauthenticated: false,
-          guest: "own",
-          member: true,
-          technician: true,
-          admin: true,
-        },
-      },
-      {
-        id: "issues.update.status",
-        label: "Update status",
-        description: "Change an issue's status (open, closed, etc.)",
-        access: {
-          unauthenticated: false,
-          guest: "own",
-          member: true,
-          technician: true,
-          admin: true,
-        },
-      },
-      {
-        id: "issues.update.priority",
-        label: "Update priority",
-        description: "Change an issue's priority level",
-        access: {
-          unauthenticated: false,
-          guest: false,
-          member: true,
-          technician: true,
-          admin: true,
-        },
-      },
-      {
-        id: "issues.update.assignee",
-        label: "Update assignee",
-        description: "Change who is assigned to an issue",
+        id: "issues.update.triage",
+        label: "Triage issues",
+        description: "Change priority or assignee",
         access: {
           unauthenticated: false,
           guest: false,

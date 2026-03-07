@@ -15,10 +15,10 @@ import { ImageGallery } from "~/components/images/ImageGallery";
 import type { Issue, IssueWithAllRelations } from "~/lib/types";
 import { BackToIssuesLink } from "~/components/issues/BackToIssuesLink";
 import { getLastIssuesPath } from "~/lib/cookies/preferences";
-import { canEditIssueTitle } from "~/lib/permissions";
 import { EditableIssueTitle } from "./editable-issue-title";
 import {
   type OwnershipContext,
+  checkPermission,
   getAccessLevel,
 } from "~/lib/permissions/helpers";
 
@@ -173,12 +173,11 @@ export default async function IssueDetailPage({
   };
 
   // Compute title edit permission
-  const userCanEditTitle = user
-    ? canEditIssueTitle(
-        { id: user.id, role: currentUserProfile?.role ?? "guest" },
-        { reportedBy: issue.reportedBy, assignedTo: issue.assignedTo }
-      )
-    : false;
+  const userCanEditTitle = checkPermission(
+    "issues.update.reporting",
+    accessLevel,
+    ownershipContext
+  );
 
   return (
     <PageShell className="space-y-8" size="wide">

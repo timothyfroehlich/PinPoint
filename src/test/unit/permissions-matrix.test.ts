@@ -115,9 +115,9 @@ describe("getPermission", () => {
   });
 
   it("should return conditional values for ownership-based permissions", () => {
-    // Guests can only update their own issues
-    expect(getPermission("issues.update.status", "guest")).toBe("own");
-    expect(getPermission("issues.update.status", "member")).toBe(true);
+    // Guests can only update their own issues (reporting tier)
+    expect(getPermission("issues.update.reporting", "guest")).toBe("own");
+    expect(getPermission("issues.update.reporting", "member")).toBe(true);
 
     // Members can only edit machines they own
     expect(getPermission("machines.edit", "member")).toBe("owner");
@@ -141,7 +141,7 @@ describe("hasPermission", () => {
   it("should throw for ownership-based permissions to prevent silent bugs", () => {
     // hasPermission throws for 'own'/'owner' values to force callers to use
     // requiresOwnershipCheck() or checkPermission() from helpers.ts
-    expect(() => hasPermission("issues.update.status", "guest")).toThrow(
+    expect(() => hasPermission("issues.update.reporting", "guest")).toThrow(
       /ownership-based permissions/
     );
     expect(() => hasPermission("machines.edit", "member")).toThrow(
@@ -152,8 +152,7 @@ describe("hasPermission", () => {
 
 describe("requiresOwnershipCheck", () => {
   it("should return true for ownership-based permissions", () => {
-    expect(requiresOwnershipCheck("issues.update.status", "guest")).toBe(true);
-    expect(requiresOwnershipCheck("issues.update.severity", "guest")).toBe(
+    expect(requiresOwnershipCheck("issues.update.reporting", "guest")).toBe(
       true
     );
     expect(requiresOwnershipCheck("machines.edit", "member")).toBe(true);
@@ -163,7 +162,7 @@ describe("requiresOwnershipCheck", () => {
     expect(requiresOwnershipCheck("issues.view", "unauthenticated")).toBe(
       false
     );
-    expect(requiresOwnershipCheck("issues.update.status", "member")).toBe(
+    expect(requiresOwnershipCheck("issues.update.reporting", "member")).toBe(
       false
     );
     expect(requiresOwnershipCheck("admin.access", "admin")).toBe(false);
@@ -281,25 +280,19 @@ describe("Specific permission rules from design", () => {
     });
   });
 
-  describe("Issue updates", () => {
-    it("should allow guests to update their own issues (descriptive + status)", () => {
-      expect(getPermission("issues.update.severity", "guest")).toBe("own");
-      expect(getPermission("issues.update.frequency", "guest")).toBe("own");
-      expect(getPermission("issues.update.status", "guest")).toBe("own");
+  describe("Issue updates (tiered model)", () => {
+    it("should allow guests to update reporting fields on their own issues", () => {
+      expect(getPermission("issues.update.reporting", "guest")).toBe("own");
     });
 
-    it("should not allow guests to update workflow fields", () => {
-      expect(getPermission("issues.update.priority", "guest")).toBe(false);
-      expect(getPermission("issues.update.assignee", "guest")).toBe(false);
+    it("should not allow guests to triage issues", () => {
+      expect(getPermission("issues.update.triage", "guest")).toBe(false);
     });
 
-    it("should allow members and technicians to update any issue", () => {
+    it("should allow members and technicians full update access", () => {
       for (const role of ["member", "technician"] as const) {
-        expect(getPermission("issues.update.severity", role)).toBe(true);
-        expect(getPermission("issues.update.frequency", role)).toBe(true);
-        expect(getPermission("issues.update.status", role)).toBe(true);
-        expect(getPermission("issues.update.priority", role)).toBe(true);
-        expect(getPermission("issues.update.assignee", role)).toBe(true);
+        expect(getPermission("issues.update.reporting", role)).toBe(true);
+        expect(getPermission("issues.update.triage", role)).toBe(true);
       }
     });
   });

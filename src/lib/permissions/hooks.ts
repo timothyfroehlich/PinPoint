@@ -78,7 +78,7 @@ export function usePermission(
  *
  * @example
  * ```tsx
- * const { allowed, reason } = usePermissionState('issues.update.priority', user);
+ * const { allowed, reason } = usePermissionState('issues.update.triage', user);
  * return (
  *   <Select disabled={!allowed} title={reason}>
  *     ...
@@ -123,11 +123,11 @@ export function usePermissionState(
  * @example
  * ```tsx
  * const perms = usePermissions(
- *   ['issues.update.status', 'issues.update.priority'],
+ *   ['issues.update.reporting', 'issues.update.triage'],
  *   user,
  *   { issue }
  * );
- * // perms = { 'issues.update.status': true, 'issues.update.priority': false }
+ * // perms = { 'issues.update.reporting': true, 'issues.update.triage': false }
  * ```
  */
 export function usePermissions(
@@ -150,7 +150,7 @@ export function usePermissions(
     return result;
   }, [
     // Stringify the array for stable dependency.
-    // Safe: permission IDs use dots (e.g. "issues.update.status"), never commas.
+    // Safe: permission IDs use dots (e.g. "issues.update.reporting"), never commas.
     permissionIds.join(","),
     user?.id,
     user?.role,
@@ -166,11 +166,11 @@ export function usePermissions(
  * @example
  * ```tsx
  * const states = usePermissionStates(
- *   ['issues.update.status', 'issues.update.priority'],
+ *   ['issues.update.reporting', 'issues.update.triage'],
  *   user,
  *   { issue }
  * );
- * // states['issues.update.priority'].reason = 'Members can perform this action'
+ * // states['issues.update.triage'].reason = 'Members can perform this action'
  * ```
  */
 export function usePermissionStates(
@@ -197,7 +197,7 @@ export function usePermissionStates(
     }
     return result;
   }, [
-    // Safe: permission IDs use dots (e.g. "issues.update.status"), never commas.
+    // Safe: permission IDs use dots (e.g. "issues.update.reporting"), never commas.
     permissionIds.join(","),
     user?.id,
     user?.role,

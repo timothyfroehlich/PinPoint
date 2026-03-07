@@ -36,7 +36,7 @@ import {
   updateIssueFrequency,
   updateIssueComment,
 } from "~/services/issues";
-import { canUpdateIssue, canEditIssueTitle } from "~/lib/permissions";
+import { checkPermission, getAccessLevel } from "~/lib/permissions/helpers";
 import { userProfiles, issueComments, issueImages } from "~/server/db/schema";
 
 const NEXT_REDIRECT_DIGEST_PREFIX = "NEXT_REDIRECT;";
@@ -163,12 +163,15 @@ export async function updateIssueStatusAction(
       columns: { role: true },
     });
 
+    const accessLevel = getAccessLevel(userProfile?.role);
+    const ownershipCtx = {
+      userId: user.id,
+      reporterId: currentIssue.reportedBy,
+      machineOwnerId: currentIssue.machine.ownerId,
+    };
+
     if (
-      !canUpdateIssue(
-        { id: user.id, role: userProfile?.role ?? "guest" },
-        currentIssue,
-        currentIssue.machine
-      )
+      !checkPermission("issues.update.reporting", accessLevel, ownershipCtx)
     ) {
       return err(
         "UNAUTHORIZED",
@@ -266,12 +269,15 @@ export async function updateIssueSeverityAction(
       columns: { role: true },
     });
 
+    const accessLevel = getAccessLevel(userProfile?.role);
+    const ownershipCtx = {
+      userId: user.id,
+      reporterId: currentIssue.reportedBy,
+      machineOwnerId: currentIssue.machine.ownerId,
+    };
+
     if (
-      !canUpdateIssue(
-        { id: user.id, role: userProfile?.role ?? "guest" },
-        currentIssue,
-        currentIssue.machine
-      )
+      !checkPermission("issues.update.reporting", accessLevel, ownershipCtx)
     ) {
       return err(
         "UNAUTHORIZED",
@@ -358,12 +364,15 @@ export async function updateIssueFrequencyAction(
       columns: { role: true },
     });
 
+    const accessLevel = getAccessLevel(userProfile?.role);
+    const ownershipCtx = {
+      userId: user.id,
+      reporterId: currentIssue.reportedBy,
+      machineOwnerId: currentIssue.machine.ownerId,
+    };
+
     if (
-      !canUpdateIssue(
-        { id: user.id, role: userProfile?.role ?? "guest" },
-        currentIssue,
-        currentIssue.machine
-      )
+      !checkPermission("issues.update.reporting", accessLevel, ownershipCtx)
     ) {
       return err(
         "UNAUTHORIZED",
@@ -458,13 +467,14 @@ export async function updateIssuePriorityAction(
       columns: { role: true },
     });
 
-    if (
-      !canUpdateIssue(
-        { id: user.id, role: userProfile?.role ?? "guest" },
-        currentIssue,
-        currentIssue.machine
-      )
-    ) {
+    const accessLevel = getAccessLevel(userProfile?.role);
+    const ownershipCtx = {
+      userId: user.id,
+      reporterId: currentIssue.reportedBy,
+      machineOwnerId: currentIssue.machine.ownerId,
+    };
+
+    if (!checkPermission("issues.update.triage", accessLevel, ownershipCtx)) {
       return err(
         "UNAUTHORIZED",
         "You do not have permission to update this issue"
@@ -562,13 +572,14 @@ export async function assignIssueAction(
       columns: { role: true },
     });
 
-    if (
-      !canUpdateIssue(
-        { id: user.id, role: userProfile?.role ?? "guest" },
-        currentIssue,
-        currentIssue.machine
-      )
-    ) {
+    const accessLevel = getAccessLevel(userProfile?.role);
+    const ownershipCtx = {
+      userId: user.id,
+      reporterId: currentIssue.reportedBy,
+      machineOwnerId: currentIssue.machine.ownerId,
+    };
+
+    if (!checkPermission("issues.update.triage", accessLevel, ownershipCtx)) {
       return err(
         "UNAUTHORIZED",
         "You do not have permission to update this issue"
@@ -910,6 +921,11 @@ export async function updateIssueTitleAction(
         reportedBy: true,
         assignedTo: true,
       },
+      with: {
+        machine: {
+          columns: { ownerId: true },
+        },
+      },
     });
 
     if (!currentIssue) {
@@ -922,11 +938,15 @@ export async function updateIssueTitleAction(
       columns: { role: true },
     });
 
+    const accessLevel = getAccessLevel(userProfile?.role);
+    const ownershipCtx = {
+      userId: user.id,
+      reporterId: currentIssue.reportedBy,
+      machineOwnerId: currentIssue.machine.ownerId,
+    };
+
     if (
-      !canEditIssueTitle(
-        { id: user.id, role: userProfile?.role ?? "guest" },
-        currentIssue
-      )
+      !checkPermission("issues.update.reporting", accessLevel, ownershipCtx)
     ) {
       return err(
         "UNAUTHORIZED",

@@ -51,14 +51,14 @@ export function UpdateIssuePriorityForm({
     FormData
   >(updateIssuePriorityAction, undefined);
   const permissionState = getPermissionState(
-    "issues.update.priority",
+    "issues.update.triage",
     accessLevel,
     ownershipContext
   );
   const deniedReason = permissionState.allowed
     ? null
     : getPermissionDeniedReason(
-        "issues.update.priority",
+        "issues.update.triage",
         accessLevel,
         ownershipContext
       );
