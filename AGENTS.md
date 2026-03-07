@@ -24,6 +24,7 @@
 12. **Email Privacy**: User email addresses must NEVER be displayed outside of admin views and the user's own settings page. Use names, "Anonymous", or role labels instead. This applies to UI, seed data, timeline events, and any client-facing serialization.
 13. **Permissions Matrix Accuracy**: The permissions matrix (`matrix.ts`) must match actual server action enforcement. The help page auto-generates from the matrix — if it drifts, users see wrong information. Update both when changing auth logic.
 14. **Matrix-Only Permissions**: All permission checks MUST use `checkPermission()` from the matrix system (`~/lib/permissions/helpers`). No standalone permission functions outside `src/lib/permissions/`. The help page auto-generates from the matrix — if enforcement diverges, users see wrong information.
+15. **Process Safety**: NEVER kill processes system-wide. Do NOT run `pkill`, `killall`, use `kill` with PIDs obtained from broad selectors like `pgrep`, run `supabase stop --all`, or use any command that terminates services beyond your current worktree. Only stop services you explicitly started in your current session. Violating this destroys other agents' environments and the user's running work.
 
 ## 3. Agent Skills (Progressive Disclosure)
 
@@ -46,6 +47,22 @@ If your tool does not support skills, read the file path directly.
 | **Workflow**   | `pinpoint-teammate-guide`        | `.claude/skills/pinpoint-teammate-guide/SKILL.md`        | For dispatched teammates: environment, contract, Copilot loop, CI.                            |
 
 ## 4. Environment & Workflow
+
+### ⛔ SYSTEM PROCESS SAFETY — READ BEFORE TOUCHING ANY SERVICE
+
+> **NEVER terminate processes system-wide. This is an absolute rule. No exceptions unless Tim gives explicit written permission in the current session.**
+>
+> **FORBIDDEN without explicit permission:**
+>
+> - `supabase stop --all` — kills ALL Supabase instances across every worktree
+> - `pkill node`, `killall node`, `pkill next`, `pkill -f next` — kills ALL Next.js servers system-wide
+> - `pkill postgres`, `killall postgres` — kills ALL database connections system-wide
+> - Any `kill`/`pkill`/`killall` targeting a process name or category rather than a specific PID you started
+> - Any `docker stop`/`docker rm` on containers you did not start in this session
+>
+> **WHY**: This system runs multiple simultaneous environments (main + secondary + review + AntiGravity + ephemeral worktrees). Killing "all Supabase" or "all node" destroys every other running environment and the user's active work.
+>
+> **ALLOWED**: Stop only the specific service you started, identified by its specific PID or by running the worktree-local stop command (e.g., run `supabase stop` from within the current worktree directory to stop only that environment's Supabase instance). When in doubt — DO NOT stop it. Ask first.
 
 ### Worktrees & Ports
 
@@ -84,7 +101,7 @@ Created with `./pinpoint-wt.py` for quick PR reviews or parallel development. Po
 **Troubleshooting**:
 
 - _Config Mismatch_: Run `./pinpoint-wt.py sync` to regenerate
-- _Supabase Failures_: Run `supabase stop --all` then restart
+- _Supabase Failures_: Run `supabase stop` (current worktree only — never `--all`) then restart
 - _Template Changes_: Edit `supabase/config.toml.template`, then `./pinpoint-wt.py sync --all`
 
 ### Branch Management

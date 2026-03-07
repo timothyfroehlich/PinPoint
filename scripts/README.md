@@ -172,7 +172,7 @@ Both scripts generate recovery commands. Follow the printed guidance:
 
 If you see Supabase startup failures:
 
-1. Run `supabase stop --all`
+1. Run `supabase stop` (stops this worktree's instance only — never use `--all`, it kills every worktree's Supabase)
 2. Re-run the sync script
 3. Check for zombie processes: `docker ps`
 
