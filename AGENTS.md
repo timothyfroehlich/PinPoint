@@ -24,7 +24,7 @@
 12. **Email Privacy**: User email addresses must NEVER be displayed outside of admin views and the user's own settings page. Use names, "Anonymous", or role labels instead. This applies to UI, seed data, timeline events, and any client-facing serialization.
 13. **Permissions Matrix Accuracy**: The permissions matrix (`matrix.ts`) must match actual server action enforcement. The help page auto-generates from the matrix — if it drifts, users see wrong information. Update both when changing auth logic.
 14. **Matrix-Only Permissions**: All permission checks MUST use `checkPermission()` from the matrix system (`~/lib/permissions/helpers`). No standalone permission functions outside `src/lib/permissions/`. The help page auto-generates from the matrix — if enforcement diverges, users see wrong information.
-15. **Process Safety**: NEVER kill processes system-wide. Do NOT run `pkill`, `killall`, or `kill` targeting process names/categories, `supabase stop --all`, or any command that terminates services beyond your current worktree. Only stop services you explicitly started in your current session. Violating this destroys other agents' environments and the user's running work.
+15. **Process Safety**: NEVER kill processes system-wide. Do NOT run `pkill`, `killall`, use `kill` with PIDs obtained from broad selectors like `pgrep`, run `supabase stop --all`, or use any command that terminates services beyond your current worktree. Only stop services you explicitly started in your current session. Violating this destroys other agents' environments and the user's running work.
 
 ## 3. Agent Skills (Progressive Disclosure)
 
@@ -62,7 +62,7 @@ If your tool does not support skills, read the file path directly.
 >
 > **WHY**: This system runs multiple simultaneous environments (main + secondary + review + AntiGravity + ephemeral worktrees). Killing "all Supabase" or "all node" destroys every other running environment and the user's active work.
 >
-> **ALLOWED**: Stop only the specific service you started, identified by its specific PID or using the worktree-local stop command (e.g., `supabase stop` with the project ref for your worktree only). When in doubt — DO NOT stop it. Ask first.
+> **ALLOWED**: Stop only the specific service you started, identified by its specific PID or by running the worktree-local stop command (e.g., run `supabase stop` from within the current worktree directory to stop only that environment's Supabase instance). When in doubt — DO NOT stop it. Ask first.
 
 ### Worktrees & Ports
 
