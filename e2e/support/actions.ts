@@ -61,6 +61,9 @@ export async function loginAs(
   // this, Server Actions on subsequent pages can see a stale/missing cookie
   // and treat the user as anonymous.
   await page.reload({ waitUntil: "networkidle" });
+  // Confirm the reload kept us on /dashboard (not redirected to /login by middleware).
+  // A redirect here means the reload itself raced with cookie rotation — surface it clearly.
+  await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
   await expect(visibleUserMenu(page)).toBeVisible({ timeout: 10000 });
 }
 
@@ -74,7 +77,10 @@ export async function ensureLoggedIn(
   options?: LoginOptions
 ): Promise<void> {
   await page.goto("/dashboard");
-  await page.waitForLoadState("domcontentloaded");
+  // Use networkidle (not domcontentloaded) so React has finished hydrating before we
+  // check for the user menu. Checking too early gives a false-negative and triggers
+  // an unnecessary loginAs, which then runs the cookie-settling reload.
+  await page.waitForLoadState("networkidle");
 
   // Check for authenticated indicator (User Menu — works on both mobile and desktop viewports)
   if (!(await visibleUserMenu(page).isVisible())) {
