@@ -384,27 +384,6 @@ export const PERMISSIONS_MATRIX: PermissionCategory[] = [
     ],
   },
   {
-    id: "images",
-    label: "Images",
-    permissions: [
-      {
-        id: "images.upload",
-        label: "Upload images",
-        description: "Attach images to issues and comments",
-        access: {
-          // Image count limits are enforced in the upload handler, not here.
-          // See src/app/report/actions.ts for per-submission limits.
-          // The matrix only tracks whether the action is permitted at all.
-          unauthenticated: true,
-          guest: true,
-          member: true,
-          technician: true,
-          admin: true,
-        },
-      },
-    ],
-  },
-  {
     id: "admin",
     label: "Administration",
     permissions: [

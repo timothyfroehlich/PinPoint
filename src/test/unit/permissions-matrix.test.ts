@@ -49,7 +49,6 @@ describe("PERMISSIONS_MATRIX", () => {
     expect(categoryIds).toContain("issues");
     expect(categoryIds).toContain("comments");
     expect(categoryIds).toContain("machines");
-    expect(categoryIds).toContain("images");
     expect(categoryIds).toContain("admin");
   });
 
