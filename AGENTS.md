@@ -101,7 +101,7 @@ Created with `./pinpoint-wt.py` for quick PR reviews or parallel development. Po
 **Troubleshooting**:
 
 - _Config Mismatch_: Run `./pinpoint-wt.py sync` to regenerate
-- _Supabase Failures_: Run `supabase stop --all` then restart
+- _Supabase Failures_: Run `supabase stop` (current worktree only — never `--all`) then restart
 - _Template Changes_: Edit `supabase/config.toml.template`, then `./pinpoint-wt.py sync --all`
 
 ### Branch Management
