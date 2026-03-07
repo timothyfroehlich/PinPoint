@@ -9,7 +9,7 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { ENABLE_COOKIE_BANNER_OVERRIDE_KEY } from "~/lib/cookies/constants";
+import { DEV_SHOW_COOKIE_BANNER_KEY } from "~/lib/cookies/constants";
 
 test.describe("Cookie Consent Banner", () => {
   // Override the default storageState to specifically enable the banner for this test.
@@ -19,7 +19,7 @@ test.describe("Cookie Consent Banner", () => {
     storageState: {
       cookies: [
         {
-          name: ENABLE_COOKIE_BANNER_OVERRIDE_KEY,
+          name: DEV_SHOW_COOKIE_BANNER_KEY,
           value: "true",
           domain: process.env.PLAYWRIGHT_HOST ?? "localhost",
           path: "/",

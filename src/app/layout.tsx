@@ -7,7 +7,7 @@ import { ClientLogger } from "~/components/dev/client-logger";
 
 import { CookieConsentBanner } from "~/components/CookieConsentBanner";
 import { SentryInitializer } from "~/components/SentryInitializer";
-import { ENABLE_COOKIE_BANNER_OVERRIDE_KEY } from "~/lib/cookies/constants";
+import { DEV_SHOW_COOKIE_BANNER_KEY } from "~/lib/cookies/constants";
 
 export const metadata: Metadata = {
   title: "PinPoint - Pinball Machine Issue Tracking",
@@ -33,8 +33,7 @@ export default async function RootLayout({
   let forceShow = false;
   if (!isProduction) {
     const cookieStore = await cookies();
-    forceShow =
-      cookieStore.get(ENABLE_COOKIE_BANNER_OVERRIDE_KEY)?.value === "true";
+    forceShow = cookieStore.get(DEV_SHOW_COOKIE_BANNER_KEY)?.value === "true";
   }
 
   const showCookieBanner = isProduction || forceShow;

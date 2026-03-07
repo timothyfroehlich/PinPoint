@@ -15,12 +15,17 @@ export const COOKIE_CONSENT_KEY = "cookieConsent";
  * Note: This does NOT override an existing `cookieConsent=true` value; the
  * client banner component may still hide itself based on that cookie.
  */
-export const ENABLE_COOKIE_BANNER_OVERRIDE_KEY = "forceShowCookieBanner";
+export const DEV_SHOW_COOKIE_BANNER_KEY = "devShowCookieBanner";
 
 /**
- * @deprecated Use ENABLE_COOKIE_BANNER_OVERRIDE_KEY instead.
+ * @deprecated Use DEV_SHOW_COOKIE_BANNER_KEY instead.
  */
-export const FORCE_SHOW_COOKIE_BANNER_KEY = ENABLE_COOKIE_BANNER_OVERRIDE_KEY;
+export const ENABLE_COOKIE_BANNER_OVERRIDE_KEY = DEV_SHOW_COOKIE_BANNER_KEY;
+
+/**
+ * @deprecated Use DEV_SHOW_COOKIE_BANNER_KEY instead.
+ */
+export const FORCE_SHOW_COOKIE_BANNER_KEY = DEV_SHOW_COOKIE_BANNER_KEY;
 
 /** Cookie lifetime: 1 year in seconds */
 export const PREFERENCE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
