@@ -3,6 +3,8 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { cleanupTestEntities } from "../support/cleanup.js";
 import { fillReportForm } from "../support/page-helpers.js";
+import { loginAs } from "../support/actions.js";
+import { TEST_USERS } from "../support/constants.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -67,13 +69,12 @@ test.describe("Image Upload Reporting", () => {
 
   test("authenticated user should see uploaded image on issue page", async ({
     page,
-  }) => {
-    // 1. Login
-    await page.goto("/login");
-    await page.getByLabel("Email").fill("admin@test.com");
-    await page.getByLabel("Password", { exact: true }).fill("TestPassword123");
-    await page.getByRole("button", { name: "Sign In" }).click();
-    await expect(page).toHaveURL("/dashboard");
+  }, testInfo) => {
+    // 1. Login — use loginAs helper for proper auth-cookie settling (networkidle + reload)
+    await loginAs(page, testInfo, {
+      email: TEST_USERS.admin.email,
+      password: TEST_USERS.admin.password,
+    });
 
     // 2. Go to Report
     await page.goto("/report");
