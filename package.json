@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Pinball machine issue tracking for Austin Pinball Collective",
   "scripts": {
-    "dev": "bash scripts/ensure-supabase.sh && node --env-file=.env.local -e \"require('child_process').execSync('next dev --port ' + process.env.PORT, {stdio: 'inherit'})\"",
+    "dev": "bash -lc 'set -a; source .env.local; set +a; bash scripts/ensure-supabase.sh && exec ./node_modules/.bin/next dev --port \"$PORT\"'",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -110,6 +110,7 @@
     "server-only": "^0.0.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
+    "vaul": "^1.1.2",
     "zod": "^4.3.6",
     "zxcvbn": "^4.4.2"
   },

@@ -37,7 +37,9 @@ test.describe("User Invitation & Signup Flow", () => {
     }
   });
 
-  test("should complete the full invite-signup flow", async ({ page }) => {
+  test("should complete the full invite-signup flow", async ({
+    page,
+  }, testInfo) => {
     test.slow(); // Triple the timeout
     const testId = Math.random().toString(36).substring(7);
     const userEmail = `full-invite-${testId}@example.com`;
@@ -74,7 +76,7 @@ test.describe("User Invitation & Signup Flow", () => {
     console.log("[test] Invitation sent");
 
     // 2. Admin logs out (to clear session for signup)
-    await logout(page);
+    await logout(page, testInfo);
 
     console.log("[test] Admin logged out");
 
@@ -108,11 +110,10 @@ test.describe("User Invitation & Signup Flow", () => {
     ).toBeVisible();
 
     // Verify user profile in menu (mobile or desktop header depending on viewport)
-    const userMenu = page
-      .locator(
-        '[data-testid="user-menu-button"],[data-testid="mobile-user-menu-button"]'
-      )
-      .filter({ visible: true });
+    const isMobile = testInfo.project.name.includes("Mobile");
+    const userMenu = isMobile
+      ? page.getByTestId("mobile-user-menu-button")
+      : page.getByTestId("user-menu-button");
     await expect(userMenu).toBeVisible();
     await userMenu.click();
     await expect(page.getByText("Full Flow")).toBeVisible();
@@ -121,7 +122,7 @@ test.describe("User Invitation & Signup Flow", () => {
 
   test("should transfer machine ownership when invited user signs up", async ({
     page,
-  }) => {
+  }, testInfo) => {
     test.slow(); // Triple the timeout - complex multi-step flow
     const testId = Math.random().toString(36).substring(7);
     const userEmail = `owner-invite-${testId}@example.com`;
@@ -168,7 +169,7 @@ test.describe("User Invitation & Signup Flow", () => {
     await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 10000 });
 
     // 3. Logout and complete signup
-    await logout(page);
+    await logout(page, testInfo);
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
     const signupLink = await getSignupLink(userEmail);

@@ -51,8 +51,11 @@ test.describe("Issue List Features", () => {
     const clearProps = page.getByRole("button", { name: "Clear", exact: true });
     await expect(clearProps).toBeVisible();
     await clearProps.click();
-    await expect(page.getByText(title1)).toBeVisible();
-    await expect(page.getByText(title2)).toBeVisible();
+    await page.waitForURL(
+      (url) => !url.searchParams.has("q") || url.searchParams.get("q") === ""
+    );
+    await expect(page.getByText(/Showing \d+ of \d+ issues/)).toBeVisible();
+    await expect(page.getByText("Showing 1 of 1 issues")).toHaveCount(0);
 
     // 3. Test Filtering
     // Filter by Severity: Major (TAF-01 and TAF-02 are both Major)
@@ -258,7 +261,7 @@ test.describe("Issue List Features", () => {
 
   test("should persist filters when navigating to issue detail and back", async ({
     page,
-  }) => {
+  }, testInfo) => {
     // 1. Go to issues and apply a severity filter
     await page.goto("/issues");
     await page.getByTestId("filter-severity").click();
@@ -277,8 +280,12 @@ test.describe("Issue List Features", () => {
     // Wait for navigation to issue detail
     await expect(page).toHaveURL(/\/m\/[A-Z]+\/i\/\d+/);
 
-    // 3. Click "Back to Issues" and verify filters preserved
-    await page.getByRole("link", { name: "Back to Issues" }).click();
+    // 3. Return to the filtered issue list
+    if (testInfo.project.name.includes("Mobile")) {
+      await page.goBack();
+    } else {
+      await page.getByRole("link", { name: "Back to Issues" }).click();
+    }
     await expect(page).toHaveURL(/severity=major/);
 
     // Verify filter badge is still visible

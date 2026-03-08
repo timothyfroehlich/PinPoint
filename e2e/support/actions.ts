@@ -3,15 +3,22 @@ import { expect, type Page, type TestInfo } from "@playwright/test";
 import { TEST_USERS } from "./constants.js";
 
 /**
- * Returns the visible user-menu trigger regardless of viewport.
+ * Returns the user-menu trigger based on viewport.
  *
- * On desktop the trigger lives in the sidebar. On mobile it lives
- * in the bottom tab bar (or top header in older designs).
+ * On desktop the trigger lives in the desktop header (data-testid="user-menu-button").
+ * On mobile it lives in the compact header (data-testid="mobile-user-menu-button").
+ * Providing isMobile ensures we target the exact intended element without relying
+ * on Playwright's visibility filter which can be flaky during hydration/layout.
  */
-export function visibleUserMenu(page: Page) {
-  // Try to find the user menu button in both possible locations
-  // data-testid="user-menu-button" (Desktop sidebar)
-  // data-testid="mobile-user-menu-button" (Mobile tab bar)
+function visibleUserMenu(page: Page, isMobile?: boolean) {
+  if (isMobile === true) {
+    return page.getByTestId("mobile-user-menu-button");
+  }
+  if (isMobile === false) {
+    return page.getByTestId("user-menu-button");
+  }
+
+  // Fallback: Use combined locator if isMobile is not known
   return page
     .locator(
       '[data-testid="user-menu-button"],[data-testid="mobile-user-menu-button"]'
@@ -39,34 +46,55 @@ export async function loginAs(
     password = TEST_USERS.member.password,
   }: LoginOptions = {}
 ): Promise<void> {
+  const isMobile = testInfo.project.name.includes("Mobile");
+
+  // Navigate to login page
   await page.goto("/login");
 
-  // Fill out login form
-  await page.getByLabel("Email").fill(email);
+  // Define possible settled states for the login page
+  const emailInput = page.getByLabel("Email");
+  const menu = visibleUserMenu(page, isMobile);
+
+  // Wait for the UI to settle into either "ready to login" or "already logged in"
+  await expect(emailInput.or(menu)).toBeVisible();
+
+  // If already logged in, we must log out first to ensure we are the correct user
+  if (await menu.isVisible()) {
+    await logout(page, testInfo);
+    await page.goto("/login");
+    await expect(emailInput).toBeVisible();
+  }
+
+  // Fill and submit login form
+  await emailInput.fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
 
   // Submit form
   await page.getByRole("button", { name: "Sign In" }).click();
 
-  // Local env has enable_confirmations = false, so we are redirected to dashboard immediately.
-  // Wait for networkidle to ensure hydration is complete before any subsequent actions.
+  // Wait for initial dashboard load
   await page.waitForLoadState("networkidle");
   await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
 
-  await assertLayoutReady(page, testInfo);
+  if (isMobile) {
+    await expect(page.getByTestId("mobile-header")).toBeVisible();
+  } else {
+    await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
+  }
+
+  // Wait for user menu to hydrate before continuing
+  await expect(visibleUserMenu(page, isMobile)).toBeVisible();
 
   // Force a full server round-trip to ensure auth cookies are settled.
   // Under concurrent load (3+ Playwright workers), Supabase cookie rotation
   // (refresh token exchange) may not be fully committed by the time the NEXT
   // navigation fires. Reloading the dashboard forces the browser to send the
-  // auth cookie back to the server, completing the rotation cycle. Without
-  // this, Server Actions on subsequent pages can see a stale/missing cookie
-  // and treat the user as anonymous.
+  // auth cookie back to the server, completing the rotation cycle.
   await page.reload({ waitUntil: "networkidle" });
+
   // Confirm the reload kept us on /dashboard (not redirected to /login by middleware).
-  // A redirect here means the reload itself raced with cookie rotation — surface it clearly.
   await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
-  await expect(visibleUserMenu(page)).toBeVisible({ timeout: 10000 });
+  await expect(visibleUserMenu(page, isMobile)).toBeVisible();
 }
 
 /**
@@ -84,7 +112,7 @@ async function assertLayoutReady(
     await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
   }
 
-  await expect(visibleUserMenu(page)).toBeVisible();
+  await expect(visibleUserMenu(page, isMobile)).toBeVisible();
 }
 
 /**
@@ -96,39 +124,52 @@ export async function ensureLoggedIn(
   options?: LoginOptions
 ): Promise<void> {
   await page.goto("/dashboard");
-  // Use networkidle (not domcontentloaded) so React has finished hydrating before we
-  // check for the user menu. Checking too early gives a false-negative and triggers
-  // an unnecessary loginAs, which then runs the cookie-settling reload.
-  await page.waitForLoadState("networkidle");
 
-  // Check for authenticated indicator (User Menu — works on both mobile and desktop viewports)
-  if (!(await visibleUserMenu(page).isVisible())) {
+  // Use project name to determine mobile vs desktop layout
+  const isMobile = testInfo.project.name.includes("Mobile");
+
+  // Define semantic locators for both states (logged-in vs logged-out)
+  const menu = visibleUserMenu(page, isMobile);
+  const signIn = isMobile
+    ? page.getByTestId("mobile-nav-signin")
+    : page.getByTestId("nav-signin");
+
+  // Use a semantic wait: wait for the UI to settle into either state.
+  // This avoids false-negatives from hydration races where visibleUserMenu
+  // might not be present yet but the user IS logged in.
+  await expect(menu.or(signIn)).toBeVisible();
+
+  // If the sign-in button is the one that's visible, we must log in.
+  if (await signIn.isVisible()) {
     await loginAs(page, testInfo, options);
     return;
   }
 
+  // Final assertion: verify we are truly logged in and layout is stable
   await assertLayoutReady(page, testInfo);
 }
 
 /**
  * Logs out the current user via the User Menu.
  */
-export async function logout(page: Page): Promise<void> {
-  const userMenu = visibleUserMenu(page);
-  await expect(userMenu).toBeVisible({ timeout: 10000 });
+export async function logout(page: Page, testInfo: TestInfo): Promise<void> {
+  const isMobile = testInfo.project.name.includes("Mobile");
+
+  const userMenu = visibleUserMenu(page, isMobile);
+  await expect(userMenu).toBeVisible();
   await userMenu.click();
 
-  const signOutItem = page.getByRole("menuitem", { name: "Sign Out" });
-  await expect(signOutItem).toBeVisible({ timeout: 5000 });
+  const signOutItem = page.getByTestId("user-menu-signout");
+  await expect(signOutItem).toBeVisible();
   await signOutItem.click();
 
   // Wait for redirect to public dashboard
-  // Increased timeout to account for potential Supabase delays
   await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
-  // Sign-in button appears in either mobile header or desktop header depending on viewport
-  const signIn = page
-    .locator('[data-testid="nav-signin"],[data-testid="mobile-nav-signin"]')
-    .filter({ visible: true });
+
+  // Wait for the UI to settle into logged-out state (Sign In button visible)
+  const signIn = isMobile
+    ? page.getByTestId("mobile-nav-signin")
+    : page.getByTestId("nav-signin");
   await expect(signIn).toBeVisible({ timeout: 15000 });
 }
 
@@ -159,15 +200,22 @@ export async function selectOption(
     ((value: string) => string) | undefined
   > = {
     "issue-status-select": (val) => `status-option-${val}`,
+    "issue-status-trigger": (val) => `status-option-${val}`,
     "issue-severity-select": (val) => `severity-option-${val}`,
+    "issue-severity-trigger": (val) => `severity-option-${val}`,
     "issue-priority-select": (val) => `priority-option-${val}`,
+    "issue-priority-trigger": (val) => `priority-option-${val}`,
     "issue-frequency-select": (val) => `frequency-option-${val}`,
+    "issue-frequency-trigger": (val) => `frequency-option-${val}`,
     "issue-assignee-select": (val) => `assignee-option-${val}`,
     "machine-select": (val) => `machine-option-${val}`,
     "filter-status": (val) => `status-option-${val}`,
     "filter-machine": (val) => `machine-option-${val}`,
     "filter-owner": (val) => `owner-option-${val}`,
     "filter-sort": (val) => `sort-option-${val}`,
+    "severity-select": (val) => `severity-option-${val}`,
+    "priority-select": (val) => `priority-option-${val}`,
+    "frequency-select": (val) => `frequency-option-${val}`,
   };
 
   const getOptionTestId = triggerToOptionTestIdMap[triggerTestId];
@@ -183,11 +231,55 @@ export async function selectOption(
   // Wait for the option to be visible in the popover
   const optionTestId = getOptionTestId(optionValue);
   const option = page.getByTestId(optionTestId);
-
-  // Use force: true because shadcn/ui Select uses a portal where Radix Select dropdown options
-  // can be positioned outside the viewport despite being visible in the DOM
-  await option.click({ force: true });
+  if (triggerTestId.endsWith("-trigger")) {
+    // Drawer items use dispatchEvent — they respond to synthetic clicks
+    await option.dispatchEvent("click");
+  } else {
+    // Use force: true because shadcn/ui Select uses a portal where Radix Select dropdown options
+    // can be positioned outside the viewport despite being visible in the DOM
+    await option.click({ force: true });
+  }
 
   // Wait for dropdown to close
   await expect(option).toBeHidden({ timeout: 5000 });
+}
+
+type IssueFieldName = "status" | "severity" | "priority" | "frequency";
+
+export function visibleIssueFieldControl(page: Page, field: IssueFieldName) {
+  return page
+    .locator(
+      `[data-testid="issue-${field}-select"],[data-testid="issue-${field}-trigger"]`
+    )
+    .filter({ visible: true })
+    .first();
+}
+
+export async function expectIssueFieldEnabled(
+  page: Page,
+  field: IssueFieldName
+): Promise<void> {
+  await expect(visibleIssueFieldControl(page, field)).toBeEnabled();
+}
+
+export async function expectIssueFieldDisabled(
+  page: Page,
+  field: IssueFieldName
+): Promise<void> {
+  await expect(visibleIssueFieldControl(page, field)).toBeDisabled();
+}
+
+export async function updateIssueField(
+  page: Page,
+  field: IssueFieldName,
+  value: string
+): Promise<void> {
+  const control = visibleIssueFieldControl(page, field);
+  const testId = await control.getAttribute("data-testid");
+
+  if (!testId) {
+    throw new Error(`Missing data-testid for issue ${field} control`);
+  }
+
+  await selectOption(page, testId, value);
 }

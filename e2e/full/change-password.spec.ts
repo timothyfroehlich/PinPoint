@@ -35,7 +35,7 @@ test.describe("Change Password", () => {
     // --- Verify new password works ---
 
     // Logout using the shared helper
-    await logout(page);
+    await logout(page, testInfo);
 
     // Login with new password
     await page.goto("/login");
