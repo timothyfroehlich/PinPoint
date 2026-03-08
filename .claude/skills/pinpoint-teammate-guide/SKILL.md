@@ -33,7 +33,7 @@ supabase start    # required before E2E tests
 ```
 
 **Troubleshooting** if `supabase start` fails:
-1. `supabase stop --all` — stop any running instances
+1. `supabase stop` — stop this worktree's instance only (**NEVER** `supabase stop --all` — that kills every other agent's environment too)
 2. `docker ps` — check for orphaned containers on conflicting ports
 3. `python3 pinpoint-wt.py sync` — regenerate config if mismatched
 4. If Docker itself is down: note this as a blocker in your return report.

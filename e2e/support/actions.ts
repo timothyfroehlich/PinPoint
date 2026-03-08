@@ -52,6 +52,19 @@ export async function loginAs(
   // Wait for user menu to hydrate before continuing
   // This prevents race conditions when tests immediately call logout()
   await expect(visibleUserMenu(page)).toBeVisible();
+
+  // Force a full server round-trip to ensure auth cookies are settled.
+  // Under concurrent load (3+ Playwright workers), Supabase cookie rotation
+  // (refresh token exchange) may not be fully committed by the time the NEXT
+  // navigation fires. Reloading the dashboard forces the browser to send the
+  // auth cookie back to the server, completing the rotation cycle. Without
+  // this, Server Actions on subsequent pages can see a stale/missing cookie
+  // and treat the user as anonymous.
+  await page.reload({ waitUntil: "networkidle" });
+  // Confirm the reload kept us on /dashboard (not redirected to /login by middleware).
+  // A redirect here means the reload itself raced with cookie rotation — surface it clearly.
+  await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
+  await expect(visibleUserMenu(page)).toBeVisible({ timeout: 10000 });
 }
 
 /**
@@ -64,7 +77,10 @@ export async function ensureLoggedIn(
   options?: LoginOptions
 ): Promise<void> {
   await page.goto("/dashboard");
-  await page.waitForLoadState("domcontentloaded");
+  // Use networkidle (not domcontentloaded) so React has finished hydrating before we
+  // check for the user menu. Checking too early gives a false-negative and triggers
+  // an unnecessary loginAs, which then runs the cookie-settling reload.
+  await page.waitForLoadState("networkidle");
 
   // Check for authenticated indicator (User Menu — works on both mobile and desktop viewports)
   if (!(await visibleUserMenu(page).isVisible())) {

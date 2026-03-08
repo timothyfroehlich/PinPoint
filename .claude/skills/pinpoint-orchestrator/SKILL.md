@@ -288,7 +288,7 @@ If a subagent can't be resumed (GC'd), spawn a new one on the same branch.
 |---------|-----|
 | Subagent fails to create PR | Check output, verify worktree state, resume with context |
 | Permission denied on worktree | Add paths to `.claude/settings.json`, restart session |
-| Worktree creation fails | `python3 ./pinpoint-wt.py sync`, `supabase stop --all`, retry |
+| Worktree creation fails | `python3 ./pinpoint-wt.py sync`, `supabase stop` (current worktree only — **never** `--all`), retry |
 | Agent Teams isolation broken | Known bug. Use standalone subagents (Option A) instead |
 | Hooks fire from wrong directory | Hooks skip for non-worktree CWD. Safeword: `touch .claude-hook-bypass` |
 | Session dies with active team | `rm -rf ~/.claude/teams/<name> ~/.claude/tasks/<name>` |
