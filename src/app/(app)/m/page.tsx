@@ -157,28 +157,30 @@ export default async function MachinesPage({
   return (
     <div className="max-w-7xl mx-auto py-10 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-on-surface">Machines</h1>
-          <p className="mt-1 text-sm text-on-surface-variant">
-            Manage pinball machines and view their status
-          </p>
+      <div className="border-b border-outline-variant pb-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-on-surface">Machines</h1>
+            <p className="mt-1 text-sm text-on-surface-variant">
+              Manage pinball machines and view their status
+            </p>
+          </div>
+          {(accessLevel === "admin" || accessLevel === "technician") && (
+            <Button
+              asChild
+              className="bg-primary text-on-primary hover:bg-primary/90 rounded-full h-11 px-6"
+              data-testid="add-machine-button"
+            >
+              <Link href="/m/new">
+                <Plus className="mr-2 size-4" />
+                Add Machine
+              </Link>
+            </Button>
+          )}
         </div>
-        {(accessLevel === "admin" || accessLevel === "technician") && (
-          <Button
-            asChild
-            className="bg-primary text-on-primary hover:bg-primary/90 rounded-full h-11 px-6"
-            data-testid="add-machine-button"
-          >
-            <Link href="/m/new">
-              <Plus className="mr-2 size-4" />
-              Add Machine
-            </Link>
-          </Button>
-        )}
-      </div>
 
-      <MachineFilters users={allUsers} filters={filters} />
+        <MachineFilters users={allUsers} filters={filters} />
+      </div>
 
       {/* Content */}
       <div>

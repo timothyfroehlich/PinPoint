@@ -212,7 +212,7 @@ export default async function MachineDetailPage({
   return (
     <div className="max-w-6xl mx-auto py-10 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="border-b border-outline-variant pb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
           <Link href="/m">
             <Button
@@ -225,7 +225,7 @@ export default async function MachineDetailPage({
             </Button>
           </Link>
           <div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-3xl font-bold text-on-surface">
                 {machine.name}
               </h1>

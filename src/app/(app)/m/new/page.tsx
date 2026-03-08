@@ -58,7 +58,7 @@ export default async function NewMachinePage(): Promise<React.JSX.Element> {
   return (
     <div className="max-w-6xl mx-auto py-10 space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="border-b border-outline-variant pb-6 flex items-center gap-4">
         <Link href="/m">
           <Button
             variant="outline"
