@@ -25,7 +25,7 @@ if ! supabase status &> /dev/null; then
 
     # Derive Supabase API port from .env.local (worktree-aware), fall back to default
     if [ -f ".env.local" ]; then
-        SUPABASE_API_PORT=$(grep '^NEXT_PUBLIC_SUPABASE_URL=' .env.local | sed 's/.*://;s/[^0-9].*//')
+        SUPABASE_API_PORT=$(grep '^NEXT_PUBLIC_SUPABASE_URL=' .env.local | sed 's/.*://;s/[^0-9].*//' || true)
     fi
     SUPABASE_API_PORT="${SUPABASE_API_PORT:-54321}"
     SUPABASE_AUTH_HEALTH_URL="http://localhost:${SUPABASE_API_PORT}/auth/v1/health"
