@@ -38,9 +38,7 @@ async function createTestIssue(
 ): Promise<string> {
   const machineInitials = seededMachines.medievalMadness.initials;
 
-  // Navigate to report page and wait for full load (Firefox can be slow under parallel load)
   await page.goto(`/report?machine=${machineInitials}`);
-  await page.waitForLoadState("networkidle");
 
   // Wait for form to be interactive before filling
   await expect(page.getByLabel("Issue Title *")).toBeVisible({
@@ -62,9 +60,6 @@ async function createTestIssue(
     timeout: 30000,
   });
 
-  // Wait for issue detail page to fully hydrate
-  await page.waitForLoadState("networkidle");
-
   rememberIssueId(page);
   return page.url();
 }
@@ -79,7 +74,6 @@ async function addComment(page: Page, content: string): Promise<void> {
   await expect(addButton).toBeEnabled({ timeout: 5000 });
   await addButton.click();
 
-  await page.waitForLoadState("networkidle");
   // Wait for comment to appear in the timeline
   await expect(page.getByText(content)).toBeVisible({ timeout: 10000 });
 }

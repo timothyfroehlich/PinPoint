@@ -263,6 +263,11 @@ function TimelineItem({
                     {event.author.name}
                   </span>
                   {isOwner && <OwnerBadge size="sm" />}
+                  {isIssue && (
+                    <span className="text-xs uppercase tracking-wide text-primary">
+                      Initial report
+                    </span>
+                  )}
                   <span className="text-muted-foreground/40">&bull;</span>
                   <span
                     className="text-xs text-muted-foreground/60"

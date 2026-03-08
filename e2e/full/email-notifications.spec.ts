@@ -209,9 +209,11 @@ test.describe.serial("Email Notifications", () => {
     // Wait for the server action to complete before checking email delivery
     await page.waitForLoadState("networkidle");
 
-    // Wait for status change email - use unique issue title to avoid crosstalk
+    // Wait for status change email - filter by "Status Changed" prefix since
+    // clearMailbox() is a no-op and the "New Issue" email (also containing
+    // issueTitle) is still in the mailbox.
     const emailAfterStatusChange = await mailpit.waitForEmail(testAdminEmail, {
-      subjectContains: issueTitle,
+      subjectContains: "Status Changed",
       timeout: 30000,
       pollIntervalMs: 750,
     });
