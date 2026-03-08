@@ -30,7 +30,8 @@ export function OwnerBadge({
       data-testid="owner-badge"
     >
       <Crown className="size-3" />
-      Game Owner
+      <span className="hidden sm:inline">Game Owner</span>
+      <span className="sm:hidden">Owner</span>
     </Badge>
   );
 }

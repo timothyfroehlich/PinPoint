@@ -263,19 +263,17 @@ function TimelineItem({
                     {event.author.name}
                   </span>
                   {isOwner && <OwnerBadge size="sm" />}
-                </div>
-                <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-                  <span>
-                    {event.type === "comment" ? "commented" : "reported"}
-                  </span>
                   <span className="text-muted-foreground/40">&bull;</span>
-                  <span title={event.createdAt.toLocaleString()}>
+                  <span
+                    className="text-xs text-muted-foreground/60"
+                    title={event.createdAt.toLocaleString()}
+                  >
                     {formatDistanceToNow(event.createdAt, { addSuffix: true })}
                   </span>
                   {isEdited && !isIssue && (
                     <span
                       title={event.updatedAt.toLocaleString()}
-                      className="hidden sm:inline"
+                      className="hidden text-xs text-muted-foreground/40 sm:inline"
                     >
                       &bull; edited{" "}
                       {formatDistanceToNow(event.updatedAt, {

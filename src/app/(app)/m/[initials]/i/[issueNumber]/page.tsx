@@ -16,7 +16,6 @@ import { BackToIssuesLink } from "~/components/issues/BackToIssuesLink";
 import { getLastIssuesPath } from "~/lib/cookies/preferences";
 import { EditableIssueTitle } from "./editable-issue-title";
 import { OwnerRequirementsCallout } from "~/components/machines/OwnerRequirementsCallout";
-import { ImageGallery } from "~/components/images/ImageGallery";
 import {
   type OwnershipContext,
   checkPermission,
@@ -278,21 +277,6 @@ export default async function IssueDetailPage({
         <section className="space-y-5 lg:pr-4">
           {/* Activity Section */}
           <div className="space-y-5">
-            {issue.images.length > 0 && (
-              <div className="space-y-3">
-                <h2 className="hidden md:block text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Images ({issue.images.length})
-                </h2>
-                <ImageGallery
-                  images={issue.images.map((img) => ({
-                    id: img.id,
-                    fullImageUrl: img.fullImageUrl,
-                    originalFilename: img.originalFilename,
-                  }))}
-                />
-              </div>
-            )}
-
             <h2 className="hidden md:block text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               Activity
             </h2>
