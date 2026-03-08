@@ -18,34 +18,34 @@ Coordinate multiple subagents working in parallel across isolated git worktrees.
 
 ```bash
 # Orchestration startup (ONE call for full situational awareness)
-bash scripts/workflow/orchestration-status.sh               # PR dashboard + worktree health + beads + security alerts
-bash scripts/workflow/orchestration-status.sh --prs-only    # Just PR dashboard
-bash scripts/workflow/orchestration-status.sh --security-only  # Just Dependabot alerts
+./scripts/workflow/orchestration-status.sh               # PR dashboard + worktree health + beads + security alerts
+./scripts/workflow/orchestration-status.sh --prs-only    # Just PR dashboard
+./scripts/workflow/orchestration-status.sh --security-only  # Just Dependabot alerts
 
 # PR monitoring
-bash scripts/workflow/pr-dashboard.sh [PR numbers...]       # CI + Copilot + merge status table (all open PRs if no args)
-bash scripts/workflow/copilot-comments.sh <PR> [PR...]      # Copilot details (accepts multiple PRs)
-bash scripts/workflow/copilot-comments.sh <PR> --raw        # JSON output for parsing
+./scripts/workflow/pr-dashboard.sh [PR numbers...]       # CI + Copilot + merge status table (all open PRs if no args)
+./scripts/workflow/copilot-comments.sh <PR> [PR...]      # Copilot details (accepts multiple PRs)
+./scripts/workflow/copilot-comments.sh <PR> --raw        # JSON output for parsing
 
 # Copilot thread management (see AGENTS.md "GitHub Copilot Reviews" for full protocol)
-bash scripts/workflow/respond-to-copilot.sh <PR> <path:line> <msg> # Reply + resolve one thread
-bash scripts/workflow/resolve-copilot-threads.sh <PR>              # Bulk-resolve addressed threads
-bash scripts/workflow/resolve-copilot-threads.sh <PR> --dry-run    # Preview without resolving
-bash scripts/workflow/resolve-copilot-threads.sh <PR> --all        # Resolve ALL unresolved threads
+./scripts/workflow/respond-to-copilot.sh <PR> <path:line> <msg> # Reply + resolve one thread
+./scripts/workflow/resolve-copilot-threads.sh <PR>              # Bulk-resolve addressed threads
+./scripts/workflow/resolve-copilot-threads.sh <PR> --dry-run    # Preview without resolving
+./scripts/workflow/resolve-copilot-threads.sh <PR> --all        # Resolve ALL unresolved threads
 
 # Readiness + cleanup
-bash scripts/workflow/label-ready.sh <PR>                   # Label ready-for-review (checks CI + Copilot + draft)
-bash scripts/workflow/label-ready.sh <PR> --cleanup         # Also remove associated worktree
-bash scripts/workflow/label-ready.sh <PR> --force           # Label even with Copilot comments
-bash scripts/workflow/label-ready.sh <PR> --dry-run         # Preview without acting
+./scripts/workflow/label-ready.sh <PR>                   # Label ready-for-review (checks CI + Copilot + draft)
+./scripts/workflow/label-ready.sh <PR> --cleanup         # Also remove associated worktree
+./scripts/workflow/label-ready.sh <PR> --force           # Label even with Copilot comments
+./scripts/workflow/label-ready.sh <PR> --dry-run         # Preview without acting
 
 # CI watching
-bash scripts/workflow/monitor-gh-actions.sh                 # Watch all active CI runs in parallel, report failures
-bash .agent/skills/pinpoint-commit/scripts/watch-ci.sh <PR> [timeout]  # Poll single PR CI (default 10min)
+./scripts/workflow/monitor-gh-actions.sh                 # Watch all active CI runs in parallel, report failures
+./.agent/skills/pinpoint-commit/scripts/watch-ci.sh <PR> [timeout]  # Poll single PR CI (default 10min)
 
 # Worktree health
-bash scripts/workflow/stale-worktrees.sh                    # Report stale/active/dirty worktrees
-bash scripts/workflow/stale-worktrees.sh --clean            # Auto-remove stale worktrees
+./scripts/workflow/stale-worktrees.sh                    # Report stale/active/dirty worktrees
+./scripts/workflow/stale-worktrees.sh --clean            # Auto-remove stale worktrees
 
 # Worktree management (paths are flat: feat/x → feat-x)
 python3 ./pinpoint-wt.py create <branch>           # Create worktree (new or existing branch)
@@ -163,8 +163,8 @@ Task(
 ### Dashboard
 
 ```bash
-bash scripts/workflow/pr-dashboard.sh 940 941 942       # Specific PRs
-bash scripts/workflow/pr-dashboard.sh                    # All open PRs
+./scripts/workflow/pr-dashboard.sh 940 941 942       # Specific PRs
+./scripts/workflow/pr-dashboard.sh                    # All open PRs
 ```
 
 ### Resume for Follow-Up
@@ -183,7 +183,7 @@ gh run view <run-id> --log-failed | tail -50
 
 **Copilot comments** → Get details, then resume subagent:
 ```bash
-bash scripts/workflow/copilot-comments.sh <PR>
+./scripts/workflow/copilot-comments.sh <PR>
 ```
 
 **Infrastructure failures**:
@@ -194,8 +194,8 @@ gh run rerun <run-id> --failed
 ### Label Ready PRs
 
 ```bash
-bash scripts/workflow/label-ready.sh <PR>               # Label (keeps worktree)
-bash scripts/workflow/label-ready.sh <PR> --cleanup     # Label + remove worktree
+./scripts/workflow/label-ready.sh <PR>               # Label (keeps worktree)
+./scripts/workflow/label-ready.sh <PR> --cleanup     # Label + remove worktree
 ```
 
 ---

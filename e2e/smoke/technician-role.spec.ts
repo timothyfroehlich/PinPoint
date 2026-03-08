@@ -19,8 +19,8 @@ test.describe("Technician Role Permissions", () => {
     });
   });
 
-  test.afterEach(async ({ page }) => {
-    await logout(page);
+  test.afterEach(async ({ page }, testInfo) => {
+    await logout(page, testInfo);
   });
 
   test("Technician can see Add Machine button on list page", async ({

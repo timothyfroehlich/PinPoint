@@ -6,11 +6,10 @@
  */
 
 import { test, expect } from "@playwright/test";
+
 import { loginAs, logout } from "../support/actions.js";
 import { seededMember } from "../support/constants.js";
 import { getPasswordResetLink } from "../support/mailpit.js";
-
-// Removed local signOut helper in favor of shared action
 
 test.describe("Extended Authentication", () => {
   test("signup flow - create new account and access dashboard", async ({
@@ -18,9 +17,10 @@ test.describe("Extended Authentication", () => {
   }, testInfo) => {
     // Navigate to signup page via visible sign-up button (mobile or desktop header)
     await page.goto("/");
-    const signupBtn = page
-      .locator('[data-testid="nav-signup"],[data-testid="mobile-nav-signup"]')
-      .filter({ visible: true });
+    const isMobile = testInfo.project.name.includes("Mobile");
+    const signupBtn = isMobile
+      ? page.getByTestId("mobile-nav-signup")
+      : page.getByTestId("nav-signup");
     await expect(signupBtn).toBeVisible({ timeout: 5000 });
     await signupBtn.click();
 
@@ -103,16 +103,19 @@ test.describe("Extended Authentication", () => {
     await expect(page.getByTestId("quick-stats")).toBeVisible();
 
     // Sign out via header
-    await logout(page);
+    await logout(page, testInfo);
 
     // Verify we're logged out (sign-in button visible in mobile or desktop header)
-    const signIn = page
-      .locator('[data-testid="nav-signin"],[data-testid="mobile-nav-signin"]')
-      .filter({ visible: true });
+    const isMobile = testInfo.project.name.includes("Mobile");
+    const signIn = isMobile
+      ? page.getByTestId("mobile-nav-signin")
+      : page.getByTestId("nav-signin");
     await expect(signIn).toBeVisible();
   });
 
-  test("password reset flow - user journey only", async ({ page }) => {
+  test("password reset flow - user journey only", async ({
+    page,
+  }, testInfo) => {
     test.setTimeout(40000);
     const testEmail = `reset-e2e-extended-${Date.now()}@example.com`;
     const oldPassword = "OldPassword123!";
@@ -132,7 +135,7 @@ test.describe("Extended Authentication", () => {
     await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
 
     // Sign out to start reset journey
-    await logout(page);
+    await logout(page, testInfo);
 
     // Request reset
     await page.goto("/forgot-password");
@@ -175,6 +178,6 @@ test.describe("Extended Authentication", () => {
     await expect(page.getByTestId("quick-stats")).toBeVisible();
 
     // Cleanup
-    await logout(page);
+    await logout(page, testInfo);
   });
 });

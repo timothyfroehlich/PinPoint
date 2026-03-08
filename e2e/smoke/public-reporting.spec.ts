@@ -5,10 +5,10 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { cleanupTestEntities } from "../support/cleanup";
-import { fillReportForm } from "../support/page-helpers";
 import { loginAs } from "../support/actions";
+import { cleanupTestEntities } from "../support/cleanup";
 import { TEST_USERS } from "../support/constants";
+import { fillReportForm } from "../support/page-helpers";
 
 const PUBLIC_PREFIX = "E2E Public Report";
 
@@ -203,7 +203,7 @@ test.describe("Public Issue Reporting", () => {
 
   test("should preserve draft when logging in from header sign-in link", async ({
     page,
-  }) => {
+  }, testInfo) => {
     await page.goto("/report");
     await page.getByTestId("machine-select").selectOption({ index: 1 });
     await expect(page).toHaveURL(/machine=/);
@@ -222,10 +222,11 @@ test.describe("Public Issue Reporting", () => {
       includePriority: false,
     });
 
-    await page
-      .locator('[data-testid="nav-signin"],[data-testid="mobile-nav-signin"]')
-      .filter({ visible: true })
-      .click();
+    const isMobile = testInfo.project.name.includes("Mobile");
+    const signIn = isMobile
+      ? page.getByTestId("mobile-nav-signin")
+      : page.getByTestId("nav-signin");
+    await signIn.click();
     await expect(page).toHaveURL(/\/login\?/);
 
     const next = new URL(page.url()).searchParams.get("next");

@@ -36,7 +36,7 @@ test.describe("Machines CRUD", () => {
 
   test("should display machine list page", async ({ page }, testInfo) => {
     // Logout and login as admin since "Add Machine" button is admin-only
-    await logout(page);
+    await logout(page, testInfo);
     await loginAs(page, testInfo, {
       email: TEST_USERS.admin.email,
       password: TEST_USERS.admin.password,
@@ -55,7 +55,7 @@ test.describe("Machines CRUD", () => {
     ).toBeVisible();
 
     // Restore default user for subsequent tests to maintain isolation
-    await logout(page);
+    await logout(page, testInfo);
     await loginAs(page, testInfo, {
       email: TEST_USERS.member.email,
       password: TEST_USERS.member.password,

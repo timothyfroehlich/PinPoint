@@ -35,7 +35,7 @@ test.describe("Privilege Reset on Account Switch", () => {
     ).toBeVisible();
 
     // 2. Logout (using shared action)
-    await logout(page);
+    await logout(page, testInfo);
 
     // 3. Login as Member
     await loginAs(page, testInfo, {
