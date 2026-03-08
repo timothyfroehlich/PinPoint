@@ -220,23 +220,31 @@ function TimelineItem({
       {/* Right: Content */}
       <div className="min-w-0 flex-1">
         {isSystem ? (
-          <div className="flex items-center gap-2 py-1 text-xs leading-snug text-muted-foreground">
-            {event.author.id && (
+          <div className="flex flex-col gap-0.5 py-1 pl-4 text-xs text-muted-foreground sm:pl-6">
+            <div className="flex items-center gap-1.5">
+              {event.author.id && (
+                <span
+                  className="font-semibold text-foreground/90"
+                  data-testid="system-event-actor"
+                >
+                  {event.author.name}
+                </span>
+              )}
+              {event.author.id && (
+                <span className="text-muted-foreground/30">&bull;</span>
+              )}
               <span
-                className="font-medium text-foreground/80"
-                data-testid="system-event-actor"
+                className="text-[11px] text-muted-foreground/60"
+                title={event.createdAt.toLocaleString()}
               >
-                {event.author.name}
+                {formatDistanceToNow(event.createdAt, { addSuffix: true })}
               </span>
+            </div>
+            {event.content && (
+              <div className="leading-relaxed text-foreground/80">
+                {event.content}
+              </div>
             )}
-            <span>{event.content}</span>
-            <span className="text-muted-foreground/40">&bull;</span>
-            <span
-              className="text-[11px] text-muted-foreground/60"
-              title={event.createdAt.toLocaleString()}
-            >
-              {formatDistanceToNow(event.createdAt, { addSuffix: true })}
-            </span>
           </div>
         ) : (
           <div

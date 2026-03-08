@@ -18,7 +18,7 @@ export default function BadgeDebugPage(): React.JSX.Element {
   ];
 
   return (
-    <div className="p-8 space-y-12 bg-background min-h-screen">
+    <div className="max-w-6xl mx-auto py-10 space-y-12">
       <div className="space-y-2 text-center">
         <h1 className="text-4xl font-bold">Issue Badge System</h1>
         <p className="text-muted-foreground">
@@ -26,7 +26,7 @@ export default function BadgeDebugPage(): React.JSX.Element {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Statuses Section */}
         <section className="space-y-4">
           <h2 className="text-xl font-semibold border-b pb-2 flex items-center gap-2">

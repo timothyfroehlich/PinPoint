@@ -155,39 +155,35 @@ export default async function MachinesPage({
   );
 
   return (
-    <main className="min-h-screen bg-surface">
+    <div className="max-w-7xl mx-auto py-10 space-y-6">
       {/* Header */}
-      <div className="border-b border-outline-variant bg-surface-container">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-col gap-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-on-surface">Machines</h1>
-                <p className="mt-1 text-sm text-on-surface-variant">
-                  Manage pinball machines and view their status
-                </p>
-              </div>
-              {(accessLevel === "admin" || accessLevel === "technician") && (
-                <Button
-                  asChild
-                  className="bg-primary text-on-primary hover:bg-primary/90 rounded-full h-11 px-6"
-                  data-testid="add-machine-button"
-                >
-                  <Link href="/m/new">
-                    <Plus className="mr-2 size-4" />
-                    Add Machine
-                  </Link>
-                </Button>
-              )}
-            </div>
-
-            <MachineFilters users={allUsers} filters={filters} />
+      <div className="border-b border-outline-variant pb-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-on-surface">Machines</h1>
+            <p className="mt-1 text-sm text-on-surface-variant">
+              Manage pinball machines and view their status
+            </p>
           </div>
+          {(accessLevel === "admin" || accessLevel === "technician") && (
+            <Button
+              asChild
+              className="bg-primary text-on-primary hover:bg-primary/90 rounded-full h-11 px-6"
+              data-testid="add-machine-button"
+            >
+              <Link href="/m/new">
+                <Plus className="mr-2 size-4" />
+                Add Machine
+              </Link>
+            </Button>
+          )}
         </div>
+
+        <MachineFilters users={allUsers} filters={filters} />
       </div>
 
       {/* Content */}
-      <div className="container mx-auto px-4 py-8">
+      <div>
         {sortedMachines.length === 0 ? (
           // Empty state
           <Card className="border-outline-variant border-dashed bg-transparent">
@@ -318,6 +314,6 @@ export default async function MachinesPage({
           </div>
         )}
       </div>
-    </main>
+    </div>
   );
 }

@@ -210,79 +210,75 @@ export default async function MachineDetailPage({
   const watchMode = currentUserWatch?.watchMode ?? "notify";
 
   return (
-    <main className="min-h-screen bg-surface">
+    <div className="max-w-6xl mx-auto py-10 space-y-6">
       {/* Header */}
-      <div className="border-b border-outline-variant bg-surface-container">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/m">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-outline text-on-surface hover:bg-surface-variant"
-                >
-                  <ArrowLeft className="mr-2 size-4" />
-                  Back
-                </Button>
-              </Link>
-              <div>
-                <div className="flex items-center gap-3">
-                  <h1 className="text-3xl font-bold text-on-surface">
-                    {machine.name}
-                  </h1>
-                  <Badge
-                    data-testid="machine-status-badge"
-                    className={cn(
-                      getMachineStatusStyles(machineStatus),
-                      "border px-3 py-1 text-sm font-semibold"
-                    )}
-                  >
-                    {getMachineStatusLabel(machineStatus)}
-                  </Badge>
-                  {!isOnTheFloor(machine.presenceStatus) && (
-                    <Badge
-                      className={cn(
-                        getMachinePresenceStyles(machine.presenceStatus),
-                        "border px-3 py-1 text-sm font-semibold"
-                      )}
-                    >
-                      {getMachinePresenceLabel(machine.presenceStatus)}
-                    </Badge>
-                  )}
-                </div>
-                <p className="mt-1 text-sm text-on-surface-variant">
-                  Machine details and issue tracking
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              {canWatch && (
-                <WatchMachineButton
-                  machineId={machine.id}
-                  initialIsWatching={isWatching}
-                  initialWatchMode={watchMode}
-                />
-              )}
-              <Button
-                className="bg-primary text-on-primary hover:bg-primary/90"
-                asChild
+      <div className="border-b border-outline-variant pb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <Link href="/m">
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-outline text-on-surface hover:bg-surface-variant"
+            >
+              <ArrowLeft className="mr-2 size-4" />
+              Back
+            </Button>
+          </Link>
+          <div>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-3xl font-bold text-on-surface">
+                {machine.name}
+              </h1>
+              <Badge
+                data-testid="machine-status-badge"
+                className={cn(
+                  getMachineStatusStyles(machineStatus),
+                  "border px-3 py-1 text-sm font-semibold"
+                )}
               >
-                <Link
-                  href={`/report?machine=${machine.initials}`}
-                  data-testid="machine-report-issue"
+                {getMachineStatusLabel(machineStatus)}
+              </Badge>
+              {!isOnTheFloor(machine.presenceStatus) && (
+                <Badge
+                  className={cn(
+                    getMachinePresenceStyles(machine.presenceStatus),
+                    "border px-3 py-1 text-sm font-semibold"
+                  )}
                 >
-                  <Plus className="mr-2 size-4" />
-                  Report Issue
-                </Link>
-              </Button>
+                  {getMachinePresenceLabel(machine.presenceStatus)}
+                </Badge>
+              )}
             </div>
+            <p className="mt-1 text-sm text-on-surface-variant">
+              Machine details and issue tracking
+            </p>
           </div>
+        </div>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          {canWatch && (
+            <WatchMachineButton
+              machineId={machine.id}
+              initialIsWatching={isWatching}
+              initialWatchMode={watchMode}
+            />
+          )}
+          <Button
+            className="bg-primary text-on-primary hover:bg-primary/90"
+            asChild
+          >
+            <Link
+              href={`/report?machine=${machine.initials}`}
+              data-testid="machine-report-issue"
+            >
+              <Plus className="mr-2 size-4" />
+              Report Issue
+            </Link>
+          </Button>
         </div>
       </div>
 
       {/* Content */}
-      <div className="container mx-auto space-y-6 px-4 py-8">
+      <div className="space-y-6">
         {!isOnTheFloor(machine.presenceStatus) && (
           <div className="rounded-md border border-outline-variant bg-surface-container px-4 py-2 text-sm text-on-surface-variant">
             This machine is currently{" "}
@@ -416,6 +412,6 @@ export default async function MachineDetailPage({
           totalIssuesCount={totalIssuesCount}
         />
       </div>
-    </main>
+    </div>
   );
 }

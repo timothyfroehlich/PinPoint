@@ -36,7 +36,7 @@ export type IssueListItem = Pick<
 };
 
 export type IssueWithAllRelations = Issue & {
-  machine: Pick<Machine, "id" | "name"> & {
+  machine: Pick<Machine, "id" | "name" | "initials" | "ownerRequirements"> & {
     owner?: Pick<UserProfile, "id" | "name"> | null;
     invitedOwner?: {
       id: string;

@@ -75,11 +75,10 @@ These are the canonical pattern sources. Read these files to understand PinPoint
 
 ### Layout
 
-| File                                   | What It Teaches                                     |
-| :------------------------------------- | :-------------------------------------------------- |
-| `src/components/layout/PageShell.tsx`  | Page wrapper with size variants, consistent padding |
-| `src/components/layout/MainLayout.tsx` | App shell, header, sidebar integration, mobile nav  |
-| `src/components/layout/Sidebar.tsx`    | Navigation, collapsed state, mobile sheet pattern   |
+| File                                   | What It Teaches                                            |
+| :------------------------------------- | :--------------------------------------------------------- |
+| `src/components/layout/MainLayout.tsx` | App shell, header, sidebar, mobile nav, horizontal padding |
+| `src/components/layout/Sidebar.tsx`    | Navigation, collapsed state, mobile sheet pattern          |
 
 ## Label Standards (Decided)
 
