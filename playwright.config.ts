@@ -1,4 +1,3 @@
-import { execSync } from "child_process";
 import { defineConfig, devices } from "@playwright/test";
 import { readFileSync } from "fs";
 import { join } from "path";
@@ -30,67 +29,9 @@ const hostname = process.env["PLAYWRIGHT_HOST"] ?? "localhost";
 const baseURL = `http://${hostname}:${port}`;
 const webServerStdout = process.env["PLAYWRIGHT_STDOUT"] ?? "ignore";
 const webServerStderr = process.env["PLAYWRIGHT_STDERR"] ?? "pipe";
-const healthCheckTimeoutMs = process.env["CI"] ? 1500 : 1000;
 
 console.log(`[playwright.config.ts] Resolved PORT: ${port}`);
 console.log(`[playwright.config.ts] Resolved baseURL: ${baseURL}`);
-
-function listPidsOnPort(targetPort: number): string[] {
-  try {
-    const output = execSync(`lsof -i :${targetPort} -sTCP:LISTEN -Fp`, {
-      stdio: "pipe",
-      encoding: "utf-8",
-    });
-    return output
-      .split("\n")
-      .filter((line) => line.startsWith("p"))
-      .map((line) => line.slice(1))
-      .filter(Boolean);
-  } catch {
-    return [];
-  }
-}
-
-function isServerHealthy(url: string): boolean {
-  const script = [
-    `const url = ${JSON.stringify(url)};`,
-    `const controller = new AbortController();`,
-    `const timeout = setTimeout(() => controller.abort(), ${healthCheckTimeoutMs});`,
-    `fetch(url, { signal: controller.signal })`,
-    `  .then((res) => { clearTimeout(timeout); process.exit(res.ok ? 0 : 1); })`,
-    `  .catch(() => { clearTimeout(timeout); process.exit(1); });`,
-  ].join(" ");
-
-  const escapedScript = script.replace(/'/g, "'\\''");
-
-  try {
-    execSync(`node -e '${escapedScript}'`, { stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function clearStaleServerIfNeeded(targetPort: number, url: string): void {
-  const pids = listPidsOnPort(targetPort);
-  if (pids.length === 0) return;
-
-  if (isServerHealthy(url)) {
-    // Healthy dev server already running; Playwright will reuse it.
-    return;
-  }
-
-  for (const pid of pids) {
-    try {
-      execSync(`kill ${pid}`);
-      console.warn(
-        `[playwright] Killed stale dev server on port ${targetPort} (pid ${pid}).`
-      );
-    } catch {
-      // If we cannot kill it, let Playwright surface the bind error.
-    }
-  }
-}
 
 /**
  * Playwright E2E Test Configuration
@@ -98,8 +39,6 @@ function clearStaleServerIfNeeded(targetPort: number, url: string): void {
  * Simplified config for smoke tests. Keep it minimal.
  * See https://playwright.dev/docs/test-configuration
  */
-
-clearStaleServerIfNeeded(port, baseURL);
 
 export default defineConfig({
   testDir: "./e2e",

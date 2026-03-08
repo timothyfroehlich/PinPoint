@@ -23,8 +23,9 @@ if ! supabase status &> /dev/null; then
     SLEEP_SECONDS=2
     RETRY_COUNT=0
 
-    # Default local Supabase Auth health endpoint
-    SUPABASE_AUTH_HEALTH_URL="http://localhost:54321/auth/v1/health"
+    # Use the worktree-specific Supabase URL when available.
+    SUPABASE_BASE_URL="${NEXT_PUBLIC_SUPABASE_URL:-http://localhost:54321}"
+    SUPABASE_AUTH_HEALTH_URL="${SUPABASE_BASE_URL%/}/auth/v1/health"
 
     while true; do
         if curl -fsS --max-time 2 "${SUPABASE_AUTH_HEALTH_URL}" > /dev/null 2>&1; then

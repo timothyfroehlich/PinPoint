@@ -10,6 +10,14 @@ import { UpdateIssuePriorityForm } from "~/app/(app)/m/[initials]/i/[issueNumber
 import { UpdateIssueFrequencyForm } from "~/app/(app)/m/[initials]/i/[issueNumber]/update-issue-frequency-form";
 import { type OwnershipContext } from "~/lib/permissions/helpers";
 import { type AccessLevel } from "~/lib/permissions/matrix";
+import { cn } from "~/lib/utils";
+
+type SidebarActionSection =
+  | "assignee"
+  | "status"
+  | "priority"
+  | "severity"
+  | "frequency";
 
 interface SidebarActionsProps {
   issue: IssueWithAllRelations;
@@ -17,7 +25,19 @@ interface SidebarActionsProps {
   currentUserId: string | null;
   accessLevel: AccessLevel;
   ownershipContext: OwnershipContext;
+  compact?: boolean;
+  only?: SidebarActionSection;
+  exclude?: SidebarActionSection;
+  rowLayout?: boolean;
 }
+
+const sectionOrder: SidebarActionSection[] = [
+  "assignee",
+  "status",
+  "priority",
+  "severity",
+  "frequency",
+];
 
 export function SidebarActions({
   issue,
@@ -25,13 +45,31 @@ export function SidebarActions({
   currentUserId,
   accessLevel,
   ownershipContext,
+  compact = false,
+  only,
+  exclude,
+  rowLayout = false,
 }: SidebarActionsProps): React.JSX.Element {
-  return (
-    <div className="space-y-5">
-      {/* Assignee */}
-      <div className="grid grid-cols-[110px,1fr] items-center gap-3">
-        <Label className="text-sm text-muted-foreground">Assignee</Label>
-        <div className="min-w-0">
+  const visibleSections = sectionOrder.filter((section) => {
+    if (only) {
+      return section === only;
+    }
+    if (exclude) {
+      return section !== exclude;
+    }
+    return true;
+  });
+
+  const labelClassName = compact
+    ? "text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+    : "text-sm text-muted-foreground";
+
+  const renderControl = (
+    section: SidebarActionSection
+  ): React.JSX.Element | null => {
+    switch (section) {
+      case "assignee":
+        return (
           <AssignIssueForm
             issueId={issue.id}
             assignedToId={issue.assignedTo ?? null}
@@ -40,60 +78,90 @@ export function SidebarActions({
             accessLevel={accessLevel}
             ownershipContext={ownershipContext}
           />
-        </div>
-      </div>
-
-      {/* Update Status */}
-      <div className="grid grid-cols-[110px,1fr] items-center gap-3">
-        <Label className="text-sm text-muted-foreground">Status</Label>
-        <div className="min-w-0">
+        );
+      case "status":
+        return (
           <UpdateIssueStatusForm
             issueId={issue.id}
             currentStatus={issue.status}
             accessLevel={accessLevel}
             ownershipContext={ownershipContext}
+            compact={compact}
           />
-        </div>
-      </div>
-
-      {/* Update Severity */}
-      <div className="grid grid-cols-[110px,1fr] items-center gap-3">
-        <Label className="text-sm text-muted-foreground">Severity</Label>
-        <div className="min-w-0">
-          <UpdateIssueSeverityForm
-            issueId={issue.id}
-            currentSeverity={issue.severity}
-            accessLevel={accessLevel}
-            ownershipContext={ownershipContext}
-          />
-        </div>
-      </div>
-
-      {/* Update Priority */}
-      <div className="grid grid-cols-[110px,1fr] items-center gap-3">
-        <Label className="text-sm text-muted-foreground">Priority</Label>
-        <div className="min-w-0">
+        );
+      case "priority":
+        return (
           <UpdateIssuePriorityForm
             issueId={issue.id}
             currentPriority={issue.priority}
             accessLevel={accessLevel}
             ownershipContext={ownershipContext}
+            compact={compact}
           />
-        </div>
-      </div>
-
-      {/* Update Frequency */}
-      <div className="grid grid-cols-[110px,1fr] items-center gap-3">
-        <Label className="text-sm text-muted-foreground">Frequency</Label>
-        <div className="min-w-0">
+        );
+      case "severity":
+        return (
+          <UpdateIssueSeverityForm
+            issueId={issue.id}
+            currentSeverity={issue.severity}
+            accessLevel={accessLevel}
+            ownershipContext={ownershipContext}
+            compact={compact}
+          />
+        );
+      case "frequency":
+        return (
           <UpdateIssueFrequencyForm
             issueId={issue.id}
             currentFrequency={issue.frequency}
             accessLevel={accessLevel}
             ownershipContext={ownershipContext}
+            compact={compact}
           />
+        );
+    }
+  };
+
+  const renderSection = (section: SidebarActionSection): React.JSX.Element => {
+    const label = section.charAt(0).toUpperCase() + section.slice(1);
+
+    if (rowLayout) {
+      return (
+        <div
+          key={section}
+          className="space-y-2 rounded-xl border bg-card p-3 shadow-xs"
+        >
+          <Label className={labelClassName}>{label}</Label>
+          <div className="min-w-0">{renderControl(section)}</div>
         </div>
+      );
+    }
+
+    return (
+      <div
+        key={section}
+        className={cn(
+          "grid items-center gap-3",
+          compact ? "grid-cols-[88px_1fr]" : "grid-cols-[110px_1fr]"
+        )}
+      >
+        <Label className={labelClassName}>{label}</Label>
+        <div className="min-w-0">{renderControl(section)}</div>
       </div>
+    );
+  };
+
+  return (
+    <div
+      className={
+        rowLayout
+          ? "grid grid-cols-2 gap-3"
+          : compact
+            ? "space-y-4"
+            : "space-y-5"
+      }
+    >
+      {visibleSections.map(renderSection)}
     </div>
   );
 }

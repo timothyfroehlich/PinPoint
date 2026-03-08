@@ -191,6 +191,11 @@ async function seedUsersAndData() {
         `;
       }
     }
+    await sql`
+      UPDATE machines
+      SET owner_requirements = 'Check the bridge lock opto alignment before opening the building assembly. Document any broken plastics with a photo.'
+      WHERE initials = 'GDZ'
+    `;
     console.log("✅ Machines seeded with distributed ownership.");
 
     // 3. Seed Issues (18 issues with comprehensive permutations)
@@ -430,13 +435,24 @@ async function seedUsersAndData() {
         id: "10000000-0000-4000-8000-000000000019",
         initials: "GDZ",
         num: 2,
-        title: "Left flipper button intermittent",
-        desc: "The left flipper button sometimes doesn't register when pressed quickly. May need switch adjustment.",
+        title: "Visual Test: All States Issue",
+        desc: "Use this issue to validate the mobile detail layout. The building mech hesitates, the owner has prep instructions, and the report includes a reference image.",
         status: "new",
         severity: "minor",
         priority: "medium",
         frequency: "intermittent",
-        // No reportedBy, reporterName, reporterEmail, or invitedUserId
+        reportedBy: userIds.admin,
+      },
+      {
+        id: "10000000-0000-4000-8000-000000000020",
+        initials: "GDZ",
+        num: 3,
+        title: "Shooter lane skill shot sometimes dead",
+        desc: "Anonymous report retained for reporter-variation coverage. The first plunge occasionally fails to score the lit skill shot.",
+        status: "new",
+        severity: "minor",
+        priority: "medium",
+        frequency: "intermittent",
       },
     ];
 
@@ -503,7 +519,7 @@ async function seedUsersAndData() {
     await sql`UPDATE machines SET next_issue_number = 3 WHERE initials = 'AFM'`;
     await sql`UPDATE machines SET next_issue_number = 3 WHERE initials = 'MM'`;
     await sql`UPDATE machines SET next_issue_number = 2 WHERE initials = 'SM'`;
-    await sql`UPDATE machines SET next_issue_number = 3 WHERE initials = 'GDZ'`;
+    await sql`UPDATE machines SET next_issue_number = 4 WHERE initials = 'GDZ'`;
 
     console.log("✅ Issues seeded.");
 
@@ -638,6 +654,39 @@ async function seedUsersAndData() {
             daysAgo: 2,
           },
         ],
+        // GDZ-02: Golden mobile detail fixture
+        "10000000-0000-4000-8000-000000000019": [
+          {
+            author: userIds.member,
+            content: "I can reproduce this when multiball starts and the building has to reset quickly.",
+            isSystem: false,
+            daysAgo: 4,
+          },
+          {
+            author: userIds.guest,
+            content: "The hesitation is short, but it happens often enough to disrupt shots into the scoop.",
+            isSystem: false,
+            daysAgo: 3,
+          },
+          {
+            author: userIds.admin,
+            content: "Priority changed from Medium to High",
+            isSystem: true,
+            daysAgo: 2,
+          },
+          {
+            author: userIds.admin,
+            content: "Status changed from New to Confirmed",
+            isSystem: true,
+            daysAgo: 1.5,
+          },
+          {
+            author: userIds.member,
+            content: "I tightened the bracket and added a note for the next owner check.",
+            isSystem: false,
+            daysAgo: 0.5,
+          },
+        ],
       };
 
       for (const [issueId, comments] of Object.entries(commentsByIssue)) {
@@ -685,6 +734,12 @@ async function seedUsersAndData() {
         uploadedBy: userIds.admin,
         filename: "recursive-playfield.png",
         sizeBytes: 1010743,
+      },
+      {
+        issueId: "10000000-0000-4000-8000-000000000019", // GDZ-02 (Golden mobile fixture)
+        uploadedBy: userIds.admin,
+        filename: "impossible-flipper-loop.png",
+        sizeBytes: 761755,
       },
     ];
 

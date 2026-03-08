@@ -130,9 +130,13 @@ export async function selectOption(
   // Mapping of trigger test IDs to option test ID patterns
   const triggerToOptionTestIdMap: Record<string, (value: string) => string> = {
     "issue-status-select": (value) => `status-option-${value}`,
+    "issue-status-trigger": (value) => `status-option-${value}`,
     "issue-severity-select": (value) => `severity-option-${value}`,
+    "issue-severity-trigger": (value) => `severity-option-${value}`,
     "issue-priority-select": (value) => `priority-option-${value}`,
+    "issue-priority-trigger": (value) => `priority-option-${value}`,
     "issue-frequency-select": (value) => `frequency-option-${value}`,
+    "issue-frequency-trigger": (value) => `frequency-option-${value}`,
     "severity-select": (value) => `severity-option-${value}`,
     "priority-select": (value) => `priority-option-${value}`,
     "frequency-select": (value) => `frequency-option-${value}`,
@@ -155,10 +159,54 @@ export async function selectOption(
   const optionTestId = getOptionTestId(optionValue);
   const option = page.getByTestId(optionTestId);
   await expect(option).toBeVisible({ timeout: 5000 });
-  // Use force:true for Mobile Chrome where Radix Select dropdown options
-  // can be positioned outside the viewport despite being visible in the DOM
-  await option.click({ force: true });
+  if (triggerTestId.endsWith("-trigger")) {
+    await option.dispatchEvent("click");
+  } else {
+    // Use force:true for Mobile Chrome where Radix Select dropdown options
+    // can be positioned outside the viewport despite being visible in the DOM
+    await option.click({ force: true });
+  }
 
   // Wait for dropdown to close
   await expect(option).toBeHidden({ timeout: 5000 });
+}
+
+type IssueFieldName = "status" | "severity" | "priority" | "frequency";
+
+export function visibleIssueFieldControl(page: Page, field: IssueFieldName) {
+  return page
+    .locator(
+      `[data-testid="issue-${field}-select"],[data-testid="issue-${field}-trigger"]`
+    )
+    .filter({ visible: true })
+    .first();
+}
+
+export async function expectIssueFieldEnabled(
+  page: Page,
+  field: IssueFieldName
+): Promise<void> {
+  await expect(visibleIssueFieldControl(page, field)).toBeEnabled();
+}
+
+export async function expectIssueFieldDisabled(
+  page: Page,
+  field: IssueFieldName
+): Promise<void> {
+  await expect(visibleIssueFieldControl(page, field)).toBeDisabled();
+}
+
+export async function updateIssueField(
+  page: Page,
+  field: IssueFieldName,
+  value: string
+): Promise<void> {
+  const control = visibleIssueFieldControl(page, field);
+  const testId = await control.getAttribute("data-testid");
+
+  if (!testId) {
+    throw new Error(`Missing data-testid for issue ${field} control`);
+  }
+
+  await selectOption(page, testId, value);
 }

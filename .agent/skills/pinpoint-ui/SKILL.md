@@ -34,6 +34,17 @@ Use this skill when:
 pnpm exec shadcn@latest add [component]
 ```
 
+### Issue Field Display Order
+
+The canonical display order for issue metadata fields is:
+
+1. Status
+2. Priority
+3. Severity
+4. Frequency
+
+When assignee is present in edit contexts, it comes first.
+
 ## Key Files Registry
 
 These are the canonical pattern sources. Read these files to understand PinPoint's UI patterns -- they ARE the documentation.

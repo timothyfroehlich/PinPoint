@@ -6,7 +6,11 @@
  */
 
 import { test, expect, type Page } from "@playwright/test";
-import { loginAs } from "../support/actions.js";
+import {
+  loginAs,
+  updateIssueField,
+  visibleIssueFieldControl,
+} from "../support/actions.js";
 import { cleanupTestEntities, extractIdFromUrl } from "../support/cleanup.js";
 import { seededMachines } from "../support/constants.js";
 import { fillReportForm } from "../support/page-helpers.js";
@@ -72,17 +76,27 @@ test.describe("Issues System", () => {
     test("should create an issue from machine page with pre-filled machine", async ({
       page,
     }) => {
-      // Navigate to machines list page
-      await page.goto("/m");
+      // Navigate to machines list page with filters reset
+      await page.goto("/m?availability=all");
       await expect(
         page.getByRole("heading", { name: "Machines" })
       ).toBeVisible();
 
-      // Click on a machine (e.g., The Addams Family)
-      const addamsFamilyCard = page
-        .getByTestId("machine-card")
-        .filter({ hasText: seededMachines.addamsFamily.name });
-      await addamsFamilyCard.click();
+      await page
+        .getByPlaceholder("Search machines by name or initials...")
+        .fill(seededMachines.addamsFamily.initials);
+      await page.waitForURL(
+        (url) =>
+          url.searchParams.get("q") === seededMachines.addamsFamily.initials
+      );
+
+      // Click the stable machine detail link by initials. The display name can
+      // change earlier in the serial suite, but the route remains /m/TAF.
+      const addamsFamilyLink = page.locator(
+        `a[href="/m/${seededMachines.addamsFamily.initials}"]`
+      );
+      await expect(addamsFamilyLink).toBeVisible();
+      await addamsFamilyLink.click();
       await expect(page).toHaveURL(/\/m\/TAF/); // Expect TAF machine detail page
 
       // Click "Submit Issue Report" button on machine page (scope to main content to avoid global header button)
@@ -90,14 +104,6 @@ test.describe("Issues System", () => {
 
       // Should be on new issue page for TAF
       await page.waitForURL(/\/report\?machine=TAF/);
-
-      // Verify machine name is displayed
-      await expect(
-        page
-          .locator("div")
-          .filter({ hasText: seededMachines.addamsFamily.name })
-          .first()
-      ).toBeVisible();
 
       // Fill out remaining fields
       await fillReportForm(page, { title: "Display flickering" });
@@ -138,9 +144,10 @@ test.describe("Issues System", () => {
       rememberIssueId(page);
     });
 
-    test("should display issue details", async ({ page }) => {
+    test("should display issue details", async ({ page }, testInfo) => {
       // Navigate to the created issue's detail page
       await page.goto(issueUrl);
+      const isMobile = testInfo.project.name.includes("Mobile");
 
       // Should be on detail page
       // Check H1 contains title
@@ -152,31 +159,45 @@ test.describe("Issues System", () => {
 
       // Check ID is displayed (in layout above title, not in H1)
       const idText = `${machineInitials}-${String(issueNumber).padStart(2, "0")}`;
-      await expect(page.getByRole("main").getByText(idText)).toBeVisible();
+      await expect(
+        page
+          .getByRole("main")
+          .getByText(idText)
+          .filter({ visible: true })
+          .first()
+      ).toBeVisible();
 
       // Should show metadata
       await expect(
-        page.getByText(seededMachines.addamsFamily.name)
+        page.getByTestId("machine-link").filter({ visible: true }).first()
       ).toBeVisible();
 
-      const sidebar = page.getByTestId("issue-sidebar");
-      await expect(
-        sidebar.getByText("Reporter", { exact: true })
-      ).toBeVisible();
-      await expect(sidebar.getByText("Created", { exact: true })).toBeVisible();
-
-      // Should show status and severity badges
-      await expect(page.getByTestId("issue-status-badge").first()).toHaveText(
-        /New/i
-      );
-      await expect(page.getByTestId("issue-severity-badge").first()).toHaveText(
-        /Minor/i
+      await expect(page.getByTestId("issue-timeline")).toBeVisible();
+      await expect(page.getByTestId("issue-comment-form")).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Activity" })).toHaveCount(
+        0
       );
 
-      // Should show timeline
-      await expect(
-        page.getByRole("heading", { name: "Activity" })
-      ).toBeVisible();
+      if (isMobile) {
+        await expect(page.getByTestId("mobile-nav-row")).toBeVisible();
+        await expect(
+          page.getByRole("link", { name: /Back to Issues/i })
+        ).toHaveCount(0);
+        await expect(page.getByTestId("issue-sidebar")).toBeHidden();
+        await expect(page.getByTestId("issue-badge-strip")).toBeVisible();
+      } else {
+        const sidebar = page.getByTestId("issue-sidebar");
+        await expect(sidebar).toBeVisible();
+        await expect(
+          sidebar.getByText("Reporter", { exact: true })
+        ).toBeVisible();
+        await expect(
+          sidebar.getByText("Created", { exact: true })
+        ).toBeVisible();
+        await expect(
+          page.getByRole("link", { name: /Back to Issues/i })
+        ).toBeVisible();
+      }
     });
 
     // Update tests moved to integration/full suite
@@ -213,8 +234,8 @@ test.describe("Issues System", () => {
 
       // Find the assignee picker - initially shows "Unassigned"
       const assigneePicker = page
-        .getByTestId("issue-sidebar")
         .getByTestId("assignee-picker-trigger")
+        .filter({ visible: true })
         .first();
       await expect(assigneePicker).toBeVisible();
       await expect(assigneePicker).toContainText("Unassigned");
@@ -231,10 +252,41 @@ test.describe("Issues System", () => {
       await page.reload();
       await expect(
         page
-          .getByTestId("issue-sidebar")
           .getByTestId("assignee-picker-trigger")
+          .filter({ visible: true })
           .first()
       ).toContainText("Member User");
+    });
+
+    test("should update issue metadata from the detail page", async ({
+      page,
+    }, testInfo) => {
+      test.skip(
+        !testInfo.project.name.includes("Mobile"),
+        "Drawer interaction is mobile-specific"
+      );
+
+      await page.goto(issueUrl);
+
+      await updateIssueField(page, "status", "confirmed");
+      await expect(visibleIssueFieldControl(page, "status")).toContainText(
+        "Confirmed"
+      );
+
+      await updateIssueField(page, "severity", "major");
+      await expect(visibleIssueFieldControl(page, "severity")).toContainText(
+        "Major"
+      );
+
+      await updateIssueField(page, "priority", "high");
+      await expect(visibleIssueFieldControl(page, "priority")).toContainText(
+        "High"
+      );
+
+      await updateIssueField(page, "frequency", "constant");
+      await expect(visibleIssueFieldControl(page, "frequency")).toContainText(
+        "Constant"
+      );
     });
   });
 

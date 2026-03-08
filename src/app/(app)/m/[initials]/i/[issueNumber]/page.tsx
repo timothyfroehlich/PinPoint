@@ -5,17 +5,17 @@ import { createClient } from "~/lib/supabase/server";
 import { db } from "~/server/db";
 import { issues, userProfiles } from "~/server/db/schema";
 import { eq, asc, and, notInArray } from "drizzle-orm";
-import { PageShell } from "~/components/layout/PageShell";
 import { IssueTimeline } from "~/components/issues/IssueTimeline";
 import { IssueSidebar } from "~/components/issues/IssueSidebar";
-import { IssueBadgeGrid } from "~/components/issues/IssueBadgeGrid";
+import { SidebarActions } from "~/components/issues/SidebarActions";
+import { WatchButton } from "~/components/issues/WatchButton";
 import { getMachineOwnerId, getMachineOwnerName } from "~/lib/issues/owner";
 import { formatIssueId } from "~/lib/issues/utils";
-import { ImageGallery } from "~/components/images/ImageGallery";
-import type { Issue, IssueWithAllRelations } from "~/lib/types";
+import type { IssueWithAllRelations } from "~/lib/types";
 import { BackToIssuesLink } from "~/components/issues/BackToIssuesLink";
 import { getLastIssuesPath } from "~/lib/cookies/preferences";
 import { EditableIssueTitle } from "./editable-issue-title";
+import { OwnerRequirementsCallout } from "~/components/machines/OwnerRequirementsCallout";
 import {
   type OwnershipContext,
   checkPermission,
@@ -165,6 +165,9 @@ export default async function IssueDetailPage({
   // Cast issue to IssueWithAllRelations for type safety
   const issueWithRelations = issue as unknown as IssueWithAllRelations;
   const ownerName = getMachineOwnerName(issueWithRelations);
+  const ownerRequirements = user
+    ? (issue.machine.ownerRequirements ?? undefined)
+    : undefined;
   const accessLevel = getAccessLevel(currentUserProfile?.role);
   const ownershipContext: OwnershipContext = {
     userId: user?.id,
@@ -178,106 +181,146 @@ export default async function IssueDetailPage({
     accessLevel,
     ownershipContext
   );
+  const isWatching = user?.id
+    ? issue.watchers.some((watcher) => watcher.userId === user.id)
+    : false;
 
   return (
-    <PageShell className="space-y-8" size="wide">
-      {/* Back button */}
-      <BackToIssuesLink href={issuesPath} />
-
-      {/* Header */}
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-muted-foreground font-mono font-bold">
-            {formatIssueId(initials, issue.issueNumber)}
-          </span>
-          <Link
-            href={`/m/${initials}`}
-            className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            {issue.machine.name}
-          </Link>
-          {ownerName && (
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <span>•</span>
-              <span>Game Owner:</span>
-              {/* Only link for registered owners - invited owner IDs won't filter correctly */}
-              {issue.machine.owner?.id ? (
-                <Link
-                  href={`/issues?owner=${issue.machine.owner.id}`}
-                  className="font-medium text-foreground transition-colors hover:text-primary"
-                >
-                  {ownerName}
-                </Link>
-              ) : (
-                <span className="font-medium text-foreground">{ownerName}</span>
-              )}
-            </div>
-          )}
+    <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-10 lg:px-8">
+      <div className="space-y-4 sm:space-y-8">
+        <div className="hidden md:block">
+          <BackToIssuesLink href={issuesPath} />
         </div>
-        <div className="space-y-3">
+
+        <div className="space-y-4">
+          <div
+            className="flex items-center gap-2 md:hidden"
+            data-testid="mobile-nav-row"
+          >
+            <span className="inline-flex rounded-full border border-border bg-muted px-2.5 py-1 font-mono text-xs font-bold text-muted-foreground">
+              {formatIssueId(initials, issue.issueNumber)}
+            </span>
+            <Link
+              href={`/m/${initials}`}
+              data-testid="machine-link"
+              className="truncate text-sm font-semibold text-foreground transition-colors hover:text-primary"
+            >
+              {issue.machine.name}
+            </Link>
+          </div>
+
+          <div className="hidden flex-wrap items-center gap-2 md:flex">
+            <span className="font-mono font-bold text-muted-foreground">
+              {formatIssueId(initials, issue.issueNumber)}
+            </span>
+            <Link
+              href={`/m/${initials}`}
+              data-testid="machine-link"
+              className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
+              {issue.machine.name}
+            </Link>
+            {ownerName ? (
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <span>•</span>
+                <span>Game Owner:</span>
+                {issue.machine.owner?.id ? (
+                  <Link
+                    href={`/issues?owner=${issue.machine.owner.id}`}
+                    className="font-medium text-foreground transition-colors hover:text-primary"
+                  >
+                    {ownerName}
+                  </Link>
+                ) : (
+                  <span className="font-medium text-foreground">
+                    {ownerName}
+                  </span>
+                )}
+              </div>
+            ) : null}
+          </div>
+
           <EditableIssueTitle
             issueId={issue.id}
             title={issue.title}
             canEdit={userCanEditTitle}
+            className="text-xl font-extrabold tracking-tight md:text-3xl"
           />
-          <div className="flex flex-wrap items-center gap-2">
-            <IssueBadgeGrid
-              issue={
-                issue as unknown as Pick<
-                  Issue,
-                  "status" | "severity" | "priority" | "frequency"
-                >
+
+          <div className="space-y-3 md:hidden">
+            <div className="flex items-center gap-3 border-y py-3">
+              <div className="min-w-0 flex-1">
+                <SidebarActions
+                  issue={issueWithRelations}
+                  allUsers={allUsers}
+                  currentUserId={user?.id ?? null}
+                  accessLevel={accessLevel}
+                  ownershipContext={ownershipContext}
+                  compact
+                  only="assignee"
+                />
+              </div>
+              {accessLevel !== "unauthenticated" ? (
+                <div className="flex shrink-0 items-center gap-2">
+                  <WatchButton
+                    issueId={issue.id}
+                    initialIsWatching={isWatching}
+                    iconOnly
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    {issue.watchers.length}
+                  </span>
+                </div>
+              ) : null}
+            </div>
+
+            <div data-testid="issue-badge-strip">
+              <SidebarActions
+                issue={issueWithRelations}
+                allUsers={allUsers}
+                currentUserId={user?.id ?? null}
+                accessLevel={accessLevel}
+                ownershipContext={ownershipContext}
+                compact
+                exclude="assignee"
+                rowLayout
+              />
+            </div>
+
+            {ownerRequirements ? (
+              <OwnerRequirementsCallout
+                ownerRequirements={ownerRequirements}
+                machineName={issue.machine.name}
+              />
+            ) : null}
+          </div>
+        </div>
+
+        <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_320px]">
+          <section className="space-y-5 lg:pr-4">
+            <IssueTimeline
+              issue={issueWithRelations}
+              currentUserId={user?.id ?? null}
+              currentUserRole={accessLevel}
+              currentUserInitials={
+                currentUserProfile?.name.slice(0, 2).toUpperCase() ?? "??"
               }
-              variant="strip"
-              size="lg"
+              ownerRequirements={ownerRequirements}
+              machineName={issue.machine.name}
+            />
+          </section>
+
+          <div className="hidden md:block">
+            <IssueSidebar
+              issue={issueWithRelations}
+              allUsers={allUsers}
+              currentUserId={user?.id ?? null}
+              accessLevel={accessLevel}
+              ownershipContext={ownershipContext}
             />
           </div>
         </div>
       </div>
-
-      <div className="grid gap-10 md:grid-cols-[minmax(0,1fr)_320px]">
-        <section className="space-y-5 lg:pr-4">
-          {issue.images.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Images ({issue.images.length})
-              </h2>
-              <ImageGallery
-                images={issue.images.map((img) => ({
-                  id: img.id,
-                  fullImageUrl: img.fullImageUrl,
-                  originalFilename: img.originalFilename,
-                }))}
-              />
-            </div>
-          )}
-
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Activity
-          </h2>
-          <IssueTimeline
-            issue={issueWithRelations}
-            currentUserId={user?.id ?? null}
-            currentUserRole={accessLevel}
-            currentUserInitials={
-              currentUserProfile?.name.slice(0, 2).toUpperCase() ?? "??"
-            }
-            ownerRequirements={
-              user ? (issue.machine.ownerRequirements ?? undefined) : undefined
-            }
-            machineName={issue.machine.name}
-          />
-        </section>
-
-        {/* Sticky Sidebar */}
-        <IssueSidebar
-          issue={issueWithRelations}
-          allUsers={allUsers}
-          currentUserId={user?.id ?? null}
-          accessLevel={accessLevel}
-          ownershipContext={ownershipContext}
-        />
-      </div>
-    </PageShell>
+    </div>
   );
 }

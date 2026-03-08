@@ -8,8 +8,10 @@ import {
   type UpdateIssueSeverityResult,
 } from "~/app/(app)/issues/actions";
 import { SeveritySelect } from "~/components/issues/fields/SeveritySelect";
+import { MetadataDrawer } from "~/components/issues/fields/MetadataDrawer";
 import { type IssueSeverity } from "~/lib/types";
 import { IssueBadge } from "~/components/issues/IssueBadge";
+import { SEVERITY_CONFIG } from "~/lib/issues/status";
 import {
   getPermissionDeniedReason,
   getPermissionState,
@@ -28,13 +30,22 @@ interface UpdateIssueSeverityFormProps {
   currentSeverity: IssueSeverity;
   accessLevel: AccessLevel;
   ownershipContext: OwnershipContext;
+  compact?: boolean;
 }
+
+const severityOptions: IssueSeverity[] = [
+  "cosmetic",
+  "minor",
+  "major",
+  "unplayable",
+];
 
 export function UpdateIssueSeverityForm({
   issueId,
   currentSeverity,
   accessLevel,
   ownershipContext,
+  compact = false,
 }: UpdateIssueSeverityFormProps): React.JSX.Element {
   const formRef = useRef<HTMLFormElement>(null);
   const [selectedSeverity, setSelectedSeverity] =
@@ -81,7 +92,38 @@ export function UpdateIssueSeverityForm({
     );
   }
 
-  const selectControl = (
+  const control = compact ? (
+    <MetadataDrawer
+      title="Severity"
+      options={severityOptions.map((severity) => ({
+        value: severity,
+        label: SEVERITY_CONFIG[severity].label,
+        icon: SEVERITY_CONFIG[severity].icon,
+        iconColor: SEVERITY_CONFIG[severity].iconColor,
+        testId: `severity-option-${severity}`,
+      }))}
+      currentValue={selectedSeverity}
+      onSelect={handleValueChange}
+      disabled={isPending || !permissionState.allowed}
+      trigger={
+        <button
+          type="button"
+          className="w-full disabled:cursor-not-allowed"
+          disabled={isPending || !permissionState.allowed}
+          data-testid="issue-severity-trigger"
+        >
+          <IssueBadge
+            type="severity"
+            value={selectedSeverity}
+            variant="strip"
+            size="lg"
+            className="w-full min-w-0"
+            showTooltip={false}
+          />
+        </button>
+      }
+    />
+  ) : (
     <SeveritySelect
       value={selectedSeverity}
       onValueChange={handleValueChange}
@@ -100,11 +142,13 @@ export function UpdateIssueSeverityForm({
       <input type="hidden" name="severity" value={selectedSeverity} />
       <div className="relative" title={deniedReason ?? undefined}>
         {permissionState.allowed ? (
-          selectControl
+          control
         ) : (
           <TooltipProvider>
             <Tooltip>
-              <TooltipTrigger asChild>{selectControl}</TooltipTrigger>
+              <TooltipTrigger asChild>
+                {compact ? <span className="block">{control}</span> : control}
+              </TooltipTrigger>
               <TooltipContent>{deniedReason}</TooltipContent>
             </Tooltip>
           </TooltipProvider>

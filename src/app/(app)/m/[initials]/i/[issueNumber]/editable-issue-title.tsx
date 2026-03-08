@@ -10,17 +10,20 @@ import {
   updateIssueTitleAction,
   type UpdateIssueTitleResult,
 } from "~/app/(app)/issues/actions";
+import { cn } from "~/lib/utils";
 
 interface EditableIssueTitleProps {
   issueId: string;
   title: string;
   canEdit: boolean;
+  className?: string;
 }
 
 export function EditableIssueTitle({
   issueId,
   title,
   canEdit,
+  className,
 }: EditableIssueTitleProps): React.JSX.Element {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(title);
@@ -79,7 +82,10 @@ export function EditableIssueTitle({
   if (!canEdit) {
     return (
       <h1
-        className="text-3xl lg:text-4xl font-extrabold tracking-tight"
+        className={cn(
+          "text-3xl lg:text-4xl font-extrabold tracking-tight",
+          className
+        )}
         title={title.length > 60 ? title : undefined}
       >
         {title.length > 60 ? `${title.slice(0, 60)}...` : title}
@@ -92,7 +98,7 @@ export function EditableIssueTitle({
       <form
         ref={formRef}
         action={formAction}
-        className="flex items-center gap-2"
+        className={cn("flex items-center gap-2", className)}
       >
         <input type="hidden" name="issueId" value={issueId} />
         <Input
@@ -110,7 +116,7 @@ export function EditableIssueTitle({
             }, 200);
           }}
           maxLength={100}
-          className="text-2xl lg:text-3xl font-extrabold tracking-tight h-auto py-1"
+          className="h-auto py-1 text-2xl font-extrabold tracking-tight lg:text-3xl"
           aria-label="Edit issue title"
           disabled={isPending}
         />
@@ -122,9 +128,12 @@ export function EditableIssueTitle({
   }
 
   return (
-    <div className="group/title flex items-center gap-2">
+    <div className={cn("group/title flex items-center gap-2", className)}>
       <h1
-        className="text-3xl lg:text-4xl font-extrabold tracking-tight"
+        className={cn(
+          "text-3xl lg:text-4xl font-extrabold tracking-tight",
+          className
+        )}
         title={title.length > 60 ? title : undefined}
       >
         {title.length > 60 ? `${title.slice(0, 60)}...` : title}
