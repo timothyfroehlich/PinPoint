@@ -2,7 +2,6 @@
 
 import type React from "react";
 import { useState, useActionState, useRef, useEffect } from "react";
-import { Loader2 } from "lucide-react";
 import {
   updateIssuePriorityAction,
   type UpdateIssuePriorityResult,
@@ -24,6 +23,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
+import { cn } from "~/lib/utils";
 import { toast } from "sonner";
 
 interface UpdateIssuePriorityFormProps {
@@ -59,8 +59,8 @@ export function UpdateIssuePriorityForm({
   >(updateIssuePriorityAction, undefined);
 
   useEffect(() => {
-    if (state?.ok) {
-      toast.success("Priority updated");
+    if (state && !state.ok) {
+      toast.error(state.message);
     }
   }, [state]);
 
@@ -147,7 +147,13 @@ export function UpdateIssuePriorityForm({
     >
       <input type="hidden" name="issueId" value={issueId} />
       <input type="hidden" name="priority" value={selectedPriority} />
-      <div className="relative" title={deniedReason ?? undefined}>
+      <div
+        className={cn(
+          "relative",
+          isPending && "opacity-50 pointer-events-none"
+        )}
+        title={deniedReason ?? undefined}
+      >
         {permissionState.allowed ? (
           control
         ) : (
@@ -160,15 +166,7 @@ export function UpdateIssuePriorityForm({
             </Tooltip>
           </TooltipProvider>
         )}
-        {isPending && (
-          <div className="absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none">
-            <Loader2 className="size-4 animate-spin text-muted-foreground" />
-          </div>
-        )}
       </div>
-      {state && !state.ok && (
-        <p className="text-sm text-destructive">{state.message}</p>
-      )}
     </form>
   );
 }

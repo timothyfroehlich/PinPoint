@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { ensureLoggedIn, selectOption } from "../support/actions.js";
+import { ensureLoggedIn, updateIssueField } from "../support/actions.js";
 import { fillReportForm } from "../support/page-helpers.js";
 import { seededMachines } from "../support/constants.js";
 import {
@@ -241,9 +241,10 @@ test.describe("Notifications", () => {
     await expect(adminPage).toHaveURL("/dashboard");
 
     await adminPage.goto(`/m/${machine.initials}/i/${issueNumber}`);
-    await selectOption(adminPage, "issue-status-select", "in_progress");
-
-    await expect(adminPage.getByTestId("status-update-success")).toBeVisible();
+    // Use viewport-aware helper — works on both desktop and mobile
+    await updateIssueField(adminPage, "status", "in_progress");
+    // Wait for the server action to complete before checking notifications
+    await adminPage.waitForLoadState("networkidle");
 
     // 3. Assertion: Reporter receives notification
     await page.bringToFront();

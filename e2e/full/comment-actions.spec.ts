@@ -190,7 +190,7 @@ test.describe.serial("Comment Edit and Delete", () => {
 
       // Verify the comment is updated
       await expect(page.getByText(editedCommentText)).toBeVisible();
-      await expect(page.getByText(/\(edited .+ ago\)/)).toBeVisible();
+      await expect(page.getByText(/•\s+edited .+ ago/)).toBeVisible();
     });
 
     test("author can delete their own comment - leaves audit trail", async ({
