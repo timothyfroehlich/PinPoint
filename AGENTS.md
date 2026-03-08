@@ -148,6 +148,22 @@ conflicts across worktrees and force-push requirements on open PRs.
 - `pnpm run e2e:full`: Full E2E suite (Don't run Safari locally on Linux).
 - `ruff check <file> && ruff format <file>`: Lint and format Python files (`pinpoint-wt.py`, scripts). Ruff is installed globally — no venv needed.
 
+### Which Tests to Run (Decision Tree)
+
+1. **Changed pure logic/utils?** → `pnpm run check` (unit tests, ~12s)
+2. **Changed a single E2E-relevant file?** → `pnpm exec playwright test e2e/smoke/specific-file.spec.ts --project=chromium` (~15-30s)
+3. **Changed UI components/forms?** → `pnpm run smoke` (~60s)
+4. **Changed auth/permissions/middleware?** → `pnpm run smoke` + targeted full specs
+5. **Changed DB schema/migrations?** → `pnpm run preflight` (full suite)
+6. **NEVER** run `e2e:full` locally unless explicitly asked — that's what CI is for
+
+**Key rules for agents:**
+
+- Always use `--project=chromium` for targeted runs (skip Mobile Chrome unless testing responsive)
+- Use `--headed` for debugging visual issues
+- `pnpm run check` catches 90% of issues — E2E is for integration verification, not iteration
+- If a test is flaky locally, report it — don't retry in a loop
+
 ### Testing After Refactors
 
 - After any refactor, verify that test mocks reflect the new code structure

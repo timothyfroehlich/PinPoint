@@ -113,39 +113,39 @@ test.describe.serial("Member Dashboard", () => {
   test("stat cards navigate to filtered lists", async ({ page }, testInfo) => {
     await ensureLoggedIn(page, testInfo);
 
-    // Test 1: Click 'Open Issues' stat card
-    const openIssuesCard = page
-      .getByTestId("quick-stats")
+    const quickStats = page.getByTestId("quick-stats");
+
+    // Verify all stat card links point to the correct filtered URLs via href
+    // (avoids costly navigate-back-navigate cycles for each card)
+
+    // Open Issues — href check only
+    const openIssuesCard = quickStats
       .getByRole("link")
       .filter({ hasText: "Open Issues" });
-    await openIssuesCard.click();
-    await expect(page).toHaveURL(
+    await expect(openIssuesCard).toHaveAttribute(
+      "href",
       /\/issues\?status=new,confirmed,in_progress,need_parts,need_help,wait_owner/
     );
 
-    // Navigate back to dashboard and wait for content
-    await page.goto("/dashboard");
-    await expect(page.getByTestId("quick-stats")).toBeVisible();
-
-    // Test 2: Click 'Machines Needing Service' stat card
-    const machinesCard = page
-      .getByTestId("quick-stats")
+    // Machines Needing Service — href check only
+    const machinesCard = quickStats
       .getByRole("link")
       .filter({ hasText: "Machines Needing Service" });
-    await machinesCard.click();
-    await expect(page).toHaveURL(/\/m\?status=unplayable,needs_service/);
+    await expect(machinesCard).toHaveAttribute(
+      "href",
+      /\/m\?status=unplayable,needs_service/
+    );
 
-    // Navigate back to dashboard and wait for content
-    await page.goto("/dashboard");
-    await expect(page.getByTestId("quick-stats")).toBeVisible();
-
-    // Test 3: Click 'Assigned to Me' stat card (only visible when logged in)
-    const assignedCard = page
-      .getByTestId("quick-stats")
+    // Assigned to Me — actually click to verify end-to-end navigation
+    const assignedCard = quickStats
       .getByRole("link")
       .filter({ hasText: "Assigned to Me" });
+    // Verify href contains assignee UUID and status filter
+    await expect(assignedCard).toHaveAttribute(
+      "href",
+      /\/issues\?assignee=[a-f0-9-]+&status=new,confirmed,in_progress,need_parts,need_help,wait_owner/
+    );
     await assignedCard.click();
-    // URL should contain assignee= with a UUID and the status filter
     await expect(page).toHaveURL(
       /\/issues\?assignee=[a-f0-9-]+&status=new,confirmed,in_progress,need_parts,need_help,wait_owner/
     );
