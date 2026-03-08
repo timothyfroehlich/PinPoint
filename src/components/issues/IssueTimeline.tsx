@@ -273,7 +273,7 @@ function TimelineItem({
                   {isEdited && !isIssue && (
                     <span
                       title={event.updatedAt.toLocaleString()}
-                      className="hidden text-xs text-muted-foreground/40 sm:inline"
+                      className="text-xs text-muted-foreground/40"
                     >
                       &bull; edited{" "}
                       {formatDistanceToNow(event.updatedAt, {
