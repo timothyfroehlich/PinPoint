@@ -19,17 +19,22 @@ type SidebarActionSection =
   | "severity"
   | "frequency";
 
-interface SidebarActionsProps {
+type SidebarActionsFilter =
+  | { only: SidebarActionSection; exclude?: never }
+  | { exclude: SidebarActionSection; only?: never }
+  | { only?: never; exclude?: never };
+
+interface SidebarActionsBase {
   issue: IssueWithAllRelations;
   allUsers: { id: string; name: string }[];
   currentUserId: string | null;
   accessLevel: AccessLevel;
   ownershipContext: OwnershipContext;
   compact?: boolean;
-  only?: SidebarActionSection;
-  exclude?: SidebarActionSection;
   rowLayout?: boolean;
 }
+
+type SidebarActionsProps = SidebarActionsBase & SidebarActionsFilter;
 
 const sectionOrder: SidebarActionSection[] = [
   "assignee",
