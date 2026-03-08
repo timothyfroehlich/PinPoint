@@ -9,6 +9,10 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { NO_AUTH_STATE } from "../support/auth-constants.js";
+
+// Landing page tests check for Sign In/Sign Up buttons — needs unauthenticated state
+test.use({ storageState: NO_AUTH_STATE });
 
 test.describe("Landing Page", () => {
   test("loads with welcome content and CTAs", async ({ page }) => {

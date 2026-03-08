@@ -5,10 +5,15 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { cleanupTestEntities } from "../support/cleanup";
-import { fillReportForm } from "../support/page-helpers";
 import { loginAs } from "../support/actions";
+import { NO_AUTH_STATE } from "../support/auth-constants.js";
+import { cleanupTestEntities } from "../support/cleanup";
 import { TEST_USERS } from "../support/constants";
+import { fillReportForm } from "../support/page-helpers";
+
+// Most tests are anonymous reporting — needs unauthenticated state.
+// The one test that calls loginAs() still works with NO_AUTH_STATE.
+test.use({ storageState: NO_AUTH_STATE });
 
 const PUBLIC_PREFIX = "E2E Public Report";
 

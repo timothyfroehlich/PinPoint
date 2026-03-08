@@ -6,11 +6,14 @@
  */
 
 import { test, expect } from "@playwright/test";
+
 import { loginAs, logout } from "../support/actions.js";
 import { seededMember } from "../support/constants.js";
+import { NO_AUTH_STATE } from "../support/auth-constants.js";
 import { getPasswordResetLink } from "../support/mailpit.js";
 
-// Removed local signOut helper in favor of shared action
+// Auth flow tests must start unauthenticated — opt out of cached storageState
+test.use({ storageState: NO_AUTH_STATE });
 
 test.describe("Extended Authentication", () => {
   test("signup flow - create new account and access dashboard", async ({

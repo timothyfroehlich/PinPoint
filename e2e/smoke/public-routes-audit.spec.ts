@@ -11,7 +11,11 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { NO_AUTH_STATE } from "../support/auth-constants.js";
 import { seededMachines, seededIssues } from "../support/constants";
+
+// All tests verify unauthenticated access — needs empty storageState
+test.use({ storageState: NO_AUTH_STATE });
 
 test.describe("Public Routes Audit", () => {
   test.describe("Static public pages", () => {

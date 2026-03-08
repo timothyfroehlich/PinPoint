@@ -7,6 +7,11 @@
 
 import { test, expect } from "@playwright/test";
 
+import { NO_AUTH_STATE } from "../support/auth-constants.js";
+
+// Auth flow tests must start unauthenticated — opt out of cached storageState
+test.use({ storageState: NO_AUTH_STATE });
+
 test.describe("Authentication Smoke", () => {
   test("password toggle switches input type on login page", async ({
     page,

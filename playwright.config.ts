@@ -3,6 +3,8 @@ import { defineConfig, devices } from "@playwright/test";
 import { readFileSync } from "fs";
 import { join } from "path";
 
+import { STORAGE_STATE } from "./e2e/support/auth-constants.js";
+
 // Load .env.local BEFORE reading process.env.PORT
 // This ensures PORT from .env.local is available when config is evaluated
 try {
@@ -137,11 +139,9 @@ export default defineConfig({
     // Base URL to use in actions like `await page.goto('/')`
     baseURL,
 
-    // Pre-dismissed cookies (none currently needed as banner is disabled in E2E)
-    storageState: {
-      cookies: [],
-      origins: [],
-    },
+    // Default: tests start pre-authenticated as member (most common role).
+    // Auth-flow tests opt out via test.use({ storageState: NO_AUTH_STATE }).
+    storageState: STORAGE_STATE["member"],
 
     // Collect trace when retrying the failed test
     trace: "on-first-retry",
@@ -154,22 +154,32 @@ export default defineConfig({
     navigationTimeout: 20 * 1000,
   },
 
-  // Configure projects for major browsers (Safari can be disabled locally via env)
+  // Configure projects for major browsers (Safari only enabled in CI by default)
+  // The "setup" project runs first to cache auth storageState per role.
   projects: [
+    {
+      name: "setup",
+      testDir: "./e2e",
+      testMatch: /auth\.setup\.ts/,
+      use: { storageState: { cookies: [], origins: [] } },
+    },
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
+      dependencies: ["setup"],
     },
     {
       name: "firefox",
       use: { ...devices["Desktop Firefox"] },
+      dependencies: ["setup"],
     },
     {
       name: "Mobile Chrome",
       use: { ...devices["Pixel 5"] },
+      dependencies: ["setup"],
     },
-    ...(process.env["PLAYWRIGHT_SKIP_SAFARI"] === "true" ||
-    process.env["PLAYWRIGHT_SKIP_SAFARI"] === "1"
+    // Safari is disabled by default locally to avoid dependency issues on Linux
+    ...(!process.env["CI"] && process.env["PLAYWRIGHT_ENABLE_SAFARI"] !== "true"
       ? []
       : [
           {
@@ -181,6 +191,7 @@ export default defineConfig({
               ...devices["iPhone 12"],
               viewport: { width: 375, height: 812 },
             },
+            dependencies: ["setup"],
             // Increase retries for WebKit due to known flakiness
             retries: process.env["CI"] ? 3 : 1,
             // Increase timeout for WebKit (2x base timeout, CI-aware)

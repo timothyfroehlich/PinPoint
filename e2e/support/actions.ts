@@ -1,4 +1,5 @@
 import { expect, type Page, type TestInfo } from "@playwright/test";
+
 import { TEST_USERS } from "./constants.js";
 
 /**
@@ -23,6 +24,12 @@ interface LoginOptions {
 
 /**
  * Logs in through the UI using the default seeded member (or provided creds).
+ *
+ * When storageState is active (the default for most tests), the browser starts
+ * pre-authenticated. This function detects that case:
+ * - If already authenticated as the requested role → fast path (~0.5s)
+ * - If already authenticated as a DIFFERENT role → clears cookies, re-logs in
+ * - If not authenticated → standard UI login flow
  */
 export async function loginAs(
   page: Page,
@@ -32,26 +39,44 @@ export async function loginAs(
     password = TEST_USERS.member.password,
   }: LoginOptions = {}
 ): Promise<void> {
+  const isMemberRequest =
+    email === TEST_USERS.member.email &&
+    password === TEST_USERS.member.password;
+
+  // Navigate to /login. If storageState has valid cookies, middleware will
+  // redirect to /dashboard instead of showing the login form.
   await page.goto("/login");
+  await page.waitForLoadState("load");
+
+  const onLoginPage = page.url().includes("/login");
+
+  if (!onLoginPage) {
+    // Already authenticated via storageState
+    if (isMemberRequest) {
+      // FAST PATH: storageState already has the right role (member).
+      // The setup project already did the cookie-settling reload, so we
+      // can skip it here. Just verify the dashboard is ready.
+      await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 });
+      await assertLayoutReady(page, testInfo);
+      return;
+    }
+
+    // Wrong role: storageState has member cookies but we need a different user.
+    // Clear cookies and re-navigate to /login for a fresh UI login.
+    await page.context().clearCookies();
+    await page.goto("/login");
+    await page.waitForLoadState("load");
+  }
+
+  // Standard UI login flow
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign In" }).click();
 
-  await page.waitForLoadState("networkidle");
+  await page.waitForLoadState("load");
   await expect(page).toHaveURL("/dashboard", { timeout: 15000 });
 
-  // Use project name to determine mobile vs desktop layout
-  const isMobile = testInfo.project.name.includes("Mobile");
-
-  if (isMobile) {
-    await expect(page.getByTestId("mobile-header")).toBeVisible();
-  } else {
-    await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
-  }
-
-  // Wait for user menu to hydrate before continuing
-  // This prevents race conditions when tests immediately call logout()
-  await expect(visibleUserMenu(page)).toBeVisible();
+  await assertLayoutReady(page, testInfo);
 
   // Force a full server round-trip to ensure auth cookies are settled.
   // Under concurrent load (3+ Playwright workers), Supabase cookie rotation
@@ -60,7 +85,7 @@ export async function loginAs(
   // auth cookie back to the server, completing the rotation cycle. Without
   // this, Server Actions on subsequent pages can see a stale/missing cookie
   // and treat the user as anonymous.
-  await page.reload({ waitUntil: "networkidle" });
+  await page.reload({ waitUntil: "load" });
   // Confirm the reload kept us on /dashboard (not redirected to /login by middleware).
   // A redirect here means the reload itself raced with cookie rotation — surface it clearly.
   await expect(page).toHaveURL("/dashboard", { timeout: 10000 });
@@ -68,36 +93,61 @@ export async function loginAs(
 }
 
 /**
+ * Asserts the dashboard layout (sidebar/header + user menu) is ready.
+ */
+async function assertLayoutReady(
+  page: Page,
+  testInfo: TestInfo
+): Promise<void> {
+  const isMobile = testInfo.project.name.includes("Mobile");
+
+  if (isMobile) {
+    await expect(page.getByTestId("mobile-header")).toBeVisible();
+  } else {
+    await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
+  }
+
+  await expect(visibleUserMenu(page)).toBeVisible();
+}
+
+/**
  * Ensures a test page is authenticated. If not, logs in automatically.
- * Useful for scenarios where previous tests logged out the session.
+ *
+ * With storageState, the browser starts pre-authenticated as member. This
+ * means the "is user menu visible?" check always passes — even when
+ * non-member credentials were requested. To avoid this silent wrong-identity
+ * bug, non-member requests always delegate to loginAs() which handles
+ * cookie clearing.
  */
 export async function ensureLoggedIn(
   page: Page,
   testInfo: TestInfo,
   options?: LoginOptions
 ): Promise<void> {
+  const isMemberRequest =
+    !options?.email ||
+    (options.email === TEST_USERS.member.email &&
+      (!options.password || options.password === TEST_USERS.member.password));
+
+  // Non-member requests must always go through loginAs() to clear
+  // the member storageState cookies and log in as the correct user.
+  if (!isMemberRequest) {
+    await loginAs(page, testInfo, options);
+    return;
+  }
+
   await page.goto("/dashboard");
-  // Use networkidle (not domcontentloaded) so React has finished hydrating before we
-  // check for the user menu. Checking too early gives a false-negative and triggers
-  // an unnecessary loginAs, which then runs the cookie-settling reload.
-  await page.waitForLoadState("networkidle");
+  // Use load (not networkidle) for speed and to avoid hanging background requests.
+  // We'll still wait for the user menu to confirm hydration.
+  await page.waitForLoadState("load");
 
   // Check for authenticated indicator (User Menu — works on both mobile and desktop viewports)
   if (!(await visibleUserMenu(page).isVisible())) {
     await loginAs(page, testInfo, options);
+    return;
   }
 
-  // Use project name to determine mobile vs desktop layout
-  const isMobile = testInfo.project.name.includes("Mobile");
-
-  // Assert we are truly logged in
-  if (isMobile) {
-    await expect(page.getByTestId("mobile-header")).toBeVisible();
-  } else {
-    await expect(page.locator("aside [data-testid='sidebar']")).toBeVisible();
-  }
-  // Double check user menu
-  await expect(visibleUserMenu(page)).toBeVisible();
+  await assertLayoutReady(page, testInfo);
 }
 
 /**
