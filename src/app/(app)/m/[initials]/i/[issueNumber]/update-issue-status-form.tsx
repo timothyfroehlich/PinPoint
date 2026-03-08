@@ -157,11 +157,7 @@ export function UpdateIssueStatusForm({
           </div>
         )}
       </div>
-      {state?.ok && (
-        <p className="text-sm text-success" data-testid="status-update-success">
-          Status updated successfully
-        </p>
-      )}
+
       {state && !state.ok && (
         <p className="text-sm text-destructive">{state.message}</p>
       )}

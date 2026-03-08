@@ -121,7 +121,7 @@ export function EditableIssueTitle({
           disabled={isPending}
         />
         {isPending && (
-          <Loader2 className="size-5 animate-spin text-muted-foreground flex-shrink-0" />
+          <Loader2 className="size-5 animate-spin text-muted-foreground shrink-0" />
         )}
       </form>
     );
@@ -130,10 +130,7 @@ export function EditableIssueTitle({
   return (
     <div className={cn("group/title flex items-center gap-2", className)}>
       <h1
-        className={cn(
-          "text-3xl lg:text-4xl font-extrabold tracking-tight",
-          className
-        )}
+        className="text-3xl lg:text-4xl font-extrabold tracking-tight"
         title={title.length > 60 ? title : undefined}
       >
         {title.length > 60 ? `${title.slice(0, 60)}...` : title}
@@ -141,7 +138,7 @@ export function EditableIssueTitle({
       <Button
         variant="ghost"
         size="icon-sm"
-        className="opacity-0 group-hover/title:opacity-100 focus-visible:opacity-100 transition-opacity flex-shrink-0"
+        className="opacity-0 group-hover/title:opacity-100 focus-visible:opacity-100 transition-opacity shrink-0"
         onClick={() => setIsEditing(true)}
         aria-label="Edit title"
       >

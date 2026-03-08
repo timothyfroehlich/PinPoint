@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import React, { useState, useTransition } from "react";
 import { Button } from "~/components/ui/button";
 import { Eye, EyeOff } from "lucide-react";
 import { toggleWatcherAction } from "~/app/(app)/issues/watcher-actions";
 import { cn } from "~/lib/utils";
+import { toast } from "sonner";
 
 interface WatchButtonProps {
   issueId: string;
@@ -12,8 +13,6 @@ interface WatchButtonProps {
   iconOnly?: boolean;
   className?: string;
 }
-
-import React from "react";
 
 export function WatchButton({
   issueId,
@@ -30,8 +29,7 @@ export function WatchButton({
       if (result.ok) {
         setIsWatching(result.value.isWatching);
       } else {
-        // Handle error (toast?)
-        console.error(result.message);
+        toast.error(result.message);
       }
     });
   };

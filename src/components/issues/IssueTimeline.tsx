@@ -245,71 +245,70 @@ function TimelineItem({
               isIssue && "border-primary/30"
             )}
           >
-            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex min-w-0 items-center gap-2">
-                <div className="flex flex-col">
-                  <div className="flex items-center gap-2">
+            <div className="mb-4 flex items-start justify-between">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="font-semibold text-foreground"
+                    data-testid="timeline-author-name"
+                  >
+                    {event.author.name}
+                  </span>
+                  {isOwner && <OwnerBadge size="sm" />}
+                </div>
+                <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                  <span>
+                    {event.type === "comment" ? "commented" : "reported"}
+                  </span>
+                  <span className="text-muted-foreground/40">&bull;</span>
+                  <span title={event.createdAt.toLocaleString()}>
+                    {formatDistanceToNow(event.createdAt, { addSuffix: true })}
+                  </span>
+                  {isEdited && !isIssue && (
                     <span
-                      className="font-semibold text-foreground"
-                      data-testid="timeline-author-name"
+                      title={event.updatedAt.toLocaleString()}
+                      className="hidden sm:inline"
                     >
-                      {event.author.name}
-                    </span>
-                    {isOwner && <OwnerBadge size="sm" />}
-                  </div>
-                  {isIssue ? (
-                    <span className="text-xs text-muted-foreground">
-                      reported
-                    </span>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">
-                      {event.type === "comment" ? "commented" : "reported"}
+                      &bull; edited{" "}
+                      {formatDistanceToNow(event.updatedAt, {
+                        addSuffix: true,
+                      })}
                     </span>
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span title={event.createdAt.toLocaleString()}>
-                  {formatDistanceToNow(event.createdAt, { addSuffix: true })}
-                </span>
-                {isEdited && !isIssue && (
-                  <span title={event.updatedAt.toLocaleString()}>
-                    (edited{" "}
-                    {formatDistanceToNow(event.updatedAt, { addSuffix: true })})
-                  </span>
-                )}
-                {canShowActions && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="-my-1 -mr-2 ml-1"
-                        aria-label="Comment actions"
+
+              {canShowActions && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="-my-1 -mr-1"
+                      aria-label="Comment actions"
+                    >
+                      <MoreHorizontal className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {canEdit && (
+                      <DropdownMenuItem onSelect={() => setIsEditing(true)}>
+                        <Pencil className="mr-2 size-4" />
+                        <span>Edit</span>
+                      </DropdownMenuItem>
+                    )}
+                    {canDelete && (
+                      <DropdownMenuItem
+                        className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                        onSelect={() => setIsDeleteDialogOpen(true)}
                       >
-                        <MoreHorizontal className="size-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {canEdit && (
-                        <DropdownMenuItem onSelect={() => setIsEditing(true)}>
-                          <Pencil className="mr-2 size-4" />
-                          <span>Edit</span>
-                        </DropdownMenuItem>
-                      )}
-                      {canDelete && (
-                        <DropdownMenuItem
-                          className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                          onSelect={() => setIsDeleteDialogOpen(true)}
-                        >
-                          <Trash2 className="mr-2 size-4" />
-                          <span>Delete</span>
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </div>
+                        <Trash2 className="mr-2 size-4" />
+                        <span>Delete</span>
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
             {isEditing ? (
               <CommentEditForm

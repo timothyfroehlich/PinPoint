@@ -61,7 +61,7 @@ export function SidebarActions({
   });
 
   const labelClassName = compact
-    ? "text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+    ? "text-[9px] font-bold uppercase tracking-wider text-muted-foreground"
     : "text-sm text-muted-foreground";
 
   const renderControl = (
@@ -122,46 +122,43 @@ export function SidebarActions({
     }
   };
 
-  const renderSection = (section: SidebarActionSection): React.JSX.Element => {
-    const label = section.charAt(0).toUpperCase() + section.slice(1);
-
-    if (rowLayout) {
-      return (
-        <div
-          key={section}
-          className="space-y-2 rounded-xl border bg-card p-3 shadow-xs"
-        >
-          <Label className={labelClassName}>{label}</Label>
-          <div className="min-w-0">{renderControl(section)}</div>
-        </div>
-      );
-    }
-
-    return (
-      <div
-        key={section}
-        className={cn(
-          "grid items-center gap-3",
-          compact ? "grid-cols-[88px_1fr]" : "grid-cols-[110px_1fr]"
-        )}
-      >
-        <Label className={labelClassName}>{label}</Label>
-        <div className="min-w-0">{renderControl(section)}</div>
-      </div>
-    );
-  };
-
   return (
     <div
       className={
         rowLayout
-          ? "grid grid-cols-2 gap-3"
+          ? "grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg border bg-card p-3 shadow-xs"
           : compact
-            ? "space-y-4"
+            ? "space-y-3"
             : "space-y-5"
       }
     >
-      {visibleSections.map(renderSection)}
+      {visibleSections.map((section) => {
+        const label = section.charAt(0).toUpperCase() + section.slice(1);
+
+        if (rowLayout) {
+          return (
+            <div key={section} className="space-y-1">
+              <Label className={labelClassName}>{label}</Label>
+              <div className="min-w-0">{renderControl(section)}</div>
+            </div>
+          );
+        }
+
+        return (
+          <div
+            key={section}
+            className={cn(
+              "grid items-center gap-2",
+              compact ? "grid-cols-[auto_1fr]" : "grid-cols-[110px_1fr]"
+            )}
+          >
+            <Label className={cn(labelClassName, compact && "min-w-[50px]")}>
+              {label}
+            </Label>
+            <div className="min-w-0">{renderControl(section)}</div>
+          </div>
+        );
+      })}
     </div>
   );
 }

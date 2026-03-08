@@ -247,8 +247,8 @@ export default async function IssueDetailPage({
             className="text-xl font-extrabold tracking-tight md:text-3xl"
           />
 
-          <div className="space-y-3 md:hidden">
-            <div className="flex items-center gap-3 border-y py-3">
+          <div className="space-y-2 md:hidden">
+            <div className="flex items-center gap-2 border-y py-2">
               <div className="min-w-0 flex-1">
                 <SidebarActions
                   issue={issueWithRelations}

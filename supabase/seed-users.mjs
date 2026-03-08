@@ -663,6 +663,12 @@ async function seedUsersAndData() {
             daysAgo: 4,
           },
           {
+            author: userIds.admin,
+            content: "Assigned to Admin User",
+            isSystem: true,
+            daysAgo: 3.5,
+          },
+          {
             author: userIds.guest,
             content: "The hesitation is short, but it happens often enough to disrupt shots into the scoop.",
             isSystem: false,

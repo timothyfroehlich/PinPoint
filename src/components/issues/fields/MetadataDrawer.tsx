@@ -48,9 +48,6 @@ export function MetadataDrawer<T extends string>({
       </DrawerTrigger>
       <DrawerContent className="mx-auto max-h-[85vh] w-full max-w-md">
         <DrawerHeader className="space-y-2 text-left">
-          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-            Select {title}
-          </p>
           <DrawerTitle className="text-lg">{title}</DrawerTitle>
           <DrawerDescription className="sr-only">
             Choose a new {title.toLowerCase()} value.

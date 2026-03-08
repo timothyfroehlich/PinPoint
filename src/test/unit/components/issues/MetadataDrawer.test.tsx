@@ -45,7 +45,7 @@ describe("MetadataDrawer", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Open status" }));
 
-    expect(screen.getByText("Select Status")).toBeInTheDocument();
+    expect(screen.getByText("Status")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /fixed/i }));
 
     expect(onSelect).toHaveBeenCalledWith("fixed");
